@@ -1,0 +1,29 @@
+#!/bin/sh -e
+
+if [ -d 'dist' ] ; then
+    rm -r dist
+fi
+if [ -d 'site' ] ; then
+    rm -r site
+fi
+if [ -d 'htmlcov' ] ; then
+    rm -r htmlcov
+fi
+if [ -d 'edgy.egg-info' ] ; then
+    rm -r edgy.egg-info
+fi
+if [ -d '.hypothesis' ] ; then
+    rm -r .hypothesis
+fi
+if [ -d '.mypy_cache' ] ; then
+    rm -r .mypy_cache
+fi
+if [ -d '.pytest_cache' ] ; then
+    rm -r .pytest_cache
+fi
+if [ -d '.ruff_cache' ] ; then
+    rm -r .ruff_cache
+fi
+
+find edgy -type f -name "*.py[co]" -delete
+find edgy -type d -name __pycache__ -delete

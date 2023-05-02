@@ -1,0 +1,13 @@
+#!/bin/sh -e
+
+export PREFIX=""
+
+if [ "$VIRTUAL_ENV" != '' ]; then
+    export PREFIX="$VIRTUAL_ENV/bin/"
+elif [ -d 'venv' ] ; then
+    export PREFIX="venv/bin/"
+fi
+
+set -x
+
+${PREFIX}mkdocs serve

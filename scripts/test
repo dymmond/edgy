@@ -1,0 +1,21 @@
+#!/bin/sh
+
+export PREFIX=""
+if [ "$VIRTUAL_ENV" != '' ]; then
+    export PREFIX="$VIRTUAL_ENV/bin/"
+elif [ -d 'venv' ] ; then
+    export PREFIX="venv/bin/"
+fi
+
+set -ex
+
+if [ -z $GITHUB_ACTIONS ]; then
+  scripts/check
+fi
+
+${PREFIX}coverage run -m pytest $@
+
+if [ -z $GITHUB_ACTIONS ]; then
+  scripts/coverage
+fi
+

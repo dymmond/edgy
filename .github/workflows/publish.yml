@@ -1,0 +1,33 @@
+---
+name: Publish
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  publish:
+    name: "Publish release"
+    runs-on: "ubuntu-latest"
+
+    steps:
+      - uses: "actions/checkout@v3"
+      - uses: "actions/setup-python@v4"
+        with:
+          python-version: 3.8
+      - name: "Install dependencies"
+        run: "scripts/install"
+      - name: Install build dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: pip install build twine
+      - name: "Build package & docs"
+        run: "scripts/build"
+      - name: "Publish to PyPI"
+        run: "scripts/publish"
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      - name: "Deploy docs"
+        run: |
+          curl -X POST '${{ secrets.DEPLOY_DOCS }}'
