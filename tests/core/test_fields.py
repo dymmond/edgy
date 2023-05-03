@@ -1,5 +1,6 @@
 import datetime
 import decimal
+import uuid
 
 import pydantic
 import pytest
@@ -19,6 +20,7 @@ from edgy.core.db.fields import (
     StringField,
     TextField,
     TimeField,
+    UUIDField,
 )
 from edgy.exceptions import FieldDefinitionError
 
@@ -37,6 +39,7 @@ def test_column_type():
     assert BigIntegerField.get_column_type() == int
     assert SmallIntegerField.get_column_type() == int
     assert DecimalField.get_column_type() == decimal.Decimal
+    assert UUIDField.get_column_type() == uuid.UUID
 
 
 def test_can_create_string_field():
@@ -166,3 +169,10 @@ def test_raises_field_definition_error_in_decimal():
 
     with pytest.raises(FieldDefinitionError):
         DecimalField(exclusive_minimum=20, exclusive_maximum=10)
+
+
+def test_can_create_uuid_field():
+    field = UUIDField(default=uuid.uuid4)
+
+    assert isinstance(field, BaseField)
+    assert field.default == uuid.uuid4

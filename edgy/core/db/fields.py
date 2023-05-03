@@ -1,5 +1,6 @@
 import datetime
 import decimal
+import uuid
 from typing import Any, Optional, Sequence
 
 import pydantic
@@ -355,11 +356,21 @@ class BinaryField(FieldFactory, bytes):
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:
-        """
-        Used to validate if all required parameters on a given field type are set.
-        :param kwargs: all params passed during construction
-        :type kwargs: Any
-        """
         max_length = kwargs.get("max_length", None)
         if max_length <= 0:
             raise FieldDefinitionError(detail="Parameter 'max_length' is required for BinaryField")
+
+
+class UUIDField(FieldFactory, uuid.UUID):
+    """Representation of a uuid"""
+
+    _type = uuid.UUID
+    _property: bool = True
+
+    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore # noqa CFQ002
+        kwargs = {
+            **kwargs,
+            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
+        }
+
+        return super().__new__(cls, **kwargs)
