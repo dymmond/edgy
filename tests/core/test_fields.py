@@ -1,13 +1,21 @@
 import datetime
+import decimal
 
+import pydantic
 import pytest
 
 from edgy.core.db.base import BaseField
 from edgy.core.db.fields import (
+    BigIntegerField,
+    BinaryField,
     BooleanField,
     DateField,
     DateTimeField,
+    DecimalField,
     FloatField,
+    IntegerField,
+    JSONField,
+    SmallIntegerField,
     StringField,
     TextField,
     TimeField,
@@ -23,6 +31,12 @@ def test_column_type():
     assert DateTimeField.get_column_type() == datetime.datetime
     assert DateField.get_column_type() == datetime.date
     assert TimeField.get_column_type() == datetime.time
+    assert JSONField.get_column_type() == pydantic.Json
+    assert BinaryField.get_column_type() == bytes
+    assert IntegerField.get_column_type() == int
+    assert BigIntegerField.get_column_type() == int
+    assert SmallIntegerField.get_column_type() == int
+    assert DecimalField.get_column_type() == decimal.Decimal
 
 
 def test_can_create_string_field():
@@ -101,3 +115,54 @@ def test_can_create_time_field():
 
     assert isinstance(field, BaseField)
     assert field.read_only is False
+
+
+def test_can_create_json_field():
+    field = JSONField(default={"json": "json"})
+
+    assert isinstance(field, BaseField)
+    assert field.default == {"json": "json"}
+
+
+def test_can_create_binary_field():
+    field = BinaryField(max_length=25)
+
+    assert isinstance(field, BaseField)
+    assert field.default is None
+
+
+def test_raises_field_definition_error_on_binary_creation():
+    with pytest.raises(FieldDefinitionError):
+        BinaryField(max_length=0)
+
+
+@pytest.mark.parametrize("klass", [FloatField, IntegerField, BigIntegerField, SmallIntegerField])
+def test_can_create_integer_field(klass):
+    field = klass(minimum=1, maximum=10)
+
+    assert isinstance(field, BaseField)
+    assert field.default is None
+
+
+@pytest.mark.parametrize("klass", [FloatField, IntegerField, BigIntegerField, SmallIntegerField])
+def test_raises_field_definition_error_in_numbers(klass):
+    with pytest.raises(FieldDefinitionError):
+        klass(minimum=20, maximum=10)
+
+    with pytest.raises(FieldDefinitionError):
+        klass(exclusive_minimum=20, exclusive_maximum=10)
+
+
+def test_can_create_decimal_field():
+    field = DecimalField(max_digits=2)
+
+    assert isinstance(field, BaseField)
+    assert field.default is None
+
+
+def test_raises_field_definition_error_in_decimal():
+    with pytest.raises(FieldDefinitionError):
+        DecimalField(minimum=20, maximum=10)
+
+    with pytest.raises(FieldDefinitionError):
+        DecimalField(exclusive_minimum=20, exclusive_maximum=10)

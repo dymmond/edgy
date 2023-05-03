@@ -1,5 +1,8 @@
 import datetime
+import decimal
 from typing import Any, Optional, Sequence
+
+import pydantic
 
 from edgy.core.db.base import BaseField
 from edgy.exceptions import FieldDefinitionError
@@ -104,7 +107,26 @@ class TextField(FieldFactory, str):
         return super().__new__(cls, **kwargs)
 
 
-class FloatField(FieldFactory, float):
+class Number(FieldFactory):
+    @classmethod
+    def validate(cls, **kwargs: Any) -> None:
+        minimum = kwargs.get("minimum", None)
+        maximum = kwargs.get("maximum", None)
+        exclusive_minimum = kwargs.get("exclusive_minimum", None)
+        exclusive_maximum = kwargs.get("exclusive_maximum", None)
+
+        if (minimum is not None and maximum is not None) and minimum > maximum:
+            raise FieldDefinitionError(detail="'minimum' cannot be bigger than 'maximum'")
+
+        if (
+            exclusive_maximum is not None and exclusive_maximum is not None
+        ) and exclusive_minimum > exclusive_maximum:
+            raise FieldDefinitionError(
+                detail="'exclusive_minimum' cannot be bigger than 'exclusive_maximum'"
+            )
+
+
+class FloatField(Number, float):
     """Representation of a int32 and int64"""
 
     _type = float
@@ -115,6 +137,8 @@ class FloatField(FieldFactory, float):
         *,
         mininum: Optional[float] = None,
         maximun: Optional[float] = None,
+        exclusive_minimum: Optional[float] = None,
+        exclusive_maximum: Optional[float] = None,
         multiple_of: Optional[int] = None,
         **kwargs: Any,
     ) -> BaseField:
@@ -123,6 +147,87 @@ class FloatField(FieldFactory, float):
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
         return super().__new__(cls, **kwargs)
+
+
+class IntegerField(Number, int):
+    """
+    Integer field factory that construct Field classes and populated their values.
+    """
+
+    _type = int
+    _property: bool = True
+
+    def __new__(  # type: ignore
+        cls,
+        *,
+        minimum: Optional[int] = None,
+        maximum: Optional[int] = None,
+        exclusive_minimum: Optional[float] = None,
+        exclusive_maximum: Optional[float] = None,
+        multiple_of: Optional[int] = None,
+        **kwargs: Any,
+    ) -> BaseField:
+        autoincrement = kwargs.pop("autoincrement", None)
+        autoincrement = (
+            autoincrement if autoincrement is not None else kwargs.get("primary_key", False)
+        )
+        kwargs = {
+            **kwargs,
+            **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
+        }
+        return super().__new__(cls, **kwargs)
+
+
+class BigIntegerField(IntegerField):
+    """Representation of big integer field"""
+
+    ...
+
+
+class SmallIntegerField(IntegerField):
+    """Represents a small integer field"""
+
+    ...
+
+
+class DecimalField(Number, decimal.Decimal):
+    _type = decimal.Decimal
+    _property: bool = True
+
+    def __new__(  # type: ignore
+        cls,
+        *,
+        minimum: Optional[int] = None,
+        maximum: Optional[int] = None,
+        exclusive_minimum: Optional[float] = None,
+        exclusive_maximum: Optional[float] = None,
+        multiple_of: Optional[int] = None,
+        precision: Optional[int] = None,
+        max_digits: Optional[int] = None,
+        decimal_places: Optional[int] = None,
+        **kwargs: Any,
+    ) -> BaseField:
+        kwargs = {
+            **kwargs,
+            **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
+        }
+
+        if kwargs.get("max_digits"):
+            kwargs["precision"] = kwargs["max_digits"]
+        elif kwargs.get("precision"):
+            kwargs["max_digits"] = kwargs["precision"]
+
+        return super().__new__(cls, **kwargs)
+
+    @classmethod
+    def validate(cls, **kwargs: Any) -> None:
+        super().validate(**kwargs)
+
+        precision = kwargs.get("precision")
+        if precision is None or precision < 0:
+            raise FieldDefinitionError(
+                "'max_digits' and 'precision' are required for DecimalField"
+            )
 
 
 class BooleanField(FieldFactory, int):
@@ -224,3 +329,37 @@ class TimeField(FieldFactory, datetime.time):
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
         }
         return super().__new__(cls, **kwargs)
+
+
+class JSONField(FieldFactory, pydantic.Json):
+    """Representation of a JSONField"""
+
+    _type = pydantic.Json
+    _property: bool = True
+
+
+class BinaryField(FieldFactory, bytes):
+    """Representation of a binary"""
+
+    _type = bytes
+    _property: bool = True
+
+    def __new__(  # type: ignore # noqa CFQ002
+        cls, *, max_length: Optional[int] = 0, **kwargs: Any
+    ) -> BaseField:  # type: ignore
+        kwargs = {
+            **kwargs,
+            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
+        }
+        return super().__new__(cls, **kwargs)
+
+    @classmethod
+    def validate(cls, **kwargs: Any) -> None:
+        """
+        Used to validate if all required parameters on a given field type are set.
+        :param kwargs: all params passed during construction
+        :type kwargs: Any
+        """
+        max_length = kwargs.get("max_length", None)
+        if max_length <= 0:
+            raise FieldDefinitionError(detail="Parameter 'max_length' is required for BinaryField")
