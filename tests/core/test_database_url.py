@@ -63,14 +63,6 @@ def test_database_url_constructor():
     assert DatabaseURL(url) == url
 
 
-def test_database_url_constructor():
-    with pytest.raises(TypeError):
-        DatabaseURL(("edgedb", "username", "password", "localhost", "mydatabase"))
-
-    url = DatabaseURL("edgedb://username:password@localhost:5656/mydatabase")
-    assert DatabaseURL(url) == url
-
-
 def test_database_url_options():
     url = DatabaseURL("edgedb://localhost/mydatabase?pool_size=20&ssl=true")
     assert url.options == {"pool_size": "20", "ssl": "true"}

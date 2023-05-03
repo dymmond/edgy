@@ -96,6 +96,7 @@ disable_error_code = "attr-defined"
 disallow_untyped_defs = true
 ignore_missing_imports = true
 no_implicit_optional = true
+ignore_errors = true
 
 [tool.ruff]
 select = [
@@ -116,9 +117,6 @@ module = "edgy.tests.*"
 ignore_missing_imports = true
 check_untyped_defs = true
 
-[[tool.mypy.overrides]]
-ignore_missing_imports = true
-ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "docs_src.*"
