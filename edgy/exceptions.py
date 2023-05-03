@@ -1,7 +1,5 @@
 import typing
 
-from edgy.core.base import BaseError
-
 
 class EdgyException(Exception):
     def __init__(
@@ -22,10 +20,6 @@ class EdgyException(Exception):
 
 
 class FieldDefinitionError(EdgyException):
-    ...
-
-
-class ValidationError(BaseError):
     ...
 
 
