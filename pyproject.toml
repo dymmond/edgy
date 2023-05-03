@@ -58,6 +58,7 @@ Source = "https://github.com/tarsil/edgy"
 test = [
     "autoflake>=2.0.2,<3.0.0",
     "black>=23.3.0,<24.0.0",
+    "freezegun>=1.2.2,<2.0.0",
     "isort>=5.12.0,<6.0.0",
     "mypy>=1.1.0,<2.0.0",
     "pytest>=7.2.2,<8.0.0",
@@ -66,7 +67,7 @@ test = [
     "ruff>=0.0.256,<1.0.0",
 ]
 
-dev = ["ipdb>=0.13.13,<1.0.0"]
+dev = ["ipdb>=0.13.13,<1.0.0", "pre-commit>=3.3.1,<4.0.0"]
 
 doc = [
     "mkautodoc>=0.2.0,<0.3.0",
@@ -96,6 +97,7 @@ disable_error_code = "attr-defined"
 disallow_untyped_defs = true
 ignore_missing_imports = true
 no_implicit_optional = true
+ignore_errors = true
 
 [tool.ruff]
 select = [
@@ -116,9 +118,6 @@ module = "edgy.tests.*"
 ignore_missing_imports = true
 check_untyped_defs = true
 
-[[tool.mypy.overrides]]
-ignore_missing_imports = true
-ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "docs_src.*"
