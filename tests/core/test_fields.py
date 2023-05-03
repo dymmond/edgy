@@ -1,5 +1,6 @@
 import datetime
 import decimal
+import enum
 import uuid
 
 import pydantic
@@ -10,6 +11,7 @@ from edgy.core.db.fields import (
     BigIntegerField,
     BinaryField,
     BooleanField,
+    ChoiceField,
     DateField,
     DateTimeField,
     DecimalField,
@@ -40,6 +42,7 @@ def test_column_type():
     assert SmallIntegerField.get_column_type() == int
     assert DecimalField.get_column_type() == decimal.Decimal
     assert UUIDField.get_column_type() == uuid.UUID
+    assert ChoiceField.get_column_type() == enum.Enum
 
 
 def test_can_create_string_field():
@@ -176,3 +179,14 @@ def test_can_create_uuid_field():
 
     assert isinstance(field, BaseField)
     assert field.default == uuid.uuid4
+
+
+def test_can_choice_field():
+    class StatusChoice(str, enum.Enum):
+        ACTIVE = "active"
+        INACTIVE = "inactive"
+
+    field = ChoiceField(choices=StatusChoice)
+
+    assert isinstance(field, BaseField)
+    assert len(field.choices) == 2

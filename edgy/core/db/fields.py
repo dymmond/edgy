@@ -1,7 +1,8 @@
 import datetime
 import decimal
+import enum
 import uuid
-from typing import Any, Optional, Sequence
+from typing import Any, Optional, Sequence, Tuple, Union
 
 import pydantic
 
@@ -373,4 +374,20 @@ class UUIDField(FieldFactory, uuid.UUID):
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
         }
 
+        return super().__new__(cls, **kwargs)
+
+
+class ChoiceField(FieldFactory):
+    """Representation of an Enum"""
+
+    _type = enum.Enum
+    _property: bool = True
+
+    def __new__(
+        cls, choices: Sequence[Union[Tuple[str, str], Tuple[str, int]]], **kwargs: Any
+    ) -> BaseField:
+        kwargs = {
+            **kwargs,
+            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
+        }
         return super().__new__(cls, **kwargs)
