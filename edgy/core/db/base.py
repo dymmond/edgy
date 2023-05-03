@@ -4,8 +4,6 @@ from typing import Any, Dict, Optional, Pattern, Sequence, Union
 import edgedb
 from pydantic.fields import FieldInfo, Undefined
 
-NO_DEFAULT = object()
-
 
 class BaseField(FieldInfo):
     """
