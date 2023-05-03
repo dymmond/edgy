@@ -7,6 +7,7 @@ from typing import Any, Optional, Sequence, Tuple, Union
 import pydantic
 
 from edgy.core.db.base import BaseField
+from edgy.core.db.constraints.base import Constraint
 from edgy.exceptions import FieldDefinitionError
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
@@ -17,7 +18,7 @@ class FieldFactory:
 
     _bases = (BaseField,)
     _property: bool = False
-    _is_link: bool = False
+    _link: bool = False
     _type: Any = None
 
     def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
@@ -31,10 +32,11 @@ class FieldFactory:
         index: bool = kwargs.pop("index", False)
         name: str = kwargs.pop("name", None)
         choices: Sequence = set(kwargs.pop("choices", []))
+        constraint: Constraint = kwargs.pop("constraint", None)
 
         field_type = cls._type
         is_property = cls._property
-        is_link = cls._is_link
+        is_link = cls._link
 
         namespace = dict(
             __type__=field_type,
@@ -48,6 +50,7 @@ class FieldFactory:
             unique=unique,
             autoincrement=autoincrement,
             choices=choices,
+            constraints=constraint,
             **kwargs,
         )
         Field = type(cls.__name__, cls._bases, {})
@@ -66,6 +69,11 @@ class FieldFactory:
     def get_column_type(cls, **kwargs) -> Any:
         """Returns the propery column type for the field"""
         return cls._type
+
+    @classmethod
+    def build_constraint(cls) -> Union[Constraint, None]:
+        """Builds the constraints for the field"""
+        return None
 
 
 class StringField(FieldFactory, str):
@@ -86,6 +94,7 @@ class StringField(FieldFactory, str):
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
+
         return super().__new__(cls, **kwargs)
 
     @classmethod
@@ -386,6 +395,19 @@ class ChoiceField(FieldFactory):
     def __new__(
         cls, choices: Sequence[Union[Tuple[str, str], Tuple[str, int]]], **kwargs: Any
     ) -> BaseField:
+        kwargs = {
+            **kwargs,
+            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
+        }
+        return super().__new__(cls, **kwargs)
+
+
+class LinkField(FieldFactory):
+    """Representation of a Composite constraint using links"""
+
+    _link: bool = True
+
+    def __new__(cls, model: Any, is_multi: bool = False, **kwargs: Any) -> BaseField:
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},

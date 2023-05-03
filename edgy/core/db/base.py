@@ -1,16 +1,15 @@
 import decimal
-from typing import Any, Dict, Optional, Pattern, Sequence, Union
+from typing import Any, Optional, Pattern, Sequence, Union
 
-import edgedb
 from pydantic.fields import FieldInfo, Undefined
+
+from edgy.core.db.constraints.base import Constraint
 
 
 class BaseField(FieldInfo):
     """
     The base field for all Edgy data model fields.
     """
-
-    error_messages: Dict[str, str] = {}
 
     def __init__(
         self,
@@ -61,6 +60,8 @@ class BaseField(FieldInfo):
         self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
             "multiple_of", None
         )
+        # Constraints
+        self.contraints: Constraint = kwargs.pop("constraints", None)
 
         for name, value in kwargs.items():
             setattr(self, name, value)
@@ -102,7 +103,7 @@ class BaseField(FieldInfo):
         """Checks if the field has a default value set"""
         return bool(self.default is not None and self.default is not Undefined)
 
-    def get_column(self, name: str) -> edgedb:
+    def get_column(self, name: str) -> Any:
         """
         Returns the column type of the field being declared.
         """
