@@ -7,7 +7,7 @@ import click
 
 from edgy.cli.constants import HELP_PARAMETER
 from edgy.cli.env import EdgyProject
-from edgy.cli.operations import init
+from edgy.cli.operations import check
 from edgy.core.terminal import Print
 from edgy.exceptions import CommandEnvironmentError
 
@@ -52,4 +52,4 @@ def edgy_cli(ctx: click.Context) -> None:
     ...
 
 
-edgy_cli.add_command(init)
+edgy_cli.add_command(check)

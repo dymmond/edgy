@@ -1,1 +1,1 @@
-from .init import init as init  # noqa
+from .check import check as check  # noqa

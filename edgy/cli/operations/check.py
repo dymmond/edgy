@@ -7,9 +7,11 @@ printer = Print()
 writter = Terminal()
 
 
-@click.command(name="init")
-def init(project: EdgyProject) -> None:
-    """Creates a new migration repository."""
+@click.command(name="check")
+def check(project: EdgyProject) -> None:
+    """
+    Checks if the project is a valid Edgy project.
+    """
     location = writter.write_info(project.project_dir, colour=OutputColour.BRIGHT_CYAN)
     message = f"Valid Edgy project. edgedb.toml found in: {location}"
     printer.write_success(message)
