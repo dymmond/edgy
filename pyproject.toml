@@ -54,6 +54,9 @@ Changelog = "https://edgyorm.tarsild.io/release-notes/"
 Funding = "https://github.com/sponsors/tarsil"
 Source = "https://github.com/tarsil/edgy"
 
+[project.scripts]
+edgy = "edgy.cli.cli:edgy_cli"
+
 [project.optional-dependencies]
 test = [
     "autoflake>=2.0.2,<3.0.0",
