@@ -5,6 +5,7 @@ import uuid
 from typing import Any, Optional, Sequence, Set, Tuple, Union
 
 import pydantic
+import sqlalchemy
 
 from edgy.core.db.base import BaseField
 from edgy.core.db.constraints.base import Constraint
@@ -33,7 +34,10 @@ class FieldFactory:
         name: str = kwargs.pop("name", None)
         choices: Set[Any] = set(kwargs.pop("choices", []))
         constraint: Constraint = kwargs.pop("constraint", None)
-
+        comment: str = kwargs.pop("comment", None)
+        owner = kwargs.pop("owner", None)
+        server_default = kwargs.pop("server_default", None)
+        server_onupdate = kwargs.pop("server_onupdate", None)
         field_type = cls._type
         is_property = cls._property
         is_link = cls._link
@@ -51,6 +55,10 @@ class FieldFactory:
             autoincrement=autoincrement,
             choices=choices,
             constraints=constraint,
+            comment=comment,
+            owner=owner,
+            server_default=server_default,
+            server_onupdate=server_onupdate,
             **kwargs,
         )
         Field = type(cls.__name__, cls._bases, {})
@@ -63,12 +71,11 @@ class FieldFactory:
         :param kwargs: all params passed during construction
         :type kwargs: Any
         """
-        ...
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         """Returns the propery column type for the field"""
-        return cls._type
+        return None
 
     @classmethod
     def build_constraint(cls) -> Union[Constraint, None]:
@@ -76,7 +83,7 @@ class FieldFactory:
         return None
 
 
-class StringField(FieldFactory, str):
+class CharField(FieldFactory, str):
     """String field representation that constructs the Field class and populates the values"""
 
     _type = str
@@ -103,6 +110,10 @@ class StringField(FieldFactory, str):
         if max_length <= 0:
             raise FieldDefinitionError(detail=f"'max_length' is required for {cls.__name__}")
 
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.String(length=kwargs.get("max_length"))
+
 
 class TextField(FieldFactory, str):
     """String representation of a text field which means no max_length required"""
@@ -116,6 +127,10 @@ class TextField(FieldFactory, str):
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
         return super().__new__(cls, **kwargs)
+
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.Text()
 
 
 class Number(FieldFactory):
@@ -135,29 +150,6 @@ class Number(FieldFactory):
             raise FieldDefinitionError(
                 detail="'exclusive_minimum' cannot be bigger than 'exclusive_maximum'"
             )
-
-
-class FloatField(Number, float):
-    """Representation of a int32 and int64"""
-
-    _type = float
-    _property: bool = True
-
-    def __new__(  # type: ignore
-        cls,
-        *,
-        mininum: Optional[float] = None,
-        maximun: Optional[float] = None,
-        exclusive_minimum: Optional[float] = None,
-        exclusive_maximum: Optional[float] = None,
-        multiple_of: Optional[int] = None,
-        **kwargs: Any,
-    ) -> BaseField:
-        kwargs = {
-            **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
 
 
 class IntegerField(Number, int):
@@ -188,17 +180,52 @@ class IntegerField(Number, int):
         }
         return super().__new__(cls, **kwargs)
 
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.Integer()
+
+
+class FloatField(Number, float):
+    """Representation of a int32 and int64"""
+
+    _type = float
+    _property: bool = True
+
+    def __new__(  # type: ignore
+        cls,
+        *,
+        mininum: Optional[float] = None,
+        maximun: Optional[float] = None,
+        exclusive_minimum: Optional[float] = None,
+        exclusive_maximum: Optional[float] = None,
+        multiple_of: Optional[int] = None,
+        **kwargs: Any,
+    ) -> BaseField:
+        kwargs = {
+            **kwargs,
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
+        }
+        return super().__new__(cls, **kwargs)
+
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.Float()()
+
 
 class BigIntegerField(IntegerField):
     """Representation of big integer field"""
 
-    ...
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.BigInteger()
 
 
 class SmallIntegerField(IntegerField):
     """Represents a small integer field"""
 
-    ...
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.SmallInteger()
 
 
 class DecimalField(Number, decimal.Decimal):
@@ -222,6 +249,7 @@ class DecimalField(Number, decimal.Decimal):
             **kwargs,
             **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
         }
+        assert decimal_places, "decimal_places is required"
 
         if kwargs.get("max_digits"):
             kwargs["precision"] = kwargs["max_digits"]
@@ -239,6 +267,12 @@ class DecimalField(Number, decimal.Decimal):
             raise FieldDefinitionError(
                 "'max_digits' and 'precision' are required for DecimalField"
             )
+
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.Numeric(
+            precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places")
+        )
 
 
 class BooleanField(FieldFactory, int):
@@ -258,6 +292,10 @@ class BooleanField(FieldFactory, int):
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
         return super().__new__(cls, **kwargs)
+
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.Boolean()
 
 
 class AutoNowMixin(FieldFactory):
@@ -302,6 +340,10 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         }
         return super().__new__(cls, **kwargs)
 
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.DateTime()
+
 
 class DateField(AutoNowMixin, datetime.date):
     """Representation of a date field"""
@@ -325,6 +367,10 @@ class DateField(AutoNowMixin, datetime.date):
         }
         return super().__new__(cls, **kwargs)
 
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.Date()
+
 
 class TimeField(FieldFactory, datetime.time):
     """Representation of a time field"""
@@ -339,12 +385,19 @@ class TimeField(FieldFactory, datetime.time):
         }
         return super().__new__(cls, **kwargs)
 
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.Time()
+
 
 class JSONField(FieldFactory, pydantic.Json):  # type: ignore
     """Representation of a JSONField"""
 
     _type = pydantic.Json
     _property: bool = True
+
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.JSON()
 
 
 class BinaryField(FieldFactory, bytes):
@@ -366,6 +419,10 @@ class BinaryField(FieldFactory, bytes):
         if max_length <= 0:
             raise FieldDefinitionError(detail="Parameter 'max_length' is required for BinaryField")
 
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.JSON(none_as_null=kwargs.get("sql_nullable", False))
+
 
 class UUIDField(FieldFactory, uuid.UUID):
     """Representation of a uuid"""
@@ -380,6 +437,10 @@ class UUIDField(FieldFactory, uuid.UUID):
         }
 
         return super().__new__(cls, **kwargs)
+
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.UUID()
 
 
 class ChoiceField(FieldFactory):
@@ -397,15 +458,28 @@ class ChoiceField(FieldFactory):
         }
         return super().__new__(cls, **kwargs)
 
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.Enum(kwargs.get("choices"))
 
-class LinkField(FieldFactory):
-    """Representation of a Composite constraint using links"""
 
-    _link: bool = True
+class PasswordField(CharField):
+    """
+    Representation of a Password
+    """
 
-    def __new__(cls, model: Any, is_multi: bool = False, **kwargs: Any) -> BaseField:  # type: ignore
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
+    @classmethod
+    def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
+        return sqlalchemy.String(length=kwargs.get("max_length"))  # type: ignore
+
+
+class EmailField(CharField):
+    @classmethod
+    def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
+        return sqlalchemy.String(length=self.validator.max_length)  # type: ignore
+
+
+class URLField(CharField):
+    @classmethod
+    def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
+        return sqlalchemy.String(length=self.validator.max_length)  # type: ignore
