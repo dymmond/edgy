@@ -1,9 +1,10 @@
 import decimal
 from typing import Any, Optional, Pattern, Sequence, Union
 
-from pydantic.fields import FieldInfo, Undefined
+from pydantic.fields import FieldInfo
 
 from edgy.core.db.constraints.base import Constraint
+from edgy.types import Undefined
 
 
 class BaseField(FieldInfo):

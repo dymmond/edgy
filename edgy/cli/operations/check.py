@@ -1,17 +1,16 @@
 import click
 
-from edgy.cli.env import EdgyProject
-from edgy.core.terminal import OutputColour, Print, Terminal
-
-printer = Print()
-writter = Terminal()
+from edgy.cli.base import check as _check
+from edgy.cli.env import MigrationEnv
 
 
-@click.command(name="check")
-def check(project: EdgyProject) -> None:
-    """
-    Checks if the project is a valid Edgy project.
-    """
-    location = writter.write_info(project.project_dir, colour=OutputColour.BRIGHT_CYAN)
-    message = f"Valid Edgy project. edgedb.toml found in: {location}"
-    printer.write_success(message)
+@click.option(
+    "-d",
+    "--directory",
+    default=None,
+    help=('Migration script directory (default is "migrations")'),
+)
+@click.command()
+def check(env: MigrationEnv, directory: str) -> None:
+    """Check if there are any new operations to migrate"""
+    _check(env.app, directory)
