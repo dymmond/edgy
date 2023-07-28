@@ -30,10 +30,10 @@ def get_ipython(app: typing.Any, registry: Registry, options: typing.Any = None)
     try:
         from IPython import start_ipython
 
-        def run_ipython():
+        def run_ipython() -> None:
             imported_objects = import_objects(app, registry)
             ipython_arguments = get_ipython_arguments(options)
-            start_ipython(argv=ipython_arguments, user_ns=imported_objects)
+            start_ipython(argv=ipython_arguments, user_ns=imported_objects)  # type: ignore
 
     except (ModuleNotFoundError, ImportError):
         error = "You must have IPython installed to run this. Run `pip install edgy[ipython]`"

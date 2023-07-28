@@ -2,7 +2,7 @@ import datetime
 import decimal
 import enum
 import uuid
-from typing import Any, Optional, Sequence, Tuple, Union
+from typing import Any, Optional, Sequence, Set, Tuple, Union
 
 import pydantic
 
@@ -31,7 +31,7 @@ class FieldFactory:
         unique: bool = kwargs.pop("unique", False)
         index: bool = kwargs.pop("index", False)
         name: str = kwargs.pop("name", None)
-        choices: Sequence = set(kwargs.pop("choices", []))
+        choices: Set[Any] = set(kwargs.pop("choices", []))
         constraint: Constraint = kwargs.pop("constraint", None)
 
         field_type = cls._type
@@ -54,7 +54,7 @@ class FieldFactory:
             **kwargs,
         )
         Field = type(cls.__name__, cls._bases, {})
-        return Field(**namespace)
+        return Field(**namespace)  # type: ignore
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:  # pragma no cover
@@ -66,7 +66,7 @@ class FieldFactory:
         ...
 
     @classmethod
-    def get_column_type(cls, **kwargs) -> Any:
+    def get_column_type(cls, **kwargs: Any) -> Any:
         """Returns the propery column type for the field"""
         return cls._type
 
@@ -82,14 +82,14 @@ class StringField(FieldFactory, str):
     _type = str
     _property: bool = True
 
-    def __new__(  # type: ignore # noqa CFQ002
+    def __new__(  # type: ignore
         cls,
         *,
         max_length: Optional[int] = 0,
         min_length: Optional[int] = None,
-        regex: str = None,
+        regex: str = None,  # type: ignore
         **kwargs: Any,
-    ) -> BaseField:  # type: ignore
+    ) -> BaseField:
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
@@ -143,7 +143,7 @@ class FloatField(Number, float):
     _type = float
     _property: bool = True
 
-    def __new__(
+    def __new__(  # type: ignore
         cls,
         *,
         mininum: Optional[float] = None,
@@ -247,7 +247,7 @@ class BooleanField(FieldFactory, int):
     _type = bool
     _property: bool = True
 
-    def __new__(
+    def __new__(  # type: ignore
         cls,
         *,
         default: Optional[bool] = False,
@@ -261,13 +261,13 @@ class BooleanField(FieldFactory, int):
 
 
 class AutoNowMixin(FieldFactory):
-    def __new__(  # type: ignore # noqa CFQ002
+    def __new__(  # type: ignore
         cls,
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
         **kwargs: Any,
-    ) -> BaseField:  # type: ignore
+    ) -> BaseField:
         if auto_now_add and auto_now:
             raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
         if auto_now_add or auto_now:
@@ -286,13 +286,13 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
     _type = datetime.datetime
     _property: bool = True
 
-    def __new__(  # type: ignore # noqa CFQ002
+    def __new__(  # type: ignore
         cls,
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
         **kwargs: Any,
-    ) -> BaseField:  # type: ignore
+    ) -> BaseField:
         if auto_now_add or auto_now:
             kwargs["default"] = datetime.datetime.now
 
@@ -309,13 +309,13 @@ class DateField(AutoNowMixin, datetime.date):
     _type = datetime.date
     _property: bool = True
 
-    def __new__(  # type: ignore # noqa CFQ002
+    def __new__(  # type: ignore
         cls,
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
         **kwargs: Any,
-    ) -> BaseField:  # type: ignore
+    ) -> BaseField:
         if auto_now_add or auto_now:
             kwargs["default"] = datetime.datetime.today
 
@@ -332,9 +332,7 @@ class TimeField(FieldFactory, datetime.time):
     _type = datetime.time
     _property: bool = True
 
-    def __new__(  # type: ignore # noqa CFQ002
-        cls, **kwargs: Any
-    ) -> BaseField:  # type: ignore
+    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -342,7 +340,7 @@ class TimeField(FieldFactory, datetime.time):
         return super().__new__(cls, **kwargs)
 
 
-class JSONField(FieldFactory, pydantic.Json):
+class JSONField(FieldFactory, pydantic.Json):  # type: ignore
     """Representation of a JSONField"""
 
     _type = pydantic.Json
@@ -355,9 +353,7 @@ class BinaryField(FieldFactory, bytes):
     _type = bytes
     _property: bool = True
 
-    def __new__(  # type: ignore # noqa CFQ002
-        cls, *, max_length: Optional[int] = 0, **kwargs: Any
-    ) -> BaseField:  # type: ignore
+    def __new__(cls, *, max_length: Optional[int] = 0, **kwargs: Any) -> BaseField:  # type: ignore
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -377,7 +373,7 @@ class UUIDField(FieldFactory, uuid.UUID):
     _type = uuid.UUID
     _property: bool = True
 
-    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore # noqa CFQ002
+    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -392,7 +388,7 @@ class ChoiceField(FieldFactory):
     _type = enum.Enum
     _property: bool = True
 
-    def __new__(
+    def __new__(  # type: ignore
         cls, choices: Sequence[Union[Tuple[str, str], Tuple[str, int]]], **kwargs: Any
     ) -> BaseField:
         kwargs = {
@@ -407,7 +403,7 @@ class LinkField(FieldFactory):
 
     _link: bool = True
 
-    def __new__(cls, model: Any, is_multi: bool = False, **kwargs: Any) -> BaseField:
+    def __new__(cls, model: Any, is_multi: bool = False, **kwargs: Any) -> BaseField:  # type: ignore
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},

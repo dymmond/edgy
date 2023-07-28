@@ -159,7 +159,14 @@ ignore_missing_imports = true
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = ["sqlalchemy.*", "asyncpg", "alembic", "sqlalchemy_utils.*"]
+module = [
+    "sqlalchemy.*",
+    "asyncpg",
+    "alembic",
+    "sqlalchemy_utils.*",
+    "nest_asyncio.*",
+    "ptpython.*",
+]
 ignore_missing_imports = true
 ignore_errors = true
 

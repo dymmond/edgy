@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from enum import Enum
-from typing import Any
+from typing import Any, Union
 
 from rich.console import Console
 
@@ -248,7 +248,7 @@ class OutputColour(str, Enum):
     GREY93 = "grey93"
     GRAY93 = "gray93"
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.value
 
     def __repr__(self) -> str:
@@ -259,24 +259,24 @@ class Base(ABC, Console):
     """Base output class for the terminal"""
 
     @abstractmethod
-    def write_success(self, message: str, colour: str = OutputColour.SUCCESS) -> None:
+    def write_success(self, message: str, colour: str = OutputColour.SUCCESS) -> Union[str, None]:
         raise NotImplementedError()
 
     @abstractmethod
-    def write_info(self, message: str, colour: str = OutputColour.INFO) -> None:
+    def write_info(self, message: str, colour: str = OutputColour.INFO) -> Union[str, None]:
         """Outputs the info to the console"""
         raise NotImplementedError()
 
     @abstractmethod
-    def write_warning(self, message: str, colour: str = OutputColour.WARNING) -> None:
+    def write_warning(self, message: str, colour: str = OutputColour.WARNING) -> Union[str, None]:
         """Outputs the warnings to the console"""
 
     @abstractmethod
-    def write_error(self, message: str, colour: str = OutputColour.ERROR) -> None:
+    def write_error(self, message: str, colour: str = OutputColour.ERROR) -> Union[str, None]:
         """Outputs the errors to the console"""
         raise NotImplementedError()
 
-    def write_plain(self, message: str, colour: str = OutputColour.WHITE) -> None:
+    def write_plain(self, message: str, colour: str = OutputColour.WHITE) -> Union[str, None]:
         """Outputs the custom plain"""
         raise NotImplementedError()
 

@@ -8,7 +8,7 @@ class Terminal(Base):
         self,
         message: str,
         colour: str = OutputColour.SUCCESS,
-    ) -> None:
+    ) -> str:
         """Outputs the successes to the console"""
         message = self.message(message, colour)
         return message
@@ -17,7 +17,7 @@ class Terminal(Base):
         self,
         message: str,
         colour: str = OutputColour.INFO,
-    ) -> None:
+    ) -> str:
         """Outputs the info to the console"""
         message = self.message(message, colour)
         return message
@@ -26,7 +26,7 @@ class Terminal(Base):
         self,
         message: str,
         colour: str = OutputColour.WARNING,
-    ) -> None:
+    ) -> str:
         """Outputs the warnings to the console"""
         message = self.message(message, colour)
         return message
@@ -35,11 +35,11 @@ class Terminal(Base):
         self,
         message: str,
         colour: str = OutputColour.ERROR,
-    ) -> None:
+    ) -> str:
         """Outputs the errors to the console"""
         message = self.message(message, colour)
         return message
 
-    def write_plain(self, message: str, colour: str = OutputColour.WHITE) -> None:
+    def write_plain(self, message: str, colour: str = OutputColour.WHITE) -> str:
         message = self.message(message, colour)
         return message

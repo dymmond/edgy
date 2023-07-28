@@ -47,7 +47,7 @@ def import_objects(app: Any, registry: Registry) -> Dict[Any, Any]:
     welcome_message(app)
     printer.write_success(79 * "-", colour=OutputColour.CYAN3)
 
-    def import_defaults():
+    def import_defaults() -> None:
         for name, module in defaults.items():
             directive = import_statement.format(module_path=module.__module__, model=name)
             printer.write_success(directive, colour=OutputColour.CYAN3)
@@ -59,14 +59,14 @@ def import_objects(app: Any, registry: Registry) -> Dict[Any, Any]:
             printer.write_success(directive, colour=OutputColour.CYAN3)
             imported_objects[model.__name__] = model
 
-    def import_models():
+    def import_models() -> None:
         if not registry.models:
             return
 
         printer.write_success("Models".center(79, "-"), colour=OutputColour.CYAN3)
         _import_objects(registry.models)
 
-    def import_reflected_models():
+    def import_reflected_models() -> None:
         if not registry.reflected:
             return
 

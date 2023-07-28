@@ -10,7 +10,7 @@ from edgy.core.terminal import Print
 printer = Print()
 
 
-def vi_mode():
+def vi_mode() -> typing.Any:
     editor = os.environ.get("EDITOR")
     if not editor:
         return False
@@ -27,7 +27,7 @@ def get_ptpython(app: typing.Any, registry: Registry, options: typing.Any = None
     try:
         from ptpython.repl import embed, run_config
 
-        def run_ptpython():
+        def run_ptpython() -> None:
             imported_objects = import_objects(app, registry)
             history_filename = os.path.expanduser("~/.ptpython_history")
 

@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 from logging.config import fileConfig
-from typing import Any, Union
+from typing import Any
 
 from alembic import context
 from databasez import DatabaseURL
@@ -51,8 +51,8 @@ def get_app() -> Any:
     return app_env.app
 
 
-def get_engine_url() -> Union[str, None]:
-    return os.environ.get("EDGY_DATABASE_URL")
+def get_engine_url() -> str:
+    return os.environ.get("EDGY_DATABASE_URL")  # type: ignore
 
 
 app: Any = get_app()
@@ -152,7 +152,7 @@ async def run_migrations_online() -> Any:
         async with connectable.connect() as connection:
             await connection.run_sync(do_run_migrations)
     else:
-        connectable = create_engine(database_url._url)
+        connectable = create_engine(database_url._url)  # type: ignore
         with connectable.connect() as connection:
             do_run_migrations(connection)
 

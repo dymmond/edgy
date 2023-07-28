@@ -27,7 +27,7 @@ class EdgyExtra(BaseExtra):
 
         self.set_edgy_extension(self.app, self.registry)
 
-    def set_edgy_extension(self, app: Any, registry: "Registry") -> None:
+    def set_edgy_extension(self, app: Any, registry: "Registry") -> None:  # type: ignore[override]
         """
         Sets a edgy dictionary for the app object.
         """

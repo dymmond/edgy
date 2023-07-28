@@ -1,7 +1,7 @@
 import functools
 import inspect
 import typing
-from typing import Any, Callable, List, Optional, Sequence, TypeVar
+from typing import Any, Callable, Optional, Sequence, TypeVar
 
 Scope = typing.MutableMapping[str, typing.Any]
 Message = typing.MutableMapping[str, typing.Any]
@@ -37,8 +37,8 @@ class AyncLifespanContextManager:
 
     def __init__(
         self,
-        on_shutdown: Optional[List[Callable[..., Any]]] = None,
-        on_startup: Optional[List[Callable[..., Any]]] = None,
+        on_shutdown: Optional[Sequence[Callable[..., Any]]] = None,
+        on_startup: Optional[Sequence[Callable[..., Any]]] = None,
     ) -> None:
         self.on_startup = [] if on_startup is None else list(on_startup)
         self.on_shutdown = [] if on_shutdown is None else list(on_shutdown)
@@ -46,7 +46,7 @@ class AyncLifespanContextManager:
     def __call__(self: _T, app: object) -> _T:
         return self
 
-    async def __aenter__(self):
+    async def __aenter__(self) -> None:
         """Runs the functions on startup"""
         for handler in self.on_startup:
             if is_async_callable(handler):
@@ -54,7 +54,7 @@ class AyncLifespanContextManager:
             else:
                 handler()
 
-    async def __aexit__(self, scope: Scope, receive: Receive, send: Send, **kwargs: Any):
+    async def __aexit__(self, scope: Scope, receive: Receive, send: Send, **kwargs: Any) -> None:
         """Runs the functions on shutdown"""
         for handler in self.on_shutdown:
             if is_async_callable(handler):

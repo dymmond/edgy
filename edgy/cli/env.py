@@ -78,9 +78,9 @@ class MigrationEnv:
         """
         return [directory.path for directory in os.scandir(path) if directory.is_dir()]
 
-    def _find_app_in_folder(
+    def _find_app_in_folder(  # type: ignore
         self, path: Path, cwd: Path
-    ) -> typing.Union[typing.NoReturn, typing.Callable[..., typing.Any]]:
+    ) -> typing.Union[typing.NoReturn, typing.Callable[..., typing.Any], Scaffold, None]:
         """
         Iterates inside the folder and looks up to the DISCOVERY_FILES.
         """
@@ -122,10 +122,10 @@ class MigrationEnv:
         if path:
             return self.import_app_from_string(path)
 
-        scaffold: Scaffold = None
+        scaffold: typing.Optional[Scaffold] = None
 
         # Check current folder
-        scaffold = self._find_app_in_folder(cwd, cwd)
+        scaffold = self._find_app_in_folder(cwd, cwd)  # type: ignore
         if scaffold:
             return scaffold
 
@@ -134,7 +134,7 @@ class MigrationEnv:
 
         for folder in folders:
             folder_path = cwd / folder
-            scaffold = self._find_app_in_folder(folder_path, cwd)
+            scaffold = self._find_app_in_folder(folder_path, cwd)  # type: ignore
 
             if not scaffold:
                 continue

@@ -2,7 +2,7 @@ from functools import cached_property
 from typing import Any
 
 import sqlalchemy
-from sqlalchemy import create_engine
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
 from sqlalchemy.orm import declarative_base as sa_declarative_base
@@ -74,7 +74,7 @@ class Registry(ArbitraryHashableBaseModel):
         return self._get_engine
 
     @cached_property
-    def _get_sync_engine(self) -> AsyncEngine:
+    def _get_sync_engine(self) -> Engine:
         url = self._get_database_url()
         engine = create_engine(url)
         return engine

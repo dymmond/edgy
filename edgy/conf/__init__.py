@@ -9,7 +9,7 @@ ENVIRONMENT_VARIABLE = "EDGY_SETTINGS_MODULE"
 DBSettings = Type["EdgyLazySettings"]
 
 
-class EdgyLazySettings(LazyObject):  # type: ignore
+class EdgyLazySettings(LazyObject):
     def _setup(self, name: Optional[str] = None) -> None:
         """
         Load the settings module pointed to by the environment variable. This
@@ -26,7 +26,7 @@ class EdgyLazySettings(LazyObject):  # type: ignore
 
         self._wrapped = settings()
 
-    def __repr__(self: "EdgyLazySettings"):
+    def __repr__(self: "EdgyLazySettings") -> str:
         # Hardcode the class name as otherwise it yields 'Settings'.
         if self._wrapped is empty:
             return "<EdgyLazySettings [Unevaluated]>"
@@ -35,9 +35,9 @@ class EdgyLazySettings(LazyObject):  # type: ignore
         )
 
     @property
-    def configured(self):
+    def configured(self) -> Any:
         """Return True if the settings have already been configured."""
         return self._wrapped is not empty
 
 
-settings: DBSettings = EdgyLazySettings()
+settings: DBSettings = EdgyLazySettings()  # type: ignore

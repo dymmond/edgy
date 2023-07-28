@@ -1,12 +1,11 @@
 from functools import cached_property
 from typing import Dict, List, Set
 
-from pydantic import ConfigDict
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class EdgySettings(BaseSettings):
-    model_config = ConfigDict(extra="allow", ignored_types=(cached_property,))
+    model_config = SettingsConfigDict(extra="allow", ignored_types=(cached_property,))
 
     ipython_args: List[str] = ["--no-banner"]
     ptpython_config_file: str = "~/.config/ptpython/config.py"

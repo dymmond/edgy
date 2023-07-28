@@ -75,7 +75,7 @@ class Migrate(BaseExtra):
 
         self.set_edgy_extension(app)
 
-    def set_edgy_extension(self, app: Any) -> None:
+    def set_edgy_extension(self, app: Any, **kwargs: Any) -> None:
         """
         Sets a Edgy dictionary for the app object.
         """
