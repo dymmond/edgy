@@ -1,5 +1,5 @@
 site_name: EdgyORM
-site_description: 🔥 The perfect ORM to work with EdgeDB 🔥.
+site_description: 🔥 The perfect ORM to work with complex databases 🔥.
 site_url: https://edgyorm.tarsild.io
 
 theme:

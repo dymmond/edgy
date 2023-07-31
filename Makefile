@@ -25,7 +25,7 @@ build-docs: ## Runs the local docs
 
 .PHONY: test
 test: ## Runs the tests
-	scripts/check && pytest $(TESTONLY) --disable-pytest-warnings -s -vv && scripts/clean
+	scripts/check && pytest $(TESTONLY) --disable-pytest-warnings -s -vv
 
 .PHONY: requirements
 requirements: ## Install requirements for development

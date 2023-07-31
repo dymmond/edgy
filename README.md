@@ -1,3 +1,3 @@
-# edgy
+# Edgy
 
-🔥 The perfect ORM to work with EdgeDB 🔥
+🔥 The perfect ORM to work with complex databases 🔥

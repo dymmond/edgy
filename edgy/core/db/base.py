@@ -1,18 +1,16 @@
 import decimal
-from typing import Any, Dict, Optional, Pattern, Sequence, Union
+from typing import Any, Optional, Pattern, Sequence, Union
 
-import edgedb
-from pydantic.fields import FieldInfo, Undefined
+from pydantic.fields import FieldInfo
 
-NO_DEFAULT = object()
+from edgy.core.db.constraints.base import Constraint
+from edgy.types import Undefined
 
 
 class BaseField(FieldInfo):
     """
     The base field for all Edgy data model fields.
     """
-
-    error_messages: Dict[str, str] = {}
 
     def __init__(
         self,
@@ -64,13 +62,15 @@ class BaseField(FieldInfo):
             "multiple_of", None
         )
 
+        # Constraints
+        self.contraints: Constraint = kwargs.pop("constraints", None)
+
         for name, value in kwargs.items():
             setattr(self, name, value)
 
         super().__init__(
             default=default,
             alias=self.alias,
-            required=self.null,
             title=title,
             description=description,
             min_length=self.min_length,
@@ -82,9 +82,18 @@ class BaseField(FieldInfo):
             multiple_of=self.multiple_of,
             max_digits=self.max_digits,
             decimal_places=self.decimal_places,
-            regex=self.regex,
+            pattern=self.regex,
             **kwargs,
         )
+
+    def is_required(self) -> bool:
+        """Check if the argument is required.
+
+        Returns:
+            `True` if the argument is required, `False` otherwise.
+        """
+        required = False if self.null else True
+        return required
 
     def get_alias(self) -> str:
         """
@@ -104,7 +113,7 @@ class BaseField(FieldInfo):
         """Checks if the field has a default value set"""
         return bool(self.default is not None and self.default is not Undefined)
 
-    def get_column(self, name: str) -> edgedb:
+    def get_column(self, name: str) -> Any:
         """
         Returns the column type of the field being declared.
         """
