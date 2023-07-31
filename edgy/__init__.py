@@ -34,6 +34,7 @@ from .core.db.fields.foreign_keys import (
     OneToOneField,
 )
 from .core.db.models import Model, ReflectModel
+from .core.db.models.managers import Manager
 from .core.extras import EdgyExtra
 from .exceptions import DoesNotFound, MultipleObjectsReturned
 
@@ -58,6 +59,7 @@ __all__ = [
     "Index",
     "IntegerField",
     "JSONField",
+    "Manager",
     "ManyToMany",
     "ManyToManyField",
     "Model",
