@@ -19,7 +19,7 @@ class ModelUtil:
         Updates the auto fields
         """
         for k, v in fields.items():
-            if isinstance(v, (DateField, DateTimeField)) and v.auto_now:
+            if isinstance(v, (DateField, DateTimeField)) and v.auto_now:  # type: ignore
                 values[k] = v.validator.get_default_value()  # type: ignore
         return values
 

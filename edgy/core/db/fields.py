@@ -2,6 +2,7 @@ import datetime
 import decimal
 import enum
 import uuid
+from enum import EnumMeta
 from typing import Any, Optional, Sequence, Set, Tuple, Union
 
 import pydantic
@@ -209,7 +210,7 @@ class FloatField(Number, float):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Float()()
+        return sqlalchemy.Float()
 
 
 class BigIntegerField(IntegerField):
@@ -249,8 +250,6 @@ class DecimalField(Number, decimal.Decimal):
             **kwargs,
             **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
         }
-        assert decimal_places, "decimal_places is required"
-
         if kwargs.get("max_digits"):
             kwargs["precision"] = kwargs["max_digits"]
         elif kwargs.get("precision"):
@@ -396,6 +395,7 @@ class JSONField(FieldFactory, pydantic.Json):  # type: ignore
     _type = pydantic.Json
     _property: bool = True
 
+    @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.JSON()
 
@@ -459,8 +459,14 @@ class ChoiceField(FieldFactory):
         return super().__new__(cls, **kwargs)
 
     @classmethod
+    def validate(cls, **kwargs: Any) -> None:
+        choice_class = kwargs.get("choices")
+        if choice_class is None and not isinstance(choice_class, EnumMeta):
+            raise FieldDefinitionError("ChoiceField choices must be an Enum")
+
+    @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Enum(kwargs.get("choices"))
+        return sqlalchemy.Enum(kwargs.get("choices", ()))
 
 
 class PasswordField(CharField):
@@ -470,7 +476,7 @@ class PasswordField(CharField):
 
     @classmethod
     def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
-        return sqlalchemy.String(length=kwargs.get("max_length"))  # type: ignore
+        return sqlalchemy.String(length=kwargs.get("max_length"))
 
 
 class EmailField(CharField):

@@ -1,6 +1,8 @@
 from typing import Any
 
-from pydantic.fields import FieldInfo, Undefined
+from pydantic.fields import FieldInfo
+
+from edgy.types import Undefined
 
 
 class Constraint(FieldInfo):

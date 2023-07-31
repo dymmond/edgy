@@ -1,16 +1,16 @@
 import datetime
-import decimal
 import enum
 import uuid
 
-import pydantic
 import pytest
+import sqlalchemy
 
 from edgy.core.db.base import BaseField
 from edgy.core.db.fields import (
     BigIntegerField,
     BinaryField,
     BooleanField,
+    CharField,
     ChoiceField,
     DateField,
     DateTimeField,
@@ -19,7 +19,6 @@ from edgy.core.db.fields import (
     IntegerField,
     JSONField,
     SmallIntegerField,
-    StringField,
     TextField,
     TimeField,
     UUIDField,
@@ -28,25 +27,25 @@ from edgy.exceptions import FieldDefinitionError
 
 
 def test_column_type():
-    assert StringField.get_column_type() == str
-    assert TextField.get_column_type() == str
-    assert FloatField.get_column_type() == float
-    assert BooleanField.get_column_type() == bool
-    assert DateTimeField.get_column_type() == datetime.datetime
-    assert DateField.get_column_type() == datetime.date
-    assert TimeField.get_column_type() == datetime.time
-    assert JSONField.get_column_type() == pydantic.Json
-    assert BinaryField.get_column_type() == bytes
-    assert IntegerField.get_column_type() == int
-    assert BigIntegerField.get_column_type() == int
-    assert SmallIntegerField.get_column_type() == int
-    assert DecimalField.get_column_type() == decimal.Decimal
-    assert UUIDField.get_column_type() == uuid.UUID
-    assert ChoiceField.get_column_type() == enum.Enum
+    assert isinstance(CharField.get_column_type(), sqlalchemy.String)
+    assert isinstance(TextField.get_column_type(), sqlalchemy.String)
+    assert isinstance(FloatField.get_column_type(), sqlalchemy.Float)
+    assert isinstance(BooleanField.get_column_type(), sqlalchemy.Boolean)
+    assert isinstance(DateTimeField.get_column_type(), sqlalchemy.DateTime)
+    assert isinstance(DateField.get_column_type(), sqlalchemy.Date)
+    assert isinstance(TimeField.get_column_type(), sqlalchemy.Time)
+    assert isinstance(JSONField.get_column_type(), sqlalchemy.JSON)
+    assert isinstance(BinaryField.get_column_type(), sqlalchemy.JSON)
+    assert isinstance(IntegerField.get_column_type(), sqlalchemy.Integer)
+    assert isinstance(BigIntegerField.get_column_type(), sqlalchemy.BigInteger)
+    assert isinstance(SmallIntegerField.get_column_type(), sqlalchemy.SmallInteger)
+    assert isinstance(DecimalField.get_column_type(), sqlalchemy.Numeric)
+    assert isinstance(UUIDField.get_column_type(), sqlalchemy.UUID)
+    assert isinstance(ChoiceField.get_column_type(), sqlalchemy.Enum)
 
 
 def test_can_create_string_field():
-    field = StringField(min_length=5, max_length=10, null=True)
+    field = CharField(min_length=5, max_length=10, null=True)
 
     assert isinstance(field, BaseField)
     assert field.min_length == 5
@@ -56,7 +55,7 @@ def test_can_create_string_field():
 
 def test_raises_field_definition_error_on_string_creation():
     with pytest.raises(FieldDefinitionError):
-        StringField(min_length=10, null=False)
+        CharField(min_length=10, null=False)
 
 
 def test_can_create_text_field():
@@ -160,7 +159,7 @@ def test_raises_field_definition_error_in_numbers(klass):
 
 
 def test_can_create_decimal_field():
-    field = DecimalField(max_digits=2)
+    field = DecimalField(max_digits=2, decimal_places=2)
 
     assert isinstance(field, BaseField)
     assert field.default is None
