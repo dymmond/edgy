@@ -1,7 +1,9 @@
 import datetime
+import decimal
 import enum
 import uuid
 
+import pydantic
 import pytest
 import sqlalchemy
 
@@ -26,6 +28,11 @@ from edgy.core.db.fields import (
 from edgy.exceptions import FieldDefinitionError
 
 
+class Choices(str, enum.Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
 def test_column_type():
     assert isinstance(CharField.get_column_type(), sqlalchemy.String)
     assert isinstance(TextField.get_column_type(), sqlalchemy.String)
@@ -44,6 +51,75 @@ def test_column_type():
     assert isinstance(ChoiceField.get_column_type(), sqlalchemy.Enum)
 
 
+@pytest.mark.parametrize(
+    "field,annotation",
+    [
+        (CharField(max_length=255), str),
+        (TextField(), str),
+        (FloatField(), float),
+        (BooleanField(), bool),
+        (DateTimeField(auto_now=True), datetime.datetime),
+        (DateField(auto_now=True), datetime.date),
+        (TimeField(), datetime.time),
+        (JSONField(), pydantic.Json),
+        (BinaryField(max_length=255), bytes),
+        (IntegerField(), int),
+        (BigIntegerField(), int),
+        (SmallIntegerField(), int),
+        (DecimalField(max_digits=20, precision=2), decimal.Decimal),
+        (ChoiceField(choices=Choices), enum.Enum),
+    ],
+)
+def test_field_annotation(field, annotation):
+    assert field.annotation == annotation
+
+
+@pytest.mark.parametrize(
+    "field,is_required",
+    [
+        (CharField(max_length=255, null=False), True),
+        (TextField(null=False), True),
+        (FloatField(null=False), True),
+        (DateTimeField(null=False), True),
+        (DateField(null=False), True),
+        (TimeField(null=False), True),
+        (JSONField(null=False), True),
+        (BinaryField(max_length=255, null=False), True),
+        (IntegerField(null=False), True),
+        (BigIntegerField(null=False), True),
+        (SmallIntegerField(null=False), True),
+        (DecimalField(max_digits=20, precision=2, null=False), True),
+        (ChoiceField(choices=Choices, null=False), True),
+    ],
+)
+def test_field_required(field, is_required):
+    assert field.is_required() == is_required
+    assert field.null is False
+
+
+@pytest.mark.parametrize(
+    "field,is_required",
+    [
+        (CharField(max_length=255, null=True), False),
+        (TextField(null=True), False),
+        (FloatField(null=True), False),
+        (DateTimeField(null=True), False),
+        (DateField(null=True), False),
+        (TimeField(null=True), False),
+        (JSONField(null=True), False),
+        (BinaryField(max_length=255, null=True), False),
+        (IntegerField(null=True), False),
+        (BigIntegerField(null=True), False),
+        (SmallIntegerField(null=True), False),
+        (DecimalField(max_digits=20, precision=2, null=True), False),
+        (ChoiceField(choices=Choices, null=True), False),
+    ],
+)
+def test_field_is_not_required(field, is_required):
+    assert field.is_required() == is_required
+    assert field.null is True
+
+
 def test_can_create_string_field():
     field = CharField(min_length=5, max_length=10, null=True)
 
@@ -51,6 +127,7 @@ def test_can_create_string_field():
     assert field.min_length == 5
     assert field.max_length == 10
     assert field.null is True
+    assert not field.is_required()
 
 
 def test_raises_field_definition_error_on_string_creation():
@@ -189,3 +266,8 @@ def test_can_choice_field():
 
     assert isinstance(field, BaseField)
     assert len(field.choices) == 2
+
+
+def test_raise_exception_choice_field():
+    with pytest.raises(FieldDefinitionError):
+        ChoiceField()

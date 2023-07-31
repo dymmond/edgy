@@ -19,8 +19,6 @@ class FieldFactory:
     """The base for all model fields to be used with EdgeDB"""
 
     _bases = (BaseField,)
-    _property: bool = False
-    _link: bool = False
     _type: Any = None
 
     def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
@@ -40,13 +38,10 @@ class FieldFactory:
         server_default = kwargs.pop("server_default", None)
         server_onupdate = kwargs.pop("server_onupdate", None)
         field_type = cls._type
-        is_property = cls._property
-        is_link = cls._link
 
         namespace = dict(
             __type__=field_type,
-            __property__=is_property,
-            __link__=is_link,
+            annotation=field_type,
             name=name,
             primary_key=primary_key,
             default=default,
@@ -88,7 +83,6 @@ class CharField(FieldFactory, str):
     """String field representation that constructs the Field class and populates the values"""
 
     _type = str
-    _property: bool = True
 
     def __new__(  # type: ignore
         cls,
@@ -120,7 +114,6 @@ class TextField(FieldFactory, str):
     """String representation of a text field which means no max_length required"""
 
     _type = str
-    _property: bool = True
 
     def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
         kwargs = {
@@ -159,7 +152,6 @@ class IntegerField(Number, int):
     """
 
     _type = int
-    _property: bool = True
 
     def __new__(  # type: ignore
         cls,
@@ -190,7 +182,6 @@ class FloatField(Number, float):
     """Representation of a int32 and int64"""
 
     _type = float
-    _property: bool = True
 
     def __new__(  # type: ignore
         cls,
@@ -231,7 +222,6 @@ class SmallIntegerField(IntegerField):
 
 class DecimalField(Number, decimal.Decimal):
     _type = decimal.Decimal
-    _property: bool = True
 
     def __new__(  # type: ignore
         cls,
@@ -278,7 +268,6 @@ class BooleanField(FieldFactory, int):
     """Representation of a boolean"""
 
     _type = bool
-    _property: bool = True
 
     def __new__(  # type: ignore
         cls,
@@ -321,7 +310,6 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
     """Representation of a datetime field"""
 
     _type = datetime.datetime
-    _property: bool = True
 
     def __new__(  # type: ignore
         cls,
@@ -348,7 +336,6 @@ class DateField(AutoNowMixin, datetime.date):
     """Representation of a date field"""
 
     _type = datetime.date
-    _property: bool = True
 
     def __new__(  # type: ignore
         cls,
@@ -375,7 +362,6 @@ class TimeField(FieldFactory, datetime.time):
     """Representation of a time field"""
 
     _type = datetime.time
-    _property: bool = True
 
     def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
         kwargs = {
@@ -393,7 +379,6 @@ class JSONField(FieldFactory, pydantic.Json):  # type: ignore
     """Representation of a JSONField"""
 
     _type = pydantic.Json
-    _property: bool = True
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
@@ -404,7 +389,6 @@ class BinaryField(FieldFactory, bytes):
     """Representation of a binary"""
 
     _type = bytes
-    _property: bool = True
 
     def __new__(cls, *, max_length: Optional[int] = 0, **kwargs: Any) -> BaseField:  # type: ignore
         kwargs = {
@@ -428,7 +412,6 @@ class UUIDField(FieldFactory, uuid.UUID):
     """Representation of a uuid"""
 
     _type = uuid.UUID
-    _property: bool = True
 
     def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
         kwargs = {
@@ -447,10 +430,11 @@ class ChoiceField(FieldFactory):
     """Representation of an Enum"""
 
     _type = enum.Enum
-    _property: bool = True
 
     def __new__(  # type: ignore
-        cls, choices: Sequence[Union[Tuple[str, str], Tuple[str, int]]], **kwargs: Any
+        cls,
+        choices: Optional[Sequence[Union[Tuple[str, str], Tuple[str, int]]]] = None,
+        **kwargs: Any,
     ) -> BaseField:
         kwargs = {
             **kwargs,

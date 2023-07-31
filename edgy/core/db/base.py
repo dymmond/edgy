@@ -61,6 +61,7 @@ class BaseField(FieldInfo):
         self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
             "multiple_of", None
         )
+
         # Constraints
         self.contraints: Constraint = kwargs.pop("constraints", None)
 
@@ -70,7 +71,6 @@ class BaseField(FieldInfo):
         super().__init__(
             default=default,
             alias=self.alias,
-            required=self.null,
             title=title,
             description=description,
             min_length=self.min_length,
@@ -82,9 +82,18 @@ class BaseField(FieldInfo):
             multiple_of=self.multiple_of,
             max_digits=self.max_digits,
             decimal_places=self.decimal_places,
-            regex=self.regex,
+            pattern=self.regex,
             **kwargs,
         )
+
+    def is_required(self) -> bool:
+        """Check if the argument is required.
+
+        Returns:
+            `True` if the argument is required, `False` otherwise.
+        """
+        required = False if self.null else True
+        return required
 
     def get_alias(self) -> str:
         """
