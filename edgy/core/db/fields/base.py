@@ -16,7 +16,7 @@ CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
 
 class FieldFactory:
-    """The base for all model fields to be used with EdgeDB"""
+    """The base for all model fields to be used with Edgy"""
 
     _bases = (BaseField,)
     _type: Any = None
@@ -25,8 +25,8 @@ class FieldFactory:
         cls.validate(**kwargs)
 
         default = kwargs.pop("default", None)
-        null = kwargs.pop("null", False)
-        primary_key = kwargs.pop("primary_key", False)
+        null: bool = kwargs.pop("null", False)
+        primary_key: bool = kwargs.pop("primary_key", False)
         autoincrement: bool = kwargs.pop("autoincrement", False)
         unique: bool = kwargs.pop("unique", False)
         index: bool = kwargs.pop("index", False)

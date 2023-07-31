@@ -61,6 +61,7 @@ class BaseField(FieldInfo):
         self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
             "multiple_of", None
         )
+        self.through: Any = kwargs.pop("through", None)
 
         # Constraints
         self.contraints: Constraint = kwargs.pop("constraints", None)

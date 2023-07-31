@@ -16,7 +16,7 @@ from edgy.exceptions import ImproperlyConfigured
 class Registry(ArbitraryHashableBaseModel):
     """
     The command center for the models being generated
-    for EdgeDB.
+    for Edgy.
     """
 
     def __init__(self, database: Database, **kwargs: Any) -> None:
