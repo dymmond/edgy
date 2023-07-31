@@ -3,9 +3,9 @@ from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
 import sqlalchemy
 
 import edgy
+from edgy.core.connection.registry import Registry
 from edgy.core.db.base import BaseField
 from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL
-from edgy.core.db.constraints.base import Constraint
 from edgy.core.terminal import Print
 from edgy.exceptions import FieldDefinitionError
 
@@ -25,16 +25,17 @@ class ForeignKeyFieldFactory:
     def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
         cls.validate(**kwargs)
 
-        to: Any = kwargs.get("to", None)
+        to: Any = kwargs.pop("to", None)
         null: bool = kwargs.pop("null", False)
         on_update: str = kwargs.pop("on_update", CASCADE)
         on_delete: str = kwargs.pop("on_delete", RESTRICT)
         related_name: str = kwargs.pop("related_name", None)
         comment: str = kwargs.pop("comment", None)
         through: Any = kwargs.pop("through", None)
-        owner = kwargs.pop("owner", None)
-        server_default = kwargs.pop("server_default", None)
-        server_onupdate = kwargs.pop("server_onupdate", None)
+        owner: Any = kwargs.pop("owner", None)
+        server_default: Any = kwargs.pop("server_default", None)
+        server_onupdate: Any = kwargs.pop("server_onupdate", None)
+        registry: Registry = kwargs.pop("registry", None)
         field_type = cls._type
 
         namespace = dict(
@@ -50,6 +51,7 @@ class ForeignKeyFieldFactory:
             server_default=server_default,
             server_onupdate=server_onupdate,
             through=through,
+            registry=registry,
             **kwargs,
         )
         Field = type(cls.__name__, cls._bases, {})
@@ -68,11 +70,6 @@ class ForeignKeyFieldFactory:
         """Returns the propery column type for the field"""
         return None
 
-    @classmethod
-    def build_constraint(cls) -> Union[Constraint, None]:
-        """Builds the constraints for the field"""
-        return None
-
 
 class ForeignKey(ForeignKeyFieldFactory):
     _type = Any
@@ -80,27 +77,34 @@ class ForeignKey(ForeignKeyFieldFactory):
     def __new__(  # type: ignore
         cls,
         *,
-        to: Any,
+        to: "Model",
         null: bool = False,
         on_update: Optional[str] = CASCADE,
         on_delete: Optional[str] = RESTRICT,
         related_name: Optional[str] = None,
         **kwargs: Any,
     ) -> BaseField:
-        assert on_delete is not None, "on_delete must not be null"
-
-        if on_delete == SET_NULL and not null:
-            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
-
-        if on_update and (on_update == SET_NULL and not null):
-            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
-
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
 
         return super().__new__(cls, **kwargs)
+
+    @classmethod
+    def validate(cls, **kwargs: Any) -> None:
+        on_delete = kwargs.get("on_delete", None)
+        on_update = kwargs.get("on_update", None)
+        null = kwargs.get("null")
+
+        if on_delete is None:
+            raise FieldDefinitionError("on_delete must not be null")
+
+        if on_delete == SET_NULL and not null:
+            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
+
+        if on_update and (on_update == SET_NULL and not null):
+            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
 
     @property
     def target(self) -> Any:
@@ -129,6 +133,14 @@ class ForeignKey(ForeignKeyFieldFactory):
             )
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+
+    def get_related_name(self) -> str:
+        """
+        Returns the name of the related name of the current relationship between the to and target.
+
+        :return: Name of the related_name attribute field.
+        """
+        return self.related_name
 
     def expand_relationship(self, value: Any) -> Any:
         target = self.target
