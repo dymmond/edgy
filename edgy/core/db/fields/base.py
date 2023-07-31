@@ -9,14 +9,13 @@ import pydantic
 import sqlalchemy
 
 from edgy.core.db.base import BaseField
-from edgy.core.db.constraints.base import Constraint
 from edgy.exceptions import FieldDefinitionError
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
 
 class FieldFactory:
-    """The base for all model fields to be used with EdgeDB"""
+    """The base for all model fields to be used with Edgy"""
 
     _bases = (BaseField,)
     _type: Any = None
@@ -25,14 +24,13 @@ class FieldFactory:
         cls.validate(**kwargs)
 
         default = kwargs.pop("default", None)
-        null = kwargs.pop("null", False)
-        primary_key = kwargs.pop("primary_key", False)
+        null: bool = kwargs.pop("null", False)
+        primary_key: bool = kwargs.pop("primary_key", False)
         autoincrement: bool = kwargs.pop("autoincrement", False)
         unique: bool = kwargs.pop("unique", False)
         index: bool = kwargs.pop("index", False)
         name: str = kwargs.pop("name", None)
         choices: Set[Any] = set(kwargs.pop("choices", []))
-        constraint: Constraint = kwargs.pop("constraint", None)
         comment: str = kwargs.pop("comment", None)
         owner = kwargs.pop("owner", None)
         server_default = kwargs.pop("server_default", None)
@@ -50,7 +48,6 @@ class FieldFactory:
             unique=unique,
             autoincrement=autoincrement,
             choices=choices,
-            constraints=constraint,
             comment=comment,
             owner=owner,
             server_default=server_default,
@@ -71,11 +68,6 @@ class FieldFactory:
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         """Returns the propery column type for the field"""
-        return None
-
-    @classmethod
-    def build_constraint(cls) -> Union[Constraint, None]:
-        """Builds the constraints for the field"""
         return None
 
 

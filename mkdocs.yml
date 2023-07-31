@@ -1,4 +1,4 @@
-site_name: EdgyORM
+site_name: Edgy
 site_description: 🔥 The perfect ORM to work with complex databases 🔥.
 site_url: https://edgyorm.tarsild.io
 
@@ -8,21 +8,21 @@ theme:
       language: en
       palette:
             - scheme: "default"
-              primary: "purple"
-              accent: "amber"
+              primary: "pink"
+              accent: "red"
               media: "(prefers-color-scheme: light)"
               toggle:
                     icon: "material/lightbulb"
                     name: "Switch to dark mode"
             - scheme: "slate"
               media: "(prefers-color-scheme: dark)"
-              primary: "purple"
-              accent: "amber"
+              primary: "pink"
+              accent: "red"
               toggle:
                     icon: "material/lightbulb-outline"
                     name: "Switch to light mode"
       favicon: statics/images/favicon.ico
-      logo: statics/images/logo-white.svg
+      logo: statics/images/white.png
       features:
             - search.suggest
             - search.highlight

@@ -1,9 +1,10 @@
 import decimal
 from typing import Any, Optional, Pattern, Sequence, Union
 
+import sqlalchemy
 from pydantic.fields import FieldInfo
 
-from edgy.core.db.constraints.base import Constraint
+from edgy.core.connection.registry import Registry
 from edgy.types import Undefined
 
 
@@ -61,9 +62,11 @@ class BaseField(FieldInfo):
         self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
             "multiple_of", None
         )
-
-        # Constraints
-        self.contraints: Constraint = kwargs.pop("constraints", None)
+        self.through: Any = kwargs.pop("through", None)
+        self.server_default: Any = kwargs.pop("server_default", None)
+        self.server_onupdate: Any = kwargs.pop("server_onupdate", None)
+        self.registry: Registry = kwargs.pop("registry", None)
+        self.comment = kwargs.get("comment", None)
 
         for name, value in kwargs.items():
             setattr(self, name, value)
@@ -117,7 +120,21 @@ class BaseField(FieldInfo):
         """
         Returns the column type of the field being declared.
         """
-        return self._type
+        column_type = self.get_column_type()
+        constraints = self.get_constraints()
+        column = sqlalchemy.Column(
+            name,
+            column_type,
+            *constraints,
+            primary_key=self.primary_key,
+            nullable=self.null and not self.primary_key,
+            index=self.index,
+            unique=self.unique,
+            default=self.default,
+            comment=self.comment,
+            server_default=self.server_default,
+            server_onupdate=self.server_onupdate,
+        )
 
     def expand_relationship(self, value: Any, child: Any, to_register: bool = True) -> Any:
         """
@@ -129,3 +146,6 @@ class BaseField(FieldInfo):
     def get_related_name(self) -> str:
         """Returns the related name used for reverse relations"""
         return ""
+
+    def get_constraints(self) -> Any:
+        return []
