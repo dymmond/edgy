@@ -23,7 +23,7 @@ class FieldDefinitionError(EdgyException):
     ...
 
 
-class DoesNotFound(EdgyException):
+class ObjectNotFound(EdgyException):
     ...
 
 

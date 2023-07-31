@@ -36,7 +36,7 @@ from .core.db.fields.foreign_keys import (
 from .core.db.models import Model, ReflectModel
 from .core.db.models.managers import Manager
 from .core.extras import EdgyExtra
-from .exceptions import DoesNotFound, MultipleObjectsReturned
+from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
 __all__ = [
     "BigIntegerField",
@@ -50,7 +50,6 @@ __all__ = [
     "DateField",
     "DateTimeField",
     "DecimalField",
-    "DoesNotFound",
     "EdgyExtra",
     "EdgySettings",
     "EmailField",
@@ -64,6 +63,7 @@ __all__ = [
     "ManyToManyField",
     "Model",
     "MultipleObjectsReturned",
+    "ObjectNotFound",
     "OneToOne",
     "OneToOneField",
     "PasswordField",

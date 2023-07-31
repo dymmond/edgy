@@ -67,7 +67,7 @@ class MetaInfo:
         self.one_to_one_fields: Set[str] = set()
         self.many_to_many_fields: Set[str] = set()
         self.foreign_key_fields: Set[str] = set()
-        self._model: Optional[Type["Model"]] = None
+        self.model: Optional[Type["Model"]] = None
         self.manager: Manager = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
         self.indexes: Any = getattr(meta, "indexes", None)

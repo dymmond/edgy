@@ -9,7 +9,7 @@ from orjson import dumps
 from edgy.core.db.fields import DateField, DateTimeField
 
 
-class ModelUtil:
+class DateParser:
     """
     Utils used by the Registry
     """
