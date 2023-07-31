@@ -286,3 +286,6 @@ class ManyToManyField(ForeignKeyFieldFactory):
         self.through = cast(Type["Model"], through_model)
 
         self.add_model_to_register(self.through)
+
+
+ManyToMany = ManyToManyField

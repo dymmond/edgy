@@ -20,6 +20,7 @@ from .base import (
     URLField,
     UUIDField,
 )
+from .foreign_keys import ForeignKey, ManyToMany, ManyToManyField, OneToOne, OneToOneField
 
 __all__ = [
     "AutoNowMixin",
@@ -34,8 +35,13 @@ __all__ = [
     "DecimalField",
     "EmailField",
     "FloatField",
+    "ForeignKey",
     "IntegerField",
     "JSONField",
+    "ManyToMany",
+    "ManyToManyField",
+    "OneToOne",
+    "OneToOneField",
     "PasswordField",
     "SmallIntegerField",
     "TextField",

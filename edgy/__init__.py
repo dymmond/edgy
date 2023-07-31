@@ -26,7 +26,14 @@ from .core.db.fields import (
     URLField,
     UUIDField,
 )
-from .core.db.models import Model
+from .core.db.fields.foreign_keys import (
+    ForeignKey,
+    ManyToMany,
+    ManyToManyField,
+    OneToOne,
+    OneToOneField,
+)
+from .core.db.models import Model, ReflectModel
 from .core.extras import EdgyExtra
 from .exceptions import DoesNotFound, MultipleObjectsReturned
 
@@ -47,12 +54,18 @@ __all__ = [
     "EdgySettings",
     "EmailField",
     "FloatField",
+    "ForeignKey",
     "Index",
     "IntegerField",
     "JSONField",
+    "ManyToMany",
+    "ManyToManyField",
     "Model",
     "MultipleObjectsReturned",
+    "OneToOne",
+    "OneToOneField",
     "PasswordField",
+    "ReflectModel",
     "RESTRICT",
     "Registry",
     "SET_NULL",
