@@ -14,13 +14,14 @@ class DateParser:
     Utils used by the Registry
     """
 
-    def _update_auto_now_fields(self, values: Any, fields: Any) -> Any:
+    def _update_auto_now_fields(self, fields: Any) -> Any:
         """
         Updates the auto fields
         """
+        values = {}
         for k, v in fields.items():
             if isinstance(v, (DateField, DateTimeField)) and v.auto_now:  # type: ignore
-                values[k] = v.validator.get_default_value()  # type: ignore
+                values[k] = v.get_default_value()  # type: ignore
         return values
 
     def _resolve_value(self, value: typing.Any) -> typing.Any:

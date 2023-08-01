@@ -4,13 +4,24 @@ import enum
 import re
 import uuid
 from enum import EnumMeta
-from typing import Any, Optional, Pattern, Sequence, Set, Tuple, Union
+from typing import Any, Dict, Optional, Pattern, Sequence, Set, Tuple, Union
 
 import pydantic
 import sqlalchemy
 
 from edgy.core.db.base import BaseField
+from edgy.core.db.fields import formats
 from edgy.exceptions import FieldDefinitionError
+
+FORMATS = {
+    "date": formats.DateFormat(),
+    "time": formats.TimeFormat(),
+    "datetime": formats.DateTimeFormat(),
+    "uuid": formats.UUIDFormat(),
+    "email": formats.EmailFormat(),
+    "ipaddress": formats.IPAddressFormat(),
+    "url": formats.URLFormat(),
+}
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
@@ -18,6 +29,7 @@ CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 class FieldFactory:
     """The base for all model fields to be used with Edgy"""
 
+    error_messages: Dict[str, str] = {}
     _bases = (BaseField,)
     _type: Any = None
 
@@ -37,6 +49,8 @@ class FieldFactory:
         server_default = kwargs.pop("server_default", None)
         server_onupdate = kwargs.pop("server_onupdate", None)
         blank: bool = kwargs.pop("blank", False)
+        format: str = kwargs.pop("format", None)
+        read_only: bool = kwargs.pop("read_only", False)
         field_type = cls._type
 
         namespace = dict(
@@ -55,6 +69,10 @@ class FieldFactory:
             server_default=server_default,
             server_onupdate=server_onupdate,
             blank=blank,
+            format=format,
+            read_only=read_only,
+            column_type=cls.get_column_type(),
+            constraints=cls.get_constraints(),
             **kwargs,
         )
         Field = type(cls.__name__, cls._bases, {})
@@ -73,15 +91,28 @@ class FieldFactory:
         """Returns the propery column type for the field"""
         return None
 
-    def check(self, value: Any) -> Any:
-        """
-        Validates some of the non pydantic field values.
-        """
+    @classmethod
+    def get_constraints(cls, **kwargs: Any) -> Any:
+        return []
+
+    # def check(self, value: Any) -> Any:
+    #     """
+    #     Runs the checks for the fields being validated.
+    #     """
+    #     return None
 
 
 class CharField(FieldFactory, str):
     """String field representation that constructs the Field class and populates the values"""
 
+    error_messages: Dict[str, str] = {
+        "type": "Must be a string.",
+        "null": "May not be null.",
+        "blank": "Must not be blank.",
+        "max_length": "Must have no more than {max_length} characters.",
+        "min_length": "Must have at least {min_length} characters.",
+        "pattern": "Must match the pattern /{pattern}/.",
+    }
     _type = str
 
     def __new__(  # type: ignore
@@ -125,6 +156,16 @@ class CharField(FieldFactory, str):
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.String(length=kwargs.get("max_length"))
+
+    # def check(self, value: Any) -> Any:
+    #     if value is None and not self.is_required():
+    #         return None
+    #     elif value is None:
+    #         raise ValueError(self.error_messages["null"])
+    #     elif self.format in FORMATS and FORMATS[self.format].is_native_type(value):
+    #         return value
+    #     elif not isinstance(value, str):
+    #         raise ValueError(self.error_messages["type"])
 
 
 class TextField(FieldFactory, str):

@@ -22,9 +22,7 @@ class Model(ModelRow, DeclarativeMixin):
         """
         Update operation of the database fields.
         """
-        fields = {key: field.validator for key, field in self.fields.items() if key in kwargs}
-        validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.check(kwargs), self.fields)
+        kwargs = self._update_auto_now_fields(self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         await self.database.execute(expression)
@@ -63,12 +61,7 @@ class Model(ModelRow, DeclarativeMixin):
             extracted_fields.pop(self.pkname, None)
 
         self.update_from_dict(dict(extracted_fields.items()))
-
-        fields = {
-            key: field.validator for key, field in self.fields.items() if key in extracted_fields
-        }
-        validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.check(extracted_fields), self.fields)
+        kwargs = self._update_auto_now_fields(self.fields)
 
         # Performs the update or the create based on a possible existing primary key
         if getattr(self, "pk", None) is None:

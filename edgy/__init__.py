@@ -1,5 +1,6 @@
 __version__ = "0.1.0"
 
+from .cli.base import Migrate
 from .conf import settings
 from .conf.global_settings import EdgySettings
 from .core.connection.database import Database, DatabaseURL
@@ -62,6 +63,7 @@ __all__ = [
     "Manager",
     "ManyToMany",
     "ManyToManyField",
+    "Migrate",
     "Model",
     "MultipleObjectsReturned",
     "ObjectNotFound",

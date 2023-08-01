@@ -19,8 +19,6 @@ from edgy.conf import settings
 from edgy.core.db.fields import CharField, ForeignKey, OneToOneField, TextField
 from edgy.core.db.querysets.mixins import QuerySetPropsMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
-
-# from edgy.core.schemas import Schema
 from edgy.core.utils.models import DateParser
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound
 from edgy.protocols.queryset import QuerySetProtocol
@@ -303,11 +301,10 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
 
     def validate_kwargs(self, **kwargs: Any) -> Any:
         fields = self.model_class.fields
-        validator = Schema(fields={key: value.validator for key, value in fields.items()})
-        kwargs = validator.check(kwargs)
+        kwargs = dict(fields.items())
         for key, value in fields.items():
-            if value.validator.read_only and value.validator.has_default():
-                kwargs[key] = value.validator.get_default_value()
+            if value.read_only and value.has_default():
+                kwargs[key] = value.get_default_value()
         return kwargs
 
     def prepare_order_by(self, order_by: str) -> Any:
@@ -635,8 +632,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             if key in fields:
                 new_fields[key] = field.validator
 
-        validator = Schema(fields=new_fields)
-
         new_objs = []
         for obj in objs:
             new_obj = {}
@@ -645,10 +640,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                     new_obj[key] = self._resolve_value(value)
             new_objs.append(new_obj)
 
-        new_objs = [
-            self._update_auto_now_fields(validator.check(obj), self.model_class.fields)
-            for obj in new_objs
-        ]
+        new_objs = [self._update_auto_now_fields(self.model_class.fields) for obj in new_objs]
 
         pk = getattr(self.table.c, self.pkname)
         expression = self.table.update().where(pk == sqlalchemy.bindparam(self.pkname))
@@ -675,12 +667,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Updates a record in a specific table with the given kwargs.
         """
-        fields = {
-            key: field.validator for key, field in self.model_class.fields.items() if key in kwargs
-        }
-
-        validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.check(kwargs), self.model_class.fields)
+        kwargs = self._update_auto_now_fields(self.model_class.fields)
         expression = self.table.update().values(**kwargs)
 
         for filter_clause in self.filter_clauses:

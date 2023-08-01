@@ -27,6 +27,8 @@ class BaseField(FieldInfo):
         if default is not Undefined:
             self.default = default
 
+        self.column_type: sqlalchemy.Column = kwargs.pop("column_type", None)
+        self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop("constraints", None)
         self.title = title
         self.description = description
         self.blank: bool = kwargs.pop("blank", False)
@@ -46,6 +48,7 @@ class BaseField(FieldInfo):
         self.max_digits: str = kwargs.pop("max_digits", None)
         self.decimal_places: str = kwargs.pop("decimal_places", None)
         self.regex: str = kwargs.pop("regex", None)
+        self.format: str = kwargs.pop("format", None)
         self.min_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
             "min_length", None
         )
@@ -122,11 +125,10 @@ class BaseField(FieldInfo):
         """
         Returns the column type of the field being declared.
         """
-        column_type = self.get_column_type()
         constraints = self.get_constraints()
         sqlalchemy.Column(
             name,
-            column_type,
+            self.column_type,
             *constraints,
             primary_key=self.primary_key,
             nullable=self.is_required() and not self.primary_key,
@@ -147,10 +149,10 @@ class BaseField(FieldInfo):
 
     def get_related_name(self) -> str:
         """Returns the related name used for reverse relations"""
-        return ""
+        return self.related_name
 
     def get_constraints(self) -> Any:
-        return []
+        return self.constraints
 
     def get_default_value(self) -> Any:
         default = getattr(self, "default", None)
