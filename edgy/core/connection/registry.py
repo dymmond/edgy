@@ -9,11 +9,10 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 
 from edgy.conf import settings
 from edgy.core.connection.database import Database
-from edgy.core.datastructures import ArbitraryHashableBaseModel
 from edgy.exceptions import ImproperlyConfigured
 
 
-class Registry(ArbitraryHashableBaseModel):
+class Registry:
     """
     The command center for the models being generated
     for Edgy.
@@ -22,7 +21,7 @@ class Registry(ArbitraryHashableBaseModel):
     def __init__(self, database: Database, **kwargs: Any) -> None:
         assert isinstance(
             database, Database
-        ), "database must be an instance of edgy.core.db.Database"
+        ), "database must be an instance of edgy.core.connection.Database"
 
         self.database = database
         self.models: Any = {}
@@ -37,7 +36,7 @@ class Registry(ArbitraryHashableBaseModel):
     @property
     def metadata(self) -> Any:
         for model_class in self.models.values():
-            model_class.build_table()
+            model_class.build()
         return self._metadata
 
     def _get_database_url(self) -> str:

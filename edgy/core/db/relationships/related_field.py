@@ -32,7 +32,7 @@ class RelatedField(BaseModel):
     @functools.cached_property
     def manager(self) -> Any:
         """Returns the manager class"""
-        return self.related_from._meta.manager
+        return self.related_from.meta.manager
 
     @functools.cached_property
     def queryset(self) -> Any:
@@ -43,7 +43,7 @@ class RelatedField(BaseModel):
         Guarantees the the m2m filter is done by the owner of the call
         and not by the children.
         """
-        if not self.related_from._meta.is_multi:
+        if not self.related_from.meta.is_multi:
             return
 
         related = [

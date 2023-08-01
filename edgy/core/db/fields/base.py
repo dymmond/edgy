@@ -1,9 +1,10 @@
 import datetime
 import decimal
 import enum
+import re
 import uuid
 from enum import EnumMeta
-from typing import Any, Optional, Sequence, Set, Tuple, Union
+from typing import Any, Optional, Pattern, Sequence, Set, Tuple, Union
 
 import pydantic
 import sqlalchemy
@@ -35,6 +36,7 @@ class FieldFactory:
         owner = kwargs.pop("owner", None)
         server_default = kwargs.pop("server_default", None)
         server_onupdate = kwargs.pop("server_onupdate", None)
+        blank: bool = kwargs.pop("blank", False)
         field_type = cls._type
 
         namespace = dict(
@@ -52,6 +54,7 @@ class FieldFactory:
             owner=owner,
             server_default=server_default,
             server_onupdate=server_onupdate,
+            blank=blank,
             **kwargs,
         )
         Field = type(cls.__name__, cls._bases, {})
@@ -70,6 +73,11 @@ class FieldFactory:
         """Returns the propery column type for the field"""
         return None
 
+    def check(self, value: Any) -> Any:
+        """
+        Validates some of the non pydantic field values.
+        """
+
 
 class CharField(FieldFactory, str):
     """String field representation that constructs the Field class and populates the values"""
@@ -81,9 +89,19 @@ class CharField(FieldFactory, str):
         *,
         max_length: Optional[int] = 0,
         min_length: Optional[int] = None,
-        regex: str = None,  # type: ignore
+        regex: Union[str, Pattern] = None,  # type: ignore
         **kwargs: Any,
     ) -> BaseField:
+        if regex is None:
+            regex = None
+            kwargs["pattern_regex"] = None
+        elif isinstance(regex, str):
+            regex = regex
+            kwargs["pattern_regex"] = re.compile(regex)
+        else:
+            regex = regex.pattern
+            kwargs["pattern_regex"] = regex
+
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
@@ -96,6 +114,13 @@ class CharField(FieldFactory, str):
         max_length = kwargs.get("max_length", 0)
         if max_length <= 0:
             raise FieldDefinitionError(detail=f"'max_length' is required for {cls.__name__}")
+
+        min_length = kwargs.get("min_length")
+        pattern = kwargs.get("regex")
+
+        assert min_length is None or isinstance(min_length, int)
+        assert max_length is None or isinstance(max_length, int)
+        assert pattern is None or isinstance(pattern, (str, Pattern))
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
