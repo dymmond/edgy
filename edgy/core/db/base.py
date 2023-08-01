@@ -29,6 +29,7 @@ class BaseField(FieldInfo):
 
         self.title = title
         self.description = description
+        self.blank: bool = kwargs.pop("blank", False)
         self.read_only: str = kwargs.pop("read_only", False)
         self.help_text: str = kwargs.pop("help_text", None)
         self.blank: bool = kwargs.pop("blank", False)
@@ -122,7 +123,7 @@ class BaseField(FieldInfo):
         """
         column_type = self.get_column_type()
         constraints = self.get_constraints()
-        column = sqlalchemy.Column(
+        sqlalchemy.Column(
             name,
             column_type,
             *constraints,
@@ -149,3 +150,9 @@ class BaseField(FieldInfo):
 
     def get_constraints(self) -> Any:
         return []
+
+    def get_default_value(self) -> Any:
+        default = getattr(self, "default", None)
+        if callable(default):
+            return default()
+        return default

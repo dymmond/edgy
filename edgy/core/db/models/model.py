@@ -1,24 +1,8 @@
-import functools
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Set,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, TypeVar
 
-import sqlalchemy
-from sqlalchemy.engine import Engine
-
+from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
-from edgy.exceptions import ImproperlyConfigured
 
 M = TypeVar("M", bound="Model")
 
@@ -106,42 +90,8 @@ class Model(ModelRow, DeclarativeMixin):
         return self
 
 
-class ReflectModel(Model):
-
+class ReflectModel(EdgyBaseReflectModel):
     """
     Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
     call.
     """
-
-    @classmethod
-    @functools.lru_cache
-    def get_engine(cls, url: str) -> Engine:
-        return sqlalchemy.create_engine(url)
-
-    @property
-    def pk(self) -> Any:
-        return getattr(self, self.pkname, None)
-
-    @pk.setter
-    def pk(self, value: Any) -> Any:
-        setattr(self, self.pkname, value)
-
-    @classmethod
-    def build_table(cls) -> Any:
-        """
-        The inspect is done in an async manner and reflects the objects from the database.
-        """
-        metadata = cls._meta.registry._metadata  # type: ignore
-        tablename = cls._meta.tablename
-        return cls.reflect(tablename, metadata)
-
-    @classmethod
-    def reflect(cls, tablename, metadata):
-        try:
-            return sqlalchemy.Table(
-                tablename, metadata, autoload_with=cls._meta.registry.sync_engine
-            )
-        except Exception as e:
-            raise ImproperlyConfigured(
-                detail=f"Table with the name {tablename} does not exist."
-            ) from e

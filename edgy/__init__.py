@@ -35,6 +35,7 @@ from .core.db.fields.foreign_keys import (
 )
 from .core.db.models import Model, ReflectModel
 from .core.db.models.managers import Manager
+from .core.db.querysets.base import QuerySet
 from .core.extras import EdgyExtra
 from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
@@ -67,6 +68,7 @@ __all__ = [
     "OneToOne",
     "OneToOneField",
     "PasswordField",
+    "QuerySet",
     "ReflectModel",
     "RESTRICT",
     "Registry",

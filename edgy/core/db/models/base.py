@@ -1,30 +1,21 @@
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Dict,
-    List,
-    Optional,
-    Sequence,
-    Set,
-    Type,
-    TypeVar,
-    Union,
-    cast,
-)
+import functools
+from typing import Annotated, Any, ClassVar, Dict, Optional, Sequence, Union
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy import Engine
 from typing_extensions import Self
 
 import edgy
+from edgy.conf import settings
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager
-from edgy.core.db.models.metaclasses import MetaInfo
+from edgy.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
 from edgy.core.utils.models import DateParser
-from edgy.conf import settings
+from edgy.exceptions import ImproperlyConfigured
 
 
-class EdgyBaseModel(BaseModel, DateParser):
+class EdgyBaseModel(BaseModel, DateParser, metaclass=BaseModelMeta):
     """
     Builds a row for a specific model
     """
@@ -32,9 +23,9 @@ class EdgyBaseModel(BaseModel, DateParser):
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     query: Manager = Manager()
-    meta: MetaInfo = MetaInfo(None)
-    __db_model__: bool = False
-    __raw_query__: Optional[str] = None
+    meta: ClassVar[MetaInfo] = MetaInfo(None)
+    __db_model__: ClassVar[bool] = False
+    __raw_query__: ClassVar[Optional[str]] = None
 
     class Meta:
         """
@@ -167,3 +158,43 @@ class EdgyBaseModel(BaseModel, DateParser):
             if getattr(self, key, None) != getattr(other, key, None):
                 return False
         return True
+
+
+class EdgyBaseReflectModel(EdgyBaseModel, metaclass=BaseModelReflectMeta):
+    """
+    Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
+    call.
+    """
+
+    @classmethod
+    @functools.lru_cache
+    def get_engine(cls, url: str) -> Engine:
+        return sqlalchemy.create_engine(url)
+
+    @property
+    def pk(self) -> Any:
+        return getattr(self, self.pkname, None)
+
+    @pk.setter
+    def pk(self, value: Any) -> Any:
+        setattr(self, self.pkname, value)
+
+    @classmethod
+    def build(cls) -> Any:
+        """
+        The inspect is done in an async manner and reflects the objects from the database.
+        """
+        metadata = cls.meta.registry._metadata  # type: ignore
+        tablename = cls.meta.tablename
+        return cls.reflect(tablename, metadata)
+
+    @classmethod
+    def reflect(cls, tablename, metadata):
+        try:
+            return sqlalchemy.Table(
+                tablename, metadata, autoload_with=cls.meta.registry.sync_engine
+            )
+        except Exception as e:
+            raise ImproperlyConfigured(
+                detail=f"Table with the name {tablename} does not exist."
+            ) from e

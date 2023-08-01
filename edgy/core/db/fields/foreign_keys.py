@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, Type, cast
 
 import sqlalchemy
 
@@ -125,10 +125,10 @@ class ForeignKey(ForeignKeyFieldFactory):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target._meta.tablename}.{target.pkname}",
+                f"{target.meta.tablename}.{target.pkname}",
                 ondelete=self.on_delete,
                 onupdate=self.on_update,
-                name=f"fk_{self.owner._meta.tablename}_{target._meta.tablename}"
+                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
                 f"_{target.pkname}_{name}",
             )
         ]
@@ -161,7 +161,7 @@ class OneToOneField(ForeignKey):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target._meta.tablename}.{target.pkname}", ondelete=self.on_delete
+                f"{target.meta.tablename}.{target.pkname}", ondelete=self.on_delete
             )
         ]
         return sqlalchemy.Column(
@@ -209,10 +209,10 @@ class ManyToManyField(ForeignKeyFieldFactory):
         column_type = to_field.get_column_type()
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target._meta.tablename}.{target.pkname}",
+                f"{target.meta.tablename}.{target.pkname}",
                 ondelete=CASCADE,
                 onupdate=CASCADE,
-                name=f"fk_{self.owner._meta.tablename}_{target._meta.tablename}"
+                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
                 f"_{target.pkname}_{name}",
             )
         ]
@@ -245,10 +245,10 @@ class ManyToManyField(ForeignKeyFieldFactory):
         """
         if self.through:  # type: ignore
             if isinstance(self.through, str):  # type: ignore
-                self.through = self.owner._meta.registry.models[self.through]  # type: ignore
+                self.through = self.owner.meta.registry.models[self.through]  # type: ignore
 
-            self.through._meta.is_multi = True
-            self.through._meta.multi_related = [self.to.__name__.lower()]  # type: ignore
+            self.through.meta.is_multi = True
+            self.through.meta.multi_related = [self.to.__name__.lower()]  # type: ignore
             return self.through
 
         owner_name = self.owner.__name__
@@ -258,7 +258,7 @@ class ManyToManyField(ForeignKeyFieldFactory):
 
         new_meta_namespace = {
             "tablename": tablename,
-            "registry": self.owner._meta.registry,
+            "registry": self.owner.meta.registry,
             "is_multi": True,
             "multi_related": [to_name.lower()],
         }

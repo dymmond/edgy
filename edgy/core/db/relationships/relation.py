@@ -50,7 +50,7 @@ class Relation(ManyRelationProtocol):
         Gets the attribute from the queryset and if it does not
         exist, then lookup in the model.
         """
-        manager = self.through._meta.manager
+        manager = self.through.meta.manager
         try:
             attr = getattr(manager.get_queryset(), item)
         except AttributeError:

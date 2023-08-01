@@ -1,12 +1,11 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Type
 
-from pydantic import BaseModel
 from sqlalchemy.engine.result import Row
 
 from edgy.core.db.models.base import EdgyBaseModel
 
 if TYPE_CHECKING:  # pragma: no cover
-    from edgy import ForeignKey, Model
+    from edgy import Model
 
 
 class ModelRow(EdgyBaseModel):

@@ -1,12 +1,25 @@
+import asyncpg
+import pymysql
 import pytest
 
 import edgy
 from edgy import ForeignKey, Model, OneToOne, OneToOneField
+from edgy.core.db import fields
 from edgy.exceptions import FieldDefinitionError
+from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
+
+pytestmark = pytest.mark.anyio
+
+database = Database(DATABASE_URL)
+models = edgy.Registry(database=database)
 
 
 class MyModel(Model):
-    """"""
+    name: str = fields.CharField(max_length=255)
+
+    class Meta:
+        registry = models
 
 
 @pytest.mark.parametrize("model", [ForeignKey, OneToOne, OneToOneField])
