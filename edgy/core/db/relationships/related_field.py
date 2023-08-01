@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from edgy import Model, ReflectModel
 
 
-class RelatedField(BaseModel):
+class RelatedField:
     """
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
@@ -66,6 +66,7 @@ class RelatedField(BaseModel):
         Gets the attribute from the queryset and if it does not
         exist, then lookup in the model.
         """
+        breakpoint()
         try:
             attr = getattr(self.queryset, item)
         except AttributeError:

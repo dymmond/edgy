@@ -11,11 +11,13 @@ from edgy.conf import settings
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
-from edgy.core.utils.models import DateParser
+from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import ImproperlyConfigured
 
+object_settr = object.__setattr__
 
-class EdgyBaseModel(BaseModel, DateParser, metaclass=BaseModelMeta):
+
+class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta):
     """
     Builds a row for a specific model
     """
@@ -26,6 +28,33 @@ class EdgyBaseModel(BaseModel, DateParser, metaclass=BaseModelMeta):
     meta: ClassVar[MetaInfo] = MetaInfo(None)
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:  # type: ignore
+        super().__init__(**kwargs)
+
+        values = self.setup_model_fields_from_kwargs(kwargs)
+        object.__setattr__(self, "__dict__", values)
+
+    def _internal_set(self, name: str, value: Any) -> None:
+        """
+        Delegates call to pydantic.
+
+        :param name: name of param
+        :type name: str
+        :param value: value to set
+        :type value: Any
+        """
+        super().__setattr__(name, value)
+
+    def __setattr__(self, name: str, value: Any) -> None:  # noqa CCR001
+        """
+        Overwrites setattr in pydantic parent as otherwise descriptors are not called.
+        """
+        if hasattr(self, name):
+            object.__setattr__(self, name, value)
+        else:
+            # let pydantic handle errors for unknown fields
+            super().__setattr__(name, value)
 
     class Meta:
         """
@@ -45,6 +74,24 @@ class EdgyBaseModel(BaseModel, DateParser, metaclass=BaseModelMeta):
                     tablename = "users"
 
         """
+
+    def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
+        """
+        Loops and setup the kwargs of the model
+        """
+        if "pk" in kwargs:
+            kwargs[self.pkname] = kwargs.pop("pk")
+        elif "id" in kwargs:
+            kwargs[self.pkname] = kwargs.pop("id")
+        kwargs = {k: v for k, v in kwargs.items() if k in self.meta.fields_mapping}
+
+        for k, v in kwargs.items():
+            if k not in self.fields:
+                if not hasattr(self, k):
+                    raise ValueError(f"Invalid keyword {k} for class {self.__class__.__name__}")
+            setattr(self, k, v)
+
+        return kwargs
 
     @property
     def pk(self) -> Any:

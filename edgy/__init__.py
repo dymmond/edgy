@@ -27,13 +27,8 @@ from .core.db.fields import (
     URLField,
     UUIDField,
 )
-from .core.db.fields.foreign_keys import (
-    ForeignKey,
-    ManyToMany,
-    ManyToManyField,
-    OneToOne,
-    OneToOneField,
-)
+from .core.db.fields.foreign_keys import ForeignKey, OneToOne, OneToOneField
+from .core.db.fields.many_to_many import ManyToMany, ManyToManyField
 from .core.db.models import Model, ReflectModel
 from .core.db.models.managers import Manager
 from .core.db.querysets.base import QuerySet

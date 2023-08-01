@@ -10,6 +10,8 @@ from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.base import BaseField, BigIntegerField
+from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
+from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
@@ -130,7 +132,6 @@ def _set_related_name_for_foreign_keys(
             raise ForeignKeyBadConfigured(
                 f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
             )
-
         foreign_key.related_name = default_related_name
 
         related_field = RelatedField(
@@ -234,16 +235,16 @@ class BaseModelMeta(ModelMetaclass):
 
                 fields[key] = value
 
-                if isinstance(value, edgy_fields.OneToOneField):
-                    one_to_one_fields.add(value)
+                # breakpoint()
+                if isinstance(value, BaseForeignKeyField):
+                    if value.is_o2o:
+                        one_to_one_fields.add(value)
+                    if value.is_fk:
+                        foreign_key_fields.add(value)
                     continue
-                elif isinstance(value, edgy_fields.ManyToManyField):
-                    many_to_many_fields.add(value)
-                    continue
-                elif isinstance(value, edgy_fields.ForeignKey) and not isinstance(
-                    value, edgy_fields.ManyToManyField
-                ):
-                    foreign_key_fields.add(value)
+                elif isinstance(value, BaseManyToManyForeignKeyField):
+                    if value.is_m2m:
+                        many_to_many_fields.add(value)
                     continue
 
         for slot in fields:

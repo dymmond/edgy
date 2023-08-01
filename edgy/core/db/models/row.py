@@ -18,14 +18,12 @@ class ModelRow(EdgyBaseModel):
         cls,
         row: Row,
         select_related: Sequence[Any],
-        related_models: Any = None,
     ) -> Optional[Type["Model"]]:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
         """
         item: Dict[str, Any] = {}
         select_related = select_related or []
-        related_models = related_models
 
         for related in select_related:
             if "__" in related:
@@ -34,13 +32,13 @@ class ModelRow(EdgyBaseModel):
                     model_cls = cls.fields[first_part].target
                 except KeyError:
                     model_cls = getattr(cls, first_part).related_from
-                item[first_part] = model_cls.from_query_result(row, select_related=[remainder])
+                item[first_part] = model_cls.from_sqla_row(row, select_related=[remainder])
             else:
                 try:
                     model_cls = cls.fields[related].target
                 except KeyError:
                     model_cls = getattr(cls, related).related_from
-                item[related] = model_cls.from_query_result(row)
+                item[related] = model_cls.from_sqla_row(row)
 
         # Pull out the regular column values.
         for column in cls.table.columns:
@@ -50,4 +48,16 @@ class ModelRow(EdgyBaseModel):
 
             elif column.name not in item:
                 item[column.name] = row[column]
+
+        if cls.meta.related_names:
+            item = cls.populate_nested_models_from_row(item, row)
+
         return cls(**item)
+
+    @classmethod
+    def populate_nested_models_from_row(cls, item: Dict[str, Any], row: Row) -> Dict[Any, Any]:
+        """
+        Populates the database model with the nested results from the row.
+        """
+        for related in cls.meta.related_names:
+            ...

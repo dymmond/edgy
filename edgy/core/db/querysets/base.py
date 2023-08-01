@@ -15,6 +15,7 @@ from typing import (
 
 import sqlalchemy
 
+import edgy
 from edgy.conf import settings
 from edgy.core.db.fields import CharField, ForeignKey, OneToOneField, TextField
 from edgy.core.db.querysets.mixins import QuerySetPropsMixin
@@ -66,13 +67,13 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
 
     def build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
-        order_by = list(map(self._prepare_order_by, order_by))
+        order_by = list(map(self.prepare_order_by, order_by))
         expression = expression.order_by(*order_by)
         return expression
 
     def build_group_by_expression(self, group_by: Any, expression: Any) -> Any:
         """Builds the group by expression"""
-        group_by = list(map(self._prepare_group_by, group_by))
+        group_by = list(map(self.prepare_group_by, group_by))
         expression = expression.group_by(*group_by)
         return expression
 
@@ -87,7 +88,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
 
     def build_select_distinct(self, distinct_on: Any, expression: Any) -> Any:
         """Filters selects only specific fields"""
-        distinct_on = list(map(self._prepare_fields_for_distinct, distinct_on))
+        distinct_on = list(map(self.prepare_fields_for_distinct, distinct_on))
         expression = expression.distinct(*distinct_on)
         return expression
 
@@ -301,10 +302,11 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
 
     def validate_kwargs(self, **kwargs: Any) -> Any:
         fields = self.model_class.fields
-        kwargs = dict(fields.items())
         for key, value in fields.items():
             if value.read_only and value.has_default():
                 kwargs[key] = value.get_default_value()
+
+        # kwargs = self.extract_foreign_key_values(kwargs)
         return kwargs
 
     def prepare_order_by(self, order_by: str) -> Any:
@@ -597,15 +599,17 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Creates a record in a specific table.
         """
-        kwargs = self.validate_kwargs(**kwargs)
         instance = self.model_class(**kwargs)
-        expression = self.table.insert().values(**kwargs)
-        self.set_query_expression(expression)
+        instance = await instance.save()
+        # kwargs = self.validate_kwargs(**kwargs)
+        # instance = self.model_class(**kwargs)
+        # expression = self.table.insert().values(**kwargs)
+        # self.set_query_expression(expression)
 
-        if self.pkname not in kwargs:
-            instance.pk = await self.database.execute(expression)
-        else:
-            await self.database.execute(expression)
+        # if self.pkname not in kwargs:
+        #     instance.pk = await self.database.execute(expression)
+        # else:
+        #     await self.database.execute(expression)
         return instance
 
     async def bulk_create(self, objs: List[Dict]) -> None:
@@ -667,7 +671,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Updates a record in a specific table with the given kwargs.
         """
-        kwargs = self._update_auto_now_fields(self.model_class.fields)
+        kwargs = self._update_auto_now_fields(kwargs, self.model_class.fields)
         expression = self.table.update().values(**kwargs)
 
         for filter_clause in self.filter_clauses:

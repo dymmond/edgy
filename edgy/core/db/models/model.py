@@ -1,5 +1,6 @@
 from typing import Any, TypeVar
 
+import edgy
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
@@ -14,15 +15,17 @@ class Model(ModelRow, DeclarativeMixin):
     from anywhere.
     """
 
-    def __repr__(self) -> str:  # pragma nocover
-        _repr = {k: getattr(self, k) for k, v in self.meta.fields.items()}
-        return f"{self.__class__.__name__}({str(_repr)})"
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}: {self}>"
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}({self.pkname}={self.pk})"
 
     async def update(self, **kwargs: Any) -> Any:
         """
         Update operation of the database fields.
         """
-        kwargs = self._update_auto_now_fields(self.fields)
+        kwargs = self._update_auto_now_fields(kwargs, self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         await self.database.execute(expression)
@@ -61,7 +64,9 @@ class Model(ModelRow, DeclarativeMixin):
             extracted_fields.pop(self.pkname, None)
 
         self.update_from_dict(dict(extracted_fields.items()))
-        kwargs = self._update_auto_now_fields(self.fields)
+
+        validated_values = self.extract_values_from_field(extracted_fields)
+        kwargs = self._update_auto_now_fields(validated_values, self.fields)
 
         # Performs the update or the create based on a possible existing primary key
         if getattr(self, "pk", None) is None:

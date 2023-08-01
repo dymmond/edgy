@@ -27,17 +27,17 @@ class BaseField(FieldInfo):
         if default is not Undefined:
             self.default = default
 
+        self.primary_key: bool = kwargs.pop("primary_key", False)
         self.column_type: sqlalchemy.Column = kwargs.pop("column_type", None)
         self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop("constraints", None)
         self.title = title
         self.description = description
         self.blank: bool = kwargs.pop("blank", False)
-        self.read_only: str = kwargs.pop("read_only", False)
+        self.read_only: bool = kwargs.pop("read_only", False)
         self.help_text: str = kwargs.pop("help_text", None)
         self.blank: bool = kwargs.pop("blank", False)
         self.pattern: Pattern = kwargs.pop("pattern", None)
         self.autoincrement: bool = kwargs.pop("autoincrement", False)
-        self.primary_key: bool = kwargs.pop("primary_key", False)
         self.related_name: str = kwargs.pop("related_name", None)
         self.unique: bool = kwargs.pop("unique", False)
         self.index: bool = kwargs.pop("index", False)
@@ -70,7 +70,12 @@ class BaseField(FieldInfo):
         self.server_default: Any = kwargs.pop("server_default", None)
         self.server_onupdate: Any = kwargs.pop("server_onupdate", None)
         self.registry: Registry = kwargs.pop("registry", None)
-        self.comment = kwargs.get("comment", None)
+        self.comment = kwargs.pop("comment", None)
+
+        # Foreign keys
+        is_m2m = kwargs.pop("is_m2m", False)
+        is_o2o = kwargs.pop("is_o2o", False)
+        is_fk = kwargs.pop("is_fk", False)
 
         for name, value in kwargs.items():
             setattr(self, name, value)
@@ -125,8 +130,11 @@ class BaseField(FieldInfo):
         """
         Returns the column type of the field being declared.
         """
+        if self.column_type == sqlalchemy.ForeignKey:
+            return self.get_column(name)
+
         constraints = self.get_constraints()
-        sqlalchemy.Column(
+        return sqlalchemy.Column(
             name,
             self.column_type,
             *constraints,
@@ -140,11 +148,10 @@ class BaseField(FieldInfo):
             server_onupdate=self.server_onupdate,
         )
 
-    def expand_relationship(self, value: Any, child: Any, to_register: bool = True) -> Any:
+    def expand_relationship(self, value: Any) -> Any:
         """
         Used to be overritten by any Link class.
         """
-
         return value
 
     def get_related_name(self) -> str:

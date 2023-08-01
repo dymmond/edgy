@@ -10,27 +10,27 @@ import pydantic
 import sqlalchemy
 
 from edgy.core.db.base import BaseField
-from edgy.core.db.fields import formats
 from edgy.exceptions import FieldDefinitionError
 
-FORMATS = {
-    "date": formats.DateFormat(),
-    "time": formats.TimeFormat(),
-    "datetime": formats.DateTimeFormat(),
-    "uuid": formats.UUIDFormat(),
-    "email": formats.EmailFormat(),
-    "ipaddress": formats.IPAddressFormat(),
-    "url": formats.URLFormat(),
-}
-
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
+
+
+class Base:
+    def check(self, value: Any) -> Any:
+        """
+        Runs the checks for the fields being validated.
+        """
+        return value
 
 
 class FieldFactory:
     """The base for all model fields to be used with Edgy"""
 
     error_messages: Dict[str, str] = {}
-    _bases = (BaseField,)
+    _bases = (
+        Base,
+        BaseField,
+    )
     _type: Any = None
 
     def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
@@ -50,7 +50,7 @@ class FieldFactory:
         server_onupdate = kwargs.pop("server_onupdate", None)
         blank: bool = kwargs.pop("blank", False)
         format: str = kwargs.pop("format", None)
-        read_only: bool = kwargs.pop("read_only", False)
+        read_only: bool = True if primary_key else kwargs.pop("read_only", False)
         field_type = cls._type
 
         namespace = dict(
@@ -94,12 +94,6 @@ class FieldFactory:
     @classmethod
     def get_constraints(cls, **kwargs: Any) -> Any:
         return []
-
-    # def check(self, value: Any) -> Any:
-    #     """
-    #     Runs the checks for the fields being validated.
-    #     """
-    #     return None
 
 
 class CharField(FieldFactory, str):
@@ -156,16 +150,6 @@ class CharField(FieldFactory, str):
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.String(length=kwargs.get("max_length"))
-
-    # def check(self, value: Any) -> Any:
-    #     if value is None and not self.is_required():
-    #         return None
-    #     elif value is None:
-    #         raise ValueError(self.error_messages["null"])
-    #     elif self.format in FORMATS and FORMATS[self.format].is_native_type(value):
-    #         return value
-    #     elif not isinstance(value, str):
-    #         raise ValueError(self.error_messages["type"])
 
 
 class TextField(FieldFactory, str):
