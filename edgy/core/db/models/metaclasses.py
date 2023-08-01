@@ -1,9 +1,7 @@
 import copy
 import inspect
-from abc import ABCMeta
-from typing import TYPE_CHECKING, Annotated, Any, Dict, Optional, Sequence, Set, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Set, Tuple, Type, Union
 
-import pydantic
 import sqlalchemy
 from pydantic._internal._model_construction import ModelMetaclass
 
@@ -59,7 +57,7 @@ class MetaInfo:
         self.many_to_many_fields: Set[str] = set()
         self.foreign_key_fields: Set[str] = set()
         self.model: Optional[Type["Model"]] = None
-        self.manager: "Manager" = getattr(meta, "manager", None)
+        self.manager: "Manager" = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
         self.indexes: Any = getattr(meta, "indexes", None)
         self.reflect: bool = getattr(meta, "reflect", False)
@@ -229,144 +227,141 @@ class BaseModelMeta(ModelMetaclass):
                         f"Cannot create model {name} without explicit primary key if field 'id' is already present."
                     )
 
-            for key, value in attrs.items():
-                if isinstance(value, BaseField):
-                    if getattr(meta_class, "abstract", None):
-                        value = copy.copy(value)
+        for key, value in attrs.items():
+            if isinstance(value, BaseField):
+                if getattr(meta_class, "abstract", None):
+                    value = copy.copy(value)
 
-                    fields[key] = value
+                fields[key] = value
 
-                    if isinstance(value, edgy_fields.OneToOneField):
-                        one_to_one_fields.add(value)
-                        continue
-                    elif isinstance(value, edgy_fields.ManyToManyField):
-                        many_to_many_fields.add(value)
-                        continue
-                    elif isinstance(value, edgy_fields.ForeignKey) and not isinstance(
-                        value, edgy_fields.ManyToManyField
-                    ):
-                        foreign_key_fields.add(value)
-                        continue
+                if isinstance(value, edgy_fields.OneToOneField):
+                    one_to_one_fields.add(value)
+                    continue
+                elif isinstance(value, edgy_fields.ManyToManyField):
+                    many_to_many_fields.add(value)
+                    continue
+                elif isinstance(value, edgy_fields.ForeignKey) and not isinstance(
+                    value, edgy_fields.ManyToManyField
+                ):
+                    foreign_key_fields.add(value)
+                    continue
 
-            for slot in fields:
-                attrs.pop(slot, None)
+        for slot in fields:
+            attrs.pop(slot, None)
 
-            attrs["meta"] = meta = MetaInfo(meta_class)
+        attrs["meta"] = meta = MetaInfo(meta_class)
 
-            meta.fields_mapping = fields
-            meta.foreign_key_fields = foreign_key_fields
-            meta.one_to_one_fields = one_to_one_fields
-            meta.many_to_many_fields = many_to_many_fields
-            meta.pk_attribute = pk_attribute
-            meta.pk = fields.get(pk_attribute)
+        meta.fields_mapping = fields
+        meta.foreign_key_fields = foreign_key_fields
+        meta.one_to_one_fields = one_to_one_fields
+        meta.many_to_many_fields = many_to_many_fields
+        meta.pk_attribute = pk_attribute
+        meta.pk = fields.get(pk_attribute)
 
-            if not fields:
-                meta.abstract = True
+        if not fields:
+            meta.abstract = True
 
-            model_class = super().__new__
+        model_class = super().__new__
 
-            # Ensure the initialization is only performed for subclasses of Model
-            parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
-            if not parents:
-                return model_class(cls, name, bases, attrs)
+        # Ensure the initialization is only performed for subclasses of Model
+        parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
+        if not parents:
+            return model_class(cls, name, bases, attrs)
 
-            meta.parents = parents
-            new_class = model_class(cls, name, bases, attrs)
+        meta.parents = parents
+        new_class = model_class(cls, name, bases, attrs)
 
-            # Abstract classes do not allow multiple managers. This make sure it is enforced.
-            if meta.abstract:
-                managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
-                if len(managers) > 1:
-                    raise ImproperlyConfigured(
-                        "Multiple managers are not allowed in abstract classes."
-                    )
-
-                if getattr(meta, "unique_together", None) is not None:
-                    raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
-
-                if getattr(meta, "indexes", None) is not None:
-                    raise ImproperlyConfigured("indexes cannot be in abstract classes.")
-            else:
-                meta.managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
-
-            # Handle the registry of models
-            if getattr(meta, "registry", None) is None:
-                if hasattr(new_class, "_db_model") and new_class._db_model:
-                    meta.registry = _check_model_inherited_registry(bases)
-                else:
-                    return new_class
-
-            # Making sure the tablename is always set if the value is not provided
-            if getattr(meta, "tablename", None) is None:
-                tablename = f"{name.lower()}s"
-                meta.tablename = tablename
+        # Abstract classes do not allow multiple managers. This make sure it is enforced.
+        if meta.abstract:
+            managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
+            if len(managers) > 1:
+                raise ImproperlyConfigured(
+                    "Multiple managers are not allowed in abstract classes."
+                )
 
             if getattr(meta, "unique_together", None) is not None:
-                unique_together = meta.unique_together
-                if not isinstance(unique_together, (list, tuple)):
-                    value_type = type(unique_together).__name__
-                    raise ImproperlyConfigured(
-                        f"unique_together must be a tuple or list. Got {value_type} instead."
-                    )
-                else:
-                    for value in unique_together:
-                        if not isinstance(value, (str, tuple, UniqueConstraint)):
-                            raise ValueError(
-                                "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
-                            )
+                raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
 
-            # Handle indexes
             if getattr(meta, "indexes", None) is not None:
-                indexes = meta.indexes
-                if not isinstance(indexes, (list, tuple)):
-                    value_type = type(indexes).__name__
-                    raise ImproperlyConfigured(
-                        f"indexes must be a tuple or list. Got {value_type} instead."
-                    )
-                else:
-                    for value in indexes:
-                        if not isinstance(value, Index):
-                            raise ValueError("Meta.indexes must be a list of Index types.")
+                raise ImproperlyConfigured("indexes cannot be in abstract classes.")
+        else:
+            meta.managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
 
-            registry = meta.registry
-            new_class.database = registry.database
+        # Handle the registry of models
+        if getattr(meta, "registry", None) is None:
+            if hasattr(new_class, "__db_model__") and new_class.__db_model__:
+                meta.registry = _check_model_inherited_registry(bases)
+            else:
+                return new_class
 
-            # Making sure it does not generate tables if abstract it set
-            if not meta.abstract:
-                registry.models[name] = new_class
+        # Making sure the tablename is always set if the value is not provided
+        if getattr(meta, "tablename", None) is None:
+            tablename = f"{name.lower()}s"
+            meta.tablename = tablename
 
-            for name, field in meta.fields_mapping.items():
-                field.registry = registry
-                if field.primary_key:
-                    new_class.pkname = name
-
-            new_class.__db_model__ = True
-            new_class.fields = meta.fields_mapping
-
-            meta.model = new_class  # type: ignore
-            meta.manager.model_class = new_class
-
-            # Set the owner of the field
-            for _, value in new_class.fields.items():
-                value.owner = new_class
-
-            # Sets the foreign key fields
-            if meta.foreign_key_fields:
-                related_name = _set_related_name_for_foreign_keys(
-                    meta.foreign_key_fields, new_class
+        if getattr(meta, "unique_together", None) is not None:
+            unique_together = meta.unique_together
+            if not isinstance(unique_together, (list, tuple)):
+                value_type = type(unique_together).__name__
+                raise ImproperlyConfigured(
+                    f"unique_together must be a tuple or list. Got {value_type} instead."
                 )
-                meta.related_names.add(related_name)
+            else:
+                for value in unique_together:
+                    if not isinstance(value, (str, tuple, UniqueConstraint)):
+                        raise ValueError(
+                            "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
+                        )
 
-            for field, value in new_class.fields.items():
-                if isinstance(value, edgy_fields.ManyToManyField):
-                    _set_many_to_many_relation(value, new_class, field)
+        # Handle indexes
+        if getattr(meta, "indexes", None) is not None:
+            indexes = meta.indexes
+            if not isinstance(indexes, (list, tuple)):
+                value_type = type(indexes).__name__
+                raise ImproperlyConfigured(
+                    f"indexes must be a tuple or list. Got {value_type} instead."
+                )
+            else:
+                for value in indexes:
+                    if not isinstance(value, Index):
+                        raise ValueError("Meta.indexes must be a list of Index types.")
 
-            # Set the manager
-            for _, value in attrs.items():
-                if isinstance(value, Manager):
-                    value.model_class = new_class
+        registry = meta.registry
+        new_class.database = registry.database
 
-            return new_class
+        # Making sure it does not generate tables if abstract it set
+        if not meta.abstract:
+            registry.models[name] = new_class
+
+        for name, field in meta.fields_mapping.items():
+            field.registry = registry
+            if field.primary_key:
+                new_class.pkname = name
+
+        new_class.__db_model__ = True
+        new_class.fields = meta.fields_mapping
+        meta.model = new_class  # type: ignore
+        meta.manager.model_class = new_class
+
+        # Set the owner of the field
+        for _, value in new_class.fields.items():
+            value.owner = new_class
+
+        # Sets the foreign key fields
+        if meta.foreign_key_fields:
+            related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
+            meta.related_names.add(related_name)
+
+        for field, value in new_class.fields.items():
+            if isinstance(value, edgy_fields.ManyToManyField):
+                _set_many_to_many_relation(value, new_class, field)
+
+        # Set the manager
+        for _, value in attrs.items():
+            if isinstance(value, Manager):
+                value.model_class = new_class
+
+        return new_class
 
     @property
     def table(cls) -> Any:

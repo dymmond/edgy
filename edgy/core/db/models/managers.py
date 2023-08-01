@@ -1,7 +1,5 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
-
 from edgy.core.db.querysets.base import QuerySet
 
 
@@ -39,13 +37,14 @@ class Manager:
         """
         return QuerySet(self.model_class)
 
-    def __getattr__(self, item: Any) -> Any:
-        """
-        Gets the attribute from the queryset and if it does not
-        exist, then lookup in the model.
-        """
-        breakpoint()
-        try:
-            return getattr(self.get_queryset(), item)
-        except AttributeError:
-            return getattr(self.model_class, item)
+    # def __getattr__(self, item: Any) -> Any:
+    #     """
+    #     Gets the attribute from the queryset and if it does not
+    #     exist, then lookup in the model.
+    #     """
+    #     if not self.model_class:
+    #         return super().__getattr__(self, item)
+    #     try:
+    #         return getattr(self.get_queryset(), item)
+    #     except AttributeError:
+    #         return getattr(self.model_class, item)

@@ -9,11 +9,10 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 
 from edgy.conf import settings
 from edgy.core.connection.database import Database
-from edgy.core.datastructures import ArbitraryHashableBaseModel
 from edgy.exceptions import ImproperlyConfigured
 
 
-class Registry(ArbitraryHashableBaseModel):
+class Registry:
     """
     The command center for the models being generated
     for Edgy.

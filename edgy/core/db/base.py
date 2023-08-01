@@ -97,6 +97,7 @@ class BaseField(FieldInfo):
             `True` if the argument is required, `False` otherwise.
         """
         required = False if self.null else True
+        # self.default is PydanticUndefined and self.default_factory is None
         return required
 
     def get_alias(self) -> str:
@@ -128,7 +129,7 @@ class BaseField(FieldInfo):
             column_type,
             *constraints,
             primary_key=self.primary_key,
-            nullable=self.null and not self.primary_key,
+            nullable=self.is_required() and not self.primary_key,
             index=self.index,
             unique=self.unique,
             default=self.default,

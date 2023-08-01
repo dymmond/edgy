@@ -1,5 +1,5 @@
 import functools
-from typing import Annotated, Any, ClassVar, Dict, Optional, Sequence, Union
+from typing import Any, ClassVar, Dict, Optional, Sequence
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
@@ -22,7 +22,7 @@ class EdgyBaseModel(BaseModel, DateParser, metaclass=BaseModelMeta):
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
-    query: Manager = Manager()
+    query: ClassVar[Manager] = Manager()
     meta: ClassVar[MetaInfo] = MetaInfo(None)
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
