@@ -1,4 +1,4 @@
-class Meta:
+class DescriptiveMeta:
     """
     The `Meta` class used to configure each metadata of the model.
     Abstract classes are not generated in the database, instead, they are simply used as

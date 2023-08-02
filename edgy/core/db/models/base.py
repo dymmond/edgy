@@ -9,7 +9,7 @@ from typing_extensions import Self
 from edgy.conf import settings
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
-from edgy.core.db.models._internal import Meta
+from edgy.core.db.models._internal import DescriptiveMeta
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
 from edgy.core.utils.models import DateParser, ModelParser
@@ -27,7 +27,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     query: ClassVar[Manager] = Manager()
     meta: ClassVar[MetaInfo] = MetaInfo(None)
-    Meta: ClassVar[Meta] = Meta()
+    Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
 
