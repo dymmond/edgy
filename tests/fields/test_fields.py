@@ -7,7 +7,6 @@ import pydantic
 import pytest
 import sqlalchemy
 
-from edgy.core.db.base import BaseField
 from edgy.core.db.fields import (
     BigIntegerField,
     BinaryField,
@@ -25,6 +24,7 @@ from edgy.core.db.fields import (
     TimeField,
     UUIDField,
 )
+from edgy.core.db.fields.base import BaseField
 from edgy.exceptions import FieldDefinitionError
 
 
@@ -48,7 +48,7 @@ def test_column_type():
     assert isinstance(SmallIntegerField.get_column_type(), sqlalchemy.SmallInteger)
     assert isinstance(DecimalField.get_column_type(), sqlalchemy.Numeric)
     assert isinstance(UUIDField.get_column_type(), sqlalchemy.UUID)
-    assert isinstance(ChoiceField.get_column_type(), sqlalchemy.Enum)
+    assert isinstance(ChoiceField.get_column_type(choices=Choices), sqlalchemy.Enum)
 
 
 @pytest.mark.parametrize(

@@ -1,11 +1,12 @@
 import typing
+from datetime import datetime
 from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, Optional, Type
 
 from orjson import OPT_OMIT_MICROSECONDS, OPT_SERIALIZE_NUMPY, dumps
 
 import edgy
-from edgy.core.db.fields import DateField, DateTimeField
+from edgy.core.db.fields.core import BaseField, Field
 
 if TYPE_CHECKING:
     from edgy import Model
@@ -13,16 +14,28 @@ if TYPE_CHECKING:
 
 
 class DateParser:
-    def _update_auto_now_fields(self, values: Any, fields: Any) -> Any:
+    def has_auto_now(self, field: Type[BaseField]) -> bool:
+        """
+        Checks if the field is auto now
+        """
+        return True if hasattr(field, "auto_now") and field.auto_now else False
+
+    def is_datetime(self, field: Type[BaseField]) -> bool:
+        """
+        Validates if the field type is a datetime type.
+        """
+        return bool(field.__type__ == datetime)
+
+    def update_auto_now_fields(self, values: Any, fields: Any) -> Any:
         """
         Updates the auto fields
         """
-        for k, v in fields.items():
-            if isinstance(v, (DateField, DateTimeField)) and v.auto_now:  # type: ignore
-                values[k] = v.get_default_value()  # type: ignore
+        for name, field in fields.items():
+            if isinstance(field, Field) and self.has_auto_now(field) and self.is_datetime(field):
+                values[name] = field.get_default_value()  # type: ignore
         return values
 
-    def _resolve_value(self, value: typing.Any) -> typing.Any:
+    def resolve_value(self, value: typing.Any) -> typing.Any:
         if isinstance(value, dict):
             return dumps(
                 value,
@@ -45,6 +58,8 @@ class ModelParser:
         validated = {}
         for name, field in model_cls.fields.items():
             if field.read_only:
+                if field.has_default():
+                    validated[name] = field.get_default_value()
                 continue
 
             if name not in extracted_values:

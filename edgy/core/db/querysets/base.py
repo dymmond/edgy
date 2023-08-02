@@ -595,16 +595,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         kwargs = self.validate_kwargs(**kwargs)
         instance = self.model_class(**kwargs)
-        instance = await instance.save()
-        # kwargs = self.validate_kwargs(**kwargs)
-        # instance = self.model_class(**kwargs)
-        # expression = self.table.insert().values(**kwargs)
-        # self.set_query_expression(expression)
-
-        # if self.pkname not in kwargs:
-        #     instance.pk = await self.database.execute(expression)
-        # else:
-        #     await self.database.execute(expression)
+        instance = await instance.save(force_save=True)
         return instance
 
     async def bulk_create(self, objs: List[Dict]) -> None:
@@ -636,10 +627,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             new_obj = {}
             for key, value in obj.__dict__.items():
                 if key in fields:
-                    new_obj[key] = self._resolve_value(value)
+                    new_obj[key] = self.resolve_value(value)
             new_objs.append(new_obj)
 
-        new_objs = [self._update_auto_now_fields(self.model_class.fields) for obj in new_objs]
+        new_objs = [self.update_auto_now_fields(self.model_class.fields) for obj in new_objs]
 
         pk = getattr(self.table.c, self.pkname)
         expression = self.table.update().where(pk == sqlalchemy.bindparam(self.pkname))
@@ -667,7 +658,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Updates a record in a specific table with the given kwargs.
         """
         extracted_fields = self.extract_values_from_field(kwargs, model_class=self.model_class)
-        kwargs = self._update_auto_now_fields(extracted_fields, self.model_class.fields)
+        kwargs = self.update_auto_now_fields(extracted_fields, self.model_class.fields)
         expression = self.table.update().values(**kwargs)
 
         for filter_clause in self.filter_clauses:

@@ -3,8 +3,8 @@ from typing import TYPE_CHECKING, Any, Optional, TypeVar
 import sqlalchemy
 
 from edgy.core.connection.registry import Registry
-from edgy.core.db.base import BaseField
 from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL
+from edgy.core.db.fields.base import BaseField
 from edgy.core.terminal import Print
 from edgy.exceptions import FieldDefinitionError
 

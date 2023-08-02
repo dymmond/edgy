@@ -1,4 +1,4 @@
-from .base import (
+from .core import (
     AutoNowMixin,
     BaseField,
     BigIntegerField,
@@ -12,6 +12,7 @@ from .base import (
     EmailField,
     FloatField,
     IntegerField,
+    IPAddressField,
     JSONField,
     PasswordField,
     SmallIntegerField,
@@ -39,6 +40,7 @@ __all__ = [
     "FloatField",
     "ForeignKey",
     "IntegerField",
+    "IPAddressField",
     "JSONField",
     "ManyToMany",
     "ManyToManyField",

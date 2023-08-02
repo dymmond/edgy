@@ -25,7 +25,7 @@ class Model(ModelRow, DeclarativeMixin):
         """
         Update operation of the database fields.
         """
-        kwargs = self._update_auto_now_fields(kwargs, self.fields)
+        kwargs = self.update_auto_now_fields(kwargs, self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         await self.database.execute(expression)
@@ -50,9 +50,29 @@ class Model(ModelRow, DeclarativeMixin):
 
         # Update the instance.
         for key, value in dict(row._mapping).items():
-            setattr(self, key, value)
+            edgy_setattr(self, key, value)
 
-    async def save(self: M) -> M:
+    async def _save(self, **kwargs: Any) -> M:
+        """
+        Performs the save instruction.
+        """
+        expression = self.table.insert().values(**kwargs)
+        awaitable = await self.database.execute(expression)
+        if not awaitable:
+            awaitable = kwargs.get(self.pkname)
+        edgy_setattr(self, self.pkname, awaitable)
+        return self
+
+    async def _update(self, **kwargs: Any) -> M:
+        """
+        Performs the save instruction.
+        """
+        pk_column = getattr(self.table.c, self.pkname)
+        expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
+        awaitable = await self.database.execute(expression)
+        return awaitable
+
+    async def save(self: M, force_save: bool = False, **kwargs: Any) -> M:
         """
         Performs a save of a given model instance.
         When creating a user it will make sure it can update existing or
@@ -66,17 +86,16 @@ class Model(ModelRow, DeclarativeMixin):
         self.update_from_dict(dict(extracted_fields.items()))
 
         validated_values = self.extract_values_from_field(extracted_fields)
-        kwargs = self._update_auto_now_fields(validated_values, self.fields)
+        kwargs = self.update_auto_now_fields(validated_values, self.fields)
 
         # Performs the update or the create based on a possible existing primary key
-        if getattr(self, "pk", None) is None:
-            expression = self.table.insert().values(**kwargs)
-            pk_column = await self.database.execute(expression)
-            setattr(self, self.pkname, pk_column)
+        expression = self.table.insert()
+        expression = expression.values(**kwargs)
+
+        if getattr(self, "pk", None) is None or force_save:
+            await self._save(**kwargs)
         else:
-            pk_column = getattr(self.table.c, self.pkname)
-            expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
-            await self.database.execute(expression)
+            await self._update(**kwargs)
 
         # Refresh the results
         if any(

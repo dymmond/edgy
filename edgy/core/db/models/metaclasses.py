@@ -10,7 +10,7 @@ from edgy.conf import settings
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.fields.base import BaseField, BigIntegerField
+from edgy.core.db.fields.core import BaseField, BigIntegerField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
