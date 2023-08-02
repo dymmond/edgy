@@ -3,6 +3,7 @@ from typing import Any, TypeVar
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
+from edgy.core.utils.functional import edgy_setattr
 
 M = TypeVar("M", bound="Model")
 
@@ -31,7 +32,7 @@ class Model(ModelRow, DeclarativeMixin):
 
         # Update the model instance.
         for key, value in kwargs.items():
-            setattr(self, key, value)
+            edgy_setattr(self, key, value)
 
     async def delete(self) -> None:
         """Delete operation from the database"""

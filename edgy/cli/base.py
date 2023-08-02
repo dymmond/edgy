@@ -10,12 +10,12 @@ from alembic.config import Config as AlembicConfig
 from edgy.cli.constants import DEFAULT_TEMPLATE_NAME, EDGY_DB
 from edgy.cli.decorators import catch_errors
 from edgy.core.extras.base import BaseExtra
+from edgy.core.utils.functional import edgy_setattr
 
 if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
 
 alembic_version = tuple(int(v) for v in __alembic_version__.split(".")[0:3])
-object_setattr = object.__setattr__
 
 
 class MigrateConfig:
@@ -80,7 +80,7 @@ class Migrate(BaseExtra):
         Sets a Edgy dictionary for the app object.
         """
         migrate = MigrateConfig(self, self.registry, **self.alembic_ctx_kwargs)
-        object_setattr(app, EDGY_DB, {})
+        edgy_setattr(app, EDGY_DB, {})
         app._edgy_db["migrate"] = migrate
 
     def configure(self, f: Callable) -> Any:

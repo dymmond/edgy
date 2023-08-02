@@ -12,10 +12,9 @@ from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.models._internal import DescriptiveMeta
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
+from edgy.core.utils.functional import edgy_setattr
 from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import ImproperlyConfigured
-
-object_settr = object.__setattr__
 
 
 class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta):
@@ -34,7 +33,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     def __init__(self, *args: Any, **kwargs: Any) -> None:  # type: ignore
         super().__init__(**kwargs)
         values = self.setup_model_fields_from_kwargs(kwargs)
-        object.__setattr__(self, "__dict__", values)
+        edgy_setattr(self, "__dict__", values)
 
     def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
         """

@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING, Any
 from edgy.cli.constants import EDGY_DB, EDGY_EXTRA
 from edgy.core.extras.base import BaseExtra
 from edgy.core.terminal import Print, Terminal
+from edgy.core.utils.functional import edgy_setattr
 
 if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
 
-object_setattr = object.__setattr__
 terminal = Terminal()
 printer = Print()
 
@@ -38,5 +38,5 @@ class EdgyExtra(BaseExtra):
             return
 
         config = Config(app=app, registry=registry)
-        object_setattr(app, EDGY_EXTRA, {})
+        edgy_setattr(app, EDGY_EXTRA, {})
         app._edgy_extra["extra"] = config

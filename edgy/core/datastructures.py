@@ -2,8 +2,6 @@ from typing import Any
 
 from pydantic import BaseModel
 
-object_setattr = object.__setattr__
-
 
 class HashableBaseModel(BaseModel):
     """

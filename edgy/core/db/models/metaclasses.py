@@ -17,13 +17,11 @@ from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
+from edgy.core.utils.functional import edgy_setattr
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
     from edgy.core.db.models import Model, ReflectModel
-
-
-object_settr = object.__setattr__
 
 
 class MetaInfo:
@@ -78,7 +76,7 @@ class MetaInfo:
         Loads the metadata from a dictionary
         """
         for key, value in values.items():
-            object_settr(self, key, value)
+            edgy_setattr(self, key, value)
 
 
 def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
