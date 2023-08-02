@@ -5,6 +5,7 @@ import sqlalchemy
 from pydantic.fields import FieldInfo
 
 from edgy.core.connection.registry import Registry
+from edgy.exceptions import FieldDefinitionError
 from edgy.types import Undefined
 
 
@@ -27,6 +28,7 @@ class BaseField(FieldInfo):
         if default is not Undefined:
             self.default = default
 
+        self.field_type: Any = kwargs.pop("__type__", None)
         self.primary_key: bool = kwargs.pop("primary_key", False)
         self.column_type: sqlalchemy.Column = kwargs.pop("column_type", None)
         self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop("constraints", None)
@@ -77,6 +79,10 @@ class BaseField(FieldInfo):
         kwargs.pop("is_o2o", False)
         kwargs.pop("is_fk", False)
 
+        if self.primary_key:
+            default_value = self.default
+            self.raise_for_non_default(default=default_value)
+
         for name, value in kwargs.items():
             setattr(self, name, value)
 
@@ -97,6 +103,12 @@ class BaseField(FieldInfo):
             pattern=self.regex,
             **kwargs,
         )
+
+    def raise_for_non_default(self, default: Any) -> Any:
+        if not self.field_type == int and not default:
+            raise FieldDefinitionError(
+                "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
+            )
 
     def is_required(self) -> bool:
         """Check if the argument is required.

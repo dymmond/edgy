@@ -595,7 +595,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         kwargs = self.validate_kwargs(**kwargs)
         instance = self.model_class(**kwargs)
-        instance = await instance.save(force_save=True)
+        instance = await instance.save(force_save=True, values=kwargs)
         return instance
 
     async def bulk_create(self, objs: List[Dict]) -> None:

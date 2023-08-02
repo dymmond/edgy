@@ -1,4 +1,4 @@
-from typing import Any, TypeVar
+from typing import Any, Dict, TypeVar
 
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
@@ -72,7 +72,9 @@ class Model(ModelRow, DeclarativeMixin):
         awaitable = await self.database.execute(expression)
         return awaitable
 
-    async def save(self: M, force_save: bool = False, **kwargs: Any) -> M:
+    async def save(
+        self: M, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
+    ) -> M:
         """
         Performs a save of a given model instance.
         When creating a user it will make sure it can update existing or
@@ -85,13 +87,10 @@ class Model(ModelRow, DeclarativeMixin):
 
         self.update_from_dict(dict(extracted_fields.items()))
 
-        validated_values = self.extract_values_from_field(extracted_fields)
+        validated_values = values or self.extract_values_from_field(extracted_fields)
         kwargs = self.update_auto_now_fields(validated_values, self.fields)
 
         # Performs the update or the create based on a possible existing primary key
-        expression = self.table.insert()
-        expression = expression.values(**kwargs)
-
         if getattr(self, "pk", None) is None or force_save:
             await self._save(**kwargs)
         else:

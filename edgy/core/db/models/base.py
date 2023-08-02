@@ -50,7 +50,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                     raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
 
             # Set model field and add to the kwargs dict
-            setattr(self, key, value)
+            edgy_setattr(self, key, value)
             kwargs[key] = getattr(self, key)
         return kwargs
 
@@ -60,7 +60,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @pk.setter
     def pk(self, value: Any) -> Any:
-        setattr(self, self.pkname, value)
+        edgy_setattr(self, self.pkname, value)
 
     @property
     def raw_query(self) -> Any:
@@ -68,7 +68,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @raw_query.setter
     def raw_query(self, value: Any) -> Any:
-        setattr(self, self.raw_query, value)
+        edgy_setattr(self, self.raw_query, value)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"
@@ -156,7 +156,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             else:
                 value = self.fields[key].expand_relationship(value)
 
-        super().__setattr__(key, value)
+        edgy_setattr(self, key, value)
 
     def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:

@@ -24,7 +24,7 @@ class DateParser:
         """
         Validates if the field type is a datetime type.
         """
-        return bool(field.__type__ == datetime)
+        return bool(field.field_type == datetime)
 
     def update_auto_now_fields(self, values: Any, fields: Any) -> Any:
         """
