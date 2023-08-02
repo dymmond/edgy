@@ -107,7 +107,7 @@ class Model(ModelRow, DeclarativeMixin):
         return self
 
 
-class ReflectModel(EdgyBaseReflectModel):
+class ReflectModel(Model, EdgyBaseReflectModel):
     """
     Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
     call.
