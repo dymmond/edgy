@@ -1,12 +1,15 @@
 import typing
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Any, Optional, Type
 
 from orjson import OPT_OMIT_MICROSECONDS  # noqa
 from orjson import OPT_SERIALIZE_NUMPY  # noqa
 from orjson import dumps
 
 from edgy.core.db.fields import DateField, DateTimeField
+
+if TYPE_CHECKING:
+    from edgy import Model
 
 
 class DateParser:
@@ -36,12 +39,15 @@ class DateParser:
 
 class ModelParser:
     """
-    Parser for the models.
+    Parser for the models operations of extraction of data from a given model.
     """
 
-    def extract_values_from_field(self, extracted_values: Any) -> Any:
+    def extract_values_from_field(
+        self, extracted_values: Any, model_class: Optional[Type["Model"]] = None
+    ) -> Any:
+        model_cls = model_class or self
         validated = {}
-        for name, field in self.fields.items():
+        for name, field in model_cls.fields.items():
             if field.read_only:
                 continue
 
@@ -54,3 +60,11 @@ class ModelParser:
             value = field.check(item)
             validated[name] = value
         return validated
+
+    def extract_db_fields_from_model(self, model_class: Type["Model"]):
+        """
+        Extacts all the db fields and excludes the related_names since those
+        are simply relations.
+        """
+        related_names = model_class.meta.related_names
+        return {k: v for k, v in model_class.__dict__.items() if k not in related_names}

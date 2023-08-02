@@ -59,8 +59,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         if "pk" in kwargs:
             kwargs[self.pkname] = kwargs.pop("pk")
-        elif "id" in kwargs:
-            kwargs[self.pkname] = kwargs.pop("id")
+
         kwargs = {k: v for k, v in kwargs.items() if k in self.meta.fields_mapping}
 
         for k, v in kwargs.items():

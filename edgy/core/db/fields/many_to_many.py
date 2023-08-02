@@ -23,9 +23,6 @@ class ForeignKeyFieldFactory:
     """The base for all model fields to be used with Edgy"""
 
     _type: Any = None
-    is_m2m: bool = False
-    is_o2o: bool = False
-    is_fk: bool = False
 
     def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
         cls.validate(**kwargs)
@@ -41,9 +38,9 @@ class ForeignKeyFieldFactory:
         server_default: Any = kwargs.pop("server_default", None)
         server_onupdate: Any = kwargs.pop("server_onupdate", None)
         registry: Registry = kwargs.pop("registry", None)
-        is_m2m = cls.is_m2m
-        is_o2o = cls.is_o2o
-        is_fk = cls.is_fk
+        is_o2o = kwargs.pop("is_o2o", False)
+        is_fk = kwargs.pop("is_fk", False)
+        is_m2m = True
         field_type = cls._type
 
         namespace = dict(

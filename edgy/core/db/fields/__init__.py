@@ -20,8 +20,9 @@ from .base import (
     URLField,
     UUIDField,
 )
-from .foreign_keys import ForeignKey, OneToOne, OneToOneField
+from .foreign_keys import ForeignKey
 from .many_to_many import ManyToMany, ManyToManyField
+from .one_to_one_keys import OneToOne, OneToOneField
 
 __all__ = [
     "AutoNowMixin",

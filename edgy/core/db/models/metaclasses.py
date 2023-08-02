@@ -12,6 +12,7 @@ from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.base import BaseField, BigIntegerField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
+from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
@@ -34,7 +35,6 @@ class MetaInfo:
         "indexes",
         "foreign_key_fields",
         "parents",
-        "one_to_one_fields",
         "many_to_many_fields",
         "manager",
         "model",
@@ -56,7 +56,6 @@ class MetaInfo:
         self.registry: Optional[Type[Registry]] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.parents: Any = getattr(meta, "parents", None) or []
-        self.one_to_one_fields: Set[str] = set()
         self.many_to_many_fields: Set[str] = set()
         self.foreign_key_fields: Dict[str, Any] = ()
         self.model: Optional[Type["Model"]] = None
@@ -163,7 +162,6 @@ class BaseModelMeta(ModelMetaclass):
 
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
         fields: Dict[str, BaseField] = {}
-        one_to_one_fields: Any = set()
         foreign_key_fields: Any = {}
         many_to_many_fields: Any = set()
         meta_class: "Model.Meta" = attrs.get("Meta", type("Meta", (), {}))
@@ -237,15 +235,13 @@ class BaseModelMeta(ModelMetaclass):
 
                 fields[key] = value
 
-                if isinstance(value, BaseForeignKeyField):
-                    if value.is_o2o:
-                        one_to_one_fields.add(value)
-                    if value.is_fk:
-                        foreign_key_fields[key] = value
-                    continue
+                if isinstance(value, BaseOneToOneKeyField):
+                    foreign_key_fields[key] = value
                 elif isinstance(value, BaseManyToManyForeignKeyField):
-                    if value.is_m2m:
-                        many_to_many_fields.add(value)
+                    many_to_many_fields.add(value)
+                    continue
+                elif isinstance(value, BaseForeignKeyField):
+                    foreign_key_fields[key] = value
                     continue
 
         for slot in fields:
@@ -255,7 +251,6 @@ class BaseModelMeta(ModelMetaclass):
 
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
-        meta.one_to_one_fields = one_to_one_fields
         meta.many_to_many_fields = many_to_many_fields
         meta.pk_attribute = pk_attribute
         meta.pk = fields.get(pk_attribute)

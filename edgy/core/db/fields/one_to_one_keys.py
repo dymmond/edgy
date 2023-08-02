@@ -38,8 +38,8 @@ class ForeignKeyFieldFactory:
         server_onupdate: Any = kwargs.pop("server_onupdate", None)
         registry: Registry = kwargs.pop("registry", None)
         is_m2m = kwargs.pop("is_m2m", False)
-        is_o2o = kwargs.pop("is_o2o", False)
-        is_fk = True
+        is_fk = kwargs.pop("is_fk", False)
+        is_o2o = True
         field_type = cls._type
 
         namespace = dict(
@@ -63,7 +63,7 @@ class ForeignKeyFieldFactory:
             constraints=cls.get_constraints(),
             **kwargs,
         )
-        Field = type(cls.__name__, (BaseForeignKeyField, BaseField), {})
+        Field = type(cls.__name__, (BaseOneToOneKeyField, BaseField), {})
         return Field(**namespace)  # type: ignore
 
     @classmethod
@@ -84,11 +84,11 @@ class ForeignKeyFieldFactory:
         return []
 
 
-class BaseForeignKeyField(BaseField):
+class BaseOneToOneKeyField(BaseField):
     @property
     def target(self) -> Any:
         """
-        The target of the ForeignKey model.
+        The target of the OneToOne model.
         """
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
@@ -104,14 +104,16 @@ class BaseForeignKeyField(BaseField):
         column_type = to_field.column_type
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}",
-                ondelete=self.on_delete,
-                onupdate=self.on_update,
-                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
-                f"_{target.pkname}_{name}",
+                f"{target.meta.tablename}.{target.pkname}", ondelete=self.on_delete
             )
         ]
-        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+        return sqlalchemy.Column(
+            name,
+            column_type,
+            *constraints,
+            nullable=self.null,
+            unique=True,
+        )
 
     def get_related_name(self) -> str:
         """
@@ -134,7 +136,11 @@ class BaseForeignKeyField(BaseField):
         return value.pk
 
 
-class ForeignKey(ForeignKeyFieldFactory):
+class OneToOneField(ForeignKeyFieldFactory):
+    """
+    Representation of a one to one field.
+    """
+
     _type = sqlalchemy.ForeignKey
 
     def __new__(  # type: ignore
@@ -168,3 +174,6 @@ class ForeignKey(ForeignKeyFieldFactory):
 
         if on_update and (on_update == SET_NULL and not null):
             raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
+
+
+OneToOne = OneToOneField

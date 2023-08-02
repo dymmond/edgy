@@ -5,6 +5,7 @@ from pydantic import ConfigDict
 
 from edgy.core.db import fields
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
+from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 
 if TYPE_CHECKING:
     from edgy import Model, ReflectModel
@@ -85,7 +86,7 @@ class RelatedField:
         field_name: str = None
 
         for field, value in self.related_from.fields.items():
-            if isinstance(value, BaseForeignKeyField):
+            if isinstance(value, (BaseForeignKeyField, BaseOneToOneKeyField)):
                 if value.related_name == self.related_name:
                     field_name = field
                     break

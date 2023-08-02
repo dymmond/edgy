@@ -18,9 +18,10 @@ import sqlalchemy
 from edgy.conf import settings
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
+from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.querysets.mixins import QuerySetPropsMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
-from edgy.core.utils.models import DateParser
+from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound
 from edgy.protocols.queryset import QuerySetProtocol
 
@@ -34,7 +35,7 @@ ReflectEdgyModel = TypeVar("ReflectEdgyModel", bound="ReflectModel")
 EdgyModel = Union[_EdgyModel, ReflectEdgyModel]
 
 
-class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
+class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[EdgyModel]):
     ESCAPE_CHARACTERS = ["%", "_"]
 
     def __init__(
@@ -114,7 +115,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
             if counter > 1:
                 has_many = True
 
-            if isinstance(value, BaseForeignKeyField):
+            if isinstance(value, (BaseForeignKeyField, BaseOneToOneKeyField)):
                 tablename = value.to if isinstance(value.to, str) else value.to.__name__
 
                 if tablename not in foreign_keys:
@@ -670,7 +671,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Updates a record in a specific table with the given kwargs.
         """
-        kwargs = self._update_auto_now_fields(kwargs, self.model_class.fields)
+        extracted_fields = self.extract_values_from_field(kwargs, model_class=self.model_class)
+        kwargs = self._update_auto_now_fields(extracted_fields, self.model_class.fields)
         expression = self.table.update().values(**kwargs)
 
         for filter_clause in self.filter_clauses:
