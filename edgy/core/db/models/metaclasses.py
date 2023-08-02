@@ -4,15 +4,20 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Set, Tuple, Typ
 
 import sqlalchemy
 from pydantic._internal._model_construction import ModelMetaclass
+from typing_extensions import Self
 
 from edgy.conf import settings
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.fields.base import BaseField, BigIntegerField
+from edgy.core.db.fields.core import BaseField, BigIntegerField
+from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
+from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
+from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
+from edgy.core.utils.functional import edgy_setattr
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
@@ -32,7 +37,6 @@ class MetaInfo:
         "indexes",
         "foreign_key_fields",
         "parents",
-        "one_to_one_fields",
         "many_to_many_fields",
         "manager",
         "model",
@@ -41,6 +45,7 @@ class MetaInfo:
         "is_multi",
         "multi_related",
         "related_names",
+        "related_fields",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
@@ -53,9 +58,8 @@ class MetaInfo:
         self.registry: Optional[Type[Registry]] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.parents: Any = getattr(meta, "parents", None) or []
-        self.one_to_one_fields: Set[str] = set()
         self.many_to_many_fields: Set[str] = set()
-        self.foreign_key_fields: Set[str] = set()
+        self.foreign_key_fields: Dict[str, Any] = ()
         self.model: Optional[Type["Model"]] = None
         self.manager: "Manager" = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
@@ -65,6 +69,14 @@ class MetaInfo:
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
         self.related_names: Set[str] = set()
+        self.related_fields: Dict[str, Any] = {}
+
+    def load_dict(self, values: Dict[str, Any]) -> Self:
+        """
+        Loads the metadata from a dictionary
+        """
+        for key, value in values.items():
+            edgy_setattr(self, key, value)
 
 
 def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
@@ -120,7 +132,7 @@ def _set_related_name_for_foreign_keys(
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
-    for foreign_key in foreign_keys:
+    for _, foreign_key in foreign_keys.items():
         default_related_name = getattr(foreign_key, "related_name", None)
 
         if not default_related_name:
@@ -130,7 +142,6 @@ def _set_related_name_for_foreign_keys(
             raise ForeignKeyBadConfigured(
                 f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
             )
-
         foreign_key.related_name = default_related_name
 
         related_field = RelatedField(
@@ -146,7 +157,7 @@ def _set_related_name_for_foreign_keys(
 
 
 def _set_many_to_many_relation(
-    m2m: edgy_fields.ManyToManyField,
+    m2m: BaseManyToManyForeignKeyField,
     model_class: Union["Model", "ReflectModel"],
     field: str,
 ) -> None:
@@ -160,8 +171,7 @@ class BaseModelMeta(ModelMetaclass):
 
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
         fields: Dict[str, BaseField] = {}
-        one_to_one_fields: Any = set()
-        foreign_key_fields: Any = set()
+        foreign_key_fields: Any = {}
         many_to_many_fields: Any = set()
         meta_class: "Model.Meta" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
@@ -234,16 +244,13 @@ class BaseModelMeta(ModelMetaclass):
 
                 fields[key] = value
 
-                if isinstance(value, edgy_fields.OneToOneField):
-                    one_to_one_fields.add(value)
-                    continue
-                elif isinstance(value, edgy_fields.ManyToManyField):
+                if isinstance(value, BaseOneToOneKeyField):
+                    foreign_key_fields[key] = value
+                elif isinstance(value, BaseManyToManyForeignKeyField):
                     many_to_many_fields.add(value)
                     continue
-                elif isinstance(value, edgy_fields.ForeignKey) and not isinstance(
-                    value, edgy_fields.ManyToManyField
-                ):
-                    foreign_key_fields.add(value)
+                elif isinstance(value, BaseForeignKeyField):
+                    foreign_key_fields[key] = value
                     continue
 
         for slot in fields:
@@ -253,7 +260,6 @@ class BaseModelMeta(ModelMetaclass):
 
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
-        meta.one_to_one_fields = one_to_one_fields
         meta.many_to_many_fields = many_to_many_fields
         meta.pk_attribute = pk_attribute
         meta.pk = fields.get(pk_attribute)
@@ -353,7 +359,7 @@ class BaseModelMeta(ModelMetaclass):
             meta.related_names.add(related_name)
 
         for field, value in new_class.fields.items():
-            if isinstance(value, edgy_fields.ManyToManyField):
+            if isinstance(value, BaseManyToManyForeignKeyField):
                 _set_many_to_many_relation(value, new_class, field)
 
         # Set the manager

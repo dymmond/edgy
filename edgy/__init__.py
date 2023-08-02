@@ -1,5 +1,6 @@
 __version__ = "0.1.0"
 
+from .cli.base import Migrate
 from .conf import settings
 from .conf.global_settings import EdgySettings
 from .core.connection.database import Database, DatabaseURL
@@ -26,16 +27,12 @@ from .core.db.fields import (
     URLField,
     UUIDField,
 )
-from .core.db.fields.foreign_keys import (
-    ForeignKey,
-    ManyToMany,
-    ManyToManyField,
-    OneToOne,
-    OneToOneField,
-)
+from .core.db.fields.foreign_keys import ForeignKey
+from .core.db.fields.many_to_many import ManyToMany, ManyToManyField
+from .core.db.fields.one_to_one_keys import OneToOne, OneToOneField
 from .core.db.models import Model, ReflectModel
 from .core.db.models.managers import Manager
-from .core.db.querysets.base import QuerySet
+from .core.db.querysets import QuerySet
 from .core.extras import EdgyExtra
 from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
@@ -62,6 +59,7 @@ __all__ = [
     "Manager",
     "ManyToMany",
     "ManyToManyField",
+    "Migrate",
     "Model",
     "MultipleObjectsReturned",
     "ObjectNotFound",

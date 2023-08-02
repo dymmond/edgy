@@ -1,21 +1,18 @@
 import functools
 from typing import TYPE_CHECKING, Any, Optional, Type, Union
 
-from pydantic import BaseModel, ConfigDict
-
-from edgy.core.db import fields
+from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
+from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 
 if TYPE_CHECKING:
     from edgy import Model, ReflectModel
 
 
-class RelatedField(BaseModel):
+class RelatedField:
     """
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
-
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     def __init__(
         self,
@@ -49,7 +46,7 @@ class RelatedField(BaseModel):
         related = [
             key
             for key, value in self.related_from.fields.items()
-            if key != self.related_to.__name__.lower() and isinstance(value, fields.ForeignKey)
+            if key != self.related_to.__name__.lower() and isinstance(value, BaseForeignKeyField)
         ]
         return related
 
@@ -84,7 +81,7 @@ class RelatedField(BaseModel):
         field_name: str = None
 
         for field, value in self.related_from.fields.items():
-            if isinstance(value, (fields.ForeignKey, fields.OneToOneField)):
+            if isinstance(value, (BaseForeignKeyField, BaseOneToOneKeyField)):
                 if value.related_name == self.related_name:
                     field_name = field
                     break

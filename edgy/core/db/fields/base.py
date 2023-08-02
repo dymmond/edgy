@@ -1,492 +1,179 @@
-import datetime
 import decimal
-import enum
-import re
-import uuid
-from enum import EnumMeta
-from typing import Any, Optional, Pattern, Sequence, Set, Tuple, Union
+from typing import Any, Optional, Pattern, Sequence, Union
 
-import pydantic
 import sqlalchemy
+from pydantic.fields import FieldInfo
 
-from edgy.core.db.base import BaseField
+from edgy.core.connection.registry import Registry
 from edgy.exceptions import FieldDefinitionError
+from edgy.types import Undefined
 
-CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
+class BaseField(FieldInfo):
+    """
+    The base field for all Edgy data model fields.
+    """
 
-class FieldFactory:
-    """The base for all model fields to be used with Edgy"""
+    def __init__(
+        self,
+        *,
+        default: Any = Undefined,
+        title: Optional[str] = None,
+        description: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        self.null: bool = kwargs.pop("null", False)
+        if self.null and default is Undefined:
+            default = None
+        if default is not Undefined:
+            self.default = default
 
-    _bases = (BaseField,)
-    _type: Any = None
+        self.field_type: Any = kwargs.pop("__type__", None)
+        self.primary_key: bool = kwargs.pop("primary_key", False)
+        self.column_type: sqlalchemy.Column = kwargs.pop("column_type", None)
+        self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop("constraints", None)
+        self.title = title
+        self.description = description
+        self.blank: bool = kwargs.pop("blank", False)
+        self.read_only: bool = kwargs.pop("read_only", False)
+        self.help_text: str = kwargs.pop("help_text", None)
+        self.blank: bool = kwargs.pop("blank", False)
+        self.pattern: Pattern = kwargs.pop("pattern", None)
+        self.autoincrement: bool = kwargs.pop("autoincrement", False)
+        self.related_name: str = kwargs.pop("related_name", None)
+        self.unique: bool = kwargs.pop("unique", False)
+        self.index: bool = kwargs.pop("index", False)
+        self.choices: Sequence = kwargs.pop("choices", None)
+        self.owner: Any = kwargs.pop("owner", None)
+        self.name: str = kwargs.pop("name", None)
+        self.alias: str = kwargs.pop("name", None)
+        self.max_digits: str = kwargs.pop("max_digits", None)
+        self.decimal_places: str = kwargs.pop("decimal_places", None)
+        self.regex: str = kwargs.pop("regex", None)
+        self.format: str = kwargs.pop("format", None)
+        self.min_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "min_length", None
+        )
+        self.max_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "max_length", None
+        )
+        self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("minimum", None)
+        self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("maximum", None)
+        self.exclusive_mininum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "exclusive_mininum", None
+        )
+        self.exclusive_maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "exclusive_maximum", None
+        )
+        self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "multiple_of", None
+        )
+        self.through: Any = kwargs.pop("through", None)
+        self.server_default: Any = kwargs.pop("server_default", None)
+        self.server_onupdate: Any = kwargs.pop("server_onupdate", None)
+        self.registry: Registry = kwargs.pop("registry", None)
+        self.comment = kwargs.pop("comment", None)
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
-        cls.validate(**kwargs)
+        # Foreign keys
+        kwargs.pop("is_m2m", False)
+        kwargs.pop("is_o2o", False)
+        kwargs.pop("is_fk", False)
 
-        default = kwargs.pop("default", None)
-        null: bool = kwargs.pop("null", False)
-        primary_key: bool = kwargs.pop("primary_key", False)
-        autoincrement: bool = kwargs.pop("autoincrement", False)
-        unique: bool = kwargs.pop("unique", False)
-        index: bool = kwargs.pop("index", False)
-        name: str = kwargs.pop("name", None)
-        choices: Set[Any] = set(kwargs.pop("choices", []))
-        comment: str = kwargs.pop("comment", None)
-        owner = kwargs.pop("owner", None)
-        server_default = kwargs.pop("server_default", None)
-        server_onupdate = kwargs.pop("server_onupdate", None)
-        blank: bool = kwargs.pop("blank", False)
-        field_type = cls._type
+        if self.primary_key:
+            default_value = self.default
+            self.raise_for_non_default(default=default_value)
 
-        namespace = dict(
-            __type__=field_type,
-            annotation=field_type,
-            name=name,
-            primary_key=primary_key,
+        for name, value in kwargs.items():
+            setattr(self, name, value)
+
+        super().__init__(
             default=default,
-            null=null,
-            index=index,
-            unique=unique,
-            autoincrement=autoincrement,
-            choices=choices,
-            comment=comment,
-            owner=owner,
-            server_default=server_default,
-            server_onupdate=server_onupdate,
-            blank=blank,
+            alias=self.alias,
+            title=title,
+            description=description,
+            min_length=self.min_length,
+            max_length=self.max_length,
+            ge=self.minimum,
+            le=self.maximum,
+            gt=self.exclusive_mininum,
+            lt=self.exclusive_maximum,
+            multiple_of=self.multiple_of,
+            max_digits=self.max_digits,
+            decimal_places=self.decimal_places,
+            pattern=self.regex,
             **kwargs,
         )
-        Field = type(cls.__name__, cls._bases, {})
-        return Field(**namespace)  # type: ignore
 
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:  # pragma no cover
-        """
-        Used to validate if all required parameters on a given field type are set.
-        :param kwargs: all params passed during construction
-        :type kwargs: Any
-        """
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        """Returns the propery column type for the field"""
-        return None
-
-    def check(self, value: Any) -> Any:
-        """
-        Validates some of the non pydantic field values.
-        """
-
-
-class CharField(FieldFactory, str):
-    """String field representation that constructs the Field class and populates the values"""
-
-    _type = str
-
-    def __new__(  # type: ignore
-        cls,
-        *,
-        max_length: Optional[int] = 0,
-        min_length: Optional[int] = None,
-        regex: Union[str, Pattern] = None,  # type: ignore
-        **kwargs: Any,
-    ) -> BaseField:
-        if regex is None:
-            regex = None
-            kwargs["pattern_regex"] = None
-        elif isinstance(regex, str):
-            regex = regex
-            kwargs["pattern_regex"] = re.compile(regex)
-        else:
-            regex = regex.pattern
-            kwargs["pattern_regex"] = regex
-
-        kwargs = {
-            **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
-        }
-
-        return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        max_length = kwargs.get("max_length", 0)
-        if max_length <= 0:
-            raise FieldDefinitionError(detail=f"'max_length' is required for {cls.__name__}")
-
-        min_length = kwargs.get("min_length")
-        pattern = kwargs.get("regex")
-
-        assert min_length is None or isinstance(min_length, int)
-        assert max_length is None or isinstance(max_length, int)
-        assert pattern is None or isinstance(pattern, (str, Pattern))
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.String(length=kwargs.get("max_length"))
-
-
-class TextField(FieldFactory, str):
-    """String representation of a text field which means no max_length required"""
-
-    _type = str
-
-    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
-        kwargs = {
-            **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Text()
-
-
-class Number(FieldFactory):
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        minimum = kwargs.get("minimum", None)
-        maximum = kwargs.get("maximum", None)
-        exclusive_minimum = kwargs.get("exclusive_minimum", None)
-        exclusive_maximum = kwargs.get("exclusive_maximum", None)
-
-        if (minimum is not None and maximum is not None) and minimum > maximum:
-            raise FieldDefinitionError(detail="'minimum' cannot be bigger than 'maximum'")
-
-        if (
-            exclusive_maximum is not None and exclusive_maximum is not None
-        ) and exclusive_minimum > exclusive_maximum:
+    def raise_for_non_default(self, default: Any) -> Any:
+        if not self.field_type == int and not default:
             raise FieldDefinitionError(
-                detail="'exclusive_minimum' cannot be bigger than 'exclusive_maximum'"
+                "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
             )
 
+    def is_required(self) -> bool:
+        """Check if the argument is required.
 
-class IntegerField(Number, int):
-    """
-    Integer field factory that construct Field classes and populated their values.
-    """
+        Returns:
+            `True` if the argument is required, `False` otherwise.
+        """
+        required = False if self.null else True
+        return required
 
-    _type = int
+    def get_alias(self) -> str:
+        """
+        Used to translate the model column names into database column tables.
+        """
+        return self.name
 
-    def __new__(  # type: ignore
-        cls,
-        *,
-        minimum: Optional[int] = None,
-        maximum: Optional[int] = None,
-        exclusive_minimum: Optional[float] = None,
-        exclusive_maximum: Optional[float] = None,
-        multiple_of: Optional[int] = None,
-        **kwargs: Any,
-    ) -> BaseField:
-        autoincrement = kwargs.pop("autoincrement", None)
-        autoincrement = (
-            autoincrement if autoincrement is not None else kwargs.get("primary_key", False)
-        )
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
-        }
-        return super().__new__(cls, **kwargs)
+    def is_primary_key(self) -> bool:
+        """
+        Sets the autoincrement to True if the field is primary key.
+        """
+        if self.primary_key:
+            self.autoincrement = True
+        return False
 
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Integer()
+    def has_default(self) -> bool:
+        """Checks if the field has a default value set"""
+        return bool(self.default is not None and self.default is not Undefined)
 
+    def get_column(self, name: str) -> Any:
+        """
+        Returns the column type of the field being declared.
+        """
+        if self.column_type == sqlalchemy.ForeignKey:
+            return self.get_column(name)
 
-class FloatField(Number, float):
-    """Representation of a int32 and int64"""
-
-    _type = float
-
-    def __new__(  # type: ignore
-        cls,
-        *,
-        mininum: Optional[float] = None,
-        maximun: Optional[float] = None,
-        exclusive_minimum: Optional[float] = None,
-        exclusive_maximum: Optional[float] = None,
-        multiple_of: Optional[int] = None,
-        **kwargs: Any,
-    ) -> BaseField:
-        kwargs = {
-            **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Float()
-
-
-class BigIntegerField(IntegerField):
-    """Representation of big integer field"""
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.BigInteger()
-
-
-class SmallIntegerField(IntegerField):
-    """Represents a small integer field"""
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.SmallInteger()
-
-
-class DecimalField(Number, decimal.Decimal):
-    _type = decimal.Decimal
-
-    def __new__(  # type: ignore
-        cls,
-        *,
-        minimum: Optional[int] = None,
-        maximum: Optional[int] = None,
-        exclusive_minimum: Optional[float] = None,
-        exclusive_maximum: Optional[float] = None,
-        multiple_of: Optional[int] = None,
-        precision: Optional[int] = None,
-        max_digits: Optional[int] = None,
-        decimal_places: Optional[int] = None,
-        **kwargs: Any,
-    ) -> BaseField:
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
-        }
-        if kwargs.get("max_digits"):
-            kwargs["precision"] = kwargs["max_digits"]
-        elif kwargs.get("precision"):
-            kwargs["max_digits"] = kwargs["precision"]
-
-        return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        super().validate(**kwargs)
-
-        precision = kwargs.get("precision")
-        if precision is None or precision < 0:
-            raise FieldDefinitionError(
-                "'max_digits' and 'precision' are required for DecimalField"
-            )
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Numeric(
-            precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places")
+        constraints = self.get_constraints()
+        return sqlalchemy.Column(
+            name,
+            self.column_type,
+            *constraints,
+            primary_key=self.primary_key,
+            nullable=self.null and not self.primary_key,
+            index=self.index,
+            unique=self.unique,
+            default=self.default,
+            comment=self.comment,
+            server_default=self.server_default,
+            server_onupdate=self.server_onupdate,
         )
 
+    def expand_relationship(self, value: Any) -> Any:
+        """
+        Used to be overritten by any Link class.
+        """
+        return value
 
-class BooleanField(FieldFactory, int):
-    """Representation of a boolean"""
+    def get_related_name(self) -> str:
+        """Returns the related name used for reverse relations"""
+        return self.related_name
 
-    _type = bool
+    def get_constraints(self) -> Any:
+        return self.constraints
 
-    def __new__(  # type: ignore
-        cls,
-        *,
-        default: Optional[bool] = False,
-        **kwargs: Any,
-    ) -> BaseField:
-        kwargs = {
-            **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Boolean()
-
-
-class AutoNowMixin(FieldFactory):
-    def __new__(  # type: ignore
-        cls,
-        *,
-        auto_now: Optional[bool] = False,
-        auto_now_add: Optional[bool] = False,
-        **kwargs: Any,
-    ) -> BaseField:
-        if auto_now_add and auto_now:
-            raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
-        if auto_now_add or auto_now:
-            kwargs["read_only"] = True
-
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
-
-class DateTimeField(AutoNowMixin, datetime.datetime):
-    """Representation of a datetime field"""
-
-    _type = datetime.datetime
-
-    def __new__(  # type: ignore
-        cls,
-        *,
-        auto_now: Optional[bool] = False,
-        auto_now_add: Optional[bool] = False,
-        **kwargs: Any,
-    ) -> BaseField:
-        if auto_now_add or auto_now:
-            kwargs["default"] = datetime.datetime.now
-
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.DateTime()
-
-
-class DateField(AutoNowMixin, datetime.date):
-    """Representation of a date field"""
-
-    _type = datetime.date
-
-    def __new__(  # type: ignore
-        cls,
-        *,
-        auto_now: Optional[bool] = False,
-        auto_now_add: Optional[bool] = False,
-        **kwargs: Any,
-    ) -> BaseField:
-        if auto_now_add or auto_now:
-            kwargs["default"] = datetime.datetime.today
-
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Date()
-
-
-class TimeField(FieldFactory, datetime.time):
-    """Representation of a time field"""
-
-    _type = datetime.time
-
-    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Time()
-
-
-class JSONField(FieldFactory, pydantic.Json):  # type: ignore
-    """Representation of a JSONField"""
-
-    _type = pydantic.Json
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.JSON()
-
-
-class BinaryField(FieldFactory, bytes):
-    """Representation of a binary"""
-
-    _type = bytes
-
-    def __new__(cls, *, max_length: Optional[int] = 0, **kwargs: Any) -> BaseField:  # type: ignore
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        max_length = kwargs.get("max_length", None)
-        if max_length <= 0:
-            raise FieldDefinitionError(detail="Parameter 'max_length' is required for BinaryField")
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.JSON(none_as_null=kwargs.get("sql_nullable", False))
-
-
-class UUIDField(FieldFactory, uuid.UUID):
-    """Representation of a uuid"""
-
-    _type = uuid.UUID
-
-    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-
-        return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.UUID()
-
-
-class ChoiceField(FieldFactory):
-    """Representation of an Enum"""
-
-    _type = enum.Enum
-
-    def __new__(  # type: ignore
-        cls,
-        choices: Optional[Sequence[Union[Tuple[str, str], Tuple[str, int]]]] = None,
-        **kwargs: Any,
-    ) -> BaseField:
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        choice_class = kwargs.get("choices")
-        if choice_class is None and not isinstance(choice_class, EnumMeta):
-            raise FieldDefinitionError("ChoiceField choices must be an Enum")
-
-    @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Enum(kwargs.get("choices", ()))
-
-
-class PasswordField(CharField):
-    """
-    Representation of a Password
-    """
-
-    @classmethod
-    def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
-        return sqlalchemy.String(length=kwargs.get("max_length"))
-
-
-class EmailField(CharField):
-    @classmethod
-    def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
-        return sqlalchemy.String(length=self.validator.max_length)  # type: ignore
-
-
-class URLField(CharField):
-    @classmethod
-    def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
-        return sqlalchemy.String(length=self.validator.max_length)  # type: ignore
+    def get_default_value(self) -> Any:
+        default = getattr(self, "default", None)
+        if callable(default):
+            return default()
+        return default

@@ -42,3 +42,4 @@ class EdgySettings(BaseSettings):
         "lte": "__le__",
     }
     many_to_many_relation: str = "relation_{key}"
+    dialects: Dict[str, str] = {"postgres": "postgres", "postgresql": "postgresql"}

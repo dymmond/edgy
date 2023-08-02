@@ -1,8 +1,9 @@
-from typing import Any, TypeVar
+from typing import Any, Dict, TypeVar
 
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
+from edgy.core.utils.functional import edgy_setattr
 
 M = TypeVar("M", bound="Model")
 
@@ -14,24 +15,24 @@ class Model(ModelRow, DeclarativeMixin):
     from anywhere.
     """
 
-    def __repr__(self) -> str:  # pragma nocover
-        _repr = {k: getattr(self, k) for k, v in self.meta.fields.items()}
-        return f"{self.__class__.__name__}({str(_repr)})"
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__}: {self}>"
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}({self.pkname}={self.pk})"
 
     async def update(self, **kwargs: Any) -> Any:
         """
         Update operation of the database fields.
         """
-        fields = {key: field.validator for key, field in self.fields.items() if key in kwargs}
-        validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.check(kwargs), self.fields)
+        kwargs = self.update_auto_now_fields(kwargs, self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         await self.database.execute(expression)
 
         # Update the model instance.
         for key, value in kwargs.items():
-            setattr(self, key, value)
+            edgy_setattr(self, key, value)
 
     async def delete(self) -> None:
         """Delete operation from the database"""
@@ -49,9 +50,31 @@ class Model(ModelRow, DeclarativeMixin):
 
         # Update the instance.
         for key, value in dict(row._mapping).items():
-            setattr(self, key, value)
+            edgy_setattr(self, key, value)
 
-    async def save(self: M) -> M:
+    async def _save(self, **kwargs: Any) -> M:
+        """
+        Performs the save instruction.
+        """
+        expression = self.table.insert().values(**kwargs)
+        awaitable = await self.database.execute(expression)
+        if not awaitable:
+            awaitable = kwargs.get(self.pkname)
+        edgy_setattr(self, self.pkname, awaitable)
+        return self
+
+    async def _update(self, **kwargs: Any) -> M:
+        """
+        Performs the save instruction.
+        """
+        pk_column = getattr(self.table.c, self.pkname)
+        expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
+        awaitable = await self.database.execute(expression)
+        return awaitable
+
+    async def save(
+        self: M, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
+    ) -> M:
         """
         Performs a save of a given model instance.
         When creating a user it will make sure it can update existing or
@@ -64,21 +87,14 @@ class Model(ModelRow, DeclarativeMixin):
 
         self.update_from_dict(dict(extracted_fields.items()))
 
-        fields = {
-            key: field.validator for key, field in self.fields.items() if key in extracted_fields
-        }
-        validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.check(extracted_fields), self.fields)
+        validated_values = values or self.extract_values_from_field(extracted_fields)
+        kwargs = self.update_auto_now_fields(validated_values, self.fields)
 
         # Performs the update or the create based on a possible existing primary key
-        if getattr(self, "pk", None) is None:
-            expression = self.table.insert().values(**kwargs)
-            pk_column = await self.database.execute(expression)
-            setattr(self, self.pkname, pk_column)
+        if getattr(self, "pk", None) is None or force_save:
+            await self._save(**kwargs)
         else:
-            pk_column = getattr(self.table.c, self.pkname)
-            expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
-            await self.database.execute(expression)
+            await self._update(**kwargs)
 
         # Refresh the results
         if any(
@@ -90,7 +106,7 @@ class Model(ModelRow, DeclarativeMixin):
         return self
 
 
-class ReflectModel(EdgyBaseReflectModel):
+class ReflectModel(Model, EdgyBaseReflectModel):
     """
     Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
     call.

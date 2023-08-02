@@ -16,12 +16,12 @@ from typing import (
 import sqlalchemy
 
 from edgy.conf import settings
-from edgy.core.db.fields import CharField, ForeignKey, OneToOneField, TextField
+from edgy.core.db.fields import CharField, TextField
+from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
+from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.querysets.mixins import QuerySetPropsMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
-
-# from edgy.core.schemas import Schema
-from edgy.core.utils.models import DateParser
+from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound
 from edgy.protocols.queryset import QuerySetProtocol
 
@@ -35,7 +35,7 @@ ReflectEdgyModel = TypeVar("ReflectEdgyModel", bound="ReflectModel")
 EdgyModel = Union[_EdgyModel, ReflectEdgyModel]
 
 
-class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
+class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[EdgyModel]):
     ESCAPE_CHARACTERS = ["%", "_"]
 
     def __init__(
@@ -68,13 +68,13 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
 
     def build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
-        order_by = list(map(self._prepare_order_by, order_by))
+        order_by = list(map(self.prepare_order_by, order_by))
         expression = expression.order_by(*order_by)
         return expression
 
     def build_group_by_expression(self, group_by: Any, expression: Any) -> Any:
         """Builds the group by expression"""
-        group_by = list(map(self._prepare_group_by, group_by))
+        group_by = list(map(self.prepare_group_by, group_by))
         expression = expression.group_by(*group_by)
         return expression
 
@@ -89,7 +89,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
 
     def build_select_distinct(self, distinct_on: Any, expression: Any) -> Any:
         """Filters selects only specific fields"""
-        distinct_on = list(map(self._prepare_fields_for_distinct, distinct_on))
+        distinct_on = list(map(self.prepare_fields_for_distinct, distinct_on))
         expression = expression.distinct(*distinct_on)
         return expression
 
@@ -115,7 +115,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
             if counter > 1:
                 has_many = True
 
-            if isinstance(value, (ForeignKey, OneToOneField)):
+            if isinstance(value, (BaseForeignKeyField, BaseOneToOneKeyField)):
                 tablename = value.to if isinstance(value.to, str) else value.to.__name__
 
                 if tablename not in foreign_keys:
@@ -302,13 +302,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
         )
 
     def validate_kwargs(self, **kwargs: Any) -> Any:
-        fields = self.model_class.fields
-        validator = Schema(fields={key: value.validator for key, value in fields.items()})
-        kwargs = validator.check(kwargs)
-        for key, value in fields.items():
-            if value.validator.read_only and value.validator.has_default():
-                kwargs[key] = value.validator.get_default_value()
-        return kwargs
+        return self.extract_values_from_field(kwargs, model_class=self.model_class)
 
     def prepare_order_by(self, order_by: str) -> Any:
         reverse = order_by.startswith("-")
@@ -484,7 +478,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         later use of foreign-key relationships won’t require database queries.
         """
-        queryset: "QuerySet" = self._clone()
+        queryset: "QuerySet" = self.clone()
         if not isinstance(related, (list, tuple)):
             related = [related]
 
@@ -498,7 +492,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         expression = self.build_select()
         expression = sqlalchemy.exists(expression).select()
-        self._set_query_expression(expression)
+        self.set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
     async def count(self) -> int:
@@ -507,7 +501,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         expression = self.build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
-        self._set_query_expression(expression)
+        self.set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
     async def get_or_none(self, **kwargs: Any) -> Union[EdgyModel, None]:
@@ -516,7 +510,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self.filter(**kwargs)
         expression = queryset.build_select().limit(2)
-        self._set_query_expression(expression)
+        self.set_query_expression(expression)
         rows = await self.database.fetch_all(expression)
 
         if not rows:
@@ -530,7 +524,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Returns the queryset records based on specific filters
         """
         queryset: "QuerySet" = self.clone()
-
         if self.is_m2m:
             queryset.distinct_on = [self.m2m_related]
 
@@ -602,13 +595,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         kwargs = self.validate_kwargs(**kwargs)
         instance = self.model_class(**kwargs)
-        expression = self.table.insert().values(**kwargs)
-        self.set_query_expression(expression)
-
-        if self.pkname not in kwargs:
-            instance.pk = await self.database.execute(expression)
-        else:
-            await self.database.execute(expression)
+        instance = await instance.save(force_save=True, values=kwargs)
         return instance
 
     async def bulk_create(self, objs: List[Dict]) -> None:
@@ -635,20 +622,15 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             if key in fields:
                 new_fields[key] = field.validator
 
-        validator = Schema(fields=new_fields)
-
         new_objs = []
         for obj in objs:
             new_obj = {}
             for key, value in obj.__dict__.items():
                 if key in fields:
-                    new_obj[key] = self._resolve_value(value)
+                    new_obj[key] = self.resolve_value(value)
             new_objs.append(new_obj)
 
-        new_objs = [
-            self._update_auto_now_fields(validator.check(obj), self.model_class.fields)
-            for obj in new_objs
-        ]
+        new_objs = [self.update_auto_now_fields(self.model_class.fields) for obj in new_objs]
 
         pk = getattr(self.table.c, self.pkname)
         expression = self.table.update().where(pk == sqlalchemy.bindparam(self.pkname))
@@ -675,12 +657,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Updates a record in a specific table with the given kwargs.
         """
-        fields = {
-            key: field.validator for key, field in self.model_class.fields.items() if key in kwargs
-        }
-
-        validator = Schema(fields=fields)
-        kwargs = self._update_auto_now_fields(validator.check(kwargs), self.model_class.fields)
+        extracted_fields = self.extract_values_from_field(kwargs, model_class=self.model_class)
+        kwargs = self.update_auto_now_fields(extracted_fields, self.model_class.fields)
         expression = self.table.update().values(**kwargs)
 
         for filter_clause in self.filter_clauses:
@@ -732,7 +710,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     def __await__(
         self,
     ) -> Generator[Any, None, List[EdgyModel]]:
-        return self._execute().__await__()
+        return self.execute().__await__()
 
     def __class_getitem__(cls, *args: Any, **kwargs: Any) -> Any:
         return cls
