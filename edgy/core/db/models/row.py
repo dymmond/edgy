@@ -18,10 +18,20 @@ class ModelRow(EdgyBaseModel):
         cls,
         row: Row,
         select_related: Optional[Sequence[Any]] = None,
-        related_names: Optional[Dict[str, Any]] = None,
     ) -> Optional[Type["Model"]]:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
+
+        Looping through select_related fields if the query comes from a select_related operation.
+        Validates if exists the select_related and related_field inside the models.
+
+        When select_related and related_field exist for the same field being validated, the related
+        field is ignored as it won't override the value already collected from the select_related.
+
+        If there is no select_related, then goes through the related field where it **should**
+        only return the instance of the the ForeignKey with the ID, making it lazy loaded.
+
+        :return: Model class.
         """
         item: Dict[str, Any] = {}
         select_related = select_related or []
@@ -45,7 +55,8 @@ class ModelRow(EdgyBaseModel):
         # Making sure if the model being queried is not inside a select related
         # This way it is not overritten by any value
         for related, foreign_key in cls.meta.foreign_key_fields.items():
-            if related in select_related:
+            ignore_related: bool = cls.should_ignore_related_name(related, select_related)
+            if ignore_related:
                 continue
 
             model_related = foreign_key.target
@@ -68,3 +79,14 @@ class ModelRow(EdgyBaseModel):
                 item[column.name] = row[column]
 
         return cls(**item)
+
+    @classmethod
+    def should_ignore_related_name(cls, related_name: str, select_related: Sequence[str]) -> bool:
+        """
+        Validates if it should populate the related field if select related is not considered.
+        """
+        for related_field in select_related:
+            fields = related_field.split("__")
+            if related_name in fields:
+                return True
+        return False

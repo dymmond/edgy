@@ -179,7 +179,7 @@ async def test_fk_filter():
         assert track.album.name == "Malibu"
 
 
-async def xtest_multiple_fk():
+async def test_multiple_fk():
     acme = await Organisation.query.create(ident="ACME Ltd")
     red_team = await Team.query.create(org=acme, name="Red Team")
     blue_team = await Team.query.create(org=acme, name="Blue Team")
