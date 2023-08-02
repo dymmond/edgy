@@ -1,22 +1,18 @@
 import typing
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, Optional, Type
 
-from orjson import OPT_OMIT_MICROSECONDS  # noqa
-from orjson import OPT_SERIALIZE_NUMPY  # noqa
-from orjson import dumps
+from orjson import OPT_OMIT_MICROSECONDS, OPT_SERIALIZE_NUMPY, dumps
 
+import edgy
 from edgy.core.db.fields import DateField, DateTimeField
 
 if TYPE_CHECKING:
     from edgy import Model
+    from edgy.core.db.models.metaclasses import MetaInfo
 
 
 class DateParser:
-    """
-    Utils used by the Registry
-    """
-
     def _update_auto_now_fields(self, values: Any, fields: Any) -> Any:
         """
         Updates the auto fields
@@ -38,13 +34,13 @@ class DateParser:
 
 
 class ModelParser:
-    """
-    Parser for the models operations of extraction of data from a given model.
-    """
-
     def extract_values_from_field(
         self, extracted_values: Any, model_class: Optional[Type["Model"]] = None
     ) -> Any:
+        """
+        Extracts all the deffault values from the given fields and returns the raw
+        value corresponding to each field.
+        """
         model_cls = model_class or self
         validated = {}
         for name, field in model_cls.fields.items():
@@ -57,7 +53,7 @@ class ModelParser:
                 continue
 
             item = extracted_values[name]
-            value = field.check(item)
+            value = field.check(item) if hasattr(field, "check") else None
             validated[name] = value
         return validated
 
@@ -68,3 +64,21 @@ class ModelParser:
         """
         related_names = model_class.meta.related_names
         return {k: v for k, v in model_class.__dict__.items() if k not in related_names}
+
+
+def create_edgy_model(
+    __name__: str,
+    __definitions__: Dict[Any, Any],
+    __module__: str,
+    __metadata__: Type["MetaInfo"],
+    __qualname__: Optional[str] = None,
+) -> Type["Model"]:
+    """
+    Generates an `edgy.Model` with all the required definitions to generate the pydantic
+    like model.
+    """
+    qualname = __qualname__ or __name__
+    core_definitions = {"__module__": __module__, "__qualname__": qualname, "Meta": __metadata__}
+    core_definitions.update(**__definitions__)
+    model: Type["Model"] = type(__name__, (edgy.Model,), core_definitions)
+    return model

@@ -8,6 +8,7 @@ from edgy.core.db.base import BaseField
 from edgy.core.db.constants import CASCADE, RESTRICT
 from edgy.core.db.fields.foreign_keys import ForeignKey
 from edgy.core.terminal import Print
+from edgy.core.utils.models import create_edgy_model
 
 if TYPE_CHECKING:
     from edgy import Model
@@ -101,6 +102,8 @@ class BaseManyToManyForeignKeyField(BaseField):
         Generates a middle model based on the owner of the field and the field itself and adds
         it to the main registry to make sure it generates the proper models and migrations.
         """
+        from edgy.core.db.models.metaclasses import MetaInfo
+
         if self.through:  # type: ignore
             if isinstance(self.through, str):  # type: ignore
                 self.through = self.owner.meta.registry.models[self.through]  # type: ignore
@@ -116,12 +119,13 @@ class BaseManyToManyForeignKeyField(BaseField):
 
         new_meta_namespace = {
             "tablename": tablename,
-            "registry": self.owner.meta.registry,
+            "registry": self.registry,
             "is_multi": True,
             "multi_related": [to_name.lower()],
         }
 
-        new_meta = type("MetaInfo", (), new_meta_namespace)
+        new_meta: MetaInfo = MetaInfo(None)
+        new_meta.load_dict(new_meta_namespace)
 
         # Define the related names
         owner_related_name = (
@@ -135,23 +139,25 @@ class BaseManyToManyForeignKeyField(BaseField):
             if self.related_name
             else f"{to_name.lower()}_{class_name.lower()}s_set"
         )
+        fields = {
+            "id": edgy.IntegerField(primary_key=True),
+            f"{owner_name.lower()}": ForeignKey(  # type: ignore
+                self.owner,
+                null=True,
+                on_delete=CASCADE,
+                related_name=owner_related_name,
+            ),
+            f"{to_name.lower()}": ForeignKey(  # type: ignore
+                self.to, null=True, on_delete=CASCADE, related_name=to_related_name
+            ),
+        }
 
-        through_model = type(
-            class_name,
-            (edgy.Model,),
-            {
-                "Meta": new_meta,
-                "id": edgy.IntegerField(primary_key=True),
-                f"{owner_name.lower()}": ForeignKey(  # type: ignore
-                    self.owner,
-                    null=True,
-                    on_delete=CASCADE,
-                    related_name=owner_related_name,
-                ),
-                f"{to_name.lower()}": ForeignKey(  # type: ignore
-                    self.to, null=True, on_delete=CASCADE, related_name=to_related_name
-                ),
-            },
+        # Create the through model
+        through_model = create_edgy_model(
+            __name__=class_name,
+            __module__=self.__module__,
+            __definitions__=fields,
+            __metadata__=new_meta,
         )
         self.through = cast(Type["Model"], through_model)
 
@@ -166,8 +172,7 @@ class BaseManyToManyForeignKeyField(BaseField):
                 self._target = self.to
         return self._target
 
-    def get_column(self, **kwargs: Any) -> sqlalchemy.Column:
-        name = kwargs["name"]
+    def get_column(self, name: str) -> sqlalchemy.Column:
         target = self.target
         to_field = target.fields[target.pkname]
 
@@ -183,11 +188,9 @@ class BaseManyToManyForeignKeyField(BaseField):
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
 
-    def check(self, value: Any) -> Any:
-        """
-        Runs the checks for the fields being validated.
-        """
-        return value.pk
+    def has_default(self) -> bool:
+        """Checks if the field has a default value set"""
+        return hasattr(self, "default")
 
 
 class ManyToManyField(ForeignKeyFieldFactory):
@@ -200,19 +203,20 @@ class ManyToManyField(ForeignKeyFieldFactory):
         through: Optional["Model"] = None,
         **kwargs: Any,
     ) -> BaseField:
+        null = kwargs.get("null", None)
+        if null:
+            terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
+
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
-
+        kwargs["null"] = True
         return super().__new__(cls, **kwargs)
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:
         related_name = kwargs.get("related_name", None)
-
-        if "null" in kwargs:
-            terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
 
         if related_name:
             assert isinstance(related_name, str), "related_name must be a string."

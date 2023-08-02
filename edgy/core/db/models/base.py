@@ -9,6 +9,7 @@ from typing_extensions import Self
 from edgy.conf import settings
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
+from edgy.core.db.models._internal import Meta
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
 from edgy.core.utils.models import DateParser, ModelParser
@@ -19,13 +20,14 @@ object_settr = object.__setattr__
 
 class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta):
     """
-    Builds a row for a specific model
+    Base of all Edgy models with the core setup.
     """
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     query: ClassVar[Manager] = Manager()
     meta: ClassVar[MetaInfo] = MetaInfo(None)
+    Meta: ClassVar[Meta] = Meta()
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
 
@@ -33,25 +35,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         super().__init__(**kwargs)
         values = self.setup_model_fields_from_kwargs(kwargs)
         object.__setattr__(self, "__dict__", values)
-
-    class Meta:
-        """
-        The `Meta` class used to configure each metadata of the model.
-        Abstract classes are not generated in the database, instead, they are simply used as
-        a reference for field generation.
-
-        Usage:
-
-        .. code-block:: python3
-
-            class User(Model):
-                ...
-
-                class Meta:
-                    registry = models
-                    tablename = "users"
-
-        """
 
     def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
         """
@@ -62,12 +45,14 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
         kwargs = {k: v for k, v in kwargs.items() if k in self.meta.fields_mapping}
 
-        for k, v in kwargs.items():
-            if k not in self.fields:
-                if not hasattr(self, k):
-                    raise ValueError(f"Invalid keyword {k} for class {self.__class__.__name__}")
-            setattr(self, k, v)
+        for key, value in kwargs.items():
+            if key not in self.fields:
+                if not hasattr(self, key):
+                    raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
 
+            # Set model field and add to the kwargs dict
+            setattr(self, key, value)
+            kwargs[key] = getattr(self, key)
         return kwargs
 
     @property
@@ -80,7 +65,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @property
     def raw_query(self) -> Any:
-        return getattr(self, self.__raw_query__)  # type: ignore
+        return getattr(self, self.__raw_query__)
 
     @raw_query.setter
     def raw_query(self, value: Any) -> Any:
@@ -167,7 +152,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             # Setting a relationship to a raw pk value should set a
             # fully-fledged relationship instance, with just the pk loaded.
             field = self.fields[key]
-
             if isinstance(field, BaseManyToManyForeignKeyField):
                 value = getattr(self, settings.many_to_many_relation.format(key=key))
             else:

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Set, Tuple, Typ
 
 import sqlalchemy
 from pydantic._internal._model_construction import ModelMetaclass
+from typing_extensions import Self
 
 from edgy.conf import settings
 from edgy.core.connection.registry import Registry
@@ -20,6 +21,9 @@ from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
     from edgy.core.db.models import Model, ReflectModel
+
+
+object_settr = object.__setattr__
 
 
 class MetaInfo:
@@ -68,6 +72,13 @@ class MetaInfo:
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
         self.related_names: Set[str] = set()
         self.related_fields: Dict[str, Any] = {}
+
+    def load_dict(self, values: Dict[str, Any]) -> Self:
+        """
+        Loads the metadata from a dictionary
+        """
+        for key, value in values.items():
+            object_settr(self, key, value)
 
 
 def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
@@ -148,7 +159,7 @@ def _set_related_name_for_foreign_keys(
 
 
 def _set_many_to_many_relation(
-    m2m: edgy_fields.ManyToManyField,
+    m2m: BaseManyToManyForeignKeyField,
     model_class: Union["Model", "ReflectModel"],
     field: str,
 ) -> None:
@@ -350,7 +361,7 @@ class BaseModelMeta(ModelMetaclass):
             meta.related_names.add(related_name)
 
         for field, value in new_class.fields.items():
-            if isinstance(value, edgy_fields.ManyToManyField):
+            if isinstance(value, BaseManyToManyForeignKeyField):
                 _set_many_to_many_relation(value, new_class, field)
 
         # Set the manager

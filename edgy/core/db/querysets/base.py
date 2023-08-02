@@ -302,13 +302,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         )
 
     def validate_kwargs(self, **kwargs: Any) -> Any:
-        fields = self.model_class.fields
-        for key, value in fields.items():
-            if value.read_only and value.has_default():
-                kwargs[key] = value.get_default_value()
-
-        # kwargs = self.extract_foreign_key_values(kwargs)
-        return kwargs
+        return self.extract_values_from_field(kwargs, model_class=self.model_class)
 
     def prepare_order_by(self, order_by: str) -> Any:
         reverse = order_by.startswith("-")
@@ -599,6 +593,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Creates a record in a specific table.
         """
+        kwargs = self.validate_kwargs(**kwargs)
         instance = self.model_class(**kwargs)
         instance = await instance.save()
         # kwargs = self.validate_kwargs(**kwargs)
