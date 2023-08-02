@@ -483,7 +483,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         later use of foreign-key relationships won’t require database queries.
         """
-        queryset: "QuerySet" = self._clone()
+        queryset: "QuerySet" = self.clone()
         if not isinstance(related, (list, tuple)):
             related = [related]
 
@@ -497,7 +497,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         expression = self.build_select()
         expression = sqlalchemy.exists(expression).select()
-        self._set_query_expression(expression)
+        self.set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
     async def count(self) -> int:
@@ -506,7 +506,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         expression = self.build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
-        self._set_query_expression(expression)
+        self.set_query_expression(expression)
         return await self.database.fetch_val(expression)
 
     async def get_or_none(self, **kwargs: Any) -> Union[EdgyModel, None]:
@@ -515,7 +515,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self.filter(**kwargs)
         expression = queryset.build_select().limit(2)
-        self._set_query_expression(expression)
+        self.set_query_expression(expression)
         rows = await self.database.fetch_all(expression)
 
         if not rows:
