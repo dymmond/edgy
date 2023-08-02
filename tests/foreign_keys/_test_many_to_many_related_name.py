@@ -1,8 +1,8 @@
 import pytest
+from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.testclient import DatabaseTestClient as Database
-from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
@@ -29,7 +29,7 @@ class Track(edgy.Model):
 class Album(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     name = edgy.CharField(max_length=100)
-    tracks = edgy.ManyToManyField(Track, related_name="album_tracks")
+    tracks = edgy.ManyToMany(Track, related_name="album_tracks")
 
     class Meta:
         registry = models
@@ -37,8 +37,8 @@ class Album(edgy.Model):
 
 class Studio(edgy.Model):
     name = edgy.CharField(max_length=255)
-    users = edgy.ManyToManyField(User, related_name="studio_users")
-    albums = edgy.ManyToManyField(Album, related_name="studio_albums")
+    users = edgy.ManyToMany(User, related_name="studio_users")
+    albums = edgy.ManyToMany(Album, related_name="studio_albums")
 
     class Meta:
         registry = models

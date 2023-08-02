@@ -15,9 +15,9 @@ from typing import (
 
 import sqlalchemy
 
-import edgy
 from edgy.conf import settings
-from edgy.core.db.fields import CharField, ForeignKey, OneToOneField, TextField
+from edgy.core.db.fields import CharField, TextField
+from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.querysets.mixins import QuerySetPropsMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
 from edgy.core.utils.models import DateParser
@@ -114,7 +114,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, AwaitableQuery[EdgyModel]):
             if counter > 1:
                 has_many = True
 
-            if isinstance(value, (ForeignKey, OneToOneField)):
+            if isinstance(value, BaseForeignKeyField):
                 tablename = value.to if isinstance(value.to, str) else value.to.__name__
 
                 if tablename not in foreign_keys:
@@ -529,7 +529,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Returns the queryset records based on specific filters
         """
         queryset: "QuerySet" = self.clone()
-
         if self.is_m2m:
             queryset.distinct_on = [self.m2m_related]
 
@@ -723,7 +722,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     def __await__(
         self,
     ) -> Generator[Any, None, List[EdgyModel]]:
-        return self._execute().__await__()
+        return self.execute().__await__()
 
     def __class_getitem__(cls, *args: Any, **kwargs: Any) -> Any:
         return cls

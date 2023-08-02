@@ -73,9 +73,9 @@ class BaseField(FieldInfo):
         self.comment = kwargs.pop("comment", None)
 
         # Foreign keys
-        is_m2m = kwargs.pop("is_m2m", False)
-        is_o2o = kwargs.pop("is_o2o", False)
-        is_fk = kwargs.pop("is_fk", False)
+        kwargs.pop("is_m2m", False)
+        kwargs.pop("is_o2o", False)
+        kwargs.pop("is_fk", False)
 
         for name, value in kwargs.items():
             setattr(self, name, value)
@@ -139,7 +139,7 @@ class BaseField(FieldInfo):
             self.column_type,
             *constraints,
             primary_key=self.primary_key,
-            nullable=self.is_required() and not self.primary_key,
+            nullable=self.null and not self.primary_key,
             index=self.index,
             unique=self.unique,
             default=self.default,

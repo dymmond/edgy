@@ -1,9 +1,9 @@
 import pytest
+from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.exceptions import RelationshipIncompatible, RelationshipNotFound
 from edgy.testclient import DatabaseTestClient as Database
-from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

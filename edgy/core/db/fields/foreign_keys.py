@@ -1,8 +1,7 @@
-from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar, cast, overload
+from typing import TYPE_CHECKING, Any, Optional, TypeVar
 
 import sqlalchemy
 
-import edgy
 from edgy.core.connection.registry import Registry
 from edgy.core.db.base import BaseField
 from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL

@@ -43,6 +43,7 @@ class MetaInfo:
         "is_multi",
         "multi_related",
         "related_names",
+        "related_fields",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
@@ -57,7 +58,7 @@ class MetaInfo:
         self.parents: Any = getattr(meta, "parents", None) or []
         self.one_to_one_fields: Set[str] = set()
         self.many_to_many_fields: Set[str] = set()
-        self.foreign_key_fields: Set[str] = set()
+        self.foreign_key_fields: Dict[str, Any] = ()
         self.model: Optional[Type["Model"]] = None
         self.manager: "Manager" = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
@@ -67,6 +68,7 @@ class MetaInfo:
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
         self.related_names: Set[str] = set()
+        self.related_fields: Dict[str, Any] = {}
 
 
 def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
@@ -122,7 +124,7 @@ def _set_related_name_for_foreign_keys(
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
-    for foreign_key in foreign_keys:
+    for _, foreign_key in foreign_keys.items():
         default_related_name = getattr(foreign_key, "related_name", None)
 
         if not default_related_name:
@@ -162,7 +164,7 @@ class BaseModelMeta(ModelMetaclass):
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
         fields: Dict[str, BaseField] = {}
         one_to_one_fields: Any = set()
-        foreign_key_fields: Any = set()
+        foreign_key_fields: Any = {}
         many_to_many_fields: Any = set()
         meta_class: "Model.Meta" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
@@ -235,12 +237,11 @@ class BaseModelMeta(ModelMetaclass):
 
                 fields[key] = value
 
-                # breakpoint()
                 if isinstance(value, BaseForeignKeyField):
                     if value.is_o2o:
                         one_to_one_fields.add(value)
                     if value.is_fk:
-                        foreign_key_fields.add(value)
+                        foreign_key_fields[key] = value
                     continue
                 elif isinstance(value, BaseManyToManyForeignKeyField):
                     if value.is_m2m:

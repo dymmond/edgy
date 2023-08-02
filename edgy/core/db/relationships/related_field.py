@@ -1,9 +1,10 @@
 import functools
 from typing import TYPE_CHECKING, Any, Optional, Type, Union
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import ConfigDict
 
 from edgy.core.db import fields
+from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 
 if TYPE_CHECKING:
     from edgy import Model, ReflectModel
@@ -66,7 +67,6 @@ class RelatedField:
         Gets the attribute from the queryset and if it does not
         exist, then lookup in the model.
         """
-        breakpoint()
         try:
             attr = getattr(self.queryset, item)
         except AttributeError:
@@ -85,7 +85,7 @@ class RelatedField:
         field_name: str = None
 
         for field, value in self.related_from.fields.items():
-            if isinstance(value, (fields.ForeignKey, fields.OneToOneField)):
+            if isinstance(value, BaseForeignKeyField):
                 if value.related_name == self.related_name:
                     field_name = field
                     break

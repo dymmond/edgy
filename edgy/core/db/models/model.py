@@ -1,6 +1,5 @@
 from typing import Any, TypeVar
 
-import edgy
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow

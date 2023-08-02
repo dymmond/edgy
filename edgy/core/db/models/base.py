@@ -6,9 +6,9 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Engine
 from typing_extensions import Self
 
-import edgy
 from edgy.conf import settings
 from edgy.core.db.datastructures import Index, UniqueConstraint
+from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
 from edgy.core.utils.models import DateParser, ModelParser
@@ -31,30 +31,8 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:  # type: ignore
         super().__init__(**kwargs)
-
         values = self.setup_model_fields_from_kwargs(kwargs)
         object.__setattr__(self, "__dict__", values)
-
-    def _internal_set(self, name: str, value: Any) -> None:
-        """
-        Delegates call to pydantic.
-
-        :param name: name of param
-        :type name: str
-        :param value: value to set
-        :type value: Any
-        """
-        super().__setattr__(name, value)
-
-    def __setattr__(self, name: str, value: Any) -> None:  # noqa CCR001
-        """
-        Overwrites setattr in pydantic parent as otherwise descriptors are not called.
-        """
-        if hasattr(self, name):
-            object.__setattr__(self, name, value)
-        else:
-            # let pydantic handle errors for unknown fields
-            super().__setattr__(name, value)
 
     class Meta:
         """
@@ -191,7 +169,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             # fully-fledged relationship instance, with just the pk loaded.
             field = self.fields[key]
 
-            if isinstance(field, edgy.ManyToManyField):
+            if isinstance(field, BaseManyToManyForeignKeyField):
                 value = getattr(self, settings.many_to_many_relation.format(key=key))
             else:
                 value = self.fields[key].expand_relationship(value)
