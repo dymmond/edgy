@@ -17,7 +17,7 @@ from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
-from edgy.core.utils.functional import edgy_setattr, extract_annotations_and_default_vals
+from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
@@ -178,7 +178,14 @@ class BaseModelMeta(ModelMetaclass):
         registry: Any = None
 
         # Extract the custom Edgy Fields in a pydantic format.
-        attrs, model_fields = extract_annotations_and_default_vals(attrs)
+        # attrs["__name__"] = name
+        # attrs["model_config"] = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+        attrs, model_fields = extract_field_annotations_and_defaults(attrs)
+        # for base in reversed(bases):
+        #     module = base.__module__
+        #     if module.startswith("edgy.core.") or module.startswith("pydantic."):
+        #         continue
+        super().__new__(cls, name, bases, attrs)  # type: ignore
 
         # Searching for fields "Field" in the class hierarchy.
         def __search_for_fields(base: Type, attrs: Any) -> None:
@@ -225,7 +232,9 @@ class BaseModelMeta(ModelMetaclass):
                 if isinstance(value, BaseField):
                     if value.primary_key:
                         if is_pk_present:
-                            raise ImproperlyConfigured(f"Cannot create model {name} with multiple primary keys.")
+                            raise ImproperlyConfigured(
+                                f"Cannot create model {name} with multiple primary keys."
+                            )
                         is_pk_present = True
                         pk_attribute = key
 
@@ -285,7 +294,9 @@ class BaseModelMeta(ModelMetaclass):
         if meta.abstract:
             managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
             if len(managers) > 1:
-                raise ImproperlyConfigured("Multiple managers are not allowed in abstract classes.")
+                raise ImproperlyConfigured(
+                    "Multiple managers are not allowed in abstract classes."
+                )
 
             if getattr(meta, "unique_together", None) is not None:
                 raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
@@ -311,7 +322,9 @@ class BaseModelMeta(ModelMetaclass):
             unique_together = meta.unique_together
             if not isinstance(unique_together, (list, tuple)):
                 value_type = type(unique_together).__name__
-                raise ImproperlyConfigured(f"unique_together must be a tuple or list. Got {value_type} instead.")
+                raise ImproperlyConfigured(
+                    f"unique_together must be a tuple or list. Got {value_type} instead."
+                )
             else:
                 for value in unique_together:
                     if not isinstance(value, (str, tuple, UniqueConstraint)):
@@ -324,7 +337,9 @@ class BaseModelMeta(ModelMetaclass):
             indexes = meta.indexes
             if not isinstance(indexes, (list, tuple)):
                 value_type = type(indexes).__name__
-                raise ImproperlyConfigured(f"indexes must be a tuple or list. Got {value_type} instead.")
+                raise ImproperlyConfigured(
+                    f"indexes must be a tuple or list. Got {value_type} instead."
+                )
             else:
                 for value in indexes:
                     if not isinstance(value, Index):

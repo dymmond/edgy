@@ -8,7 +8,7 @@ from edgy.core.db.fields.base import BaseField
 edgy_setattr = object.__setattr__
 
 
-def extract_annotations_and_default_vals(
+def extract_field_annotations_and_defaults(
     attrs: Dict[Any, Any]
 ) -> Tuple[Dict[Any, Any], Dict[Any, Any]]:
     """

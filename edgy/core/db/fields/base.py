@@ -2,6 +2,7 @@ import decimal
 from typing import Any, Callable, Optional, Pattern, Sequence, Union
 
 import sqlalchemy
+from pydantic._internal import _repr
 from pydantic.fields import FieldInfo
 
 from edgy.core.connection.registry import Registry
@@ -11,7 +12,7 @@ from edgy.types import Undefined
 edgy_setattr = object.__setattr__
 
 
-class BaseField(FieldInfo):
+class BaseField(FieldInfo, _repr.Representation):
     """
     The base field for all Edgy data model fields.
     """
@@ -31,7 +32,9 @@ class BaseField(FieldInfo):
             self.default = default
 
         super().__init__(**kwargs)
-        self.defaulf_factory: Optional[Callable[..., Any]] = kwargs.pop("defaulf_factory", Undefined)
+        self.defaulf_factory: Optional[Callable[..., Any]] = kwargs.pop(
+            "defaulf_factory", Undefined
+        )
         self.field_type: Any = kwargs.pop("__type__", None)
         self.__original_type__: type = kwargs.pop("__original_type__", None)
         self.primary_key: bool = kwargs.pop("primary_key", False)
@@ -56,13 +59,23 @@ class BaseField(FieldInfo):
         self.decimal_places: str = kwargs.pop("decimal_places", None)
         self.regex: str = kwargs.pop("regex", None)
         self.format: str = kwargs.pop("format", None)
-        self.min_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("min_length", None)
-        self.max_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("max_length", None)
+        self.min_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "min_length", None
+        )
+        self.max_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "max_length", None
+        )
         self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("minimum", None)
         self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("maximum", None)
-        self.exclusive_mininum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("exclusive_mininum", None)
-        self.exclusive_maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("exclusive_maximum", None)
-        self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("multiple_of", None)
+        self.exclusive_mininum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "exclusive_mininum", None
+        )
+        self.exclusive_maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "exclusive_maximum", None
+        )
+        self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "multiple_of", None
+        )
         self.through: Any = kwargs.pop("through", None)
         self.server_default: Any = kwargs.pop("server_default", None)
         self.server_onupdate: Any = kwargs.pop("server_onupdate", None)
@@ -81,8 +94,17 @@ class BaseField(FieldInfo):
         for name, value in kwargs.items():
             edgy_setattr(self, name, value)
 
-        self.default = None if self.null or self.primary_key else self.default
+        self.default = None if self.null or self.primary_key else default
         self.defaulf_factory = None if self.null or self.primary_key else self.defaulf_factory
+
+    def is_required(self) -> bool:
+        """Check if the argument is required.
+
+        Returns:
+            `True` if the argument is required, `False` otherwise.
+        """
+        required = False if self.null else True
+        return bool(required and not self.primary_key)
 
     def raise_for_non_default(self, default: Any) -> Any:
         if not self.field_type == int and not default:

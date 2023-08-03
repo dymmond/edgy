@@ -6,7 +6,7 @@ import ipaddress
 import re
 import uuid
 from enum import EnumMeta
-from typing import Any, Dict, Optional, Pattern, Sequence, Set, Tuple, Union
+from typing import Any, Optional, Pattern, Sequence, Set, Tuple, Union
 
 import pydantic
 import sqlalchemy
@@ -30,7 +30,6 @@ class Field:
 class FieldFactory:
     """The base for all model fields to be used with Edgy"""
 
-    error_messages: Dict[str, str] = {}
     _bases = (
         Field,
         BaseField,
