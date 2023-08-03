@@ -135,7 +135,7 @@ class BaseForeignKeyField(BaseField):
 
 
 class ForeignKey(ForeignKeyFieldFactory):
-    _type = sqlalchemy.ForeignKey
+    _type: Any = Any
 
     def __new__(  # type: ignore
         cls,

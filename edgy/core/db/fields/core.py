@@ -32,8 +32,8 @@ class FieldFactory:
 
     error_messages: Dict[str, str] = {}
     _bases = (
-        BaseField,
         Field,
+        BaseField,
     )
     _type: Any = None
 

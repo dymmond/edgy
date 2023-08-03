@@ -1,5 +1,5 @@
 import decimal
-from typing import Any, Optional, Pattern, Sequence, Union
+from typing import Any, Callable, Optional, Pattern, Sequence, Union
 
 import sqlalchemy
 from pydantic.fields import FieldInfo
@@ -7,6 +7,8 @@ from pydantic.fields import FieldInfo
 from edgy.core.connection.registry import Registry
 from edgy.exceptions import FieldDefinitionError
 from edgy.types import Undefined
+
+edgy_setattr = object.__setattr__
 
 
 class BaseField(FieldInfo):
@@ -28,7 +30,10 @@ class BaseField(FieldInfo):
         if default is not Undefined:
             self.default = default
 
+        super().__init__(**kwargs)
+        self.defaulf_factory: Optional[Callable[..., Any]] = kwargs.pop("defaulf_factory", Undefined)
         self.field_type: Any = kwargs.pop("__type__", None)
+        self.__original_type__: type = kwargs.pop("__original_type__", None)
         self.primary_key: bool = kwargs.pop("primary_key", False)
         self.column_type: sqlalchemy.Column = kwargs.pop("column_type", None)
         self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop("constraints", None)
@@ -51,23 +56,13 @@ class BaseField(FieldInfo):
         self.decimal_places: str = kwargs.pop("decimal_places", None)
         self.regex: str = kwargs.pop("regex", None)
         self.format: str = kwargs.pop("format", None)
-        self.min_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "min_length", None
-        )
-        self.max_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "max_length", None
-        )
+        self.min_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("min_length", None)
+        self.max_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("max_length", None)
         self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("minimum", None)
         self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("maximum", None)
-        self.exclusive_mininum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "exclusive_mininum", None
-        )
-        self.exclusive_maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "exclusive_maximum", None
-        )
-        self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "multiple_of", None
-        )
+        self.exclusive_mininum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("exclusive_mininum", None)
+        self.exclusive_maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("exclusive_maximum", None)
+        self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("multiple_of", None)
         self.through: Any = kwargs.pop("through", None)
         self.server_default: Any = kwargs.pop("server_default", None)
         self.server_onupdate: Any = kwargs.pop("server_onupdate", None)
@@ -84,40 +79,16 @@ class BaseField(FieldInfo):
             self.raise_for_non_default(default=default_value)
 
         for name, value in kwargs.items():
-            setattr(self, name, value)
+            edgy_setattr(self, name, value)
 
-        super().__init__(
-            default=default,
-            alias=self.alias,
-            title=title,
-            description=description,
-            min_length=self.min_length,
-            max_length=self.max_length,
-            ge=self.minimum,
-            le=self.maximum,
-            gt=self.exclusive_mininum,
-            lt=self.exclusive_maximum,
-            multiple_of=self.multiple_of,
-            max_digits=self.max_digits,
-            decimal_places=self.decimal_places,
-            pattern=self.regex,
-            **kwargs,
-        )
+        self.default = None if self.null or self.primary_key else self.default
+        self.defaulf_factory = None if self.null or self.primary_key else self.defaulf_factory
 
     def raise_for_non_default(self, default: Any) -> Any:
         if not self.field_type == int and not default:
             raise FieldDefinitionError(
                 "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
             )
-
-    def is_required(self) -> bool:
-        """Check if the argument is required.
-
-        Returns:
-            `True` if the argument is required, `False` otherwise.
-        """
-        required = False if self.null else True
-        return required
 
     def get_alias(self) -> str:
         """

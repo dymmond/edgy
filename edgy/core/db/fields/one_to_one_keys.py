@@ -141,7 +141,7 @@ class OneToOneField(ForeignKeyFieldFactory):
     Representation of a one to one field.
     """
 
-    _type = sqlalchemy.ForeignKey
+    _type: Any = Any
 
     def __new__(  # type: ignore
         cls,

@@ -3,6 +3,7 @@ from typing import Any, ClassVar, Dict, Optional, Sequence
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
+from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 from sqlalchemy import Engine
 from typing_extensions import Self
 
@@ -33,7 +34,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     def __init__(self, *args: Any, **kwargs: Any) -> None:  # type: ignore
         super().__init__(**kwargs)
         values = self.setup_model_fields_from_kwargs(kwargs)
+        edgy_setattr(self, "__pydantic_extra__", None)
         edgy_setattr(self, "__dict__", values)
+        self.model_json_schema()
 
     def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
         """
@@ -106,9 +109,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             index = cls._get_indexes(field)
             indexes.append(index)
 
-        return sqlalchemy.Table(
-            tablename, metadata, *columns, *uniques, *indexes, extend_existing=True
-        )
+        return sqlalchemy.Table(tablename, metadata, *columns, *uniques, *indexes, extend_existing=True)
 
     @classmethod
     def _get_unique_constraints(cls, columns: Sequence) -> Optional[sqlalchemy.UniqueConstraint]:
@@ -198,10 +199,6 @@ class EdgyBaseReflectModel(EdgyBaseModel, metaclass=BaseModelReflectMeta):
     @classmethod
     def reflect(cls, tablename, metadata):
         try:
-            return sqlalchemy.Table(
-                tablename, metadata, autoload_with=cls.meta.registry.sync_engine
-            )
+            return sqlalchemy.Table(tablename, metadata, autoload_with=cls.meta.registry.sync_engine)
         except Exception as e:
-            raise ImproperlyConfigured(
-                detail=f"Table with the name {tablename} does not exist."
-            ) from e
+            raise ImproperlyConfigured(detail=f"Table with the name {tablename} does not exist.") from e
