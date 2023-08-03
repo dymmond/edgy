@@ -3,6 +3,8 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Type
 from sqlalchemy.engine.result import Row
 
 from edgy.core.db.models.base import EdgyBaseModel
+from edgy.core.utils.functional import edgy_setattr
+from edgy.core.utils.models import create_edgy_model
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy import Model
@@ -67,7 +69,17 @@ class ModelRow(EdgyBaseModel):
                     continue
                 elif related not in child_item:
                     child_item[column.name] = row[related]
-            item[related] = model_related(**child_item)
+
+            fields = cls.generify_model_fields_for_partial_model(model_related)
+            partial_model = create_edgy_model(
+                __name__=model_related.__name__,
+                __module__=model_related.__module__,
+                __definitions__=fields,
+                __metadata__=model_related.meta,
+                __partial__=True,
+            )
+            partial_model.model_rebuild(force=True)
+            item[related] = partial_model(**child_item)
 
         # Pull out the regular column values.
         for column in cls.table.columns:
@@ -90,3 +102,18 @@ class ModelRow(EdgyBaseModel):
             if related_name in fields:
                 return True
         return False
+
+    @classmethod
+    def generify_model_fields_for_partial_model(cls, model: Type["Model"]) -> Dict[Any, Any]:
+        """
+        Makes all fields generic when a partial model is generated or used
+        """
+        fields = {}
+
+        # handle the nested non existing results
+        for name, field in model.model_fields.items():
+            edgy_setattr(field, "annotation", Any)
+            edgy_setattr(field, "null", True)
+            fields[name] = field
+
+        return fields

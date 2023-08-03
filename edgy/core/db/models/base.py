@@ -25,6 +25,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
+    partial_model: ClassVar[bool] = False
     query: ClassVar[Manager] = Manager()
     meta: ClassVar[MetaInfo] = MetaInfo(None)
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
@@ -32,11 +33,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     __raw_query__: ClassVar[Optional[str]] = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:  # type: ignore
-        super().__init__(**kwargs)
         values = self.setup_model_fields_from_kwargs(kwargs)
         edgy_setattr(self, "__pydantic_extra__", None)
         edgy_setattr(self, "__dict__", values)
-        self.model_json_schema()
+        super().__init__(**kwargs)
 
     def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
         """
@@ -109,7 +109,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             index = cls._get_indexes(field)
             indexes.append(index)
 
-        return sqlalchemy.Table(tablename, metadata, *columns, *uniques, *indexes, extend_existing=True)
+        return sqlalchemy.Table(
+            tablename, metadata, *columns, *uniques, *indexes, extend_existing=True
+        )
 
     @classmethod
     def _get_unique_constraints(cls, columns: Sequence) -> Optional[sqlalchemy.UniqueConstraint]:
@@ -199,6 +201,10 @@ class EdgyBaseReflectModel(EdgyBaseModel, metaclass=BaseModelReflectMeta):
     @classmethod
     def reflect(cls, tablename, metadata):
         try:
-            return sqlalchemy.Table(tablename, metadata, autoload_with=cls.meta.registry.sync_engine)
+            return sqlalchemy.Table(
+                tablename, metadata, autoload_with=cls.meta.registry.sync_engine
+            )
         except Exception as e:
-            raise ImproperlyConfigured(detail=f"Table with the name {tablename} does not exist.") from e
+            raise ImproperlyConfigured(
+                detail=f"Table with the name {tablename} does not exist."
+            ) from e
