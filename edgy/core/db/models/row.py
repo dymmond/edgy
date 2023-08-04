@@ -74,20 +74,6 @@ class ModelRow(EdgyBaseModel):
             fields_filtered = {
                 model_related.pkname: model_related.fields.get(model_related.pkname)
             }
-            # Since all the models are Pydantic BaseModel types, for Edgy related models
-            # Simply generates a partial model of the related field and stores it instead of
-            # the original model that triggers all the needed validations for the required fields.
-            # fields = cls.generify_model_fields_for_partial_model(model_related)
-            # partial_model = create_edgy_model(
-            #     __name__=model_related.__name__,
-            #     __module__=cls.__module__,
-            #     __definitions__=fields_filtered,
-            #     __metadata__=model_related.meta,
-            #     __config__={"extra": "ignore"},
-            #     __partial__=True,
-            # )
-            # fields = cls.generify_model_fields_for_partial_model(model_related)
-            # model_related.model_fields.update(fields)
             model_related.model_fields = fields_filtered
             model_related.model_rebuild(force=True)
             item[related] = model_related(**child_item)

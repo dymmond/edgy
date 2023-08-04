@@ -53,7 +53,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                     raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
 
             # Set model field and add to the kwargs dict
-            edgy_setattr(self, key, value)
+            setattr(self, key, value)
             kwargs[key] = getattr(self, key)
         return kwargs
 

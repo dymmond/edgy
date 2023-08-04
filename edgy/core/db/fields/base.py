@@ -26,12 +26,16 @@ class BaseField(FieldInfo, _repr.Representation):
         **kwargs: Any,
     ) -> None:
         self.null: bool = kwargs.pop("null", False)
+
+        super().__init__(**kwargs)
+
         if self.null and default is Undefined:
             default = None
         if default is not Undefined:
             self.default = default
+        if default is not None:
+            self.null = True
 
-        super().__init__(**kwargs)
         self.defaulf_factory: Optional[Callable[..., Any]] = kwargs.pop(
             "defaulf_factory", Undefined
         )
@@ -94,14 +98,20 @@ class BaseField(FieldInfo, _repr.Representation):
         for name, value in kwargs.items():
             edgy_setattr(self, name, value)
 
-        self.default = None if self.null else default
-        self.defaulf_factory = None if self.null or self.primary_key else self.defaulf_factory
-
         if self.primary_key:
             self.field_type = Any
+            self.null = True
 
         if isinstance(self.default, bool):
             self.null = True
+
+    # def is_required(self) -> bool:
+    #     """Check if the argument is required.
+
+    #     Returns:
+    #         `True` if the argument is required, `False` otherwise.
+    #     """
+    #     return self.default is PydanticUndefined and self.default_factory is None
 
     def is_required(self) -> bool:
         """Check if the argument is required.
