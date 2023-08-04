@@ -179,7 +179,7 @@ class BaseModelMeta(ModelMetaclass):
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
-        # super().__new__(cls, name, bases, attrs)  # type: ignore
+        super().__new__(cls, name, bases, attrs)  # type: ignore
 
         # Searching for fields "Field" in the class hierarchy.
         def __search_for_fields(base: Type, attrs: Any) -> None:

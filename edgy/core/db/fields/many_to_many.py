@@ -5,7 +5,7 @@ import sqlalchemy
 import edgy
 from edgy.core.connection.registry import Registry
 from edgy.core.db.constants import CASCADE, RESTRICT
-from edgy.core.db.fields.base import BaseField
+from edgy.core.db.fields._base_fk import BaseField, BaseForeignKey
 from edgy.core.db.fields.foreign_keys import ForeignKey
 from edgy.core.terminal import Print
 from edgy.core.utils.models import create_edgy_model
@@ -86,7 +86,7 @@ class ForeignKeyFieldFactory:
         return []
 
 
-class BaseManyToManyForeignKeyField(BaseField):
+class BaseManyToManyForeignKeyField(BaseForeignKey):
     is_m2m: bool = True
 
     def add_model_to_register(self, model: Any) -> None:
@@ -163,15 +163,6 @@ class BaseManyToManyForeignKeyField(BaseField):
 
         self.add_model_to_register(self.through)
 
-    @property
-    def target(self) -> Any:
-        if not hasattr(self, "_target"):
-            if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]  # type: ignore
-            else:
-                self._target = self.to
-        return self._target
-
     def get_column(self, name: str) -> sqlalchemy.Column:
         target = self.target
         to_field = target.fields[target.pkname]
@@ -187,10 +178,6 @@ class BaseManyToManyForeignKeyField(BaseField):
             )
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
-
-    def has_default(self) -> bool:
-        """Checks if the field has a default value set"""
-        return hasattr(self, "default")
 
 
 class ManyToManyField(ForeignKeyFieldFactory):
