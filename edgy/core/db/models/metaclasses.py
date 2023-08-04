@@ -17,7 +17,7 @@ from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
-from edgy.core.utils.functional import edgy_setattr
+from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
@@ -177,6 +177,10 @@ class BaseModelMeta(ModelMetaclass):
         pk_attribute: str = "id"
         registry: Any = None
 
+        # Extract the custom Edgy Fields in a pydantic format.
+        attrs, model_fields = extract_field_annotations_and_defaults(attrs)
+        # super().__new__(cls, name, bases, attrs)  # type: ignore
+
         # Searching for fields "Field" in the class hierarchy.
         def __search_for_fields(base: Type, attrs: Any) -> None:
             """
@@ -277,6 +281,9 @@ class BaseModelMeta(ModelMetaclass):
         meta.parents = parents
         new_class = model_class(cls, name, bases, attrs)
 
+        # Update the model_fields are updated to the latest
+        new_class.model_fields.update(model_fields)
+
         # Abstract classes do not allow multiple managers. This make sure it is enforced.
         if meta.abstract:
             managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
@@ -367,6 +374,9 @@ class BaseModelMeta(ModelMetaclass):
             if isinstance(value, Manager):
                 value.model_class = new_class
 
+        # Update the model references with the validations of the model
+        # Being done by the Edgy fields instead.
+        new_class.model_rebuild(force=True)
         return new_class
 
     @property

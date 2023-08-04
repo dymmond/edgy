@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Type
 from sqlalchemy.engine.result import Row
 
 from edgy.core.db.models.base import EdgyBaseModel
+from edgy.core.utils.functional import edgy_setattr
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy import Model
@@ -66,7 +67,18 @@ class ModelRow(EdgyBaseModel):
                 if column.name not in model_related.fields.keys():
                     continue
                 elif related not in child_item:
-                    child_item[column.name] = row[related]
+                    value = row[related]
+                    if value is not None:
+                        child_item[column.name] = value
+
+            # Make sure we generate a temporary reduced model
+            # For the related fields. We simply chnage the structure of the model
+            # and rebuild it with the new fields.
+            fields_filtered = {
+                model_related.pkname: model_related.fields.get(model_related.pkname)
+            }
+            model_related.model_fields = fields_filtered
+            model_related.model_rebuild(force=True)
             item[related] = model_related(**child_item)
 
         # Pull out the regular column values.
@@ -74,10 +86,8 @@ class ModelRow(EdgyBaseModel):
             # Making sure when a table is reflected, maps the right fields of the ReflectModel
             if column.name not in cls.fields.keys():
                 continue
-
             elif column.name not in item:
                 item[column.name] = row[column]
-
         return cls(**item)
 
     @classmethod
@@ -90,3 +100,17 @@ class ModelRow(EdgyBaseModel):
             if related_name in fields:
                 return True
         return False
+
+    @classmethod
+    def generify_model_fields_for_partial_model(cls, model: Type["Model"]) -> Dict[Any, Any]:
+        """
+        Makes all fields generic when a partial model is generated or used
+        """
+        fields = {}
+
+        # handle the nested non existing results
+        for name, field in model.model_fields.items():
+            edgy_setattr(field, "annotation", Any)
+            edgy_setattr(field, "null", True)
+            fields[name] = field
+        return fields

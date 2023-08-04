@@ -1,9 +1,10 @@
 import typing
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Dict, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
 
 from orjson import OPT_OMIT_MICROSECONDS, OPT_SERIALIZE_NUMPY, dumps
+from pydantic import ConfigDict
 
 import edgy
 from edgy.core.db.fields.core import BaseField, Field
@@ -78,22 +79,41 @@ class ModelParser:
         are simply relations.
         """
         related_names = model_class.meta.related_names
-        return {k: v for k, v in model_class.__dict__.items() if k not in related_names}
+        return {k: v for k, v in model_class.model_fields.items() if k not in related_names}
 
 
 def create_edgy_model(
     __name__: str,
-    __definitions__: Dict[Any, Any],
     __module__: str,
-    __metadata__: Type["MetaInfo"],
+    __definitions__: Optional[Dict[Any, Any]] = None,
+    __metadata__: Optional[Type["MetaInfo"]] = None,
     __qualname__: Optional[str] = None,
+    __config__: Optional[ConfigDict] = None,
+    __bases__: Optional[Tuple[Type["Model"]]] = None,
+    __partial__: bool = False,
 ) -> Type["Model"]:
     """
     Generates an `edgy.Model` with all the required definitions to generate the pydantic
     like model.
     """
+    if not __bases__:
+        __bases__ = (edgy.Model,)
+
     qualname = __qualname__ or __name__
-    core_definitions = {"__module__": __module__, "__qualname__": qualname, "Meta": __metadata__}
+    core_definitions = {
+        "__module__": __module__,
+        "__qualname__": qualname,
+        "partial_model": __partial__,
+    }
+    if not __definitions__:
+        __definitions__ = {}
+
     core_definitions.update(**__definitions__)
-    model: Type["Model"] = type(__name__, (edgy.Model,), core_definitions)
+
+    if __config__:
+        core_definitions.update(**{"model_config": __config__})
+    if __metadata__:
+        core_definitions.update(**{"Meta": __metadata__})
+
+    model: Type["Model"] = type(__name__, __bases__, core_definitions)
     return model

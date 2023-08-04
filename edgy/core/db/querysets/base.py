@@ -594,6 +594,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Creates a record in a specific table.
         """
         kwargs = self.validate_kwargs(**kwargs)
+
         instance = self.model_class(**kwargs)
         instance = await instance.save(force_save=True, values=kwargs)
         return instance
@@ -617,10 +618,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         It is thought to be a clean approach to a simple problem so it was added here and
         refactored to be compatible with Saffier.
         """
-        new_fields = {}
-        for key, field in self.model_class.fields.items():
-            if key in fields:
-                new_fields[key] = field.validator
 
         new_objs = []
         for obj in objs:
@@ -630,7 +627,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                     new_obj[key] = self.resolve_value(value)
             new_objs.append(new_obj)
 
-        new_objs = [self.update_auto_now_fields(self.model_class.fields) for obj in new_objs]
+        new_objs = [self.extract_values_from_field(obj, self.model_class) for obj in new_objs]
 
         pk = getattr(self.table.c, self.pkname)
         expression = self.table.update().where(pk == sqlalchemy.bindparam(self.pkname))

@@ -53,7 +53,6 @@ async def test_filter_with_foreign_key():
     products = await Product.query.filter(user=user)
 
     assert len(products) == 5
-
     products = await Product.query.filter(user__id=user.pk)
 
     assert len(products) == 5

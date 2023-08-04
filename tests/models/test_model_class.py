@@ -13,19 +13,19 @@ pytestmark = pytest.mark.anyio
 
 
 class User(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    name = edgy.CharField(max_length=100)
-    language = edgy.CharField(max_length=200, null=True)
+    id: int = edgy.IntegerField(primary_key=True)
+    name: str = edgy.CharField(max_length=100, null=True)
+    language: str = edgy.CharField(max_length=200, null=True)
 
     class Meta:
         registry = models
 
 
 class Product(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    name = edgy.CharField(max_length=100)
-    rating = edgy.IntegerField(minimum=1, maximum=5)
-    in_stock = edgy.BooleanField(default=False)
+    id: int = edgy.IntegerField(primary_key=True)
+    name: str = edgy.CharField(max_length=100, null=True)
+    rating: int = edgy.IntegerField(minimum=1, maximum=5, default=1)
+    in_stock: bool = edgy.BooleanField(default=False)
 
     class Meta:
         registry = models

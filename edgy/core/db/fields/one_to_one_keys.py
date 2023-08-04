@@ -127,6 +127,10 @@ class BaseOneToOneKeyField(BaseField):
         target = self.target
         if isinstance(value, target):
             return value
+
+        fields_filtered = {target.pkname: target.fields.get(target.pkname)}
+        target.model_fields = fields_filtered
+        target.model_rebuild(force=True)
         return target(pk=value)
 
     def check(self, value: Any) -> Any:
@@ -141,7 +145,7 @@ class OneToOneField(ForeignKeyFieldFactory):
     Representation of a one to one field.
     """
 
-    _type = sqlalchemy.ForeignKey
+    _type: Any = Any
 
     def __new__(  # type: ignore
         cls,

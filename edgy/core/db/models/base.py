@@ -3,6 +3,7 @@ from typing import Any, ClassVar, Dict, Optional, Sequence
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
+from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 from sqlalchemy import Engine
 from typing_extensions import Self
 
@@ -24,6 +25,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
+    partial_model: ClassVar[bool] = False
     query: ClassVar[Manager] = Manager()
     meta: ClassVar[MetaInfo] = MetaInfo(None)
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
@@ -31,8 +33,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     __raw_query__: ClassVar[Optional[str]] = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:  # type: ignore
-        super().__init__(**kwargs)
         values = self.setup_model_fields_from_kwargs(kwargs)
+        edgy_setattr(self, "__pydantic_extra__", None)
+        super().__init__(**kwargs)
         edgy_setattr(self, "__dict__", values)
 
     def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
@@ -50,13 +53,13 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                     raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
 
             # Set model field and add to the kwargs dict
-            edgy_setattr(self, key, value)
+            setattr(self, key, value)
             kwargs[key] = getattr(self, key)
         return kwargs
 
     @property
     def pk(self) -> Any:
-        return getattr(self, self.pkname)
+        return getattr(self, self.pkname, None)
 
     @pk.setter
     def pk(self, value: Any) -> Any:

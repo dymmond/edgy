@@ -1,5 +1,8 @@
-import datetime
+import decimal
+from datetime import date, datetime
 from enum import Enum
+from typing import Any, Dict
+from uuid import UUID
 
 import pytest
 from tests.settings import DATABASE_URL
@@ -15,7 +18,7 @@ models = edgy.Registry(database=database)
 
 
 def time():
-    return datetime.datetime.now().time()
+    return datetime.now().time()
 
 
 class StatusEnum(Enum):
@@ -24,21 +27,21 @@ class StatusEnum(Enum):
 
 
 class Product(edgy.Model):
-    id = fields.IntegerField(primary_key=True)
-    uuid = fields.UUIDField(null=True)
-    created = fields.DateTimeField(default=datetime.datetime.now)
-    created_day = fields.DateField(default=datetime.date.today)
-    created_time = fields.TimeField(default=time)
-    created_date = fields.DateField(auto_now_add=True)
-    created_datetime = fields.DateTimeField(auto_now_add=True)
-    updated_datetime = fields.DateTimeField(auto_now=True)
-    updated_date = fields.DateField(auto_now=True)
-    data = fields.JSONField(default={})
-    description = fields.CharField(blank=True, max_length=255)
-    huge_number = fields.BigIntegerField(default=0)
-    price = fields.DecimalField(max_digits=5, decimal_places=2, null=True)
-    status = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
-    value = fields.FloatField(null=True)
+    id: int = fields.IntegerField(primary_key=True)
+    uuid: UUID = fields.UUIDField(null=True)
+    created: datetime = fields.DateTimeField(default=datetime.now)
+    created_day: datetime = fields.DateField(default=date.today)
+    created_time: datetime = fields.TimeField(default=time)
+    created_date: datetime = fields.DateField(auto_now_add=True)
+    created_datetime: datetime = fields.DateTimeField(auto_now_add=True)
+    updated_datetime: datetime = fields.DateTimeField(auto_now=True)
+    updated_date: datetime = fields.DateField(auto_now=True)
+    data: Dict[Any, Any] = fields.JSONField(default={})
+    description: str = fields.CharField(null=True, max_length=255)
+    huge_number: int = fields.BigIntegerField(default=0)
+    price: decimal.Decimal = fields.DecimalField(null=True)
+    status: str = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
+    value: float = fields.FloatField(null=True)
 
     class Meta:
         registry = models

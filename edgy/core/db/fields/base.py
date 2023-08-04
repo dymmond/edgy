@@ -1,18 +1,23 @@
 import decimal
-from typing import Any, Optional, Pattern, Sequence, Union
+from typing import Any, Callable, ClassVar, Dict, Optional, Pattern, Sequence, Union
 
 import sqlalchemy
+from pydantic._internal import _repr
 from pydantic.fields import FieldInfo
 
 from edgy.core.connection.registry import Registry
 from edgy.exceptions import FieldDefinitionError
 from edgy.types import Undefined
 
+edgy_setattr = object.__setattr__
 
-class BaseField(FieldInfo):
+
+class BaseField(FieldInfo, _repr.Representation):
     """
     The base field for all Edgy data model fields.
     """
+
+    __namespace__: ClassVar[Union[Dict[str, Any], None]] = None
 
     def __init__(
         self,
@@ -22,13 +27,21 @@ class BaseField(FieldInfo):
         description: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
+        super().__init__(**kwargs)
+
         self.null: bool = kwargs.pop("null", False)
         if self.null and default is Undefined:
             default = None
         if default is not Undefined:
             self.default = default
+        if default is not None:
+            self.null = True
 
+        self.defaulf_factory: Optional[Callable[..., Any]] = kwargs.pop(
+            "defaulf_factory", Undefined
+        )
         self.field_type: Any = kwargs.pop("__type__", None)
+        self.__original_type__: type = kwargs.pop("__original_type__", None)
         self.primary_key: bool = kwargs.pop("primary_key", False)
         self.column_type: sqlalchemy.Column = kwargs.pop("column_type", None)
         self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop("constraints", None)
@@ -48,6 +61,7 @@ class BaseField(FieldInfo):
         self.name: str = kwargs.pop("name", None)
         self.alias: str = kwargs.pop("name", None)
         self.max_digits: str = kwargs.pop("max_digits", None)
+        self.scale: str = kwargs.pop("scale", None)
         self.decimal_places: str = kwargs.pop("decimal_places", None)
         self.regex: str = kwargs.pop("regex", None)
         self.format: str = kwargs.pop("format", None)
@@ -59,12 +73,6 @@ class BaseField(FieldInfo):
         )
         self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("minimum", None)
         self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("maximum", None)
-        self.exclusive_mininum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "exclusive_mininum", None
-        )
-        self.exclusive_maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "exclusive_maximum", None
-        )
         self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
             "multiple_of", None
         )
@@ -80,35 +88,24 @@ class BaseField(FieldInfo):
         kwargs.pop("is_fk", False)
 
         if self.primary_key:
-            default_value = self.default
+            default_value = default
             self.raise_for_non_default(default=default_value)
 
         for name, value in kwargs.items():
-            setattr(self, name, value)
+            edgy_setattr(self, name, value)
 
-        super().__init__(
-            default=default,
-            alias=self.alias,
-            title=title,
-            description=description,
-            min_length=self.min_length,
-            max_length=self.max_length,
-            ge=self.minimum,
-            le=self.maximum,
-            gt=self.exclusive_mininum,
-            lt=self.exclusive_maximum,
-            multiple_of=self.multiple_of,
-            max_digits=self.max_digits,
-            decimal_places=self.decimal_places,
-            pattern=self.regex,
-            **kwargs,
-        )
+        if self.primary_key:
+            self.field_type = Any
+            self.null = True
 
-    def raise_for_non_default(self, default: Any) -> Any:
-        if not self.field_type == int and not default:
-            raise FieldDefinitionError(
-                "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
-            )
+        if isinstance(self.default, bool):
+            self.null = True
+        self.__namespace__ = {k: v for k, v in self.__dict__.items() if k != "__namespace__"}
+
+    @property
+    def namespace(self) -> Any:
+        """Returns the properties added to the fields in a dict format"""
+        return self.__namespace__
 
     def is_required(self) -> bool:
         """Check if the argument is required.
@@ -117,7 +114,13 @@ class BaseField(FieldInfo):
             `True` if the argument is required, `False` otherwise.
         """
         required = False if self.null else True
-        return required
+        return bool(required and not self.primary_key)
+
+    def raise_for_non_default(self, default: Any) -> Any:
+        if not self.field_type == int and not default:
+            raise FieldDefinitionError(
+                "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
+            )
 
     def get_alias(self) -> str:
         """

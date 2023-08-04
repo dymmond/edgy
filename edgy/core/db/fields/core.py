@@ -6,7 +6,7 @@ import ipaddress
 import re
 import uuid
 from enum import EnumMeta
-from typing import Any, Dict, Optional, Pattern, Sequence, Set, Tuple, Union
+from typing import Any, Optional, Pattern, Sequence, Set, Tuple, Union
 
 import pydantic
 import sqlalchemy
@@ -30,10 +30,9 @@ class Field:
 class FieldFactory:
     """The base for all model fields to be used with Edgy"""
 
-    error_messages: Dict[str, str] = {}
     _bases = (
-        BaseField,
         Field,
+        BaseField,
     )
     _type: Any = None
 
@@ -171,18 +170,9 @@ class Number(FieldFactory):
     def validate(cls, **kwargs: Any) -> None:
         minimum = kwargs.get("minimum", None)
         maximum = kwargs.get("maximum", None)
-        exclusive_minimum = kwargs.get("exclusive_minimum", None)
-        exclusive_maximum = kwargs.get("exclusive_maximum", None)
 
         if (minimum is not None and maximum is not None) and minimum > maximum:
             raise FieldDefinitionError(detail="'minimum' cannot be bigger than 'maximum'")
-
-        if (
-            exclusive_maximum is not None and exclusive_maximum is not None
-        ) and exclusive_minimum > exclusive_maximum:
-            raise FieldDefinitionError(
-                detail="'exclusive_minimum' cannot be bigger than 'exclusive_maximum'"
-            )
 
 
 class IntegerField(Number, int):
@@ -197,8 +187,6 @@ class IntegerField(Number, int):
         *,
         minimum: Optional[int] = None,
         maximum: Optional[int] = None,
-        exclusive_minimum: Optional[float] = None,
-        exclusive_maximum: Optional[float] = None,
         multiple_of: Optional[int] = None,
         **kwargs: Any,
     ) -> BaseField:
@@ -227,8 +215,6 @@ class FloatField(Number, float):
         *,
         mininum: Optional[float] = None,
         maximun: Optional[float] = None,
-        exclusive_minimum: Optional[float] = None,
-        exclusive_maximum: Optional[float] = None,
         multiple_of: Optional[int] = None,
         **kwargs: Any,
     ) -> BaseField:
@@ -265,36 +251,33 @@ class DecimalField(Number, decimal.Decimal):
     def __new__(  # type: ignore
         cls,
         *,
-        minimum: Optional[int] = None,
-        maximum: Optional[int] = None,
-        exclusive_minimum: Optional[float] = None,
-        exclusive_maximum: Optional[float] = None,
-        multiple_of: Optional[int] = None,
-        precision: Optional[int] = None,
-        max_digits: Optional[int] = None,
-        decimal_places: Optional[int] = None,
+        minimum: float = None,
+        maximum: float = None,
+        multiple_of: int = None,
+        precision: int = None,
+        scale: int = None,
+        max_digits: int = None,
+        decimal_places: int = None,
         **kwargs: Any,
     ) -> BaseField:
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
         }
+        kwargs["ge"] = kwargs["minimum"]
+        kwargs["le"] = kwargs["maximum"]
+
         if kwargs.get("max_digits"):
             kwargs["precision"] = kwargs["max_digits"]
         elif kwargs.get("precision"):
             kwargs["max_digits"] = kwargs["precision"]
 
+        if kwargs.get("decimal_places"):
+            kwargs["scale"] = kwargs["decimal_places"]
+        elif kwargs.get("scale"):
+            kwargs["decimal_places"] = kwargs["scale"]
+
         return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        super().validate(**kwargs)
-
-        precision = kwargs.get("precision")
-        if precision is None or precision < 0:
-            raise FieldDefinitionError(
-                "'max_digits' and 'precision' are required for DecimalField"
-            )
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
@@ -385,7 +368,7 @@ class DateField(AutoNowMixin, datetime.date):
         **kwargs: Any,
     ) -> BaseField:
         if auto_now_add or auto_now:
-            kwargs["default"] = datetime.datetime.today
+            kwargs["default"] = datetime.date.today
 
         kwargs = {
             **kwargs,
@@ -418,7 +401,7 @@ class TimeField(FieldFactory, datetime.time):
 class JSONField(FieldFactory, pydantic.Json):  # type: ignore
     """Representation of a JSONField"""
 
-    _type = pydantic.Json
+    _type = Any
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
