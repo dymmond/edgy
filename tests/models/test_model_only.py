@@ -99,3 +99,36 @@ async def test_model_only_with_exclude():
     users = await User.query.only("name", "language").exclude(id__in=[1, 2])
 
     assert len(users) == 0
+
+
+async def test_model_only_save():
+    await User.query.create(name="John", language="PT")
+
+    user = await User.query.filter(pk=1).only("name", "language").get()
+    user.name = "Edgy"
+    user.language = "EN"
+    user.description = "LOL"
+    await user.save()
+
+    user = await User.query.get(pk=1)
+
+    assert user.name == "Edgy"
+    assert user.language == "EN"
+
+
+async def test_model_only_save_without_nullable_field():
+    user = await User.query.create(name="John", language="PT", description="John")
+
+    assert user.description == "John"
+    assert user.language == "PT"
+
+    user = await User.query.filter(pk=1).only("description", "language").get()
+    user.language = "EN"
+    user.description = "A new description"
+    await user.save()
+
+    user = await User.query.get(pk=1)
+
+    assert user.name == "John"
+    assert user.language == "EN"
+    assert user.description == "A new description"

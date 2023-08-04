@@ -91,6 +91,7 @@ def create_edgy_model(
     __config__: Optional[ConfigDict] = None,
     __bases__: Optional[Tuple[Type["Model"]]] = None,
     __partial__: bool = False,
+    __pydantic_extra__: Any = None,
 ) -> Type["Model"]:
     """
     Generates an `edgy.Model` with all the required definitions to generate the pydantic
@@ -103,6 +104,7 @@ def create_edgy_model(
     core_definitions = {
         "__module__": __module__,
         "__qualname__": qualname,
+        "__pydantic_extra__": __pydantic_extra__,
         "partial_model": __partial__,
     }
     if not __definitions__:

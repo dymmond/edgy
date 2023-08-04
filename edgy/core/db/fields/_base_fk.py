@@ -39,7 +39,3 @@ class BaseForeignKey(BaseField):
         Runs the checks for the fields being validated.
         """
         return value.pk
-
-    def has_default(self) -> bool:
-        """Checks if the field has a default value set"""
-        return hasattr(self, "default")

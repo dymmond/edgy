@@ -1,9 +1,11 @@
+import copy
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Type
 
 from sqlalchemy.engine.result import Row
 
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.utils.functional import edgy_setattr
+from edgy.core.utils.models import create_edgy_model
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy import Model
@@ -95,11 +97,20 @@ class ModelRow(EdgyBaseModel):
                 if column not in item:
                     item[column] = value
 
-                # We need to generify the model fields to make sure we can populate the
-                # model without mandatory fields
-                fields = cls.generify_model_fields(model=cls)
-                cls.model_fields.update(fields)
-                cls.model_rebuild(force=True)
+            # We need to generify the model fields to make sure we can populate the
+            # model without mandatory fields
+            partial_fields = {k: copy.copy(v) for k, v in cls.fields.items() if k in item}
+            model = create_edgy_model(
+                __name__=cls.__name__,
+                __module__=cls.__module__,
+                __metadata__=cls.meta,
+                __definitions__=partial_fields,
+            )
+            # breakpoint()
+            fields = cls.generify_model_fields(model=model)
+            model.model_fields.update(fields)
+            model.model_rebuild(force=True)
+            return model(**item)
         else:
             # Pull out the regular column values.
             for column in cls.table.columns:

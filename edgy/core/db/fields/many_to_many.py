@@ -179,6 +179,10 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
 
+    def has_default(self) -> bool:
+        """Checks if the field has a default value set"""
+        return hasattr(self, "default")
+
 
 class ManyToManyField(ForeignKeyFieldFactory):
     _type: Any = Any

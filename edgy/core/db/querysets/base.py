@@ -559,6 +559,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         # Attach the raw query to the object
         queryset.model_class.raw_query = self.sql
 
+        # Only fields
         is_only_fields = True if queryset._only else False
 
         results = [
@@ -587,11 +588,19 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         rows = await self.database.fetch_all(expression)
         self.set_query_expression(expression)
 
+        # Only fields
+        is_only_fields = True if self._only else False
+
         if not rows:
             raise ObjectNotFound()
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        return self.model_class.from_sqla_row(rows[0], select_related=self._select_related)
+        return self.model_class.from_sqla_row(
+            rows[0],
+            select_related=self._select_related,
+            is_only_fields=is_only_fields,
+            only_fields=self._only,
+        )
 
     async def first(self, **kwargs: Any) -> EdgyModel:
         """
@@ -622,7 +631,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Creates a record in a specific table.
         """
         kwargs = self.validate_kwargs(**kwargs)
-
         instance = self.model_class(**kwargs)
         instance = await instance.save(force_save=True, values=kwargs)
         return instance
