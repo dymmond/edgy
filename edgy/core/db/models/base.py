@@ -35,8 +35,8 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     def __init__(self, *args: Any, **kwargs: Any) -> None:  # type: ignore
         values = self.setup_model_fields_from_kwargs(kwargs)
         edgy_setattr(self, "__pydantic_extra__", None)
-        edgy_setattr(self, "__dict__", values)
         super().__init__(**kwargs)
+        edgy_setattr(self, "__dict__", values)
 
     def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
         """

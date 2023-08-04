@@ -88,14 +88,20 @@ class BaseField(FieldInfo, _repr.Representation):
         kwargs.pop("is_fk", False)
 
         if self.primary_key:
-            default_value = self.default
+            default_value = default
             self.raise_for_non_default(default=default_value)
 
         for name, value in kwargs.items():
             edgy_setattr(self, name, value)
 
-        self.default = None if self.null or self.primary_key else default
+        self.default = None if self.null else default
         self.defaulf_factory = None if self.null or self.primary_key else self.defaulf_factory
+
+        if self.primary_key:
+            self.field_type = Any
+
+        if isinstance(self.default, bool):
+            self.null = True
 
     def is_required(self) -> bool:
         """Check if the argument is required.

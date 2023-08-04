@@ -23,7 +23,7 @@ class User(edgy.Model):
 
 
 class Profile(edgy.Model):
-    id = edgy.UUIDField(max_length=100, primary_key=True, default=uuid.uuid4)
+    id = edgy.UUIDField(primary_key=True, default=uuid.uuid4)
     language = edgy.CharField(max_length=200, null=True)
     age = edgy.IntegerField()
 

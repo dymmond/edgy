@@ -84,9 +84,9 @@ class ModelParser:
 
 def create_edgy_model(
     __name__: str,
-    __definitions__: Dict[Any, Any],
     __module__: str,
-    __metadata__: Type["MetaInfo"],
+    __definitions__: Optional[Dict[Any, Any]] = None,
+    __metadata__: Optional[Type["MetaInfo"]] = None,
     __qualname__: Optional[str] = None,
     __config__: Optional[ConfigDict] = None,
     __bases__: Optional[Tuple[Type["Model"]]] = None,
@@ -104,12 +104,16 @@ def create_edgy_model(
         "__module__": __module__,
         "__qualname__": qualname,
         "partial_model": __partial__,
-        "Meta": __metadata__,
     }
+    if not __definitions__:
+        __definitions__ = {}
+
     core_definitions.update(**__definitions__)
 
     if __config__:
         core_definitions.update(**{"model_config": __config__})
+    if __metadata__:
+        core_definitions.update(**{"Meta": __metadata__})
 
     model: Type["Model"] = type(__name__, __bases__, core_definitions)
     return model

@@ -14,7 +14,7 @@ pytestmark = pytest.mark.anyio
 
 class User(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
-    name = edgy.CharField(max_length=100)
+    name = edgy.CharField(max_length=100, null=True)
     language = edgy.CharField(max_length=200, null=True)
 
     class Meta:
@@ -23,8 +23,8 @@ class User(edgy.Model):
 
 class Product(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
-    name = edgy.CharField(max_length=100)
-    rating = edgy.IntegerField(minimum=1, maximum=5)
+    name = edgy.CharField(max_length=100, null=True)
+    rating = edgy.IntegerField(minimum=1, maximum=5, default=1)
     in_stock = edgy.BooleanField(default=False)
 
     class Meta:

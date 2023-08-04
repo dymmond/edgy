@@ -4,7 +4,6 @@ from sqlalchemy.engine.result import Row
 
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.utils.functional import edgy_setattr
-from edgy.core.utils.models import create_edgy_model
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy import Model
@@ -68,18 +67,30 @@ class ModelRow(EdgyBaseModel):
                 if column.name not in model_related.fields.keys():
                     continue
                 elif related not in child_item:
-                    child_item[column.name] = row[related]
+                    value = row[related]
+                    if value is not None:
+                        child_item[column.name] = value
 
-            fields = cls.generify_model_fields_for_partial_model(model_related)
-            partial_model = create_edgy_model(
-                __name__=model_related.__name__,
-                __module__=model_related.__module__,
-                __definitions__=fields,
-                __metadata__=model_related.meta,
-                __partial__=True,
-            )
-            partial_model.model_rebuild(force=True)
-            item[related] = partial_model(**child_item)
+            fields_filtered = {
+                model_related.pkname: model_related.fields.get(model_related.pkname)
+            }
+            # Since all the models are Pydantic BaseModel types, for Edgy related models
+            # Simply generates a partial model of the related field and stores it instead of
+            # the original model that triggers all the needed validations for the required fields.
+            # fields = cls.generify_model_fields_for_partial_model(model_related)
+            # partial_model = create_edgy_model(
+            #     __name__=model_related.__name__,
+            #     __module__=cls.__module__,
+            #     __definitions__=fields_filtered,
+            #     __metadata__=model_related.meta,
+            #     __config__={"extra": "ignore"},
+            #     __partial__=True,
+            # )
+            # fields = cls.generify_model_fields_for_partial_model(model_related)
+            # model_related.model_fields.update(fields)
+            model_related.model_fields = fields_filtered
+            model_related.model_rebuild(force=True)
+            item[related] = model_related(**child_item)
 
         # Pull out the regular column values.
         for column in cls.table.columns:
@@ -88,9 +99,20 @@ class ModelRow(EdgyBaseModel):
                 continue
 
             elif column.name not in item:
-                item[column.name] = row[column]
-
+                value = row[column]
+                if value is not None:
+                    item[column.name] = value
         return cls(**item)
+
+    @classmethod
+    def clean_data(cls, fields: Dict[Any, Any], item: Dict[Any, Any]):
+        new_item = {}
+        for name, value in item.items():
+            if name in fields:
+                new_item[name] = fields[name].field_type(value)
+            else:
+                new_item[name] = value
+        return new_item
 
     @classmethod
     def should_ignore_related_name(cls, related_name: str, select_related: Sequence[str]) -> bool:
@@ -115,5 +137,4 @@ class ModelRow(EdgyBaseModel):
             edgy_setattr(field, "annotation", Any)
             edgy_setattr(field, "null", True)
             fields[name] = field
-
         return fields
