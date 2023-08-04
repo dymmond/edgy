@@ -71,6 +71,9 @@ class ModelRow(EdgyBaseModel):
                     if value is not None:
                         child_item[column.name] = value
 
+            # Make sure we generate a temporary reduced model
+            # For the related fields. We simply chnage the structure of the model
+            # and rebuild it with the new fields.
             fields_filtered = {
                 model_related.pkname: model_related.fields.get(model_related.pkname)
             }
@@ -83,22 +86,9 @@ class ModelRow(EdgyBaseModel):
             # Making sure when a table is reflected, maps the right fields of the ReflectModel
             if column.name not in cls.fields.keys():
                 continue
-
             elif column.name not in item:
-                value = row[column]
-                if value is not None:
-                    item[column.name] = value
+                item[column.name] = row[column]
         return cls(**item)
-
-    @classmethod
-    def clean_data(cls, fields: Dict[Any, Any], item: Dict[Any, Any]):
-        new_item = {}
-        for name, value in item.items():
-            if name in fields:
-                new_item[name] = fields[name].field_type(value)
-            else:
-                new_item[name] = value
-        return new_item
 
     @classmethod
     def should_ignore_related_name(cls, related_name: str, select_related: Sequence[str]) -> bool:

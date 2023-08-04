@@ -59,7 +59,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @property
     def pk(self) -> Any:
-        return getattr(self, self.pkname)
+        return getattr(self, self.pkname, None)
 
     @pk.setter
     def pk(self, value: Any) -> Any:
