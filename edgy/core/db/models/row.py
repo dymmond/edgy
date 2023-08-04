@@ -19,6 +19,8 @@ class ModelRow(EdgyBaseModel):
         cls,
         row: Row,
         select_related: Optional[Sequence[Any]] = None,
+        is_only_fields: bool = False,
+        only_fields: Sequence[str] = None,
     ) -> Optional[Type["Model"]]:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
@@ -81,13 +83,31 @@ class ModelRow(EdgyBaseModel):
             model_related.model_rebuild(force=True)
             item[related] = model_related(**child_item)
 
-        # Pull out the regular column values.
-        for column in cls.table.columns:
-            # Making sure when a table is reflected, maps the right fields of the ReflectModel
-            if column.name not in cls.fields.keys():
-                continue
-            elif column.name not in item:
-                item[column.name] = row[column]
+        # Check for the only_fields
+        if is_only_fields:
+            only_fields = [str(field) for field in only_fields]
+
+            for column, value in row._mapping.items():
+                # Making sure when a table is reflected, maps the right fields of the ReflectModel
+                if column not in only_fields:
+                    continue
+
+                if column not in item:
+                    item[column] = value
+
+                # We need to generify the model fields to make sure we can populate the
+                # model without mandatory fields
+                fields = cls.generify_model_fields(model=cls)
+                cls.model_fields.update(fields)
+                cls.model_rebuild(force=True)
+        else:
+            # Pull out the regular column values.
+            for column in cls.table.columns:
+                # Making sure when a table is reflected, maps the right fields of the ReflectModel
+                if column.name not in cls.fields.keys():
+                    continue
+                elif column.name not in item:
+                    item[column.name] = row[column]
         return cls(**item)
 
     @classmethod
@@ -102,7 +122,7 @@ class ModelRow(EdgyBaseModel):
         return False
 
     @classmethod
-    def generify_model_fields_for_partial_model(cls, model: Type["Model"]) -> Dict[Any, Any]:
+    def generify_model_fields(cls, model: Type["Model"]) -> Dict[Any, Any]:
         """
         Makes all fields generic when a partial model is generated or used
         """

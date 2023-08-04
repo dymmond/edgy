@@ -49,6 +49,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         order_by: Any = None,
         group_by: Any = None,
         distinct_on: Any = None,
+        only_fields: Any = None,
         m2m_related: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
@@ -60,6 +61,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
         self.distinct_on = [] if distinct_on is None else distinct_on
+        self._only = [] if only_fields is None else only_fields
         self._expression = None
         self._cache = None
         self._m2m_related = m2m_related
@@ -186,6 +188,9 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         expression = sqlalchemy.sql.select(*tables)
         expression = expression.select_from(select_from)
 
+        if self._only:
+            expression = expression.with_only_columns(*self._only)
+
         if self.filter_clauses:
             expression = self.build_filter_clauses_expression(
                 self.filter_clauses, expression=expression
@@ -299,6 +304,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
             limit_count=self.limit_count,
             limit_offset=self._offset,
             order_by=self._order_by,
+            only_fields=self._only,
             m2m_related=self.m2m_related,
         )
 
@@ -471,6 +477,19 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset.distinct_on = distinct_on
         return queryset
 
+    def only(self, *fields: Sequence[str]) -> Union[List[EdgyModel], None]:
+        """
+        Returns a list of models with the selected only fields and always the primary
+        key.
+        """
+        only_fields = [sqlalchemy.text(field) for field in fields]
+        if self.model_class.pkname not in fields:
+            only_fields.insert(0, sqlalchemy.text(self.model_class.pkname))
+
+        queryset: "QuerySet" = self.clone()
+        queryset._only = only_fields
+        return queryset
+
     def select_related(self, related: Any) -> "QuerySet":
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
@@ -540,8 +559,15 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         # Attach the raw query to the object
         queryset.model_class.raw_query = self.sql
 
+        is_only_fields = True if queryset._only else False
+
         results = [
-            queryset.model_class.from_sqla_row(row, select_related=self._select_related)
+            queryset.model_class.from_sqla_row(
+                row,
+                select_related=self._select_related,
+                is_only_fields=is_only_fields,
+                only_fields=queryset._only,
+            )
             for row in rows
         ]
 
