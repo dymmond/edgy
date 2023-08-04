@@ -253,6 +253,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
                         try:
                             model_class = model_class.fields[part].target
                         except KeyError:
+                            # breakpoint()
                             model_class = getattr(model_class, part).related_from
 
                 column = model_class.table.columns[field_name]

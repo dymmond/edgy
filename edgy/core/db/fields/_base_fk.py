@@ -16,6 +16,10 @@ class BaseForeignKey(BaseField):
                 self._target = self.to
         return self._target
 
+    @target.setter
+    def target(self, value: Any) -> Any:
+        self._target = value
+
     def get_related_name(self) -> str:
         """
         Returns the name of the related name of the current relationship between the to and target.

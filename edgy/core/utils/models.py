@@ -90,7 +90,7 @@ def create_edgy_model(
     __qualname__: Optional[str] = None,
     __config__: Optional[ConfigDict] = None,
     __bases__: Optional[Tuple[Type["Model"]]] = None,
-    __partial__: bool = False,
+    __proxy__: bool = False,
     __pydantic_extra__: Any = None,
 ) -> Type["Model"]:
     """
@@ -105,7 +105,7 @@ def create_edgy_model(
         "__module__": __module__,
         "__qualname__": qualname,
         "__pydantic_extra__": __pydantic_extra__,
-        "partial_model": __partial__,
+        "proxy_model": __proxy__,
     }
     if not __definitions__:
         __definitions__ = {}

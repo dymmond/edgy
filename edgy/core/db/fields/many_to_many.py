@@ -160,7 +160,6 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             __metadata__=new_meta,
         )
         self.through = cast(Type["Model"], through_model)
-
         self.add_model_to_register(self.through)
 
     def get_column(self, name: str) -> sqlalchemy.Column:

@@ -25,7 +25,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
-    partial_model: ClassVar[bool] = False
+    proxy_model: ClassVar[bool] = False
     query: ClassVar[Manager] = Manager()
     meta: ClassVar[MetaInfo] = MetaInfo(None)
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()

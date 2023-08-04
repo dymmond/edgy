@@ -71,6 +71,9 @@ class MetaInfo:
         self.related_names: Set[str] = set()
         self.related_fields: Dict[str, Any] = {}
 
+    def model_dump(self) -> Dict[Any, Any]:
+        return {k: getattr(self, k, None) for k in self.__slots__}
+
     def load_dict(self, values: Dict[str, Any]) -> Self:
         """
         Loads the metadata from a dictionary
@@ -132,6 +135,9 @@ def _set_related_name_for_foreign_keys(
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
+    if not foreign_keys:
+        return
+
     for _, foreign_key in foreign_keys.items():
         default_related_name = getattr(foreign_key, "related_name", None)
 
@@ -361,7 +367,7 @@ class BaseModelMeta(ModelMetaclass):
             value.owner = new_class
 
         # Sets the foreign key fields
-        if meta.foreign_key_fields:
+        if meta.foreign_key_fields and not new_class.proxy_model:
             related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
             meta.related_names.add(related_name)
 
