@@ -7,6 +7,7 @@ from typing import (
     Generator,
     List,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -336,6 +337,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         queryset._expression = self._expression
         queryset._cache = self._cache
         queryset._m2m_related = self._m2m_related
+        queryset._only = self._only
         return queryset
 
 
@@ -453,7 +455,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._offset = offset
         return queryset
 
-    def group_by(self, *group_by: str) -> "QuerySet":
+    def group_by(self, *group_by: Sequence[str]) -> "QuerySet":
         """
         Returns the values grouped by the given fields.
         """
@@ -461,7 +463,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._group_by = group_by
         return queryset
 
-    def distinct(self, *distinct_on: str) -> "QuerySet":
+    def distinct(self, *distinct_on: Sequence[str]) -> "QuerySet":
         """
         Returns a queryset with distinct results.
         """

@@ -24,7 +24,7 @@ if TYPE_CHECKING:  # pragma: nocover
 _EdgyModel = TypeVar("_EdgyModel", bound="Model")
 ReflectEdgyModel = TypeVar("ReflectEdgyModel", bound="ReflectModel")
 
-SaffierModel = Union[_EdgyModel, ReflectEdgyModel]
+EdgyModel = Union[_EdgyModel, ReflectEdgyModel]
 
 
 @runtime_checkable
@@ -37,7 +37,7 @@ class QuerySetProtocol(Protocol):
     def exclude(self, **kwargs: "Model") -> "QuerySet":
         ...
 
-    def loopup(self, **kwargs: Any) -> "QuerySet":
+    def lookup(self, **kwargs: Any) -> "QuerySet":
         ...
 
     def order_by(self, columns: Union[List, str]) -> "QuerySet":
@@ -58,34 +58,37 @@ class QuerySetProtocol(Protocol):
     def select_related(self, related: Union[List, str]) -> "QuerySet":
         ...
 
+    def only(self, *fields: Sequence[str]) -> Union[List[EdgyModel], None]:
+        ...
+
     async def exists(self) -> bool:
         ...
 
     async def count(self) -> int:
         ...
 
-    async def get_or_none(self, **kwargs: Any) -> Union[SaffierModel, None]:
+    async def get_or_none(self, **kwargs: Any) -> Union[EdgyModel, None]:
         ...
 
-    async def all(self, **kwargs: Any) -> Sequence[Optional[SaffierModel]]:
+    async def all(self, **kwargs: Any) -> Sequence[Optional[EdgyModel]]:
         ...
 
-    async def get(self, **kwargs: Any) -> SaffierModel:
+    async def get(self, **kwargs: Any) -> EdgyModel:
         ...
 
-    async def first(self, **kwargs: Any) -> SaffierModel:
+    async def first(self, **kwargs: Any) -> EdgyModel:
         ...
 
-    async def last(self, **kwargs: Any) -> SaffierModel:
+    async def last(self, **kwargs: Any) -> EdgyModel:
         ...
 
-    async def create(self, **kwargs: Any) -> SaffierModel:
+    async def create(self, **kwargs: Any) -> EdgyModel:
         ...
 
     async def bulk_create(self, objs: Sequence[List[Dict[Any, Any]]]) -> None:
         ...
 
-    async def bulk_update(self, objs: Sequence[List[SaffierModel]], fields: List[str]) -> None:
+    async def bulk_update(self, objs: Sequence[List[EdgyModel]], fields: List[str]) -> None:
         ...
 
     async def delete(self) -> None:
@@ -98,11 +101,11 @@ class QuerySetProtocol(Protocol):
         self,
         _defaults: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
-    ) -> Tuple[SaffierModel, bool]:
+    ) -> Tuple[EdgyModel, bool]:
         ...
 
-    async def update_or_create(self, defaults: Any, **kwargs: Any) -> Tuple[SaffierModel, bool]:
+    async def update_or_create(self, defaults: Any, **kwargs: Any) -> Tuple[EdgyModel, bool]:
         ...
 
-    async def contains(self, instance: SaffierModel) -> bool:
+    async def contains(self, instance: EdgyModel) -> bool:
         ...
