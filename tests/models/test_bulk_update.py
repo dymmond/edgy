@@ -1,4 +1,4 @@
-import datetime
+from datetime import date, datetime, timedelta
 from enum import Enum
 
 import pytest
@@ -15,7 +15,7 @@ models = edgy.Registry(database=database)
 
 
 def time():
-    return datetime.datetime.now().time()
+    return datetime.now().time()
 
 
 class StatusEnum(Enum):
@@ -31,17 +31,17 @@ class BaseModel(edgy.Model):
 class Product(BaseModel):
     id = fields.IntegerField(primary_key=True)
     uuid = fields.UUIDField(null=True)
-    created = fields.DateTimeField(default=datetime.datetime.now)
-    created_day = fields.DateField(default=datetime.date.today)
+    created = fields.DateTimeField(default=datetime.now)
+    created_day = fields.DateField(default=date.today)
     created_time = fields.TimeField(default=time)
     created_date = fields.DateField(auto_now_add=True)
     created_datetime = fields.DateTimeField(auto_now_add=True)
     updated_datetime = fields.DateTimeField(auto_now=True)
     updated_date = fields.DateField(auto_now=True)
     data = fields.JSONField(default={})
-    description = fields.CharField(blank=True, max_length=255)
+    description = fields.CharField(null=True, max_length=255)
     huge_number = fields.BigIntegerField(default=0)
-    price = fields.DecimalField(max_digits=5, decimal_places=2, null=True)
+    price = fields.DecimalField(null=True)
     status = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
     value = fields.FloatField(null=True)
 
@@ -86,7 +86,7 @@ async def test_bulk_update():
     assert products[1].value == 456.789
     assert products[1].status == StatusEnum.DRAFT
 
-    today_date = datetime.date.today() + datetime.timedelta(days=3)
+    today_date = date.today() + timedelta(days=3)
 
     products = await Product.query.all()
     products[0].created_day = today_date

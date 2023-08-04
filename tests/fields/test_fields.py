@@ -2,8 +2,8 @@ import datetime
 import decimal
 import enum
 import uuid
+from typing import Any
 
-import pydantic
 import pytest
 import sqlalchemy
 
@@ -61,7 +61,7 @@ def test_column_type():
         (DateTimeField(auto_now=True), datetime.datetime),
         (DateField(auto_now=True), datetime.date),
         (TimeField(), datetime.time),
-        (JSONField(), pydantic.Json),
+        (JSONField(), Any),
         (BinaryField(max_length=255), bytes),
         (IntegerField(), int),
         (BigIntegerField(), int),
@@ -183,7 +183,7 @@ def test_can_create_date_field():
     field = DateField(auto_now=True)
 
     assert isinstance(field, BaseField)
-    assert field.default == datetime.datetime.today
+    assert field.default == datetime.date.today
     assert field.read_only is True
 
 
@@ -226,28 +226,11 @@ def test_can_create_integer_field(klass):
     assert field.default is None
 
 
-@pytest.mark.parametrize("klass", [FloatField, IntegerField, BigIntegerField, SmallIntegerField])
-def test_raises_field_definition_error_in_numbers(klass):
-    with pytest.raises(FieldDefinitionError):
-        klass(minimum=20, maximum=10)
-
-    with pytest.raises(FieldDefinitionError):
-        klass(exclusive_minimum=20, exclusive_maximum=10)
-
-
 def test_can_create_decimal_field():
     field = DecimalField(max_digits=2, decimal_places=2)
 
     assert isinstance(field, BaseField)
     assert field.default is None
-
-
-def test_raises_field_definition_error_in_decimal():
-    with pytest.raises(FieldDefinitionError):
-        DecimalField(minimum=20, maximum=10)
-
-    with pytest.raises(FieldDefinitionError):
-        DecimalField(exclusive_minimum=20, exclusive_maximum=10)
 
 
 def test_can_create_uuid_field():

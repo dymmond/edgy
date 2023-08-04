@@ -178,14 +178,8 @@ class BaseModelMeta(ModelMetaclass):
         registry: Any = None
 
         # Extract the custom Edgy Fields in a pydantic format.
-        # attrs["__name__"] = name
-        # attrs["model_config"] = ConfigDict(extra="allow", arbitrary_types_allowed=True)
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
-        # for base in reversed(bases):
-        #     module = base.__module__
-        #     if module.startswith("edgy.core.") or module.startswith("pydantic."):
-        #         continue
-        super().__new__(cls, name, bases, attrs)  # type: ignore
+        # super().__new__(cls, name, bases, attrs)  # type: ignore
 
         # Searching for fields "Field" in the class hierarchy.
         def __search_for_fields(base: Type, attrs: Any) -> None:

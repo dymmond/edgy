@@ -40,7 +40,7 @@ class Product(edgy.Model):
     data = fields.JSONField(default={})
     description = fields.CharField(null=True, max_length=255)
     huge_number = fields.BigIntegerField(default=0)
-    price = fields.DecimalField(max_digits=5, decimal_places=2, null=True)
+    price = fields.DecimalField(null=True)
     status = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
     value = fields.FloatField(null=True)
 

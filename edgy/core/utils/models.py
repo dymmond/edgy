@@ -79,7 +79,7 @@ class ModelParser:
         are simply relations.
         """
         related_names = model_class.meta.related_names
-        return {k: v for k, v in model_class.__dict__.items() if k not in related_names}
+        return {k: v for k, v in model_class.model_fields.items() if k not in related_names}
 
 
 def create_edgy_model(

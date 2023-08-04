@@ -1,5 +1,5 @@
 import decimal
-from typing import Any, Callable, Optional, Pattern, Sequence, Union
+from typing import Any, Callable, ClassVar, Dict, Optional, Pattern, Sequence, Union
 
 import sqlalchemy
 from pydantic._internal import _repr
@@ -17,6 +17,8 @@ class BaseField(FieldInfo, _repr.Representation):
     The base field for all Edgy data model fields.
     """
 
+    __namespace__: ClassVar[Union[Dict[str, Any], None]] = None
+
     def __init__(
         self,
         *,
@@ -25,10 +27,9 @@ class BaseField(FieldInfo, _repr.Representation):
         description: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
-        self.null: bool = kwargs.pop("null", False)
-
         super().__init__(**kwargs)
 
+        self.null: bool = kwargs.pop("null", False)
         if self.null and default is Undefined:
             default = None
         if default is not Undefined:
@@ -60,6 +61,7 @@ class BaseField(FieldInfo, _repr.Representation):
         self.name: str = kwargs.pop("name", None)
         self.alias: str = kwargs.pop("name", None)
         self.max_digits: str = kwargs.pop("max_digits", None)
+        self.scale: str = kwargs.pop("scale", None)
         self.decimal_places: str = kwargs.pop("decimal_places", None)
         self.regex: str = kwargs.pop("regex", None)
         self.format: str = kwargs.pop("format", None)
@@ -71,12 +73,6 @@ class BaseField(FieldInfo, _repr.Representation):
         )
         self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("minimum", None)
         self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("maximum", None)
-        self.exclusive_mininum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "exclusive_mininum", None
-        )
-        self.exclusive_maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "exclusive_maximum", None
-        )
         self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
             "multiple_of", None
         )
@@ -104,14 +100,12 @@ class BaseField(FieldInfo, _repr.Representation):
 
         if isinstance(self.default, bool):
             self.null = True
+        self.__namespace__ = {k: v for k, v in self.__dict__.items() if k != "__namespace__"}
 
-    # def is_required(self) -> bool:
-    #     """Check if the argument is required.
-
-    #     Returns:
-    #         `True` if the argument is required, `False` otherwise.
-    #     """
-    #     return self.default is PydanticUndefined and self.default_factory is None
+    @property
+    def namespace(self) -> Any:
+        """Returns the properties added to the fields in a dict format"""
+        return self.__namespace__
 
     def is_required(self) -> bool:
         """Check if the argument is required.
