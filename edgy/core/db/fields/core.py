@@ -488,6 +488,8 @@ class PasswordField(CharField):
 
 
 class EmailField(CharField):
+    _type = str
+
     @classmethod
     def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
         return sqlalchemy.String(length=kwargs.get("max_length"))
