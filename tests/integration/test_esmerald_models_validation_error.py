@@ -1,6 +1,7 @@
 import pytest
 from esmerald import Esmerald, Gateway, post
 from esmerald.testclient import EsmeraldTestClient
+from pydantic import __version__
 from tests.settings import DATABASE_URL
 
 import edgy
@@ -10,6 +11,8 @@ database = Database(url=DATABASE_URL)
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
+
+pydantic_version = __version__[:3]
 
 
 class User(edgy.Model):
@@ -45,14 +48,14 @@ def test_raises_error_on_missing_not_null_fields():
                 "loc": ["name"],
                 "msg": "Field required",
                 "input": {"language": "EN", "description": "A description"},
-                "url": "https://errors.pydantic.dev/2.1/v/missing",
+                "url": f"https://errors.pydantic.dev/{pydantic_version}/v/missing",
             },
             {
                 "type": "missing",
                 "loc": ["email"],
                 "msg": "Field required",
                 "input": {"language": "EN", "description": "A description"},
-                "url": "https://errors.pydantic.dev/2.1/v/missing",
+                "url": f"https://errors.pydantic.dev/{pydantic_version}/v/missing",
             },
         ],
     }
