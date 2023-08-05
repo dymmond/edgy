@@ -24,7 +24,7 @@ from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.querysets.mixins import QuerySetPropsMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
 from edgy.core.utils.models import DateParser, ModelParser
-from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound
+from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.protocols.queryset import QuerySetProtocol
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -523,16 +523,21 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     async def values(
         self,
-        fields: Optional[Sequence[str]] = None,
+        fields: Union[Sequence[str], str, None] = None,
         exclude: Union[Sequence[str], Set[str]] = None,
         exclude_none: bool = False,
         flatten: bool = False,
+        **kwargs: Any,
     ) -> List[Any]:
         """
         Returns the results in a python dictionary format.
         """
+        fields = fields or []
         queryset: "QuerySet" = self.clone()
         rows: List[Type["Model"]] = await queryset.all()
+
+        if not isinstance(fields, list):
+            raise QuerySetError(detail="Fields must be an iterable.")
 
         if not fields:
             rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
@@ -541,7 +546,50 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)
                 for row in rows
             ]
+
+        as_tuple = kwargs.pop("__as_tuple__", False)
+
+        if not as_tuple:
+            return rows
+
+        if not flatten:
+            rows = [tuple(row.values()) for row in rows]
+        else:
+            try:
+                rows = [row[fields[0]] for row in rows]
+            except KeyError:
+                raise QuerySetError(detail=f"{fields[0]} does not exist in the results.") from None
         return rows
+
+    async def values_list(
+        self,
+        fields: Union[Sequence[str], str, None] = None,
+        exclude: Union[Sequence[str], Set[str]] = None,
+        exclude_none: bool = False,
+        flat: bool = False,
+    ) -> List[Any]:
+        """
+        Returns the results in a python dictionary format.
+        """
+        fields = fields or []
+        if flat and len(fields) > 1:
+            raise QuerySetError(
+                detail=f"Maximum of 1 in fields when `flat` is enables, got {len(fields)} instead."
+            ) from None
+
+        if flat and isinstance(fields, str):
+            fields = [fields]
+
+        if isinstance(fields, str):
+            fields = [fields]
+
+        return await self.values(
+            fields=fields,
+            exclude=exclude,
+            exclude_none=exclude_none,
+            flatten=flat,
+            __as_tuple__=True,
+        )
 
     async def exists(self) -> bool:
         """

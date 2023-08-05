@@ -5,6 +5,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     Tuple,
     TypeVar,
     Union,
@@ -97,10 +98,23 @@ class QuerySetProtocol(Protocol):
     async def update(self, **kwargs: Any) -> int:
         ...
 
-    async def values(self, fields: Sequence[str], flatten: bool) -> List[Any]:
+    async def values(
+        self,
+        fields: Union[Sequence[str], str, None],
+        exclude: Union[Sequence[str], Set[str]],
+        exclude_none: bool,
+        flatten: bool,
+        **kwargs: Any,
+    ) -> List[Any]:
         ...
 
-    async def values_list(self, *fields: Sequence[str], flatten: bool) -> List[Any]:
+    async def values_list(
+        self,
+        fields: Union[Sequence[str], str, None],
+        exclude: Union[Sequence[str], Set[str]],
+        exclude_none: bool,
+        flat: bool,
+    ) -> List[Any]:
         ...
 
     async def get_or_create(
