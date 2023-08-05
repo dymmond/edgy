@@ -97,6 +97,12 @@ class QuerySetProtocol(Protocol):
     async def update(self, **kwargs: Any) -> int:
         ...
 
+    async def values(self, fields: Sequence[str], flatten: bool) -> List[Any]:
+        ...
+
+    async def values_list(self, *fields: Sequence[str], flatten: bool) -> List[Any]:
+        ...
+
     async def get_or_create(
         self,
         _defaults: Optional[Dict[str, Any]] = None,

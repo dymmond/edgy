@@ -8,6 +8,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -519,6 +520,28 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         related = list(self._select_related) + related
         queryset._select_related = related
         return queryset
+
+    async def values(
+        self,
+        fields: Optional[Sequence[str]] = None,
+        exclude: Union[Sequence[str], Set[str]] = None,
+        exclude_none: bool = False,
+        flatten: bool = False,
+    ) -> List[Any]:
+        """
+        Returns the results in a python dictionary format.
+        """
+        queryset: "QuerySet" = self.clone()
+        rows: List[Type["Model"]] = await queryset.all()
+
+        if not fields:
+            rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
+        else:
+            rows = [
+                row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)
+                for row in rows
+            ]
+        return rows
 
     async def exists(self) -> bool:
         """

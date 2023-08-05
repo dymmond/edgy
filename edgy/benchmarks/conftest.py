@@ -72,7 +72,7 @@ async def products_in_db(num_models: int):
         Product(
             name="".join(random.sample(string.ascii_letters, 5)),
             rating=random.randint(0, 5),
-        )
+        ).model_dump()
         for i in range(0, num_models)
     ]
     await Product.objects.bulk_create(products)
