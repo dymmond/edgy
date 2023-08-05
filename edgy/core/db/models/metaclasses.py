@@ -71,6 +71,9 @@ class MetaInfo:
         self.related_names: Set[str] = set()
         self.related_fields: Dict[str, Any] = {}
 
+    def model_dump(self) -> Dict[Any, Any]:
+        return {k: getattr(self, k, None) for k in self.__slots__}
+
     def load_dict(self, values: Dict[str, Any]) -> Self:
         """
         Loads the metadata from a dictionary
@@ -132,6 +135,9 @@ def _set_related_name_for_foreign_keys(
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
+    if not foreign_keys:
+        return
+
     for _, foreign_key in foreign_keys.items():
         default_related_name = getattr(foreign_key, "related_name", None)
 
@@ -152,6 +158,7 @@ def _set_related_name_for_foreign_keys(
 
         # Set the related name
         setattr(foreign_key.target, default_related_name, related_field)
+        model_class.meta.related_fields[default_related_name] = related_field
 
     return default_related_name
 
@@ -179,7 +186,7 @@ class BaseModelMeta(ModelMetaclass):
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
-        # super().__new__(cls, name, bases, attrs)  # type: ignore
+        super().__new__(cls, name, bases, attrs)  # type: ignore
 
         # Searching for fields "Field" in the class hierarchy.
         def __search_for_fields(base: Type, attrs: Any) -> None:
@@ -361,7 +368,7 @@ class BaseModelMeta(ModelMetaclass):
             value.owner = new_class
 
         # Sets the foreign key fields
-        if meta.foreign_key_fields:
+        if meta.foreign_key_fields and not new_class.is_proxy_model:
             related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
             meta.related_names.add(related_name)
 
@@ -376,6 +383,17 @@ class BaseModelMeta(ModelMetaclass):
 
         # Update the model references with the validations of the model
         # Being done by the Edgy fields instead.
+
+        # Generates a proxy model for each model created
+        # Making sure the core model where the fields are inherited
+        # And mapped contains the main proxy_model
+        if not new_class.is_proxy_model:
+            proxy_model = new_class.generate_proxy_model()
+            new_class.proxy_model = proxy_model
+            new_class.proxy_model.parent = new_class
+            new_class.proxy_model.model_rebuild(force=True)
+            meta.registry.models[new_class.__name__] = new_class
+
         new_class.model_rebuild(force=True)
         return new_class
 

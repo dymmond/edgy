@@ -7,6 +7,7 @@ from typing import (
     Generator,
     List,
     Optional,
+    Sequence,
     Tuple,
     Type,
     TypeVar,
@@ -48,6 +49,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         order_by: Any = None,
         group_by: Any = None,
         distinct_on: Any = None,
+        only_fields: Any = None,
         m2m_related: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
@@ -59,6 +61,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
         self.distinct_on = [] if distinct_on is None else distinct_on
+        self._only = [] if only_fields is None else only_fields
         self._expression = None
         self._cache = None
         self._m2m_related = m2m_related
@@ -185,6 +188,9 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         expression = sqlalchemy.sql.select(*tables)
         expression = expression.select_from(select_from)
 
+        if self._only:
+            expression = expression.with_only_columns(*self._only)
+
         if self.filter_clauses:
             expression = self.build_filter_clauses_expression(
                 self.filter_clauses, expression=expression
@@ -214,6 +220,11 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         clauses = []
         filter_clauses = self.filter_clauses
         select_related = list(self._select_related)
+
+        # Making sure for queries we use the main class and not the proxy
+        # And enable the parent
+        if self.model_class.is_proxy_model:
+            self.model_class = self.model_class.parent
 
         if kwargs.get("pk"):
             pk_name = self.model_class.pkname
@@ -264,6 +275,14 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
                         column = model_class.table.columns[settings.default_related_lookup_field]
                     except AttributeError:
                         raise KeyError(str(error)) from error
+                        # Tries the parent class from the proxy model
+                        # try:
+                        #     model_class = getattr(self.model_class.parent, key).related_to
+                        #     column = model_class.table.columns[
+                        #         settings.default_related_lookup_field
+                        #     ]
+                        # except AttributeError:
+                        #     raise KeyError(str(error)) from error
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
@@ -298,6 +317,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
             limit_count=self.limit_count,
             limit_offset=self._offset,
             order_by=self._order_by,
+            only_fields=self._only,
             m2m_related=self.m2m_related,
         )
 
@@ -336,6 +356,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         queryset._expression = self._expression
         queryset._cache = self._cache
         queryset._m2m_related = self._m2m_related
+        queryset._only = self._only
         return queryset
 
 
@@ -453,7 +474,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._offset = offset
         return queryset
 
-    def group_by(self, *group_by: str) -> "QuerySet":
+    def group_by(self, *group_by: Sequence[str]) -> "QuerySet":
         """
         Returns the values grouped by the given fields.
         """
@@ -461,12 +482,25 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._group_by = group_by
         return queryset
 
-    def distinct(self, *distinct_on: str) -> "QuerySet":
+    def distinct(self, *distinct_on: Sequence[str]) -> "QuerySet":
         """
         Returns a queryset with distinct results.
         """
         queryset: "QuerySet" = self.clone()
         queryset.distinct_on = distinct_on
+        return queryset
+
+    def only(self, *fields: Sequence[str]) -> Union[List[EdgyModel], None]:
+        """
+        Returns a list of models with the selected only fields and always the primary
+        key.
+        """
+        only_fields = [sqlalchemy.text(field) for field in fields]
+        if self.model_class.pkname not in fields:
+            only_fields.insert(0, sqlalchemy.text(self.model_class.pkname))
+
+        queryset: "QuerySet" = self.clone()
+        queryset._only = only_fields
         return queryset
 
     def select_related(self, related: Any) -> "QuerySet":
@@ -538,8 +572,16 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         # Attach the raw query to the object
         queryset.model_class.raw_query = self.sql
 
+        # Only fields
+        is_only_fields = True if queryset._only else False
+
         results = [
-            queryset.model_class.from_sqla_row(row, select_related=self._select_related)
+            queryset.model_class.from_sqla_row(
+                row,
+                select_related=self._select_related,
+                is_only_fields=is_only_fields,
+                only_fields=queryset._only,
+            )
             for row in rows
         ]
 
@@ -559,11 +601,19 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         rows = await self.database.fetch_all(expression)
         self.set_query_expression(expression)
 
+        # Only fields
+        is_only_fields = True if self._only else False
+
         if not rows:
             raise ObjectNotFound()
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        return self.model_class.from_sqla_row(rows[0], select_related=self._select_related)
+        return self.model_class.from_sqla_row(
+            rows[0],
+            select_related=self._select_related,
+            is_only_fields=is_only_fields,
+            only_fields=self._only,
+        )
 
     async def first(self, **kwargs: Any) -> EdgyModel:
         """
@@ -594,7 +644,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Creates a record in a specific table.
         """
         kwargs = self.validate_kwargs(**kwargs)
-
         instance = self.model_class(**kwargs)
         instance = await instance.save(force_save=True, values=kwargs)
         return instance
@@ -618,7 +667,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         It is thought to be a clean approach to a simple problem so it was added here and
         refactored to be compatible with Saffier.
         """
-
         new_objs = []
         for obj in objs:
             new_obj = {}

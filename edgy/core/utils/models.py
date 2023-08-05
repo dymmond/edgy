@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from edgy import Model
     from edgy.core.db.models.metaclasses import MetaInfo
 
+edgy_setattr = object.__setattr__
+
 
 class DateParser:
     def has_auto_now(self, field: Type[BaseField]) -> bool:
@@ -90,12 +92,14 @@ def create_edgy_model(
     __qualname__: Optional[str] = None,
     __config__: Optional[ConfigDict] = None,
     __bases__: Optional[Tuple[Type["Model"]]] = None,
-    __partial__: bool = False,
+    __proxy__: bool = False,
+    __pydantic_extra__: Any = None,
 ) -> Type["Model"]:
     """
     Generates an `edgy.Model` with all the required definitions to generate the pydantic
     like model.
     """
+
     if not __bases__:
         __bases__ = (edgy.Model,)
 
@@ -103,7 +107,7 @@ def create_edgy_model(
     core_definitions = {
         "__module__": __module__,
         "__qualname__": qualname,
-        "partial_model": __partial__,
+        "is_proxy_model": __proxy__,
     }
     if not __definitions__:
         __definitions__ = {}
@@ -114,6 +118,54 @@ def create_edgy_model(
         core_definitions.update(**{"model_config": __config__})
     if __metadata__:
         core_definitions.update(**{"Meta": __metadata__})
+    if __pydantic_extra__:
+        core_definitions.update(**{"__pydantic_extra__": __pydantic_extra__})
 
     model: Type["Model"] = type(__name__, __bases__, core_definitions)
     return model
+
+
+def create_generic_model_proxy(
+    model_to_proxy: Any,
+    fields: Optional[Any] = None,
+    bases: Optional[Any] = None,
+) -> Type["Model"]:
+    """
+    Generic proxy generator for the rows.
+    Each row has their own proxy making it isolated fromt he main
+    registry model and not changing its state.
+    """
+    from edgy.core.db.models.model_proxy import ProxyModel
+
+    if not fields:
+        fields = {}
+
+    model_definition = {
+        "name": model_to_proxy.__name__,
+        "module": model_to_proxy.__module__,
+        "metadata": model_to_proxy.meta,
+        "definitions": fields,
+        "proxy": True,
+    }
+    if bases:
+        model_definition["bases"] = bases
+
+    proxy_model = ProxyModel(**model_definition)
+    model = proxy_model()
+    model.model_fields = fields
+    model.model_rebuild(force=True)
+    return model
+
+
+def generify_model_fields(model: Type["Model"]) -> Dict[Any, Any]:
+    """
+    Makes all fields generic when a partial model is generated or used
+    """
+    fields = {}
+
+    # handle the nested non existing results
+    for name, field in model.model_fields.items():
+        edgy_setattr(field, "annotation", Any)
+        edgy_setattr(field, "null", True)
+        fields[name] = field
+    return fields

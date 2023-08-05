@@ -1,0 +1,3 @@
+import os
+
+alias kkk os.system('kill -9 %d' % os.getpid())

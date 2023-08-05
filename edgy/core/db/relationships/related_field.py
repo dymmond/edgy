@@ -79,7 +79,6 @@ class RelatedField:
         with the FK to the related_to.
         """
         field_name: str = None
-
         for field, value in self.related_from.fields.items():
             if isinstance(value, (BaseForeignKeyField, BaseOneToOneKeyField)):
                 if value.related_name == self.related_name:

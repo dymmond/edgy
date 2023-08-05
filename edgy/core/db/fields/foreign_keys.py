@@ -4,7 +4,7 @@ import sqlalchemy
 
 from edgy.core.connection.registry import Registry
 from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL
-from edgy.core.db.fields.base import BaseField
+from edgy.core.db.fields._base_fk import BaseField, BaseForeignKey
 from edgy.core.terminal import Print
 from edgy.exceptions import FieldDefinitionError
 
@@ -84,19 +84,7 @@ class ForeignKeyFieldFactory:
         return []
 
 
-class BaseForeignKeyField(BaseField):
-    @property
-    def target(self) -> Any:
-        """
-        The target of the ForeignKey model.
-        """
-        if not hasattr(self, "_target"):
-            if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]  # type: ignore
-            else:
-                self._target = self.to
-        return self._target
-
+class BaseForeignKeyField(BaseForeignKey):
     def get_column(self, name: str) -> Any:
         target = self.target
         to_field = target.fields[target.pkname]
@@ -112,30 +100,6 @@ class BaseForeignKeyField(BaseField):
             )
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
-
-    def get_related_name(self) -> str:
-        """
-        Returns the name of the related name of the current relationship between the to and target.
-
-        :return: Name of the related_name attribute field.
-        """
-        return self.related_name
-
-    def expand_relationship(self, value: Any) -> Any:
-        target = self.target
-        if isinstance(value, target):
-            return value
-
-        fields_filtered = {target.pkname: target.fields.get(target.pkname)}
-        target.model_fields = fields_filtered
-        target.model_rebuild(force=True)
-        return target(pk=value)
-
-    def check(self, value: Any) -> Any:
-        """
-        Runs the checks for the fields being validated.
-        """
-        return value.pk
 
 
 class ForeignKey(ForeignKeyFieldFactory):

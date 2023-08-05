@@ -1,5 +1,6 @@
+import copy
 import functools
-from typing import Any, ClassVar, Dict, Optional, Sequence
+from typing import Any, ClassVar, Dict, Optional, Sequence, Type, Union
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
@@ -13,8 +14,9 @@ from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.models._internal import DescriptiveMeta
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
+from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.utils.functional import edgy_setattr
-from edgy.core.utils.models import DateParser, ModelParser
+from edgy.core.utils.models import DateParser, ModelParser, generify_model_fields
 from edgy.exceptions import ImproperlyConfigured
 
 
@@ -24,8 +26,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     """
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+    proxy_model: ClassVar[Union[Type[Self], None]]
+    parent: ClassVar[Union[Type[Self], None]]
+    is_proxy_model: ClassVar[bool] = False
 
-    partial_model: ClassVar[bool] = False
     query: ClassVar[Manager] = Manager()
     meta: ClassVar[MetaInfo] = MetaInfo(None)
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
@@ -33,10 +37,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     __raw_query__: ClassVar[Optional[str]] = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:  # type: ignore
-        values = self.setup_model_fields_from_kwargs(kwargs)
-        edgy_setattr(self, "__pydantic_extra__", None)
         super().__init__(**kwargs)
-        edgy_setattr(self, "__dict__", values)
+        values = self.setup_model_fields_from_kwargs(kwargs)
+        self.__dict__ = values
 
     def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
         """
@@ -53,8 +56,8 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                     raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
 
             # Set model field and add to the kwargs dict
-            setattr(self, key, value)
-            kwargs[key] = getattr(self, key)
+            edgy_setattr(self, key, value)
+            kwargs[key] = value
         return kwargs
 
     @property
@@ -82,6 +85,24 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     @property
     def table(self) -> sqlalchemy.Table:
         return self.__class__.table
+
+    @classmethod
+    def generate_proxy_model(cls) -> Type[Self]:
+        """
+        Generates a proxy model for each model. This proxy model is a simple
+        shallow copy of the original model being generated.
+        """
+        fields = {key: copy.copy(field) for key, field in cls.fields.items()}
+        proxy_model = ProxyModel(
+            name=cls.__name__,
+            module=cls.__module__,
+            metadata=cls.meta,
+            definitions=fields,
+        )
+
+        proxy_model.build()
+        generify_model_fields(proxy_model.model)
+        return proxy_model.model
 
     @classmethod
     def build(cls) -> sqlalchemy.Table:
@@ -151,14 +172,11 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     def __setattr__(self, key: Any, value: Any) -> Any:
         if key in self.fields:
-            # Setting a relationship to a raw pk value should set a
-            # fully-fledged relationship instance, with just the pk loaded.
             field = self.fields[key]
             if isinstance(field, BaseManyToManyForeignKeyField):
                 value = getattr(self, settings.many_to_many_relation.format(key=key))
             else:
                 value = self.fields[key].expand_relationship(value)
-
         edgy_setattr(self, key, value)
 
     def __eq__(self, other: Any) -> bool:
