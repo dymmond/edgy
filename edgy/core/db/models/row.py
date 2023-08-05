@@ -1,11 +1,8 @@
-import copy
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Type
 
 from sqlalchemy.engine.result import Row
 
 from edgy.core.db.models.base import EdgyBaseModel
-from edgy.core.utils.functional import edgy_setattr
-from edgy.core.utils.models import create_edgy_model
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy import Model
@@ -67,23 +64,24 @@ class ModelRow(EdgyBaseModel):
             model_related = foreign_key.target
             child_item = {}
 
-            for column in cls.table.columns:
-                if column.name not in model_related.fields.keys():
+            for column in model_related.table.columns:
+                if column.name not in cls.fields.keys():
                     continue
                 elif related not in child_item:
-                    value = row[related]
-                    if value is not None:
-                        child_item[column.name] = value
+                    if row[related] is not None:
+                        child_item[column.name] = row[related]
 
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
             # and rebuild it with the new fields.
-            fields_filtered = {
-                model_related.pkname: model_related.fields.get(model_related.pkname)
+            fields = {
+                model_related.proxy_model.pkname: model_related.model_fields.get(
+                    model_related.proxy_model.pkname
+                )
             }
-            model_related.model_fields = fields_filtered
+            model_related.proxy_model.model_fields = fields
             model_related.model_rebuild(force=True)
-            item[related] = model_related(**child_item)
+            item[related] = model_related.proxy_model(**child_item)
 
         # Check for the only_fields
         if is_only_fields:
@@ -97,20 +95,10 @@ class ModelRow(EdgyBaseModel):
                 if column not in item:
                     item[column] = value
 
-            # We need to generify the model fields to make sure we can populate the
-            # model without mandatory fields
-            partial_fields = {k: copy.copy(v) for k, v in cls.fields.items() if k in item}
-            model = create_edgy_model(
-                __name__=cls.__name__,
-                __module__=cls.__module__,
-                __metadata__=cls.meta,
-                __definitions__=partial_fields,
-            )
-            # breakpoint()
-            fields = cls.generify_model_fields(model=model)
-            model.model_fields.update(fields)
-            model.model_rebuild(force=True)
-            return model(**item)
+            # # We need to generify the model fields to make sure we can populate the
+            # # model without mandatory fields
+            # partial_fields = {k: copy.copy(v) for k, v in cls.fields.items() if k in item}
+            return cls.proxy_model(**item)
         else:
             # Pull out the regular column values.
             for column in cls.table.columns:
@@ -119,6 +107,7 @@ class ModelRow(EdgyBaseModel):
                     continue
                 elif column.name not in item:
                     item[column.name] = row[column]
+
         return cls(**item)
 
     @classmethod
@@ -131,17 +120,3 @@ class ModelRow(EdgyBaseModel):
             if related_name in fields:
                 return True
         return False
-
-    @classmethod
-    def generify_model_fields(cls, model: Type["Model"]) -> Dict[Any, Any]:
-        """
-        Makes all fields generic when a partial model is generated or used
-        """
-        fields = {}
-
-        # handle the nested non existing results
-        for name, field in model.model_fields.items():
-            edgy_setattr(field, "annotation", Any)
-            edgy_setattr(field, "null", True)
-            fields[name] = field
-        return fields

@@ -221,6 +221,11 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         filter_clauses = self.filter_clauses
         select_related = list(self._select_related)
 
+        # Making sure for queries we use the main class and not the proxy
+        # And enable the parent
+        if self.model_class.is_proxy_model:
+            self.model_class = self.model_class.parent
+
         if kwargs.get("pk"):
             pk_name = self.model_class.pkname
             kwargs[pk_name] = kwargs.pop("pk")
@@ -253,7 +258,6 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
                         try:
                             model_class = model_class.fields[part].target
                         except KeyError:
-                            # breakpoint()
                             model_class = getattr(model_class, part).related_from
 
                 column = model_class.table.columns[field_name]
@@ -271,6 +275,14 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
                         column = model_class.table.columns[settings.default_related_lookup_field]
                     except AttributeError:
                         raise KeyError(str(error)) from error
+                        # Tries the parent class from the proxy model
+                        # try:
+                        #     model_class = getattr(self.model_class.parent, key).related_to
+                        #     column = model_class.table.columns[
+                        #         settings.default_related_lookup_field
+                        #     ]
+                        # except AttributeError:
+                        #     raise KeyError(str(error)) from error
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
@@ -655,7 +667,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         It is thought to be a clean approach to a simple problem so it was added here and
         refactored to be compatible with Saffier.
         """
-
         new_objs = []
         for obj in objs:
             new_obj = {}

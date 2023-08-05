@@ -2,8 +2,6 @@ from typing import TYPE_CHECKING, Any, Dict, Tuple, Type, Union
 
 from pydantic import ConfigDict
 
-from edgy.core.utils.models import create_edgy_model
-
 if TYPE_CHECKING:
     from edgy import Model
     from edgy.core.db.models.metaclasses import MetaInfo
@@ -15,16 +13,6 @@ class ProxyModel:
     original, this instance is triggered instead.
     """
 
-    __name__: str
-    __module__: str
-    __bases__: Union[Tuple[Type["Model"]], None]
-    __definitions__: Union[Dict[Any, Any], None]
-    __metadata__: Union[Type["MetaInfo"], None]
-    __qualname__: Union[str, None]
-    __config__: Union[ConfigDict, None]
-    __proxy__: bool = False
-    __pydantic_extra__: Union[Any, None]
-
     def __init__(
         self,
         name: str,
@@ -35,21 +23,27 @@ class ProxyModel:
         metadata: Union[Type["MetaInfo"], None] = None,
         qualname: Union[str, None] = None,
         config: Union[ConfigDict, None] = None,
-        proxy: bool = False,
+        proxy: bool = True,
         pydantic_extra: Union[Any, None] = None,
     ) -> None:
-        self.__name__ = name
-        self.__module__ = module
-        self.__bases__ = bases
-        self.__definitions__ = definitions
-        self.__metadata__ = metadata
-        self.__qualname__ = qualname
-        self.__config__ = config
-        self.__proxy__ = proxy
+        self.__name__: str = name
+        self.__module__: str = module
+        self.__bases__: Union[Tuple[Type["Model"]], None] = bases
+        self.__definitions__: Union[Dict[Any, Any], None] = definitions
+        self.__metadata__: Union[Type["MetaInfo"], None] = metadata
+        self.__qualname__: Union[str, None] = qualname
+        self.__config__: Union[ConfigDict, None] = config
+        self.__proxy__: bool = proxy
         self.__pydantic_extra__ = pydantic_extra
+        self.__model__ = None
 
-    def __call__(self, *args: Any, **kwds: Any) -> Any:
-        return create_edgy_model(
+    def build(self) -> Type["Model"]:
+        """
+        Generates the model proxy for the __model__ definition.
+        """
+        from edgy.core.utils.models import create_edgy_model
+
+        model = create_edgy_model(
             __name__=self.__name__,
             __module__=self.__module__,
             __bases__=self.__bases__,
@@ -60,6 +54,16 @@ class ProxyModel:
             __proxy__=self.__proxy__,
             __pydantic_extra__=self.__pydantic_extra__,
         )
+        self.__model__ = model
+        return self
+
+    @property
+    def model(self):
+        return self.__model__
+
+    @model.setter
+    def model(self, value: Type["Model"]) -> None:
+        self.__model__ = value
 
     def __repr__(self) -> str:
         name = f"Proxy{self.__name__}"

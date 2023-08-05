@@ -33,10 +33,12 @@ class BaseForeignKey(BaseField):
         if isinstance(value, target):
             return value
 
-        fields_filtered = {target.pkname: target.fields.get(target.pkname)}
-        target.model_fields = fields_filtered
-        target.model_rebuild(force=True)
-        return target(pk=value)
+        fields_filtered = {
+            target.proxy_model.pkname: target.proxy_model.fields.get(target.proxy_model.pkname)
+        }
+        target.proxy_model.model_fields = fields_filtered
+        target.proxy_model.model_rebuild(force=True)
+        return target.proxy_model(pk=value)
 
     def check(self, value: Any) -> Any:
         """

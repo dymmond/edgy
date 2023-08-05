@@ -158,6 +158,7 @@ def _set_related_name_for_foreign_keys(
 
         # Set the related name
         setattr(foreign_key.target, default_related_name, related_field)
+        model_class.meta.related_fields[default_related_name] = related_field
 
     return default_related_name
 
@@ -367,7 +368,7 @@ class BaseModelMeta(ModelMetaclass):
             value.owner = new_class
 
         # Sets the foreign key fields
-        if meta.foreign_key_fields and not new_class.proxy_model:
+        if meta.foreign_key_fields and not new_class.is_proxy_model:
             related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
             meta.related_names.add(related_name)
 
@@ -382,6 +383,17 @@ class BaseModelMeta(ModelMetaclass):
 
         # Update the model references with the validations of the model
         # Being done by the Edgy fields instead.
+
+        # Generates a proxy model for each model created
+        # Making sure the core model where the fields are inherited
+        # And mapped contains the main proxy_model
+        if not new_class.is_proxy_model:
+            proxy_model = new_class.generate_proxy_model()
+            new_class.proxy_model = proxy_model
+            new_class.proxy_model.parent = new_class
+            new_class.proxy_model.model_rebuild(force=True)
+            meta.registry.models[new_class.__name__] = new_class
+
         new_class.model_rebuild(force=True)
         return new_class
 
