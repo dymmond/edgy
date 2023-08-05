@@ -1,6 +1,6 @@
 import copy
 import functools
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, Type, Union
+from typing import Any, ClassVar, Dict, Optional, Sequence, Type, Union
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
@@ -18,9 +18,6 @@ from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.utils.functional import edgy_setattr
 from edgy.core.utils.models import DateParser, ModelParser, generify_model_fields
 from edgy.exceptions import ImproperlyConfigured
-
-if TYPE_CHECKING:
-    from edgy.core.db.models.model_proxy import ProxyModel
 
 
 class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta):
@@ -59,7 +56,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                     raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
 
             # Set model field and add to the kwargs dict
-            setattr(self, key, value)
+            edgy_setattr(self, key, value)
             kwargs[key] = value
         return kwargs
 
@@ -69,7 +66,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @pk.setter
     def pk(self, value: Any) -> Any:
-        setattr(self, self.pkname, value)
+        edgy_setattr(self, self.pkname, value)
 
     @property
     def raw_query(self) -> Any:
@@ -180,7 +177,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 value = getattr(self, settings.many_to_many_relation.format(key=key))
             else:
                 value = self.fields[key].expand_relationship(value)
-        super().__setattr__(key, value)
+        edgy_setattr(self, key, value)
 
     def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:

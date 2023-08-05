@@ -55,7 +55,7 @@ async def test_model_only_attribute_error():
     assert users[0].pk == john.pk
 
     with pytest.raises(AttributeError):
-        john.description
+        john.description  # noqa
 
 
 async def test_model_only_with_all():
