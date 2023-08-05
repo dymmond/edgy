@@ -62,6 +62,9 @@ class QuerySetProtocol(Protocol):
     def only(self, *fields: Sequence[str]) -> Union[List[EdgyModel], None]:
         ...
 
+    def defer(self, *fields: Sequence[str]) -> Union[List[EdgyModel], None]:
+        ...
+
     async def exists(self) -> bool:
         ...
 

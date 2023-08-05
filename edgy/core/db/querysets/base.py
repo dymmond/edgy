@@ -51,6 +51,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         group_by: Any = None,
         distinct_on: Any = None,
         only_fields: Any = None,
+        defer_fields: Any = None,
         m2m_related: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
@@ -63,6 +64,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         self._group_by = [] if group_by is None else group_by
         self.distinct_on = [] if distinct_on is None else distinct_on
         self._only = [] if only_fields is None else only_fields
+        self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
         self._cache = None
         self._m2m_related = m2m_related
@@ -276,14 +278,6 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
                         column = model_class.table.columns[settings.default_related_lookup_field]
                     except AttributeError:
                         raise KeyError(str(error)) from error
-                        # Tries the parent class from the proxy model
-                        # try:
-                        #     model_class = getattr(self.model_class.parent, key).related_to
-                        #     column = model_class.table.columns[
-                        #         settings.default_related_lookup_field
-                        #     ]
-                        # except AttributeError:
-                        #     raise KeyError(str(error)) from error
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
@@ -319,6 +313,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
             limit_offset=self._offset,
             order_by=self._order_by,
             only_fields=self._only,
+            defer_fields=self._defer,
             m2m_related=self.m2m_related,
         )
 
@@ -358,6 +353,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         queryset._cache = self._cache
         queryset._m2m_related = self._m2m_related
         queryset._only = self._only
+        queryset._defer = self._defer
         return queryset
 
 
@@ -504,6 +500,19 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._only = only_fields
         return queryset
 
+    def defer(self, *fields: Sequence[str]) -> Union[List[EdgyModel], None]:
+        """
+        Returns a list of models with the selected only fields and always the primary
+        key.
+        """
+        defer_fields = [sqlalchemy.text(field) for field in fields]
+        if self.model_class.pkname not in fields:
+            defer_fields.insert(0, sqlalchemy.text(self.model_class.pkname))
+
+        queryset: "QuerySet" = self.clone()
+        queryset._defer = defer_fields
+        return queryset
+
     def select_related(self, related: Any) -> "QuerySet":
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
@@ -646,12 +655,17 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         # Only fields
         is_only_fields = True if queryset._only else False
 
+        # Defer fields
+        is_defer_fields = True if queryset._only else False
+
         results = [
             queryset.model_class.from_sqla_row(
                 row,
                 select_related=self._select_related,
                 is_only_fields=is_only_fields,
                 only_fields=queryset._only,
+                is_defer_fields=is_defer_fields,
+                defer_fields=queryset._defer,
             )
             for row in rows
         ]
@@ -672,8 +686,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         rows = await self.database.fetch_all(expression)
         self.set_query_expression(expression)
 
-        # Only fields
         is_only_fields = True if self._only else False
+        is_defer_fields = True if self._defer else False
 
         if not rows:
             raise ObjectNotFound()
@@ -684,6 +698,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             select_related=self._select_related,
             is_only_fields=is_only_fields,
             only_fields=self._only,
+            is_defer_fields=is_defer_fields,
+            defer_fields=self._defer,
         )
 
     async def first(self, **kwargs: Any) -> EdgyModel:

@@ -20,6 +20,8 @@ class ModelRow(EdgyBaseModel):
         select_related: Optional[Sequence[Any]] = None,
         is_only_fields: bool = False,
         only_fields: Sequence[str] = None,
+        is_defer_fields: bool = False,
+        defer_fields: Sequence[str] = None,
     ) -> Optional[Type["Model"]]:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
