@@ -72,6 +72,9 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class.meta.multi_related[0]
 
+        if self._only and self._defer:
+            raise QuerySetError("You cannot use .only() and .defer() at the same time.")
+
     def build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
         order_by = list(map(self.prepare_order_by, order_by))
@@ -193,6 +196,10 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
 
         if self._only:
             expression = expression.with_only_columns(*self._only)
+
+        if self._defer:
+            columns = [column for column in select_from.columns if column.name not in self._defer]
+            expression = expression.with_only_columns(*columns)
 
         if self.filter_clauses:
             expression = self.build_filter_clauses_expression(
@@ -505,12 +512,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Returns a list of models with the selected only fields and always the primary
         key.
         """
-        defer_fields = [sqlalchemy.text(field) for field in fields]
-        if self.model_class.pkname not in fields:
-            defer_fields.insert(0, sqlalchemy.text(self.model_class.pkname))
-
         queryset: "QuerySet" = self.clone()
-        queryset._defer = defer_fields
+        queryset._defer = fields
         return queryset
 
     def select_related(self, related: Any) -> "QuerySet":
@@ -652,11 +655,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         # Attach the raw query to the object
         queryset.model_class.raw_query = self.sql
 
-        # Only fields
         is_only_fields = True if queryset._only else False
-
-        # Defer fields
-        is_defer_fields = True if queryset._only else False
+        is_defer_fields = True if queryset._defer else False
 
         results = [
             queryset.model_class.from_sqla_row(

@@ -76,22 +76,17 @@ class ModelRow(EdgyBaseModel):
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
             # and rebuild it with the new fields.
-            fields = {
-                model_related.proxy_model.pkname: model_related.model_fields.get(
-                    model_related.proxy_model.pkname
-                )
-            }
-            model_related.proxy_model.model_fields = fields
-            model_related.model_rebuild(force=True)
             item[related] = model_related.proxy_model(**child_item)
 
         # Check for the only_fields
-        if is_only_fields:
-            only_fields = [str(field) for field in only_fields]
+        if is_only_fields or is_defer_fields:
+            mapping_fields = (
+                [str(field) for field in only_fields] if is_only_fields else list(row.keys())
+            )
 
             for column, value in row._mapping.items():
                 # Making sure when a table is reflected, maps the right fields of the ReflectModel
-                if column not in only_fields:
+                if column not in mapping_fields:
                     continue
 
                 if column not in item:

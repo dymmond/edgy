@@ -61,6 +61,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             kwargs[key] = value
         return kwargs
 
+    @cached_property
+    def proxy_model(self) -> Type[Self]:
+        return self._proxy_model
+
     @property
     def pk(self) -> Any:
         return getattr(self, self.pkname, None)
