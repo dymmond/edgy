@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, Dict, Tuple, Type, Union
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, computed_field
 
 if TYPE_CHECKING:
     from edgy import Model
@@ -57,6 +57,7 @@ class ProxyModel:
         self.__model__ = model
         return self
 
+    @computed_field
     @property
     def model(self):
         return self.__model__

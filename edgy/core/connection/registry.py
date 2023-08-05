@@ -2,6 +2,7 @@ from functools import cached_property
 from typing import Any
 
 import sqlalchemy
+from pydantic import computed_field
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
@@ -33,6 +34,7 @@ class Registry:
         else:
             self._metadata = sqlalchemy.MetaData()
 
+    @computed_field
     @property
     def metadata(self) -> Any:
         for model_class in self.models.values():
@@ -54,12 +56,14 @@ class Registry:
             raise ImproperlyConfigured("Edgy does not support MSSQL at the moment.")
         return str(url)
 
+    @computed_field
     @cached_property
     def _get_engine(self) -> AsyncEngine:
         url = self._get_database_url()
         engine = create_async_engine(url)
         return engine
 
+    @computed_field
     @cached_property
     def declarative_base(self) -> Any:
         if self._schema:
@@ -68,16 +72,19 @@ class Registry:
             metadata = sqlalchemy.MetaData()
         return sa_declarative_base(metadata=metadata)
 
+    @computed_field
     @property
     def engine(self):  # type: ignore
         return self._get_engine
 
+    @computed_field
     @cached_property
     def _get_sync_engine(self) -> Engine:
         url = self._get_database_url()
         engine = create_engine(url)
         return engine
 
+    @computed_field
     @property
     def sync_engine(self):  # type: ignore
         return self._get_sync_engine
