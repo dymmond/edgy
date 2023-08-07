@@ -1,6 +1,6 @@
 # Related Name
 
-**Saffier** is very flexible in the way you assemble your models and perform your queries.
+**Edgy** is very flexible in the way you assemble your models and perform your queries.
 
 One very common example is declaring [ForeignKeys][foreign_keys] pointing it out to
 declared [relationships][relationships] among tables.
@@ -32,13 +32,13 @@ The related name can be declared directly inside the [ForeignKeys][foreign_keys]
 ##### Auto generating
 
 This is the other automatic way. When a `related_name` is not specified in the
-[ForeignKeys][foreign_keys], **Saffier** will **automatically generate the name for you** with the
+[ForeignKeys][foreign_keys], **Edgy** will **automatically generate the name for you** with the
 the following format:
 
 ```text
 <table-name>s_set
 ```
-Saffier will use the lowercased model name of the related model to create the reverse relation.
+Edgy will use the lowercased model name of the related model to create the reverse relation.
 
 Imagine you have a model `Team` that has a [ForeignKey][foreign_keys] to another model
 `Organisation`.
@@ -47,7 +47,7 @@ Imagine you have a model `Team` that has a [ForeignKey][foreign_keys] to another
 {!> ../docs_src/queries/related_name/example.py !}
 ```
 
-Because no `related_name` was specified, automatically **Saffier** will call it **`organisations_set`**.
+Because no `related_name` was specified, automatically **Edgy** will call it **`organisations_set`**.
 
 
 #### Deep into the related_name
@@ -88,7 +88,7 @@ teams = await acme.teams_set.all()
 
 !!! Warning
     Because in the `org` foreign key of the `Team` model no `related_name` was not specified.
-    Saffier automatically generated the `teams_set` that is accessible from the `Organisation`.
+    Edgy automatically generated the `teams_set` that is accessible from the `Organisation`.
     Check the [default behaviour](#auto-generating) to understand.
 
 * **We want the team where the members of the blue team belong to**

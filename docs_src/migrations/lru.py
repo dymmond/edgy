@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from saffier import Database, Registry
+from edgy import Database, Registry
 
 
 @lru_cache()

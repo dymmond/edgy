@@ -30,6 +30,139 @@
 
 ---
 
+## Motivation
+
+From the same author of [Saffier][saffier], Edgy is also an ORM but different from its predecessor.
+Saffier is more of a Generic ORM for probably 99.9% of every single day application and works
+perfectly well with is, whereas **Edgy** is also that and more.
+
+Edgy comes with batteries included thanks to Pydantic so that means your [models][models] are 100%
+Pydantic which also means you get all the benefits of the technology (like automatic validations...)
+out of the box with the need of building independent schemas to validate those fields before injest
+them into a database.
+
+**Was it already mentioned that Edgy is extremely fast? Well, it is!**
+
+Almost every project, in one way or another uses one (or many) databases. An ORM is simply an mapping
+of the top of an existing database. ORM extends for Object Relational Mapping and bridges object-oriented
+programs and relational databases.
+
+Two of the most well known ORMs are from Django and SQLAlchemy. Both have their own strenghts and
+weaknesses and specific use cases.
+
+This ORM is built on the top of SQLAlchemy core and aims to simplify the way the setup and queries
+are done into a more common and familiar interface with the power of **Pydantic**.
+
+## Edgy
+
+Edgy is some sort of a fork from [Saffier][saffier] but rewritten at its core fully in Pydantic 🔥.
+
+This was necessary because Saffier although serving 99.9% of the daily use cases, there was still
+a great need to add automatic validations and performance, so instead of rewritting
+[Saffier][saffier] and risking breaking existing use cases already in place, a brand new shiny ORM
+came to be 😁.
+
+Edgy leverages the power of **Pydantic** while offering a friendly, familiar and easy to use interface.
+
+This ORM was designed to be flexible and compatible with pretty much every ASGI framework, like
+[Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic, Quart... With simple pluggable
+design thanks to its origins.
+
+## Features
+
+While adopting a familiar interface, it offers some cool and powerful features on the top of
+SQLAlchemy core.
+
+### Key features
+
+* **Model inheritance** - For those cases where you don't want to repeat yourself while maintaining
+intregity of the models.
+* **Abstract classes** - That's right! Sometimes you simply want a model that holds common fields
+that doesn't need to created as a table in the database.
+* **Meta classes** - If you are familiar with Django, this is not new to you and Edgy offers this
+in the same fashion.
+* **Managers** - Versatility at its core, you can have separate managers for your models to optimise
+specific queries and querysets at ease.
+* **Filters** - Filter by any field you want and need.
+* **Model operators** - Classic operations such as `update`, `get`, `get_or_none`, `bulk_create`,
+`bulk_update`, `values`, `values_list`, `only`, `defer` and a lot more.
+* **Relationships made it easy** - Support for `OneToOne`, `ForeignKey` and `ManyToMany` in the same Django style.
+* **Constraints** - Unique constraints through meta fields.
+* **Indexes** - Unique indexes through meta fields.
+* **Native test client** - We all know how hard it can be to setup that client for those tests you
+need so we give you already one.
+
+And a lot more you can do here.
+
+## Migrations
+
+Since **Edgy**, like [Saffier][saffier], it is built on the top of
+[SQLAlchemy core](https://docs.sqlalchemy.org/en/20/core/) and brings its own native migration
+system running on the top of [Alembic][alembic] but making it a
+lot easier to use and more pleasant for you.
+
+Have a look at the [migrations](./migrations/migrations.md) for more details.
+
+## Installation
+
+To install Edgy, simply run:
+
+```shell
+$ pip install edgy
+```
+
+You can pickup your favourite database driver by yourself or you can run:
+
+**Postgres**
+
+```shell
+$ pip install edgy[postgres]
+```
+
+**MySQL/MariaDB**
+
+```shell
+$ pip install edgy[mysql]
+```
+
+**SQLite**
+
+```shell
+$ pip install edgy[sqlite]
+```
+
+## Quick Start
+
+The following is an example how to start with **Edgy** and more details and examples can be
+found throughout the documentation.
+
+**Use** `ipython` **to run the following from the console, since it supports** `await`.
+
+```python
+{!> ../docs_src/quickstart/example1.py!}
+```
+
+As stated in the example, if no `tablename` is provided in the `Meta` class, Edgy automatically
+generates the name of the table for you by pluralising the class name.
+
+### Note
+
+{! ../docs_src/shared/notes.md !}
+
+## Connect your application
+
+Do you want to have more complex structures and connect to your favourite framework? Have a look
+at [connections](./connection.md) to understand how to do it properly.
+
+
+**All the examples of this documentation will be using field typing but it is up to you if you want to use them or not.**
+
+**Exciting!**
+
+In the documentation we go deeper in explanations and examples, this was just to warm up. 😁
 
 
 [edgy]: https://edgy.tarsild.io
+[saffier]: https://saffier.tarsild.io
+[models]: ./models.md
+[alembic]: https://alembic.sqlalchemy.org/en/latest/

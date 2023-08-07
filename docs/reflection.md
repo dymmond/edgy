@@ -4,7 +4,7 @@ When working for a big project, sometimes new, sometimes legacy, you might face 
 is already an existing database with tables and views and you simply would like to reflect them
 into your code by representation without the need of creating new ones.
 
-This is where Saffier reflection comes in.
+This is where Edgy reflection comes in.
 
 ## What is reflection
 
@@ -36,7 +36,7 @@ What is happening is:
 * The `ReflectModel` is going to the database.
 * Reads the existing tables.
 * Verifies if there is any `users` table name.
-* Converts the `users` fields into Saffier model fields.
+* Converts the `users` fields into Edgy model fields.
 
 ### Note
 
@@ -49,7 +49,7 @@ The reflect model is very similar to `Model` from [models](./models.md) but with
 that won't generate any migrations.
 
 ```python
-from saffier import ReflectModel
+from edgy import ReflectModel
 ```
 
 The same operations of inserting, deleting, updating and creating are still valid and working
@@ -89,7 +89,7 @@ When reflecting a model or a view from an existing database, usually you want to
 existing fields from it but sometimes in your code, you simply want **only a few fields** reflected
 and not all of them for your own reasons.
 
-Saffier `ReflectModel` does this for you.
+Edgy `ReflectModel` does this for you.
 
 Let us see an example:
 

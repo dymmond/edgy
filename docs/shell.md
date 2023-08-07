@@ -3,7 +3,7 @@
 Who never needed to load a few database models ina command line  or have the need to do it so and
 got stuck trying to do it and wasted a lot of time?
 
-Well, Saffier gives you that possibility completely out of the box and ready to use with your
+Well, Edgy gives you that possibility completely out of the box and ready to use with your
 application models.
 
 !!! Warning
@@ -11,7 +11,7 @@ application models.
 
 ## Important
 
-Before reading this section, you should get familiar with the ways Saffier handles the discovery
+Before reading this section, you should get familiar with the ways Edgy handles the discovery
 of the applications.
 
 The following examples and explanations will be using the [auto discovery](./migrations/discovery.md#auto-discovery)
@@ -24,7 +24,7 @@ is equally valid and works in the same way.
 
 ## How does it work
 
-Saffier ecosystem is complex internally but simpler to the user. Saffier will use the application
+Edgy ecosystem is complex internally but simpler to the user. Edgy will use the application
 using the [migration](./migrations/migrations.md#migration) and automatically extract the
 [registry](./registry.md) from it.
 
@@ -44,7 +44,7 @@ $ pip install ipython
 or
 
 ```shell
-$ pip install saffier[ipython]
+$ pip install edgy[ipython]
 ```
 
 **PTPython**
@@ -56,7 +56,7 @@ $ pip install ptpython
 or
 
 ```shell
-$ pip install saffier[ptpyton]
+$ pip install edgy[ptpyton]
 ```
 
 ### How to call it
@@ -66,13 +66,13 @@ $ pip install saffier[ptpyton]
 **Default shell**
 
 ```shell
-$ saffier shell
+$ edgy shell
 ```
 
 **PTPython shell**
 
 ```shell
-$ saffier shell --kernel ptpython
+$ edgy shell --kernel ptpython
 ```
 
 #### With [--app and environment variables](./migrations/discovery.md##environment-variables)
@@ -80,24 +80,24 @@ $ saffier shell --kernel ptpython
 **--app**
 
 ```shell
-$ saffier --app myproject.main:app shell
+$ edgy --app myproject.main:app shell
 ```
 
 **Environment variables**
 
 ```shell
 $ export SAFFIER_DEFAULT_APP=--app myproject.main:app
-$ saffier shell --kernel ptpython
+$ edgy shell --kernel ptpython
 ```
 
 ### How does it look like
 
-Saffier doesn't want to load all python globals and locals for you. Instead loads all the
+Edgy doesn't want to load all python globals and locals for you. Instead loads all the
 essentials for the models and reflected models and some python packages.
 
 It looks like this:
 
-<img src="https://res.cloudinary.com/dymmond/image/upload/v1682083526/Saffier/carbon/shell_n2ruox.png" alt='Shell Example'>
+<img src="https://res.cloudinary.com/dymmond/image/upload/v1682083526/Edgy/carbon/shell_n2ruox.png" alt='Shell Example'>
 
 Of course the `SAFFIER-VERSION` and `APPLICATION` are replaced automatically by the version you are
 using.
@@ -116,7 +116,7 @@ Let us see an example using example using Esmerald and we will have:
 
 And it will look like this:
 
-<img src="https://res.cloudinary.com/dymmond/image/upload/v1682084269/Saffier/carbon/example_m2ggyt.png" alt='Shell Example'>
+<img src="https://res.cloudinary.com/dymmond/image/upload/v1682084269/Edgy/carbon/example_m2ggyt.png" alt='Shell Example'>
 
 Pretty cool, right? Then it is a normal python shell where you can import whatever you want and
 need as per normal python shell interaction.

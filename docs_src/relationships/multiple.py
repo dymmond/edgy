@@ -1,33 +1,33 @@
-import saffier
-from saffier import Database, Registry
+import edgy
+from edgy import Database, Registry
 
 database = Database("sqlite:///db.sqlite")
 models = Registry(database=database)
 
 
-class User(saffier.Model):
-    is_active = saffier.BooleanField(default=True)
-    first_name = saffier.CharField(max_length=50)
-    last_name = saffier.CharField(max_length=50)
-    email = saffier.EmailField(max_lengh=100)
-    password = saffier.CharField(max_length=1000)
+class User(edgy.Model):
+    is_active = edgy.BooleanField(default=True)
+    first_name = edgy.CharField(max_length=50)
+    last_name = edgy.CharField(max_length=50)
+    email = edgy.EmailField(max_lengh=100)
+    password = edgy.CharField(max_length=1000)
 
     class Meta:
         registry = models
 
 
-class Thread(saffier.Model):
-    sender = saffier.ForeignKey(
+class Thread(edgy.Model):
+    sender = edgy.ForeignKey(
         User,
-        on_delete=saffier.CASCADE,
+        on_delete=edgy.CASCADE,
         related_name="sender",
     )
-    receiver = saffier.ForeignKey(
+    receiver = edgy.ForeignKey(
         User,
-        on_delete=saffier.CASCADE,
+        on_delete=edgy.CASCADE,
         related_name="receiver",
     )
-    message = saffier.TextField()
+    message = edgy.TextField()
 
     class Meta:
         registry = models

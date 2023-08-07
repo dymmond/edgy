@@ -1,9 +1,9 @@
 # Managers
 
-The managers are a great tool that **Saffier** offers. Heavily inspired by Django, the managers
+The managers are a great tool that **Edgy** offers. Heavily inspired by Django, the managers
 allow you to build unique tailored queries ready to be used by your models.
 
-**Saffier** by default uses the the manager called `query` which it makes it simple to understand.
+**Edgy** by default uses the the manager called `query` which it makes it simple to understand.
 
 Let us see an example.
 

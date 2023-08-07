@@ -1,13 +1,13 @@
 # Relationships
 
-Creating relationships in **Saffier** is as simple as importing the fields and apply them into
+Creating relationships in **Edgy** is as simple as importing the fields and apply them into
 the models.
 
 There are currently two types, the [ForeignKey](./fields.md#foreignkey)
 and the [OneToOneField](./fields.md#onetoonefield).
 
 When declaring a foreign key, you can pass the value in two ways, as a string or as a model
-object. Internally **Saffier** lookups up inside the [registry](./models.md#registry) and maps
+object. Internally **Edgy** lookups up inside the [registry](./models.md#registry) and maps
 your fields.
 
 When declaring a model you can have one or more ForeignKey pointing to different tables or
@@ -84,10 +84,10 @@ As mentioned in the [foreign key field](./fields.md#foreignkey), you can specify
 a foreign key.
 
 The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
-from `saffier`.
+from `edgy`.
 
 ```python
-from saffier import CASCADE, SET_NULL, RESTRICT
+from edgy import CASCADE, SET_NULL, RESTRICT
 ```
 
 When declaring a foreign key or a one to one key, the **on_delete must be provided** or an
@@ -99,7 +99,7 @@ Looking back to the previous example.
 {!> ../docs_src/relationships/model.py !}
 ```
 
-`Profile` model defines a `saffier.ForeignKey` to the `User` with `on_delete=saffier.CASCADE` which
+`Profile` model defines a `edgy.ForeignKey` to the `User` with `on_delete=edgy.CASCADE` which
 means that whenever a `User` is deleted from the database, all associated `Profile` instances will
 also be removed.
 

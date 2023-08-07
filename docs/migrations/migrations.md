@@ -3,18 +3,18 @@
 You will almost certainly need to be using a database migration tool to make sure you manage
 your incremental database changes properly.
 
-Saffier being on the top of SQLAlchemy core means that we can leverage that within the internal
+Edgy being on the top of SQLAlchemy core means that we can leverage that within the internal
 migration tool.
 
-Saffier provides an internal migration tool that makes your life way easier when it comes to manage
+Edgy provides an internal migration tool that makes your life way easier when it comes to manage
 models and corresponding migrations.
 
-Heavily inspired by the way Flask-Migration approached the problem, Saffier took it to the next
+Heavily inspired by the way Flask-Migration approached the problem, Edgy took it to the next
 level and makes it framework agnostic, which means you can use it **anywhere**.
 
 ## Important
 
-Before reading this section, you should get familiar with the ways Saffier handles the discovery
+Before reading this section, you should get familiar with the ways Edgy handles the discovery
 of the applications.
 
 The following examples and explanations will be using the
@@ -62,17 +62,17 @@ make visually clear.
 
 ## Migration
 
-This is the object that Saffier requires to make sure you can manage the migrations in a consistent,
+This is the object that Edgy requires to make sure you can manage the migrations in a consistent,
 clean and simple manner. Much like Django migrations type of feeling.
 
-This `Migration` class is not depending of any framework specifically, in fact, Saffier makes sure
+This `Migration` class is not depending of any framework specifically, in fact, Edgy makes sure
 when this object is created, it will plug it into any framework you desire.
 
-This makes Saffier unique and extremely flexible to be used within any of the Frameworks out there,
+This makes Edgy unique and extremely flexible to be used within any of the Frameworks out there,
 such as [Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic... You choose.
 
 ```python
-from saffier import Migration
+from edgy import Migration
 ```
 
 ### Parameters
@@ -81,7 +81,7 @@ The parameters availabe when using instantiating a [Migrate](#migration) object 
 
 * **app** - The application instance. Any application you want your migrations to be attached to.
 * **registry** - The registry being used for your models. The registry **must be** an instance
-of `saffier.Registry` or an `AssertationError` is raised.
+of `edgy.Registry` or an `AssertationError` is raised.
 * **compare_type** - Flag option that configures the automatic migration generation subsystem
 to detect column type changes.
 
@@ -129,7 +129,7 @@ Now that we have our details about the database and registry, it is time to use 
 
 #### Using FastAPI
 
-As mentioned before, Saffier is framework agnostic so you can also use it in your FastAPI
+As mentioned before, Edgy is framework agnostic so you can also use it in your FastAPI
 application.
 
 ```python title="my_project/main.py" hl_lines="6 9 29 33"
@@ -161,8 +161,8 @@ suggestions.
 
 This will depend heavily on this and **everything works around the registry**.
 
-Saffier has the internal client that manages and handles the migration process for you in a clean
-fashion and it called `saffier`.
+Edgy has the internal client that manages and handles the migration process for you in a clean
+fashion and it called `edgy`.
 
 Remember the initial structure at the top of this document? No worries, let us have a look again.
 
@@ -218,11 +218,11 @@ that same principle.
 
 ### Environment variables
 
-When generating migrations, Saffier **expects at least one environment variable to be present**.
+When generating migrations, Edgy **expects at least one environment variable to be present**.
 
 * **SAFFIER_DATABASE_URL** - The database url for your database.
 
-The reason for this is because Saffier is agnostic to any framework and this way it makes it easier
+The reason for this is because Edgy is agnostic to any framework and this way it makes it easier
 to work with the `migrations`.
 
 Also, gives a clean design for the time where it is needed to go to production as the procedure is
@@ -239,21 +239,21 @@ Or whatever connection string you are using.
 ### Initialise the migrations folder
 
 It is now time to generate the migrations folder. As mentioned before in the
-[environment variables section](#environment-variables), Saffier does need to have the
+[environment variables section](#environment-variables), Edgy does need to have the
 `SAFFIER_DATABASE_URL` to generate the `migrations` folder. So, without further ado let us generate
 our `migrations`.
 
 ```shell
-saffier --app myproject.main:app init
+edgy --app myproject.main:app init
 ```
 
-What is happenening here? Well, `saffier` is always expecting an `--app` parameter to be
+What is happenening here? Well, `edgy` is always expecting an `--app` parameter to be
 provided.
 
 This `--app` is the location of your application in `module:app` format and this is because of
 the fact of being **framework agnostic**.
 
-Saffier needs to know where your application object is located in order to hook it to that same
+Edgy needs to know where your application object is located in order to hook it to that same
 application.
 
 Remember when it was mentioned that is important the location where you generate the migrations
@@ -311,10 +311,10 @@ Pretty great so far! Well done 🎉🎉
 You have now generated your migrations folder and came with gifts.
 
 A lot of files were generated automatically for you and they are specially tailored for the needs
-and complexity of **Saffier**.
+and complexity of **Edgy**.
 
 Do you remember when it was mentioned in the [environment variables](#environment-variables) that
-saffier is expecting the `SAFFIER_DATABASE_URL` to be available?
+edgy is expecting the `SAFFIER_DATABASE_URL` to be available?
 
 Well, this is another reason, inside the generated `migrations/env.py` the `get_engine_url()` is
 also expecting that value.
@@ -329,9 +329,9 @@ def get_engine_url():
 ```
 
 !!! Warning
-    You do not need to use this environment variable. This is the `default` provided by Saffier.
+    You do not need to use this environment variable. This is the `default` provided by Edgy.
     You can change the value to whatever you want/need but be careful when doing it as it might
-    cause Saffier not to work properly with migrations if this value is not updated properly.
+    cause Edgy not to work properly with migrations if this value is not updated properly.
 
 ### Generate the first migrations
 
@@ -354,8 +354,8 @@ from .models import User
 ```
 
 !!! Note
-    Since Saffier is agnostic to any framework, there aren't automatic mechanisms that detects
-    Saffier models in the same fashion that Django does with the `INSTALLED_APPS`. So this is
+    Since Edgy is agnostic to any framework, there aren't automatic mechanisms that detects
+    Edgy models in the same fashion that Django does with the `INSTALLED_APPS`. So this is
     one way of exposing your models in the application.
 
 There are many ways of exposing your models of course, so feel free to use any approach you want.
@@ -363,7 +363,7 @@ There are many ways of exposing your models of course, so feel free to use any a
 Now it is time to generate the migration.
 
 ```shell
-$ saffier --app my_project.main:app makemigrations
+$ edgy --app my_project.main:app makemigrations
 ```
 
 Yes, it is this simple 😁
@@ -388,7 +388,7 @@ Your new migration should now be inside `migrations/versions/`. Something like t
 Or you can attach a message your migration that will then added to the file name as well.
 
 ```shell
-$ saffier --app my_project.main:app makemigrations -m "Initial migrations"
+$ edgy --app my_project.main:app makemigrations -m "Initial migrations"
 ```
 
 ```shell hl_lines="10"
@@ -413,7 +413,7 @@ Now comes the easiest part where you need to apply the migrations.
 Simply run:
 
 ```shell
-$ saffier --app my_project.main:app migrate
+$ edgy --app my_project.main:app migrate
 ```
 
 And that is about it 🎉🎉
@@ -428,13 +428,13 @@ for any other ORM and when you are happy run the migrations and apply them again
 **Generate new migrations**
 
 ```shell
-$ saffier --app my_project.main:app makemigrations
+$ edgy --app my_project.main:app makemigrations
 ```
 
 **Apply them to your database**
 
 ```shell
-$ saffier --app my_project.main:app migrate
+$ edgy --app my_project.main:app migrate
 ```
 
 ### More migration commands
@@ -442,28 +442,28 @@ $ saffier --app my_project.main:app migrate
 There are of course more available commands to you to be used which they can also be accessed
 via `--help` command.
 
-## Saffier admin
+## Edgy admin
 
-To access the available options of saffier:
+To access the available options of edgy:
 
 ```shell
-$ saffier --help
+$ edgy --help
 ```
 
-This will list all the commands available within `saffier`.
+This will list all the commands available within `edgy`.
 
 **What if you need to also know the available options available to each command?**
 
 Let us imagine you want to see the available options for the `merge`
 
 ```shell
-$ saffier merge --help
+$ edgy merge --help
 ```
 
 You should see something like this:
 
 ```shell
-Usage: saffier merge [OPTIONS] [REVISIONS]...
+Usage: edgy merge [OPTIONS] [REVISIONS]...
 
   Merge two revisions together, creating a new revision file
 
@@ -476,20 +476,20 @@ Options:
   --help                Show this message and exit.
 ```
 
-This is applied to any other available command via `saffier`.
+This is applied to any other available command via `edgy`.
 
 ### References
 
-Since Saffier has a very friendly and familiar interface to interact with so does the
-`saffier`.
+Since Edgy has a very friendly and familiar interface to interact with so does the
+`edgy`.
 
-Saffier migrations as mentioned before uses Alembic and therefore the commands are exactly the
+Edgy migrations as mentioned before uses Alembic and therefore the commands are exactly the
 same as the ones for alembic except two, which are masked with different more intuitive names.
 
 * **makemigrations** - Is calling the Alembic `migrate`.
 * **migrate** - Is calling the Alembic `upgrade`.
 
-Since the alembic names for those two specific operations is not that intuitive, Saffier masks them
+Since the alembic names for those two specific operations is not that intuitive, Edgy masks them
 into a more friendly and intuitive way.
 
 For those familiar with Django, the names came from those same operations.

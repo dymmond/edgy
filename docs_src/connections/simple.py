@@ -1,5 +1,6 @@
 from esmerald import Esmerald
-from saffier import Database, Registry
+
+from edgy import Database, Registry
 
 database = Database("sqlite:///db.sqlite")
 models = Registry(database=database)

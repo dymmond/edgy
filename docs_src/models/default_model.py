@@ -1,13 +1,13 @@
-import saffier
-from saffier import Database, Registry
+import edgy
+from edgy import Database, Registry
 
 database = Database("sqlite:///db.sqlite")
 models = Registry(database=database)
 
 
-class User(saffier.Model):
-    age = saffier.IntegerField(minimum=18)
-    is_active = saffier.BooleanField(default=True)
+class User(edgy.Model):
+    age = edgy.IntegerField(minimum=18)
+    is_active = edgy.BooleanField(default=True)
 
     class Meta:
         registry = models

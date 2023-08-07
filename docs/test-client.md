@@ -5,13 +5,13 @@ of making sure the tests against models would land in a specific targeted databa
 one used for development, right?
 
 Well, at least I did and it is annoying the amount of setup required to make it happen and for that
-reason, Saffier provides you already one client that exctly that job for you.
+reason, Edgy provides you already one client that exctly that job for you.
 
-Before continuing, make sure you have the Saffier test client installed with the needed
+Before continuing, make sure you have the Edgy test client installed with the needed
 requirements.
 
 ```
-$ pip install saffier[testing]
+$ pip install edgy[testing]
 ```
 
 ## DatabaseTestClient
@@ -20,7 +20,7 @@ This is the client you have been waiting for. This object does a lot of magic fo
 help you manage those stubborn tests that should land on a `test_` database.
 
 ```python
-from saffier.testclient import DatabaseTestClient
+from edgy.testclient import DatabaseTestClient
 ```
 
 ### Parameters
@@ -47,7 +47,7 @@ that rollbacks once the database is disconnected.
 
 ### How to use it
 
-This is the easiest part because is already very familiar with the `Database` used by Saffier. In
+This is the easiest part because is already very familiar with the `Database` used by Edgy. In
 fact, this is an extension of that same object with a lot of testing flavours.
 
 Let us assume you have a database url like this following:
@@ -70,7 +70,7 @@ Nothing like an example to see it in action.
 
 #### What is happening
 
-Well, this is rather complex test and actually a real one from Saffier and what you can see is
+Well, this is rather complex test and actually a real one from Edgy and what you can see is
 that is using the `DatabaseTestClient` which means the tests against models, fields or whatever
 database operation you want will be on a `test_` database.
 

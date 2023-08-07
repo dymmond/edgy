@@ -1,15 +1,15 @@
-import saffier
-from saffier import Database, Index, Registry
+import edgy
+from edgy import Database, Index, Registry
 
 database = Database("sqlite:///db.sqlite")
 models = Registry(database=database)
 
 
-class User(saffier.Model):
-    name = saffier.CharField(max_length=255)
-    email = saffier.EmailField(max_length=70)
-    is_active = saffier.BooleanField(default=True)
-    status = saffier.CharField(max_length=255)
+class User(edgy.Model):
+    name = edgy.CharField(max_length=255)
+    email = edgy.EmailField(max_length=70)
+    is_active = edgy.BooleanField(default=True)
+    status = edgy.CharField(max_length=255)
 
     class Meta:
         registry = models

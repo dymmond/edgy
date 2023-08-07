@@ -1,7 +1,8 @@
 from esmerald import Request, post
 from models import Profile, User
 from pydantic import BaseModel, EmailStr
-from saffier import Database, Registry
+
+from edgy import Database, Registry
 
 # These settings should be placed somewhere
 # Central where it can be accessed anywhere.

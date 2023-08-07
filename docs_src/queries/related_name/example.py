@@ -1,20 +1,20 @@
-import saffier
-from saffier import Database, Registry
+import edgy
+from edgy import Database, Registry
 
 database = Database("sqlite:///db.sqlite")
 models = Registry(database=database)
 
 
-class Organisation(saffier.Model):
-    ident = saffier.CharField(max_length=100)
+class Organisation(edgy.Model):
+    ident = edgy.CharField(max_length=100)
 
     class Meta:
         registry = models
 
 
-class Team(saffier.Model):
-    org = saffier.ForeignKey(Organisation, on_delete=saffier.RESTRICT)
-    name = saffier.CharField(max_length=100)
+class Team(edgy.Model):
+    org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT)
+    name = edgy.CharField(max_length=100)
 
     class Meta:
         registry = models

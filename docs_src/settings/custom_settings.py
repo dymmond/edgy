@@ -1,7 +1,7 @@
 from typing import Optional
 
-from saffier import SaffierSettings
-from saffier.conf.enums import EnvironmentType
+from edgy import SaffierSettings
+from edgy.conf.enums import EnvironmentType
 
 
 class MyCustomSettings(SaffierSettings):

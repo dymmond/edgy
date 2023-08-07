@@ -1,4 +1,4 @@
-# Saffier People
+# Edgy People
 
 ## The Special Ones
 

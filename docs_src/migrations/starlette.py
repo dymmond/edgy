@@ -4,8 +4,9 @@ import sys
 from pathlib import Path
 
 from my_project.utils import get_db_connection
-from saffier.migrations import Migrate
 from starlette.applications import Starlette
+
+from edgy.migrations import Migrate
 
 
 def build_path():

@@ -5,13 +5,14 @@ import uuid
 from enum import Enum
 
 import pytest
-import saffier
-from saffier.db.models import fields
-from saffier.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
+import edgy
+from edgy.db.models import fields
+from edgy.testclient import DatabaseTestClient
+
 database = DatabaseTestClient(DATABASE_URL, drop_database=True)
-models = saffier.Registry(database=database)
+models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
 
@@ -25,7 +26,7 @@ class StatusEnum(Enum):
     RELEASED = "Released"
 
 
-class Product(saffier.Model):
+class Product(edgy.Model):
     id = fields.IntegerField(primary_key=True)
     uuid = fields.UUIDField(null=True)
     created = fields.DateTimeField(default=datetime.datetime.now)
@@ -46,7 +47,7 @@ class Product(saffier.Model):
         registry = models
 
 
-class User(saffier.Model):
+class User(edgy.Model):
     id = fields.UUIDField(primary_key=True, default=uuid.uuid4)
     name = fields.CharField(null=True, max_length=16)
     email = fields.EmailField(null=True, max_length=256)
@@ -58,7 +59,7 @@ class User(saffier.Model):
         registry = models
 
 
-class Customer(saffier.Model):
+class Customer(edgy.Model):
     name = fields.CharField(null=True, max_length=16)
 
     class Meta:
@@ -124,8 +125,8 @@ async def test_model_crud():
     await user.update(
         ipaddress="192.168.1.1",
         name="Test",
-        email="test@saffier.com",
-        url="https://saffier.com",
+        email="test@edgy.com",
+        url="https://edgy.com",
         password="12345",
     )
 
@@ -133,7 +134,7 @@ async def test_model_crud():
     assert isinstance(user.ipaddress, (ipaddress.IPv4Address, ipaddress.IPv6Address))
     assert user.password == "12345"
 
-    assert user.url == "https://saffier.com"
+    assert user.url == "https://edgy.com"
     await product.update(data={"foo": 1234})
     assert product.updated_datetime != last_updated_datetime
     assert product.updated_date == last_updated_date

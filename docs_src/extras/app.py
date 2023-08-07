@@ -6,17 +6,18 @@ import os
 import sys
 from pathlib import Path
 
-import saffier
 from esmerald import Esmerald, Include
-from saffier import Database, Registry, SaffierExtra
+
+import edgy
+from edgy import Database, Registry, SaffierExtra
 
 database = Database("sqlite:///db.sqlite")
 registry = Registry(database)
 
 
-class CustomModel(saffier.Model):
-    name = saffier.CharField(max_length=255)
-    email = saffier.EmailField(max_length=255)
+class CustomModel(edgy.Model):
+    name = edgy.CharField(max_length=255)
+    email = edgy.EmailField(max_length=255)
 
     class Meta:
         registry = registry

@@ -1,15 +1,15 @@
 import uuid
 
-import saffier
-from saffier import Database, Registry
+import edgy
+from edgy import Database, Registry
 
 database = Database("sqlite:///db.sqlite")
 models = Registry(database=database)
 
 
-class BaseModel(saffier.Model):
-    id = saffier.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = saffier.CharField(max_length=255)
+class BaseModel(edgy.Model):
+    id = edgy.UUIDField(primary_key=True, default=uuid.uuid4)
+    name = edgy.CharField(max_length=255)
 
     class Meta:
         abstract = True
@@ -28,8 +28,8 @@ class User(BaseModel):
     as well as the Meta data.
     """
 
-    phone_number = saffier.CharField(max_length=15)
-    description = saffier.TextField()
+    phone_number = edgy.CharField(max_length=15)
+    description = edgy.TextField()
 
     def transform_phone_number(self):
         # logic here for the phone number
@@ -42,8 +42,8 @@ class Product(BaseModel):
     as well as the Meta data.
     """
 
-    sku = saffier.CharField(max_length=255)
-    description = saffier.TextField()
+    sku = edgy.CharField(max_length=255)
+    description = edgy.TextField()
 
     def get_sku(self):
         # Logic to obtain the SKU

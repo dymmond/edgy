@@ -4,7 +4,7 @@ Making queries is a must when using an ORM and being able to make complex querie
 when allowed.
 
 SQLAlchemy is known for its performance when querying a database and it is very fast. The core
-being part of **Saffier** also means that saffier performs extremely well when doing it.
+being part of **Edgy** also means that edgy performs extremely well when doing it.
 
 When making queries in a [model][model], the ORM uses the [managers][managers] to
 perform those same actions.
@@ -14,11 +14,11 @@ be a great time to have a look and get yourself acquainted .
 
 ## QuerySet
 
-When making queries within Saffier, this return or an object if you want only one result or a
+When making queries within Edgy, this return or an object if you want only one result or a
 `queryset` which is the internal representation of the results.
 
 If you are familiar with Django querysets, this is **almost** the same and by almost is because
-saffier restricts loosely queryset variable assignments.
+edgy restricts loosely queryset variable assignments.
 
 Let us get familar with queries.
 
@@ -28,7 +28,7 @@ Let us assume you have the following `User` model defined.
 {!> ../docs_src/queries/model.py !}
 ```
 
-As mentioned before, Saffier returns queysets and simple objects and when queysets are returned
+As mentioned before, Edgy returns queysets and simple objects and when queysets are returned
 those can be chained together, for example, with `filter()` or `limit()`.
 
 ```python
@@ -38,7 +38,7 @@ await User.query.filter(is_active=True).filter(first_name__icontains="a").order_
 Do we really need two filters here instead of one containing both conditions? No, we do not but
 this is for example purposes.
 
-Internally when querying the model and with returning querysets, **Saffier** runs the `all()`.
+Internally when querying the model and with returning querysets, **Edgy** runs the `all()`.
 This can be done manually by you or automatically by the ORM.
 
 Let us refactor the previous queryset and apply the manual `all()`.
@@ -95,7 +95,7 @@ users = await User.query.filter(id__in=[1, 2, 3])
 
 #### SQLAlchemy style
 
-Since Saffier uses SQLAlchemy core, it is also possible to do queries in SQLAlchemy style.
+Since Edgy uses SQLAlchemy core, it is also possible to do queries in SQLAlchemy style.
 The filter accepts also those.
 
 ##### Example
@@ -207,7 +207,7 @@ users = await User.query.all()
 ```
 
 !!! Tip
-    The all as mentioned before it automatically executed by **Saffier** if not provided and it
+    The all as mentioned before it automatically executed by **Edgy** if not provided and it
     can also be aggregated with other [queryset operations](#returning-querysets).
 
 

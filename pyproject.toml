@@ -108,6 +108,7 @@ testing = ["sqlalchemy_utils>=0.40.0"]
 postgres = ["databasez[postgresql]"]
 mysql = ["databasez[mysql]"]
 sqlite = ["databasez[sqlite]"]
+mssql = ["databasez[aioodbc]"]
 
 ptpython = ["ptpython>=3.0.23,<4.0.0"]
 ipython = ["ipython>=8.10.0,<9.0.0"]

@@ -13,7 +13,7 @@ What happens internally is the creation of an intermediary table that links the 
 As mentioned before, a many to many it is not possible in a relational database, instead, an
 intermediary table needs to be created and connect the tables for the said many to many.
 
-This is exactly what saffier does with the [ManyToManyField][many_to_many] automatically.
+This is exactly what edgy does with the [ManyToManyField][many_to_many] automatically.
 
 ### Operations
 
@@ -71,7 +71,7 @@ organisation.teams.remove(blue_team)
 The same way you define [related names][related_name] for foreign keys, you can do the same for
 the [ManyToMany][many_to_many].
 
-When a `related_name` is not defined, Saffier will automatically generate one with the following
+When a `related_name` is not defined, Edgy will automatically generate one with the following
 format:
 
 ```shell

@@ -1,5 +1,5 @@
-import saffier
-from saffier import Database, Registry
+import edgy
+from edgy import Database, Registry
 
 
 class MyRegistry(Registry):
@@ -15,8 +15,8 @@ database = Database("sqlite:///db.sqlite")
 models = MyRegistry(database=database)
 
 
-class User(saffier.Model):
-    is_active = saffier.BooleanField(default=False)
+class User(edgy.Model):
+    is_active = edgy.BooleanField(default=False)
 
     class Meta:
         registry = models
@@ -26,8 +26,8 @@ another_db = Database("postgressql://user:password@localhost:5432/mydb")
 another_registry = MyRegistry(another_db=another_db)
 
 
-class Profile(saffier.Model):
-    is_active = saffier.BooleanField(default=False)
+class Profile(edgy.Model):
+    is_active = edgy.BooleanField(default=False)
 
     class Meta:
         registry = another_registry

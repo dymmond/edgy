@@ -1,19 +1,19 @@
 # Exceptions
 
-All **Saffier** custom exceptions derive from the base `SaffierException`.
+All **Edgy** custom exceptions derive from the base `SaffierException`.
 
-## DoesNotFound
+## ObjectNotFound
 
 Raised when querying a model instance and it does not exist.
 
 ```python
-from saffier.exceptions import DoesNotFound
+from edgy.exceptions import ObjectNotFound
 ```
 
 Or simply:
 
 ```python
-from saffier import DoesNotFound
+from edgy import ObjectNotFound
 ```
 
 ## MultipleObjectsReturned
@@ -21,13 +21,13 @@ from saffier import DoesNotFound
 Raised when querying a model and returns multiple results for the given query result.
 
 ```python
-from saffier.exceptions import MultipleObjectsReturned
+from edgy.exceptions import MultipleObjectsReturned
 ```
 
 Or simply:
 
 ```python
-from saffier import MultipleObjectsReturned
+from edgy import MultipleObjectsReturned
 ```
 
 ## ValidationError
@@ -35,13 +35,13 @@ from saffier import MultipleObjectsReturned
 Raised when a validation error is thrown.
 
 ```python
-from saffier.exceptions import ValidationError
+from edgy.exceptions import ValidationError
 ```
 
 Or simply:
 
 ```python
-from saffier import ValidationError
+from edgy import ValidationError
 ```
 
 ## ImproperlyConfigured
@@ -49,11 +49,11 @@ from saffier import ValidationError
 Raised when misconfiguration in the models and metaclass is passed.
 
 ```python
-from saffier.exceptions import ImproperlyConfigured
+from edgy.exceptions import ImproperlyConfigured
 ```
 
 Or simply:
 
 ```python
-from saffier import ImproperlyConfigured
+from edgy import ImproperlyConfigured
 ```

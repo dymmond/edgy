@@ -1,6 +1,6 @@
 # Transactions
 
-Saffier using `databases` package allows also the use of transacations in a very familiar way for
+Edgy using `databases` package allows also the use of transacations in a very familiar way for
 a lot of the users.
 
 You can see a transaction as atomic, which means, when you need to save everything or fail all.
@@ -32,7 +32,7 @@ This is probably one of the less common ways of using transactions but still ver
 want all of your endpoint to be atomic.
 
 We want to create an endpoint where we save the `user` and the `profile` in one go. Since the
-author of Saffier is the same as [Esmerald](https://esmerald.dymmond.com), it makes sense to use
+author of Edgy is the same as [Esmerald](https://esmerald.dymmond.com), it makes sense to use
 it as example.
 
 **You can use whatever you want, from Starlette to FastAPI. It is your choice**.
@@ -55,7 +55,7 @@ or an operation, you will need to make some transactions that need atomocity.
 
 ## Important notes
 
-Saffier although running on the top of [Databases](https://www.encode.io/databases/) it varies in
+Edgy although running on the top of [Databases](https://www.encode.io/databases/) it varies in
 many aspects and limits some of the unecessary `free-style` usage to make sure it keeps its
 consistance.
 

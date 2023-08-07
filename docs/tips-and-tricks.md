@@ -142,7 +142,7 @@ now what we will be using everywhere.
 
 ### Prepare the application to allow migrations
 
-Now it is time to tell the application that your models and migrations are managed by Saffier.
+Now it is time to tell the application that your models and migrations are managed by Edgy.
 More information on [migrations](./migrations/migrations.md) where explains how to use it.
 
 
@@ -150,7 +150,7 @@ More information on [migrations](./migrations/migrations.md) where explains how 
 {!> ../docs_src/tips/migrations.py !}
 ```
 
-This will make sure that your application migrations are now managed by **Saffier**.
+This will make sure that your application migrations are now managed by **Edgy**.
 
 ### Hook the connection
 
@@ -172,4 +172,4 @@ not redundant and beautiful.
 This example is applied to any of your favourite frameworks and you can use as many and different
 techniques as the ones you see fit for your own purposes.
 
-**Saffier is framework agnostic**.
+**Edgy is framework agnostic**.

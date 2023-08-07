@@ -1,13 +1,13 @@
 # Connection
 
-Using saffier is extremely simple and easy to do but there are some steps you might want to take
+Using edgy is extremely simple and easy to do but there are some steps you might want to take
 into consideration like connections and what it can happen if this is not done properly.
 
-Saffier is on SQLAlechemy core but is an `async` version of it and therefore what happens if you
+Edgy is on SQLAlechemy core but is an `async` version of it and therefore what happens if you
 want to use it within your favourite frameworks like [Esmerald](https://esmerald.dymmond.com),
 Starlette or even FastAPI?
 
-Well, Saffier is framework agnostic so it will fit in any framework you want, even in those that
+Well, Edgy is framework agnostic so it will fit in any framework you want, even in those that
 are not listed above that support **lifecycle events**.
 
 ## Lifecycle events

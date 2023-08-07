@@ -5,14 +5,14 @@ be generated in the SQL database when generated.
 
 ## Data types
 
-As **Saffier** is a new approach on the top of Encode ORM, the following keyword arguments are
+As **Edgy** is a new approach on the top of Encode ORM, the following keyword arguments are
 supported in **all field types**.
 
 !!! Check
     The data types are also very familiar for those with experience with Django model fields.
 
 * **primary_key** - A boolean. Determine if a column is primary key.
-Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions with Saffier.
+Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions with Edgy.
 * **null** - A boolean. Determine if a column allows null.
 * **default** - A value or a callable (function).
 * **index** - A boolean. Determine if a database index should be created.
@@ -37,7 +37,7 @@ construct representing the DDL DEFAULT value for the column.
 
 ## Available fields
 
-Saffier is built on the top of **pydantic** and inspired by `typesystem`. This means, for example,
+Edgy is built on the top of **pydantic** and inspired by `typesystem`. This means, for example,
 that migrating from the Encode ORM is almost direct as it was made sure the same patterns, names,
 and internal validation remained the same, intentionally.
 
@@ -48,19 +48,19 @@ To make the interface even more familiar, the field names end with a `Field` at 
 You have a few ways of doing this and those are the following:
 
 ```python
-import saffier
+import edgy
 ```
 
-From `saffier` you can access all the available fields.
+From `edgy` you can access all the available fields.
 
 ```python
-from saffier.db.models import fields
+from edgy.db.models import fields
 ```
 
 From `fields` you should be able to access the fields directly.
 
 ```python
-from saffier.db.models.fields import BigIntegerField
+from edgy.db.models.fields import BigIntegerField
 ```
 
 You can import directly the desired field.
@@ -70,12 +70,12 @@ All the fields have specific parameters beisdes the ones [mentioned in data type
 #### BigIntegerField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    big_number = saffier.BigIntegerField(default=0)
-    another_big_number = saffier.BigIntegerField(minimum=10)
+class MyModel(edgy.Model):
+    big_number = edgy.BigIntegerField(default=0)
+    another_big_number = edgy.BigIntegerField(minimum=10)
     ...
 
 ```
@@ -94,12 +94,12 @@ This field is used as a default field for the `id` of a model.
 #### IntegerField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    a_number = saffier.IntegerField(default=0)
-    another_number = saffier.IntegerField(minimum=10)
+class MyModel(edgy.Model):
+    a_number = edgy.IntegerField(default=0)
+    another_number = edgy.IntegerField(minimum=10)
     ...
 
 ```
@@ -116,12 +116,12 @@ class MyModel(saffier.Model):
 #### BooleanField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    is_active = saffier.BooleanField(default=True)
-    is_completed = saffier.BooleanField(default=False)
+class MyModel(edgy.Model):
+    is_active = edgy.BooleanField(default=True)
+    is_completed = edgy.BooleanField(default=False)
     ...
 
 ```
@@ -129,12 +129,12 @@ class MyModel(saffier.Model):
 #### CharField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    description = saffier.CharField(max_length=255)
-    title = saffier.CharField(max_length=50, minimum_length=200)
+class MyModel(edgy.Model):
+    description = edgy.CharField(max_length=255)
+    title = edgy.CharField(max_length=50, minimum_length=200)
     ...
 
 ```
@@ -148,15 +148,15 @@ class MyModel(saffier.Model):
 
 ```python
 from enum import Enum
-import saffier
+import edgy
 
 class Status(Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
 
 
-class MyModel(saffier.Model):
-    status = saffier.ChoiceField(choices=Status, default=Status.ACTIVE)
+class MyModel(edgy.Model):
+    status = edgy.ChoiceField(choices=Status, default=Status.ACTIVE)
     ...
 
 ```
@@ -169,11 +169,11 @@ class MyModel(saffier.Model):
 
 ```python
 import datetime
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    created_at = saffier.DateField(default=datetime.date.today)
+class MyModel(edgy.Model):
+    created_at = edgy.DateField(default=datetime.date.today)
     ...
 
 ```
@@ -188,11 +188,11 @@ class MyModel(saffier.Model):
 
 ```python
 import datetime
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    created_at = saffier.DateTimeField(datetime.datetime.now)
+class MyModel(edgy.Model):
+    created_at = edgy.DateTimeField(datetime.datetime.now)
     ...
 
 ```
@@ -206,11 +206,11 @@ class MyModel(saffier.Model):
 #### DecimalField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    price = saffier.DecimalField(max_digits=5, decimal_places=2, null=True)
+class MyModel(edgy.Model):
+    price = edgy.DecimalField(max_digits=5, decimal_places=2, null=True)
     ...
 
 ```
@@ -223,11 +223,11 @@ class MyModel(saffier.Model):
 #### EmailField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    email = saffier.EmailField(max_length=60, null=True)
+class MyModel(edgy.Model):
+    email = edgy.EmailField(max_length=60, null=True)
     ...
 
 ```
@@ -237,11 +237,11 @@ Derives from the same as [CharField](#charfield) and validates the email value.
 #### FloatField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    email = saffier.FloatField(null=True)
+class MyModel(edgy.Model):
+    email = edgy.FloatField(null=True)
     ...
 
 ```
@@ -251,20 +251,20 @@ Derives from the same as [IntergerField](#integerfield) and validates the decima
 #### ForeignKey
 
 ```python
-import saffier
+import edgy
 
 
-class User(saffier.Model):
-    is_active = saffier.BooleanField(default=True)
+class User(edgy.Model):
+    is_active = edgy.BooleanField(default=True)
 
 
-class Profile(saffier.Model):
-    is_enabled = saffier.BooleanField(default=True)
+class Profile(edgy.Model):
+    is_enabled = edgy.BooleanField(default=True)
 
 
-class MyModel(saffier.Model):
-    user = saffier.ForeignKey("User", on_delete=saffier.CASCADE)
-    profile = saffier.ForeignKey(Profile, on_delete=saffier.CASCADE, related_name="my_models")
+class MyModel(edgy.Model):
+    user = edgy.ForeignKey("User", on_delete=edgy.CASCADE)
+    profile = edgy.ForeignKey(Profile, on_delete=edgy.CASCADE, related_name="my_models")
     ...
 
 ```
@@ -275,53 +275,53 @@ class MyModel(saffier.Model):
 * **related_name** - The name to use for the relation from the related object back to this one.
 * **on_delete** - A string indicating the behaviour that should happen on delete of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
-from `saffier`.
+from `edgy`.
 * **on_update** - A string indicating the behaviour that should happen on update of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
-from `saffier`.
+from `edgy`.
 
     ```python
-    from saffier import CASCADE, SET_NULL, RESTRICT
+    from edgy import CASCADE, SET_NULL, RESTRICT
     ```
 
 #### ManyToManyField
 
 ```python
-import saffier
+import edgy
 
 
-class User(saffier.Model):
-    is_active = saffier.BooleanField(default=True)
+class User(edgy.Model):
+    is_active = edgy.BooleanField(default=True)
 
 
-class Organisation(saffier.Model):
-    is_enabled = saffier.BooleanField(default=True)
+class Organisation(edgy.Model):
+    is_enabled = edgy.BooleanField(default=True)
 
 
-class MyModel(saffier.Model):
-    users = saffier.ManyToManyField(User)
-    organisations = saffier.ManyToManyField(Organisation)
+class MyModel(edgy.Model):
+    users = edgy.ManyToManyField(User)
+    organisations = edgy.ManyToManyField(Organisation)
 
 ```
 
 !!! Tip
-    You can use `saffier.ManyToMany` as alternative to `ManyToManyField` instead.
+    You can use `edgy.ManyToMany` as alternative to `ManyToManyField` instead.
 
 ##### Parameters
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
 * **related_name** - The name to use for the relation from the related object back to this one.
-* **through** - The model to be used for the relationship. Saffier generates the model by default
+* **through** - The model to be used for the relationship. Edgy generates the model by default
 if none is provided.
 
 #### IPAddressField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    ip_address = saffier.IPAddressField()
+class MyModel(edgy.Model):
+    ip_address = edgy.IPAddressField()
     ...
 
 ```
@@ -332,11 +332,11 @@ supports `ipv4` and `ipv6`.
 #### JSONField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    data = saffier.JSONField(default={})
+class MyModel(edgy.Model):
+    data = edgy.JSONField(default={})
     ...
 
 ```
@@ -346,15 +346,15 @@ Simple JSON representation object.
 #### OneToOneField
 
 ```python
-import saffier
+import edgy
 
 
-class User(saffier.Model):
-    is_active = saffier.BooleanField(default=True)
+class User(edgy.Model):
+    is_active = edgy.BooleanField(default=True)
 
 
-class MyModel(saffier.Model):
-    user = saffier.OneToOneField("User")
+class MyModel(edgy.Model):
+    user = edgy.OneToOneField("User")
     ...
 
 ```
@@ -362,16 +362,16 @@ class MyModel(saffier.Model):
 Derives from the same as [ForeignKey](#foreignkey) and applies a One to One direction.
 
 !!! Tip
-    You can use `saffier.OneToOne` as alternative to `OneToOneField` instead.
+    You can use `edgy.OneToOne` as alternative to `OneToOneField` instead.
 
 #### TextField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    data = saffier.TextField(null=True, blank=True)
+class MyModel(edgy.Model):
+    data = edgy.TextField(null=True, blank=True)
     ...
 
 ```
@@ -381,11 +381,11 @@ Similar to [CharField](#charfield) but has no `max_length` restrictions.
 #### PasswordField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
-    data = saffier.PasswordField(null=False, max_length=255)
+class MyModel(edgy.Model):
+    data = edgy.PasswordField(null=False, max_length=255)
     ...
 
 ```
@@ -396,15 +396,15 @@ Similar to [CharField](#charfield) and it can be used to represent a password te
 
 ```python
 import datetime
-import saffier
+import edgy
 
 
 def get_time():
     return datetime.datetime.now().time()
 
 
-class MyModel(saffier.Model):
-    time = saffier.TimeField(default=get_time)
+class MyModel(edgy.Model):
+    time = edgy.TimeField(default=get_time)
     ...
 
 ```
@@ -417,10 +417,10 @@ class MyModel(saffier.Model):
 #### URLField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
+class MyModel(edgy.Model):
     url = fields.URLField(null=True, max_length=1024)
     ...
 
@@ -431,10 +431,10 @@ Derives from the same as [CharField](#charfield) and validates the value of an U
 #### UUIDField
 
 ```python
-import saffier
+import edgy
 
 
-class MyModel(saffier.Model):
+class MyModel(edgy.Model):
     uuid = fields.UUIDField()
     ...
 

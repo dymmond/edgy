@@ -5,7 +5,8 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from my_project.utils import get_db_connection
-from saffier.migrations import Migrate
+
+from edgy.migrations import Migrate
 
 
 def build_path():

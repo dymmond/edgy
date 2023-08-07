@@ -1,6 +1,6 @@
 # Registry
 
-When using the **Saffier** ORM, you must use the **Registry** object to tell exactly where the
+When using the **Edgy** ORM, you must use the **Registry** object to tell exactly where the
 database is going to be.
 
 Imagine the registry as a mapping between your models and the database where is going to be written.
@@ -16,11 +16,11 @@ Alembic.
 
 ## Parameters
 
-* **database** - An instance of `saffier.core.db.Database` object.
+* **database** - An instance of `edgy.core.db.Database` object.
 
 !!! Warning
     Using the `Database` from the `databases` package will raise an assertation error. You must
-    use the `saffier.Database` object instead.
+    use the `edgy.Database` object instead.
 
 ## Custom registry
 

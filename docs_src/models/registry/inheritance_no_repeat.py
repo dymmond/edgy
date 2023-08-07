@@ -1,11 +1,11 @@
-import saffier
-from saffier import Database, Registry
+import edgy
+from edgy import Database, Registry
 
 database = Database("sqlite:///db.sqlite")
 models = Registry(database=database)
 
 
-class BaseModel(saffier.Model):
+class BaseModel(edgy.Model):
     """
     The base model for all models using the `models` registry.
     """
@@ -15,10 +15,10 @@ class BaseModel(saffier.Model):
 
 
 class User(BaseModel):
-    name = saffier.CharField(max_length=255)
-    is_active = saffier.BooleanField(default=True)
+    name = edgy.CharField(max_length=255)
+    is_active = edgy.BooleanField(default=True)
 
 
 class Product(BaseModel):
-    user = saffier.ForeignKey(User, null=False, on_delete=saffier.CASCADE)
-    sku = saffier.CharField(max_length=255, null=False)
+    user = edgy.ForeignKey(User, null=False, on_delete=edgy.CASCADE)
+    sku = edgy.CharField(max_length=255, null=False)
