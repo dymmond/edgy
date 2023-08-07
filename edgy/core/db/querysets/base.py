@@ -752,7 +752,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         A similar solution was suggested here: https://github.com/encode/orm/pull/148
 
         It is thought to be a clean approach to a simple problem so it was added here and
-        refactored to be compatible with Saffier.
+        refactored to be compatible with Edgy.
         """
         new_objs = []
         for obj in objs:

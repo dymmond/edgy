@@ -386,7 +386,7 @@ class BaseModelMeta(ModelMetaclass):
         # Generates a proxy model for each model created
         # Making sure the core model where the fields are inherited
         # And mapped contains the main proxy_model
-        if not new_class.is_proxy_model:
+        if not new_class.is_proxy_model and not new_class.meta.abstract:
             proxy_model = new_class.generate_proxy_model()
             new_class.proxy_model = proxy_model
             new_class.proxy_model.parent = new_class
