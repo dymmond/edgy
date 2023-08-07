@@ -9,7 +9,7 @@ from edgy.conf import settings
 DIALECTS = {"postgres": "postgres"}
 
 
-class BaseFieldProtocol(sqlalchemy.TypeDecorator):  # type: ignore
+class BaseFieldProtocol(sqlalchemy.TypeDecorator):
     """
     When implementing a field representation from SQLAlchemy, the protocol will be enforced
     """
@@ -34,7 +34,7 @@ class BaseFieldProtocol(sqlalchemy.TypeDecorator):  # type: ignore
 
 
 class IPAddress(BaseFieldProtocol):
-    impl: str = sqlalchemy.CHAR
+    impl: str = sqlalchemy.CHAR  # type: ignore
     cache_ok: bool = True
 
     def load_dialect_impl(self, dialect: Any) -> Any:

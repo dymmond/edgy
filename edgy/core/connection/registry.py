@@ -40,7 +40,7 @@ class Registry:
         return self._metadata
 
     @metadata.setter
-    def metadata(self, value: sqlalchemy.MetaData) -> sqlalchemy.MetaData:
+    def metadata(self, value: sqlalchemy.MetaData) -> None:
         self._metadata = value
 
     def _get_database_url(self) -> str:

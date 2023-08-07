@@ -26,7 +26,7 @@ class QuerySetPropsMixin:
         return bool(self.model_class.meta.is_multi)
 
     @property
-    def m2m_related(self) -> bool:
+    def m2m_related(self) -> str:
         return self._m2m_related
 
     @m2m_related.setter

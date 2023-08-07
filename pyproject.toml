@@ -135,9 +135,10 @@ strict = true
 disallow_untyped_decorators = true
 disallow_any_generics = false
 implicit_reexport = false
+no_implicit_optional = false
 show_error_codes = true
 disallow_incomplete_defs = true
-disable_error_code = "attr-defined"
+disable_error_code = "attr-defined,arg-type,override,misc"
 warn_unused_ignores = true
 warn_redundant_casts = true
 

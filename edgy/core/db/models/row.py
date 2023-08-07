@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Type
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Type, cast
 
 from sqlalchemy.engine.result import Row
 
@@ -21,7 +21,6 @@ class ModelRow(EdgyBaseModel):
         is_only_fields: bool = False,
         only_fields: Sequence[str] = None,
         is_defer_fields: bool = False,
-        defer_fields: Sequence[str] = None,
     ) -> Optional[Type["Model"]]:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
@@ -81,7 +80,7 @@ class ModelRow(EdgyBaseModel):
         # Check for the only_fields
         if is_only_fields or is_defer_fields:
             mapping_fields = (
-                [str(field) for field in only_fields] if is_only_fields else list(row.keys())
+                [str(field) for field in only_fields] if is_only_fields else list(row.keys())  # type: ignore
             )
 
             for column, value in row._mapping.items():
@@ -95,7 +94,7 @@ class ModelRow(EdgyBaseModel):
             # # We need to generify the model fields to make sure we can populate the
             # # model without mandatory fields
             # partial_fields = {k: copy.copy(v) for k, v in cls.fields.items() if k in item}
-            return cls.proxy_model(**item)
+            return cast("Type[Model]", cls.proxy_model(**item))  # type: ignore
         else:
             # Pull out the regular column values.
             for column in cls.table.columns:
@@ -105,7 +104,7 @@ class ModelRow(EdgyBaseModel):
                 elif column.name not in item:
                     item[column.name] = row[column]
 
-        return cls(**item)
+        return cast("Type[Model]", cls(**item))
 
     @classmethod
     def should_ignore_related_name(cls, related_name: str, select_related: Sequence[str]) -> bool:

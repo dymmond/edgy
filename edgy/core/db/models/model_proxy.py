@@ -1,6 +1,6 @@
-from typing import TYPE_CHECKING, Any, Dict, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, Tuple, Type, Union, cast
 
-from pydantic import ConfigDict, computed_field
+from pydantic import ConfigDict
 
 if TYPE_CHECKING:
     from edgy import Model
@@ -37,13 +37,13 @@ class ProxyModel:
         self.__pydantic_extra__ = pydantic_extra
         self.__model__ = None
 
-    def build(self) -> Type["Model"]:
+    def build(self) -> "ProxyModel":
         """
         Generates the model proxy for the __model__ definition.
         """
         from edgy.core.utils.models import create_edgy_model
 
-        model = create_edgy_model(
+        model: Type["Model"] = create_edgy_model(
             __name__=self.__name__,
             __module__=self.__module__,
             __bases__=self.__bases__,
@@ -54,17 +54,16 @@ class ProxyModel:
             __proxy__=self.__proxy__,
             __pydantic_extra__=self.__pydantic_extra__,
         )
-        self.__model__ = model
+        self.__model__ = model  # type: ignore
         return self
 
-    @computed_field
     @property
-    def model(self):
-        return self.__model__
+    def model(self) -> Type["Model"]:
+        return cast("Type[Model]", self.__model__)
 
     @model.setter
     def model(self, value: Type["Model"]) -> None:
-        self.__model__ = value
+        self.__model__ = value  # type: ignore
 
     def __repr__(self) -> str:
         name = f"Proxy{self.__name__}"

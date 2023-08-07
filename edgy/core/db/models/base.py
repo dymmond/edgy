@@ -1,7 +1,7 @@
 import copy
 import functools
 from functools import cached_property
-from typing import Any, ClassVar, Dict, Optional, Sequence, Type, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, Type, Union, cast
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
@@ -20,6 +20,9 @@ from edgy.core.utils.functional import edgy_setattr
 from edgy.core.utils.models import DateParser, ModelParser, generify_model_fields
 from edgy.exceptions import ImproperlyConfigured
 
+if TYPE_CHECKING:
+    from edgy import Model
+
 
 class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta):
     """
@@ -37,7 +40,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:  # type: ignore
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         values = self.setup_model_fields_from_kwargs(kwargs)
         self.__dict__ = values
@@ -60,10 +63,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             edgy_setattr(self, key, value)
             kwargs[key] = value
         return kwargs
-
-    @cached_property
-    def proxy_model(self) -> Type[Self]:
-        return self._proxy_model
 
     @property
     def pk(self) -> Any:
@@ -89,10 +88,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @cached_property
     def table(self) -> sqlalchemy.Table:
-        return self.__class__.table
+        return cast("sqlalchemy.Table", self.__class__.table)
 
     @classmethod
-    def generate_proxy_model(cls) -> Type[Self]:
+    def generate_proxy_model(cls) -> Type["Model"]:
         """
         Generates a proxy model for each model. This proxy model is a simple
         shallow copy of the original model being generated.
@@ -114,8 +113,8 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         Builds the SQLAlchemy table representation from the loaded fields.
         """
-        tablename = cls.meta.tablename
-        metadata = cls.meta.registry._metadata
+        tablename: str = cls.meta.tablename  # type: ignore
+        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
 
@@ -136,7 +135,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             indexes.append(index)
 
         return sqlalchemy.Table(
-            tablename, metadata, *columns, *uniques, *indexes, extend_existing=True
+            tablename, metadata, *columns, *uniques, *indexes, extend_existing=True  # type: ignore
         )
 
     @classmethod
@@ -159,7 +158,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         Creates the index based on the Index fields
         """
-        return sqlalchemy.Index(index.name, *index.fields)
+        return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
     def update_from_dict(self, dict_values: Dict[str, Any]) -> Self:
         """Updates the current model object with the new fields"""
@@ -167,7 +166,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             setattr(self, key, value)
         return self
 
-    def extract_db_fields(self):
+    def extract_db_fields(self) -> Dict[str, Any]:
         """
         Extacts all the db fields and excludes the related_names since those
         are simply relations.
@@ -217,15 +216,17 @@ class EdgyBaseReflectModel(EdgyBaseModel, metaclass=BaseModelReflectMeta):
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-        metadata = cls.meta.registry._metadata  # type: ignore
-        tablename = cls.meta.tablename
+        metadata: sqlalchemy.MetaData = cls.meta.registry._metadata  # type: ignore
+        tablename: str = cast("str", cls.meta.tablename)
         return cls.reflect(tablename, metadata)
 
     @classmethod
-    def reflect(cls, tablename, metadata):
+    def reflect(cls, tablename: str, metadata: sqlalchemy.MetaData) -> sqlalchemy.Table:
         try:
             return sqlalchemy.Table(
-                tablename, metadata, autoload_with=cls.meta.registry.sync_engine
+                tablename,
+                metadata,
+                autoload_with=cast("sqlalchemy.Engine", cls.meta.registry.sync_engine),  # type: ignore
             )
         except Exception as e:
             raise ImproperlyConfigured(

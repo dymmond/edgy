@@ -1,11 +1,9 @@
-from typing import Any, Dict, TypeVar
+from typing import Any, Dict, Type, Union
 
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
 from edgy.core.utils.functional import edgy_setattr
-
-M = TypeVar("M", bound="Model")
 
 
 class Model(ModelRow, DeclarativeMixin):
@@ -52,7 +50,7 @@ class Model(ModelRow, DeclarativeMixin):
         for key, value in dict(row._mapping).items():
             edgy_setattr(self, key, value)
 
-    async def _save(self, **kwargs: Any) -> M:
+    async def _save(self, **kwargs: Any) -> "Model":
         """
         Performs the save instruction.
         """
@@ -63,7 +61,7 @@ class Model(ModelRow, DeclarativeMixin):
         edgy_setattr(self, self.pkname, awaitable)
         return self
 
-    async def _update(self, **kwargs: Any) -> M:
+    async def _update(self, **kwargs: Any) -> Any:
         """
         Performs the save instruction.
         """
@@ -73,8 +71,8 @@ class Model(ModelRow, DeclarativeMixin):
         return awaitable
 
     async def save(
-        self: M, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
-    ) -> M:
+        self: Any, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
+    ) -> Union[Type["Model"], Any]:
         """
         Performs a save of a given model instance.
         When creating a user it will make sure it can update existing or
@@ -85,10 +83,12 @@ class Model(ModelRow, DeclarativeMixin):
         if getattr(self, "pk", None) is None and self.fields[self.pkname].autoincrement:
             extracted_fields.pop(self.pkname, None)
 
-        self.update_from_dict(dict(extracted_fields.items()))
+        self.update_from_dict(dict_values=dict(extracted_fields.items()))
 
-        validated_values = values or self.extract_values_from_field(extracted_fields)
-        kwargs = self.update_auto_now_fields(validated_values, self.fields)
+        validated_values = values or self.extract_values_from_field(
+            extracted_values=extracted_fields
+        )
+        kwargs = self.update_auto_now_fields(values=validated_values, fields=self.fields)
 
         # Performs the update or the create based on a possible existing primary key
         if getattr(self, "pk", None) is None or force_save:

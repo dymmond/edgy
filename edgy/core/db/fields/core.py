@@ -52,7 +52,6 @@ class FieldFactory:
         owner = kwargs.pop("owner", None)
         server_default = kwargs.pop("server_default", None)
         server_onupdate = kwargs.pop("server_onupdate", None)
-        blank: bool = kwargs.pop("blank", False)
         format: str = kwargs.pop("format", None)
         read_only: bool = True if primary_key else kwargs.pop("read_only", False)
         field_type = cls._type
@@ -72,7 +71,6 @@ class FieldFactory:
             owner=owner,
             server_default=server_default,
             server_onupdate=server_onupdate,
-            blank=blank,
             format=format,
             read_only=read_only,
             column_type=cls.get_column_type(**arguments),
@@ -110,7 +108,7 @@ class CharField(FieldFactory, str):
         *,
         max_length: Optional[int] = 0,
         min_length: Optional[int] = None,
-        regex: Union[str, Pattern] = None,  # type: ignore
+        regex: Union[str, Pattern] = None,
         **kwargs: Any,
     ) -> BaseField:
         if regex is None:

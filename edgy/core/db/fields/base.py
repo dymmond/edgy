@@ -47,10 +47,8 @@ class BaseField(FieldInfo, _repr.Representation):
         self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop("constraints", None)
         self.title = title
         self.description = description
-        self.blank: bool = kwargs.pop("blank", False)
         self.read_only: bool = kwargs.pop("read_only", False)
         self.help_text: str = kwargs.pop("help_text", None)
-        self.blank: bool = kwargs.pop("blank", False)
         self.pattern: Pattern = kwargs.pop("pattern", None)
         self.autoincrement: bool = kwargs.pop("autoincrement", False)
         self.related_name: str = kwargs.pop("related_name", None)
