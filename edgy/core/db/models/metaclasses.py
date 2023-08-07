@@ -383,7 +383,6 @@ class BaseModelMeta(ModelMetaclass):
 
         # Update the model references with the validations of the model
         # Being done by the Edgy fields instead.
-
         # Generates a proxy model for each model created
         # Making sure the core model where the fields are inherited
         # And mapped contains the main proxy_model

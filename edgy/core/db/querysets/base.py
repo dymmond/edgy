@@ -8,6 +8,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Type,
     TypeVar,
@@ -23,7 +24,7 @@ from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.querysets.mixins import QuerySetPropsMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
 from edgy.core.utils.models import DateParser, ModelParser
-from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound
+from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.protocols.queryset import QuerySetProtocol
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -50,6 +51,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         group_by: Any = None,
         distinct_on: Any = None,
         only_fields: Any = None,
+        defer_fields: Any = None,
         m2m_related: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
@@ -62,12 +64,16 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         self._group_by = [] if group_by is None else group_by
         self.distinct_on = [] if distinct_on is None else distinct_on
         self._only = [] if only_fields is None else only_fields
+        self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
         self._cache = None
         self._m2m_related = m2m_related
 
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class.meta.multi_related[0]
+
+        if self._only and self._defer:
+            raise QuerySetError("You cannot use .only() and .defer() at the same time.")
 
     def build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
@@ -191,6 +197,10 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         if self._only:
             expression = expression.with_only_columns(*self._only)
 
+        if self._defer:
+            columns = [column for column in select_from.columns if column.name not in self._defer]
+            expression = expression.with_only_columns(*columns)
+
         if self.filter_clauses:
             expression = self.build_filter_clauses_expression(
                 self.filter_clauses, expression=expression
@@ -275,14 +285,6 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
                         column = model_class.table.columns[settings.default_related_lookup_field]
                     except AttributeError:
                         raise KeyError(str(error)) from error
-                        # Tries the parent class from the proxy model
-                        # try:
-                        #     model_class = getattr(self.model_class.parent, key).related_to
-                        #     column = model_class.table.columns[
-                        #         settings.default_related_lookup_field
-                        #     ]
-                        # except AttributeError:
-                        #     raise KeyError(str(error)) from error
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
@@ -318,6 +320,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
             limit_offset=self._offset,
             order_by=self._order_by,
             only_fields=self._only,
+            defer_fields=self._defer,
             m2m_related=self.m2m_related,
         )
 
@@ -357,6 +360,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         queryset._cache = self._cache
         queryset._m2m_related = self._m2m_related
         queryset._only = self._only
+        queryset._defer = self._defer
         return queryset
 
 
@@ -503,6 +507,15 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._only = only_fields
         return queryset
 
+    def defer(self, *fields: Sequence[str]) -> Union[List[EdgyModel], None]:
+        """
+        Returns a list of models with the selected only fields and always the primary
+        key.
+        """
+        queryset: "QuerySet" = self.clone()
+        queryset._defer = fields
+        return queryset
+
     def select_related(self, related: Any) -> "QuerySet":
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
@@ -519,6 +532,76 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         related = list(self._select_related) + related
         queryset._select_related = related
         return queryset
+
+    async def values(
+        self,
+        fields: Union[Sequence[str], str, None] = None,
+        exclude: Union[Sequence[str], Set[str]] = None,
+        exclude_none: bool = False,
+        flatten: bool = False,
+        **kwargs: Any,
+    ) -> List[Any]:
+        """
+        Returns the results in a python dictionary format.
+        """
+        fields = fields or []
+        queryset: "QuerySet" = self.clone()
+        rows: List[Type["Model"]] = await queryset.all()
+
+        if not isinstance(fields, list):
+            raise QuerySetError(detail="Fields must be an iterable.")
+
+        if not fields:
+            rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
+        else:
+            rows = [
+                row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)
+                for row in rows
+            ]
+
+        as_tuple = kwargs.pop("__as_tuple__", False)
+
+        if not as_tuple:
+            return rows
+
+        if not flatten:
+            rows = [tuple(row.values()) for row in rows]
+        else:
+            try:
+                rows = [row[fields[0]] for row in rows]
+            except KeyError:
+                raise QuerySetError(detail=f"{fields[0]} does not exist in the results.") from None
+        return rows
+
+    async def values_list(
+        self,
+        fields: Union[Sequence[str], str, None] = None,
+        exclude: Union[Sequence[str], Set[str]] = None,
+        exclude_none: bool = False,
+        flat: bool = False,
+    ) -> List[Any]:
+        """
+        Returns the results in a python dictionary format.
+        """
+        fields = fields or []
+        if flat and len(fields) > 1:
+            raise QuerySetError(
+                detail=f"Maximum of 1 in fields when `flat` is enables, got {len(fields)} instead."
+            ) from None
+
+        if flat and isinstance(fields, str):
+            fields = [fields]
+
+        if isinstance(fields, str):
+            fields = [fields]
+
+        return await self.values(
+            fields=fields,
+            exclude=exclude,
+            exclude_none=exclude_none,
+            flatten=flat,
+            __as_tuple__=True,
+        )
 
     async def exists(self) -> bool:
         """
@@ -572,8 +655,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         # Attach the raw query to the object
         queryset.model_class.raw_query = self.sql
 
-        # Only fields
         is_only_fields = True if queryset._only else False
+        is_defer_fields = True if queryset._defer else False
 
         results = [
             queryset.model_class.from_sqla_row(
@@ -581,6 +664,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 select_related=self._select_related,
                 is_only_fields=is_only_fields,
                 only_fields=queryset._only,
+                is_defer_fields=is_defer_fields,
+                defer_fields=queryset._defer,
             )
             for row in rows
         ]
@@ -601,8 +686,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         rows = await self.database.fetch_all(expression)
         self.set_query_expression(expression)
 
-        # Only fields
         is_only_fields = True if self._only else False
+        is_defer_fields = True if self._defer else False
 
         if not rows:
             raise ObjectNotFound()
@@ -613,6 +698,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             select_related=self._select_related,
             is_only_fields=is_only_fields,
             only_fields=self._only,
+            is_defer_fields=is_defer_fields,
+            defer_fields=self._defer,
         )
 
     async def first(self, **kwargs: Any) -> EdgyModel:

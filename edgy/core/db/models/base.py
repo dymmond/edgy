@@ -1,5 +1,6 @@
 import copy
 import functools
+from functools import cached_property
 from typing import Any, ClassVar, Dict, Optional, Sequence, Type, Union
 
 import sqlalchemy
@@ -60,6 +61,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             kwargs[key] = value
         return kwargs
 
+    @cached_property
+    def proxy_model(self) -> Type[Self]:
+        return self._proxy_model
+
     @property
     def pk(self) -> Any:
         return getattr(self, self.pkname, None)
@@ -82,7 +87,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     def __str__(self) -> str:
         return f"{self.__class__.__name__}({self.pkname}={self.pk})"
 
-    @property
+    @cached_property
     def table(self) -> sqlalchemy.Table:
         return self.__class__.table
 

@@ -125,41 +125,12 @@ def create_edgy_model(
     return model
 
 
-def create_generic_model_proxy(
-    model_to_proxy: Any,
-    fields: Optional[Any] = None,
-    bases: Optional[Any] = None,
-) -> Type["Model"]:
-    """
-    Generic proxy generator for the rows.
-    Each row has their own proxy making it isolated fromt he main
-    registry model and not changing its state.
-    """
-    from edgy.core.db.models.model_proxy import ProxyModel
-
-    if not fields:
-        fields = {}
-
-    model_definition = {
-        "name": model_to_proxy.__name__,
-        "module": model_to_proxy.__module__,
-        "metadata": model_to_proxy.meta,
-        "definitions": fields,
-        "proxy": True,
-    }
-    if bases:
-        model_definition["bases"] = bases
-
-    proxy_model = ProxyModel(**model_definition)
-    model = proxy_model()
-    model.model_fields = fields
-    model.model_rebuild(force=True)
-    return model
-
-
 def generify_model_fields(model: Type["Model"]) -> Dict[Any, Any]:
     """
-    Makes all fields generic when a partial model is generated or used
+    Makes all fields generic when a partial model is generated or used.
+    This also removes any metadata for the field such as validations making
+    it a clean slate to be used internally to process dynamic data and removing
+    the constraints of the original model fields.
     """
     fields = {}
 
@@ -167,5 +138,6 @@ def generify_model_fields(model: Type["Model"]) -> Dict[Any, Any]:
     for name, field in model.model_fields.items():
         edgy_setattr(field, "annotation", Any)
         edgy_setattr(field, "null", True)
+        edgy_setattr(field, "metadata", [])
         fields[name] = field
     return fields

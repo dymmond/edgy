@@ -17,7 +17,7 @@ defaults.update(
         "datetime": datetime.datetime,
         "timedelta": datetime.timedelta,
         "BaseModel": pydantic.BaseModel,
-        "BaseConfig": pydantic.BaseConfig,
+        "ConfigDict": pydantic.ConfigDict,
         "settings": edgy.settings,
     }
 )

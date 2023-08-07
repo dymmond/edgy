@@ -22,6 +22,36 @@ class User(edgy.Model):
         registry = models
 
 
+class Organisation(edgy.Model):
+    id = edgy.IntegerField(primary_key=True)
+    ident = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Team(edgy.Model):
+    id = edgy.IntegerField(primary_key=True)
+    org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT)
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Member(edgy.Model):
+    id = edgy.IntegerField(primary_key=True)
+    team = edgy.ForeignKey(Team, on_delete=edgy.SET_NULL, null=True, related_name="members")
+    second_team = edgy.ForeignKey(
+        Team, on_delete=edgy.SET_NULL, null=True, related_name="team_members"
+    )
+    email = edgy.CharField(max_length=100)
+    name = edgy.CharField(max_length=255, null=True)
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     await models.create_all()

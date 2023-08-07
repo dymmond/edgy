@@ -51,5 +51,9 @@ class RelationshipNotFound(EdgyException):
     ...
 
 
+class QuerySetError(EdgyException):
+    ...
+
+
 class CommandEnvironmentError(EdgyException):
     ...
