@@ -10,22 +10,22 @@ This is exactly what happened.
 
 The way of using the settings object within a Edgy use of the ORM is via:
 
-* **SAFFIER_SETTINGS_MODULE** environment variable.
+* **EDGY_SETTINGS_MODULE** environment variable.
 
 All the settings are **[pydantic BaseSettings](https://pypi.org/project/pydantic-settings/)** objects which makes it easier to use and override
 when needed.
 
-### SAFFIER_SETTINGS_MODULE
+### EDGY_SETTINGS_MODULE
 
-Edgy by default uses is looking for a `SAFFIER_SETTINGS_MODULE` environment variable to run and
+Edgy by default uses is looking for a `EDGY_SETTINGS_MODULE` environment variable to run and
 apply the given settings to your instance.
 
-If no `SAFFIER_SETTINGS_MODULE` is found, Edgy then uses its own internal settings which are
+If no `EDGY_SETTINGS_MODULE` is found, Edgy then uses its own internal settings which are
 widely applied across the system.
 
 #### Custom settings
 
-When creating your own custom settings class, you should inherit from `SaffierSettings` which is
+When creating your own custom settings class, you should inherit from `EdgySettings` which is
 the class responsible for all internal settings of Edgy and those can be extended and overriden
 with ease.
 
@@ -88,7 +88,7 @@ Using the example [above](#custom-settings) and the location `myproject/configs/
 settings should be called like this:
 
 ```shell
-$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy <COMMAND>
+$ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy <COMMAND>
 ```
 
 Example:
@@ -96,31 +96,31 @@ Example:
 **Starting the default shell**
 
 ```shell
-$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy shell
+$ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy shell
 ```
 
 **Starting the PTPython shell**
 
 ```shell
-$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy shell --kernel ptpython
+$ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy shell --kernel ptpython
 ```
 
 **Creating the migrations folder**
 
 ```shell
-$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy init
+$ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy init
 ```
 
 **Generating migrations**
 
 ```shell
-$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy makemigrations
+$ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy makemigrations
 ```
 
 **Appying migrations**
 
 ```shell
-$ SAFFIER_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy migrate
+$ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy migrate
 ```
 
 And the list goes on and on, you get the gist. Too understand which commands are available, check

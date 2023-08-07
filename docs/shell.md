@@ -86,7 +86,7 @@ $ edgy --app myproject.main:app shell
 **Environment variables**
 
 ```shell
-$ export SAFFIER_DEFAULT_APP=--app myproject.main:app
+$ export EDGY_DEFAULT_APP=--app myproject.main:app
 $ edgy shell --kernel ptpython
 ```
 
@@ -97,9 +97,9 @@ essentials for the models and reflected models and some python packages.
 
 It looks like this:
 
-<img src="https://res.cloudinary.com/dymmond/image/upload/v1682083526/Edgy/carbon/shell_n2ruox.png" alt='Shell Example'>
+<img src="https://res.cloudinary.com/tarsild/image/upload/v1691426975/packages/edgy/resources/edgy_shell_dqx9bf.png" alt='Shell Example'>
 
-Of course the `SAFFIER-VERSION` and `APPLICATION` are replaced automatically by the version you are
+Of course the `EDGY-VERSION` and `APPLICATION` are replaced automatically by the version you are
 using.
 
 #### Example
@@ -116,7 +116,7 @@ Let us see an example using example using Esmerald and we will have:
 
 And it will look like this:
 
-<img src="https://res.cloudinary.com/dymmond/image/upload/v1682084269/Edgy/carbon/example_m2ggyt.png" alt='Shell Example'>
+<img src="https://res.cloudinary.com/tarsild/image/upload/v1691427229/packages/edgy/resources/reflected_cdc3rg.png" alt='Shell Example'>
 
 Pretty cool, right? Then it is a normal python shell where you can import whatever you want and
 need as per normal python shell interaction.

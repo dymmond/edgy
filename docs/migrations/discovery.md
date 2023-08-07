@@ -12,11 +12,11 @@ Although not having that same level, Edgy does a similar job by having "a guess"
 it should be and throws an error if not found or if no [environment variables or --app](#environment-variables)
 are provided.
 
-**The application discovery works as an alternative to providing the `--app` or a `SAFFIER_DEFAULT_APP` environment variable**.
+**The application discovery works as an alternative to providing the `--app` or a `EDGY_DEFAULT_APP` environment variable**.
 
 So, what does this mean?
 
-This means if **you do not provide an --app or a SAFFIER_DEFAULT_APP**, Edgy will try to find the
+This means if **you do not provide an --app or a EDGY_DEFAULT_APP**, Edgy will try to find the
 application for you automatically.
 
 Let us see a practical example of what does this mean.
@@ -54,7 +54,7 @@ contains the application object with the [Migration](./migrations.md#migration) 
 
 ### How does it work?
 
-When no `--app` or no `SAFFIER_DEFAULT_APP` environment variable is provided, Edgy will
+When no `--app` or no `EDGY_DEFAULT_APP` environment variable is provided, Edgy will
 **automatically look for**:
 
 * The current directory where `edgy` is being called contains a file called:
@@ -86,7 +86,7 @@ This is the way that Edgy can `auto discover` your application.
 
 When generating migrations, Edgy **expects at least one environment variable to be present**.
 
-* **SAFFIER_DATABASE_URL** - The database url for your database.
+* **EDGY_DATABASE_URL** - The database url for your database.
 
 The reason for this is because Edgy is agnostic to any framework and this way it makes it easier
 to work with the `migrations`.
@@ -97,7 +97,7 @@ very likely to be done using environment variables.
 **This variable must be present**. So to save time you can simply do:
 
 ```
-$ export SAFFIER_DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/my_database
+$ export EDGY_DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/my_database
 ```
 
 Or whatever connection string you are using.
@@ -158,7 +158,7 @@ This is a simple example with two endpoints, you can do as you desire with the p
 add and with any desired structure.
 
 What will be doing now is run the following commands using the [auto discovery](#auto-discovery)
-and the [--app or SAFFIER_DEFAULT_APP](#environment-variables):
+and the [--app or EDGY_DEFAULT_APP](#environment-variables):
 
 * **init** - Starts the migrations and creates the migrations folder.
 * **makemigrations** - Generates the migrations for the application.
@@ -178,13 +178,13 @@ We will be also executing the commands inside `myproject`.
 $ edgy init
 ```
 
-Yes! Simply this and because the `--app` or a `SAFFIER_DEFAULT_APP` was provided, it triggered the
+Yes! Simply this and because the `--app` or a `EDGY_DEFAULT_APP` was provided, it triggered the
 auto discovery of the application that contains the edgy information.
 
 Because the application is inside `src/main.py` it will be automatically discovered by Edgy as
 it followed the [discovery pattern](#how-does-it-work).
 
-##### Using the --app or SAFFIER_DISCOVERY_APP
+##### Using the --app or EDGY_DISCOVERY_APP
 
 This is the other way to tell Edgy where to find your application. Since the application is
 inside the `src/main.py` we need to provide the proper location is a `<module>:<app>` format.
@@ -197,14 +197,14 @@ With the `--app` flag.
 $ edgy --app src.main:app init
 ```
 
-###### SAFFIER_DEFAULT_APP
+###### EDGY_DEFAULT_APP
 
-With the `SAFFIER_DEFAULT_APP`.
+With the `EDGY_DEFAULT_APP`.
 
 Export the env var first:
 
 ```shell
-$ export SAFFIER_DEFAULT_APP=src.main:app
+$ export EDGY_DEFAULT_APP=src.main:app
 ```
 
 And then run:
@@ -225,10 +225,10 @@ It is time to run this command.
 $ edgy makemigrations
 ```
 
-Again, same principle as before because the `--app` or a `SAFFIER_DEFAULT_APP` was provided,
+Again, same principle as before because the `--app` or a `EDGY_DEFAULT_APP` was provided,
 it triggered the auto discovery of the application.
 
-##### Using the --app or SAFFIER_DISCOVERY_APP
+##### Using the --app or EDGY_DISCOVERY_APP
 
 ###### --app
 
@@ -238,14 +238,14 @@ With the `--app` flag.
 $ edgy --app src.main:app makemigrations
 ```
 
-###### SAFFIER_DEFAULT_APP
+###### EDGY_DEFAULT_APP
 
-With the `SAFFIER_DEFAULT_APP`.
+With the `EDGY_DEFAULT_APP`.
 
 Export the env var first:
 
 ```shell
-$ export SAFFIER_DEFAULT_APP=src.main:app
+$ export EDGY_DEFAULT_APP=src.main:app
 ```
 
 And then run:

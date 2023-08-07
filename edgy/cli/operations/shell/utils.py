@@ -19,6 +19,8 @@ defaults.update(
         "BaseModel": pydantic.BaseModel,
         "ConfigDict": pydantic.ConfigDict,
         "settings": edgy.settings,
+        "Model": edgy.Model,
+        "ReflectModel": edgy.ReflectModel,
     }
 )
 

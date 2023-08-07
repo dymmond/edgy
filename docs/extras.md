@@ -18,9 +18,9 @@ Edgy and Edgy only needs to reflect those tables back into your code, so, do you
 the **Migrate** object here? **Short answer is no**.
 
 So how can you still use those features without depending on the Migrate object? Enters
-[SaffierExtra](#saffierextra).
+[EdgyExtra](#edgyextra).
 
-## SaffierExtra
+## EdgyExtra
 
 This is the object you want to use when **you don't need Edgy to manage the migrations for you**
 and yet still being able to use Edgy tools like the [shell](./shell.md).
@@ -44,4 +44,4 @@ And that is it, you can use any tool that does not relate with migrations in you
 ## Note
 
 For now, besides the migrations and the shell, Edgy does not offer any extra tools but there are
-plans to add more extras in the future and `SaffierExtra` is the way to go for that setup.
+plans to add more extras in the future and `EdgyExtra` is the way to go for that setup.

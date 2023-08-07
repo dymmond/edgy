@@ -25,11 +25,6 @@ All the fields are required unless on the the following is set:
 
     <sup>Set default to `None`</sup>
 
-* **blank** - A boolean. Determine if empry strings are allowed. This can be useful if you want to
-build an admin-like application.
-
-    <sup>Set default to `""`</sup>
-
 * **default** - A value or a callable (function).
 * **server_default** - nstance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
 construct representing the DDL DEFAULT value for the column.
@@ -54,13 +49,13 @@ import edgy
 From `edgy` you can access all the available fields.
 
 ```python
-from edgy.db.models import fields
+from edgy.core.db import fields
 ```
 
 From `fields` you should be able to access the fields directly.
 
 ```python
-from edgy.db.models.fields import BigIntegerField
+from edgy.core.db.fields import BigIntegerField
 ```
 
 You can import directly the desired field.
@@ -74,8 +69,8 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    big_number = edgy.BigIntegerField(default=0)
-    another_big_number = edgy.BigIntegerField(minimum=10)
+    big_number: int = edgy.BigIntegerField(default=0)
+    another_big_number: int = edgy.BigIntegerField(minimum=10)
     ...
 
 ```
@@ -98,8 +93,8 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    a_number = edgy.IntegerField(default=0)
-    another_number = edgy.IntegerField(minimum=10)
+    a_number: int = edgy.IntegerField(default=0)
+    another_number: int = edgy.IntegerField(minimum=10)
     ...
 
 ```
@@ -120,8 +115,8 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    is_active = edgy.BooleanField(default=True)
-    is_completed = edgy.BooleanField(default=False)
+    is_active: bool = edgy.BooleanField(default=True)
+    is_completed: bool = edgy.BooleanField(default=False)
     ...
 
 ```
@@ -133,8 +128,8 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    description = edgy.CharField(max_length=255)
-    title = edgy.CharField(max_length=50, minimum_length=200)
+    description: str = edgy.CharField(max_length=255)
+    title: str = edgy.CharField(max_length=50, minimum_length=200)
     ...
 
 ```
@@ -156,7 +151,7 @@ class Status(Enum):
 
 
 class MyModel(edgy.Model):
-    status = edgy.ChoiceField(choices=Status, default=Status.ACTIVE)
+    status: Status = edgy.ChoiceField(choices=Status, default=Status.ACTIVE)
     ...
 
 ```
@@ -173,7 +168,7 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    created_at = edgy.DateField(default=datetime.date.today)
+    created_at: datetime.date = edgy.DateField(default=datetime.date.today)
     ...
 
 ```
@@ -192,7 +187,7 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    created_at = edgy.DateTimeField(datetime.datetime.now)
+    created_at: datetime.datetime = edgy.DateTimeField(datetime.datetime.now)
     ...
 
 ```
@@ -206,11 +201,11 @@ class MyModel(edgy.Model):
 #### DecimalField
 
 ```python
+import decimal
 import edgy
 
-
 class MyModel(edgy.Model):
-    price = edgy.DecimalField(max_digits=5, decimal_places=2, null=True)
+    price: decimal.Decimal = edgy.DecimalField(max_digits=5, decimal_places=2, null=True)
     ...
 
 ```
@@ -227,7 +222,7 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    email = edgy.EmailField(max_length=60, null=True)
+    email: str = edgy.EmailField(max_length=60, null=True)
     ...
 
 ```
@@ -241,7 +236,7 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    email = edgy.FloatField(null=True)
+    price: float = edgy.FloatField(null=True)
     ...
 
 ```
@@ -255,16 +250,16 @@ import edgy
 
 
 class User(edgy.Model):
-    is_active = edgy.BooleanField(default=True)
+    is_active: bool = edgy.BooleanField(default=True)
 
 
 class Profile(edgy.Model):
-    is_enabled = edgy.BooleanField(default=True)
+    is_enabled: bool = edgy.BooleanField(default=True)
 
 
 class MyModel(edgy.Model):
-    user = edgy.ForeignKey("User", on_delete=edgy.CASCADE)
-    profile = edgy.ForeignKey(Profile, on_delete=edgy.CASCADE, related_name="my_models")
+    user: User = edgy.ForeignKey("User", on_delete=edgy.CASCADE)
+    profile: Profile = edgy.ForeignKey(Profile, on_delete=edgy.CASCADE, related_name="my_models")
     ...
 
 ```
@@ -287,20 +282,21 @@ from `edgy`.
 #### ManyToManyField
 
 ```python
+from typing import List
 import edgy
 
 
 class User(edgy.Model):
-    is_active = edgy.BooleanField(default=True)
+    is_active: bool = edgy.BooleanField(default=True)
 
 
 class Organisation(edgy.Model):
-    is_enabled = edgy.BooleanField(default=True)
+    is_enabled: bool = edgy.BooleanField(default=True)
 
 
 class MyModel(edgy.Model):
-    users = edgy.ManyToManyField(User)
-    organisations = edgy.ManyToManyField(Organisation)
+    users: List[User] = edgy.ManyToManyField(User)
+    organisations: List[Organisation] = edgy.ManyToManyField(Organisation)
 
 ```
 
@@ -321,7 +317,7 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    ip_address = edgy.IPAddressField()
+    ip_address: str = edgy.IPAddressField()
     ...
 
 ```
@@ -332,11 +328,12 @@ supports `ipv4` and `ipv6`.
 #### JSONField
 
 ```python
+from typing import Dict, Any
 import edgy
 
 
 class MyModel(edgy.Model):
-    data = edgy.JSONField(default={})
+    data: Dict[str, Any] = edgy.JSONField(default={})
     ...
 
 ```
@@ -350,11 +347,11 @@ import edgy
 
 
 class User(edgy.Model):
-    is_active = edgy.BooleanField(default=True)
+    is_active: bool = edgy.BooleanField(default=True)
 
 
 class MyModel(edgy.Model):
-    user = edgy.OneToOneField("User")
+    user: User = edgy.OneToOneField("User")
     ...
 
 ```
@@ -371,7 +368,7 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    data = edgy.TextField(null=True, blank=True)
+    data: str = edgy.TextField(null=True, blank=True)
     ...
 
 ```
@@ -385,7 +382,7 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    data = edgy.PasswordField(null=False, max_length=255)
+    data: str = edgy.PasswordField(null=False, max_length=255)
     ...
 
 ```
@@ -404,7 +401,7 @@ def get_time():
 
 
 class MyModel(edgy.Model):
-    time = edgy.TimeField(default=get_time)
+    time: datetime.time = edgy.TimeField(default=get_time)
     ...
 
 ```
@@ -421,7 +418,7 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    url = fields.URLField(null=True, max_length=1024)
+    url: str = fields.URLField(null=True, max_length=1024)
     ...
 
 ```
@@ -431,11 +428,12 @@ Derives from the same as [CharField](#charfield) and validates the value of an U
 #### UUIDField
 
 ```python
+from uuid import UUID
 import edgy
 
 
 class MyModel(edgy.Model):
-    uuid = fields.UUIDField()
+    uuid: UUID = fields.UUIDField()
     ...
 
 ```

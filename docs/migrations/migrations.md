@@ -220,7 +220,7 @@ that same principle.
 
 When generating migrations, Edgy **expects at least one environment variable to be present**.
 
-* **SAFFIER_DATABASE_URL** - The database url for your database.
+* **EDGY_DATABASE_URL** - The database url for your database.
 
 The reason for this is because Edgy is agnostic to any framework and this way it makes it easier
 to work with the `migrations`.
@@ -231,7 +231,7 @@ very likely to be done using environment variables.
 **This variable must be present**. So to save time you can simply do:
 
 ```
-$ export SAFFIER_DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/my_database
+$ export EDGY_DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/my_database
 ```
 
 Or whatever connection string you are using.
@@ -240,7 +240,7 @@ Or whatever connection string you are using.
 
 It is now time to generate the migrations folder. As mentioned before in the
 [environment variables section](#environment-variables), Edgy does need to have the
-`SAFFIER_DATABASE_URL` to generate the `migrations` folder. So, without further ado let us generate
+`EDGY_DATABASE_URL` to generate the `migrations` folder. So, without further ado let us generate
 our `migrations`.
 
 ```shell
@@ -314,7 +314,7 @@ A lot of files were generated automatically for you and they are specially tailo
 and complexity of **Edgy**.
 
 Do you remember when it was mentioned in the [environment variables](#environment-variables) that
-edgy is expecting the `SAFFIER_DATABASE_URL` to be available?
+edgy is expecting the `EDGY_DATABASE_URL` to be available?
 
 Well, this is another reason, inside the generated `migrations/env.py` the `get_engine_url()` is
 also expecting that value.
@@ -323,7 +323,7 @@ also expecting that value.
 # Code above
 
 def get_engine_url():
-    return os.environ.get("SAFFIER_DATABASE_URL")
+    return os.environ.get("EDGY_DATABASE_URL")
 
 # Code below
 ```

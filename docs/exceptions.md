@@ -1,6 +1,6 @@
 # Exceptions
 
-All **Edgy** custom exceptions derive from the base `SaffierException`.
+All **Edgy** custom exceptions derive from the base `EdgyException`.
 
 ## ObjectNotFound
 
