@@ -18,7 +18,7 @@ class DeclarativeMixin(BaseModel):
     @classmethod
     def generate_model_declarative(cls) -> Any:
         """
-        Transforms a core Saffier table into a Declarative model table.
+        Transforms a core Edgy table into a Declarative model table.
         """
         Base = cls.meta.registry.declarative_base
 
@@ -35,7 +35,7 @@ class DeclarativeMixin(BaseModel):
 
             # Maps the relationships with the foreign keys and related names
             field = cls.fields.get(column.name)
-            mapped_model: Mapped[field.to.__name__] = relationship(field.to.__name__)
+            mapped_model: Mapped[field.to.__name__] = relationship(field.to.__name__)  # type: ignore
 
             # Adds to the current model
             model_table.__mapper__.add_property(f"{column.name}_relation", mapped_model)

@@ -2,6 +2,7 @@ import pytest
 from tests.settings import DATABASE_URL
 
 import edgy
+from edgy.exceptions import QuerySetError
 from edgy.testclient import DatabaseTestClient as Database
 
 database = Database(url=DATABASE_URL)
@@ -32,6 +33,13 @@ async def rollback_connections():
     with database.force_rollback():
         async with database:
             yield
+
+
+async def test_raise_QuerySetError_on_only_and_defer():
+    await User.query.create(name="John", language="PT", description="A simple description")
+
+    with pytest.raises(QuerySetError):
+        await User.query.only("name").defer("language")
 
 
 async def test_model_only():

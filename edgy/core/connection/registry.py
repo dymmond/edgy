@@ -39,6 +39,10 @@ class Registry:
             model_class.build()
         return self._metadata
 
+    @metadata.setter
+    def metadata(self, value: sqlalchemy.MetaData) -> None:
+        self._metadata = value
+
     def _get_database_url(self) -> str:
         url = self.database.url
         if not url.driver:

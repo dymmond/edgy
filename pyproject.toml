@@ -70,7 +70,7 @@ Funding = "https://github.com/sponsors/tarsil"
 Source = "https://github.com/tarsil/edgy"
 
 [project.scripts]
-edgy = "edgy.cli.cli:edgy_cli"
+edgy = "edgy.__main__:run_cli"
 
 [project.optional-dependencies]
 test = [
@@ -108,6 +108,7 @@ testing = ["sqlalchemy_utils>=0.40.0"]
 postgres = ["databasez[postgresql]"]
 mysql = ["databasez[mysql]"]
 sqlite = ["databasez[sqlite]"]
+mssql = ["databasez[aioodbc]"]
 
 ptpython = ["ptpython>=3.0.23,<4.0.0"]
 ipython = ["ipython>=8.10.0,<9.0.0"]
@@ -135,9 +136,10 @@ strict = true
 disallow_untyped_decorators = true
 disallow_any_generics = false
 implicit_reexport = false
+no_implicit_optional = false
 show_error_codes = true
 disallow_incomplete_defs = true
-disable_error_code = "attr-defined"
+disable_error_code = "attr-defined,arg-type,override,misc"
 warn_unused_ignores = true
 warn_redundant_casts = true
 

@@ -13,6 +13,7 @@ from typing import (
     Type,
     TypeVar,
     Union,
+    cast,
 )
 
 import sqlalchemy
@@ -42,7 +43,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
 
     def __init__(
         self,
-        model_class: Any = None,
+        model_class: Union[Type["Model"], None] = None,
         filter_clauses: Any = None,
         select_related: Any = None,
         limit_count: Any = None,
@@ -55,7 +56,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         m2m_related: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
-        self.model_class = model_class
+        self.model_class = cast("Type[Model]", model_class)
         self.filter_clauses = [] if filter_clauses is None else filter_clauses
         self.limit_count = limit_count
         self._select_related = [] if select_related is None else select_related
@@ -67,13 +68,10 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
         self._cache = None
-        self._m2m_related = m2m_related
+        self._m2m_related = m2m_related  # type: ignore
 
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class.meta.multi_related[0]
-
-        if self._only and self._defer:
-            raise QuerySetError("You cannot use .only() and .defer() at the same time.")
 
     def build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
@@ -112,7 +110,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
 
         Returns a tuple of bool, list of tuples
         """
-        fields = model_class.fields
+        fields = model_class.fields  # type: ignore
         foreign_keys = []
         has_many = False
 
@@ -125,7 +123,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
                 has_many = True
 
             if isinstance(value, (BaseForeignKeyField, BaseOneToOneKeyField)):
-                tablename = value.to if isinstance(value.to, str) else value.to.__name__
+                tablename = value.to if isinstance(value.to, str) else value.to.__name__  # type: ignore
 
                 if tablename not in foreign_keys:
                     foreign_keys.append((key, tablename, value.related_name))
@@ -164,7 +162,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
 
                 # If there is multiple FKs to the same table
                 if not has_many_fk_same_table:
-                    select_from = sqlalchemy.sql.join(select_from, table)
+                    select_from = sqlalchemy.sql.join(select_from, table)  # type: ignore
                 else:
                     lookup_field = None
 
@@ -176,7 +174,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
                             lookup_field = field
                             break
 
-                    select_from = sqlalchemy.sql.join(
+                    select_from = sqlalchemy.sql.join(  # type: ignore
                         select_from,
                         table,
                         select_from.c.id == getattr(table.c, lookup_field),
@@ -186,10 +184,16 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
 
         return tables, select_from
 
+    def validate_only_and_defer(self) -> None:
+        if self._only and self._defer:
+            raise QuerySetError("You cannot use .only() and .defer() at the same time.")
+
     def build_select(self) -> Any:
         """
         Builds the query select based on the given parameters and filters.
         """
+        self.validate_only_and_defer()
+
         tables, select_from = self.build_tables_select_from_relationship()
         expression = sqlalchemy.sql.select(*tables)
         expression = expression.select_from(select_from)
@@ -221,10 +225,10 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         if self.distinct_on:
             expression = self.build_select_distinct(self.distinct_on, expression=expression)
 
-        self._expression = expression
+        self._expression = expression  # type: ignore
         return expression
 
-    def filter_query(self, exclude: bool = False, **kwargs: Any) -> Any:
+    def filter_query(self, exclude: bool = False, **kwargs: Any) -> "QuerySet":
         from edgy.core.db.models import Model
 
         clauses = []
@@ -312,16 +316,19 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         else:
             filter_clauses += clauses
 
-        return self.__class__(
-            model_class=self.model_class,
-            filter_clauses=filter_clauses,
-            select_related=select_related,
-            limit_count=self.limit_count,
-            limit_offset=self._offset,
-            order_by=self._order_by,
-            only_fields=self._only,
-            defer_fields=self._defer,
-            m2m_related=self.m2m_related,
+        return cast(
+            "QuerySet",
+            self.__class__(
+                model_class=self.model_class,
+                filter_clauses=filter_clauses,
+                select_related=select_related,
+                limit_count=self.limit_count,
+                limit_offset=self._offset,
+                order_by=self._order_by,
+                only_fields=self._only,
+                defer_fields=self._defer,
+                m2m_related=self.m2m_related,
+            ),
         )
 
     def validate_kwargs(self, **kwargs: Any) -> Any:
@@ -339,8 +346,8 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         return group_col
 
     def prepare_fields_for_distinct(self, distinct_on: str) -> Any:
-        distinct_on = self.table.columns[distinct_on]
-        return distinct_on
+        _distinct_on: sqlalchemy.Column = self.table.columns[distinct_on]
+        return _distinct_on
 
     def clone(self) -> Any:
         """
@@ -381,7 +388,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         self._expression = value
 
     async def __aiter__(self) -> AsyncIterator[EdgyModel]:
-        for value in await self:  # type: ignore
+        for value in await self:
             yield value
 
     def set_query_expression(self, expression: Any) -> None:
@@ -396,7 +403,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         exclude: bool = False,
         **kwargs: Any,
-    ) -> Any:
+    ) -> "QuerySet":
         """
         Filters or excludes a given clause for a specific QuerySet.
         """
@@ -494,7 +501,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset.distinct_on = distinct_on
         return queryset
 
-    def only(self, *fields: Sequence[str]) -> Union[List[EdgyModel], None]:
+    def only(self, *fields: Sequence[str]) -> "QuerySet":
         """
         Returns a list of models with the selected only fields and always the primary
         key.
@@ -507,7 +514,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._only = only_fields
         return queryset
 
-    def defer(self, *fields: Sequence[str]) -> Union[List[EdgyModel], None]:
+    def defer(self, *fields: Sequence[str]) -> "QuerySet":
         """
         Returns a list of models with the selected only fields and always the primary
         key.
@@ -552,10 +559,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             raise QuerySetError(detail="Fields must be an iterable.")
 
         if not fields:
-            rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
+            rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]  # type: ignore
         else:
             rows = [
-                row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)
+                row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)  # type: ignore
                 for row in rows
             ]
 
@@ -565,10 +572,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             return rows
 
         if not flatten:
-            rows = [tuple(row.values()) for row in rows]
+            rows = [tuple(row.values()) for row in rows]  # type: ignore
         else:
             try:
-                rows = [row[fields[0]] for row in rows]
+                rows = [row[fields[0]] for row in rows]  # type: ignore
             except KeyError:
                 raise QuerySetError(detail=f"{fields[0]} does not exist in the results.") from None
         return rows
@@ -610,7 +617,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         expression = self.build_select()
         expression = sqlalchemy.exists(expression).select()
         self.set_query_expression(expression)
-        return await self.database.fetch_val(expression)
+        _exists = await self.database.fetch_val(expression)
+        return cast("bool", _exists)
 
     async def count(self) -> int:
         """
@@ -619,7 +627,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         expression = self.build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
         self.set_query_expression(expression)
-        return await self.database.fetch_val(expression)
+        _count = await self.database.fetch_val(expression)
+        return cast("int", _count)
 
     async def get_or_none(self, **kwargs: Any) -> Union[EdgyModel, None]:
         """
@@ -665,7 +674,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 is_only_fields=is_only_fields,
                 only_fields=queryset._only,
                 is_defer_fields=is_defer_fields,
-                defer_fields=queryset._defer,
             )
             for row in rows
         ]
@@ -673,7 +681,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if not self.is_m2m:
             return results
 
-        return [getattr(result, self.m2m_related) for result in results]
+        all_results = [getattr(result, self.m2m_related) for result in results]
+        return all_results
 
     async def get(self, **kwargs: Any) -> EdgyModel:
         """
@@ -699,10 +708,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             is_only_fields=is_only_fields,
             only_fields=self._only,
             is_defer_fields=is_defer_fields,
-            defer_fields=self._defer,
         )
 
-    async def first(self, **kwargs: Any) -> EdgyModel:
+    async def first(self, **kwargs: Any) -> Union[EdgyModel, None]:
         """
         Returns the first record of a given queryset.
         """
@@ -713,8 +721,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         rows = await queryset.limit(1).order_by("id").all()
         if rows:
             return rows[0]
+        return None
 
-    async def last(self, **kwargs: Any) -> EdgyModel:
+    async def last(self, **kwargs: Any) -> Union[EdgyModel, None]:
         """
         Returns the last record of a given queryset.
         """
@@ -725,6 +734,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         rows = await queryset.order_by("-id").all()
         if rows:
             return rows[0]
+        return None
 
     async def create(self, **kwargs: Any) -> EdgyModel:
         """
@@ -752,7 +762,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         A similar solution was suggested here: https://github.com/encode/orm/pull/148
 
         It is thought to be a clean approach to a simple problem so it was added here and
-        refactored to be compatible with Saffier.
+        refactored to be compatible with Edgy.
         """
         new_objs = []
         for obj in objs:
@@ -766,7 +776,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         pk = getattr(self.table.c, self.pkname)
         expression = self.table.update().where(pk == sqlalchemy.bindparam(self.pkname))
-        kwargs = {field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()}
+        kwargs: Dict[Any, Any] = {
+            field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()
+        }
         pks = [{self.pkname: getattr(obj, self.pkname)} for obj in objs]
 
         query_list = []
@@ -785,7 +797,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         self.set_query_expression(expression)
         await self.database.execute(expression)
 
-    async def update(self, **kwargs: Any) -> int:
+    async def update(self, **kwargs: Any) -> None:
         """
         Updates a record in a specific table with the given kwargs.
         """

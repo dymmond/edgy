@@ -59,7 +59,7 @@ class ModelParser:
         """
         model_cls = model_class or self
         validated = {}
-        for name, field in model_cls.fields.items():
+        for name, field in model_cls.fields.items():  # type: ignore
             if field.read_only:
                 if field.has_default():
                     validated[name] = field.get_default_value()
@@ -75,7 +75,7 @@ class ModelParser:
             validated[name] = value
         return validated
 
-    def extract_db_fields_from_model(self, model_class: Type["Model"]):
+    def extract_db_fields_from_model(self, model_class: Type["Model"]) -> Dict[Any, Any]:
         """
         Extacts all the db fields and excludes the related_names since those
         are simply relations.

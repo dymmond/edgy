@@ -5,6 +5,7 @@ from .conf import settings
 from .conf.global_settings import EdgySettings
 from .core.connection.database import Database, DatabaseURL
 from .core.connection.registry import Registry
+from .core.db import fields
 from .core.db.constants import CASCADE, RESTRICT, SET_NULL
 from .core.db.datastructures import Index, UniqueConstraint
 from .core.db.fields import (
@@ -51,6 +52,7 @@ __all__ = [
     "EdgyExtra",
     "EdgySettings",
     "EmailField",
+    "fields",
     "FloatField",
     "ForeignKey",
     "Index",

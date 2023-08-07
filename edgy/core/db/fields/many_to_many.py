@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Optional, TypeVar
 
 import sqlalchemy
 
@@ -104,9 +104,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         from edgy.core.db.models.metaclasses import MetaInfo
 
-        if self.through:  # type: ignore
-            if isinstance(self.through, str):  # type: ignore
-                self.through = self.owner.meta.registry.models[self.through]  # type: ignore
+        if self.through:
+            if isinstance(self.through, str):
+                self.through = self.owner.meta.registry.models[self.through]
 
             self.through.meta.is_multi = True
             self.through.meta.multi_related = [self.to.__name__.lower()]  # type: ignore
@@ -141,13 +141,13 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         )
         fields = {
             "id": edgy.IntegerField(primary_key=True),
-            f"{owner_name.lower()}": ForeignKey(  # type: ignore
+            f"{owner_name.lower()}": ForeignKey(
                 self.owner,
                 null=True,
                 on_delete=CASCADE,
                 related_name=owner_related_name,
             ),
-            f"{to_name.lower()}": ForeignKey(  # type: ignore
+            f"{to_name.lower()}": ForeignKey(
                 self.to, null=True, on_delete=CASCADE, related_name=to_related_name
             ),
         }
@@ -159,7 +159,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             __definitions__=fields,
             __metadata__=new_meta,
         )
-        self.through = cast(Type["Model"], through_model)
+        self.through = through_model
         self.add_model_to_register(self.through)
 
     def get_column(self, name: str) -> sqlalchemy.Column:

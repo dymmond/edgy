@@ -3,7 +3,7 @@ import typing
 if typing.TYPE_CHECKING:
     from edgy.core.db.models import Model
 
-# Create a var type for the Saffier Model
+# Create a var type for the Edgy Model
 EdgyModel = typing.TypeVar("EdgyModel", bound="Model")
 
 

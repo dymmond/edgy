@@ -1,12 +1,9 @@
 from typing import Any
 
-from pydantic import computed_field
-
 from edgy.core.db.fields.base import BaseField
 
 
 class BaseForeignKey(BaseField):
-    @computed_field
     @property
     def target(self) -> Any:
         """

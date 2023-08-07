@@ -1,10 +1,21 @@
 import copy
 import inspect
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Set, Tuple, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    Union,
+    cast,
+)
 
 import sqlalchemy
 from pydantic._internal._model_construction import ModelMetaclass
-from typing_extensions import Self
 
 from edgy.conf import settings
 from edgy.core.connection.registry import Registry
@@ -59,13 +70,13 @@ class MetaInfo:
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.parents: Any = getattr(meta, "parents", None) or []
         self.many_to_many_fields: Set[str] = set()
-        self.foreign_key_fields: Dict[str, Any] = ()
+        self.foreign_key_fields: Dict[str, Any] = {}
         self.model: Optional[Type["Model"]] = None
         self.manager: "Manager" = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
         self.indexes: Any = getattr(meta, "indexes", None)
         self.reflect: bool = getattr(meta, "reflect", False)
-        self.managers: bool = getattr(meta, "_managers", None)
+        self.managers: List[Manager] = getattr(meta, "managers", [])
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
         self.related_names: Set[str] = set()
@@ -74,7 +85,7 @@ class MetaInfo:
     def model_dump(self) -> Dict[Any, Any]:
         return {k: getattr(self, k, None) for k in self.__slots__}
 
-    def load_dict(self, values: Dict[str, Any]) -> Self:
+    def load_dict(self, values: Dict[str, Any]) -> None:
         """
         Loads the metadata from a dictionary
         """
@@ -129,20 +140,20 @@ def _check_manager_for_bases(
 def _set_related_name_for_foreign_keys(
     foreign_keys: Set[Union[edgy_fields.OneToOneField, edgy_fields.ForeignKey]],
     model_class: Union["Model", "ReflectModel"],
-) -> str:
+) -> Union[str, None]:
     """
     Sets the related name for the foreign keys.
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
     if not foreign_keys:
-        return
+        return None
 
     for _, foreign_key in foreign_keys.items():
         default_related_name = getattr(foreign_key, "related_name", None)
 
         if not default_related_name:
-            default_related_name = f"{model_class.__name__.lower()}s_set"
+            default_related_name = f"{model_class.__name__.lower()}s_set"  # type: ignore
 
         elif hasattr(foreign_key.target, default_related_name):
             raise ForeignKeyBadConfigured(
@@ -180,13 +191,13 @@ class BaseModelMeta(ModelMetaclass):
         fields: Dict[str, BaseField] = {}
         foreign_key_fields: Any = {}
         many_to_many_fields: Any = set()
-        meta_class: "Model.Meta" = attrs.get("Meta", type("Meta", (), {}))
+        meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: Any = None
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
-        super().__new__(cls, name, bases, attrs)  # type: ignore
+        super().__new__(cls, name, bases, attrs)
 
         # Searching for fields "Field" in the class hierarchy.
         def __search_for_fields(base: Type, attrs: Any) -> None:
@@ -286,7 +297,7 @@ class BaseModelMeta(ModelMetaclass):
             return model_class(cls, name, bases, attrs)
 
         meta.parents = parents
-        new_class = model_class(cls, name, bases, attrs)
+        new_class = cast("Type[Model]", model_class(cls, name, bases, attrs))
 
         # Update the model_fields are updated to the latest
         new_class.model_fields.update(model_fields)
@@ -360,7 +371,7 @@ class BaseModelMeta(ModelMetaclass):
 
         new_class.__db_model__ = True
         new_class.fields = meta.fields_mapping
-        meta.model = new_class  # type: ignore
+        meta.model = new_class
         meta.manager.model_class = new_class
 
         # Set the owner of the field
@@ -372,7 +383,7 @@ class BaseModelMeta(ModelMetaclass):
             related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
             meta.related_names.add(related_name)
 
-        for field, value in new_class.fields.items():
+        for field, value in new_class.fields.items():  # type: ignore
             if isinstance(value, BaseManyToManyForeignKeyField):
                 _set_many_to_many_relation(value, new_class, field)
 
@@ -386,12 +397,12 @@ class BaseModelMeta(ModelMetaclass):
         # Generates a proxy model for each model created
         # Making sure the core model where the fields are inherited
         # And mapped contains the main proxy_model
-        if not new_class.is_proxy_model:
+        if not new_class.is_proxy_model and not new_class.meta.abstract:
             proxy_model = new_class.generate_proxy_model()
             new_class.proxy_model = proxy_model
             new_class.proxy_model.parent = new_class
             new_class.proxy_model.model_rebuild(force=True)
-            meta.registry.models[new_class.__name__] = new_class
+            meta.registry.models[new_class.__name__] = new_class  # type: ignore
 
         new_class.model_rebuild(force=True)
         return new_class
@@ -412,7 +423,7 @@ class BaseModelMeta(ModelMetaclass):
 
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:
-        return cls._table.columns
+        return cast("sqlalchemy.sql.ColumnCollection", cls._table.columns)
 
 
 class BaseModelReflectMeta(BaseModelMeta):

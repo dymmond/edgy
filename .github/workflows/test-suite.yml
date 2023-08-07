@@ -49,8 +49,8 @@ jobs:
       - name: "Install dependencies"
         if: steps.cache.outputs.cache-hit != 'true'
         run: "scripts/install"
-      # - name: "Run linting checks"
-      #   run: "scripts/check"
+      - name: "Run linting"
+        run: "scripts/lint"
       - name: "Run tests"
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/edgy"

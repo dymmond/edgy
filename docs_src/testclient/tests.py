@@ -1,0 +1,145 @@
+import datetime
+import decimal
+import ipaddress
+import uuid
+from datetime import date as local_date
+from datetime import datetime as local_datetime
+from datetime import time as local_time
+from enum import Enum
+from typing import Any, Dict
+from uuid import UUID
+
+import pytest
+from tests.settings import DATABASE_URL
+
+import edgy
+from edgy.core.db import fields
+from edgy.testclient import DatabaseTestClient
+
+database = DatabaseTestClient(DATABASE_URL, drop_database=True)
+models = edgy.Registry(database=database)
+
+pytestmark = pytest.mark.anyio
+
+
+def time():
+    return datetime.datetime.now().time()
+
+
+class StatusEnum(Enum):
+    DRAFT = "Draft"
+    RELEASED = "Released"
+
+
+class Product(edgy.Model):
+    id: int = fields.IntegerField(primary_key=True)
+    uuid: UUID = fields.UUIDField(null=True)
+    created: local_datetime = fields.DateTimeField(default=datetime.datetime.now)
+    created_day: local_date = fields.DateField(default=datetime.date.today)
+    created_time: local_time = fields.TimeField(default=time)
+    created_date: local_date = fields.DateField(auto_now_add=True)
+    created_datetime: local_datetime = fields.DateTimeField(auto_now_add=True)
+    updated_datetime: local_datetime = fields.DateTimeField(auto_now=True)
+    updated_date: local_date = fields.DateField(auto_now=True)
+    data: Dict[str, Any] = fields.JSONField(default={})
+    description: str = fields.CharField(blank=True, max_length=255)
+    huge_number: int = fields.BigIntegerField(default=0)
+    price: decimal.Decimal = fields.DecimalField(max_digits=5, decimal_places=2, null=True)
+    status: Enum = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
+    value: float = fields.FloatField(null=True)
+
+    class Meta:
+        registry = models
+
+
+class User(edgy.Model):
+    id: int = fields.UUIDField(primary_key=True, default=uuid.uuid4)
+    name: str = fields.CharField(null=True, max_length=16)
+    email: str = fields.EmailField(null=True, max_length=256)
+    ipaddress: str = fields.IPAddressField(null=True)
+    url: str = fields.URLField(null=True, max_length=2048)
+    password: str = fields.PasswordField(null=True, max_length=255)
+
+    class Meta:
+        registry = models
+
+
+class Customer(edgy.Model):
+    name: str = fields.CharField(null=True, max_length=16)
+
+    class Meta:
+        registry = models
+
+
+@pytest.fixture(autouse=True, scope="module")
+async def create_test_database():
+    await models.create_all()
+    yield
+    await models.drop_all()
+
+
+@pytest.fixture(autouse=True)
+async def rollback_transactions():
+    with database.force_rollback():
+        async with database:
+            yield
+
+
+async def test_model_crud():
+    product = await Product.query.create()
+    product = await Product.query.get(pk=product.pk)
+    assert product.created.year == datetime.datetime.now().year
+    assert product.created_day == datetime.date.today()
+    assert product.created_date == datetime.date.today()
+    assert product.created_datetime.date() == datetime.datetime.now().date()
+    assert product.updated_date == datetime.date.today()
+    assert product.updated_datetime.date() == datetime.datetime.now().date()
+    assert product.data == {}
+    assert product.description == ""
+    assert product.huge_number == 0
+    assert product.price is None
+    assert product.status == StatusEnum.DRAFT
+    assert product.value is None
+    assert product.uuid is None
+
+    await product.update(
+        data={"foo": 123},
+        value=123.456,
+        status=StatusEnum.RELEASED,
+        price=decimal.Decimal("999.99"),
+        uuid=uuid.UUID("f4e87646-bafa-431e-a0cb-e84f2fcf6b55"),
+    )
+
+    product = await Product.query.get()
+    assert product.value == 123.456
+    assert product.data == {"foo": 123}
+    assert product.status == StatusEnum.RELEASED
+    assert product.price == decimal.Decimal("999.99")
+    assert product.uuid == uuid.UUID("f4e87646-bafa-431e-a0cb-e84f2fcf6b55")
+
+    last_updated_datetime = product.updated_datetime
+    last_updated_date = product.updated_date
+    user = await User.query.create()
+    assert isinstance(user.pk, uuid.UUID)
+
+    user = await User.query.get()
+    assert user.email is None
+    assert user.ipaddress is None
+    assert user.url is None
+
+    await user.update(
+        ipaddress="192.168.1.1",
+        name="Test",
+        email="test@edgy.com",
+        url="https://edgy.com",
+        password="12345",
+    )
+
+    user = await User.query.get()
+    assert isinstance(user.ipaddress, (ipaddress.IPv4Address, ipaddress.IPv6Address))
+    assert user.password == "12345"
+
+    assert user.url == "https://edgy.com"
+    await product.update(data={"foo": 1234})
+    assert product.updated_datetime != last_updated_datetime
+    assert product.updated_date == last_updated_date

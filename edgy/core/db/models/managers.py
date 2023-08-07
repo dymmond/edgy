@@ -5,7 +5,7 @@ from edgy.core.db.querysets.base import QuerySet
 
 class Manager:
     """
-    Base Manager for the Saffier Models.
+    Base Manager for the Edgy Models.
     To create a custom manager, the best approach is to inherit from the ModelManager.
 
     Example:

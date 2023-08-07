@@ -4,6 +4,7 @@ from typing import (
     Dict,
     List,
     Optional,
+    Protocol,
     Sequence,
     Set,
     Tuple,
@@ -11,12 +12,6 @@ from typing import (
     Union,
     runtime_checkable,
 )
-
-try:
-    from typing import Protocol
-except ImportError:  # pragma: nocover
-    from typing_extensions import Protocol  # type: ignore
-
 
 if TYPE_CHECKING:  # pragma: nocover
     from edgy import Model, QuerySet, ReflectModel
@@ -59,10 +54,10 @@ class QuerySetProtocol(Protocol):
     def select_related(self, related: Union[List, str]) -> "QuerySet":
         ...
 
-    def only(self, *fields: Sequence[str]) -> Union[List[EdgyModel], None]:
+    def only(self, *fields: Sequence[str]) -> "QuerySet":
         ...
 
-    def defer(self, *fields: Sequence[str]) -> Union[List[EdgyModel], None]:
+    def defer(self, *fields: Sequence[str]) -> "QuerySet":
         ...
 
     async def exists(self) -> bool:
@@ -80,10 +75,10 @@ class QuerySetProtocol(Protocol):
     async def get(self, **kwargs: Any) -> EdgyModel:
         ...
 
-    async def first(self, **kwargs: Any) -> EdgyModel:
+    async def first(self, **kwargs: Any) -> Union[EdgyModel, None]:
         ...
 
-    async def last(self, **kwargs: Any) -> EdgyModel:
+    async def last(self, **kwargs: Any) -> Union[EdgyModel, None]:
         ...
 
     async def create(self, **kwargs: Any) -> EdgyModel:
@@ -98,7 +93,7 @@ class QuerySetProtocol(Protocol):
     async def delete(self) -> None:
         ...
 
-    async def update(self, **kwargs: Any) -> int:
+    async def update(self, **kwargs: Any) -> None:
         ...
 
     async def values(

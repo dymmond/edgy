@@ -1,19 +1,19 @@
 # Contributing
 
-Thank you for showing interes in contributing to EdgyORM. There are many ways you can help and contribute to the
+Thank you for showing interes in contributing to Edgy. There are many ways you can help and contribute to the
 project.
 
-* Try EdgyORM and [report bugs and issues](https://github.com/tarsil/edgy/issues/new) you find.
+* Try Edgy and [report bugs and issues](https://github.com/tarsil/edgy/issues/new) you find.
 * [Implement new features](https://github.com/tarsil/edgy/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
 * Help othes by [reviewing pull requests](https://github.com/tarsil/edgy/pulls)
 * Help writting documentation
 * Use the discussions and actively participate on them.
-* Become an contributor by helping EdgyORM growing and spread the words across small, medium, large or any company
+* Become an contributor by helping Edgy growing and spread the words across small, medium, large or any company
 size.
 
 ## Reporting possible bugs and issues
 
-It is natural that you might find something that EdgyORM should support or even experience some sorte of unexpected
+It is natural that you might find something that Edgy should support or even experience some sorte of unexpected
 behaviour that needs addressing.
 
 The way we love doing things is very simple, contributions should start out with a
@@ -37,7 +37,7 @@ it clear to understand and get the required help.
 
 ## Development
 
-To develop for EdgyORM, create a fork of the [EdgyORM repository](https://github.com/tarsil/edgy) on GitHub.
+To develop for Edgy, create a fork of the [Edgy repository](https://github.com/tarsil/edgy) on GitHub.
 
 After, clone your fork with the follow command replacing `YOUR-USERNAME` wih your GitHub username:
 
@@ -68,7 +68,7 @@ To run the tests, use:
 $ scripts/test
 ```
 
-Because EdgyORM uses pytest, any additional arguments will be passed. More info within the
+Because Edgy uses pytest, any additional arguments will be passed. More info within the
 [pytest documentation](https://docs.pytest.org/en/latest/how-to/usage.html)
 
 For example, to run a single test_script:
@@ -80,7 +80,7 @@ $ scripts/test tests/test_apiviews.py
 To run the linting, use:
 
 ```shell
-$ scripts/format
+$ scripts/lint
 ```
 
 ### Documentation
@@ -93,7 +93,7 @@ To start the docs, run:
 $ scripts/docs
 ```
 
-## Building EdgyORM
+## Building Edgy
 
 To build a package locally, run:
 
@@ -111,9 +111,9 @@ It will install the requirements and create a local build in your virtual enviro
 
 ## Releasing
 
-*This section is for the maintainers of `EdgyORM`*.
+*This section is for the maintainers of `Edgy`*.
 
-### Building the EdgyORM for release
+### Building the Edgy for release
 
 Before releasing a new package into production some considerations need to be taken into account.
 
