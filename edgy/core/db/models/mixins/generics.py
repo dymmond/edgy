@@ -18,7 +18,7 @@ class DeclarativeMixin(BaseModel):
     @classmethod
     def generate_model_declarative(cls) -> Any:
         """
-        Transforms a core Saffier table into a Declarative model table.
+        Transforms a core Edgy table into a Declarative model table.
         """
         Base = cls.meta.registry.declarative_base
 

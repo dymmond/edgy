@@ -9,7 +9,7 @@ from pathlib import Path
 from esmerald import Esmerald, Include
 
 import edgy
-from edgy import Database, Registry, SaffierExtra
+from edgy import Database, EdgyExtra, Registry
 
 database = Database("sqlite:///db.sqlite")
 registry = Registry(database)
@@ -44,7 +44,7 @@ def get_application():
         routes=[Include(namespace="my_project.urls")],
     )
 
-    SaffierExtra(app=app, registry=registry)
+    EdgyExtra()(app=app, registry=registry)
     return app
 
 

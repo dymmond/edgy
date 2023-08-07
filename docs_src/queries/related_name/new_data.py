@@ -13,5 +13,5 @@ await Member.query.create(team=blue_team, email="snoopy@blueteam.com")
 monica = await Member.query.create(team=green_team, email="monica@blueteam.com")
 
 # New data
-user = await User.query.create(member=monica, name="Saffier")
+user = await User.query.create(member=monica, name="Edgy")
 profile = await Profile.query.create(user=user, profile_type="admin")

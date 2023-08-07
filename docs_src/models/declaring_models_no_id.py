@@ -9,7 +9,7 @@ class User(edgy.Model):
     """
     The user model representation.
 
-    The `id` is not provided and Saffier will automatically
+    The `id` is not provided and Edgy will automatically
     generate a primary_key `id` BigIntegerField.
     """
 

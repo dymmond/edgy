@@ -1,10 +1,10 @@
 from typing import Optional
 
-from edgy import SaffierSettings
+from edgy import EdgySettings
 from edgy.conf.enums import EnvironmentType
 
 
-class MyCustomSettings(SaffierSettings):
+class MyCustomSettings(EdgySettings):
     """
     My settings overriding default values and add new ones.
     """

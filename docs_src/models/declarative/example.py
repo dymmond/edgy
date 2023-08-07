@@ -5,7 +5,7 @@ database = Database("sqlite:///db.sqlite")
 models = Registry(database=database)
 
 
-# Declare the Saffier model
+# Declare the Edgy model
 
 
 class User(edgy.Model):

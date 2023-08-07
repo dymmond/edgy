@@ -20,7 +20,7 @@ class User(edgy.Model):
 # The migrations for you
 await models.create_all()  # noqa
 
-await User.query.create(name="Saffier", email="foo@bar.com")  # noqa
+await User.query.create(name="Edgy", email="foo@bar.com")  # noqa
 
 user = await User.query.get(id=1)  # noqa
 # User(id=1)

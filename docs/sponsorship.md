@@ -1,13 +1,13 @@
-# Help EdgyORM
+# Help Edgy
 
-Do you like **EdgyORM** and would like to help EdgyORM, other userd and the author?
+Do you like **Edgy** and would like to help Edgy, other userd and the author?
 
-## 🐦 Follow EdgyORM on Twitter
+## 🐦 Follow Edgy on Twitter
 
 
-## ⭐ Star **EdgyORM** on GitHub
+## ⭐ Star **Edgy** on GitHub
 
-Giving a start to EdgyORM is very simple and helps promoting the work across the developers around the world.
+Giving a start to Edgy is very simple and helps promoting the work across the developers around the world.
 
 The button is located at the top right.
 
@@ -17,12 +17,12 @@ This will help spreading the word about the tool and how helpful has been.
 
 ## 👀 Follow the GitHub repo
 
-Following the GitHub repo will allow you to "watch" for any new release of EdgyORM and be always up to date.
+Following the GitHub repo will allow you to "watch" for any new release of Edgy and be always up to date.
 
 You can click on "***watch***" and select "***custom***" -> "***Releases***"or any other you may find particular
 interesting to you.
 
-## 💬 Join the official EdgyORM discord channel
+## 💬 Join the official Edgy discord channel
 
 ## 🔥 Sponsor the author
 

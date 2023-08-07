@@ -34,10 +34,10 @@ class User(edgy.Model):
 await models.create_all()  # noqa
 
 # Create an inactive user
-await User.query.create(name="Saffier", email="foo@bar.com", is_active=False)  # noqa
+await User.query.create(name="Edgy", email="foo@bar.com", is_active=False)  # noqa
 
 # You can also create a user using the new manager
-await User.inactives.create(name="Another Saffier", email="bar@foo.com", is_active=False)  # noqa
+await User.inactives.create(name="Another Edgy", email="bar@foo.com", is_active=False)  # noqa
 
 # Querying using the new manager
 user = await User.inactives.get(email="foo@bar.com")  # noqa
@@ -47,7 +47,7 @@ user = await User.inactives.get(email="bar@foo.com")  # noqa
 # User(id=2)
 
 # Create a user using the default manager
-await User.query.create(name="Saffier", email="user@edgy.com")  # noqa
+await User.query.create(name="Edgy", email="user@edgy.com")  # noqa
 
 # Querying all inactives only
 users = await User.inactives.all()  # noqa
