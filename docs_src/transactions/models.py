@@ -12,15 +12,15 @@ class User(edgy.Model):
     a "users" table for you.
     """
 
-    email = edgy.EmailField(unique=True, max_length=120)
-    is_active = edgy.BooleanField(default=False)
+    email: str = edgy.EmailField(unique=True, max_length=120)
+    is_active: bool = edgy.BooleanField(default=False)
 
     class Meta:
         registry = models
 
 
 class Profile(edgy.Model):
-    user = edgy.ForeignKey(User, on_delete=edgy.CASCADE)
+    user: User = edgy.ForeignKey(User, on_delete=edgy.CASCADE)
 
     class Meta:
         registry = models

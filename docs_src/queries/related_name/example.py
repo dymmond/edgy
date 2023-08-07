@@ -6,15 +6,15 @@ models = Registry(database=database)
 
 
 class Organisation(edgy.Model):
-    ident = edgy.CharField(max_length=100)
+    ident: str = edgy.CharField(max_length=100)
 
     class Meta:
         registry = models
 
 
 class Team(edgy.Model):
-    org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT)
-    name = edgy.CharField(max_length=100)
+    org: Organisation = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT)
+    name: str = edgy.CharField(max_length=100)
 
     class Meta:
         registry = models

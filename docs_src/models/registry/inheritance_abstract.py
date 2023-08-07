@@ -16,10 +16,10 @@ class BaseModel(edgy.Model):
 
 
 class User(BaseModel):
-    name = edgy.CharField(max_length=255)
-    is_active = edgy.BooleanField(default=True)
+    name: str = edgy.CharField(max_length=255)
+    is_active: bool = edgy.BooleanField(default=True)
 
 
 class Product(BaseModel):
-    user = edgy.ForeignKey(User, null=False, on_delete=edgy.CASCADE)
-    sku = edgy.CharField(max_length=255, null=False)
+    user: User = edgy.ForeignKey(User, null=False, on_delete=edgy.CASCADE)
+    sku: str = edgy.CharField(max_length=255, null=False)

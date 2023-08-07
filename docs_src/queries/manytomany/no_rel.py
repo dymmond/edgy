@@ -1,3 +1,5 @@
+from typing import List
+
 import edgy
 from edgy import Database, Registry
 
@@ -6,15 +8,15 @@ models = Registry(database=database)
 
 
 class Team(edgy.Model):
-    name = edgy.CharField(max_length=100)
+    name: str = edgy.CharField(max_length=100)
 
     class Meta:
         registry = models
 
 
 class Organisation(edgy.Model):
-    ident = edgy.CharField(max_length=100)
-    teams = edgy.ManyToManyField(Team)
+    ident: str = edgy.CharField(max_length=100)
+    teams: List[Team] = edgy.ManyToManyField(Team)
 
     class Meta:
         registry = models

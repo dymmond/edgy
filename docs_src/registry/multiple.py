@@ -16,7 +16,7 @@ models = MyRegistry(database=database)
 
 
 class User(edgy.Model):
-    is_active = edgy.BooleanField(default=False)
+    is_active: bool = edgy.BooleanField(default=False)
 
     class Meta:
         registry = models
@@ -27,7 +27,7 @@ another_registry = MyRegistry(another_db=another_db)
 
 
 class Profile(edgy.Model):
-    is_active = edgy.BooleanField(default=False)
+    is_active: bool = edgy.BooleanField(default=False)
 
     class Meta:
         registry = another_registry

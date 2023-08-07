@@ -6,7 +6,7 @@ from pathlib import Path
 from my_project.utils import get_db_connection
 from starlette.applications import Starlette
 
-from edgy.migrations import Migrate
+from edgy import Migrate
 
 
 def build_path():

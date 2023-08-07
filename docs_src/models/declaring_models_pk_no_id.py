@@ -8,9 +8,9 @@ models = Registry(database=database)
 
 
 class User(edgy.Model):
-    name = edgy.CharField(max_length=255, primary_key=True, default=str(uuid.uuid4))
-    age = edgy.IntegerField(minimum=18)
-    is_active = edgy.BooleanField(default=True)
+    name: str = edgy.CharField(max_length=255, primary_key=True, default=str(uuid.uuid4))
+    age: int = edgy.IntegerField(minimum=18)
+    is_active: bool = edgy.BooleanField(default=True)
 
     class Meta:
         registry = models

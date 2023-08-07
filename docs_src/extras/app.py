@@ -16,8 +16,8 @@ registry = Registry(database)
 
 
 class CustomModel(edgy.Model):
-    name = edgy.CharField(max_length=255)
-    email = edgy.EmailField(max_length=255)
+    name: str = edgy.CharField(max_length=255)
+    email: str = edgy.EmailField(max_length=255)
 
     class Meta:
         registry = registry

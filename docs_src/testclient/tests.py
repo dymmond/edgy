@@ -2,13 +2,18 @@ import datetime
 import decimal
 import ipaddress
 import uuid
+from datetime import date as local_date
+from datetime import datetime as local_datetime
+from datetime import time as local_time
 from enum import Enum
+from typing import Any, Dict
+from uuid import UUID
 
 import pytest
 from tests.settings import DATABASE_URL
 
 import edgy
-from edgy.db.models import fields
+from edgy.core.db import fields
 from edgy.testclient import DatabaseTestClient
 
 database = DatabaseTestClient(DATABASE_URL, drop_database=True)
@@ -27,40 +32,40 @@ class StatusEnum(Enum):
 
 
 class Product(edgy.Model):
-    id = fields.IntegerField(primary_key=True)
-    uuid = fields.UUIDField(null=True)
-    created = fields.DateTimeField(default=datetime.datetime.now)
-    created_day = fields.DateField(default=datetime.date.today)
-    created_time = fields.TimeField(default=time)
-    created_date = fields.DateField(auto_now_add=True)
-    created_datetime = fields.DateTimeField(auto_now_add=True)
-    updated_datetime = fields.DateTimeField(auto_now=True)
-    updated_date = fields.DateField(auto_now=True)
-    data = fields.JSONField(default={})
-    description = fields.CharField(blank=True, max_length=255)
-    huge_number = fields.BigIntegerField(default=0)
-    price = fields.DecimalField(max_digits=5, decimal_places=2, null=True)
-    status = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
-    value = fields.FloatField(null=True)
+    id: int = fields.IntegerField(primary_key=True)
+    uuid: UUID = fields.UUIDField(null=True)
+    created: local_datetime = fields.DateTimeField(default=datetime.datetime.now)
+    created_day: local_date = fields.DateField(default=datetime.date.today)
+    created_time: local_time = fields.TimeField(default=time)
+    created_date: local_date = fields.DateField(auto_now_add=True)
+    created_datetime: local_datetime = fields.DateTimeField(auto_now_add=True)
+    updated_datetime: local_datetime = fields.DateTimeField(auto_now=True)
+    updated_date: local_date = fields.DateField(auto_now=True)
+    data: Dict[str, Any] = fields.JSONField(default={})
+    description: str = fields.CharField(blank=True, max_length=255)
+    huge_number: int = fields.BigIntegerField(default=0)
+    price: decimal.Decimal = fields.DecimalField(max_digits=5, decimal_places=2, null=True)
+    status: Enum = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
+    value: float = fields.FloatField(null=True)
 
     class Meta:
         registry = models
 
 
 class User(edgy.Model):
-    id = fields.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = fields.CharField(null=True, max_length=16)
-    email = fields.EmailField(null=True, max_length=256)
-    ipaddress = fields.IPAddressField(null=True)
-    url = fields.URLField(null=True, max_length=2048)
-    password = fields.PasswordField(null=True, max_length=255)
+    id: int = fields.UUIDField(primary_key=True, default=uuid.uuid4)
+    name: str = fields.CharField(null=True, max_length=16)
+    email: str = fields.EmailField(null=True, max_length=256)
+    ipaddress: str = fields.IPAddressField(null=True)
+    url: str = fields.URLField(null=True, max_length=2048)
+    password: str = fields.PasswordField(null=True, max_length=255)
 
     class Meta:
         registry = models
 
 
 class Customer(edgy.Model):
-    name = fields.CharField(null=True, max_length=16)
+    name: str = fields.CharField(null=True, max_length=16)
 
     class Meta:
         registry = models

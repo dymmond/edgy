@@ -12,8 +12,8 @@ class User(edgy.Model):
     a "users" table for you.
     """
 
-    id = edgy.IntegerField(primary_key=True)
-    is_active = edgy.BooleanField(default=False)
+    id: int = edgy.IntegerField(primary_key=True)
+    is_active: bool = edgy.BooleanField(default=False)
 
     class Meta:
         registry = models

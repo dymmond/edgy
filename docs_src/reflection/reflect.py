@@ -6,8 +6,8 @@ models = Registry(database=database)
 
 
 class User(edgy.ReflectModel):
-    age = edgy.IntegerField(minimum=18)
-    is_active = edgy.BooleanField(default=True)
+    age: int = edgy.IntegerField(minimum=18)
+    is_active: bool = edgy.BooleanField(default=True)
 
     class Meta:
         tablename = "users"

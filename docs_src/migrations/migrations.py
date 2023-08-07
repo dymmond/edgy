@@ -9,7 +9,7 @@ from pathlib import Path
 from esmerald import Esmerald, Include
 from my_project.utils import get_db_connection
 
-from edgy.migrations import Migrate
+from edgy import Migrate
 
 
 def build_path():

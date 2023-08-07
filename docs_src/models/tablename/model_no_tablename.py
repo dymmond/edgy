@@ -13,8 +13,8 @@ class User(edgy.Model):
     This table will be called in the database `users`.
     """
 
-    name = edgy.CharField(max_length=255)
-    is_active = edgy.BooleanField(default=True)
+    name: str = edgy.CharField(max_length=255)
+    is_active: bool = edgy.BooleanField(default=True)
 
     class Meta:
         registry = models

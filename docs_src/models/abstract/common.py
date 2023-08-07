@@ -8,8 +8,8 @@ models = Registry(database=database)
 
 
 class BaseModel(edgy.Model):
-    id = edgy.UUIDField(primary_key=True, default=uuid.uuid4)
-    name = edgy.CharField(max_length=255)
+    id: uuid.UUID = edgy.UUIDField(primary_key=True, default=uuid.uuid4)
+    name: str = edgy.CharField(max_length=255)
 
     class Meta:
         abstract = True
@@ -28,8 +28,8 @@ class User(BaseModel):
     as well as the Meta data.
     """
 
-    phone_number = edgy.CharField(max_length=15)
-    description = edgy.TextField()
+    phone_number: str = edgy.CharField(max_length=15)
+    description: str = edgy.TextField()
 
     def transform_phone_number(self):
         # logic here for the phone number
@@ -42,8 +42,8 @@ class Product(BaseModel):
     as well as the Meta data.
     """
 
-    sku = edgy.CharField(max_length=255)
-    description = edgy.TextField()
+    sku: str = edgy.CharField(max_length=255)
+    description: str = edgy.TextField()
 
     def get_sku(self):
         # Logic to obtain the SKU

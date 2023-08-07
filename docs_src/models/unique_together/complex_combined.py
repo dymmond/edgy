@@ -6,11 +6,11 @@ models = Registry(database=database)
 
 
 class User(edgy.Model):
-    name = edgy.CharField(max_length=255)
-    email = edgy.EmailField(max_length=70)
-    phone_number = edgy.CharField(max_length=15)
-    address = edgy.CharField(max_length=500)
-    is_active = edgy.BooleanField(default=True)
+    name: str = edgy.CharField(max_length=255)
+    email: str = edgy.EmailField(max_length=70)
+    phone_number: str = edgy.CharField(max_length=15)
+    address: str = edgy.CharField(max_length=500)
+    is_active: bool = edgy.BooleanField(default=True)
 
     class Meta:
         registry = models
