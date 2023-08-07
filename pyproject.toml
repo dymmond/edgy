@@ -70,7 +70,7 @@ Funding = "https://github.com/sponsors/tarsil"
 Source = "https://github.com/tarsil/edgy"
 
 [project.scripts]
-edgy = "edgy.cli.cli:edgy_cli"
+edgy = "edgy.__main__:run_cli"
 
 [project.optional-dependencies]
 test = [
