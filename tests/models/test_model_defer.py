@@ -60,7 +60,7 @@ async def test_model_defer_attribute_error():
         john.description  # noqa
 
 
-async def xtest_model_defer_with_all():
+async def test_model_defer_with_all():
     await User.query.create(name="John", language="PT")
     await User.query.create(name="Jane", language="EN", description="Another simple description")
 
@@ -69,13 +69,17 @@ async def xtest_model_defer_with_all():
     assert len(users) == 2
 
 
-async def xtest_model_defer_with_filter():
+async def test_model_defer_with_filter():
     await User.query.create(name="John", language="PT")
     await User.query.create(name="Jane", language="EN", description="Another simple description")
 
     users = await User.query.filter(pk=1).defer("name", "language")
 
     assert len(users) == 1
+
+    user = users[0]
+
+    assert user.model_dump() == {"id": 1, "description": None}
 
     users = await User.query.filter(id=2).defer("name", "language")
 
@@ -86,7 +90,7 @@ async def xtest_model_defer_with_filter():
     assert len(users) == 0
 
 
-async def xtest_model_defer_with_exclude():
+async def test_model_defer_with_exclude():
     await User.query.create(name="John", language="PT")
     await User.query.create(name="Jane", language="EN", description="Another simple description")
 
@@ -103,7 +107,7 @@ async def xtest_model_defer_with_exclude():
     assert len(users) == 0
 
 
-async def xtest_model_defer_save():
+async def test_model_defer_save():
     await User.query.create(name="John", language="PT")
 
     user = await User.query.filter(pk=1).defer("name", "language").get()
@@ -118,7 +122,7 @@ async def xtest_model_defer_save():
     assert user.language == "EN"
 
 
-async def xtest_model_defer_save_without_nullable_field():
+async def test_model_defer_save_without_nullable_field():
     user = await User.query.create(name="John", language="PT", description="John")
 
     assert user.description == "John"
