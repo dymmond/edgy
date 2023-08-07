@@ -73,9 +73,6 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class.meta.multi_related[0]
 
-        if self._only and self._defer:
-            raise QuerySetError("You cannot use .only() and .defer() at the same time.")
-
     def build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
         order_by = list(map(self.prepare_order_by, order_by))
@@ -187,10 +184,16 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
 
         return tables, select_from
 
+    def validate_only_and_defer(self) -> None:
+        if self._only and self._defer:
+            raise QuerySetError("You cannot use .only() and .defer() at the same time.")
+
     def build_select(self) -> Any:
         """
         Builds the query select based on the given parameters and filters.
         """
+        self.validate_only_and_defer()
+
         tables, select_from = self.build_tables_select_from_relationship()
         expression = sqlalchemy.sql.select(*tables)
         expression = expression.select_from(select_from)

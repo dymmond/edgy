@@ -149,11 +149,35 @@ generates the name of the table for you by pluralising the class name.
 
 {! ../docs_src/shared/notes.md !}
 
+## `Esmerald` ecosystem
+
+This does not mean that only works with Esmerald! Edgy is also framework agnostic but the author
+of Edgy is the same of Saffier and Esmerald which makes it nicer to integrate directly with Esmerald.
+
+How could you integrate `Edgy` with Esmerald (or any other framework)?
+
+Let us see an example. Since Edgy is fully Pydantic that means we can perform tasks directly.
+
+```python hl_lines="28"
+{!> ../docs_src/quickstart/esmerald.py!}
+```
+
+The response of the API `/create` should have a format similar to this (assuming the post with the following payload as well):
+
+```json
+{
+    "id": 1,
+    "name": "Edgy",
+    "email": "edgy@esmerald.dev",
+    "language": "EN",
+    "description": "A description",
+}
+```
+
 ## Connect your application
 
 Do you want to have more complex structures and connect to your favourite framework? Have a look
 at [connections](./connection.md) to understand how to do it properly.
-
 
 **All the examples of this documentation will be using field typing but it is up to you if you want to use them or not.**
 

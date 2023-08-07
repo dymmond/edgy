@@ -49,8 +49,8 @@ class User(edgy.Model):
 
 @post("/create")
 async def create_user(data: User) -> User:
-    await data.save()
-    return data.model_dump()
+    user = await data.save()
+    return user
 
 
 @pytest.fixture()

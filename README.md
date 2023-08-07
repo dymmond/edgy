@@ -253,6 +253,66 @@ It does not matter if you type or not, Edgy knows what and how to validate via `
 Do you want to have more complex structures and connect to your favourite framework? Have a look
 at [connections](./connection.md) to understand how to do it properly.
 
+## `Esmerald` ecosystem
+
+This does not mean that only works with Esmerald! Edgy is also framework agnostic but the author
+of Edgy is the same of Saffier and Esmerald which makes it nicer to integrate directly with Esmerald.
+
+How could you integrate `Edgy` with Esmerald (or any other framework)?
+
+Let us see an example. Since Edgy is fully Pydantic that means we can perform tasks directly.
+
+```python
+from esmerald import Esmerald, Gateway, post
+
+import edgy
+from edgy.testclient import DatabaseTestClient as Database
+
+database = Database("sqlite:///db.sqlite")
+models = edgy.Registry(database=database)
+
+
+class User(edgy.Model):
+    id: int = edgy.IntegerField(primary_key=True)
+    name: str = edgy.CharField(max_length=100)
+    email: str = edgy.EmailField(max_length=100)
+    language: str = edgy.CharField(max_length=200, null=True)
+    description: str = edgy.TextField(max_length=5000, null=True)
+
+    class Meta:
+        registry = models
+
+
+@post("/create")
+async def create_user(data: User) -> User:
+    """
+    You can perform the same directly like this
+    as the validations for the model (nulls, mandatories, @field_validators)
+    already did all the necessary checks defined by you.
+    """
+    user = await data.save()
+    return user
+
+
+app = Esmerald(
+    routes=[Gateway(handler=create_user)],
+    on_startup=[database.connect],
+    on_shutdown=[database.disconnect],
+)
+
+```
+
+The response of the API `/create` should have a format similar to this (assuming the post with the following payload as well):
+
+```json
+{
+    "id": 1,
+    "name": "Edgy",
+    "email": "edgy@esmerald.dev",
+    "language": "EN",
+    "description": "A description",
+}
+```
 
 **All the examples of this documentation will be using field typing but it is up to you if you want to use them or not.**
 
