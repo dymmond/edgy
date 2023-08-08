@@ -391,7 +391,6 @@ The `values()` can also be combined with `filter`, `only`, `exclude` as per usua
 * **exclude** - Fields to exclude from the return.
 * **exclude_none** - Boolean flag indicating if the fields with `None` should be excluded.
 
-
 ### Values list
 
 Returns the model results in a tuple like format.
