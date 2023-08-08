@@ -399,9 +399,9 @@ class BaseModelMeta(ModelMetaclass):
         # And mapped contains the main proxy_model
         if not new_class.is_proxy_model and not new_class.meta.abstract:
             proxy_model = new_class.generate_proxy_model()
-            new_class.proxy_model = proxy_model
-            new_class.proxy_model.parent = new_class
-            new_class.proxy_model.model_rebuild(force=True)
+            new_class.__proxy_model__ = proxy_model
+            new_class.__proxy_model__.parent = new_class
+            new_class.__proxy_model__.model_rebuild(force=True)
             meta.registry.models[new_class.__name__] = new_class  # type: ignore
 
         new_class.model_rebuild(force=True)
@@ -420,6 +420,13 @@ class BaseModelMeta(ModelMetaclass):
             if table.name.lower() != cls.meta.tablename:
                 cls._table = cls.build()
         return cls._table
+
+    @property
+    def proxy_model(cls) -> Any:
+        """
+        Returns the proxy_model from the Model when called using the cache.
+        """
+        return cls.__proxy_model__
 
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:

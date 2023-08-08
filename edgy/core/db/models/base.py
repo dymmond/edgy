@@ -30,13 +30,13 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     """
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
-    proxy_model: ClassVar[Union[Type[Self], None]]
     parent: ClassVar[Union[Type[Self], None]]
     is_proxy_model: ClassVar[bool] = False
 
     query: ClassVar[Manager] = Manager()
     meta: ClassVar[MetaInfo] = MetaInfo(None)
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
+    __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
 
@@ -87,6 +87,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return f"{self.__class__.__name__}({self.pkname}={self.pk})"
 
     @cached_property
+    def proxy_model(self) -> Any:
+        return self.__class__.proxy_model
+
+    @cached_property
     def table(self) -> sqlalchemy.Table:
         return cast("sqlalchemy.Table", self.__class__.table)
 
@@ -96,6 +100,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         Generates a proxy model for each model. This proxy model is a simple
         shallow copy of the original model being generated.
         """
+        if cls.__proxy_model__:
+            return cls.__proxy_model__
+
         fields = {key: copy.copy(field) for key, field in cls.fields.items()}
         proxy_model = ProxyModel(
             name=cls.__name__,
