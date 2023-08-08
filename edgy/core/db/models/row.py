@@ -93,7 +93,7 @@ class ModelRow(EdgyBaseModel):
 
             # We need to generify the model fields to make sure we can populate the
             # model without mandatory fields
-            return cast("Type[Model]", cls.proxy_model(**item))  # type: ignore
+            return cast("Type[Model]", cls.proxy_model(**item))
         else:
             # Pull out the regular column values.
             for column in cls.table.columns:

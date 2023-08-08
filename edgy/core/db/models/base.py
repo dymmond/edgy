@@ -87,7 +87,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return f"{self.__class__.__name__}({self.pkname}={self.pk})"
 
     @cached_property
-    def proxy_model(self):
+    def proxy_model(self) -> Any:
         return self.__class__.proxy_model
 
     @cached_property
