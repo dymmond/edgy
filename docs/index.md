@@ -34,7 +34,7 @@
 
 From the same author of [Saffier][saffier], Edgy is also an ORM but different from its predecessor.
 Saffier is more of a Generic ORM for probably 99.9% of every single day application and works
-perfectly well with is, whereas **Edgy** is also that and more.
+perfectly well with it, whereas **Edgy** is also that and more.
 
 Edgy comes with batteries included thanks to Pydantic so that means your [models][models] are 100%
 Pydantic which also means you get all the benefits of the technology (like automatic validations...)
