@@ -80,11 +80,6 @@ class BaseField(FieldInfo, _repr.Representation):
         self.registry: Registry = kwargs.pop("registry", None)
         self.comment = kwargs.pop("comment", None)
 
-        # Foreign keys
-        kwargs.pop("is_m2m", False)
-        kwargs.pop("is_o2o", False)
-        kwargs.pop("is_fk", False)
-
         if self.primary_key:
             default_value = default
             self.raise_for_non_default(default=default_value)

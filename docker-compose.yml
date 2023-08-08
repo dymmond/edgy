@@ -2,7 +2,7 @@ version: "3.8"
 services:
   db:
     restart: always
-    image: postgres:12.3
+    image: postgres:15.3
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
       POSTGRES_USER: "postgres"
@@ -14,14 +14,6 @@ services:
       - "edgy:/var/lib/postgresql/data"
     ports:
       - "5432:5432"
-
-  redis:
-    restart: always
-    image: redis:latest
-    ports:
-      - "6379:6379"
-    expose:
-      - "6379"
 
 volumes:
   edgy:

@@ -22,6 +22,7 @@ from .core import (
     UUIDField,
 )
 from .foreign_keys import ForeignKey
+from .list_foreign_key import ListForeignKey
 from .many_to_many import ManyToMany, ManyToManyField
 from .one_to_one_keys import OneToOne, OneToOneField
 
@@ -42,6 +43,7 @@ __all__ = [
     "IntegerField",
     "IPAddressField",
     "JSONField",
+    "ListForeignKey",
     "ManyToMany",
     "ManyToManyField",
     "OneToOne",

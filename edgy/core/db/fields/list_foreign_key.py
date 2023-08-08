@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, List, Optional, TypeVar
 
 import sqlalchemy
 
@@ -19,10 +19,6 @@ terminal = Print()
 
 
 class ForeignKeyFieldFactory:
-    """The base for all model fields to be used with Edgy"""
-
-    _type: Any = None
-
     def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
         cls.validate(**kwargs)
 
@@ -37,7 +33,7 @@ class ForeignKeyFieldFactory:
         server_default: Any = kwargs.pop("server_default", None)
         server_onupdate: Any = kwargs.pop("server_onupdate", None)
         registry: Registry = kwargs.pop("registry", None)
-        field_type = cls._type
+        field_type = List[to]
 
         namespace = dict(
             __type__=field_type,
@@ -57,7 +53,7 @@ class ForeignKeyFieldFactory:
             constraints=cls.get_constraints(),
             **kwargs,
         )
-        Field = type(cls.__name__, (BaseOneToOneKeyField, BaseField), {})
+        Field = type(cls.__name__, (BaseForeignKeyField, BaseField), {})
         return Field(**namespace)  # type: ignore
 
     @classmethod
@@ -78,7 +74,7 @@ class ForeignKeyFieldFactory:
         return []
 
 
-class BaseOneToOneKeyField(BaseForeignKey):
+class BaseForeignKeyField(BaseForeignKey):
     def get_column(self, name: str) -> Any:
         target = self.target
         to_field = target.fields[target.pkname]
@@ -86,25 +82,23 @@ class BaseOneToOneKeyField(BaseForeignKey):
         column_type = to_field.column_type
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}", ondelete=self.on_delete
+                f"{target.meta.tablename}.{target.pkname}",
+                ondelete=self.on_delete,
+                onupdate=self.on_update,
+                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
+                f"_{target.pkname}_{name}",
             )
         ]
-        return sqlalchemy.Column(
-            name,
-            column_type,
-            *constraints,
-            nullable=self.null,
-            unique=True,
-        )
+        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+
+    def check(self, value: Any) -> Any:
+        """
+        Returns a list of foreign keys
+        """
+        return [key.pk for key in value]
 
 
-class OneToOneField(ForeignKeyFieldFactory):
-    """
-    Representation of a one to one field.
-    """
-
-    _type: Any = Any
-
+class ListForeignKey(ForeignKeyFieldFactory):
     def __new__(  # type: ignore
         cls,
         to: "Model",
@@ -136,6 +130,3 @@ class OneToOneField(ForeignKeyFieldFactory):
 
         if on_update and (on_update == SET_NULL and not null):
             raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
-
-
-OneToOne = OneToOneField

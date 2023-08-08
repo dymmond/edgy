@@ -37,9 +37,6 @@ class ForeignKeyFieldFactory:
         server_default: Any = kwargs.pop("server_default", None)
         server_onupdate: Any = kwargs.pop("server_onupdate", None)
         registry: Registry = kwargs.pop("registry", None)
-        is_m2m = kwargs.pop("is_m2m", False)
-        is_o2o = kwargs.pop("is_o2o", False)
-        is_fk = True
         field_type = cls._type
 
         namespace = dict(
@@ -57,9 +54,6 @@ class ForeignKeyFieldFactory:
             through=through,
             registry=registry,
             column_type=field_type,
-            is_m2m=is_m2m,
-            is_o2o=is_o2o,
-            is_fk=is_fk,
             constraints=cls.get_constraints(),
             **kwargs,
         )
