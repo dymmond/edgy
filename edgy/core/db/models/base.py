@@ -36,7 +36,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     query: ClassVar[Manager] = Manager()
     meta: ClassVar[MetaInfo] = MetaInfo(None)
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
-    __proxy_model__: Union[Type[Self], None] = None
+    __proxy_model__: ClassVar[Union[Type[Self], None]] = None
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
 
