@@ -91,9 +91,8 @@ class ModelRow(EdgyBaseModel):
                 if column not in item:
                     item[column] = value
 
-            # # We need to generify the model fields to make sure we can populate the
-            # # model without mandatory fields
-            # partial_fields = {k: copy.copy(v) for k, v in cls.fields.items() if k in item}
+            # We need to generify the model fields to make sure we can populate the
+            # model without mandatory fields
             return cast("Type[Model]", cls.proxy_model(**item))  # type: ignore
         else:
             # Pull out the regular column values.
