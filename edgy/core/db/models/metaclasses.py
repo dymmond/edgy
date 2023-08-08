@@ -423,6 +423,9 @@ class BaseModelMeta(ModelMetaclass):
 
     @property
     def proxy_model(cls) -> Any:
+        """
+        Returns the proxy_model from the Model when called using the cache.
+        """
         return cls.__proxy_model__
 
     @property
