@@ -12,6 +12,8 @@ services:
       - "5432"
     volumes:
       - "edgy:/var/lib/postgresql/data"
+    command: >-
+        --jit=false
     ports:
       - "5432:5432"
 
