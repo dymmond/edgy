@@ -32,7 +32,7 @@ from .core.db.fields import (
 from .core.db.fields.foreign_keys import ForeignKey
 from .core.db.fields.many_to_many import ManyToMany, ManyToManyField
 from .core.db.fields.one_to_one_keys import OneToOne, OneToOneField
-from .core.db.models import Model, ReflectModel
+from .core.db.models import Model, ModelRef, ReflectModel
 from .core.db.models.managers import Manager
 from .core.db.querysets import QuerySet
 from .core.extras import EdgyExtra
@@ -65,6 +65,7 @@ __all__ = [
     "ManyToManyField",
     "Migrate",
     "Model",
+    "ModelRef",
     "MultipleObjectsReturned",
     "ObjectNotFound",
     "OneToOne",

@@ -50,6 +50,18 @@ class DateParser:
 
 
 class ModelParser:
+    def extract_model_references(
+        self, extracted_values: Any, model_class: Optional[Type["Model"]]
+    ) -> Any:
+        """
+        Exracts any possible model references from the EdgyModel and returns a dictionary.
+        """
+        model_references = {
+            name: extracted_values.get(name, None)
+            for name in model_class.meta.model_references.keys()  # type: ignore
+        }
+        return model_references
+
     def extract_values_from_field(
         self, extracted_values: Any, model_class: Optional[Type["Model"]] = None
     ) -> Any:
@@ -73,6 +85,10 @@ class ModelParser:
             item = extracted_values[name]
             value = field.check(item) if hasattr(field, "check") else None
             validated[name] = value
+
+        # Update with any ModelRef
+        if hasattr(model_class, "meta"):
+            validated.update(self.extract_model_references(extracted_values, model_class))
         return validated
 
     def extract_db_fields_from_model(self, model_class: Type["Model"]) -> Dict[Any, Any]:

@@ -1,15 +1,15 @@
-from typing import TYPE_CHECKING, Any, List, Optional, TypeVar
-
-import sqlalchemy
+from functools import cached_property
+from typing import TYPE_CHECKING, Any, TypeVar
 
 from edgy.core.connection.registry import Registry
-from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL
+from edgy.core.db.constants import CASCADE, RESTRICT
 from edgy.core.db.fields._base_fk import BaseField, BaseForeignKey
 from edgy.core.terminal import Print
-from edgy.exceptions import FieldDefinitionError
+from edgy.exceptions import ModelReferenceError
 
 if TYPE_CHECKING:
     from edgy import Model
+    from edgy.core.db.models.model_reference import ModelRef
 
 T = TypeVar("T", bound="Model")
 
@@ -33,7 +33,7 @@ class ForeignKeyFieldFactory:
         server_default: Any = kwargs.pop("server_default", None)
         server_onupdate: Any = kwargs.pop("server_onupdate", None)
         registry: Registry = kwargs.pop("registry", None)
-        field_type = List[to]
+        field_type = list
 
         namespace = dict(
             __type__=field_type,
@@ -53,7 +53,7 @@ class ForeignKeyFieldFactory:
             constraints=cls.get_constraints(),
             **kwargs,
         )
-        Field = type(cls.__name__, (BaseForeignKeyField, BaseField), {})
+        Field = type(cls.__name__, (BaseListForeignKeyField, BaseField), {})
         return Field(**namespace)  # type: ignore
 
     @classmethod
@@ -74,59 +74,36 @@ class ForeignKeyFieldFactory:
         return []
 
 
-class BaseForeignKeyField(BaseForeignKey):
-    def get_column(self, name: str) -> Any:
-        target = self.target
-        to_field = target.fields[target.pkname]
+class BaseListForeignKeyField(BaseForeignKey):
+    @cached_property
+    def target(self) -> Any:
+        """
+        The target of the ForeignKey model.
+        """
+        from edgy.core.db.models.model_reference import ModelRef
 
-        column_type = to_field.column_type
-        constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}",
-                ondelete=self.on_delete,
-                onupdate=self.on_update,
-                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
-                f"_{target.pkname}_{name}",
+        if not issubclass(self.to, ModelRef):
+            raise ModelReferenceError(
+                detail="A model reference must be an object of type ModelRef"
             )
-        ]
-        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+        if not hasattr(self, "_target"):
+            if isinstance(self.to.__model__, str):
+                self._target = self.registry.models[self.to.__model__]  # type: ignore
+            else:
+                self._target = self.to.__model__
 
-    def check(self, value: Any) -> Any:
-        """
-        Returns a list of foreign keys
-        """
-        return [key.pk for key in value]
+        self.to.__model__ = self._target
+        return self._target
 
 
-class ListForeignKey(ForeignKeyFieldFactory):
+class ListForeignKey(ForeignKeyFieldFactory, list):
     def __new__(  # type: ignore
         cls,
-        to: "Model",
-        *,
+        to: "ModelRef",
         null: bool = False,
-        on_update: Optional[str] = CASCADE,
-        on_delete: Optional[str] = RESTRICT,
-        related_name: Optional[str] = None,
-        **kwargs: Any,
     ) -> BaseField:
         kwargs = {
-            **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
 
         return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        on_delete = kwargs.get("on_delete", None)
-        on_update = kwargs.get("on_update", None)
-        null = kwargs.get("null")
-
-        if on_delete is None:
-            raise FieldDefinitionError("on_delete must not be null")
-
-        if on_delete == SET_NULL and not null:
-            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
-
-        if on_update and (on_update == SET_NULL and not null):
-            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")

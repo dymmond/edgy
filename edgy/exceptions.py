@@ -55,5 +55,9 @@ class QuerySetError(EdgyException):
     ...
 
 
+class ModelReferenceError(EdgyException):
+    ...
+
+
 class CommandEnvironmentError(EdgyException):
     ...

@@ -168,7 +168,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
     def update_from_dict(self, dict_values: Dict[str, Any]) -> Self:
-        """Updates the current model object with the new fields"""
+        """Updates the current model object with the new fields and possible model_references"""
         for key, value in dict_values.items():
             setattr(self, key, value)
         return self
