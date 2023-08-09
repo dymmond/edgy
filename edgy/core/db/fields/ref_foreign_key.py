@@ -58,7 +58,7 @@ class ForeignKeyFieldFactory:
             constraints=cls.get_constraints(),
             **kwargs,
         )
-        Field = type(cls.__name__, (BaseListForeignKeyField, BaseField), {})
+        Field = type(cls.__name__, (BaseRefForeignKeyField, BaseField), {})
         return Field(**namespace)  # type: ignore
 
     @classmethod
@@ -79,7 +79,7 @@ class ForeignKeyFieldFactory:
         return []
 
 
-class BaseListForeignKeyField(BaseForeignKey):
+class BaseRefForeignKeyField(BaseForeignKey):
     @cached_property
     def target(self) -> Any:
         """
@@ -95,7 +95,7 @@ class BaseListForeignKeyField(BaseForeignKey):
         return self._target
 
 
-class ListForeignKey(ForeignKeyFieldFactory, list):
+class RefForeignKey(ForeignKeyFieldFactory, list):
     @classmethod
     def is_class_and_subclass(cls, value: typing.Any, _type: typing.Any) -> bool:
         original = get_origin(value)

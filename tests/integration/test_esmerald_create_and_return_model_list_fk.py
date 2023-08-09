@@ -48,7 +48,7 @@ class User(edgy.Model):
     email: str = edgy.EmailField(max_length=100)
     language: str = edgy.CharField(max_length=200, null=True)
     description: str = edgy.TextField(max_length=5000, null=True)
-    posts: PostRef = edgy.ListForeignKey(PostRef)
+    posts: PostRef = edgy.RefForeignKey(PostRef)
 
     class Meta:
         registry = models

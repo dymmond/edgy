@@ -23,9 +23,9 @@ from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.core import BaseField, BigIntegerField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
-from edgy.core.db.fields.list_foreign_key import BaseListForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
+from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
@@ -268,7 +268,7 @@ class BaseModelMeta(ModelMetaclass):
                 if getattr(meta_class, "abstract", None):
                     value = copy.copy(value)
 
-                if not isinstance(value, BaseListForeignKeyField):
+                if not isinstance(value, BaseRefForeignKeyField):
                     fields[key] = value
 
                 if isinstance(value, BaseOneToOneKeyField):
@@ -276,7 +276,7 @@ class BaseModelMeta(ModelMetaclass):
                 elif isinstance(value, BaseManyToManyForeignKeyField):
                     many_to_many_fields.add(value)
                     continue
-                elif isinstance(value, BaseListForeignKeyField):
+                elif isinstance(value, BaseRefForeignKeyField):
                     model_references[key] = value.to
                 elif isinstance(value, BaseForeignKeyField):
                     foreign_key_fields[key] = value

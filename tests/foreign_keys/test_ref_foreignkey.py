@@ -24,7 +24,7 @@ class TrackModelRef(ModelRef):
 class Album(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     name = edgy.CharField(max_length=100)
-    tracks = edgy.ListForeignKey(TrackModelRef, null=True)
+    tracks = edgy.RefForeignKey(TrackModelRef, null=True)
 
     class Meta:
         registry = models
@@ -52,7 +52,7 @@ class Post(edgy.Model):
 
 class User(edgy.Model):
     name = edgy.CharField(max_length=100, null=True)
-    posts = edgy.ListForeignKey(PostRef)
+    posts = edgy.RefForeignKey(PostRef)
 
     class Meta:
         registry = models
@@ -212,7 +212,7 @@ async def test_raises_model_reference_error(to):
 
         class User(edgy.Model):
             name = edgy.CharField(max_length=100)
-            users = edgy.ListForeignKey(to, null=True)
+            users = edgy.RefForeignKey(to, null=True)
 
             class Meta:
                 registry = models
@@ -241,7 +241,7 @@ async def test_raises_model_reference_error_on_missing__model__():
 
         class User(edgy.Model):
             name = edgy.CharField(max_length=100)
-            users = edgy.ListForeignKey(PostRef, null=True)
+            users = edgy.RefForeignKey(PostRef, null=True)
 
             class Meta:
                 registry = models
