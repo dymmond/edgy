@@ -224,7 +224,7 @@ await Post.query.create(user=user, comment="A third comment")
 # Create the posts using PostRef model
 post1 = PostRef(comment="A comment")
 post2 = PostRef(comment="Another comment")
-post3 = PostRefcomment="A third comment")
+post3 = PostRef(comment="A third comment")
 
 # Create the usee with all the posts
 await User.query.create(name="Edgy", post=[post1, post2, post3])
