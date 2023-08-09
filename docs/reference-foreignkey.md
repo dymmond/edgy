@@ -294,8 +294,13 @@ and the comment of the first inserted,
 As per normal Pydantic validations, if you send the wrong payload, it will raise the corresponding
 errors, for example:
 
-```python
-{!> ../docs_src/reffk/apis/api_call.py !}
+```json
+data = {
+    "name": "Edgy",
+    "email": "edgy@esmerald.dev",
+    "language": "EN",
+    "description": "A description"
+}
 ```
 
 This will raise a `ValidationError` as the `posts` are **not null**, as expected and you should
