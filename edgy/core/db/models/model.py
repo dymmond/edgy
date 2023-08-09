@@ -65,16 +65,25 @@ class Model(ModelRow, DeclarativeMixin):
         edgy_setattr(self, self.pkname, awaitable)
         return self
 
-    async def save_model_references(self, model_references: Any) -> None:
+    async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
         """
         If there is any MoedlRef declared in the model, it will generate the subsquent model
         reference records for that same model created.
         """
 
         for reference in model_references:
-            model: Type["Model"] = reference.__model__
+            if isinstance(reference, dict):
+                model: Type["Model"] = self.meta.model_references[model_ref].__model__  # type: ignore
+            else:
+                model: Type["Model"] = reference.__model__  # type: ignore
+
             if isinstance(model, str):
                 model = self.meta.registry.models[model]  # type: ignore
+
+            # If the reference did come in a dict format
+            # It is necessary to convert into the original ModelRef.
+            if isinstance(reference, dict):
+                reference = self.meta.model_references[model_ref](**reference)  # type: ignore
 
             foreign_key_target_field = None
             for name, foreign_key in model.meta.foreign_key_fields.items():
@@ -121,8 +130,9 @@ class Model(ModelRow, DeclarativeMixin):
         When creating a user it will make sure it can update existing or
         create a new one.
         """
-
         extracted_fields = self.extract_db_fields()
+        extracted_model_references = self.extract_db_model_references()
+        extracted_fields.update(extracted_model_references)
 
         if getattr(self, "pk", None) is None and self.fields[self.pkname].autoincrement:
             extracted_fields.pop(self.pkname, None)
@@ -143,8 +153,8 @@ class Model(ModelRow, DeclarativeMixin):
 
         # Save the model references
         if model_references:
-            for _, references in model_references.items():
-                await self.save_model_references(references or [])
+            for model_ref, references in model_references.items():
+                await self.save_model_references(references or [], model_ref=model_ref)
 
         # Refresh the results
         if any(
@@ -153,6 +163,7 @@ class Model(ModelRow, DeclarativeMixin):
             if name not in extracted_fields
         ):
             await self.load()
+
         return self
 
 

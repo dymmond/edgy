@@ -88,8 +88,7 @@ class ModelParser:
             validated[name] = value
 
         # Update with any ModelRef
-        if hasattr(model_class, "meta"):
-            validated.update(self.extract_model_references(extracted_values, model_class))
+        validated.update(self.extract_model_references(extracted_values, model_cls))
         return validated
 
     def extract_db_fields_from_model(self, model_class: Type["Model"]) -> Dict[Any, Any]:

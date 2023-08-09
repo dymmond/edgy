@@ -23,6 +23,8 @@ from edgy.exceptions import ImproperlyConfigured
 if TYPE_CHECKING:
     from edgy import Model
 
+EXCLUDED_LOOKUP = ["__model_references__"]
+
 
 class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta):
     """
@@ -39,11 +41,21 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
+    __model_references__: ClassVar[Any] = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(**kwargs)
+        model_references = self.setup_model_references_from_kwargs(kwargs)
         values = self.setup_model_fields_from_kwargs(kwargs)
         self.__dict__ = values
+        self.__model_references__ = model_references
+
+    def setup_model_references_from_kwargs(self, kwargs: Any) -> Any:
+        """
+        Loops and setup the kwargs of the model
+        """
+        model_references = {k: v for k, v in kwargs.items() if k in self.meta.model_references}
+        return model_references
 
     def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
         """
@@ -52,7 +64,11 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         if "pk" in kwargs:
             kwargs[self.pkname] = kwargs.pop("pk")
 
-        kwargs = {k: v for k, v in kwargs.items() if k in self.meta.fields_mapping}
+        kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k in self.meta.fields_mapping and k not in self.meta.model_references
+        }
 
         for key, value in kwargs.items():
             if key not in self.fields:
@@ -173,13 +189,24 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             setattr(self, key, value)
         return self
 
+    def extract_db_model_references(self) -> Dict[str, Any]:
+        """
+        Extracts all the model references (ModelRef) from the model
+        """
+        related_names = self.meta.related_names
+        return {k: v for k, v in self.__model_references__.items() if k not in related_names}
+
     def extract_db_fields(self) -> Dict[str, Any]:
         """
         Extacts all the db fields and excludes the related_names since those
         are simply relations.
         """
         related_names = self.meta.related_names
-        return {k: v for k, v in self.__dict__.items() if k not in related_names}
+        return {
+            k: v
+            for k, v in self.__dict__.items()
+            if k not in related_names and k not in EXCLUDED_LOOKUP
+        }
 
     def __setattr__(self, key: Any, value: Any) -> Any:
         if key in self.fields:
