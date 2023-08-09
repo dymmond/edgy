@@ -1,5 +1,20 @@
 # Release Notes
 
+## 0.2.0
+
+### Added
+
+- [RefForeignKey](./reference-foreignkey.md). A model reference where it can create sub objects from the main object directly.
+- Performance enhancements in general.
+
+### Changed
+
+- The way fields are evaluated and caching for the `__model_reference__` fields.
+
+### Fixed
+
+- Improved performance of the `__proxy_model__` by caching.
+
 ## 0.1.0
 
 This is the initial release of Edgy.

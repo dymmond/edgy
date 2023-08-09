@@ -279,6 +279,15 @@ from `edgy`.
     from edgy import CASCADE, SET_NULL, RESTRICT
     ```
 
+#### RefForeignKey
+
+```python
+from edgy import RefForeignKey
+```
+
+This is unique to **Edgy** and has [dedicated place](./reference-foreignkey.md) in the documentation
+just to explain what it is and how to use it.
+
 #### ManyToManyField
 
 ```python

@@ -1,4 +1,4 @@
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .cli.base import Migrate
 from .conf import settings
@@ -22,6 +22,7 @@ from .core.db.fields import (
     IntegerField,
     JSONField,
     PasswordField,
+    RefForeignKey,
     SmallIntegerField,
     TextField,
     TimeField,
@@ -31,7 +32,7 @@ from .core.db.fields import (
 from .core.db.fields.foreign_keys import ForeignKey
 from .core.db.fields.many_to_many import ManyToMany, ManyToManyField
 from .core.db.fields.one_to_one_keys import OneToOne, OneToOneField
-from .core.db.models import Model, ReflectModel
+from .core.db.models import Model, ModelRef, ReflectModel
 from .core.db.models.managers import Manager
 from .core.db.querysets import QuerySet
 from .core.extras import EdgyExtra
@@ -58,11 +59,13 @@ __all__ = [
     "Index",
     "IntegerField",
     "JSONField",
+    "RefForeignKey",
     "Manager",
     "ManyToMany",
     "ManyToManyField",
     "Migrate",
     "Model",
+    "ModelRef",
     "MultipleObjectsReturned",
     "ObjectNotFound",
     "OneToOne",

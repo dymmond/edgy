@@ -24,6 +24,7 @@ from .core import (
 from .foreign_keys import ForeignKey
 from .many_to_many import ManyToMany, ManyToManyField
 from .one_to_one_keys import OneToOne, OneToOneField
+from .ref_foreign_key import RefForeignKey
 
 __all__ = [
     "AutoNowMixin",
@@ -42,6 +43,7 @@ __all__ = [
     "IntegerField",
     "IPAddressField",
     "JSONField",
+    "RefForeignKey",
     "ManyToMany",
     "ManyToManyField",
     "OneToOne",

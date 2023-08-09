@@ -1,15 +1,20 @@
-from typing import TYPE_CHECKING, Any, Optional, TypeVar
+import typing
+from functools import cached_property
+from inspect import isclass
+from typing import TYPE_CHECKING, Any, TypeVar
 
-import sqlalchemy
+from typing_extensions import get_origin
 
+import edgy
 from edgy.core.connection.registry import Registry
-from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL
+from edgy.core.db.constants import CASCADE, RESTRICT
 from edgy.core.db.fields._base_fk import BaseField, BaseForeignKey
 from edgy.core.terminal import Print
-from edgy.exceptions import FieldDefinitionError
+from edgy.exceptions import ModelReferenceError
 
 if TYPE_CHECKING:
     from edgy import Model
+    from edgy.core.db.models.model_reference import ModelRef
 
 T = TypeVar("T", bound="Model")
 
@@ -19,10 +24,6 @@ terminal = Print()
 
 
 class ForeignKeyFieldFactory:
-    """The base for all model fields to be used with Edgy"""
-
-    _type: Any = None
-
     def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
         cls.validate(**kwargs)
 
@@ -37,7 +38,7 @@ class ForeignKeyFieldFactory:
         server_default: Any = kwargs.pop("server_default", None)
         server_onupdate: Any = kwargs.pop("server_onupdate", None)
         registry: Registry = kwargs.pop("registry", None)
-        field_type = cls._type
+        field_type = list
 
         namespace = dict(
             __type__=field_type,
@@ -57,7 +58,7 @@ class ForeignKeyFieldFactory:
             constraints=cls.get_constraints(),
             **kwargs,
         )
-        Field = type(cls.__name__, (BaseOneToOneKeyField, BaseField), {})
+        Field = type(cls.__name__, (BaseRefForeignKeyField, BaseField), {})
         return Field(**namespace)  # type: ignore
 
     @classmethod
@@ -78,64 +79,49 @@ class ForeignKeyFieldFactory:
         return []
 
 
-class BaseOneToOneKeyField(BaseForeignKey):
-    def get_column(self, name: str) -> Any:
-        target = self.target
-        to_field = target.fields[target.pkname]
+class BaseRefForeignKeyField(BaseForeignKey):
+    @cached_property
+    def target(self) -> Any:
+        """
+        The target of the ForeignKey model.
+        """
+        if not hasattr(self, "_target"):
+            if isinstance(self.to.__model__, str):
+                self._target = self.registry.models[self.to.__model__]  # type: ignore
+            else:
+                self._target = self.to.__model__
 
-        column_type = to_field.column_type
-        constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}", ondelete=self.on_delete
-            )
-        ]
-        return sqlalchemy.Column(
-            name,
-            column_type,
-            *constraints,
-            nullable=self.null,
-            unique=True,
-        )
+        self.to.__model__ = self._target
+        return self._target
 
 
-class OneToOneField(ForeignKeyFieldFactory):
-    """
-    Representation of a one to one field.
-    """
+class RefForeignKey(ForeignKeyFieldFactory, list):
+    @classmethod
+    def is_class_and_subclass(cls, value: typing.Any, _type: typing.Any) -> bool:
+        original = get_origin(value)
+        if not original and not isclass(value):
+            return False
 
-    _type: Any = Any
+        try:
+            if original:
+                return original and issubclass(original, _type)
+            return issubclass(value, _type)
+        except TypeError:
+            return False
 
     def __new__(  # type: ignore
         cls,
-        to: "Model",
-        *,
+        to: "ModelRef",
         null: bool = False,
-        on_update: Optional[str] = CASCADE,
-        on_delete: Optional[str] = RESTRICT,
-        related_name: Optional[str] = None,
-        **kwargs: Any,
     ) -> BaseField:
+        if not cls.is_class_and_subclass(to, edgy.ModelRef):
+            raise ModelReferenceError(
+                detail="A model reference must be an object of type ModelRef"
+            )
+        if not hasattr(to, "__model__") or getattr(to, "__model__", None) is None:
+            raise ModelReferenceError("'__model__' must bre declared when subclassing ModelRef.")
+
         kwargs = {
-            **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
-
         return super().__new__(cls, **kwargs)
-
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        on_delete = kwargs.get("on_delete", None)
-        on_update = kwargs.get("on_update", None)
-        null = kwargs.get("null")
-
-        if on_delete is None:
-            raise FieldDefinitionError("on_delete must not be null")
-
-        if on_delete == SET_NULL and not null:
-            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
-
-        if on_update and (on_update == SET_NULL and not null):
-            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
-
-
-OneToOne = OneToOneField

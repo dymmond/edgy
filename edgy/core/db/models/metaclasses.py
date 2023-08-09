@@ -25,6 +25,7 @@ from edgy.core.db.fields.core import BaseField, BigIntegerField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
+from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
@@ -32,7 +33,7 @@ from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_a
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
-    from edgy.core.db.models import Model, ReflectModel
+    from edgy.core.db.models import Model, ModelRef, ReflectModel
 
 
 class MetaInfo:
@@ -57,6 +58,7 @@ class MetaInfo:
         "multi_related",
         "related_names",
         "related_fields",
+        "model_references",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
@@ -71,6 +73,7 @@ class MetaInfo:
         self.parents: Any = getattr(meta, "parents", None) or []
         self.many_to_many_fields: Set[str] = set()
         self.foreign_key_fields: Dict[str, Any] = {}
+        self.model_references: Dict["ModelRef", str] = {}
         self.model: Optional[Type["Model"]] = None
         self.manager: "Manager" = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
@@ -190,6 +193,7 @@ class BaseModelMeta(ModelMetaclass):
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
         fields: Dict[str, BaseField] = {}
         foreign_key_fields: Any = {}
+        model_references: Dict["ModelRef", str] = {}
         many_to_many_fields: Any = set()
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
@@ -264,13 +268,16 @@ class BaseModelMeta(ModelMetaclass):
                 if getattr(meta_class, "abstract", None):
                     value = copy.copy(value)
 
-                fields[key] = value
+                if not isinstance(value, BaseRefForeignKeyField):
+                    fields[key] = value
 
                 if isinstance(value, BaseOneToOneKeyField):
                     foreign_key_fields[key] = value
                 elif isinstance(value, BaseManyToManyForeignKeyField):
                     many_to_many_fields.add(value)
                     continue
+                elif isinstance(value, BaseRefForeignKeyField):
+                    model_references[key] = value.to
                 elif isinstance(value, BaseForeignKeyField):
                     foreign_key_fields[key] = value
                     continue
@@ -283,6 +290,7 @@ class BaseModelMeta(ModelMetaclass):
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
         meta.many_to_many_fields = many_to_many_fields
+        meta.model_references = model_references
         meta.pk_attribute = pk_attribute
         meta.pk = fields.get(pk_attribute)
 

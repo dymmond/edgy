@@ -3,92 +3,93 @@ site_description: 🔥 The perfect ORM to work with complex databases 🔥.
 site_url: https://edgyorm.tarsild.io
 
 theme:
-      name: "material"
-      custom_dir: docs/overrides
-      language: en
-      palette:
-            - scheme: "default"
-              primary: "pink"
-              accent: "red"
-              media: "(prefers-color-scheme: light)"
-              toggle:
-                    icon: "material/lightbulb"
-                    name: "Switch to dark mode"
-            - scheme: "slate"
-              media: "(prefers-color-scheme: dark)"
-              primary: "pink"
-              accent: "red"
-              toggle:
-                    icon: "material/lightbulb-outline"
-                    name: "Switch to light mode"
-      favicon: statics/images/favicon.ico
-      logo: statics/images/white.png
-      features:
-            - search.suggest
-            - search.highlight
-            - content.tabs.link
+        name: "material"
+        custom_dir: docs/overrides
+        language: en
+        palette:
+                - scheme: "default"
+                  primary: "pink"
+                  accent: "red"
+                  media: "(prefers-color-scheme: light)"
+                  toggle:
+                          icon: "material/lightbulb"
+                          name: "Switch to dark mode"
+                - scheme: "slate"
+                  media: "(prefers-color-scheme: dark)"
+                  primary: "pink"
+                  accent: "red"
+                  toggle:
+                          icon: "material/lightbulb-outline"
+                          name: "Switch to light mode"
+        favicon: statics/images/favicon.ico
+        logo: statics/images/white.png
+        features:
+                - search.suggest
+                - search.highlight
+                - content.tabs.link
 
 repo_name: tarsil/edgy
 repo_url: https://github.com/tarsil/edgy
 edit_uri: ""
 plugins:
-      - search
-      - markdownextradata:
-              data: data
+        - search
+        - markdownextradata:
+                  data: data
 
 nav:
-      - Introduction: "index.md"
-      - Models: "models.md"
-      - Declarative Models: "declarative-models.md"
-      - Reflection: "reflection.md"
-      - Managers: "managers.md"
-      - Fields: "fields.md"
-      - Queries:
-              - Queries: "queries/queries.md"
-              - Related Name: "queries/related-name.md"
-              - ManyToMany: "queries/many-to-many.md"
-      - Transactions: "transactions.md"
-      - Relationships: "relationships.md"
-      - Connection: "connection.md"
-      - Registry: "registry.md"
-      - Shell Support: "shell.md"
-      - Settings: "settings.md"
-      - Exceptions: "exceptions.md"
-      - Migrations:
-              - Discovery: "migrations/discovery.md"
-              - Migrations: "migrations/migrations.md"
-      - Tips and Tricks: "tips-and-tricks.md"
-      - Extras: "extras.md"
-      - Test Client: "test-client.md"
-      - Edgy People: "edgy-people.md"
-      - Contributing: "contributing.md"
-      - Sponsorship: "sponsorship.md"
-      - Release Notes: "release-notes.md"
+        - Introduction: "index.md"
+        - Models: "models.md"
+        - Declarative Models: "declarative-models.md"
+        - Reflection: "reflection.md"
+        - Managers: "managers.md"
+        - Fields: "fields.md"
+        - Queries:
+                  - Queries: "queries/queries.md"
+                  - Related Name: "queries/related-name.md"
+                  - ManyToMany: "queries/many-to-many.md"
+        - Transactions: "transactions.md"
+        - Relationships: "relationships.md"
+        - Reference ForeignKey: "reference-foreignkey.md"
+        - Connection: "connection.md"
+        - Registry: "registry.md"
+        - Shell Support: "shell.md"
+        - Settings: "settings.md"
+        - Exceptions: "exceptions.md"
+        - Migrations:
+                  - Discovery: "migrations/discovery.md"
+                  - Migrations: "migrations/migrations.md"
+        - Tips and Tricks: "tips-and-tricks.md"
+        - Extras: "extras.md"
+        - Test Client: "test-client.md"
+        - Edgy People: "edgy-people.md"
+        - Contributing: "contributing.md"
+        - Sponsorship: "sponsorship.md"
+        - Release Notes: "release-notes.md"
 markdown_extensions:
-      - attr_list
-      - toc:
-              permalink: true
-      - markdown.extensions.codehilite:
-              guess_lang: false
-      - mdx_include:
-              base_path: docs
-      - admonition
-      - codehilite
-      - extra
-      - pymdownx.superfences:
-              custom_fences:
-                    - name: mermaid
-                      class: mermaid
-                      format: !!python/name:pymdownx.superfences.fence_code_format ""
-      - pymdownx.emoji:
-              emoji_index: !!python/name:materialx.emoji.twemoji
-              emoji_generator: !!python/name:materialx.emoji.to_svg
-      - pymdownx.tabbed:
-              alternate_style: true
-      - md_in_html
+        - attr_list
+        - toc:
+                  permalink: true
+        - markdown.extensions.codehilite:
+                  guess_lang: false
+        - mdx_include:
+                  base_path: docs
+        - admonition
+        - codehilite
+        - extra
+        - pymdownx.superfences:
+                  custom_fences:
+                          - name: mermaid
+                            class: mermaid
+                            format: !!python/name:pymdownx.superfences.fence_code_format ""
+        - pymdownx.emoji:
+                  emoji_index: !!python/name:materialx.emoji.twemoji
+                  emoji_generator: !!python/name:materialx.emoji.to_svg
+        - pymdownx.tabbed:
+                  alternate_style: true
+        - md_in_html
 
 extra:
-      alternate:
-            - link: /
-              name: English
-              lang: en
+        alternate:
+                - link: /
+                  name: English
+                  lang: en

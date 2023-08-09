@@ -1,9 +1,13 @@
-from typing import Any, Dict, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, Set, Type, Union
 
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
 from edgy.core.utils.functional import edgy_setattr
+from edgy.exceptions import RelationshipNotFound
+
+if TYPE_CHECKING:
+    pass
 
 
 class Model(ModelRow, DeclarativeMixin):
@@ -61,6 +65,40 @@ class Model(ModelRow, DeclarativeMixin):
         edgy_setattr(self, self.pkname, awaitable)
         return self
 
+    async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
+        """
+        If there is any MoedlRef declared in the model, it will generate the subsquent model
+        reference records for that same model created.
+        """
+
+        for reference in model_references:
+            if isinstance(reference, dict):
+                model: Type["Model"] = self.meta.model_references[model_ref].__model__  # type: ignore
+            else:
+                model: Type["Model"] = reference.__model__  # type: ignore
+
+            if isinstance(model, str):
+                model = self.meta.registry.models[model]  # type: ignore
+
+            # If the reference did come in a dict format
+            # It is necessary to convert into the original ModelRef.
+            if isinstance(reference, dict):
+                reference = self.meta.model_references[model_ref](**reference)  # type: ignore
+
+            foreign_key_target_field = None
+            for name, foreign_key in model.meta.foreign_key_fields.items():
+                if foreign_key.target == self.__class__:
+                    foreign_key_target_field = name
+
+            if not foreign_key_target_field:
+                raise RelationshipNotFound(
+                    f"There was no relationship found between '{model.__class__.__name__}' and {self.__class__.__name__}"
+                )
+
+            data = reference.model_dump(exclude={"__model__"})
+            data[foreign_key_target_field] = self
+            await model.query.create(**data)
+
     async def _update(self, **kwargs: Any) -> Any:
         """
         Performs the save instruction.
@@ -69,6 +107,20 @@ class Model(ModelRow, DeclarativeMixin):
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         awaitable = await self.database.execute(expression)
         return awaitable
+
+    def update_model_references(self, **kwargs: Any) -> Any:
+        model_refs_set: Set[str] = set()
+        model_references: Dict[str, Any] = {}
+
+        for name, value in kwargs.items():
+            if name in self.meta.model_references:
+                model_references[name] = value
+                model_refs_set.add(name)
+
+        for value in model_refs_set:
+            kwargs.pop(value)
+
+        return kwargs, model_references
 
     async def save(
         self: Any, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
@@ -79,6 +131,8 @@ class Model(ModelRow, DeclarativeMixin):
         create a new one.
         """
         extracted_fields = self.extract_db_fields()
+        extracted_model_references = self.extract_db_model_references()
+        extracted_fields.update(extracted_model_references)
 
         if getattr(self, "pk", None) is None and self.fields[self.pkname].autoincrement:
             extracted_fields.pop(self.pkname, None)
@@ -89,12 +143,18 @@ class Model(ModelRow, DeclarativeMixin):
             extracted_values=extracted_fields
         )
         kwargs = self.update_auto_now_fields(values=validated_values, fields=self.fields)
+        kwargs, model_references = self.update_model_references(**kwargs)
 
         # Performs the update or the create based on a possible existing primary key
         if getattr(self, "pk", None) is None or force_save:
             await self._save(**kwargs)
         else:
             await self._update(**kwargs)
+
+        # Save the model references
+        if model_references:
+            for model_ref, references in model_references.items():
+                await self.save_model_references(references or [], model_ref=model_ref)
 
         # Refresh the results
         if any(
@@ -103,6 +163,7 @@ class Model(ModelRow, DeclarativeMixin):
             if name not in extracted_fields
         ):
             await self.load()
+
         return self
 
 
