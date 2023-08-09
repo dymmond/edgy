@@ -256,6 +256,10 @@ async def test_on_save_select_related_no_all():
     album.tracks = [track1, track2, track3]
     await album.save()
 
+    total = await Track.query.filter(album__id=album.pk)
+
+    assert len(total) == 3
+
     track_f1 = TrackModelRef(title="Help I'm Alive", position=1)
     track_f2 = TrackModelRef(title="Sick Muse", position=2)
     track_f3 = TrackModelRef(title="Satellite Mind", position=3)

@@ -4,7 +4,7 @@ import pytest
 from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, post
 from httpx import AsyncClient
-from pydantic import __version__
+from pydantic import __version__, field_validator
 from tests.settings import DATABASE_URL
 
 import edgy
@@ -42,6 +42,11 @@ class PostRef(edgy.ModelRef):
     __model__ = "Post"
     comment: str
 
+    @field_validator("comment", mode="before")
+    def validate_comment(cls, comment: str) -> str:
+        comment = comment.upper()
+        return comment
+
 
 class User(edgy.Model):
     name: str = edgy.CharField(max_length=100)
@@ -68,6 +73,8 @@ async def create_user(data: User) -> User:
     posts = await Post.query.filter(user=user)
     return_user = user.model_dump(exclude={"posts"})
     return_user["total_posts"] = len(posts)
+    return_user["comment"] = posts[0].comment
+    assert posts[0].comment == "A COMMENT"
     return return_user
 
 
@@ -131,5 +138,6 @@ async def test_creates_a_user(async_client):
         "email": "edgy@esmerald.dev",
         "language": "EN",
         "description": "A description",
+        "comment": "A COMMENT",
         "total_posts": 1,
     }

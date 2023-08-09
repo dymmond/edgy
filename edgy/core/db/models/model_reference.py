@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING, Type, Union
 
 from pydantic import BaseModel
 
@@ -7,4 +7,4 @@ if TYPE_CHECKING:
 
 
 class ModelRef(BaseModel):
-    __model__: Type["Model"]
+    __model__: Union[Type["Model"], str]
