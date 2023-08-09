@@ -1,14 +1,18 @@
 import pytest
+from pydantic import __version__
 from tests.settings import DATABASE_URL
 
 import edgy
 from edgy import ModelRef
+from edgy.exceptions import ModelReferenceError
 from edgy.testclient import DatabaseTestClient as Database
 
 pytestmark = pytest.mark.anyio
 
 database = Database(DATABASE_URL)
 models = edgy.Registry(database=database)
+
+pydantic_version = __version__[:3]
 
 
 class TrackModelRef(ModelRef):
@@ -31,6 +35,24 @@ class Track(edgy.Model):
     album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE)
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()
+
+    class Meta:
+        registry = models
+
+
+class PostRef(ModelRef):
+    __model__ = "Post"
+    comment: str
+
+
+class Post(edgy.Model):
+    user = edgy.ForeignKey("User")
+    comment = edgy.CharField(max_length=255)
+
+
+class User(edgy.Model):
+    name = edgy.CharField(max_length=100, null=True)
+    posts = edgy.ListForeignKey(PostRef)
 
     class Meta:
         registry = models
@@ -178,3 +200,34 @@ async def test_on_delete_cascade():
     await album.delete()
 
     assert await Track.query.count() == 0
+
+
+@pytest.mark.parametrize(
+    "to",
+    [1, {"id": 2}, [3], [4, [4]], Track],
+    ids=["int", "dict", "list", "list-of_lists", "model"],
+)
+async def test_raises_model_reference_error(to):
+    with pytest.raises(ModelReferenceError):
+
+        class User(edgy.Model):
+            name = edgy.CharField(max_length=100)
+            users = edgy.ListForeignKey(to, null=True)
+
+            class Meta:
+                registry = models
+
+
+async def test_raise_value_error_on_missing_model_fields():
+    with pytest.raises(ValueError) as raised:
+        await User.query.create()
+
+    assert raised.value.errors() == [
+        {
+            "type": "missing",
+            "loc": ("posts",),
+            "msg": "Field required",
+            "input": {},
+            "url": f"https://errors.pydantic.dev/{pydantic_version}/v/missing",
+        }
+    ]

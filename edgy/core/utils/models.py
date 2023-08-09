@@ -59,6 +59,7 @@ class ModelParser:
         model_references = {
             name: extracted_values.get(name, None)
             for name in model_class.meta.model_references.keys()  # type: ignore
+            if extracted_values.get(name)
         }
         return model_references
 

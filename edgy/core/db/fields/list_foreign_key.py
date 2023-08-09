@@ -1,6 +1,11 @@
+import typing
 from functools import cached_property
+from inspect import isclass
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from typing_extensions import get_origin
+
+import edgy
 from edgy.core.connection.registry import Registry
 from edgy.core.db.constants import CASCADE, RESTRICT
 from edgy.core.db.fields._base_fk import BaseField, BaseForeignKey
@@ -80,12 +85,6 @@ class BaseListForeignKeyField(BaseForeignKey):
         """
         The target of the ForeignKey model.
         """
-        from edgy.core.db.models.model_reference import ModelRef
-
-        if not issubclass(self.to, ModelRef):
-            raise ModelReferenceError(
-                detail="A model reference must be an object of type ModelRef"
-            )
         if not hasattr(self, "_target"):
             if isinstance(self.to.__model__, str):
                 self._target = self.registry.models[self.to.__model__]  # type: ignore
@@ -97,13 +96,29 @@ class BaseListForeignKeyField(BaseForeignKey):
 
 
 class ListForeignKey(ForeignKeyFieldFactory, list):
+    @classmethod
+    def is_class_and_subclass(cls, value: typing.Any, _type: typing.Any) -> bool:
+        original = get_origin(value)
+        if not original and not isclass(value):
+            return False
+
+        try:
+            if original:
+                return original and issubclass(original, _type)
+            return issubclass(value, _type)
+        except TypeError:
+            return False
+
     def __new__(  # type: ignore
         cls,
         to: "ModelRef",
         null: bool = False,
     ) -> BaseField:
+        if not cls.is_class_and_subclass(to, edgy.ModelRef):
+            raise ModelReferenceError(
+                detail="A model reference must be an object of type ModelRef"
+            )
         kwargs = {
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
-
         return super().__new__(cls, **kwargs)
