@@ -245,3 +245,25 @@ async def test_raises_model_reference_error_on_missing__model__():
 
             class Meta:
                 registry = models
+
+
+async def test_on_save_select_related_no_all():
+    track1 = TrackModelRef(title="The Bird", position=1)
+    track2 = TrackModelRef(title="Heart don't stand a chance", position=2)
+    track3 = TrackModelRef(title="The Waters", position=3)
+
+    album = await Album.query.create(name="Malibu")
+    album.tracks = [track1, track2, track3]
+    await album.save()
+
+    track_f1 = TrackModelRef(title="Help I'm Alive", position=1)
+    track_f2 = TrackModelRef(title="Sick Muse", position=2)
+    track_f3 = TrackModelRef(title="Satellite Mind", position=3)
+
+    await Album.query.create(name="Fantasies", tracks=[track_f1, track_f2, track_f3])
+
+    track = await Track.query.select_related("album").get(title="The Bird")
+    assert track.album.name == "Malibu"
+
+    tracks = await Track.query.select_related("album")
+    assert len(tracks) == 6
