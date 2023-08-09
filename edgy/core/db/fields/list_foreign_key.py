@@ -118,6 +118,9 @@ class ListForeignKey(ForeignKeyFieldFactory, list):
             raise ModelReferenceError(
                 detail="A model reference must be an object of type ModelRef"
             )
+        if not hasattr(to, "__model__") or getattr(to, "__model__", None) is None:
+            raise ModelReferenceError("'__model__' must bre declared when subclassing ModelRef.")
+
         kwargs = {
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }

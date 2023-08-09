@@ -231,3 +231,17 @@ async def test_raise_value_error_on_missing_model_fields():
             "url": f"https://errors.pydantic.dev/{pydantic_version}/v/missing",
         }
     ]
+
+
+async def test_raises_model_reference_error_on_missing__model__():
+    with pytest.raises(ModelReferenceError):
+
+        class PostRef(ModelRef):
+            comment: str
+
+        class User(edgy.Model):
+            name = edgy.CharField(max_length=100)
+            users = edgy.ListForeignKey(PostRef, null=True)
+
+            class Meta:
+                registry = models
