@@ -23,7 +23,7 @@ Alembic.
     use the `edgy.Database` object instead.
 
 * **schema** - The schema to connect to. This can be very useful for multi-tenancy applications if
-you want to specify a specific schema or simlpy if you just want to connect to a different schema
+you want to specify a specific schema or simply if you just want to connect to a different schema
 that is not the default.
 
     ```python

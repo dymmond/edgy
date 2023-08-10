@@ -27,7 +27,7 @@ In a nutshell, to use the [RefForeignKey][reffk] you will need to use a [ModelRe
 The [ModelRef][model_ref] is a special Edgy object that will make sure you can interact with the
 model declared and perform the operations.
 
-Now, wht is this useful? Let us imagine the following scenario:
+Now, what is this useful? Let us imagine the following scenario:
 
 ### Scenario example
 
