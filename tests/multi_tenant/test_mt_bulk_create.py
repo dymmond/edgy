@@ -5,6 +5,7 @@ from typing import Any, Dict
 from uuid import UUID
 
 import pytest
+from asyncpg.exceptions import UndefinedTableError
 from tests.settings import DATABASE_URL
 
 import edgy
@@ -14,7 +15,8 @@ from edgy.testclient import DatabaseTestClient as Database
 pytestmark = pytest.mark.anyio
 
 database = Database(DATABASE_URL)
-models = edgy.Registry(database=database, schema="mamas")
+models = edgy.Registry(database=database)
+another_models = edgy.Registry(database=database)
 
 
 def time():
@@ -62,17 +64,10 @@ async def rollback_transactions():
 
 
 async def test_bulk_create_another_tenant():
-    await Product.using("mamas").query.bulk_create(
-        [
-            {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
-            {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
-        ]
-    )
-    products = await Product.query.all()
-    assert len(products) == 2
-    assert products[0].data == {"foo": 123}
-    assert products[0].value == 123.456
-    assert products[0].status == StatusEnum.RELEASED
-    assert products[1].data == {"foo": 456}
-    assert products[1].value == 456.789
-    assert products[1].status == StatusEnum.DRAFT
+    with pytest.raises(UndefinedTableError):
+        await Product.query.using("another").bulk_create(
+            [
+                {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
+                {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
+            ]
+        )

@@ -22,13 +22,14 @@ from edgy.conf import settings
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
-from edgy.core.db.querysets.mixins import QuerySetPropsMixin
+from edgy.core.db.querysets.mixins import QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
 from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.protocols.queryset import QuerySetProtocol
 
 if TYPE_CHECKING:  # pragma: no cover
+    from edgy import Registry
     from edgy.core.db.models import Model, ReflectModel
 
 
@@ -38,12 +39,15 @@ ReflectEdgyModel = TypeVar("ReflectEdgyModel", bound="ReflectModel")
 EdgyModel = Union[_EdgyModel, ReflectEdgyModel]
 
 
-class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[EdgyModel]):
+class BaseQuerySet(
+    TenancyMixin, QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[EdgyModel]
+):
     ESCAPE_CHARACTERS = ["%", "_"]
 
     def __init__(
         self,
         model_class: Union[Type["Model"], None] = None,
+        using: Union["Registry", None] = None,
         filter_clauses: Any = None,
         select_related: Any = None,
         limit_count: Any = None,
@@ -68,6 +72,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
         self._cache = None
+        self._db = using
         self._m2m_related = m2m_related  # type: ignore
 
         if self.is_m2m and not self._m2m_related:
@@ -328,6 +333,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
                 only_fields=self._only,
                 defer_fields=self._defer,
                 m2m_related=self.m2m_related,
+                using=self._db,
             ),
         )
 
@@ -368,6 +374,7 @@ class BaseQuerySet(QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[E
         queryset._m2m_related = self._m2m_related
         queryset._only = self._only
         queryset._defer = self._defer
+        queryset._db = self._db
         return queryset
 
 
@@ -749,11 +756,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Bulk creates records in a table
         """
+        queryset: "QuerySet" = self.clone()
         new_objs = [self.validate_kwargs(**obj) for obj in objs]
 
         expression = self.table.insert().values(new_objs)
         self.set_query_expression(expression)
-        await self.database.execute(expression)
+        await queryset.database.execute(expression)
 
     async def bulk_update(self, objs: List[EdgyModel], fields: List[str]) -> None:
         """
@@ -858,13 +866,3 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def __class_getitem__(cls, *args: Any, **kwargs: Any) -> Any:
         return cls
-
-    def __deepcopy__(self, memo: Any) -> Any:
-        """Don't populate the QuerySet's cache."""
-        obj = self.__class__()
-        for k, v in self.__dict__.items():
-            if k == "_cache":
-                obj.__dict__[k] = None
-            else:
-                obj.__dict__[k] = copy.deepcopy(v, memo)
-        return obj

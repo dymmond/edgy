@@ -1,3 +1,3 @@
-from .generics import DeclarativeMixin, TenancyMixin
+from .generics import DeclarativeMixin
 
-__all__ = ["DeclarativeMixin", "TenancyMixin"]
+__all__ = ["DeclarativeMixin"]
