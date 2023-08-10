@@ -22,6 +22,16 @@ Alembic.
     Using the `Database` from the `databases` package will raise an assertation error. You must
     use the `edgy.Database` object instead.
 
+* **schema** - The schema to connect to. This can be very useful for multi-tenancy applications if
+you want to specify a specific schema or simlpy if you just want to connect to a different schema
+that is not the default.
+
+    ```python
+    from edgy import Registry
+
+    registry = Registry(database=..., schema="custom-schema")
+    ```
+
 ## Custom registry
 
 Can you have your own custom Registry? Yes, of course! You simply need to subclass the `Registry`
