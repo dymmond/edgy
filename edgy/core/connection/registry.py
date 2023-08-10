@@ -30,6 +30,7 @@ class Registry:
 
         if self._schema:
             self._metadata = sqlalchemy.MetaData(schema=self._schema)
+
         else:
             self._metadata = sqlalchemy.MetaData()
 
@@ -42,6 +43,28 @@ class Registry:
     @metadata.setter
     def metadata(self, value: sqlalchemy.MetaData) -> None:
         self._metadata = value
+
+    async def create_schema(self, schema: str, if_not_exists: bool = False) -> None:
+        """
+        Creates a model schema if it does not exist.
+        """
+        async with self.database:
+            async with self.engine.begin() as connection:
+                await connection.execute(
+                    sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists)  # type: ignore
+                )
+
+    async def drop_schema(
+        self, schema: str, cascade: bool = False, if_exists: bool = False
+    ) -> None:
+        """
+        Drops an existing model schema.
+        """
+        async with self.database:
+            async with self.engine.begin() as connection:
+                await connection.execute(
+                    sqlalchemy.schema.DropSchema(name=schema, cascade=cascade, if_exists=if_exists)  # type: ignore
+                )
 
     def _get_database_url(self) -> str:
         url = self.database.url
@@ -73,7 +96,7 @@ class Registry:
         return sa_declarative_base(metadata=metadata)
 
     @property
-    def engine(self):  # type: ignore
+    def engine(self) -> AsyncEngine:
         return self._get_engine
 
     @cached_property
@@ -83,10 +106,12 @@ class Registry:
         return engine
 
     @property
-    def sync_engine(self):  # type: ignore
+    def sync_engine(self) -> Engine:
         return self._get_sync_engine
 
     async def create_all(self) -> None:
+        if self._schema:
+            await self.create_schema(self._schema, True)
         async with self.database:
             async with self.engine.begin() as connection:
                 await connection.run_sync(self.metadata.create_all)
@@ -94,6 +119,8 @@ class Registry:
         await self.engine.dispose()
 
     async def drop_all(self) -> None:
+        if self._schema:
+            await self.drop_schema(self._schema, True, True)
         async with self.database:
             async with self.engine.begin() as conn:
                 await conn.run_sync(self.metadata.drop_all)
