@@ -101,7 +101,7 @@ class DomainMixin(edgy.Model):
 
     async def save(
         self: Any, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
-    ) -> type[Model] | Any:
+    ) -> Type[Model]:
         async with self.meta.registry.database.transaction():
             domains = self.__class__.query.filter(tenant=self.tenant, is_priamry=True).exclude(
                 id=self.pk
