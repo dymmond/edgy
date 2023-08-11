@@ -16,7 +16,6 @@ pytestmark = pytest.mark.anyio
 
 database = Database(DATABASE_URL)
 models = edgy.Registry(database=database)
-another_models = edgy.Registry(database=database)
 
 
 def time():
