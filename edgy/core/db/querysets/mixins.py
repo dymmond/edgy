@@ -28,7 +28,7 @@ class QuerySetPropsMixin:
         if not self._db:
             return self.model_class.table  # type: ignore
         table = copy.copy(self.model_class.table)
-        table.schema = self._db._schema
+        table.schema = self._db.db_schema
         return cast("sqlalchemy.Table", table)
 
     @property
