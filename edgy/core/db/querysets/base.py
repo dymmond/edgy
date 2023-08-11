@@ -29,7 +29,7 @@ from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetErr
 from edgy.protocols.queryset import QuerySetProtocol
 
 if TYPE_CHECKING:  # pragma: no cover
-    from edgy import Registry
+    from edgy import Database
     from edgy.core.db.models import Model, ReflectModel
 
 
@@ -47,7 +47,8 @@ class BaseQuerySet(
     def __init__(
         self,
         model_class: Union[Type["Model"], None] = None,
-        using: Union["Registry", None] = None,
+        schema: Optional[str] = None,
+        database: Union["Database", None] = None,
         filter_clauses: Any = None,
         select_related: Any = None,
         limit_count: Any = None,
@@ -72,7 +73,8 @@ class BaseQuerySet(
         self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
         self._cache = None
-        self._db = using
+        self._schema = schema  # type: ignore
+        self._database = database  # type: ignore
         self._m2m_related = m2m_related  # type: ignore
 
         if self.is_m2m and not self._m2m_related:
@@ -325,6 +327,7 @@ class BaseQuerySet(
             "QuerySet",
             self.__class__(
                 model_class=self.model_class,
+                database=self._database,
                 filter_clauses=filter_clauses,
                 select_related=select_related,
                 limit_count=self.limit_count,
@@ -333,7 +336,7 @@ class BaseQuerySet(
                 only_fields=self._only,
                 defer_fields=self._defer,
                 m2m_related=self.m2m_related,
-                using=self._db,
+                schema=self._schema,
             ),
         )
 
@@ -374,7 +377,8 @@ class BaseQuerySet(
         queryset._m2m_related = self._m2m_related
         queryset._only = self._only
         queryset._defer = self._defer
-        queryset._db = self._db
+        queryset._schema = self._schema
+        queryset._database = self._database
         return queryset
 
 

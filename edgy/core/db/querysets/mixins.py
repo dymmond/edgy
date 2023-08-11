@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 import sqlalchemy
 
 from edgy.core.connection.database import Database
-from edgy.core.connection.registry import Registry
 
 if TYPE_CHECKING:
     from edgy import QuerySet
@@ -18,17 +17,29 @@ class QuerySetPropsMixin:
     """
 
     @property
-    def database(self) -> Any:
-        if not self._db:
-            return self.model_class.meta.registry.database  # type: ignore
-        return self._db.database
+    def database(self) -> Database:
+        if not self._database:
+            return cast("Database", self.model_class.meta.registry.database)
+        return self._database
+
+    @database.setter
+    def database(self, value: Database) -> None:
+        self._database = value
+
+    @property
+    def schema(self) -> str:
+        return self._schema
+
+    @schema.setter
+    def schema(self, value: str) -> None:
+        self._schema = value
 
     @property
     def table(self) -> sqlalchemy.Table:
-        if not self._db:
+        if not self.schema:
             return self.model_class.table  # type: ignore
         table = copy.copy(self.model_class.table)
-        table.schema = self._db.db_schema
+        table.schema = self.schema
         return cast("sqlalchemy.Table", table)
 
     @property
@@ -67,8 +78,7 @@ class TenancyMixin:
         using the same connection.
         """
         queryset: "QuerySet" = self.clone()
-        registry = Registry(database=self.database, schema=schema)
-        queryset._db = registry
+        queryset.schema = schema
         return queryset
 
     def using_with_db(self, database: Database, schema: str) -> "QuerySet":
@@ -79,6 +89,6 @@ class TenancyMixin:
         using a different database connection.
         """
         queryset: "QuerySet" = self.clone()
-        registry = Registry(database=database, schema=schema)
-        queryset._db = registry
+        queryset.database = database
+        queryset.schema = schema
         return queryset
