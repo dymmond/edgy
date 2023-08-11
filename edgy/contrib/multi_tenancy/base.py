@@ -1,7 +1,8 @@
+from edgy.contrib.multi_tenancy.metaclasses import BaseTenantMeta
 from edgy.core.db.models.model import Model
 
 
-class TenantModel(Model):
+class TenantModel(Model, metaclass=BaseTenantMeta):
     """
     Base for a multi tenant model from the Edgy contrib.
     This is **not mandatory** and can be used as a possible

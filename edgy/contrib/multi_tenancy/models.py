@@ -5,12 +5,13 @@ from uuid import UUID
 
 import edgy
 from edgy import settings
+from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.exceptions import ModelSchemaError
 from edgy.core.db.models.model import Model
 from edgy.core.db.models.utils import get_model
 
 
-class TenantMixin(edgy.Model):
+class TenantMixin(TenantModel):
     """
     Abstract table that acts as an entry-point for
     the tenants with Edgy contrib.
@@ -38,6 +39,7 @@ class TenantMixin(edgy.Model):
 
     class Meta:
         abstract = True
+        is_tenant = False
 
     def __str__(self) -> str:
         return f"{self.tenant_name} - {self.schema_name}"
@@ -84,7 +86,7 @@ class TenantMixin(edgy.Model):
         await super().delete()
 
 
-class DomainMixin(edgy.Model):
+class DomainMixin(TenantModel):
     """
     All models that store the domains must use this class
     """
@@ -95,6 +97,7 @@ class DomainMixin(edgy.Model):
 
     class Meta:
         abstract = True
+        is_tenant = False
 
     def __str__(self) -> str:
         return self.domain
@@ -125,7 +128,7 @@ class DomainMixin(edgy.Model):
         return await super().delete()
 
 
-class TenantUserMixin(edgy.Model):
+class TenantUserMixin(TenantModel):
     """
     Mapping between user and a client (tenant).
     """
@@ -147,6 +150,7 @@ class TenantUserMixin(edgy.Model):
 
     class Meta:
         abstract = True
+        is_tenant = False
 
     def __str__(self) -> str:
         return f"User: {self.user.pk}, Tenant: {self.tenant}"

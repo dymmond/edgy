@@ -1,25 +1,41 @@
+import decimal
+from datetime import date, datetime
+from enum import Enum
+from typing import Any, Dict
+from uuid import UUID
+
 import pytest
 from tests.settings import DATABASE_URL
 
-import edgy
+from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.exceptions import ModelSchemaError
 from edgy.contrib.multi_tenancy.models import DomainMixin, TenantMixin
+from edgy.core.db import fields
 from edgy.testclient import DatabaseTestClient as Database
 
 database = Database(url=DATABASE_URL)
-models = edgy.Registry(database=database)
+models = TenantRegistry(database=database)
 
 pytestmark = pytest.mark.anyio
 
 
-@pytest.fixture(autouse=True, scope="function")
+def time():
+    return datetime.now().time()
+
+
+class StatusEnum(Enum):
+    DRAFT = "Draft"
+    RELEASED = "Released"
+
+
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     try:
         await models.create_all()
         yield
         await models.drop_all()
-    except Exception:
-        pytest.skip("No database available")
+    except Exception as e:
+        pytest.skip(f"Error: {str(e)}")
 
 
 @pytest.fixture(autouse=True)
@@ -37,6 +53,32 @@ class Tenant(TenantMixin):
 class Domain(DomainMixin):
     class Meta:
         registry = models
+
+
+class Product(TenantModel):
+    id: int = fields.IntegerField(primary_key=True)
+    uuid: UUID = fields.UUIDField(null=True)
+    created: datetime = fields.DateTimeField(default=datetime.now)
+    created_day: datetime = fields.DateField(default=date.today)
+    created_time: datetime = fields.TimeField(default=time)
+    created_date: datetime = fields.DateField(auto_now_add=True)
+    created_datetime: datetime = fields.DateTimeField(auto_now_add=True)
+    updated_datetime: datetime = fields.DateTimeField(auto_now=True)
+    updated_date: datetime = fields.DateField(auto_now=True)
+    data: Dict[Any, Any] = fields.JSONField(default={})
+    description: str = fields.CharField(null=True, max_length=255)
+    huge_number: int = fields.BigIntegerField(default=0)
+    price: decimal.Decimal = fields.DecimalField(null=True)
+    status: str = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
+    value: float = fields.FloatField(null=True)
+
+    class Meta:
+        registry = models
+        is_tenant = True
+
+
+async def test_tenant_model_metaclass_tenant_models():
+    assert Product.__name__ in Product.meta.registry.tenant_models
 
 
 async def test_create_a_tenant_schema():
