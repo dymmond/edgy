@@ -59,5 +59,9 @@ class ModelReferenceError(EdgyException):
     ...
 
 
+class SchemaError(EdgyException):
+    ...
+
+
 class CommandEnvironmentError(EdgyException):
     ...

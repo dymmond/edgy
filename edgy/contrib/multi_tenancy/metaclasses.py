@@ -1,6 +1,9 @@
-from typing import Any, Tuple, Type
+from typing import TYPE_CHECKING, Any, Tuple, Type
 
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
+
+if TYPE_CHECKING:
+    pass
 
 
 class TenantMeta(MetaInfo):
@@ -11,10 +14,11 @@ class TenantMeta(MetaInfo):
 
 class BaseTenantMeta(BaseModelMeta):
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
-        new_model = super().__new__(cls, name, bases, attrs)
-
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         meta = TenantMeta(meta_class)
+        attrs["meta"] = meta
+        new_model = super().__new__(cls, name, bases, attrs)
+
         registry = new_model.meta.registry
 
         if registry:

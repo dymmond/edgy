@@ -20,6 +20,7 @@ from pydantic._internal._model_construction import ModelMetaclass
 from edgy.conf import settings
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
+from edgy.core.db.context_vars import CONTEXT_SCHEMA
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.core import BaseField, BigIntegerField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
@@ -265,6 +266,7 @@ class BaseModelMeta(ModelMetaclass):
 
         for key, value in attrs.items():
             if isinstance(value, BaseField):
+                getattr(meta_class, "abstract", None)
                 if getattr(meta_class, "abstract", None):
                     value = copy.copy(value)
 
@@ -421,13 +423,29 @@ class BaseModelMeta(ModelMetaclass):
         Making sure the tables on inheritance state, creates the new
         one properly.
         """
+        if CONTEXT_SCHEMA.get():
+            cls._table = cls.table_schema(schema=CONTEXT_SCHEMA.get())
+            return cls._table
+
         if not hasattr(cls, "_table"):
             cls._table = cls.build()
         elif hasattr(cls, "_table"):
+            if not CONTEXT_SCHEMA.get() and cls._table.schema is not None:
+                cls._table = cls.build()
             table = cls._table
             if table.name.lower() != cls.meta.tablename:
                 cls._table = cls.build()
         return cls._table
+
+    def table_schema(cls, schema: str) -> Any:
+        """
+        Making sure the tables on inheritance state, creates the new
+        one properly.
+
+        The use of context vars instead of using the lru_cache comes from
+        a warning from `ruff` where lru can lead to memory leaks.
+        """
+        return cls.build(schema)
 
     @property
     def proxy_model(cls) -> Any:

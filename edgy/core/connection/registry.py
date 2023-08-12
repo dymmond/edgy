@@ -9,6 +9,7 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 
 from edgy.conf import settings
 from edgy.core.connection.database import Database
+from edgy.core.connection.schemas import Schema
 from edgy.exceptions import ImproperlyConfigured
 
 
@@ -29,6 +30,8 @@ class Registry:
         self.tenancy_models: Dict[str, Any] = {}
         self.db_schema = kwargs.get("schema", None)
 
+        self.schema = Schema(registry=self)
+
         self._metadata = (
             sqlalchemy.MetaData(schema=self.db_schema)
             if self.db_schema is not None
@@ -44,28 +47,6 @@ class Registry:
     @metadata.setter
     def metadata(self, value: sqlalchemy.MetaData) -> None:
         self._metadata = value
-
-    async def create_schema(self, schema: str, if_not_exists: bool = False) -> None:
-        """
-        Creates a model schema if it does not exist.
-        """
-        expression = sqlalchemy.text(
-            str(sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists))  # type: ignore
-        )
-        await self.database.execute(expression)
-
-    async def drop_schema(
-        self, schema: str, cascade: bool = False, if_exists: bool = False
-    ) -> None:
-        """
-        Drops an existing model schema.
-        """
-        expression = sqlalchemy.text(
-            str(
-                sqlalchemy.schema.DropSchema(name=schema, cascade=cascade, if_exists=if_exists)  # type: ignore
-            )
-        )
-        await self.database.execute(expression)
 
     def _get_database_url(self) -> str:
         url = self.database.url
@@ -112,7 +93,7 @@ class Registry:
 
     async def create_all(self) -> None:
         if self.db_schema:
-            await self.create_schema(self.db_schema, True)
+            await self.schema.create_schema(self.db_schema, True)
         async with self.database:
             async with self.engine.begin() as connection:
                 await connection.run_sync(self.metadata.create_all)
@@ -121,7 +102,7 @@ class Registry:
 
     async def drop_all(self) -> None:
         if self.db_schema:
-            await self.drop_schema(self.db_schema, True, True)
+            await self.schema.drop_schema(self.db_schema, True, True)
         async with self.database:
             async with self.engine.begin() as conn:
                 await conn.run_sync(self.metadata.drop_all)

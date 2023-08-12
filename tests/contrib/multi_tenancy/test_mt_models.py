@@ -9,7 +9,7 @@ from tests.settings import DATABASE_URL
 
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.exceptions import ModelSchemaError
-from edgy.contrib.multi_tenancy.models import DomainMixin, TenantMixin
+from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.core.db import fields
 from edgy.testclient import DatabaseTestClient as Database
 
@@ -50,11 +50,6 @@ class Tenant(TenantMixin):
         registry = models
 
 
-class Domain(DomainMixin):
-    class Meta:
-        registry = models
-
-
 class Product(TenantModel):
     id: int = fields.IntegerField(primary_key=True)
     uuid: UUID = fields.UUIDField(null=True)
@@ -75,10 +70,6 @@ class Product(TenantModel):
     class Meta:
         registry = models
         is_tenant = True
-
-
-async def test_tenant_model_metaclass_tenant_models():
-    assert Product.__name__ in Product.meta.registry.tenant_models
 
 
 async def test_create_a_tenant_schema():

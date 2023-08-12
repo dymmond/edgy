@@ -19,6 +19,7 @@ from typing import (
 import sqlalchemy
 
 from edgy.conf import settings
+from edgy.core.db.context_vars import CONTEXT_SCHEMA
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
@@ -47,7 +48,6 @@ class BaseQuerySet(
     def __init__(
         self,
         model_class: Union[Type["Model"], None] = None,
-        schema: Optional[str] = None,
         database: Union["Database", None] = None,
         filter_clauses: Any = None,
         select_related: Any = None,
@@ -73,9 +73,12 @@ class BaseQuerySet(
         self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
         self._cache = None
-        self._schema = schema  # type: ignore
         self._database = database  # type: ignore
+        self._schema = None
         self._m2m_related = m2m_related  # type: ignore
+
+        # Making sure the queryset always starts without any schema associated unless specified
+        CONTEXT_SCHEMA.set(None)
 
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class.meta.multi_related[0]
@@ -336,7 +339,6 @@ class BaseQuerySet(
                 only_fields=self._only,
                 defer_fields=self._defer,
                 m2m_related=self.m2m_related,
-                schema=self._schema,
             ),
         )
 
@@ -364,21 +366,21 @@ class BaseQuerySet(
         operation.
         """
         queryset = self.__class__.__new__(self.__class__)
-        queryset.model_class = self.model_class
+        queryset.model_class = copy.deepcopy(self.model_class)
         queryset.filter_clauses = copy.copy(self.filter_clauses)
-        queryset.limit_count = self.limit_count
+        queryset.limit_count = copy.copy(self.limit_count)
         queryset._select_related = copy.copy(self._select_related)
-        queryset._offset = self._offset
+        queryset._offset = copy.copy(self._offset)
         queryset._order_by = copy.copy(self._order_by)
         queryset._group_by = copy.copy(self._group_by)
         queryset.distinct_on = copy.copy(self.distinct_on)
-        queryset._expression = self._expression
+        queryset._expression = copy.copy(self._expression)
         queryset._cache = self._cache
-        queryset._m2m_related = self._m2m_related
-        queryset._only = self._only
-        queryset._defer = self._defer
-        queryset._schema = self._schema
-        queryset._database = self._database
+        queryset._m2m_related = copy.copy(self._m2m_related)
+        queryset._only = copy.copy(self._only)
+        queryset._defer = copy.copy(self._defer)
+        queryset._schema = None
+        queryset._database = copy.copy(self._database)
         return queryset
 
 

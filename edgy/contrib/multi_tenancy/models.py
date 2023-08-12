@@ -3,15 +3,17 @@ from datetime import date
 from typing import Any, Dict, Type, cast
 from uuid import UUID
 
+from loguru import logger
+
 import edgy
 from edgy import settings
-from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.exceptions import ModelSchemaError
+from edgy.contrib.multi_tenancy.utils import create_tables
 from edgy.core.db.models.model import Model
 from edgy.core.db.models.utils import get_model
 
 
-class TenantMixin(TenantModel):
+class TenantMixin(edgy.Model):
     """
     Abstract table that acts as an entry-point for
     the tenants with Edgy contrib.
@@ -39,7 +41,6 @@ class TenantMixin(TenantModel):
 
     class Meta:
         abstract = True
-        is_tenant = False
 
     def __str__(self) -> str:
         return f"{self.tenant_name} - {self.schema_name}"
@@ -49,6 +50,9 @@ class TenantMixin(TenantModel):
     ) -> Type["TenantMixin"]:
         """
         Creates a tenant record and generates a schema in the database.
+
+        When a schema is created, then generates the tables for that same schema
+        from the tenant models.
         """
         fields = self.extract_db_fields()
         schema_name = fields.get("schema_name", None)
@@ -70,8 +74,15 @@ class TenantMixin(TenantModel):
 
         tenant: Type["Model"] = await super().save(force_save, values, **kwargs)
         try:
-            await self.meta.registry.create_schema(schema=tenant.schema_name, if_not_exists=True)
-        except Exception:
+            await self.meta.registry.schema.create_schema(
+                schema=tenant.schema_name, if_not_exists=True
+            )
+            await create_tables(
+                self.meta.registry, self.meta.registry.tenant_models, tenant.schema_name
+            )
+        except Exception as e:
+            message = f"Rolling back... {str(e)}"
+            logger.error(message)
             await self.delete()
         return cast("Type[TenantMixin]", tenant)
 
@@ -82,11 +93,11 @@ class TenantMixin(TenantModel):
         if self.schema_name == settings.tenant_schema_default:
             raise ValueError("Cannot drop public schema.")
 
-        await self.meta.registry.drop_schema(schema=self.schema_name, cascade=True)  # type: ignore
+        await self.meta.registry.schema.drop_schema(schema=self.schema_name, cascade=True)  # type: ignore
         await super().delete()
 
 
-class DomainMixin(TenantModel):
+class DomainMixin(edgy.Model):
     """
     All models that store the domains must use this class
     """
@@ -97,7 +108,6 @@ class DomainMixin(TenantModel):
 
     class Meta:
         abstract = True
-        is_tenant = False
 
     def __str__(self) -> str:
         return self.domain
@@ -128,7 +138,7 @@ class DomainMixin(TenantModel):
         return await super().delete()
 
 
-class TenantUserMixin(TenantModel):
+class TenantUserMixin(edgy.Model):
     """
     Mapping between user and a client (tenant).
     """
@@ -137,20 +147,19 @@ class TenantUserMixin(TenantModel):
         settings.auth_user_model,
         null=False,
         blank=False,
-        related_name="tenant_users",
+        related_name="tenant_user_users",
     )
     tenant = edgy.ForeignKey(
         settings.tenant_model,
         null=False,
         blank=False,
-        related_name="tenant_users",
+        related_name="tenant_users_tenant",
     )
     is_active = edgy.BooleanField(default=False)
     created_on = edgy.DateField(auto_now_add=True)
 
     class Meta:
         abstract = True
-        is_tenant = False
 
     def __str__(self) -> str:
         return f"User: {self.user.pk}, Tenant: {self.tenant}"

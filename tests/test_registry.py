@@ -1,9 +1,24 @@
+import random
+
 import pytest
-from asyncpg.exceptions import DuplicateSchemaError, InvalidSchemaNameError
 from tests.settings import DATABASE_URL
 
 import edgy
+from edgy.exceptions import SchemaError
 from edgy.testclient import DatabaseTestClient as Database
+
+
+def get_random_string(
+    length: int = 12,
+    allowed_chars: str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+) -> str:
+    """
+    Returns a securely generated random string.
+    The default length of 12 with the a-z, A-Z, 0-9 character set returns
+    a 71-bit value. log_2((26+26+10)^12) =~ 71 bits
+    """
+    return "".join(random.choice(allowed_chars) for _ in range(length))
+
 
 database = Database(url=DATABASE_URL)
 registry = edgy.Registry(database=database)
@@ -30,35 +45,47 @@ async def rollback_connections():
 
 @pytest.mark.parametrize("schema", ["edgy", "saffier", "esmerald", "tenant"])
 async def test_create_schema(schema):
-    await registry.create_schema(schema=schema, if_not_exists=False)
+    await registry.schema.create_schema(schema=schema, if_not_exists=False)
 
 
 @pytest.mark.skipif(database.url.dialect != "postgresql", reason="Testing for postgres")
 async def test_raises_schema_error_if_exists():
-    await registry.create_schema(schema="edgy", if_not_exists=False)
+    schema = get_random_string(5)
+    await registry.schema.create_schema(schema=schema, if_not_exists=False)
 
-    with pytest.raises(DuplicateSchemaError) as raised:
-        await registry.create_schema(schema="edgy", if_not_exists=False)
+    with pytest.raises(SchemaError) as raised:
+        await registry.schema.create_schema(schema=schema, if_not_exists=False)
 
-    assert raised.value.args[0] == 'schema "edgy" already exists'
+    assert (
+        raised.value.args[0]
+        == f"<class 'asyncpg.exceptions.DuplicateSchemaError'>: schema \"{schema}\" already exists"
+    )
 
 
 async def test_can_drop_schema():
-    await registry.create_schema(schema="edgy", if_not_exists=False)
-    await registry.drop_schema(schema="edgy", cascade=True)
+    schema = get_random_string(5)
+    await registry.schema.create_schema(schema=schema, if_not_exists=False)
+    await registry.schema.drop_schema(schema=schema, cascade=True)
 
 
-@pytest.mark.parametrize("schema", ["edgy", "saffier", "esmerald", "tenant"])
+@pytest.mark.parametrize(
+    "schema",
+    [get_random_string(5), get_random_string(7), get_random_string(8), get_random_string(6)],
+)
 async def test_drop_schemas(schema):
-    await registry.create_schema(schema=schema, if_not_exists=False)
-    await registry.drop_schema(schema=schema, cascade=True)
+    await registry.schema.create_schema(schema=schema, if_not_exists=False)
+    await registry.schema.drop_schema(schema=schema, cascade=True)
 
 
 async def test_cannot_drop_not_existing_schema():
-    await registry.create_schema(schema="edgy", if_not_exists=False)
-    await registry.drop_schema(schema="edgy", cascade=True)
+    schema = get_random_string(5)
+    await registry.schema.create_schema(schema=schema, if_not_exists=False)
+    await registry.schema.drop_schema(schema=schema, cascade=True)
 
-    with pytest.raises(InvalidSchemaNameError) as raised:
-        await registry.drop_schema(schema="edgy", cascade=True)
+    with pytest.raises(SchemaError) as raised:
+        await registry.schema.drop_schema(schema=schema, cascade=True)
 
-    assert raised.value.args[0] == 'schema "edgy" does not exist'
+    assert (
+        raised.value.args[0]
+        == f"<class 'asyncpg.exceptions.InvalidSchemaNameError'>: schema \"{schema}\" does not exist"
+    )
