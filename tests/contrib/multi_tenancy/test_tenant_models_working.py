@@ -121,6 +121,8 @@ async def test_can_have_multiple_tenants_with_different_records():
 
     # Create top level users
     for name in range(10):
+        await User.query.using(saffier.schema_name).create(name=f"user-{name}")
+        await User.query.using(edgy.schema_name).create(name=f"user-{name}")
         await User.query.create(name=f"user-{name}")
 
     # Check the totals
@@ -128,7 +130,7 @@ async def test_can_have_multiple_tenants_with_different_records():
     assert len(top_level_users) == 10
 
     users_edgy = await User.query.using(edgy.schema_name).all()
-    assert len(users_edgy) == 1
+    assert len(users_edgy) == 11
 
     users_saffier = await User.query.using(saffier.schema_name).all()
-    assert len(users_saffier) == 1
+    assert len(users_saffier) == 11
