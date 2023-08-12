@@ -6,7 +6,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class EdgySettings(BaseSettings):
     model_config = SettingsConfigDict(extra="allow", ignored_types=(cached_property,))
-
     ipython_args: List[str] = ["--no-banner"]
     ptpython_config_file: str = "~/.config/ptpython/config.py"
 

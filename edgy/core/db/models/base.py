@@ -21,7 +21,7 @@ from edgy.core.utils.models import DateParser, ModelParser, generify_model_field
 from edgy.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
-    from edgy import Model, Registry
+    from edgy import Model
 
 EXCLUDED_LOOKUP = ["__model_references__"]
 
@@ -106,7 +106,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     def proxy_model(self) -> Any:
         return self.__class__.proxy_model
 
-    @cached_property
+    @property
     def table(self) -> sqlalchemy.Table:
         return cast("sqlalchemy.Table", self.__class__.table)
 
@@ -132,14 +132,16 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return proxy_model.model
 
     @classmethod
-    def build(cls, registry: Optional["Registry"] = None) -> sqlalchemy.Table:
+    def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:
         """
         Builds the SQLAlchemy table representation from the loaded fields.
         """
         tablename: str = cls.meta.tablename  # type: ignore
-        using = registry or cls.meta.registry
+        meta: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
 
-        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", using._metadata)  # type: ignore
+        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", meta)  # type: ignore
+        metadata.schema = schema
+
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
 

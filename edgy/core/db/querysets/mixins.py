@@ -1,10 +1,10 @@
 import asyncio
-import copy
 from typing import TYPE_CHECKING, Any, Callable, cast
 
 import sqlalchemy
 
 from edgy.core.connection.database import Database
+from edgy.core.db.context_vars import CONTEXT_SCHEMA
 
 if TYPE_CHECKING:
     from edgy import QuerySet
@@ -28,19 +28,11 @@ class QuerySetPropsMixin:
 
     @property
     def schema(self) -> str:
-        return self._schema
-
-    @schema.setter
-    def schema(self, value: str) -> None:
-        self._schema = value
+        return CONTEXT_SCHEMA.get()
 
     @property
     def table(self) -> sqlalchemy.Table:
-        if not self.schema:
-            return self.model_class.table  # type: ignore
-        table = copy.copy(self.model_class.table)
-        table.schema = self.schema
-        return cast("sqlalchemy.Table", table)
+        return cast("sqlalchemy.Table", self.model_class.table)
 
     @property
     def pkname(self) -> Any:
@@ -77,9 +69,9 @@ class TenancyMixin:
         Generates the registry object pointing to the desired schema
         using the same connection.
         """
-        queryset: "QuerySet" = self.clone()
-        queryset.schema = schema
-        return queryset
+
+        CONTEXT_SCHEMA.set(schema)
+        return cast("QuerySet", self)
 
     def using_with_db(self, database: Database, schema: str) -> "QuerySet":
         """
@@ -90,5 +82,5 @@ class TenancyMixin:
         """
         queryset: "QuerySet" = self.clone()
         queryset.database = database
-        queryset.schema = schema
+        CONTEXT_SCHEMA.set(schema)
         return queryset
