@@ -26,7 +26,6 @@ def set_queryset_schema(
     queryset: "QuerySet",
     model_class: Type["Model"],
     value: Union[str, None],
-    is_global: bool = False,
 ) -> "QuerySet":
     """
     Returns a new queryset object pointing to the desired schema of the
@@ -35,6 +34,5 @@ def set_queryset_schema(
     return queryset.__class__(
         model_class=model_class,
         using_schema=value,
-        is_global=is_global,
         table=model_class.table_schema(value),
     )

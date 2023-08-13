@@ -82,7 +82,6 @@ class TenancyMixin:
         using the same connection.
         """
         queryset = set_queryset_schema(self, self.model_class, value=schema)
-        queryset.table = self.model_class.table_schema(queryset.using_schema)
         return queryset
 
     def using_with_db(self, database: Database, schema: str) -> "QuerySet":
@@ -93,6 +92,5 @@ class TenancyMixin:
         using a different database connection.
         """
         queryset = set_queryset_schema(self, self.model_class, value=schema)
-        queryset.table = self.model_class.table_schema(queryset.using_schema)
         queryset.database = database
         return queryset
