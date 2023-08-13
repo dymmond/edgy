@@ -1,0 +1,59 @@
+from datetime import datetime
+from enum import Enum
+
+import pytest
+from tests.settings import DATABASE_URL
+
+import edgy
+from edgy.core.db import fields
+from edgy.testclient import DatabaseTestClient as Database
+
+pytestmark = pytest.mark.anyio
+
+database = Database(DATABASE_URL)
+models = edgy.Registry(database=database, schema="another")
+
+
+def time():
+    return datetime.now().time()
+
+
+class StatusEnum(Enum):
+    DRAFT = "Draft"
+    RELEASED = "Released"
+
+
+class Product(edgy.Model):
+    id: int = fields.IntegerField(primary_key=True)
+    name: str = fields.CharField(max_length=255)
+
+    class Meta:
+        registry = models
+
+
+@pytest.fixture(autouse=True, scope="module")
+async def create_test_database():
+    await models.create_all()
+    yield
+    await models.drop_all()
+
+
+@pytest.fixture(autouse=True)
+async def rollback_transactions():
+    with database.force_rollback():
+        async with database:
+            yield
+
+
+async def test_bulk_create():
+    await Product.query.bulk_create(
+        [
+            {"name": "product-1"},
+            {"name": "product-2"},
+        ]
+    )
+
+    total = await Product.query.all()
+
+    assert len(total) == 2
+    assert Product.table.schema == models.db_schema

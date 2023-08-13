@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 import sqlalchemy
 
 from edgy.core.connection.database import Database
-from edgy.core.db.context_vars import CONTEXT_SCHEMA
+from edgy.core.db.context_vars import CONTEXT_SCHEMA, get_context_db_schema
 
 if TYPE_CHECKING:
     from edgy import QuerySet
@@ -28,7 +28,7 @@ class QuerySetPropsMixin:
 
     @property
     def schema(self) -> str:
-        return CONTEXT_SCHEMA.get()
+        return get_context_db_schema()
 
     @property
     def table(self) -> sqlalchemy.Table:

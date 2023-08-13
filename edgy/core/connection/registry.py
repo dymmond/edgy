@@ -41,7 +41,7 @@ class Registry:
     @property
     def metadata(self) -> Any:
         for model_class in self.models.values():
-            model_class.build()
+            model_class.build(schema=self.db_schema)
         return self._metadata
 
     @metadata.setter
