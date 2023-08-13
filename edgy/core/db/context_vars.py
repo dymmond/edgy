@@ -15,4 +15,4 @@ def set_context_db_schema(value: Any) -> None:
     """
     Gets the db schema from the context.
     """
-    CONTEXT_SCHEMA.set(None)
+    CONTEXT_SCHEMA.set(value)
