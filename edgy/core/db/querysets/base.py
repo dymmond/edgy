@@ -340,7 +340,7 @@ class BaseQuerySet(
                 order_by=self._order_by,
                 only_fields=self._only,
                 defer_fields=self._defer,
-                m2m_related=self.m2m_related
+                m2m_related=self.m2m_related,
                 table=self.table,
             ),
         )
