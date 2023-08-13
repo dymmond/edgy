@@ -2,9 +2,10 @@ import asyncio
 from typing import TYPE_CHECKING, Any, Callable, cast
 
 import sqlalchemy
+from loguru import logger
 
 from edgy.core.connection.database import Database
-from edgy.core.db.context_vars import get_context_db_schema, set_context_db_schema
+from edgy.core.db.context_vars import get_context_db_schema, get_tenant, set_context_db_schema
 
 if TYPE_CHECKING:
     from edgy import QuerySet
@@ -62,6 +63,15 @@ class TenancyMixin:
         """
         return asyncio.get_event_loop().run_until_complete(fn)
 
+    def is_active_tenant(self) -> None:
+        """
+        Checks if there is any active tenant.
+        """
+        if get_tenant():
+            logger.warning(
+                "There is already global tenant in the context. `using` will be ignored."
+            )
+
     def using(self, schema: str) -> "QuerySet":
         """
         Enables and switches the db schema.
@@ -69,7 +79,7 @@ class TenancyMixin:
         Generates the registry object pointing to the desired schema
         using the same connection.
         """
-
+        self.is_active_tenant()
         set_context_db_schema(schema)
         return cast("QuerySet", self)
 
