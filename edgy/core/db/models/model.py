@@ -6,9 +6,6 @@ from edgy.core.db.models.row import ModelRow
 from edgy.core.utils.functional import edgy_setattr
 from edgy.exceptions import RelationshipNotFound
 
-if TYPE_CHECKING:
-    pass
-
 
 class Model(ModelRow, DeclarativeMixin):
     """

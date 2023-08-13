@@ -27,7 +27,6 @@ class Registry:
         self.database: Database = database
         self.models: Dict[str, Any] = {}
         self.reflected: Dict[str, Any] = {}
-        self.tenancy_models: Dict[str, Any] = {}
         self.db_schema = kwargs.get("schema", None)
 
         self.schema = Schema(registry=self)
