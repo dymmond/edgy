@@ -3,11 +3,19 @@ from typing import Union
 
 SCHEMA: ContextVar[str] = ContextVar("schema", default=None)
 TENANT: ContextVar[str] = ContextVar("tenant", default=None)
+QUERY: ContextVar[str] = ContextVar("query", default=False)
 
 
 def get_tenant() -> str:
     """
     Gets the current active tenant in the context.
+    """
+    return TENANT.get()
+
+
+def get_new_query() -> str:
+    """
+    Gets the current query in the context.
     """
     return TENANT.get()
 
@@ -22,6 +30,13 @@ def get_context_db_schema() -> str:
     if get_tenant():
         return get_tenant()
     return SCHEMA.get()
+
+
+def set_context_query(value: Union[str, None]) -> None:
+    """
+    Set the value of the query for the context.
+    """
+    QUERY.set(value)
 
 
 def set_context_db_schema(value: Union[str, None]) -> None:

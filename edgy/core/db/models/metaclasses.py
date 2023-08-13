@@ -425,6 +425,14 @@ class BaseModelMeta(ModelMetaclass):
             return cast("str", cls.meta.registry.db_schema)
         return None
 
+    def is_tenant_model(cls) -> bool:
+        """
+        Checks if this is a tenant model.
+
+        The schema is only built if the model is a tenant.
+        """
+        return False
+
     @property
     def table(cls) -> Any:
         """
@@ -462,7 +470,9 @@ class BaseModelMeta(ModelMetaclass):
         The use of context vars instead of using the lru_cache comes from
         a warning from `ruff` where lru can lead to memory leaks.
         """
-        return cls.build(schema)
+        if cls.is_tenant_model():
+            return cls.build(schema=schema)
+        return cls.build()
 
     @property
     def proxy_model(cls) -> Any:

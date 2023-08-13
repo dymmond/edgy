@@ -1,4 +1,6 @@
-from edgy.contrib.multi_tenancy.metaclasses import BaseTenantMeta
+from typing import ClassVar
+
+from edgy.contrib.multi_tenancy.metaclasses import BaseTenantMeta, TenantMeta
 from edgy.core.db.models.model import Model
 
 
@@ -12,3 +14,5 @@ class TenantModel(Model, metaclass=BaseTenantMeta):
     example of how to achieve the multi-tenancy in a simple fashion
     using Edgy and Edgy models.
     """
+
+    meta: ClassVar[TenantMeta] = TenantMeta(None)

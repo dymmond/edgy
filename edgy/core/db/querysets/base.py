@@ -59,6 +59,7 @@ class BaseQuerySet(
         only_fields: Any = None,
         defer_fields: Any = None,
         m2m_related: Any = None,
+        is_new: bool = True,
     ) -> None:
         super().__init__(model_class=model_class)
         self.model_class = cast("Type[Model]", model_class)
@@ -74,12 +75,11 @@ class BaseQuerySet(
         self._expression = None
         self._cache = None
         self._database = database  # type: ignore
-        self._schema = None
         self._m2m_related = m2m_related  # type: ignore
-
-        # Making sure the queryset always starts without any schema associated unless specified
+        self.is_new = is_new
         set_context_db_schema(None)
 
+        # Making sure the queryset always starts without any schema associated unless specified
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class.meta.multi_related[0]
 
@@ -339,6 +339,7 @@ class BaseQuerySet(
                 only_fields=self._only,
                 defer_fields=self._defer,
                 m2m_related=self.m2m_related,
+                is_new=False,
             ),
         )
 
@@ -379,8 +380,8 @@ class BaseQuerySet(
         queryset._m2m_related = copy.copy(self._m2m_related)
         queryset._only = copy.copy(self._only)
         queryset._defer = copy.copy(self._defer)
-        queryset._schema = None
         queryset._database = copy.copy(self._database)
+        queryset.is_new = False
         return queryset
 
 
@@ -863,7 +864,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return await self.filter(pk=instance.pk).exists()
 
     async def execute(self) -> Any:
-        return await self.all()
+        records = await self.all()
+        return records
 
     def __await__(
         self,

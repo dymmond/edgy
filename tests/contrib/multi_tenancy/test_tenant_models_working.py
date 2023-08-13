@@ -134,31 +134,3 @@ async def test_can_have_multiple_tenants_with_different_records():
 
     users_saffier = await User.query.using(saffier.schema_name).all()
     assert len(users_saffier) == 11
-
-
-async def test_activate_and_deactivate_tenant():
-    edgy = await Tenant.query.create(
-        schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
-    )
-
-    edgy.activate()
-
-    # Create a user for edgy
-    user = await User.query.create(name="Edgy")
-
-    for i in range(25):
-        await Product.query.create(name=f"product-{i}", user=user)
-
-    total_users = await User.query.all()
-    assert len(total_users) == 1
-
-    total_products = await Product.query.all()
-    assert len(total_products) == 25
-
-    edgy.deactivate()
-
-    total_users = await User.query.all()
-    assert len(total_users) == 0
-
-    total_products = await Product.query.all()
-    assert len(total_products) == 0

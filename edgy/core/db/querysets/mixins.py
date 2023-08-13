@@ -5,7 +5,7 @@ import sqlalchemy
 from loguru import logger
 
 from edgy.core.connection.database import Database
-from edgy.core.db.context_vars import get_context_db_schema, get_tenant, set_context_db_schema
+from edgy.core.db.context_vars import get_tenant, set_context_db_schema
 
 if TYPE_CHECKING:
     from edgy import QuerySet
@@ -26,10 +26,6 @@ class QuerySetPropsMixin:
     @database.setter
     def database(self, value: Database) -> None:
         self._database = value
-
-    @property
-    def schema(self) -> str:
-        return get_context_db_schema()
 
     @property
     def table(self) -> sqlalchemy.Table:
