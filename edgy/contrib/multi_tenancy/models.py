@@ -9,6 +9,7 @@ import edgy
 from edgy import settings
 from edgy.contrib.multi_tenancy.exceptions import ModelSchemaError
 from edgy.contrib.multi_tenancy.utils import create_tables
+from edgy.core.db.context_vars import set_context_db_schema
 from edgy.core.db.models.model import Model
 from edgy.core.db.models.utils import get_model
 
@@ -93,7 +94,8 @@ class TenantMixin(edgy.Model):
         if self.schema_name == settings.tenant_schema_default:
             raise ValueError("Cannot drop public schema.")
 
-        await self.meta.registry.schema.drop_schema(schema=self.schema_name, cascade=True)  # type: ignore
+        await self.meta.registry.schema.drop_schema(schema=self.schema_name, cascade=True, if_exists=True)  # type: ignore
+        set_context_db_schema(None)
         await super().delete()
 
 
