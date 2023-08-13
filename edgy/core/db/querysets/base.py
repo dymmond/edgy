@@ -19,7 +19,7 @@ from typing import (
 import sqlalchemy
 
 from edgy.conf import settings
-from edgy.core.db.context_vars import CONTEXT_SCHEMA
+from edgy.core.db.context_vars import set_context_db_schema
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
@@ -78,7 +78,7 @@ class BaseQuerySet(
         self._m2m_related = m2m_related  # type: ignore
 
         # Making sure the queryset always starts without any schema associated unless specified
-        CONTEXT_SCHEMA.set(None)
+        set_context_db_schema(None)
 
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class.meta.multi_related[0]

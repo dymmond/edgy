@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Callable, cast
 import sqlalchemy
 
 from edgy.core.connection.database import Database
-from edgy.core.db.context_vars import CONTEXT_SCHEMA, get_context_db_schema
+from edgy.core.db.context_vars import get_context_db_schema, set_context_db_schema
 
 if TYPE_CHECKING:
     from edgy import QuerySet
@@ -70,7 +70,7 @@ class TenancyMixin:
         using the same connection.
         """
 
-        CONTEXT_SCHEMA.set(schema)
+        set_context_db_schema(schema)
         return cast("QuerySet", self)
 
     def using_with_db(self, database: Database, schema: str) -> "QuerySet":
@@ -82,5 +82,5 @@ class TenancyMixin:
         """
         queryset: "QuerySet" = self.clone()
         queryset.database = database
-        CONTEXT_SCHEMA.set(schema)
+        set_context_db_schema(schema)
         return queryset
