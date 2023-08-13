@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Set, Type, Union
+from typing import Any, Dict, Set, Type, Union
 
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
