@@ -59,7 +59,6 @@ class BaseQuerySet(
         defer_fields: Any = None,
         m2m_related: Any = None,
         using_schema: Any = None,
-        is_global: bool = False,
         table: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
@@ -78,7 +77,6 @@ class BaseQuerySet(
         self._database = database  # type: ignore
         self._m2m_related = m2m_related  # type: ignore
         self.using_schema = using_schema
-        self.is_global = is_global
 
         # Making sure the queryset always starts without any schema associated unless specified
         if self.is_m2m and not self._m2m_related:
@@ -342,8 +340,7 @@ class BaseQuerySet(
                 order_by=self._order_by,
                 only_fields=self._only,
                 defer_fields=self._defer,
-                m2m_related=self.m2m_related,
-                is_global=self.is_global,
+                m2m_related=self.m2m_related
                 table=self.table,
             ),
         )
@@ -387,7 +384,6 @@ class BaseQuerySet(
         queryset._defer = copy.copy(self._defer)
         queryset._database = copy.copy(self._database)
         queryset.table = self.table
-        queryset.is_global = self.is_global
         queryset.table = self.table
         return queryset
 
