@@ -250,11 +250,15 @@ class EdgyBaseReflectModel(EdgyBaseModel, metaclass=BaseModelReflectMeta):
         setattr(self, self.pkname, value)
 
     @classmethod
-    def build(cls) -> Any:
+    def build(cls, schema: Optional[str] = None) -> Any:
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-        metadata: sqlalchemy.MetaData = cls.meta.registry._metadata  # type: ignore
+        meta: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
+
+        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", meta)  # type: ignore
+        metadata.schema = schema
+
         tablename: str = cast("str", cls.meta.tablename)
         return cls.reflect(tablename, metadata)
 
