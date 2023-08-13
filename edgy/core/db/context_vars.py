@@ -4,9 +4,7 @@ from typing import TYPE_CHECKING, Type, Union
 if TYPE_CHECKING:
     from edgy import Model, QuerySet
 
-SCHEMA: ContextVar[str] = ContextVar("schema", default=None)
 TENANT: ContextVar[str] = ContextVar("tenant", default=None)
-QUERY: ContextVar[str] = ContextVar("query", default=False)
 
 
 def get_tenant() -> str:
@@ -14,18 +12,6 @@ def get_tenant() -> str:
     Gets the current active tenant in the context.
     """
     return TENANT.get()
-
-
-def get_context_db_schema() -> Union[str, None]:
-    """
-    Gets the db schema from the context.
-
-    If a global tenant is set, then it ignore the context schema and sets the tenant
-    to global.
-    """
-    if get_tenant():
-        return get_tenant()
-    return None
 
 
 def set_tenant(value: Union[str, None]) -> None:
