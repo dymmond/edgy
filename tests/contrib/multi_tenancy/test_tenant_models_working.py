@@ -134,3 +134,35 @@ async def test_can_have_multiple_tenants_with_different_records():
 
     users_saffier = await User.query.using(saffier.schema_name).all()
     assert len(users_saffier) == 11
+
+
+async def test_model_crud():
+    edgy = await Tenant.query.create(
+        schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
+    )
+
+    users = await User.query.using(edgy.schema_name).all()
+    assert users == []
+
+    user = await User.query.using(edgy.schema_name).create(name="Test")
+    users = await User.query.using(edgy.schema_name).all()
+    assert user.name == "Test"
+    assert user.pk is not None
+    assert users == [user]
+
+    lookup = await User.query.using(edgy.schema_name).get()
+    assert lookup == user
+
+    await user.update(name="Jane")
+    users = await User.query.using(edgy.schema_name).all()
+    assert user.name == "Jane"
+    assert user.pk is not None
+    assert users == [user]
+
+    # Check if public has the users
+    users = await User.query.all()
+    assert users == []
+
+    await user.delete()
+    users = await User.query.using(edgy.schema_name).all()
+    assert users == []
