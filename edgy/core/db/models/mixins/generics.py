@@ -1,10 +1,7 @@
 from typing import Any
 
-import nest_asyncio
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Mapped, relationship
-
-nest_asyncio.apply()
 
 
 class DeclarativeMixin(BaseModel):
