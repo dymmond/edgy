@@ -5,7 +5,7 @@ import sqlalchemy
 from loguru import logger
 
 from edgy.core.connection.database import Database
-from edgy.core.db.context_vars import get_tenant, set_context_db_schema
+from edgy.core.db.context_vars import get_tenant, set_context_db_schema, set_user_tenant
 
 if TYPE_CHECKING:
     from edgy import QuerySet
@@ -29,7 +29,13 @@ class QuerySetPropsMixin:
 
     @property
     def table(self) -> sqlalchemy.Table:
-        return cast("sqlalchemy.Table", self.model_class.table)
+        if getattr(self, "_table", None) is None:
+            return cast("sqlalchemy.Table", self.model_class.table)
+        return self._table
+
+    @table.setter
+    def table(self, value: sqlalchemy.Table) -> None:
+        self._table = value
 
     @property
     def pkname(self) -> Any:
@@ -75,9 +81,9 @@ class TenancyMixin:
         Generates the registry object pointing to the desired schema
         using the same connection.
         """
-        self.is_active_tenant()
-        set_context_db_schema(schema)
-        return cast("QuerySet", self)
+        queryset = set_user_tenant(self, self.model_class, value=schema)
+        queryset.table = self.model_class.table_schema(queryset.using_schema)
+        return queryset
 
     def using_with_db(self, database: Database, schema: str) -> "QuerySet":
         """

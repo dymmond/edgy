@@ -108,7 +108,13 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @property
     def table(self) -> sqlalchemy.Table:
-        return cast("sqlalchemy.Table", self.__class__.table)
+        if getattr(self, "_table", None) is None:
+            return cast("sqlalchemy.Table", self.__class__.table)
+        return self._table
+
+    @table.setter
+    def table(self, value: sqlalchemy.Table) -> None:
+        self._table = value
 
     @classmethod
     def generate_proxy_model(cls) -> Type["Model"]:

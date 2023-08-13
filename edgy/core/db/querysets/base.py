@@ -59,7 +59,7 @@ class BaseQuerySet(
         only_fields: Any = None,
         defer_fields: Any = None,
         m2m_related: Any = None,
-        is_new: bool = True,
+        using_schema: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
         self.model_class = cast("Type[Model]", model_class)
@@ -76,7 +76,8 @@ class BaseQuerySet(
         self._cache = None
         self._database = database  # type: ignore
         self._m2m_related = m2m_related  # type: ignore
-        self.is_new = is_new
+        self.using_schema = using_schema
+
         set_context_db_schema(None)
 
         # Making sure the queryset always starts without any schema associated unless specified
@@ -339,7 +340,6 @@ class BaseQuerySet(
                 only_fields=self._only,
                 defer_fields=self._defer,
                 m2m_related=self.m2m_related,
-                is_new=False,
             ),
         )
 
@@ -381,7 +381,7 @@ class BaseQuerySet(
         queryset._only = copy.copy(self._only)
         queryset._defer = copy.copy(self._defer)
         queryset._database = copy.copy(self._database)
-        queryset.is_new = False
+        queryset.table = self.table
         return queryset
 
 
@@ -628,9 +628,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a boolean indicating if a record exists or not.
         """
-        expression = self.build_select()
+        queryset: "QuerySet" = self.clone()
+        expression = queryset.build_select()
         expression = sqlalchemy.exists(expression).select()
-        self.set_query_expression(expression)
+        queryset.set_query_expression(expression)
         _exists = await self.database.fetch_val(expression)
         return cast("bool", _exists)
 
@@ -638,10 +639,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns an indicating the total records.
         """
-        expression = self.build_select().alias("subquery_for_count")
+        queryset: "QuerySet" = self.clone()
+        expression = queryset.build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
-        self.set_query_expression(expression)
-        _count = await self.database.fetch_val(expression)
+        queryset.set_query_expression(expression)
+        _count = await queryset.database.fetch_val(expression)
         return cast("int", _count)
 
     async def get_or_none(self, **kwargs: Any) -> Union[EdgyModel, None]:
@@ -650,33 +652,33 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self.filter(**kwargs)
         expression = queryset.build_select().limit(2)
-        self.set_query_expression(expression)
-        rows = await self.database.fetch_all(expression)
+        queryset.set_query_expression(expression)
+        rows = await queryset.database.fetch_all(expression)
 
         if not rows:
             return None
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        return self.model_class.from_sqla_row(rows[0], select_related=self._select_related)
+        return queryset.model_class.from_sqla_row(rows[0], select_related=queryset._select_related)
 
     async def all(self, **kwargs: Any) -> List[EdgyModel]:
         """
         Returns the queryset records based on specific filters
         """
         queryset: "QuerySet" = self.clone()
-        if self.is_m2m:
-            queryset.distinct_on = [self.m2m_related]
+        if queryset.is_m2m:
+            queryset.distinct_on = [queryset.m2m_related]
 
         if kwargs:
             return await queryset.filter(**kwargs).all()
 
         expression = queryset.build_select()
-        self.set_query_expression(expression)
+        queryset.set_query_expression(expression)
 
         rows = await queryset.database.fetch_all(expression)
 
         # Attach the raw query to the object
-        queryset.model_class.raw_query = self.sql
+        queryset.model_class.raw_query = queryset.sql
 
         is_only_fields = True if queryset._only else False
         is_defer_fields = True if queryset._defer else False
@@ -684,7 +686,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         results = [
             queryset.model_class.from_sqla_row(
                 row,
-                select_related=self._select_related,
+                select_related=queryset._select_related,
                 is_only_fields=is_only_fields,
                 only_fields=queryset._only,
                 is_defer_fields=is_defer_fields,
@@ -692,35 +694,37 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             for row in rows
         ]
 
-        if not self.is_m2m:
+        if not queryset.is_m2m:
             return results
 
-        all_results = [getattr(result, self.m2m_related) for result in results]
+        all_results = [getattr(result, queryset.m2m_related) for result in results]
         return all_results
 
     async def get(self, **kwargs: Any) -> EdgyModel:
         """
         Returns a single record based on the given kwargs.
         """
+        queryset: "QuerySet" = self.clone()
+
         if kwargs:
-            return await self.filter(**kwargs).get()
+            return await queryset.filter(**kwargs).get()
 
-        expression = self.build_select().limit(2)
-        rows = await self.database.fetch_all(expression)
-        self.set_query_expression(expression)
+        expression = queryset.build_select().limit(2)
+        rows = await queryset.database.fetch_all(expression)
+        queryset.set_query_expression(expression)
 
-        is_only_fields = True if self._only else False
-        is_defer_fields = True if self._defer else False
+        is_only_fields = True if queryset._only else False
+        is_defer_fields = True if queryset._defer else False
 
         if not rows:
             raise ObjectNotFound()
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        return self.model_class.from_sqla_row(
+        return queryset.model_class.from_sqla_row(
             rows[0],
-            select_related=self._select_related,
+            select_related=queryset._select_related,
             is_only_fields=is_only_fields,
-            only_fields=self._only,
+            only_fields=queryset._only,
             is_defer_fields=is_defer_fields,
         )
 
@@ -754,8 +758,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Creates a record in a specific table.
         """
-        kwargs = self.validate_kwargs(**kwargs)
-        instance = self.model_class(**kwargs)
+        queryset: "QuerySet" = self.clone()
+        kwargs = queryset.validate_kwargs(**kwargs)
+        instance = queryset.model_class(**kwargs)
+        instance.table = queryset.table
         instance = await instance.save(force_save=True, values=kwargs)
         return instance
 
@@ -766,8 +772,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset: "QuerySet" = self.clone()
         new_objs = [self.validate_kwargs(**obj) for obj in objs]
 
-        expression = self.table.insert().values(new_objs)
-        self.set_query_expression(expression)
+        expression = queryset.table.insert().values(new_objs)
+        queryset.set_query_expression(expression)
         await queryset.database.execute(expression)
 
     async def bulk_update(self, objs: List[EdgyModel], fields: List[str]) -> None:
@@ -779,6 +785,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         It is thought to be a clean approach to a simple problem so it was added here and
         refactored to be compatible with Edgy.
         """
+        queryset: "QuerySet" = self.clone()
+
         new_objs = []
         for obj in objs:
             new_obj = {}
@@ -787,44 +795,52 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                     new_obj[key] = self.resolve_value(value)
             new_objs.append(new_obj)
 
-        new_objs = [self.extract_values_from_field(obj, self.model_class) for obj in new_objs]
+        new_objs = [
+            queryset.extract_values_from_field(obj, queryset.model_class) for obj in new_objs
+        ]
 
-        pk = getattr(self.table.c, self.pkname)
-        expression = self.table.update().where(pk == sqlalchemy.bindparam(self.pkname))
+        pk = getattr(queryset.table.c, queryset.pkname)
+        expression = queryset.table.update().where(pk == sqlalchemy.bindparam(queryset.pkname))
         kwargs: Dict[Any, Any] = {
             field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()
         }
-        pks = [{self.pkname: getattr(obj, self.pkname)} for obj in objs]
+        pks = [{queryset.pkname: getattr(obj, queryset.pkname)} for obj in objs]
 
         query_list = []
         for pk, value in zip(pks, new_objs):  # noqa
             query_list.append({**pk, **value})
 
         expression = expression.values(kwargs)
-        self.set_query_expression(expression)
-        await self.database.execute_many(str(expression), query_list)
+        queryset.set_query_expression(expression)
+        await queryset.database.execute_many(str(expression), query_list)
 
     async def delete(self) -> None:
-        expression = self.table.delete()
-        for filter_clause in self.filter_clauses:
+        queryset: "QuerySet" = self.clone()
+
+        expression = queryset.table.delete()
+        for filter_clause in queryset.filter_clauses:
             expression = expression.where(filter_clause)
 
-        self.set_query_expression(expression)
-        await self.database.execute(expression)
+        queryset.set_query_expression(expression)
+        await queryset.database.execute(expression)
 
     async def update(self, **kwargs: Any) -> None:
         """
         Updates a record in a specific table with the given kwargs.
         """
-        extracted_fields = self.extract_values_from_field(kwargs, model_class=self.model_class)
-        kwargs = self.update_auto_now_fields(extracted_fields, self.model_class.fields)
-        expression = self.table.update().values(**kwargs)
+        queryset: "QuerySet" = self.clone()
 
-        for filter_clause in self.filter_clauses:
+        extracted_fields = queryset.extract_values_from_field(
+            kwargs, model_class=queryset.model_class
+        )
+        kwargs = queryset.update_auto_now_fields(extracted_fields, queryset.model_class.fields)
+        expression = queryset.table.update().values(**kwargs)
+
+        for filter_clause in queryset.filter_clauses:
             expression = expression.where(filter_clause)
 
-        self.set_query_expression(expression)
-        await self.database.execute(expression)
+        queryset.set_query_expression(expression)
+        await queryset.database.execute(expression)
 
     async def get_or_create(
         self, defaults: Dict[str, Any], **kwargs: Any
@@ -832,12 +848,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Creates a record in a specific table or updates if already exists.
         """
+        queryset: "QuerySet" = self.clone()
+
         try:
-            instance = await self.get(**kwargs)
+            instance = await queryset.get(**kwargs)
             return instance, False
         except ObjectNotFound:
             kwargs.update(defaults)
-            instance = await self.create(**kwargs)
+            instance = await queryset.create(**kwargs)
             return instance, True
 
     async def update_or_create(
@@ -846,25 +864,29 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Updates a record in a specific table or creates a new one.
         """
+        queryset: "QuerySet" = self.clone()
         try:
-            instance = await self.get(**kwargs)
+            instance = await queryset.get(**kwargs)
             await instance.update(**defaults)
             return instance, False
         except ObjectNotFound:
             kwargs.update(defaults)
-            instance = await self.create(**kwargs)
+            instance = await queryset.create(**kwargs)
             return instance, True
 
     async def contains(self, instance: EdgyModel) -> bool:
         """Returns true if the QuerySet contains the provided object.
         False if otherwise.
         """
+        queryset: "QuerySet" = self.clone()
+
         if getattr(instance, "pk", None) is None:
             raise ValueError("'obj' must be a model or reflect model instance.")
-        return await self.filter(pk=instance.pk).exists()
+        return await queryset.filter(pk=instance.pk).exists()
 
     async def execute(self) -> Any:
-        records = await self.all()
+        queryset: "QuerySet" = self.clone()
+        records = await queryset.all()
         return records
 
     def __await__(

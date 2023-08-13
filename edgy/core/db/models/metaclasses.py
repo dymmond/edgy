@@ -470,9 +470,7 @@ class BaseModelMeta(ModelMetaclass):
         The use of context vars instead of using the lru_cache comes from
         a warning from `ruff` where lru can lead to memory leaks.
         """
-        if cls.is_tenant_model():
-            return cls.build(schema=schema)
-        return cls.build()
+        return cls.build(schema=schema)
 
     @property
     def proxy_model(cls) -> Any:
