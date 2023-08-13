@@ -16,14 +16,7 @@ def get_tenant() -> str:
     return TENANT.get()
 
 
-def get_new_query() -> str:
-    """
-    Gets the current query in the context.
-    """
-    return TENANT.get()
-
-
-def get_context_db_schema() -> str:
+def get_context_db_schema() -> Union[str, None]:
     """
     Gets the db schema from the context.
 
@@ -32,21 +25,7 @@ def get_context_db_schema() -> str:
     """
     if get_tenant():
         return get_tenant()
-    return SCHEMA.get()
-
-
-def set_context_query(value: Union[str, None]) -> None:
-    """
-    Set the value of the query for the context.
-    """
-    QUERY.set(value)
-
-
-def set_context_db_schema(value: Union[str, None]) -> None:
-    """
-    Set the value of the db schema for the context.
-    """
-    SCHEMA.set(value)
+    return None
 
 
 def set_tenant(value: Union[str, None]) -> None:
@@ -57,11 +36,19 @@ def set_tenant(value: Union[str, None]) -> None:
     TENANT.set(value)
 
 
-def set_user_tenant(
-    queryset: "QuerySet", model_class: Type["Model"], value: Union[str, None]
+def set_queryset_schema(
+    queryset: "QuerySet",
+    model_class: Type["Model"],
+    value: Union[str, None],
+    is_global: bool = False,
 ) -> "QuerySet":
     """
     Returns a new queryset object pointing to the desired schema of the
     using.
     """
-    return queryset.__class__(model_class=model_class, using_schema=value)
+    return queryset.__class__(
+        model_class=model_class,
+        using_schema=value,
+        is_global=is_global,
+        table=model_class.table_schema(value),
+    )

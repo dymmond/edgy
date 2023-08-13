@@ -19,7 +19,6 @@ from typing import (
 import sqlalchemy
 
 from edgy.conf import settings
-from edgy.core.db.context_vars import set_context_db_schema
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
@@ -60,6 +59,8 @@ class BaseQuerySet(
         defer_fields: Any = None,
         m2m_related: Any = None,
         using_schema: Any = None,
+        is_global: bool = False,
+        table: Any = None,
     ) -> None:
         super().__init__(model_class=model_class)
         self.model_class = cast("Type[Model]", model_class)
@@ -77,12 +78,14 @@ class BaseQuerySet(
         self._database = database  # type: ignore
         self._m2m_related = m2m_related  # type: ignore
         self.using_schema = using_schema
-
-        set_context_db_schema(None)
+        self.is_global = is_global
 
         # Making sure the queryset always starts without any schema associated unless specified
         if self.is_m2m and not self._m2m_related:
             self._m2m_related = self.model_class.meta.multi_related[0]
+
+        if table is not None:
+            self.table = table
 
     def build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
@@ -340,6 +343,8 @@ class BaseQuerySet(
                 only_fields=self._only,
                 defer_fields=self._defer,
                 m2m_related=self.m2m_related,
+                is_global=self.is_global,
+                table=self.table,
             ),
         )
 
@@ -381,6 +386,8 @@ class BaseQuerySet(
         queryset._only = copy.copy(self._only)
         queryset._defer = copy.copy(self._defer)
         queryset._database = copy.copy(self._database)
+        queryset.table = self.table
+        queryset.is_global = self.is_global
         queryset.table = self.table
         return queryset
 

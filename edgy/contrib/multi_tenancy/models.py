@@ -9,7 +9,6 @@ import edgy
 from edgy import settings
 from edgy.contrib.multi_tenancy.exceptions import ModelSchemaError
 from edgy.contrib.multi_tenancy.utils import create_tables
-from edgy.core.db.context_vars import set_context_db_schema, set_tenant
 from edgy.core.db.models.model import Model
 from edgy.core.db.models.utils import get_model
 
@@ -87,18 +86,6 @@ class TenantMixin(edgy.Model):
             await self.delete()
         return cast("Type[TenantMixin]", tenant)
 
-    def activate(self) -> None:
-        """
-        Activates the current tenant.
-        """
-        set_tenant(self.schema_name)
-
-    def deactivate(self) -> None:
-        """
-        Deactivates the current tenant.
-        """
-        set_tenant(None)
-
     async def delete(self, force_drop: bool = False) -> None:
         """
         Validates the permissions for the schema before deleting it.
@@ -107,7 +94,6 @@ class TenantMixin(edgy.Model):
             raise ValueError("Cannot drop public schema.")
 
         await self.meta.registry.schema.drop_schema(schema=self.schema_name, cascade=True, if_exists=True)  # type: ignore
-        set_context_db_schema(None)
         await super().delete()
 
 

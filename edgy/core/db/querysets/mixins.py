@@ -5,7 +5,7 @@ import sqlalchemy
 from loguru import logger
 
 from edgy.core.connection.database import Database
-from edgy.core.db.context_vars import get_tenant, set_user_tenant
+from edgy.core.db.context_vars import get_tenant, set_queryset_schema
 
 if TYPE_CHECKING:
     from edgy import QuerySet
@@ -81,7 +81,7 @@ class TenancyMixin:
         Generates the registry object pointing to the desired schema
         using the same connection.
         """
-        queryset = set_user_tenant(self, self.model_class, value=schema)
+        queryset = set_queryset_schema(self, self.model_class, value=schema)
         queryset.table = self.model_class.table_schema(queryset.using_schema)
         return queryset
 
@@ -92,7 +92,7 @@ class TenancyMixin:
         Generates the registry object pointing to the desired schema
         using a different database connection.
         """
-        queryset = set_user_tenant(self, self.model_class, value=schema)
+        queryset = set_queryset_schema(self, self.model_class, value=schema)
         queryset.table = self.model_class.table_schema(queryset.using_schema)
         queryset.database = database
         return queryset

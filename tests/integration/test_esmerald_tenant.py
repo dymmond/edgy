@@ -153,3 +153,9 @@ async def test_user_query_tenant_data(async_client):
     assert response_saffier.status_code == 200
 
     assert len(response_saffier.json()) == 25
+
+    # Check edgy again
+    response_edgy = await async_client.get("/products", headers={"tenant": "edgy"})
+    assert response_edgy.status_code == 200
+
+    assert len(response_edgy.json()) == 10

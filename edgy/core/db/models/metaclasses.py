@@ -20,7 +20,6 @@ from pydantic._internal._model_construction import ModelMetaclass
 from edgy.conf import settings
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
-from edgy.core.db.context_vars import get_context_db_schema
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.core import BaseField, BigIntegerField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
@@ -446,20 +445,12 @@ class BaseModelMeta(ModelMetaclass):
         2. If a db_schema in the `registry` is passed, then it will use that as a default.
         3. If none is passed, defaults to the shared schema of the database connected.
         """
-        if get_context_db_schema():
-            cls._table = cls.table_schema(schema=get_context_db_schema())
-            return cls._table
-
-        db_schema = cls.get_db_shema()
-
         if not hasattr(cls, "_table"):
-            cls._table = cls.build(schema=db_schema)
+            cls._table = cls.build()
         elif hasattr(cls, "_table"):
-            if not get_context_db_schema() and cls._table.schema is not None:
-                cls._table = cls.build(schema=db_schema)
             table = cls._table
             if table.name.lower() != cls.meta.tablename:
-                cls._table = cls.build(schema=db_schema)
+                cls._table = cls.build()
         return cls._table
 
     def table_schema(cls, schema: str) -> Any:
