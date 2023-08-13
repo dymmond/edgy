@@ -424,14 +424,6 @@ class BaseModelMeta(ModelMetaclass):
             return cast("str", cls.meta.registry.db_schema)
         return None
 
-    def is_tenant_model(cls) -> bool:
-        """
-        Checks if this is a tenant model.
-
-        The schema is only built if the model is a tenant.
-        """
-        return False
-
     @property
     def table(cls) -> Any:
         """
@@ -445,12 +437,14 @@ class BaseModelMeta(ModelMetaclass):
         2. If a db_schema in the `registry` is passed, then it will use that as a default.
         3. If none is passed, defaults to the shared schema of the database connected.
         """
+        db_schema = cls.get_db_shema()
+
         if not hasattr(cls, "_table"):
-            cls._table = cls.build()
+            cls._table = cls.build(db_schema)
         elif hasattr(cls, "_table"):
             table = cls._table
             if table.name.lower() != cls.meta.tablename:
-                cls._table = cls.build()
+                cls._table = cls.build(db_schema)
         return cls._table
 
     def table_schema(cls, schema: str) -> Any:
