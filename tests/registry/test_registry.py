@@ -26,7 +26,7 @@ registry = edgy.Registry(database=database)
 pytestmark = pytest.mark.anyio
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     try:
         await registry.create_all()
@@ -45,6 +45,9 @@ async def rollback_connections():
 
 @pytest.mark.parametrize("schema", ["edgy", "saffier", "esmerald", "tenant"])
 async def test_create_schema(schema):
+    # Get rid of the schema
+    await registry.schema.drop_schema(schema=schema, cascade=True, if_exists=True)
+
     await registry.schema.create_schema(schema=schema, if_not_exists=False)
 
 

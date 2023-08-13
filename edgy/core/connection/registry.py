@@ -97,7 +97,6 @@ class Registry:
         async with self.database:
             async with self.engine.begin() as connection:
                 await connection.run_sync(self.metadata.create_all)
-
         await self.engine.dispose()
 
     async def drop_all(self) -> None:

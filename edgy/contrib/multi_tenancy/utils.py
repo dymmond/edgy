@@ -38,6 +38,7 @@ async def create_tables(
         try:
             async with registry.engine.begin() as connection:
                 await connection.run_sync(table.create)
+            await registry.engine.dispose()
         except Exception as e:
             logger.error(str(e))
             ...

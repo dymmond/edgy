@@ -52,6 +52,7 @@ class Schema:
 
         async with self.registry.engine.begin() as connection:
             await connection.run_sync(execute_create)
+        await self.registry.engine.dispose()
 
     async def drop_schema(
         self, schema: str, cascade: bool = False, if_exists: bool = False
@@ -70,3 +71,4 @@ class Schema:
 
         async with self.registry.engine.begin() as connection:
             await connection.run_sync(execute_drop)
+        await self.registry.engine.dispose()
