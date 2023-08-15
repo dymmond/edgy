@@ -144,11 +144,6 @@ def _check_model_inherited_registries(bases: Tuple[Type, ...]) -> Dict[str, Type
             found_registries = meta.registries
             break
 
-    if not found_registries:
-        raise ImproperlyConfigured(
-            "Registry for the table not found in the Meta class or any of the superclasses. You must set thr registry in the Meta."
-        )
-
     if not isinstance(found_registries, dict):
         raise ImproperlyConfigured(
             f"`registries` must be a dict like object, got {type(found_registries)}"
@@ -382,11 +377,9 @@ class BaseModelMeta(ModelMetaclass):
                 raise ImproperlyConfigured(
                     f"`registries` must be a dict like object, got {type(meta.registries)}"
                 )
-
-            if hasattr(new_class, "__db_model__") and new_class.__db_model__:
-                registries = _check_model_inherited_registries(bases)
-                for name, registry in registries.items():
-                    meta.registries[name] = registry
+            registries = _check_model_inherited_registries(bases)
+            for name, registry in registries.items():
+                meta.registries[name] = registry
 
         # Making sure the tablename is always set if the value is not provided
         if getattr(meta, "tablename", None) is None:
