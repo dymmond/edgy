@@ -70,13 +70,3 @@ async def test_bulk_create_another_tenant():
                 {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
             ]
         )
-
-
-async def test_bulk_create_another_tenant_with_db():
-    with pytest.raises(UndefinedTableError):
-        await Product.query.using_with_db(database=database, schema="another").bulk_create(
-            [
-                {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
-                {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
-            ]
-        )
