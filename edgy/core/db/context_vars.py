@@ -2,7 +2,7 @@ from contextvars import ContextVar
 from typing import TYPE_CHECKING, Type, Union
 
 if TYPE_CHECKING:
-    from edgy import Model, QuerySet
+    from edgy import Database, Model, QuerySet
 
 TENANT: ContextVar[str] = ContextVar("tenant", default=None)
 
@@ -36,3 +36,22 @@ def set_queryset_schema(
         using_schema=value,
         table=model_class.table_schema(value),
     )
+
+
+def set_queryset_database(
+    queryset: "QuerySet",
+    model_class: Type["Model"],
+    database: Type["Database"] = None,
+    schema: Union[str, None] = None,
+) -> "QuerySet":
+    """
+    Returns a new queryset object pointing to the desired schema of the
+    using.
+    """
+    if not schema:
+        return queryset.__class__(
+            model_class=model_class,
+            database=database,
+            table=model_class.table_schema(schema),
+        )
+    return queryset.__class__(model_class=model_class, database=database)

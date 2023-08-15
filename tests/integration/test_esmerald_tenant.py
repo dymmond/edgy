@@ -113,6 +113,23 @@ def app():
 
 
 @pytest.fixture()
+def another_app():
+    app = Esmerald(
+        routes=[Gateway("/no-tenant", handler=get_products)],
+        on_startup=[database.connect],
+        on_shutdown=[database.disconnect],
+    )
+    return app
+
+
+@pytest.fixture()
+async def async_cli(another_app) -> AsyncGenerator:
+    async with AsyncClient(app=another_app, base_url="http://test") as acli:
+        await to_thread.run_sync(blocking_function)
+        yield acli
+
+
+@pytest.fixture()
 async def async_client(app) -> AsyncGenerator:
     async with AsyncClient(app=app, base_url="http://test") as ac:
         await to_thread.run_sync(blocking_function)
@@ -139,7 +156,7 @@ async def create_data():
         await Product.query.create(name=f"Product-{i}", user=saffier)
 
 
-async def test_user_query_tenant_data(async_client):
+async def test_user_query_tenant_data(async_client, async_cli):
     await create_data()
 
     # Test Edgy Response intercepted in the
@@ -159,3 +176,7 @@ async def test_user_query_tenant_data(async_client):
     assert response_edgy.status_code == 200
 
     assert len(response_edgy.json()) == 10
+
+    response = await async_cli.get("/no-tenant/products")
+    assert response.status_code == 200
+    assert len(response.json()) == 25

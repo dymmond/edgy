@@ -49,3 +49,81 @@ that is also possible thanks to the registry with [Meta](./models.md#the-meta-cl
 ```python hl_lines="26 33"
 {!> ../docs_src/registry/multiple.py !}
 ```
+
+## Schemas
+
+This is another great supported feature from Edgy. This allows you to manipulate database schema
+operations like [creating schemas](#create-schema) or [dropping schemas](#drop-schema).
+
+This can be particulary useful if you want to create a [multi-tenancy](./tenancy/edgy.md) application
+and you need to generate schemas for your own purposes.
+
+### Create schema
+
+As the name suggests, it is the functionality that allows you to create database schemas.
+
+**Parameters**:
+
+* **schema** - String name of the schema.
+* **if_not_exists** - Flag indicating if should create if not exists.
+
+    <sup>Default: `False`</sup>
+
+```python hl_lines="11"
+{!> ../docs_src/registry/create_schema.py !}
+```
+
+Create a schema called `edgy`.
+
+```python
+await create_schema("edgy")
+```
+
+This will make sure it will create a new schema `edgy` if it does not exist. If the `if_not_exists`
+is `False` and the schema already exists, it will raise a `edgy.exceptions.SchemaError`.
+
+### Drop schema
+
+As name also suggests, it is the opposite of [create_schema](#create-schema) and instead of creating
+it will drop it from the database.
+
+!!! Warning
+    You need to be very careful when using the `drop_schema` as the consequences are irreversible
+    and not only you don't want to remove the wrong schema but also you don't want to delete the
+    `default` schema as well. Use it with caution.
+
+**Parameters**:
+
+* **schema** - String name of the schema.
+* **cascade** - Flag indicating if should do `cascade` delete.
+*
+    <sup>Default: `False`</sup>
+
+* **if_exists** - Flag indicating if should create if not exists.
+
+    <sup>Default: `False`</sup>
+
+```python hl_lines="11"
+{!> ../docs_src/registry/drop_schema.py !}
+```
+
+Drop a schema called `edgy`
+
+```python
+await drop_schema("edgy")
+```
+
+This will make sure it will drop a schema `edgy` if exists. If the `if_exists`
+is `False` and the schema does not exist, it will raise a `edgy.exceptions.SchemaError`.
+
+### Get default schema name
+
+This is just a helper. Each database has its own ***default*** schema name, for example,
+Postgres calls it `public` and MSSQLServer calls it `dbo`.
+
+This is just an helper in case you need to know the default schema name for any needed purpose of
+your application.
+
+```python hl_lines="11"
+{!> ../docs_src/registry/default_schema.py !}
+```

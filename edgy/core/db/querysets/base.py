@@ -74,7 +74,6 @@ class BaseQuerySet(
         self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
         self._cache = None
-        self._database = database  # type: ignore
         self._m2m_related = m2m_related  # type: ignore
         self.using_schema = using_schema
 
@@ -84,6 +83,8 @@ class BaseQuerySet(
 
         if table is not None:
             self.table = table
+        if database is not None:
+            self.database = database
 
     def build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
@@ -369,7 +370,7 @@ class BaseQuerySet(
         operation.
         """
         queryset = self.__class__.__new__(self.__class__)
-        queryset.model_class = copy.deepcopy(self.model_class)
+        queryset.model_class = self.model_class
         queryset.filter_clauses = copy.copy(self.filter_clauses)
         queryset.limit_count = copy.copy(self.limit_count)
         queryset._select_related = copy.copy(self._select_related)
@@ -382,8 +383,7 @@ class BaseQuerySet(
         queryset._m2m_related = copy.copy(self._m2m_related)
         queryset._only = copy.copy(self._only)
         queryset._defer = copy.copy(self._defer)
-        queryset._database = copy.copy(self._database)
-        queryset.table = self.table
+        queryset._database = self.database
         queryset.table = self.table
         return queryset
 

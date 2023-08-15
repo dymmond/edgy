@@ -1,11 +1,10 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, Optional, cast
 
 import sqlalchemy
-from loguru import logger
 
 from edgy.core.connection.database import Database
-from edgy.core.db.context_vars import get_tenant, set_queryset_schema
+from edgy.core.db.context_vars import set_queryset_database, set_queryset_schema
 
 if TYPE_CHECKING:
     from edgy import QuerySet
@@ -19,7 +18,7 @@ class QuerySetPropsMixin:
 
     @property
     def database(self) -> Database:
-        if not self._database:
+        if getattr(self, "_database", None) is None:
             return cast("Database", self.model_class.meta.registry.database)
         return self._database
 
@@ -65,15 +64,6 @@ class TenancyMixin:
         """
         return asyncio.get_event_loop().run_until_complete(fn)
 
-    def is_active_tenant(self) -> None:
-        """
-        Checks if there is any active tenant.
-        """
-        if get_tenant():
-            logger.warning(
-                "There is already global tenant in the context. `using` will be ignored."
-            )
-
     def using(self, schema: str) -> "QuerySet":
         """
         Enables and switches the db schema.
@@ -84,13 +74,13 @@ class TenancyMixin:
         queryset = set_queryset_schema(self, self.model_class, value=schema)
         return queryset
 
-    def using_with_db(self, database: Database, schema: str) -> "QuerySet":
+    def using_with_db(self, database: Database, schema: Optional[str] = None) -> "QuerySet":
         """
         Enables and switches the db schema and the database connection.
 
         Generates the registry object pointing to the desired schema
         using a different database connection.
         """
-        queryset = set_queryset_schema(self, self.model_class, value=schema)
-        queryset.database = database
-        return queryset
+        if schema:
+            return set_queryset_database(self, self.model_class, database, schema)
+        return set_queryset_database(self, self.model_class, database)

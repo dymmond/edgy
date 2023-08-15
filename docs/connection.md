@@ -41,6 +41,10 @@ won't have error like `AssertationError: DatabaseBackend is not running`.
 
 You are now free to use the ORM anywhere in your application.
 
+## Querying other schemas
+
+Edgy supports that as well. Have a look at the [tenancy](./tenancy/edgy.md) section for more details.
+
 ## Note
 
 Check the [tips and tricks](./tips-and-tricks.md) and learn how to make your connections even cleaner.
