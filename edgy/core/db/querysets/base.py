@@ -384,7 +384,6 @@ class BaseQuerySet(
         queryset._defer = copy.copy(self._defer)
         queryset._database = copy.copy(self._database)
         queryset.table = self.table
-        queryset.table = self.table
         return queryset
 
 

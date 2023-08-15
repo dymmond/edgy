@@ -2,10 +2,9 @@ import asyncio
 from typing import TYPE_CHECKING, Any, Callable, cast
 
 import sqlalchemy
-from loguru import logger
 
 from edgy.core.connection.database import Database
-from edgy.core.db.context_vars import get_tenant, set_queryset_schema
+from edgy.core.db.context_vars import set_queryset_schema
 
 if TYPE_CHECKING:
     from edgy import QuerySet
@@ -64,15 +63,6 @@ class TenancyMixin:
         Returns the event loop from the corresponding policy.
         """
         return asyncio.get_event_loop().run_until_complete(fn)
-
-    def is_active_tenant(self) -> None:
-        """
-        Checks if there is any active tenant.
-        """
-        if get_tenant():
-            logger.warning(
-                "There is already global tenant in the context. `using` will be ignored."
-            )
 
     def using(self, schema: str) -> "QuerySet":
         """
