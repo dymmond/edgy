@@ -5,6 +5,7 @@ from typing import (
     Any,
     Dict,
     List,
+    Mapping,
     Optional,
     Sequence,
     Set,
@@ -44,6 +45,7 @@ class MetaInfo:
         "fields",
         "fields_mapping",
         "registry",
+        "registries",
         "tablename",
         "unique_together",
         "indexes",
@@ -69,6 +71,7 @@ class MetaInfo:
         self.fields: Set[Any] = set()
         self.fields_mapping: Dict[str, BaseField] = {}
         self.registry: Optional[Type[Registry]] = getattr(meta, "registry", None)
+        self.registries: Mapping[str, Type[Registry]] = getattr(meta, "registries", {})
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.parents: Any = getattr(meta, "parents", None) or []
         self.many_to_many_fields: Set[str] = set()
@@ -119,6 +122,39 @@ def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
             "Registry for the table not found in the Meta class or any of the superclasses. You must set thr registry in the Meta."
         )
     return found_registry
+
+
+def _check_model_inherited_registries(bases: Tuple[Type, ...]) -> Dict[str, Type[Registry]]:
+    """
+    Evaluates if there is any `registries` entry in the metaclass.
+    The registries is what allows to query the model into a different
+    database using a different connection.
+
+    If registries are found, then it will update the mapping with the details of the
+    model.
+    """
+    found_registries: Mapping[str, Type[Registry]] = {}
+
+    for base in bases:
+        meta: MetaInfo = getattr(base, "meta", None)  # type: ignore
+        if not meta:
+            continue
+
+        if getattr(meta, "registries", None) is not None:
+            found_registries = meta.registries
+            break
+
+    if not found_registries:
+        raise ImproperlyConfigured(
+            "Registry for the table not found in the Meta class or any of the superclasses. You must set thr registry in the Meta."
+        )
+
+    if not isinstance(found_registries, dict):
+        raise ImproperlyConfigured(
+            f"`registries` must be a dict like object, got {type(found_registries)}"
+        )
+
+    return found_registries
 
 
 def _check_manager_for_bases(
@@ -198,6 +234,7 @@ class BaseModelMeta(ModelMetaclass):
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: Any = None
+        registries: Any = {}
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
@@ -334,6 +371,23 @@ class BaseModelMeta(ModelMetaclass):
             else:
                 return new_class
 
+        # Handle the extra registries of models
+        if not meta.registries or getattr(meta, "registries", None) is None:
+            if hasattr(new_class, "__db_model__") and new_class.__db_model__:
+                registries = _check_model_inherited_registries(bases)
+                for name, registry in registries.items():
+                    meta.registries[name] = registry  # type: ignore
+        else:
+            if not isinstance(meta.registries, dict):
+                raise ImproperlyConfigured(
+                    f"`registries` must be a dict like object, got {type(meta.registries)}"
+                )
+
+            if hasattr(new_class, "__db_model__") and new_class.__db_model__:
+                registries = _check_model_inherited_registries(bases)
+                for name, registry in registries.items():
+                    meta.registries[name] = registry
+
         # Making sure the tablename is always set if the value is not provided
         if getattr(meta, "tablename", None) is None:
             tablename = f"{name.lower()}s"
@@ -367,6 +421,7 @@ class BaseModelMeta(ModelMetaclass):
                         raise ValueError("Meta.indexes must be a list of Index types.")
 
         registry = meta.registry
+        registries = meta.registries
         new_class.database = registry.database
 
         # Making sure it does not generate tables if abstract it set
