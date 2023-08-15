@@ -17,6 +17,25 @@ services:
     ports:
       - "5432:5432"
 
+  edgy_alternative:
+    restart: always
+    image: postgres:12.3
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: "postgres"
+      POSTGRES_PASSWORD: "postgres"
+      POSTGRES_DB: "edgy_alt"
+    expose:
+      - "5432"
+    volumes:
+      - "edgy_alternative:/var/lib/postgresql/data"
+    command: >-
+        --jit=false
+    ports:
+      - "5433:5432"
+
 volumes:
   edgy:
+    external: true
+  edgy_alternative:
     external: true
