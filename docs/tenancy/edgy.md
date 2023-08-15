@@ -80,7 +80,7 @@ without a lot of boilerplate.
 ### With with database
 
 Now here it is where the things get interesting. What if you need/want to query a schema but from
-a different database instead?
+a different database instead? Well, that is possible with the use of the `using_with_db`.
 
 ### Set tenant
 
