@@ -51,6 +51,9 @@ nav:
         - Relationships: "relationships.md"
         - Reference ForeignKey: "reference-foreignkey.md"
         - Connection: "connection.md"
+        - Tenancy:
+                  - Edgy: "tenancy/edgy.md"
+                  - Contrib: "tenancy/contrib.md"
         - Registry: "registry.md"
         - Shell Support: "shell.md"
         - Settings: "settings.md"

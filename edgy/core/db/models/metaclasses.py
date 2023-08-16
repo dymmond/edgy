@@ -5,6 +5,7 @@ from typing import (
     Any,
     Dict,
     List,
+    Mapping,
     Optional,
     Sequence,
     Set,
@@ -119,6 +120,34 @@ def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
             "Registry for the table not found in the Meta class or any of the superclasses. You must set thr registry in the Meta."
         )
     return found_registry
+
+
+def _check_model_inherited_registries(bases: Tuple[Type, ...]) -> Dict[str, Type[Registry]]:
+    """
+    Evaluates if there is any `registries` entry in the metaclass.
+    The registries is what allows to query the model into a different
+    database using a different connection.
+
+    If registries are found, then it will update the mapping with the details of the
+    model.
+    """
+    found_registries: Mapping[str, Type[Registry]] = {}
+
+    for base in bases:
+        meta: MetaInfo = getattr(base, "meta", None)  # type: ignore
+        if not meta:
+            continue
+
+        if getattr(meta, "registries", None) is not None:
+            found_registries = meta.registries
+            break
+
+    if not isinstance(found_registries, dict):
+        raise ImproperlyConfigured(
+            f"`registries` must be a dict like object, got {type(found_registries)}"
+        )
+
+    return found_registries
 
 
 def _check_manager_for_bases(
@@ -265,6 +294,7 @@ class BaseModelMeta(ModelMetaclass):
 
         for key, value in attrs.items():
             if isinstance(value, BaseField):
+                getattr(meta_class, "abstract", None)
                 if getattr(meta_class, "abstract", None):
                     value = copy.copy(value)
 
@@ -366,6 +396,7 @@ class BaseModelMeta(ModelMetaclass):
                         raise ValueError("Meta.indexes must be a list of Index types.")
 
         registry = meta.registry
+        # registries = meta.registries
         new_class.database = registry.database
 
         # Making sure it does not generate tables if abstract it set
@@ -415,19 +446,46 @@ class BaseModelMeta(ModelMetaclass):
         new_class.model_rebuild(force=True)
         return new_class
 
+    def get_db_shema(cls) -> Union[str, None]:
+        """
+        Returns a db_schema from registry if any is passed.
+        """
+        if hasattr(cls, "meta") and hasattr(cls.meta, "registry"):
+            return cast("str", cls.meta.registry.db_schema)
+        return None
+
     @property
     def table(cls) -> Any:
         """
         Making sure the tables on inheritance state, creates the new
         one properly.
+
+        Making sure the following scenarios are met:
+
+        1. If there is a context_db_schema, it will return for those, which means, the `using`
+        if being utilised.
+        2. If a db_schema in the `registry` is passed, then it will use that as a default.
+        3. If none is passed, defaults to the shared schema of the database connected.
         """
+        db_schema = cls.get_db_shema()
+
         if not hasattr(cls, "_table"):
-            cls._table = cls.build()
+            cls._table = cls.build(db_schema)
         elif hasattr(cls, "_table"):
             table = cls._table
             if table.name.lower() != cls.meta.tablename:
-                cls._table = cls.build()
+                cls._table = cls.build(db_schema)
         return cls._table
+
+    def table_schema(cls, schema: str) -> Any:
+        """
+        Making sure the tables on inheritance state, creates the new
+        one properly.
+
+        The use of context vars instead of using the lru_cache comes from
+        a warning from `ruff` where lru can lead to memory leaks.
+        """
+        return cls.build(schema=schema)
 
     @property
     def proxy_model(cls) -> Any:
@@ -446,6 +504,7 @@ class BaseModelReflectMeta(BaseModelMeta):
         new_model = super().__new__(cls, name, bases, attrs)
 
         registry = new_model.meta.registry
+        # registries = new_model.meta.registries
 
         # Remove the reflected models from the registry
         # Add the reflecte model to the views section of the refected

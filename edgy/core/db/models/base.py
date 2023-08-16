@@ -106,9 +106,15 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     def proxy_model(self) -> Any:
         return self.__class__.proxy_model
 
-    @cached_property
+    @property
     def table(self) -> sqlalchemy.Table:
-        return cast("sqlalchemy.Table", self.__class__.table)
+        if getattr(self, "_table", None) is None:
+            return cast("sqlalchemy.Table", self.__class__.table)
+        return self._table
+
+    @table.setter
+    def table(self, value: sqlalchemy.Table) -> None:
+        self._table = value
 
     @classmethod
     def generate_proxy_model(cls) -> Type["Model"]:
@@ -132,12 +138,14 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return proxy_model.model
 
     @classmethod
-    def build(cls) -> sqlalchemy.Table:
+    def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:
         """
         Builds the SQLAlchemy table representation from the loaded fields.
         """
         tablename: str = cls.meta.tablename  # type: ignore
         metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
+        metadata.schema = schema
+
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
 
@@ -246,11 +254,13 @@ class EdgyBaseReflectModel(EdgyBaseModel, metaclass=BaseModelReflectMeta):
         setattr(self, self.pkname, value)
 
     @classmethod
-    def build(cls) -> Any:
+    def build(cls, schema: Optional[str] = None) -> Any:
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-        metadata: sqlalchemy.MetaData = cls.meta.registry._metadata  # type: ignore
+        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
+        metadata.schema = schema
+
         tablename: str = cast("str", cls.meta.tablename)
         return cls.reflect(tablename, metadata)
 

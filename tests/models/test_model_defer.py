@@ -109,11 +109,11 @@ async def test_model_defer_with_exclude():
 
 async def test_model_defer_save():
     await User.query.create(name="John", language="PT")
-
     user = await User.query.filter(pk=1).defer("name", "language").get()
     user.name = "Edgy"
     user.language = "EN"
     user.description = "LOL"
+
     await user.save()
 
     user = await User.query.get(pk=1)

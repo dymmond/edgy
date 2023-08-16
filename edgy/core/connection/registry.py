@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Any
+from typing import Any, Dict, Mapping, Type
 
 import sqlalchemy
 from sqlalchemy import Engine, create_engine
@@ -9,13 +9,13 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 
 from edgy.conf import settings
 from edgy.core.connection.database import Database
+from edgy.core.connection.schemas import Schema
 from edgy.exceptions import ImproperlyConfigured
 
 
 class Registry:
     """
-    The command center for the models being generated
-    for Edgy.
+    The command center for the models of Edgy.
     """
 
     def __init__(self, database: Database, **kwargs: Any) -> None:
@@ -23,20 +23,24 @@ class Registry:
             database, Database
         ), "database must be an instance of edgy.core.connection.Database"
 
-        self.database = database
-        self.models: Any = {}
-        self.reflected: Any = {}
-        self._schema = kwargs.get("schema", None)
+        self.database: Database = database
+        self.models: Dict[str, Any] = {}
+        self.reflected: Dict[str, Any] = {}
+        self.db_schema = kwargs.get("schema", None)
+        self.extra: Mapping[str, Type["Database"]] = kwargs.pop("extra", {})
 
-        if self._schema:
-            self._metadata = sqlalchemy.MetaData(schema=self._schema)
-        else:
-            self._metadata = sqlalchemy.MetaData()
+        self.schema = Schema(registry=self)
+
+        self._metadata = (
+            sqlalchemy.MetaData(schema=self.db_schema)
+            if self.db_schema is not None
+            else sqlalchemy.MetaData()
+        )
 
     @property
     def metadata(self) -> Any:
         for model_class in self.models.values():
-            model_class.build()
+            model_class.build(schema=self.db_schema)
         return self._metadata
 
     @metadata.setter
@@ -66,14 +70,14 @@ class Registry:
 
     @cached_property
     def declarative_base(self) -> Any:
-        if self._schema:
-            metadata = sqlalchemy.MetaData(schema=self._schema)
+        if self.db_schema:
+            metadata = sqlalchemy.MetaData(schema=self.db_schema)
         else:
             metadata = sqlalchemy.MetaData()
         return sa_declarative_base(metadata=metadata)
 
     @property
-    def engine(self):  # type: ignore
+    def engine(self) -> AsyncEngine:
         return self._get_engine
 
     @cached_property
@@ -83,17 +87,20 @@ class Registry:
         return engine
 
     @property
-    def sync_engine(self):  # type: ignore
+    def sync_engine(self) -> Engine:
         return self._get_sync_engine
 
     async def create_all(self) -> None:
+        if self.db_schema:
+            await self.schema.create_schema(self.db_schema, True)
         async with self.database:
             async with self.engine.begin() as connection:
                 await connection.run_sync(self.metadata.create_all)
-
         await self.engine.dispose()
 
     async def drop_all(self) -> None:
+        if self.db_schema:
+            await self.schema.drop_schema(self.db_schema, True, True)
         async with self.database:
             async with self.engine.begin() as conn:
                 await conn.run_sync(self.metadata.drop_all)
