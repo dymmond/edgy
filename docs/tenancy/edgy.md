@@ -82,7 +82,125 @@ without a lot of boilerplate.
 Now here it is where the things get interesting. What if you need/want to query a schema but from
 a different database instead? Well, that is possible with the use of the `using_with_db`.
 
+{!> ../docs_src/shared/extra.md !}
+
 ### Set tenant
+
+This is another way to create a global `tenant` for your application. Instead if [using](#using) or
+[using_with_db](#using-with-database) you simply want to make sure that in your application you
+want every request for a specific `tenant` to always hit their corresponding tenant data.
+
+This is specially useful for multi-tenant applications where your tenant users will only see their
+own data.
+
+To use the `set_tenant` you can import it via:
+
+```python
+from edgy.core.db import set_tenant
+```
+
+!!! Tip
+    Use the `set_tenant` in things like application middlewares or interceptors, right before
+    reaching the API.
+
+#### Practical case
+
+The `set_tenant` can be somehow confusing without a proper example so let us run one 😁.
+
+As usual, for this example [Esmerald][esmerald] will be used. This can be applied to any framework
+of your choice of course.
+
+**What are we building**:
+
+- [Models](#models) - Some models that will help us out mapping a user with a tenant.
+- [Middleware](#middleware) - Intercept the request and **set the corresponding tenant**.
+- [API](#api) - The API that returns the data for a given tenant.
+
+##### Models
+
+Let us start with some models where we have a `Tenant`, a `User` model as well as a `Product`
+where we will be adding some data for different tenants.
+
+The `TenantUser` model will serve as the link between a database schema (tenant) and the `User`.
+
+We will want to exclude some models from being created in every schema. The `Tenant` on save it will
+generate the `schema` for a user in the database and it will automatically generate the database
+models.
+
+!!! Warning
+    This is for explanation purposes, just do in the way you see fit.
+
+```python
+{!> ../docs_src/tenancy/example/models.py !}
+```
+
+This is a lot to unwrap is it? Well, that was explained [before](#models) at the top and this is just
+the declaration of the models for some general purposes.
+
+###### Generate example data
+
+Now it is time to generate some example data and populate the tables previously created.
+
+```python
+{!> ../docs_src/tenancy/example/data.py !}
+```
+
+We now have `models` and mock data for those. You will realise that we created a `user` inside the
+`shared` database (no schema associated) and one specifically inside the newly `edgy` schema.
+
+##### Middleware
+
+It is time to create a [middleware][middleware] that will take advantage of our new models and
+tenants and **set the tenant** automatically.
+
+The middleware will receive some headers with the tenant information and it will lookup if the
+tenant exist.
+
+!!! Danger
+    Do not use this example in production, the way it is done it is not safe. A real lookup example
+    would need more validations besides a direct headers check.
+
+```python hl_lines="7 29 34"
+{!> ../docs_src/tenancy/example/middleware.py !}
+```
+
+Now this is getting somewhere! As you could now see, this is where we take advantage of the
+[set_tenant](#set-tenant).
+
+In the middleware, the tenant is intercepted and all the calls in the API will now query **only**
+the tenant data, which means that **there is no need for `using` or `using_with_db` anymore**.
+
+##### API
+
+Now it is time to simply create the API that will read the [created products](#generate-example-data)
+from the database and assemble everything.
+
+This will create an [Esmerald][esmerald] application, assemble the `routes` and add the
+[middleware](#middleware) created in the previous step.
+
+```python hl_lines="25"
+{!> ../docs_src/tenancy/example/api.py !}
+```
+
+###### Query the API
+
+If you query the API, you should have similar results to this:
+
+```python
+{!> ../docs_src/tenancy/example/query.py !}
+```
+
+The [data generated](#generate-example-data) for each schema (`shared` and `edgy`) should match
+the response total returned.
+
+##### Notes
+
+As you could see in the previous step-by=step example, using the [set_tenant](#set-tenant) can be
+extremely useful mostrly for those large scale applications where multi-tenancy is a **must** so
+you can actually take advantage of this.
 
 [registry]: ../registry.md
 [schemas]: ../registry.md#schemas
+[using_with_db_registry]: ../registry.md#extra
+[esmerald]: https://esmerald.dev
+[middleware]: https://esmerald.dev/middleware

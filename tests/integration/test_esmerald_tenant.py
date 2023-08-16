@@ -11,8 +11,7 @@ from tests.settings import DATABASE_URL
 
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.models import TenantMixin, TenantUserMixin
-from edgy.core.db import fields
-from edgy.core.db.context_vars import set_tenant
+from edgy.core.db import fields, set_tenant
 from edgy.exceptions import ObjectNotFound
 from edgy.testclient import DatabaseTestClient as Database
 
