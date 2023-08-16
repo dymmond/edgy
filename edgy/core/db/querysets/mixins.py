@@ -1,5 +1,4 @@
-import asyncio
-from typing import TYPE_CHECKING, Any, Callable, Optional, cast
+from typing import TYPE_CHECKING, Any, Optional, Type, cast
 
 import sqlalchemy
 
@@ -7,7 +6,7 @@ from edgy.core.connection.database import Database
 from edgy.core.db.context_vars import set_queryset_database, set_queryset_schema
 
 if TYPE_CHECKING:
-    from edgy import QuerySet
+    from edgy import QuerySet, Registry
 
 
 class QuerySetPropsMixin:
@@ -58,12 +57,6 @@ class TenancyMixin:
     Mixin used for querying a possible multi tenancy application
     """
 
-    def run_async(self, fn: Callable[..., Any]) -> asyncio.BaseEventLoop:
-        """
-        Returns the event loop from the corresponding policy.
-        """
-        return asyncio.get_event_loop().run_until_complete(fn)
-
     def using(self, schema: str) -> "QuerySet":
         """
         Enables and switches the db schema.
@@ -74,13 +67,19 @@ class TenancyMixin:
         queryset = set_queryset_schema(self, self.model_class, value=schema)
         return queryset
 
-    def using_with_db(self, database: Database, schema: Optional[str] = None) -> "QuerySet":
+    def using_with_db(self, connection: str, schema: Optional[str] = None) -> "QuerySet":
         """
-        Enables and switches the db schema and the database connection.
+        Enables and switches the database connection.
 
-        Generates the registry object pointing to the desired schema
-        using a different database connection.
+        Generates the new queryset using the selected connection provided in the extra of the model
+        registry.
         """
+        assert (
+            connection in self.model_class.meta.registry.extra
+        ), f"`another` is not in the connections extra of the model`{self.model_class.__name__}` registry"
+
+        connection: Type["Registry"] = self.model_class.meta.registry.extra[connection]
         if schema:
-            return set_queryset_database(self, self.model_class, database, schema)
-        return set_queryset_database(self, self.model_class, database)
+            return set_queryset_database(self, self.model_class, connection, schema)
+        queryset = set_queryset_database(self, self.model_class, connection)
+        return queryset

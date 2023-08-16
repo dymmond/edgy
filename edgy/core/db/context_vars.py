@@ -41,7 +41,7 @@ def set_queryset_schema(
 def set_queryset_database(
     queryset: "QuerySet",
     model_class: Type["Model"],
-    database: Type["Database"] = None,
+    database: Type["Database"],
     schema: Union[str, None] = None,
 ) -> "QuerySet":
     """

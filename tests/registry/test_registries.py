@@ -1,30 +1,13 @@
-import random
-
 import pytest
 from tests.settings import DATABASE_ALTERNATIVE_URL, DATABASE_URL
 
 import edgy
-from edgy.exceptions import ImproperlyConfigured
 from edgy.testclient import DatabaseTestClient as Database
-
-
-def get_random_string(
-    length: int = 12,
-    allowed_chars: str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-) -> str:
-    """
-    Returns a securely generated random string.
-    The default length of 12 with the a-z, A-Z, 0-9 character set returns
-    a 71-bit value. log_2((26+26+10)^12) =~ 71 bits
-    """
-    return "".join(random.choice(allowed_chars) for _ in range(length))
-
 
 database = Database(url=DATABASE_URL)
 another_db = Database(url=DATABASE_ALTERNATIVE_URL)
 
-registry = edgy.Registry(database=database)
-another_registry = edgy.Registry(database=another_db)
+registry = edgy.Registry(database=database, extra={"alternative": another_db})
 pytestmark = pytest.mark.anyio
 
 
@@ -54,46 +37,7 @@ class User(edgy.Model):
 
     class Meta:
         registry = registry
-        registries = {"alternative": another_registry}
 
 
-class BaseModel(edgy.Model):
-    name: str = edgy.CharField(max_length=255, null=True)
-
-    class Meta:
-        registry = registry
-        registries = {"alternative": another_registry}
-
-
-class Product(BaseModel):
-    ...
-
-
-class Item(BaseModel):
-    class Meta:
-        registries = {"another": another_registry}
-
-
-def test_has_multiple_registries():
-    assert "alternative" in User.meta.registries
-
-
-def test_inherited_registries():
-    assert "alternative" in Product.meta.registries
-
-
-def test_added_to_inherited_registries_also_inherited():
-    assert "alternative" in Item.meta.registries
-    assert "another" in Item.meta.registries
-
-
-def test_raise_exception_bases():
-    with pytest.raises(ImproperlyConfigured):
-
-        class MainModel(edgy.Model):
-            class Meta:
-                registry = registry
-                registries = [another_registry]
-
-        class MyModel(MainModel):
-            ...
+def test_has_multiple_connections():
+    assert "alternative" in User.meta.registry.extra

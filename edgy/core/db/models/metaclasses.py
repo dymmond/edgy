@@ -45,7 +45,6 @@ class MetaInfo:
         "fields",
         "fields_mapping",
         "registry",
-        "registries",
         "tablename",
         "unique_together",
         "indexes",
@@ -71,7 +70,6 @@ class MetaInfo:
         self.fields: Set[Any] = set()
         self.fields_mapping: Dict[str, BaseField] = {}
         self.registry: Optional[Type[Registry]] = getattr(meta, "registry", None)
-        self.registries: Mapping[str, Type[Registry]] = getattr(meta, "registries", {})
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.parents: Any = getattr(meta, "parents", None) or []
         self.many_to_many_fields: Set[str] = set()
@@ -229,7 +227,6 @@ class BaseModelMeta(ModelMetaclass):
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: Any = None
-        registries: Any = {}
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
@@ -366,21 +363,6 @@ class BaseModelMeta(ModelMetaclass):
             else:
                 return new_class
 
-        # Handle the extra registries of models
-        if not meta.registries or getattr(meta, "registries", None) is None:
-            if hasattr(new_class, "__db_model__") and new_class.__db_model__:
-                registries = _check_model_inherited_registries(bases)
-                for name, registry in registries.items():
-                    meta.registries[name] = registry  # type: ignore
-        else:
-            if not isinstance(meta.registries, dict):
-                raise ImproperlyConfigured(
-                    f"`registries` must be a dict like object, got {type(meta.registries)}"
-                )
-            registries = _check_model_inherited_registries(bases)
-            for name, registry in registries.items():
-                meta.registries[name] = registry
-
         # Making sure the tablename is always set if the value is not provided
         if getattr(meta, "tablename", None) is None:
             tablename = f"{name.lower()}s"
@@ -414,7 +396,7 @@ class BaseModelMeta(ModelMetaclass):
                         raise ValueError("Meta.indexes must be a list of Index types.")
 
         registry = meta.registry
-        registries = meta.registries
+        # registries = meta.registries
         new_class.database = registry.database
 
         # Making sure it does not generate tables if abstract it set
@@ -522,6 +504,7 @@ class BaseModelReflectMeta(BaseModelMeta):
         new_model = super().__new__(cls, name, bases, attrs)
 
         registry = new_model.meta.registry
+        # registries = new_model.meta.registries
 
         # Remove the reflected models from the registry
         # Add the reflecte model to the views section of the refected
