@@ -91,6 +91,8 @@ specific queries and querysets at ease.
 * **Indexes** - Unique indexes through meta fields.
 * **Native test client** - We all know how hard it can be to setup that client for those tests you
 need so we give you already one.
+* **Multi-tenancy** - Edgy supports multi-tenancy and even offers a possible solution to be used
+out of the box if you don't want to waste time.
 
 And a lot more you can do here.
 
