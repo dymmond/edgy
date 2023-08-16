@@ -77,7 +77,7 @@ User.query.using('main').all()
 And that is it, really. Using its a simple shortcut that allows querying different schemas
 without a lot of boilerplate.
 
-### With with database
+### Using with database
 
 Now here it is where the things get interesting. What if you need/want to query a schema but from
 a different database instead? Well, that is possible with the use of the `using_with_db`.

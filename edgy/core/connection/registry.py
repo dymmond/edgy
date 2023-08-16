@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Type
+from typing import Any, Dict, Mapping, Type
 
 import sqlalchemy
 from sqlalchemy import Engine, create_engine
@@ -12,14 +12,10 @@ from edgy.core.connection.database import Database
 from edgy.core.connection.schemas import Schema
 from edgy.exceptions import ImproperlyConfigured
 
-if TYPE_CHECKING:
-    from edgy import Model
-
 
 class Registry:
     """
-    The command center for the models being generated
-    for Edgy.
+    The command center for the models of Edgy.
     """
 
     def __init__(self, database: Database, **kwargs: Any) -> None:
@@ -31,7 +27,7 @@ class Registry:
         self.models: Dict[str, Any] = {}
         self.reflected: Dict[str, Any] = {}
         self.db_schema = kwargs.get("schema", None)
-        self.extra: Mapping[str, Type["Model"]] = kwargs.pop("extra", {})
+        self.extra: Mapping[str, Type["Database"]] = kwargs.pop("extra", {})
 
         self.schema = Schema(registry=self)
 

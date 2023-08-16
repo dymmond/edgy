@@ -67,7 +67,7 @@ class TenancyMixin:
         queryset = set_queryset_schema(self, self.model_class, value=schema)
         return queryset
 
-    def using_with_db(self, connection: str, schema: Optional[str] = None) -> "QuerySet":
+    def using_with_db(self, connection_name: str, schema: Optional[str] = None) -> "QuerySet":
         """
         Enables and switches the database connection.
 
@@ -75,10 +75,10 @@ class TenancyMixin:
         registry.
         """
         assert (
-            connection in self.model_class.meta.registry.extra
+            connection_name in self.model_class.meta.registry.extra
         ), f"`another` is not in the connections extra of the model`{self.model_class.__name__}` registry"
 
-        connection: Type["Registry"] = self.model_class.meta.registry.extra[connection]
+        connection: Type["Registry"] = self.model_class.meta.registry.extra[connection_name]
         if schema:
             return set_queryset_database(self, self.model_class, connection, schema)
         queryset = set_queryset_database(self, self.model_class, connection)
