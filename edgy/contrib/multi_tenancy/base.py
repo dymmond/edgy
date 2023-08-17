@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from edgy.contrib.multi_tenancy.metaclasses import BaseTenantMeta, TenantMeta
-from edgy.core.db.models.model import Model
+from edgy.core.db.models.model import Model, ReflectModel
 
 
 class TenantModel(Model, metaclass=BaseTenantMeta):
@@ -15,4 +15,8 @@ class TenantModel(Model, metaclass=BaseTenantMeta):
     using Edgy and Edgy models.
     """
 
+    meta: ClassVar[TenantMeta] = TenantMeta(None)
+
+
+class TenantReflectModel(ReflectModel, metaclass=BaseTenantMeta):
     meta: ClassVar[TenantMeta] = TenantMeta(None)

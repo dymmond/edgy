@@ -438,7 +438,7 @@ The `values_list()` can also be combined with `filter`, `only`, `exclude` as per
 * **exclude_none** - Boolean flag indicating if the fields with `None` should be excluded.
 * **flat** - Boolean flag indicating the results should be flattened.
 
-## Only
+### Only
 
 Returns the results containing **only** the fields in the query and nothing else.
 
@@ -451,7 +451,7 @@ user = await User.query.only("name")
 !!! Warning
     You can only use `only()` or `defer()` but not both combined or a `QuerySetError` is raised.
 
-## Defer
+### Defer
 
 Returns the results containing all the fields **but the ones you want to exclude**.
 
