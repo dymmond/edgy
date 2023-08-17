@@ -14,8 +14,8 @@ if TYPE_CHECKING:  # pragma: nocover
 class ManyRelationProtocol(Protocol):
     """Defines the what needs to be implemented when using the ManyRelationProtocol"""
 
-    def add(self, child: "Model") -> None:
+    async def add(self, child: "Model") -> None:
         ...
 
-    def remove(self, child: "Model") -> None:
+    async def remove(self, child: "Model") -> None:
         ...
