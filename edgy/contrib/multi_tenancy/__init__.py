@@ -1,5 +1,5 @@
-from .base import TenantModel, TenantReflectModel
+from .base import TenantModel
 from .registry import TenantRegistry
 from .settings import TenancySettings
 
-__all__ = ["TenantModel", "TenantReflectModel", "TenantRegistry", "TenancySettings"]
+__all__ = ["TenantModel", "TenantRegistry", "TenancySettings"]
