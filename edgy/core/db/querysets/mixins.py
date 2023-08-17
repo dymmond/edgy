@@ -76,7 +76,7 @@ class TenancyMixin:
         """
         assert (
             connection_name in self.model_class.meta.registry.extra
-        ), f"`another` is not in the connections extra of the model`{self.model_class.__name__}` registry"
+        ), f"`{connection_name}` is not in the connections extra of the model`{self.model_class.__name__}` registry"
 
         connection: Type["Registry"] = self.model_class.meta.registry.extra[connection_name]
         if schema:
