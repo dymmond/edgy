@@ -23,7 +23,7 @@ from edgy.exceptions import ImproperlyConfigured
 if TYPE_CHECKING:
     from edgy import Model
 
-EXCLUDED_LOOKUP = ["__model_references__"]
+EXCLUDED_LOOKUP = ["__model_references__", "_table"]
 
 
 class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta):
