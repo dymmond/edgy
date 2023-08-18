@@ -22,7 +22,6 @@ and query them.
 
 - Registry `metaclass` wasn't reflecting 100% the schema being passed into the metadata and therefore, querying the database public schema.
 
-
 ## 0.2.0
 
 ### Added
