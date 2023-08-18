@@ -1,5 +1,28 @@
 # Release Notes
 
+## 0.3.0
+
+### Added
+
+- **Multi tenancy support** by updating the registry and allowing to create the multi schema.
+- Add new `using(schema=...)` and `using_with_db(database=..., schema=...)` to querysets.
+- Add support for `create_schema` and `drop_schema` via registry.
+- Add support to `get_default_schema` from the `registry.schema`.
+- Documentation for [tenancy](./tenancy/edgy.md).
+- Improved the documentation for [schemas](./registry.md#schemas).
+- Added a new parameter `extra` to registry allowing to pass a Dict like object containing more database connections. This is an alternative to the registries.
+- Improved documentation for [registry](./registry.md#extra) explaining how to use the extra parameters.
+and query them.
+
+### Changed
+
+- Update the `build` for `Model` and `ReflectModel` to allow passing the schema.
+
+### Fixed
+
+- Registry `metaclass` wasn't reflecting 100% the schema being passed into the metadata and therefore, querying the database public schema.
+
+
 ## 0.2.0
 
 ### Added
