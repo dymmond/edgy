@@ -168,7 +168,9 @@ class TenantUserMixin(edgy.Model):
         tenant_user = await super().save(*args, **kwargs)
         if self.is_active:
             qs = (
-                await get_model(registry=tenant_user.meta.registry, model_name=self.tenant)
+                await get_model(
+                    registry=tenant_user.meta.registry, model_name=settings.tenant_model
+                )
                 .query.filter(is_active=True, user=self.user)
                 .exclude(pk=self.pk)
             )
