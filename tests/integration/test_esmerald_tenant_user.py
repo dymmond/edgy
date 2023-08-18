@@ -86,7 +86,7 @@ class TenantMiddleware(MiddlewareProtocol):
         await self.app(scope, receive, send)
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     try:
         await models.create_all()
@@ -199,3 +199,57 @@ async def test_user_query_tenant_data(async_client, async_cli):
     response = await async_cli.get("/no-tenant/products")
     assert response.status_code == 200
     assert len(response.json()) == 25
+
+
+async def test_active_schema_user():
+    tenant = await Tenant.query.create(schema_name="edgy", tenant_name="Edgy")
+    user = await User.query.create(name="edgy", email="edgy@esmerald.dev")
+    tenant_user = await TenantUser.query.create(user=user, tenant=tenant, is_active=True)
+
+    await tenant_user.tenant.load()
+
+    active_user_tenant = await TenantUser.get_active_user_tenant(user)
+    assert active_user_tenant.tenant_uuid == tenant_user.tenant.tenant_uuid
+    assert str(active_user_tenant.tenant_uuid) == str(tenant_user.tenant.tenant_uuid)
+
+
+async def test_can_be_tenant_of_multiple_users():
+    tenant = await Tenant.query.create(schema_name="edgy", tenant_name="Edgy")
+
+    for i in range(3):
+        user = await User.query.create(name=f"user-{i}", email=f"user-{i}@esmerald.dev")
+        await TenantUser.query.create(user=user, tenant=tenant, is_active=True)
+
+    total = await tenant.tenant_users_tenant_test.count()
+
+    assert total == 3
+
+
+async def test_multiple_tenants_one_active():
+    # Tenant 1
+    tenant = await Tenant.query.create(schema_name="edgy", tenant_name="Edgy")
+    user = await User.query.create(name="edgy", email="edgy@esmerald.dev")
+    tenant_user = await TenantUser.query.create(user=user, tenant=tenant, is_active=True)
+
+    await tenant_user.tenant.load()
+
+    active_user_tenant = await TenantUser.get_active_user_tenant(user)
+    assert active_user_tenant.tenant_uuid == tenant_user.tenant.tenant_uuid
+
+    # Tenant 2
+    another_tenant = await Tenant.query.create(
+        schema_name="another_edgy", tenant_name="Another Edgy"
+    )
+    await TenantUser.query.create(user=user, tenant=another_tenant, is_active=True)
+
+    # Tenant 2
+    another_tenant_three = await Tenant.query.create(
+        schema_name="another_edgy_three", tenant_name="Another Edgy Three"
+    )
+    await TenantUser.query.create(user=user, tenant=another_tenant_three, is_active=True)
+
+    active_user_tenant = await TenantUser.get_active_user_tenant(user)
+
+    assert active_user_tenant.tenant_uuid == another_tenant_three.tenant_uuid
+    assert active_user_tenant.tenant_uuid != another_tenant.tenant_uuid
+    assert active_user_tenant.tenant_uuid != tenant.tenant_uuid

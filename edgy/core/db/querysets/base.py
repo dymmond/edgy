@@ -627,7 +627,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             __as_tuple__=True,
         )
 
-    async def exists(self) -> bool:
+    async def exists(self, **kwargs: Any) -> bool:
         """
         Returns a boolean indicating if a record exists or not.
         """
@@ -638,7 +638,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         _exists = await queryset.database.fetch_val(expression)
         return cast("bool", _exists)
 
-    async def count(self) -> int:
+    async def count(self, **kwargs: Any) -> int:
         """
         Returns an indicating the total records.
         """
