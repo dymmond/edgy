@@ -5,7 +5,7 @@ from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 
 if TYPE_CHECKING:
-    from edgy import Manager, Model, ReflectModel
+    from edgy import Manager, Model, QuerySet, ReflectModel
 
 
 class RelatedField:
@@ -32,7 +32,7 @@ class RelatedField:
         return cast("Manager", self.related_from.meta.manager)  # type: ignore
 
     @functools.cached_property
-    def queryset(self) -> Any:
+    def queryset(self) -> "QuerySet":
         return self.manager.get_queryset()
 
     def m2m_related(self) -> Any:

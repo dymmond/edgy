@@ -635,7 +635,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         expression = queryset.build_select()
         expression = sqlalchemy.exists(expression).select()
         queryset.set_query_expression(expression)
-        _exists = await self.database.fetch_val(expression)
+        _exists = await queryset.database.fetch_val(expression)
         return cast("bool", _exists)
 
     async def count(self) -> int:

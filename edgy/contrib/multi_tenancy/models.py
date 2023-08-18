@@ -165,7 +165,7 @@ class TenantUserMixin(edgy.Model):
         return f"User: {self.user.pk}, Tenant: {self.tenant}"
 
     async def save(self, *args: Any, **kwargs: Any) -> Type["TenantUserMixin"]:
-        tenant_user = await super().save(*args, **kwargs)
+        tenant_user: Type["Model"] = await super().save(*args, **kwargs)
         if self.is_active:
             qs = (
                 await get_model(
