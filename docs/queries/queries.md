@@ -338,7 +338,7 @@ exists = await User.query.filter(email="foo@bar.com").exists()
 Returns an integer with the total of records.
 
 ```python
-exists = await User.query.filter(email="foo@bar.com").exists()
+exists = await User.query.count()
 ```
 
 ### Contains
