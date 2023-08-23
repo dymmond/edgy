@@ -53,5 +53,5 @@ async def test_model_limit_with_filter_offset():
     await User.query.create(name="Test")
     await User.query.create(name="Test")
     await User.query.create(name="Test")
-    result = await User.query.filter(name__icontains="Test").offset(2).limit(2)
+    result = await User.query.filter(name__icontains="Test").offset(1).limit(2)
     assert len(result) == 2
