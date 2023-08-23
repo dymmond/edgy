@@ -5,12 +5,12 @@ import uuid
 from enum import Enum
 
 import pytest
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.core.db import fields
 from edgy.exceptions import FieldDefinitionError
 from edgy.testclient import DatabaseTestClient
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
@@ -40,7 +40,7 @@ class Product(edgy.Model):
     data = fields.JSONField(default={})
     description = fields.CharField(null=True, max_length=255)
     huge_number = fields.BigIntegerField(default=0)
-    price = fields.DecimalField(null=True)
+    price = fields.DecimalField(max_digits=9, decimal_places=2, null=True)
     status = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
     value = fields.FloatField(null=True)
 
