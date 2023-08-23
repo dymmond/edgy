@@ -1,3 +1,4 @@
+import inspect
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
@@ -35,7 +36,8 @@ class DeclarativeMixin(BaseModel):
 
             # Maps the relationships with the foreign keys and related names
             field = cls.fields.get(column.name)
-            mapped_model: Mapped[field.to.__name__] = relationship(field.to.__name__)  # type: ignore
+            to = field.to.__name__ if inspect.isclass(field.to) else field.to
+            mapped_model: Mapped[to] = relationship(to)  # type: ignore
 
             # Adds to the current model
             model_table.__mapper__.add_property(f"{column.name}_relation", mapped_model)
