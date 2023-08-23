@@ -6,11 +6,11 @@ from typing import Any, Dict
 from uuid import UUID
 
 import pytest
-from tests.settings import DATABASE_ALTERNATIVE_URL, DATABASE_URL
 
 import edgy
 from edgy.core.db import fields
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_ALTERNATIVE_URL, DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
@@ -43,7 +43,7 @@ class Product(edgy.Model):
     data: Dict[Any, Any] = fields.JSONField(default={})
     description: str = fields.CharField(null=True, max_length=255)
     huge_number: int = fields.BigIntegerField(default=0)
-    price: decimal.Decimal = fields.DecimalField(null=True)
+    price: decimal.Decimal = fields.DecimalField(max_digits=9, decimal_places=2, null=True)
     status: str = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
     value: float = fields.FloatField(null=True)
 
