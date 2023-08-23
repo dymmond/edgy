@@ -47,3 +47,11 @@ async def test_model_limit_with_filter():
     await User.query.create(name="Test")
 
     assert len(await User.query.limit(2).filter(name__iexact="Test").all()) == 2
+
+
+async def test_model_limit_with_filter_offset():
+    await User.query.create(name="Test")
+    await User.query.create(name="Test")
+    await User.query.create(name="Test")
+    result = await User.query.filter(name__icontains="Test").offset(2).limit(2)
+    assert len(result) == 2
