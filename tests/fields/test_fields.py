@@ -66,7 +66,7 @@ def test_column_type():
         (IntegerField(), int),
         (BigIntegerField(), int),
         (SmallIntegerField(), int),
-        (DecimalField(max_digits=20, precision=2), decimal.Decimal),
+        (DecimalField(max_digits=20, decimal_places=2), decimal.Decimal),
         (ChoiceField(choices=Choices), enum.Enum),
     ],
 )
@@ -88,7 +88,7 @@ def test_field_annotation(field, annotation):
         (IntegerField(null=False), True),
         (BigIntegerField(null=False), True),
         (SmallIntegerField(null=False), True),
-        (DecimalField(max_digits=20, precision=2, null=False), True),
+        (DecimalField(max_digits=20, decimal_places=2, null=False), True),
         (ChoiceField(choices=Choices, null=False), True),
     ],
 )
@@ -111,7 +111,7 @@ def test_field_required(field, is_required):
         (IntegerField(null=True), False),
         (BigIntegerField(null=True), False),
         (SmallIntegerField(null=True), False),
-        (DecimalField(max_digits=20, precision=2, null=True), False),
+        (DecimalField(max_digits=20, decimal_places=2, null=True), False),
         (ChoiceField(choices=Choices, null=True), False),
     ],
 )
