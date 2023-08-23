@@ -252,8 +252,6 @@ class DecimalField(Number, decimal.Decimal):
         minimum: float = None,
         maximum: float = None,
         multiple_of: int = None,
-        precision: int = None,
-        scale: int = None,
         max_digits: int = None,
         decimal_places: int = None,
         **kwargs: Any,
@@ -262,19 +260,6 @@ class DecimalField(Number, decimal.Decimal):
             **kwargs,
             **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
         }
-        kwargs["ge"] = kwargs["minimum"]
-        kwargs["le"] = kwargs["maximum"]
-
-        if kwargs.get("max_digits"):
-            kwargs["precision"] = kwargs["max_digits"]
-        elif kwargs.get("precision"):
-            kwargs["max_digits"] = kwargs["precision"]
-
-        if kwargs.get("decimal_places"):
-            kwargs["scale"] = kwargs["decimal_places"]
-        elif kwargs.get("scale"):
-            kwargs["decimal_places"] = kwargs["scale"]
-
         return super().__new__(cls, **kwargs)
 
     @classmethod
@@ -282,6 +267,17 @@ class DecimalField(Number, decimal.Decimal):
         return sqlalchemy.Numeric(
             precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places")
         )
+
+    @classmethod
+    def validate(cls, **kwargs: Any) -> None:
+        super().validate(**kwargs)
+
+        max_digits = kwargs.get("max_digits")
+        decimal_places = kwargs.get("decimal_places")
+        if max_digits is None or max_digits < 0 or decimal_places is None or decimal_places < 0:
+            raise FieldDefinitionError(
+                "max_digits and decimal_places are required for DecimalField"
+            )
 
 
 class BooleanField(FieldFactory, int):

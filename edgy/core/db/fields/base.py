@@ -27,6 +27,9 @@ class BaseField(FieldInfo, _repr.Representation):
         description: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
+        self.max_digits: str = kwargs.pop("max_digits", None)
+        self.decimal_places: str = kwargs.pop("decimal_places", None)
+
         super().__init__(**kwargs)
 
         self.null: bool = kwargs.pop("null", False)
@@ -58,9 +61,6 @@ class BaseField(FieldInfo, _repr.Representation):
         self.owner: Any = kwargs.pop("owner", None)
         self.name: str = kwargs.pop("name", None)
         self.alias: str = kwargs.pop("name", None)
-        self.max_digits: str = kwargs.pop("max_digits", None)
-        self.scale: str = kwargs.pop("scale", None)
-        self.decimal_places: str = kwargs.pop("decimal_places", None)
         self.regex: str = kwargs.pop("regex", None)
         self.format: str = kwargs.pop("format", None)
         self.min_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
