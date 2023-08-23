@@ -5,7 +5,7 @@ from sqlalchemy.engine.result import Row
 from edgy.core.db.models.base import EdgyBaseModel
 
 if TYPE_CHECKING:  # pragma: no cover
-    from edgy import Model
+    from edgy import Model, Prefetch
 
 
 class ModelRow(EdgyBaseModel):
@@ -18,6 +18,7 @@ class ModelRow(EdgyBaseModel):
         cls,
         row: Row,
         select_related: Optional[Sequence[Any]] = None,
+        prefetch_related: Optional[Sequence["Prefetch"]] = None,
         is_only_fields: bool = False,
         only_fields: Sequence[str] = None,
         is_defer_fields: bool = False,
@@ -38,6 +39,7 @@ class ModelRow(EdgyBaseModel):
         """
         item: Dict[str, Any] = {}
         select_related = select_related or []
+        prefetch_related = prefetch_related or []
 
         for related in select_related:
             if "__" in related:
@@ -53,6 +55,14 @@ class ModelRow(EdgyBaseModel):
                 except KeyError:
                     model_cls = getattr(cls, related).related_from
                 item[related] = model_cls.from_sqla_row(row)
+
+        # for prefetch in prefetch_related:
+        #     # Validates the queryset
+        #     if prefetch.queryset is not None:
+        #         filter_by_pk = row[cls.pkname]
+
+        #     elif "__" in prefetch.related_name:
+        #         first_part, remainder = related.split("__", 1)
 
         # Populate the related names
         # Making sure if the model being queried is not inside a select related

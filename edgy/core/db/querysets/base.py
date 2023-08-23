@@ -23,6 +23,7 @@ from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.querysets.mixins import QuerySetPropsMixin, TenancyMixin
+from edgy.core.db.querysets.prefetch import PrefetchMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
 from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
@@ -40,7 +41,12 @@ EdgyModel = Union[_EdgyModel, ReflectEdgyModel]
 
 
 class BaseQuerySet(
-    TenancyMixin, QuerySetPropsMixin, DateParser, ModelParser, AwaitableQuery[EdgyModel]
+    TenancyMixin,
+    QuerySetPropsMixin,
+    PrefetchMixin,
+    DateParser,
+    ModelParser,
+    AwaitableQuery[EdgyModel],
 ):
     ESCAPE_CHARACTERS = ["%", "_"]
 
@@ -50,6 +56,7 @@ class BaseQuerySet(
         database: Union["Database", None] = None,
         filter_clauses: Any = None,
         select_related: Any = None,
+        prefetch_related: Any = None,
         limit_count: Any = None,
         limit_offset: Any = None,
         order_by: Any = None,
@@ -66,6 +73,7 @@ class BaseQuerySet(
         self.filter_clauses = [] if filter_clauses is None else filter_clauses
         self.limit_count = limit_count
         self._select_related = [] if select_related is None else select_related
+        self._prefetch_related = [] if prefetch_related is None else prefetch_related
         self._offset = limit_offset
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
@@ -76,6 +84,7 @@ class BaseQuerySet(
         self._cache = None
         self._m2m_related = m2m_related  # type: ignore
         self.using_schema = using_schema
+        self.extra: Dict[str, Any] = {}
 
         # Making sure the queryset always starts without any schema associated unless specified
         if self.is_m2m and not self._m2m_related:
@@ -155,9 +164,9 @@ class BaseQuerySet(
         """
         tables = [self.table]
         select_from = self.table
-
         has_many_fk_same_table = False
 
+        # Select related
         for item in self._select_related:
             # For m2m relationships
             model_class = self.model_class
@@ -194,7 +203,6 @@ class BaseQuerySet(
                     )
 
                 tables.append(table)
-
         return tables, select_from
 
     def validate_only_and_defer(self) -> None:
@@ -247,6 +255,7 @@ class BaseQuerySet(
         clauses = []
         filter_clauses = self.filter_clauses
         select_related = list(self._select_related)
+        prefetch_related = list(self._prefetch_related)
 
         # Making sure for queries we use the main class and not the proxy
         # And enable the parent
@@ -336,6 +345,7 @@ class BaseQuerySet(
                 database=self._database,
                 filter_clauses=filter_clauses,
                 select_related=select_related,
+                prefetch_related=prefetch_related,
                 limit_count=self.limit_count,
                 limit_offset=self._offset,
                 order_by=self._order_by,
@@ -374,17 +384,18 @@ class BaseQuerySet(
         queryset.filter_clauses = copy.copy(self.filter_clauses)
         queryset.limit_count = copy.copy(self.limit_count)
         queryset._select_related = copy.copy(self._select_related)
+        queryset._prefetch_related = copy.copy(self._prefetch_related)
         queryset._offset = copy.copy(self._offset)
         queryset._order_by = copy.copy(self._order_by)
         queryset._group_by = copy.copy(self._group_by)
         queryset.distinct_on = copy.copy(self.distinct_on)
         queryset._expression = copy.copy(self._expression)
-        queryset._cache = self._cache
         queryset._m2m_related = copy.copy(self._m2m_related)
         queryset._only = copy.copy(self._only)
         queryset._defer = copy.copy(self._defer)
         queryset._database = self.database
         queryset.table = self.table
+        queryset.extra = self.extra
         return queryset
 
 
@@ -664,9 +675,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             raise MultipleObjectsReturned()
         return queryset.model_class.from_sqla_row(rows[0], select_related=queryset._select_related)
 
-    async def all(self, **kwargs: Any) -> List[EdgyModel]:
+    async def _all(self, **kwargs: Any) -> List[EdgyModel]:
         """
-        Returns the queryset records based on specific filters
+        Executes the query.
         """
         queryset: "QuerySet" = self.clone()
         if queryset.is_m2m:
@@ -690,6 +701,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             queryset.model_class.from_sqla_row(
                 row,
                 select_related=queryset._select_related,
+                prefetch_related=queryset._prefetch_related,
                 is_only_fields=is_only_fields,
                 only_fields=queryset._only,
                 is_defer_fields=is_defer_fields,
@@ -702,6 +714,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         all_results = [getattr(result, queryset.m2m_related) for result in results]
         return all_results
+
+    def all(self, **kwargs: Any) -> "QuerySet":
+        """
+        Returns the queryset records based on specific filters
+        """
+        queryset: "QuerySet" = self.clone()
+        queryset.extra = kwargs
+        return queryset
 
     async def get(self, **kwargs: Any) -> EdgyModel:
         """
@@ -889,7 +909,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     async def execute(self) -> Any:
         queryset: "QuerySet" = self.clone()
-        records = await queryset.all()
+        records = await queryset._all(**queryset.extra)
         return records
 
     def __await__(
