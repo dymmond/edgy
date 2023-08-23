@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.3.1
+
+### Fix
+
+- `DecimalField` definition raising unknown constraint `max_digits`.
+-  DeclarativeModel generating internal mappings names was breaking for class objects.
+
 ## 0.3.0
 
 ### Added
