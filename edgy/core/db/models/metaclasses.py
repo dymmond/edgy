@@ -61,7 +61,6 @@ class MetaInfo:
         "related_fields",
         "model_references",
         "related_names_mapping",
-        "many_to_many_related_names_mapping",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
@@ -88,7 +87,6 @@ class MetaInfo:
         self.related_names: Set[str] = set()
         self.related_fields: Dict[str, Any] = {}
         self.related_names_mapping: Dict[str, Any] = {}
-        self.many_to_many_related_names_mapping: Dict[str, Any] = {}
 
     def model_dump(self) -> Dict[Any, Any]:
         return {k: getattr(self, k, None) for k in self.__slots__}
@@ -231,7 +229,6 @@ class BaseModelMeta(ModelMetaclass):
         foreign_key_fields: Any = {}
         model_references: Dict["ModelRef", str] = {}
         many_to_many_fields: Any = set()
-        many_to_many_related_names_mapping: Dict[str, Any] = {}
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: Any = None
@@ -313,7 +310,6 @@ class BaseModelMeta(ModelMetaclass):
                     foreign_key_fields[key] = value
                 elif isinstance(value, BaseManyToManyForeignKeyField):
                     many_to_many_fields.add(value)
-                    many_to_many_related_names_mapping[key] = value.related_name
                     continue
                 elif isinstance(value, BaseRefForeignKeyField):
                     model_references[key] = value.to
@@ -329,7 +325,6 @@ class BaseModelMeta(ModelMetaclass):
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
         meta.many_to_many_fields = many_to_many_fields
-        meta.many_to_many_related_names_mapping = many_to_many_related_names_mapping
         meta.model_references = model_references
         meta.pk_attribute = pk_attribute
         meta.pk = fields.get(pk_attribute)
