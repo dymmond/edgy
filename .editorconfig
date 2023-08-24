@@ -1,0 +1,48 @@
+; More information at http://editorconfig.org
+root = true
+
+[*]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = false
+
+# See Google Shell Style Guide
+# https://google.github.io/styleguide/shell.xml
+[*.sh]
+indent_size = 2  # shfmt: like -i 2
+insert_final_newline = true
+switch_case_indent = true  # shfmt: like -ci
+
+[*.py]
+insert_final_newline = true
+indent_size = 4
+max_line_length = 120
+
+[*.md]
+trim_trailing_whitespace = false
+indent_size = 4
+
+[*.yml]
+indent_size = 2
+
+[Makefile]
+indent_style = tab
+
+[*.js]
+indent_size = 4
+insert_final_newline = true
+
+[*.ts]
+insert_final_newline = true
+
+[*.scss]
+insert_final_newline = true
+
+[*.json]
+indent_size = 2
+
+[*.html]
+insert_final_newline = true
