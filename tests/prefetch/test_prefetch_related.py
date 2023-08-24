@@ -100,3 +100,16 @@ async def test_prefetch_related_with_select_related_return_multiple():
     assert len(tracks) == 2
     assert tracks[0].albums[0].pk == track1.pk
     assert tracks[1].albums[0].pk == track2.pk
+
+
+async def test_prefetch_related_with_select_related_return_none():
+    album = await Album.query.create(name="Malibu")
+    await Track.query.create(album=album, title="The Bird", position=1)
+
+    tracks = (
+        await Track.query.select_related("album")
+        .prefetch_related(Prefetch("tracks_set", to_attr="albums", queryset=Album.query.filter()))
+        .filter(album__id=2)
+    )
+
+    assert len(tracks) == 0

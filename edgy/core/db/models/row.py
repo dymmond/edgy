@@ -176,7 +176,11 @@ class ModelRow(EdgyBaseModel):
                 filter_by_pk = row[cls.pkname]
                 extra = {f"{related.related_name}__id": filter_by_pk}
                 related.queryset.extra = extra
-                records = asyncio.get_event_loop().run_until_complete(related.queryset)
+
+                # Execute the queryset
+                records = asyncio.get_event_loop().run_until_complete(
+                    cls.run_query(queryset=related.queryset)
+                )
                 setattr(model, related.to_attr, records)
             else:
                 model_cls = getattr(cls, related.related_name).related_from
@@ -231,13 +235,19 @@ class ModelRow(EdgyBaseModel):
 
     @classmethod
     async def run_query(
-        cls, model: Type["Model"], extra: Any, queryset: Optional["QuerySet"] = None
+        cls,
+        model: Optional[Type["Model"]] = None,
+        extra: Optional[Dict[str, Any]] = None,
+        queryset: Optional["QuerySet"] = None,
     ) -> Union[List[Type["Model"]], Any]:
         """
         Runs a specific query against a given model with filters.
         """
-        if not queryset:
-            return await model.query.filter(**extra)
 
-        queryset.extra = extra
+        if not queryset:
+            return await model.query.filter(**extra)  # type: ignore
+
+        if extra:
+            queryset.extra = extra
+
         return await queryset
