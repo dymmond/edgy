@@ -29,7 +29,7 @@ class PrefetchMixin:
     subsequent queries.
     """
 
-    def prefetch_related(self, prefetch: Prefetch) -> "QuerySet":
+    def prefetch_related(self, *prefetch: Prefetch) -> "QuerySet":
         """
         Performs a reverse lookup for the foreignkeys. This is different
         from the select_related. Select related performs a follows the SQL foreign relation
@@ -39,6 +39,9 @@ class PrefetchMixin:
 
         if not isinstance(prefetch, (list, tuple)):
             prefetch = cast("List[Prefetch]", [prefetch])  # type: ignore
+
+        if isinstance(prefetch, tuple):
+            prefetch = list(prefetch)  # type: ignore
 
         if any(not isinstance(value, Prefetch) for value in prefetch):
             raise QuerySetError("The prefetch_related must have Prefetch type objects only.")

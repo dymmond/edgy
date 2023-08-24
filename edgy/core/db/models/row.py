@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Uni
 from sqlalchemy.engine.result import Row
 
 from edgy.core.db.models.base import EdgyBaseModel
+from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy import Model, Prefetch, QuerySet
@@ -141,8 +142,9 @@ class ModelRow(EdgyBaseModel):
     ) -> Type["Model"]:
         """
         Handles any prefetch related scenario from the model.
-
         Loads in advance all the models needed for a specific record
+
+        Recursively checks for the related field
         """
         if not parent_cls:
             parent_cls = model
@@ -150,6 +152,16 @@ class ModelRow(EdgyBaseModel):
         for related in prefetch_related:
             if not original_prefetch:
                 original_prefetch = related
+
+            if original_prefetch and not is_nested:
+                original_prefetch = related
+
+            # Check for conflicting names
+            # If to_attr has the same name of any
+            if hasattr(parent_cls, original_prefetch.to_attr):
+                raise QuerySetError(
+                    f"Conflicting attribute to_attr='{original_prefetch.related_name}' with '{original_prefetch.to_attr}' in {parent_cls.__class__.__name__}"
+                )
 
             if "__" in related.related_name:
                 first_part, remainder = related.related_name.split("__", 1)

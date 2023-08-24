@@ -47,6 +47,7 @@ nav:
                   - Queries: "queries/queries.md"
                   - Related Name: "queries/related-name.md"
                   - ManyToMany: "queries/many-to-many.md"
+                  - Prefetch Related: "queries/prefetch.md"
         - Transactions: "transactions.md"
         - Relationships: "relationships.md"
         - Reference ForeignKey: "reference-foreignkey.md"
