@@ -13,12 +13,14 @@ class Prefetch:
     """
 
     def __init__(
-        self, related_name: str, to_attr: str, queryset: Optional["QuerySet"] = None
+        self,
+        related_name: str,
+        to_attr: str,
+        queryset: Optional["QuerySet"] = None,
     ) -> None:
         self.related_name = related_name
         self.to_attr = to_attr
         self.queryset = queryset
-        self.operation = None
 
 
 class PrefetchMixin:

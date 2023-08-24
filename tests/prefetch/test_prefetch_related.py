@@ -29,7 +29,7 @@ class Track(edgy.Model):
         registry = models
 
 
-@pytest.fixture(autouse=True, scope="module")
+@pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     await models.create_all()
     yield
@@ -83,3 +83,20 @@ async def test_prefetch_related_with_select_related():
     assert track.album.name == "Malibu"
     assert len(track.albums) == 1
     assert track.albums[0].name == "Malibu"
+
+
+async def test_prefetch_related_with_select_related_return_multiple():
+    album = await Album.query.create(name="Malibu")
+    album2 = await Album.query.create(name="Malibu")
+    track1 = await Track.query.create(album=album, title="The Bird", position=1)
+    track2 = await Track.query.create(album=album2, title="The Bird", position=1)
+
+    tracks = (
+        await Track.query.select_related("album")
+        .prefetch_related(Prefetch("tracks_set", to_attr="albums", queryset=Album.query.filter()))
+        .filter(title="The Bird")
+    )
+
+    assert len(tracks) == 2
+    assert tracks[0].albums[0].pk == track1.pk
+    assert tracks[1].albums[0].pk == track2.pk
