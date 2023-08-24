@@ -144,7 +144,8 @@ class ModelRow(EdgyBaseModel):
         Handles any prefetch related scenario from the model.
         Loads in advance all the models needed for a specific record
 
-        Recursively checks for the related field
+        Recursively checks for the related field and validates if there is any conflicting
+        attribute. If there is, a `QuerySetError` is raised.
         """
         if not parent_cls:
             parent_cls = model
