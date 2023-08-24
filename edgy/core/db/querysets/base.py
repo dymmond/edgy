@@ -749,6 +749,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             is_only_fields=is_only_fields,
             only_fields=queryset._only,
             is_defer_fields=is_defer_fields,
+            prefetch_related=queryset._prefetch_related,
         )
 
     async def first(self, **kwargs: Any) -> Union[EdgyModel, None]:

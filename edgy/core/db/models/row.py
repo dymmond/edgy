@@ -1,3 +1,4 @@
+import asyncio
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Type, cast
 
 from sqlalchemy.engine.result import Row
@@ -48,21 +49,15 @@ class ModelRow(EdgyBaseModel):
                     model_cls = cls.fields[first_part].target
                 except KeyError:
                     model_cls = getattr(cls, first_part).related_from
-                item[first_part] = model_cls.from_sqla_row(row, select_related=[remainder])
+                item[first_part] = model_cls.from_sqla_row(
+                    row, select_related=[remainder], prefetch_related=prefetch_related
+                )
             else:
                 try:
                     model_cls = cls.fields[related].target
                 except KeyError:
                     model_cls = getattr(cls, related).related_from
                 item[related] = model_cls.from_sqla_row(row)
-
-        # for prefetch in prefetch_related:
-        #     # Validates the queryset
-        #     if prefetch.queryset is not None:
-        #         filter_by_pk = row[cls.pkname]
-
-        #     elif "__" in prefetch.related_name:
-        #         first_part, remainder = related.split("__", 1)
 
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
@@ -103,7 +98,11 @@ class ModelRow(EdgyBaseModel):
 
             # We need to generify the model fields to make sure we can populate the
             # model without mandatory fields
-            return cast("Type[Model]", cls.proxy_model(**item))
+            model = cast("Type[Model]", cls.proxy_model(**item))
+            model = cls.handle_prefetch_related(
+                row=row, model=model, prefetch_related=prefetch_related
+            )
+            return model
         else:
             # Pull out the regular column values.
             for column in cls.table.columns:
@@ -113,7 +112,11 @@ class ModelRow(EdgyBaseModel):
                 elif column.name not in item:
                     item[column.name] = row[column]
 
-        return cast("Type[Model]", cls(**item))
+        model = cast("Type[Model]", cls(**item))
+        model = cls.handle_prefetch_related(
+            row=row, model=model, prefetch_related=prefetch_related
+        )
+        return model
 
     @classmethod
     def should_ignore_related_name(cls, related_name: str, select_related: Sequence[str]) -> bool:
@@ -125,3 +128,33 @@ class ModelRow(EdgyBaseModel):
             if related_name in fields:
                 return True
         return False
+
+    @classmethod
+    def handle_prefetch_related(
+        cls, row: Row, model: Type["Model"], prefetch_related: Sequence["Prefetch"]
+    ) -> Type["Model"]:
+        """
+        Handles any prefetch related scenario from the model.
+
+        Loads in advance all the models needed for a specific record
+        """
+        for prefetch in prefetch_related:
+            # Validates the queryset
+
+            if hasattr(cls, prefetch.to_attr):
+                raise ValueError(f"Confliting `{prefetch.to_attr}` in {cls.__name__}")
+
+            if prefetch.related_name not in cls.meta.related_fields:
+                raise ValueError(f"'{prefetch.related_name}' has not been created or declared.")
+
+            if prefetch.queryset is not None:
+                filter_by_pk = row[cls.pkname]
+                extra = {f"{prefetch.related_name}__id": filter_by_pk}
+                prefetch.queryset.extra = extra
+
+                records = asyncio.get_event_loop().run_until_complete(prefetch.queryset)
+                setattr(model, prefetch.to_attr, records)
+
+            # elif "__" in prefetch.related_name:
+            #     first_part, remainder = related.split("__", 1)
+        return model
