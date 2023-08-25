@@ -195,7 +195,7 @@ def _set_many_to_many_relation(
     setattr(model_class, settings.many_to_many_relation.format(key=field), relation)
 
 
-def _register_model_signals(model_class: Type["Model"]) -> None:
+def _register_model_signals(model_class: Type["Model"]) -> "Broadcaster":
     """
     Registers the signals in the model's Broadcaster and sets the defaults.
     """
@@ -209,10 +209,12 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
         signals.post_delete = Signal()
         signals.post_bulk_update = Signal()
         signals.post_bulk_create = Signal()
-        model_class.meta.signals = signals
 
         # Flag the signals as registered
         model_class.__signal_register__ = True
+        return signals
+    else:
+        return model_class.meta.signals
 
 
 class BaseModelMeta(ModelMetaclass):
@@ -430,9 +432,9 @@ class BaseModelMeta(ModelMetaclass):
             if isinstance(value, Manager):
                 value.model_class = new_class
 
-        if getattr(meta, "signals", None) is None:
-            if hasattr(new_class, "__signal_register__"):
-                _register_model_signals(new_class)
+        # Register signals
+        signals = _register_model_signals(new_class)
+        meta.signals = signals
 
         # Update the model references with the validations of the model
         # Being done by the Edgy fields instead.
