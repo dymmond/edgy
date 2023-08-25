@@ -143,15 +143,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         generify_model_fields(proxy_model.model)
         return proxy_model.model
 
-    def model_dump(self, **kwargs: Any) -> Dict[str, Any]:
-        """
-        An updated version of the model dump if the primary key is not provided.
-        """
-        model = super().model_dump(**kwargs)
-        if self.pkname not in model:
-            model = {**{self.pkname: self.pk}, **model}
-        return model
-
     @classmethod
     def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:
         """
