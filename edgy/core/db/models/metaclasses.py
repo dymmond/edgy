@@ -195,7 +195,7 @@ def _set_many_to_many_relation(
     setattr(model_class, settings.many_to_many_relation.format(key=field), relation)
 
 
-def _register_model_signals(model_class: Type["Model"]) -> "Broadcaster":
+def _register_model_signals(model_class: Type["Model"]) -> Optional["Broadcaster"]:
     """
     Registers the signals in the model's Broadcaster and sets the defaults.
     """
