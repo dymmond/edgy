@@ -110,7 +110,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @property
     def signals(self) -> "Broadcaster":
-        return self.meta.signals  # type: ignore
+        return self.__class__.meta.signals  # type: ignore
 
     @property
     def table(self) -> sqlalchemy.Table:
