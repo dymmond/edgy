@@ -24,20 +24,29 @@ class Model(ModelRow, DeclarativeMixin):
         """
         Update operation of the database fields.
         """
+        await self.signals.pre_update.send(sender=self.__class__, instance=self)
+
         kwargs = self.update_auto_now_fields(kwargs, self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         await self.database.execute(expression)
+        await self.signals.post_update.send(sender=self.__class__, instance=self)
 
         # Update the model instance.
         for key, value in kwargs.items():
             edgy_setattr(self, key, value)
 
+        return self
+
     async def delete(self) -> None:
         """Delete operation from the database"""
+        await self.signals.pre_delete.send(sender=self.__class__, instance=self)
+
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.delete().where(pk_column == self.pk)
         await self.database.execute(expression)
+
+        await self.signals.post_delete.send(sender=self.__class__, instance=self)
 
     async def load(self) -> None:
         # Build the select expression.
@@ -127,6 +136,8 @@ class Model(ModelRow, DeclarativeMixin):
         When creating a user it will make sure it can update existing or
         create a new one.
         """
+        await self.signals.pre_save.send(sender=self.__class__, instance=self)
+
         extracted_fields = self.extract_db_fields()
         extracted_model_references = self.extract_db_model_references()
         extracted_fields.update(extracted_model_references)
@@ -146,7 +157,14 @@ class Model(ModelRow, DeclarativeMixin):
         if getattr(self, "pk", None) is None or force_save:
             await self._save(**kwargs)
         else:
+            # Broadcast the initial update details
+            await self.model_class.signals.pre_update.send(
+                sender=self.__class__, instance=self, kwargs=kwargs
+            )
             await self._update(**kwargs)
+
+            # Broadcast the update complete
+            await self.model_class.signals.post_update.send(sender=self.__class__, instance=self)
 
         # Save the model references
         if model_references:
@@ -161,6 +179,7 @@ class Model(ModelRow, DeclarativeMixin):
         ):
             await self.load()
 
+        await self.signals.post_save.send(sender=self.__class__, instance=self)
         return self
 
 

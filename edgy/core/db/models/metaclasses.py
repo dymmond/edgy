@@ -5,7 +5,6 @@ from typing import (
     Any,
     Dict,
     List,
-    Mapping,
     Optional,
     Sequence,
     Set,
@@ -30,6 +29,7 @@ from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
+from edgy.core.signals import Broadcaster, Signal
 from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
@@ -61,6 +61,7 @@ class MetaInfo:
         "related_fields",
         "model_references",
         "related_names_mapping",
+        "signals",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
@@ -87,6 +88,7 @@ class MetaInfo:
         self.related_names: Set[str] = set()
         self.related_fields: Dict[str, Any] = {}
         self.related_names_mapping: Dict[str, Any] = {}
+        self.signals: Optional[Broadcaster] = {}  # type: ignore
 
     def model_dump(self) -> Dict[Any, Any]:
         return {k: getattr(self, k, None) for k in self.__slots__}
@@ -122,34 +124,6 @@ def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
             "Registry for the table not found in the Meta class or any of the superclasses. You must set thr registry in the Meta."
         )
     return found_registry
-
-
-def _check_model_inherited_registries(bases: Tuple[Type, ...]) -> Dict[str, Type[Registry]]:
-    """
-    Evaluates if there is any `registries` entry in the metaclass.
-    The registries is what allows to query the model into a different
-    database using a different connection.
-
-    If registries are found, then it will update the mapping with the details of the
-    model.
-    """
-    found_registries: Mapping[str, Type[Registry]] = {}
-
-    for base in bases:
-        meta: MetaInfo = getattr(base, "meta", None)  # type: ignore
-        if not meta:
-            continue
-
-        if getattr(meta, "registries", None) is not None:
-            found_registries = meta.registries
-            break
-
-    if not isinstance(found_registries, dict):
-        raise ImproperlyConfigured(
-            f"`registries` must be a dict like object, got {type(found_registries)}"
-        )
-
-    return found_registries
 
 
 def _check_manager_for_bases(
@@ -219,6 +193,26 @@ def _set_many_to_many_relation(
     m2m.create_through_model()
     relation = Relation(through=m2m.through, to=m2m.to, owner=m2m.owner)
     setattr(model_class, settings.many_to_many_relation.format(key=field), relation)
+
+
+def _register_model_signals(model_class: Type["Model"]) -> None:
+    """
+    Registers the signals in the model's Broadcaster and sets the defaults.
+    """
+    if not model_class.__signal_register__:
+        signals = Broadcaster()
+        signals.pre_save = Signal()
+        signals.pre_update = Signal()
+        signals.pre_delete = Signal()
+        signals.post_save = Signal()
+        signals.post_update = Signal()
+        signals.post_delete = Signal()
+        signals.post_bulk_update = Signal()
+        signals.post_bulk_create = Signal()
+        model_class.meta.signals = signals
+
+        # Flag the signals as registered
+        model_class.__signal_register__ = True
 
 
 class BaseModelMeta(ModelMetaclass):
@@ -435,6 +429,9 @@ class BaseModelMeta(ModelMetaclass):
         for _, value in attrs.items():
             if isinstance(value, Manager):
                 value.model_class = new_class
+
+        # Register the signals
+        _register_model_signals(new_class)
 
         # Update the model references with the validations of the model
         # Being done by the Edgy fields instead.
