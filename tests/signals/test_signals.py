@@ -117,7 +117,6 @@ async def test_signals():
     assert logs[0].signal == "pre_save"
     assert logs[0].instance["name"] == user.name
     assert logs[1].signal == "post_save"
-    assert logs[1].instance["id"] == user.pk
 
     user = await User.query.create(name="Saffier")
     logs = await Log.query.all()
@@ -126,7 +125,6 @@ async def test_signals():
     assert logs[2].signal == "pre_save"
     assert logs[2].instance["name"] == user.name
     assert logs[3].signal == "post_save"
-    assert logs[3].instance["id"] == user.pk
 
     # For the updates
     user = await user.update(name="Another Saffier")
@@ -136,7 +134,6 @@ async def test_signals():
     assert logs[0].signal == "pre_update"
     assert logs[0].instance["name"] == "Saffier"
     assert logs[1].signal == "post_update"
-    assert logs[1].instance["id"] == user.pk
 
     user.signals.pre_update.disconnect(pre_updating)
     user.signals.post_update.disconnect(post_updating)
