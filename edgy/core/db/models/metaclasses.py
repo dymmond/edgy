@@ -430,8 +430,9 @@ class BaseModelMeta(ModelMetaclass):
             if isinstance(value, Manager):
                 value.model_class = new_class
 
-        # Register the signals
-        _register_model_signals(new_class)
+        if getattr(meta, "signals", None) is None:
+            if hasattr(new_class, "__signal_register__"):
+                _register_model_signals(new_class)
 
         # Update the model references with the validations of the model
         # Being done by the Edgy fields instead.
