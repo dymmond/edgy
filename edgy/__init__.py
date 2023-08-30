@@ -1,4 +1,4 @@
-__version__ = "0.3.1"
+__version__ = "0.4.0"
 
 from .cli.base import Migrate
 from .conf import settings
@@ -36,6 +36,7 @@ from .core.db.models import Model, ModelRef, ReflectModel
 from .core.db.models.managers import Manager
 from .core.db.querysets import Prefetch, QuerySet
 from .core.extras import EdgyExtra
+from .core.signals import Signal
 from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
 __all__ = [
@@ -77,6 +78,7 @@ __all__ = [
     "RESTRICT",
     "Registry",
     "SET_NULL",
+    "Signal",
     "SmallIntegerField",
     "TextField",
     "TimeField",

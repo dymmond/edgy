@@ -63,5 +63,9 @@ class SchemaError(EdgyException):
     ...
 
 
+class SignalError(EdgyException):
+    ...
+
+
 class CommandEnvironmentError(EdgyException):
     ...

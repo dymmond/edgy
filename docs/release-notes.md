@@ -1,5 +1,14 @@
 # Release Notes
 
+### Added
+
+- New [Prefetch](./queries/prefetch.md) support allowing to simultaneously load nested data onto models.
+- New [Signal](./signals) support allowing to "listen" to model events upon actions being triggered.
+
+### Changed
+
+- Updated pydantic and alembic
+
 ## 0.3.1
 
 ### Fix

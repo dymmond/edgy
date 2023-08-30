@@ -5,7 +5,6 @@ from typing import (
     Any,
     Dict,
     List,
-    Mapping,
     Optional,
     Sequence,
     Set,
@@ -30,6 +29,7 @@ from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
+from edgy.core.signals import Broadcaster, Signal
 from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
@@ -61,7 +61,7 @@ class MetaInfo:
         "related_fields",
         "model_references",
         "related_names_mapping",
-        "many_to_many_related_names_mapping",
+        "signals",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
@@ -88,7 +88,7 @@ class MetaInfo:
         self.related_names: Set[str] = set()
         self.related_fields: Dict[str, Any] = {}
         self.related_names_mapping: Dict[str, Any] = {}
-        self.many_to_many_related_names_mapping: Dict[str, Any] = {}
+        self.signals: Optional[Broadcaster] = {}  # type: ignore
 
     def model_dump(self) -> Dict[Any, Any]:
         return {k: getattr(self, k, None) for k in self.__slots__}
@@ -124,34 +124,6 @@ def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
             "Registry for the table not found in the Meta class or any of the superclasses. You must set thr registry in the Meta."
         )
     return found_registry
-
-
-def _check_model_inherited_registries(bases: Tuple[Type, ...]) -> Dict[str, Type[Registry]]:
-    """
-    Evaluates if there is any `registries` entry in the metaclass.
-    The registries is what allows to query the model into a different
-    database using a different connection.
-
-    If registries are found, then it will update the mapping with the details of the
-    model.
-    """
-    found_registries: Mapping[str, Type[Registry]] = {}
-
-    for base in bases:
-        meta: MetaInfo = getattr(base, "meta", None)  # type: ignore
-        if not meta:
-            continue
-
-        if getattr(meta, "registries", None) is not None:
-            found_registries = meta.registries
-            break
-
-    if not isinstance(found_registries, dict):
-        raise ImproperlyConfigured(
-            f"`registries` must be a dict like object, got {type(found_registries)}"
-        )
-
-    return found_registries
 
 
 def _check_manager_for_bases(
@@ -223,6 +195,20 @@ def _set_many_to_many_relation(
     setattr(model_class, settings.many_to_many_relation.format(key=field), relation)
 
 
+def _register_model_signals(model_class: Type["Model"]) -> None:
+    """
+    Registers the signals in the model's Broadcaster and sets the defaults.
+    """
+    signals = Broadcaster()
+    signals.pre_save = Signal()
+    signals.pre_update = Signal()
+    signals.pre_delete = Signal()
+    signals.post_save = Signal()
+    signals.post_update = Signal()
+    signals.post_delete = Signal()
+    model_class.meta.signals = signals
+
+
 class BaseModelMeta(ModelMetaclass):
     __slots__ = ()
 
@@ -231,7 +217,6 @@ class BaseModelMeta(ModelMetaclass):
         foreign_key_fields: Any = {}
         model_references: Dict["ModelRef", str] = {}
         many_to_many_fields: Any = set()
-        many_to_many_related_names_mapping: Dict[str, Any] = {}
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: Any = None
@@ -313,7 +298,6 @@ class BaseModelMeta(ModelMetaclass):
                     foreign_key_fields[key] = value
                 elif isinstance(value, BaseManyToManyForeignKeyField):
                     many_to_many_fields.add(value)
-                    many_to_many_related_names_mapping[key] = value.related_name
                     continue
                 elif isinstance(value, BaseRefForeignKeyField):
                     model_references[key] = value.to
@@ -329,7 +313,6 @@ class BaseModelMeta(ModelMetaclass):
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
         meta.many_to_many_fields = many_to_many_fields
-        meta.many_to_many_related_names_mapping = many_to_many_related_names_mapping
         meta.model_references = model_references
         meta.pk_attribute = pk_attribute
         meta.pk = fields.get(pk_attribute)
@@ -441,6 +424,9 @@ class BaseModelMeta(ModelMetaclass):
             if isinstance(value, Manager):
                 value.model_class = new_class
 
+        # Register the signals
+        _register_model_signals(new_class)
+
         # Update the model references with the validations of the model
         # Being done by the Edgy fields instead.
         # Generates a proxy model for each model created
@@ -486,6 +472,13 @@ class BaseModelMeta(ModelMetaclass):
             if table.name.lower() != cls.meta.tablename:
                 cls._table = cls.build(db_schema)
         return cls._table
+
+    @property
+    def signals(cls) -> "Broadcaster":
+        """
+        Returns the signals of a class
+        """
+        return cast("Broadcaster", cls.meta.signals)
 
     def table_schema(cls, schema: str) -> Any:
         """

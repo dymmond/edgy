@@ -22,6 +22,7 @@ from edgy.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
     from edgy import Model
+    from edgy.core.signals import Broadcaster
 
 EXCLUDED_LOOKUP = ["__model_references__", "_table"]
 
@@ -106,6 +107,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     def proxy_model(self) -> Any:
         return self.__class__.proxy_model
 
+    @cached_property
+    def signals(self) -> "Broadcaster":
+        return self.__class__.signals  # type: ignore
+
     @property
     def table(self) -> sqlalchemy.Table:
         if getattr(self, "_table", None) is None:
@@ -136,6 +141,18 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         proxy_model.build()
         generify_model_fields(proxy_model.model)
         return proxy_model.model
+
+    def model_dump(self, show_pk: bool = False, **kwargs: Any) -> Dict[str, Any]:
+        """
+        An updated version of the model dump if the primary key is not provided.
+
+        Args:
+            show_pk: bool - Enforces showing the primary key in the model_dump.
+        """
+        model = super().model_dump(**kwargs)
+        if self.pkname not in model and show_pk:
+            model = {**{self.pkname: self.pk}, **model}
+        return model
 
     @classmethod
     def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:
@@ -215,6 +232,12 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             for k, v in self.__dict__.items()
             if k not in related_names and k not in EXCLUDED_LOOKUP
         }
+
+    def get_instance_name(self) -> str:
+        """
+        Returns the name of the class in lowercase.
+        """
+        return self.__class__.__name__.lower()
 
     def __setattr__(self, key: Any, value: Any) -> Any:
         if key in self.fields:
