@@ -838,11 +838,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset.set_query_expression(expression)
         await queryset.database.execute_many(str(expression), query_list)
 
-        # Broadcast the signal
-        await self.model_class.meta.signals.post_bulk_update.send(
-            sender=self.model_class, instances=query_list
-        )
-
     async def delete(self) -> None:
         queryset: "QuerySet" = self.clone()
 

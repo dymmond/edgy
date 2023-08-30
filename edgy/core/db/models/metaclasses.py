@@ -206,8 +206,6 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
     signals.post_save = Signal()
     signals.post_update = Signal()
     signals.post_delete = Signal()
-    signals.post_bulk_update = Signal()
-    signals.post_bulk_create = Signal()
     model_class.meta.signals = signals
 
 

@@ -65,10 +65,3 @@ def post_delete(senders: Union[Type["Model"], List[Type["Model"]]]) -> Callable:
     Connects all the senders to post_delete.
     """
     return Send.consumer(signal="post_delete", senders=senders)
-
-
-def post_bulk_update(senders: Union[Type["Model"], List[Type["Model"]]]) -> Callable:
-    """
-    Connects all the senders to post_bulk_update.
-    """
-    return Send.consumer(signal="post_bulk_update", senders=senders)

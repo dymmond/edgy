@@ -192,3 +192,18 @@ async def test_multiple_senders():
 
     user.signals.pre_save.disconnect(pre_saving)
     profile.signals.pre_save.disconnect(pre_saving)
+
+
+async def test_custom_signal():
+    async def processing(sender, instance, **kwargs):
+        instance.name = f"{instance.name} ORM"
+        await instance.save()
+
+    User.meta.signals.custom.connect(processing)
+
+    user = await User.query.create(name="Edgy")
+    await User.meta.signals.custom.send(sender=User, instance=user)
+
+    assert user.name == "Edgy ORM"
+
+    User.meta.signals.custom.disconnect(processing)
