@@ -43,7 +43,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
     __model_references__: ClassVar[Any] = None
-    __signal_register__: ClassVar[bool] = False
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(**kwargs)
