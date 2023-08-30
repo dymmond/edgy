@@ -158,13 +158,11 @@ class Model(ModelRow, DeclarativeMixin):
             await self._save(**kwargs)
         else:
             # Broadcast the initial update details
-            await self.model_class.signals.pre_update.send(
-                sender=self.__class__, instance=self, kwargs=kwargs
-            )
+            await self.signals.pre_update.send(sender=self.__class__, instance=self, kwargs=kwargs)
             await self._update(**kwargs)
 
             # Broadcast the update complete
-            await self.model_class.signals.post_update.send(sender=self.__class__, instance=self)
+            await self.signals.post_update.send(sender=self.__class__, instance=self)
 
         # Save the model references
         if model_references:

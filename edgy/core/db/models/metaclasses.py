@@ -199,20 +199,16 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
     """
     Registers the signals in the model's Broadcaster and sets the defaults.
     """
-    if not model_class.__signal_register__:
-        signals = Broadcaster()
-        signals.pre_save = Signal()
-        signals.pre_update = Signal()
-        signals.pre_delete = Signal()
-        signals.post_save = Signal()
-        signals.post_update = Signal()
-        signals.post_delete = Signal()
-        signals.post_bulk_update = Signal()
-        signals.post_bulk_create = Signal()
-        model_class.meta.signals = signals
-
-        # Flag the signals as registered
-        model_class.__signal_register__ = True
+    signals = Broadcaster()
+    signals.pre_save = Signal()
+    signals.pre_update = Signal()
+    signals.pre_delete = Signal()
+    signals.post_save = Signal()
+    signals.post_update = Signal()
+    signals.post_delete = Signal()
+    signals.post_bulk_update = Signal()
+    signals.post_bulk_create = Signal()
+    model_class.meta.signals = signals
 
 
 class BaseModelMeta(ModelMetaclass):
@@ -478,6 +474,13 @@ class BaseModelMeta(ModelMetaclass):
             if table.name.lower() != cls.meta.tablename:
                 cls._table = cls.build(db_schema)
         return cls._table
+
+    @property
+    def signals(cls) -> "Broadcaster":
+        """
+        Returns the signals of a class
+        """
+        return cast("Broadcaster", cls.meta.signals)
 
     def table_schema(cls, schema: str) -> Any:
         """

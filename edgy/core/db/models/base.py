@@ -108,9 +108,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     def proxy_model(self) -> Any:
         return self.__class__.proxy_model
 
-    @property
+    @cached_property
     def signals(self) -> "Broadcaster":
-        return self.meta.signals  # type: ignore
+        return self.__class__.signals  # type: ignore
 
     @property
     def table(self) -> sqlalchemy.Table:
@@ -143,12 +143,15 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         generify_model_fields(proxy_model.model)
         return proxy_model.model
 
-    def model_dump(self, **kwargs: Any) -> Dict[str, Any]:
+    def model_dump(self, show_pk: bool = False, **kwargs: Any) -> Dict[str, Any]:
         """
         An updated version of the model dump if the primary key is not provided.
+
+        Args:
+            show_pk: bool - Enforces showing the primary key in the model_dump.
         """
         model = super().model_dump(**kwargs)
-        if self.pkname not in model:
+        if self.pkname not in model and show_pk:
             model = {**{self.pkname: self.pk}, **model}
         return model
 
