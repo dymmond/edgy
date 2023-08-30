@@ -3,7 +3,7 @@
 ### Added
 
 - New [Prefetch](./queries/prefetch.md) support allowing to simultaneously load nested data onto models.
-- New [Signal](./signals) support allowing to "listen" to model events upon actions being triggered.
+- New [Signal](./signals.md) support allowing to "listen" to model events upon actions being triggered.
 
 ### Changed
 
