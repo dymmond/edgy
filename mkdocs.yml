@@ -37,7 +37,8 @@ plugins:
                   data: data
 
 nav:
-        - Introduction: "index.md"
+        - Home: "index.md"
+        - Edgy: "edgy.md"
         - Models: "models.md"
         - Declarative Models: "declarative-models.md"
         - Reflection: "reflection.md"
