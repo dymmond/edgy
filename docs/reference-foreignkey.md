@@ -10,7 +10,7 @@ Well for start it is not a normal [ForeignKey](./fields.md#foreignkey). The reas
 when it comes to **insert** records in the database.
 
 This object **does not create** any foreign key in the database for you, mostly because this type
-literally does not exist. Instead if some sort of a mapper that can coexist inside your [model][models]
+literally does not exist. Instead is some sort of a mapper that can coexist inside your [model][models]
 declaration and help you with some automated tasks.
 
 !!! Warning
@@ -50,6 +50,7 @@ await Post.query.create(user=user, comment="A third comment")
 ```
 
 Simple, right? What if there was another way of doing this? This is where the [RefForeignKey][reffk] gets in.
+
 ## RefForeignKey
 
 A RefForeignKey is internally interpreted as a **list of the model declared in the [ModelRef][model_ref]**.
@@ -94,7 +95,7 @@ from edgy.core.db.models import ModelRef
 ```
 
 The `ModelRef` when creating and declaring it makes it **mandatory** to populate the `__model__`
-attribute or else it won't know what to do and it will raise a `ModelReferenceError`. This is good,
+attribute or else it won't know what to do and it will raise a `ModelReferenceError`. This is good and
 means you can't miss it even if you wanted to.
 
 The `__model__` attribute can be the [model][models] itself or a string model name.
@@ -105,7 +106,7 @@ or anything you could normally use with a normal Pydantic model.
 
 #### Attention
 
-You need to be careful when declaring the fields of the `ModelRef` because that will be used to
+You need to be careful when declaring the fields of the `ModelRef` because that will be used
 against the `__model__` declared. If the [model][models] has `constraints`, `uniques` and so on
 you will need to respect it when you are about to insert in the database.
 
@@ -125,7 +126,7 @@ Let us see an example how to declare the [ModelRef][model_ref] for a specific [m
 {!> ../docs_src/reffk/model_ref/how_to_declare.py !}
 ```
 
-First we have a model already created which is the database table represenation as per normal design,
+First we have a model already created which is the database table representation as per normal design,
 then we can create a model reference for that same [model][models].
 
 ```python title="The model reference" hl_lines="9-10"
@@ -189,7 +190,7 @@ is **not null**.
 The previous example has everything in one place but 99% of times you will want to have the references
 somewhere else and just import them. A dedicated `references.py` file for instance.
 
-With this idea in mind, now it kinda makes a bit more sense doesn't it? Someting like this:
+With this idea in mind, now it kinda makes a bit more sense doesn't it? Something like this:
 
 ```python hl_lines="5" title="references.py"
 {!> ../docs_src/reffk/references.py !}
@@ -227,7 +228,7 @@ post2 = PostRef(comment="Another comment")
 post3 = PostRef(comment="A third comment")
 
 # Create the usee with all the posts
-await User.query.create(name="Edgy", post=[post1, post2, post3])
+await User.query.create(name="Edgy", posts=[post1, post2, post3])
 ```
 
 This will now will make sure that creates all the proper objects and associated IDs in the corresponding
