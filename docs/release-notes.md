@@ -1,5 +1,7 @@
 # Release Notes
 
+## 0.4.0
+
 ### Added
 
 - New [Prefetch](./queries/prefetch.md) support allowing to simultaneously load nested data onto models.
