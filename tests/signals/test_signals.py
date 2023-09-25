@@ -162,12 +162,12 @@ async def test_staticmethod_signals():
         @staticmethod
         @pre_save(User)
         async def pre_save_one(sender, instance, **kwargs):
-            await Log.query.create(signal="pre_save_one", instance=instance.json())
+            await Log.query.create(signal="pre_save_one", instance=instance.model_dump_json())
 
         @staticmethod
         @pre_save(User)
         async def pre_save_two(sender, instance, **kwargs):
-            await Log.query.create(signal="pre_save_two", instance=instance.json())
+            await Log.query.create(signal="pre_save_two", instance=instance.model_dump_json())
 
     # Signals for the create
     user = await User.query.create(name="Edgy")
@@ -182,7 +182,7 @@ async def test_staticmethod_signals():
 async def test_multiple_senders():
     @pre_save([User, Profile])
     async def pre_saving(sender, instance, **kwargs):
-        await Log.query.create(signal="pre_save", instance=instance.json())
+        await Log.query.create(signal="pre_save", instance=instance.model_dump_json())
 
     user = await User.query.create(name="Edgy")
     profile = await User.query.create(name="Profile Edgy")

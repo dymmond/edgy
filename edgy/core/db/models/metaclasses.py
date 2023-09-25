@@ -287,7 +287,6 @@ class BaseModelMeta(ModelMetaclass):
 
         for key, value in attrs.items():
             if isinstance(value, BaseField):
-                getattr(meta_class, "abstract", None)
                 if getattr(meta_class, "abstract", None):
                     value = copy.copy(value)
 
