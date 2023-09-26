@@ -24,6 +24,11 @@ interesting to you.
 
 ## 💬 Join the official Edgy discord channel
 
+Our official chat is on discord, we find it very useful and free for people to discuss issues, helping and contributing
+in a more organised manner.
+
+<a href="https://discord.gg/eMrM9sWWvu" target="_blank">Edgy discord channel</a>. Join us! 🗸
+
 ## 🔥 Sponsor the author
 
 The author built this framework with all of his heart and dedication and will continue to do it so but that also
