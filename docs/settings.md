@@ -6,7 +6,7 @@ the same principle but in a simpler manner but to Edgy?
 
 This is exactly what happened.
 
-## Edgy Setting Module
+## Edgy Settings Module
 
 The way of using the settings object within a Edgy use of the ORM is via:
 
