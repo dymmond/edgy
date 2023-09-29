@@ -13,7 +13,6 @@ supported in **all field types**.
 
 * **primary_key** - A boolean. Determine if a column is primary key.
 Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions with Edgy.
-* **null** - A boolean. Determine if a column allows null.
 * **default** - A value or a callable (function).
 * **index** - A boolean. Determine if a database index should be created.
 * **unique** - A boolean. Determine if a unique constraint should be created for the field.
@@ -25,7 +24,6 @@ All the fields are required unless on the the following is set:
 
     <sup>Set default to `None`</sup>
 
-* **default** - A value or a callable (function).
 * **server_default** - nstance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
 construct representing the DDL DEFAULT value for the column.
 * **comment** - A comment to be added with the field in the SQL database.
