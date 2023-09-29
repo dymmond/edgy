@@ -30,11 +30,8 @@ construct representing the DDL DEFAULT value for the column.
 
 ## Available fields
 
-Edgy is built on the top of **pydantic** and inspired by `typesystem`. This means, for example,
-that migrating from the Encode ORM is almost direct as it was made sure the same patterns, names,
-and internal validation remained the same, intentionally.
-
-To make the interface even more familiar, the field names end with a `Field` at the end.
+All the values you can pass in any Pydantic [Field](https://docs.pydantic.dev/latest/concepts/fields/)
+are also 100% allowed within Mongoz fields.
 
 ### Importing fields
 
