@@ -168,7 +168,7 @@ This will make sure that every receiver will execute the given defined action.
 
 ### Disconnecting receivers
 
-If you wish to disconnect the receiver and stop it from running for a fiven model, you can also
+If you wish to disconnect the receiver and stop it from running for a given model, you can also
 achieve this in a simple way.
 
 ```python hl_lines="20 23"
