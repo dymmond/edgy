@@ -13,7 +13,6 @@ supported in **all field types**.
 
 * **primary_key** - A boolean. Determine if a column is primary key.
 Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions with Edgy.
-* **null** - A boolean. Determine if a column allows null.
 * **default** - A value or a callable (function).
 * **index** - A boolean. Determine if a database index should be created.
 * **unique** - A boolean. Determine if a unique constraint should be created for the field.
@@ -25,18 +24,14 @@ All the fields are required unless on the the following is set:
 
     <sup>Set default to `None`</sup>
 
-* **default** - A value or a callable (function).
 * **server_default** - nstance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
 construct representing the DDL DEFAULT value for the column.
 * **comment** - A comment to be added with the field in the SQL database.
 
 ## Available fields
 
-Edgy is built on the top of **pydantic** and inspired by `typesystem`. This means, for example,
-that migrating from the Encode ORM is almost direct as it was made sure the same patterns, names,
-and internal validation remained the same, intentionally.
-
-To make the interface even more familiar, the field names end with a `Field` at the end.
+All the values you can pass in any Pydantic [Field](https://docs.pydantic.dev/latest/concepts/fields/)
+are also 100% allowed within Mongoz fields.
 
 ### Importing fields
 
@@ -81,10 +76,9 @@ This field is used as a default field for the `id` of a model.
 
 * **minimum** - An integer, float or decimal indicating the minimum.
 * **maximum** - An integer, float or decimal indicating the maximum.
-* **exclusive_minimum** - An integer, float or decimal indicating the exclusive minimum.
-* **exclusive_maximum** - An integer, float or decimal indicating the exclusive maximum.
-* **precision** - A string indicating the precision.
+* **max_digits** - Maximum digits allowed.
 * **multiple_of** - An integer, float or decimal indicating the multiple of.
+* **decimal_places** - The total decimal places.
 
 #### IntegerField
 
@@ -103,10 +97,9 @@ class MyModel(edgy.Model):
 
 * **minimum** - An integer, float or decimal indicating the minimum.
 * **maximum** - An integer, float or decimal indicating the maximum.
-* **exclusive_minimum** - An integer, float or decimal indicating the exclusive minimum.
-* **exclusive_maximum** - An integer, float or decimal indicating the exclusive maximum.
-* **precision** - A string indicating the precision.
+* **max_digits** - Maximum digits allowed.
 * **multiple_of** - An integer, float or decimal indicating the multiple of.
+* **decimal_places** - The total decimal places.
 
 #### BooleanField
 
@@ -129,7 +122,7 @@ import edgy
 
 class MyModel(edgy.Model):
     description: str = edgy.CharField(max_length=255)
-    title: str = edgy.CharField(max_length=50, minimum_length=200)
+    title: str = edgy.CharField(max_length=50, min_length=200)
     ...
 
 ```
@@ -187,7 +180,7 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    created_at: datetime.datetime = edgy.DateTimeField(datetime.datetime.now)
+    created_at: datetime.datetime = edgy.DateTimeField(default=datetime.datetime.now)
     ...
 
 ```
@@ -212,8 +205,11 @@ class MyModel(edgy.Model):
 
 ##### Parameters
 
+* **minimum** - An integer indicating the minimum.
+* **maximum** - An integer indicating the maximum.
 * **max_digits** - An integer indicating the total maximum digits.
 * **decimal_places** - An integer indicating the total decimal places.
+* **multiple_of** - An integer, float or decimal indicating the multiple of.
 
 #### EmailField
 
@@ -414,11 +410,6 @@ class MyModel(edgy.Model):
     ...
 
 ```
-
-##### Parameters
-
-* **auto_now** - A boolean indicating the `auto_now` enabled.
-* **auto_now_add** - A boolean indicating the `auto_now_add` enabled.
 
 #### URLField
 

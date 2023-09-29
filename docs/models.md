@@ -412,7 +412,6 @@ Let us see some examples.
 The simplest and cleanest way of declaring an index with **Edgy**. You declare it directly in
 the model field.
 
-
 ```python hl_lines="10"
 {!> ../docs_src/models/indexes/simple.py !}
 ```

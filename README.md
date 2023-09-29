@@ -76,7 +76,7 @@ SQLAlchemy core.
 ### Key features
 
 * **Model inheritance** - For those cases where you don't want to repeat yourself while maintaining
-intregity of the models.
+integrity of the models.
 * **Abstract classes** - That's right! Sometimes you simply want a model that holds common fields
 that doesn't need to created as a table in the database.
 * **Meta classes** - If you are familiar with Django, this is not new to you and Edgy offers this

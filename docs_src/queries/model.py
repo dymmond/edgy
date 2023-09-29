@@ -16,7 +16,7 @@ class User(edgy.Model):
         registry = models
 
 
-class User(edgy.Model):
+class Profile(edgy.Model):
     user: User = edgy.ForeignKey(User, on_delete=edgy.CASCADE)
 
     class Meta:
