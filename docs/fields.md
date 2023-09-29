@@ -122,7 +122,7 @@ import edgy
 
 class MyModel(edgy.Model):
     description: str = edgy.CharField(max_length=255)
-    title: str = edgy.CharField(max_length=50, minimum_length=200)
+    title: str = edgy.CharField(max_length=50, min_length=200)
     ...
 
 ```
