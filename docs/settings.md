@@ -12,7 +12,7 @@ The way of using the settings object within a Edgy use of the ORM is via:
 
 * **EDGY_SETTINGS_MODULE** environment variable.
 
-All the settings are **[pydantic BaseSettings](https://pypi.org/project/pydantic-settings/)** objects which makes it easier to use and override
+All the settings are **[Pydantic BaseSettings](https://pypi.org/project/pydantic-settings/)** objects which makes it easier to use and override
 when needed.
 
 ### EDGY_SETTINGS_MODULE
