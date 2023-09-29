@@ -76,10 +76,9 @@ This field is used as a default field for the `id` of a model.
 
 * **minimum** - An integer, float or decimal indicating the minimum.
 * **maximum** - An integer, float or decimal indicating the maximum.
-* **exclusive_minimum** - An integer, float or decimal indicating the exclusive minimum.
-* **exclusive_maximum** - An integer, float or decimal indicating the exclusive maximum.
-* **precision** - A string indicating the precision.
+* **max_digits** - Maximum digits allowed.
 * **multiple_of** - An integer, float or decimal indicating the multiple of.
+* **decimal_places** - The total decimal places.
 
 #### IntegerField
 
@@ -98,10 +97,9 @@ class MyModel(edgy.Model):
 
 * **minimum** - An integer, float or decimal indicating the minimum.
 * **maximum** - An integer, float or decimal indicating the maximum.
-* **exclusive_minimum** - An integer, float or decimal indicating the exclusive minimum.
-* **exclusive_maximum** - An integer, float or decimal indicating the exclusive maximum.
-* **precision** - A string indicating the precision.
+* **max_digits** - Maximum digits allowed.
 * **multiple_of** - An integer, float or decimal indicating the multiple of.
+* **decimal_places** - The total decimal places.
 
 #### BooleanField
 
