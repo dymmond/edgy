@@ -239,7 +239,7 @@ user = await User.query.get(email="foo@bar.com")
 # Making a quick copy
 user.id = None
 new_user = await user.save()
-# user(id=2)
+# User(id=2)
 ```
 
 ### Create
