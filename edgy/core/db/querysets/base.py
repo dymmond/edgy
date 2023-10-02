@@ -618,6 +618,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns the results in a python dictionary format.
         """
+        queryset: "QuerySet" = self.clone()
         fields = fields or []
         if flat and len(fields) > 1:
             raise QuerySetError(
@@ -630,7 +631,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if isinstance(fields, str):
             fields = [fields]
 
-        return await self.values(
+        return await queryset.values(
             fields=fields,
             exclude=exclude,
             exclude_none=exclude_none,
