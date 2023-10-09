@@ -5,7 +5,7 @@ about: Please only raise an issue if you've been advised to do so after discussi
 
 The starting point for issues should usually be a discussion...
 
-https://github.com/tarsil/saffier/discussions
+https://github.com/tarsil/edgy/discussions
 
 Potential bugs may be raised as a "Potential Issue" discussion. The feature requests may be raised as an
 "Ideas" discussion.
