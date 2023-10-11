@@ -1,5 +1,22 @@
 # Release Notes
 
+## 0.5.0
+
+### Added
+
+- Added support for Python 3.12.
+
+### Changed
+
+- Update base requirements.
+
+### Fixed
+
+- Removed copy of docs folder
+- `minimum_length` to `min_length`.
+- `values_list()` to implement the `queryset.clone()`.
+- Fixed `.json()` to `model_dump_json()`.
+
 ## 0.4.0
 
 ### Added
