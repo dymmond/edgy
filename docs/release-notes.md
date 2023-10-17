@@ -1,5 +1,18 @@
 # Release Notes
 
+## 0.5.1
+
+### Changed
+
+- Base metaclass that is now generating the initial annotations for validations.
+- Update Pydantic version.
+- Update documentation to reflect the new fixed issues.
+
+### Fixed
+
+- Raise `ImproperlyConfigured` for managers that are not typed as `ClassVar` avoiding
+maximum recursion error. [#19](https://github.com/tarsil/edgy/pull/39).
+
 ## 0.5.0
 
 ### Added
