@@ -3,6 +3,7 @@ import inspect
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Dict,
     List,
     Optional,
@@ -12,6 +13,7 @@ from typing import (
     Type,
     Union,
     cast,
+    get_origin,
 )
 
 import sqlalchemy
@@ -127,22 +129,21 @@ def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
 
 
 def _check_manager_for_bases(
-    base: Tuple[Type, ...],
-    attrs: Any,
-    meta: Optional[MetaInfo] = None,
+    base: Tuple[Type, ...], attrs: Any, meta: Optional[MetaInfo] = None, is_check: bool = False
 ) -> None:
     """
     When an abstract class is declared, we must treat the manager's value coming from the top.
     """
-    if not meta:
+    if not meta or (meta and not meta.abstract):
         for key, value in inspect.getmembers(base):
             if isinstance(value, Manager) and key not in attrs:
+                if key not in base.__class_vars__:
+                    raise ImproperlyConfigured(
+                        f"Managers must be type annotated and '{key}' is not annotated. Managers must be annotated with ClassVar."
+                    )
+                if get_origin(base.__annotations__[key]) is not ClassVar:
+                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
                 attrs[key] = value.__class__()
-    else:
-        if not meta.abstract:
-            for key, value in inspect.getmembers(base):
-                if isinstance(value, Manager) and key not in attrs:
-                    attrs[key] = value.__class__()
 
 
 def _set_related_name_for_foreign_keys(
@@ -220,10 +221,10 @@ class BaseModelMeta(ModelMetaclass):
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: Any = None
+        __annotations__: Dict[str, Any] = {}
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
-        super().__new__(cls, name, bases, attrs)
 
         # Searching for fields "Field" in the class hierarchy.
         def __search_for_fields(base: Type, attrs: Any) -> None:
@@ -319,6 +320,38 @@ class BaseModelMeta(ModelMetaclass):
         if not fields:
             meta.abstract = True
 
+        for base in bases:
+            if hasattr(base, "__annotations__") and base.__annotations__:
+                __annotations__.update(base.__annotations__)
+
+        # Handle annotations
+        annotations: Dict[str, Any] = attrs["__annotations__"]
+        annotations.update(__annotations__)
+
+        # Abstract classes do not allow multiple managers. This make sure it is enforced.
+        if not meta.abstract:
+            for k, v in attrs.items():
+                if isinstance(v, Manager):
+                    if k not in annotations:
+                        raise ImproperlyConfigured(
+                            f"Managers must be type annotated and '{k}' is not annotated. Managers must be annotated with ClassVar."
+                        )
+                    if get_origin(annotations[k]) is not ClassVar:
+                        raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
+                    meta.managers.append(k)
+        else:
+            managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
+            if len(managers) > 1:
+                raise ImproperlyConfigured(
+                    "Multiple managers are not allowed in abstract classes."
+                )
+
+            if getattr(meta, "unique_together", None) is not None:
+                raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
+
+            if getattr(meta, "indexes", None) is not None:
+                raise ImproperlyConfigured("indexes cannot be in abstract classes.")
+
         model_class = super().__new__
 
         # Ensure the initialization is only performed for subclasses of Model
@@ -331,22 +364,6 @@ class BaseModelMeta(ModelMetaclass):
 
         # Update the model_fields are updated to the latest
         new_class.model_fields.update(model_fields)
-
-        # Abstract classes do not allow multiple managers. This make sure it is enforced.
-        if meta.abstract:
-            managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
-            if len(managers) > 1:
-                raise ImproperlyConfigured(
-                    "Multiple managers are not allowed in abstract classes."
-                )
-
-            if getattr(meta, "unique_together", None) is not None:
-                raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
-
-            if getattr(meta, "indexes", None) is not None:
-                raise ImproperlyConfigured("indexes cannot be in abstract classes.")
-        else:
-            meta.managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
 
         # Handle the registry of models
         if getattr(meta, "registry", None) is None:

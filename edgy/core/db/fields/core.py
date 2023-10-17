@@ -10,6 +10,7 @@ from typing import Any, Optional, Pattern, Sequence, Set, Tuple, Union
 
 import pydantic
 import sqlalchemy
+from pydantic import EmailStr
 
 from edgy.core.db.fields._internal import IPAddress
 from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
@@ -482,7 +483,7 @@ class PasswordField(CharField):
 
 
 class EmailField(CharField):
-    _type = str
+    _type = EmailStr
 
     @classmethod
     def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
