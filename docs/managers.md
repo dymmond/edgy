@@ -21,9 +21,15 @@ the **Manager** class and override the `get_queryset()`.
 
 For those familiar with Django managers, the principle is exactly the same. 😀
 
+**The managers must be type annotated ClassVar** or an `ImproperlyConfigured` exception will be raised.
+
+```python hl_lines="19"
+{!> ../docs_src/models/managers/example.py !}
+```
+
 Let us now create new manager and use it with our previous example.
 
-```python hl_lines="24 40 43 46 53"
+```python hl_lines="26 42 45 48 55"
 {!> ../docs_src/models/managers/custom.py !}
 ```
 
@@ -35,7 +41,7 @@ simply override the `get_queryset()` and add it to your models.
 Overriding the default manager is also possible by creating the custom manager and overriding
 the `query` manager.
 
-```python hl_lines="24 37 40 43 46"
+```python hl_lines="26 39 42 45 48"
 {!> ../docs_src/models/managers/override.py !}
 ```
 

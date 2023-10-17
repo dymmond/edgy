@@ -3,6 +3,7 @@ import inspect
 from typing import (
     TYPE_CHECKING,
     Any,
+    ClassVar,
     Dict,
     List,
     Optional,
@@ -12,6 +13,7 @@ from typing import (
     Type,
     Union,
     cast,
+    get_origin,
 )
 
 import sqlalchemy
@@ -127,22 +129,21 @@ def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
 
 
 def _check_manager_for_bases(
-    base: Tuple[Type, ...],
-    attrs: Any,
-    meta: Optional[MetaInfo] = None,
+    base: Tuple[Type, ...], attrs: Any, meta: Optional[MetaInfo] = None, is_check: bool = False
 ) -> None:
     """
     When an abstract class is declared, we must treat the manager's value coming from the top.
     """
-    if not meta:
+    if not meta or (meta and not meta.abstract):
         for key, value in inspect.getmembers(base):
             if isinstance(value, Manager) and key not in attrs:
+                if key not in base.__class_vars__:
+                    raise ImproperlyConfigured(
+                        f"Managers must be type annotated and '{key}' is not annotated. Managers must be annotated with ClassVar."
+                    )
+                if get_origin(base.__annotations__[key]) is not ClassVar:
+                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
                 attrs[key] = value.__class__()
-    else:
-        if not meta.abstract:
-            for key, value in inspect.getmembers(base):
-                if isinstance(value, Manager) and key not in attrs:
-                    attrs[key] = value.__class__()
 
 
 def _set_related_name_for_foreign_keys(
@@ -209,6 +210,28 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
     model_class.meta.signals = signals
 
 
+def handle_annotations(
+    bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any
+) -> Dict[str, Any]:
+    """
+    Handles and copies some of the annotations for
+    initialiasation.
+    """
+    for base in bases:
+        if hasattr(base, "__init_annotations__") and base.__init_annotations__:
+            base_annotations.update(base.__init_annotations__)
+        elif hasattr(base, "__annotations__") and base.__annotations__:
+            base_annotations.update(base.__annotations__)
+
+    annotations: Dict[str, Any] = (
+        copy.copy(attrs["__init_annotations__"])
+        if "__init_annotations__" in attrs
+        else copy.copy(attrs["__annotations__"])
+    )
+    annotations.update(base_annotations)
+    return annotations
+
+
 class BaseModelMeta(ModelMetaclass):
     __slots__ = ()
 
@@ -220,10 +243,10 @@ class BaseModelMeta(ModelMetaclass):
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: Any = None
+        base_annotations: Dict[str, Any] = {}
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
-        super().__new__(cls, name, bases, attrs)
 
         # Searching for fields "Field" in the class hierarchy.
         def __search_for_fields(base: Type, attrs: Any) -> None:
@@ -308,7 +331,6 @@ class BaseModelMeta(ModelMetaclass):
             attrs.pop(slot, None)
 
         attrs["meta"] = meta = MetaInfo(meta_class)
-
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
         meta.many_to_many_fields = many_to_many_fields
@@ -321,7 +343,22 @@ class BaseModelMeta(ModelMetaclass):
 
         model_class = super().__new__
 
+        # Handle annotations
+        annotations: Dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
+
+        # Abstract classes do not allow multiple managers. This make sure it is enforced.
+        if not meta.abstract:
+            meta.managers = {k: v for k, v in attrs.items() if isinstance(v, Manager)}  # type: ignore
+            for k, _ in meta.managers.items():
+                if annotations and k not in annotations:
+                    raise ImproperlyConfigured(
+                        f"Managers must be type annotated and '{k}' is not annotated. Managers must be annotated with ClassVar."
+                    )
+                if annotations and get_origin(annotations[k]) is not ClassVar:
+                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
+
         # Ensure the initialization is only performed for subclasses of Model
+        attrs["__init_annotations__"] = annotations
         parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
         if not parents:
             return model_class(cls, name, bases, attrs)
@@ -332,7 +369,7 @@ class BaseModelMeta(ModelMetaclass):
         # Update the model_fields are updated to the latest
         new_class.model_fields.update(model_fields)
 
-        # Abstract classes do not allow multiple managers. This make sure it is enforced.
+        # Validate meta for managers, uniques and indexes
         if meta.abstract:
             managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
             if len(managers) > 1:
@@ -345,8 +382,6 @@ class BaseModelMeta(ModelMetaclass):
 
             if getattr(meta, "indexes", None) is not None:
                 raise ImproperlyConfigured("indexes cannot be in abstract classes.")
-        else:
-            meta.managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
 
         # Handle the registry of models
         if getattr(meta, "registry", None) is None:
