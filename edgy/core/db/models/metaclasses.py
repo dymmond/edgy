@@ -210,6 +210,28 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
     model_class.meta.signals = signals
 
 
+def handle_annotations(
+    bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any
+) -> Dict[str, Any]:
+    """
+    Handles and copies some of the annotations for
+    initialiasation.
+    """
+    for base in bases:
+        if hasattr(base, "__init_annotations__") and base.__init_annotations__:
+            base_annotations.update(base.__init_annotations__)
+        elif hasattr(base, "__annotations__") and base.__annotations__:
+            base_annotations.update(base.__annotations__)
+
+    annotations: Dict[str, Any] = (
+        copy.copy(attrs["__init_annotations__"])
+        if "__init_annotations__" in attrs
+        else copy.copy(attrs["__annotations__"])
+    )
+    annotations.update(base_annotations)
+    return annotations
+
+
 class BaseModelMeta(ModelMetaclass):
     __slots__ = ()
 
@@ -221,7 +243,7 @@ class BaseModelMeta(ModelMetaclass):
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attribute: str = "id"
         registry: Any = None
-        __annotations__: Dict[str, Any] = {}
+        base_annotations: Dict[str, Any] = {}
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
@@ -309,7 +331,6 @@ class BaseModelMeta(ModelMetaclass):
             attrs.pop(slot, None)
 
         attrs["meta"] = meta = MetaInfo(meta_class)
-
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
         meta.many_to_many_fields = many_to_many_fields
@@ -320,26 +341,36 @@ class BaseModelMeta(ModelMetaclass):
         if not fields:
             meta.abstract = True
 
-        for base in bases:
-            if hasattr(base, "__annotations__") and base.__annotations__:
-                __annotations__.update(base.__annotations__)
+        model_class = super().__new__
 
         # Handle annotations
-        annotations: Dict[str, Any] = attrs["__annotations__"]
-        annotations.update(__annotations__)
+        annotations: Dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
 
         # Abstract classes do not allow multiple managers. This make sure it is enforced.
         if not meta.abstract:
-            for k, v in attrs.items():
-                if isinstance(v, Manager):
-                    if k not in annotations:
-                        raise ImproperlyConfigured(
-                            f"Managers must be type annotated and '{k}' is not annotated. Managers must be annotated with ClassVar."
-                        )
-                    if get_origin(annotations[k]) is not ClassVar:
-                        raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
-                    meta.managers.append(k)
-        else:
+            meta.managers = {k: v for k, v in attrs.items() if isinstance(v, Manager)}  # type: ignore
+            for k, _ in meta.managers.items():
+                if annotations and k not in annotations:
+                    raise ImproperlyConfigured(
+                        f"Managers must be type annotated and '{k}' is not annotated. Managers must be annotated with ClassVar."
+                    )
+                if annotations and get_origin(annotations[k]) is not ClassVar:
+                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
+
+        # Ensure the initialization is only performed for subclasses of Model
+        attrs["__init_annotations__"] = annotations
+        parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
+        if not parents:
+            return model_class(cls, name, bases, attrs)
+
+        meta.parents = parents
+        new_class = cast("Type[Model]", model_class(cls, name, bases, attrs))
+
+        # Update the model_fields are updated to the latest
+        new_class.model_fields.update(model_fields)
+
+        # Validate meta for managers, uniques and indexes
+        if meta.abstract:
             managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
             if len(managers) > 1:
                 raise ImproperlyConfigured(
@@ -351,19 +382,6 @@ class BaseModelMeta(ModelMetaclass):
 
             if getattr(meta, "indexes", None) is not None:
                 raise ImproperlyConfigured("indexes cannot be in abstract classes.")
-
-        model_class = super().__new__
-
-        # Ensure the initialization is only performed for subclasses of Model
-        parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
-        if not parents:
-            return model_class(cls, name, bases, attrs)
-
-        meta.parents = parents
-        new_class = cast("Type[Model]", model_class(cls, name, bases, attrs))
-
-        # Update the model_fields are updated to the latest
-        new_class.model_fields.update(model_fields)
 
         # Handle the registry of models
         if getattr(meta, "registry", None) is None:
