@@ -42,12 +42,12 @@ class Manager:
         Checks for a global possible tenant and returns the corresponding queryset.
         """
         tenant = get_tenant()
-        if tenant is not None:
+        if tenant:
             set_tenant(None)
             return QuerySet(
                 self.model_class, table=self.model_class.table_schema(tenant)  # type: ignore
             )
-        return QuerySet(self.model_class)  # type: ignore
+        return QuerySet(self.model_class)
 
     def __getattr__(self, item: Any) -> Any:
         """

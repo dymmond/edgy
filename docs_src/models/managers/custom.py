@@ -1,3 +1,5 @@
+from typing import ClassVar
+
 import edgy
 from edgy import Database, Manager, QuerySet, Registry
 
@@ -21,7 +23,7 @@ class User(edgy.Model):
     is_active: bool = edgy.BooleanField(default=True)
 
     # Add the new manager
-    inactives: Manager = InactiveManager()
+    inactives: ClassVar[Manager] = InactiveManager()
 
     class Meta:
         registry = models
