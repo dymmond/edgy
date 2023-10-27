@@ -12,24 +12,27 @@ class Manager:
     Base Manager for the Edgy Models.
     To create a custom manager, the best approach is to inherit from the ModelManager.
 
-    Example:
-        from saffier.managers import ModelManager
-        from saffier.models import Model
+    **Example**
+
+    ```python
+    from saffier.managers import ModelManager
+    from saffier.models import Model
 
 
-        class MyCustomManager(ModelManager):
-            ...
+    class MyCustomManager(ModelManager):
+        ...
 
 
-        class MyOtherManager(ModelManager):
-            ...
+    class MyOtherManager(ModelManager):
+        ...
 
 
-        class MyModel(saffier.Model):
-            query = MyCustomManager()
-            active = MyOtherManager()
+    class MyModel(saffier.Model):
+        query = MyCustomManager()
+        active = MyOtherManager()
 
-            ...
+        ...
+    ```
     """
 
     def __init__(self, model_class: Any = None):

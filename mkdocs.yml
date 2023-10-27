@@ -57,7 +57,7 @@ plugins:
               - griffe_typingdoc
             show_root_heading: true
             show_if_no_docstring: true
-            preload_modules: [httpx, starlette, a2wsgi]
+            preload_modules: [databasez]
             inherited_members: true
             members_order: source
             separate_signature: true
@@ -84,7 +84,7 @@ nav:
           - ManyToMany: "queries/many-to-many.md"
           - Prefetch Related: "queries/prefetch.md"
       - Transactions: "transactions.md"
-  - Additional Features:
+  - Features:
       - Signals: "signals.md"
       - Relationships: "relationships.md"
       - Reference ForeignKey: "reference-foreignkey.md"
@@ -104,7 +104,22 @@ nav:
       - Tips and Tricks: "tips-and-tricks.md"
       - Extras: "extras.md"
       - Test Client: "test-client.md"
-  - API Reference: "references/index.md"
+  - API Reference:
+      - "references/index.md"
+      - Model: "references/models.md"
+      - ReflectModel: "references/reflect-model.md"
+      - Manager: "references/manager.md"
+      - QuerySet: "references/queryset.md"
+      - Signals: "references/signals.md"
+      - Fields:
+          - Field: "references/fields.md"
+          - OneToOne: "references/one-to-one.md"
+          - ForeignKey: "references/foreignkey.md"
+          - ManyToMany: "references/many-to-many.md"
+          - Reference ForeignKey: "references/reference-foreign-key.md"
+      - Registry: "references/registry.md"
+      - Schema: "references/schemas.md"
+      - Database: "references/database.md"
   - About:
       - Edgy People: "edgy-people.md"
       - Contributing: "contributing.md"
