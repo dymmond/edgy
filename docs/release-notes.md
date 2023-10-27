@@ -5,6 +5,18 @@ hide:
 
 # Release Notes
 
+## 0.5.2
+
+### Changed
+
+- Add [API Reference](http://edgy.tarsild.io/references/).
+- Update base requirements.
+
+### Fixed
+
+- `Database` object docstring.
+
+
 ## 0.5.1
 
 ### Changed
