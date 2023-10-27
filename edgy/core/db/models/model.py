@@ -9,9 +9,34 @@ from edgy.exceptions import RelationshipNotFound
 
 class Model(ModelRow, DeclarativeMixin):
     """
-    Representation of an Edgy Model.
+    Representation of an Edgy `Model`.
+
     This also means it can generate declarative SQLAlchemy models
-    from anywhere.
+    from anywhere by calling the `Model.declarative()` function.
+
+    **Example**
+
+    ```python
+    import edgy
+    from edgy import Database, Registry
+
+    database = Database("sqlite:///db.sqlite")
+    models = Registry(database=database)
+
+
+    class User(edgy.Model):
+        '''
+        The User model to be created in the database as a table
+        If no name is provided the in Meta class, it will generate
+        a "users" table for you.
+        '''
+
+        id: int = edgy.IntegerField(primary_key=True)
+        is_active: bool = edgy.BooleanField(default=False)
+
+        class Meta:
+            registry = models
+    ```
     """
 
     def __repr__(self) -> str:
@@ -129,7 +154,10 @@ class Model(ModelRow, DeclarativeMixin):
         return kwargs, model_references
 
     async def save(
-        self: Any, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
+        self: Any,
+        force_save: bool = False,
+        values: Dict[str, Any] = None,
+        **kwargs: Any,
     ) -> Union[Type["Model"], Any]:
         """
         Performs a save of a given model instance.
