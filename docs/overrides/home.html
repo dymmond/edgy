@@ -52,8 +52,8 @@
 <code class="language-python">
 import edgy
 
-database = Database("sqlite:///db.sqlite")
-registry = Registry(database=database)
+database = edgy.Database("sqlite:///db.sqlite")
+registry = edgy.Registry(database=database)
 
 class User(edgy.Model):
     id: int = edgy.IntegerField(primary_key=True)

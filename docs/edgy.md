@@ -1,3 +1,8 @@
+---
+hide:
+  - navigation
+---
+
 # Edgy
 
 <p align="center">

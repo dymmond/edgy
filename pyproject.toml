@@ -95,13 +95,15 @@ test = [
 dev = ["ipdb>=0.13.13,<1.0.0", "pre-commit>=3.3.1,<4.0.0"]
 
 doc = [
+    "griffe-typingdoc>=0.2.2",
     "mkautodoc>=0.2.0,<0.3.0",
-    "mkdocs>=1.5.2,<2.0.0",
-    "mkdocs-material>=9.1.21,<11.0.0",
-    "mdx-include>=1.4.1,<2.0.0",
-    "mkdocs-markdownextradata-plugin>=0.1.7,<0.3.0",
-    "mkdocstrings>=0.19.0,<0.21.0",
-    "pyyaml>=5.3.1,<7.0.0",
+    "mkdocs>=1.1.2,<2.0.0",
+    "mkdocs-material>=9.4.4,<10.0.0",
+    "mdx-include>=1.4.2,<2.0.0",
+    "mkdocs-markdownextradata-plugin>=0.2.5,<0.3.0",
+    "mkdocs-meta-descriptions-plugin>=2.3.0",
+    "mkdocstrings[python]>=0.23.0,<0.30.0",
+    "pyyaml>=6.0,<7.0.0",
 ]
 
 testing = ["sqlalchemy_utils>=0.40.0"]

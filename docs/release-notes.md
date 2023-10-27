@@ -1,3 +1,8 @@
+---
+hide:
+  - navigation
+---
+
 # Release Notes
 
 ## 0.5.1
