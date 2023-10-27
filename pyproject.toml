@@ -106,7 +106,7 @@ doc = [
     "pyyaml>=6.0,<7.0.0",
 ]
 
-testing = ["sqlalchemy_utils>=0.40.0"]
+testing = ["sqlalchemy_utils>=0.41.1"]
 postgres = ["databasez[postgresql]"]
 mysql = ["databasez[mysql]"]
 sqlite = ["databasez[sqlite]"]
