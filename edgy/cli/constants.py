@@ -6,5 +6,5 @@ DISCOVERY_FILES = ["application.py", "app.py", "main.py"]
 DISCOVERY_FUNCTIONS = ["get_application", "get_app"]
 EDGY_DB = "_edgy_db"
 EDGY_EXTRA = "_edgy_extra"
-EXCLUDED_COMMANDS = ["list-templates"]
+EXCLUDED_COMMANDS = ["list-templates", "inspectdb"]
 IGNORE_COMMANDS = ["list-templates"]
