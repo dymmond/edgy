@@ -3,6 +3,7 @@ from typing import Union
 import click
 import sqlalchemy
 from loguru import logger
+from sqlalchemy.ext.asyncio import AsyncEngine
 
 from edgy import Database, Registry
 from edgy.cli.env import MigrationEnv
@@ -80,17 +81,17 @@ def inspect_db(
     if registry is None:
         logger.info("`Registry` not found in the application. Using credentials...")
         connection_string = build_connection_string(port, scheme, user, password, host, database)
-        database: Database = Database(connection_string)
-        registry = Registry(database=database)
+        _database: Database = Database(connection_string)
+        registry = Registry(database=_database)
 
     # Get the engine to connect
-    engine: sqlalchemy.Engine = registry.engine
+    engine: AsyncEngine = registry.engine
 
     # Connect to a schema
     metadata: sqlalchemy.MetaData = (
         sqlalchemy.MetaData(schema=schema) if schema is not None else sqlalchemy.MetaData()
     )
-    metadata: sqlalchemy.MetaData = execsync(reflect)(engine=engine, metadata=metadata)
+    metadata = execsync(reflect)(engine=engine, metadata=metadata)
 
 
 async def reflect(
