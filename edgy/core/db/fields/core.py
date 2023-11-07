@@ -124,11 +124,7 @@ class CharField(FieldFactory, str):
 
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
 
         return super().__new__(cls, **kwargs)
@@ -137,9 +133,7 @@ class CharField(FieldFactory, str):
     def validate(cls, **kwargs: Any) -> None:
         max_length = kwargs.get("max_length", 0)
         if max_length <= 0:
-            raise FieldDefinitionError(
-                detail=f"'max_length' is required for {cls.__name__}"
-            )
+            raise FieldDefinitionError(detail=f"'max_length' is required for {cls.__name__}")
 
         min_length = kwargs.get("min_length")
         pattern = kwargs.get("regex")
@@ -163,11 +157,7 @@ class TextField(FieldFactory, str):
     def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
         return super().__new__(cls, **kwargs)
 
@@ -183,9 +173,7 @@ class Number(FieldFactory):
         maximum = kwargs.get("maximum", None)
 
         if (minimum is not None and maximum is not None) and minimum > maximum:
-            raise FieldDefinitionError(
-                detail="'minimum' cannot be bigger than 'maximum'"
-            )
+            raise FieldDefinitionError(detail="'minimum' cannot be bigger than 'maximum'")
 
 
 class IntegerField(Number, int):
@@ -205,17 +193,11 @@ class IntegerField(Number, int):
     ) -> BaseField:
         autoincrement = kwargs.pop("autoincrement", None)
         autoincrement = (
-            autoincrement
-            if autoincrement is not None
-            else kwargs.get("primary_key", False)
+            autoincrement if autoincrement is not None else kwargs.get("primary_key", False)
         )
         kwargs = {
             **kwargs,
-            **{
-                k: v
-                for k, v in locals().items()
-                if k not in ["cls", "__class__", "kwargs"]
-            },
+            **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
         }
         return super().__new__(cls, **kwargs)
 
@@ -239,11 +221,7 @@ class FloatField(Number, float):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
         return super().__new__(cls, **kwargs)
 
@@ -283,11 +261,7 @@ class DecimalField(Number, decimal.Decimal):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{
-                k: v
-                for k, v in locals().items()
-                if k not in ["cls", "__class__", "kwargs"]
-            },
+            **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
         }
         return super().__new__(cls, **kwargs)
 
@@ -303,12 +277,7 @@ class DecimalField(Number, decimal.Decimal):
 
         max_digits = kwargs.get("max_digits")
         decimal_places = kwargs.get("decimal_places")
-        if (
-            max_digits is None
-            or max_digits < 0
-            or decimal_places is None
-            or decimal_places < 0
-        ):
+        if max_digits is None or max_digits < 0 or decimal_places is None or decimal_places < 0:
             raise FieldDefinitionError(
                 "max_digits and decimal_places are required for DecimalField"
             )
@@ -327,11 +296,7 @@ class BooleanField(FieldFactory, int):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
         return super().__new__(cls, **kwargs)
 
@@ -349,9 +314,7 @@ class AutoNowMixin(FieldFactory):
         **kwargs: Any,
     ) -> BaseField:
         if auto_now_add and auto_now:
-            raise FieldDefinitionError(
-                "'auto_now' and 'auto_now_add' cannot be both True"
-            )
+            raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
 
         if auto_now_add or auto_now:
             kwargs["read_only"] = True
@@ -458,9 +421,7 @@ class BinaryField(FieldFactory, bytes):
     def validate(cls, **kwargs: Any) -> None:
         max_length = kwargs.get("max_length", None)
         if max_length <= 0:
-            raise FieldDefinitionError(
-                detail="Parameter 'max_length' is required for BinaryField"
-            )
+            raise FieldDefinitionError(detail="Parameter 'max_length' is required for BinaryField")
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
@@ -564,11 +525,7 @@ class IPAddressField(FieldFactory, str):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
 
         return super().__new__(cls, **kwargs)

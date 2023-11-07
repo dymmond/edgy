@@ -1,9 +1,5 @@
 import sys
-from datetime import date, datetime, time
-from decimal import Decimal
-from enum import Enum
-from typing import Any, Dict, List, Union
-from uuid import UUID
+from typing import Any, Dict, List, Set, Tuple, Union
 
 import click
 import sqlalchemy
@@ -11,7 +7,8 @@ from loguru import logger
 from sqlalchemy.dialects.mysql import types as mytypes
 from sqlalchemy.dialects.postgresql import types as pgtypes
 from sqlalchemy.ext.asyncio import AsyncEngine
-from sqlalchemy.sql import sqltypes
+from sqlalchemy.sql import schema, sqltypes
+from typing_extensions import NoReturn
 
 import edgy
 from edgy import Database, Registry
@@ -43,6 +40,7 @@ SQL_GENERIC_TYPES = {
 }
 
 FOREIGN_KEY_MAPPING = {sqlalchemy.ForeignKey: edgy.ForeignKey}
+DB_MODULE = "edgy"
 
 
 @click.option(
@@ -97,7 +95,6 @@ def inspect_db(
     Inspects an existing database and generates the Edgy reflect models.
     """
     registry: Union[Registry, None] = None
-    db_module = "edgy"
 
     try:
         registry = env.app._edgy_db["migrate"].registry  # type: ignore
@@ -107,9 +104,7 @@ def inspect_db(
     # Generates a registry based on the passed connection details
     if registry is None:
         logger.info("`Registry` not found in the application. Using credentials...")
-        connection_string = build_connection_string(
-            port, scheme, user, password, host, database
-        )
+        connection_string = build_connection_string(port, scheme, user, password, host, database)
         _database: Database = Database(connection_string)
         registry = Registry(database=_database)
 
@@ -118,22 +113,20 @@ def inspect_db(
 
     # Connect to a schema
     metadata: sqlalchemy.MetaData = (
-        sqlalchemy.MetaData(schema=schema)
-        if schema is not None
-        else sqlalchemy.MetaData()
+        sqlalchemy.MetaData(schema=schema) if schema is not None else sqlalchemy.MetaData()
     )
     metadata = execsync(reflect)(engine=engine, metadata=metadata)
 
     # Generate the tables
-    tables, models = generate_table_information(metadata, registry)
+    tables, models = generate_table_information(metadata)
 
-    for line in write_output(tables, models, db_module, connection_string):
-        sys.stdout.writelines(line)
+    for line in write_output(tables, models, connection_string):
+        sys.stdout.writelines(line)  # type: ignore
 
 
 def generate_table_information(
-    metadata: sqlalchemy.MetaData, registry: Registry
-) -> List[Any]:
+    metadata: sqlalchemy.MetaData,
+) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
     """
     Generates the tables from the reflection and maps them into the
     `reflected` dictionary of the `Registry`.
@@ -154,6 +147,7 @@ def generate_table_information(
 
         # Get the details of the indexes
         table_details["indexes"] = table.indexes
+        table_details["constraints"] = table.constraints
         tables.append(table_details)
 
     return tables, models
@@ -175,7 +169,6 @@ def get_foreign_keys(
         fk["class_name"] = foreign_key.column.table.name.replace("_", "").capitalize()
         fk["on_delete"] = foreign_key.ondelete
         fk["on_update"] = foreign_key.onupdate
-        fk["null"] = foreign_key.column.nullable
         details.append(fk)
 
     return details
@@ -187,9 +180,9 @@ def get_field_type(column: sqlalchemy.Column, is_fk: bool = False) -> Any:
     outside of the scope.
     """
     if is_fk:
-        return "edgy.ForeignKey" if not column.unique else "edgy.OneToOne", {}
+        return "ForeignKey" if not column.unique else "OneToOne", {}
 
-    real_field: sqlalchemy.Column.type.as_generic = column.type.as_generic()
+    real_field: Any = column.type.as_generic()
     try:
         field_type = SQL_GENERIC_TYPES[type(real_field)].__name__
     except KeyError:
@@ -207,18 +200,16 @@ def get_field_type(column: sqlalchemy.Column, is_fk: bool = False) -> Any:
         field_params["collation"] = real_field.collation
 
     if field_type == "DecimalField":
-        field_params["max_digitis"] = real_field.precision
+        field_params["max_digits"] = real_field.precision
         field_params["decimal_places"] = real_field.scale
 
     if field_type == "BinaryField":
         field_params["sql_nullable"] = getattr(real_field, "none_as_null", False)
 
-    return f"edgy.{field_type}", field_params
+    return field_type, field_params
 
 
-def write_output(
-    tables: List[Any], models: Dict[str, str], db_module: str, connection_string: str
-) -> None:
+def write_output(tables: List[Any], models: Dict[str, str], connection_string: str) -> NoReturn:
     """
     Writes to stdout.
     """
@@ -230,28 +221,30 @@ def write_output(
         "to the desired behavior\n"
     )
     yield (
-        "# Feel free to rename the models, but don't rename tablename values or "
-        "field names.\n"
+        "# Feel free to rename the models, but don't rename tablename values or " "field names.\n"
     )
-    yield "# The automatic generated models will be subclassed as `%s.ReflectModel`.\n\n\n" % db_module
-    yield "import %s \n" % db_module
+    yield "# The automatic generated models will be subclassed as `%s.ReflectModel`.\n\n\n" % DB_MODULE
+    yield "import %s \n" % DB_MODULE
+    yield "from %s import UniqueConstraint, Index \n" % DB_MODULE
 
     yield "\n"
     yield "\n"
-    yield "database = %s.Database('%s')\n" % (db_module, connection_string)
-    yield "registry = %s.Registry(database=database)\n" % db_module
+    yield "database = {}.Database('{}')\n".format(DB_MODULE, connection_string)
+    yield "registry = %s.Registry(database=database)\n" % DB_MODULE
 
     # Start writing the classes
     for table in tables:
-        used_column_names: List[str] = []
+        unique_constraints: Set[str] = set()
+        indexes: Set[str] = set()
 
         yield "\n"
         yield "\n"
-        yield "class %s(%s.ReflectModel):\n" % (table["class_name"], db_module)
+        yield "\n"
+        yield "class {}({}.ReflectModel):\n".format(table["class_name"], DB_MODULE)
         # yield "    ...\n"
 
         sqla_table: sqlalchemy.Table = table["table"]
-        columns = [col for col in sqla_table.columns]
+        columns = list(sqla_table.columns)
 
         # Get the column information
         for column in columns:
@@ -265,49 +258,92 @@ def write_output(
 
             if column.primary_key:
                 field_params["primary_key"] = column.primary_key
+                unique_constraints.add(attr_name)
+            if column.unique:
+                unique_constraints.add(attr_name)
+            if column.unique and not column.primary_key:
+                field_params["unique"] = column.unique
+
+            if column.index:
+                field_params["index"] = column.index
+                indexes.add(column.name)
+
             if column.comment:
                 field_params["comment"] = column.comment
+            if column.default:
+                field_params["default"] = column.default
 
             if is_fk:
                 field_params["to"] = foreign_keys[0]["class_name"]
                 field_params["on_update"] = foreign_keys[0]["on_update"]
                 field_params["on_delete"] = foreign_keys[0]["on_update"]
-                field_params["related_name"] = "%s_%s_set" % (
+                field_params["related_name"] = "{}_{}_set".format(
                     attr_name,
                     field_params["to"].lower(),
                 )
 
-        yield from get_meta(table)
-        # if column_type in FOREIGN_KEY_MAPPING:
-        #     breakpoint()
-        #     field_type = "edgy.ForeignKey" if not unique_column else "edgy.OneToOne"
-        # else:
-        #     breakpoint()
-        #     field_type = SQL_MAPPING_TYPES[type(column.type)].__name__
+            field_type += "("
+            field_description = "{} = {}{}".format(
+                attr_name,
+                "" if "." in field_type else f"{DB_MODULE}.",
+                field_type,
+            )
+            if field_params:
+                if not field_description.endswith("("):
+                    field_description += ", "
+                field_description += ", ".join(
+                    "{}={!r}".format(k, v) for k, v in field_params.items()
+                )
+            field_description += ")\n"
+            yield "    %s" % field_description
 
-        # Extract information
-        # edgy_column = SQL_MAPPING_TYPES[type(column.type)]
-        # edgy_column = edgy_column(
-        #     primary_key=column.primary_key,
-        #     null=column.nullable,
-        #     comment=column.comment,
-        #     unique=unique_column,
-        # )
+        yield "\n"
+        yield from get_meta(table, unique_constraints, indexes)
 
 
-def get_meta(table: Dict[str, Any]) -> None:
+def get_meta(table: Dict[str, Any], unique_constraints: Set[str], _indexes: Set[str]) -> NoReturn:
     """
     Produces the Meta class.
     """
-    unique_together = []
-    indexes = []
+    unique_together: List[edgy.UniqueConstraint] = []
+    unique_indexes: List[edgy.Index] = []
+    indexes = list(table["indexes"])
+    constraints = list(table["constraints"])
+
+    # Handle the unique together
+    for constraint in constraints:
+        if isinstance(constraint, schema.UniqueConstraint):
+            columns = [
+                column.name
+                for column in constraint.columns
+                if column.name not in unique_constraints
+            ]
+            unique_definition = edgy.UniqueConstraint(fields=columns)
+            unique_together.append(unique_definition)
+
+    # Handle the indexes
+    for index in indexes:
+        if isinstance(index, schema.Index):
+            columns = [column.name for column in index.columns if column.name not in _indexes]
+            index_definition = edgy.Index(name=index.name, fields=columns)
+            unique_indexes.append(index_definition)
 
     meta = [""]
     meta += [
         "    class Meta:\n",
         "        registry = registry\n",
-        "        tablename = '%s'" % table["tablename"],
+        "        tablename = '%s'\n" % table["tablename"],
     ]
+
+    if unique_together:
+        meta.append(
+            "        unique_together = %s\n" % unique_together,
+        )
+
+    if unique_indexes:
+        meta.append(
+            "        indexes = %s\n" % unique_indexes,
+        )
     return meta
 
 
@@ -340,9 +376,7 @@ def build_connection_string(
     then it will generate a connection string without authentication.
     """
     if not host and not database:
-        raise MissingParameterException(
-            detail="`host` and `database` must be provided."
-        )
+        raise MissingParameterException(detail="`host` and `database` must be provided.")
 
     if not user or not password:
         printer.write_info("Logging in without authentication.")
