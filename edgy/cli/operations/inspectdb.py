@@ -76,6 +76,11 @@ DB_MODULE = "edgy"
     default=None,
     help=("Database schema to be applied."),
 )
+@click.option(
+    "--db_url",
+    default=None,
+    help=("Alternative to parameters. This can be used as direct connection string."),
+)
 @click.command()
 def inspect_db(
     env: MigrationEnv,
@@ -86,6 +91,7 @@ def inspect_db(
     host: Union[str, None] = None,
     database: Union[str, None] = None,
     schema: Union[str, None] = None,
+    db_url: Union[str, None] = None,
 ) -> None:
     """
     Inspects an existing database and generates the Edgy reflect models.
@@ -100,7 +106,12 @@ def inspect_db(
     # Generates a registry based on the passed connection details
     if registry is None:
         logger.info("`Registry` not found in the application. Using credentials...")
-        connection_string = build_connection_string(port, scheme, user, password, host, database)
+        if db_url:
+            connection_string = db_url
+        else:
+            connection_string = build_connection_string(
+                port, scheme, user, password, host, database
+            )
         _database: Database = Database(connection_string)
         registry = Registry(database=_database)
 
