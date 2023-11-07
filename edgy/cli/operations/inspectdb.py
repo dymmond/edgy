@@ -4,8 +4,6 @@ from typing import Any, Dict, List, Set, Tuple, Union
 import click
 import sqlalchemy
 from loguru import logger
-from sqlalchemy.dialects.mysql import types as mytypes
-from sqlalchemy.dialects.postgresql import types as pgtypes
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.sql import schema, sqltypes
 from typing_extensions import NoReturn
@@ -34,8 +32,6 @@ SQL_GENERIC_TYPES = {
     sqltypes.SmallInteger: edgy.SmallIntegerField,
     sqltypes.Text: edgy.TextField,
     sqltypes.Time: edgy.TimeField,
-    pgtypes.TIMESTAMP: edgy.TimeField,
-    mytypes.TIMESTAMP: edgy.TimeField,
     sqltypes.Uuid: edgy.UUIDField,
 }
 
