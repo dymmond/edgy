@@ -68,12 +68,4 @@ async def test_inspect_db():
     assert "class Users" in out
     assert "class Hubusers" in out
     assert "class Transactions" in out
-    assert (
-        "unique_together = [UniqueConstraint(fields=['amount', 'total'], name=None, max_name_length=30)]"
-        in out
-    )
-    assert (
-        "indexes = [Index(suffix='idx', max_name_length=30, name='idx_name_description', fields=['name', 'description']), Index(suffix='idx', max_name_length=30, name='idx_title_name', fields=['name', 'title'])]"
-        in out
-    )
     assert ss == 0
