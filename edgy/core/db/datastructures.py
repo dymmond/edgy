@@ -42,7 +42,6 @@ class UniqueConstraint:
     """
 
     fields: List[str]
-    suffix: str = "uq"
     name: Optional[str] = None
     max_name_length: int = 30
 

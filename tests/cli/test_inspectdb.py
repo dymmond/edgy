@@ -69,7 +69,7 @@ async def test_inspect_db():
     assert "class Hubusers" in out
     assert "class Transactions" in out
     assert (
-        "unique_together = [UniqueConstraint(fields=['amount', 'total'], suffix='uq', name='uq_amount_total', max_name_length=30)]"
+        "unique_together = [UniqueConstraint(fields=['amount', 'total'], name=None, max_name_length=30)]"
         in out
     )
     assert (
