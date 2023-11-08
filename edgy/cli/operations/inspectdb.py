@@ -29,13 +29,13 @@ SQL_GENERIC_TYPES = {
     sqltypes.DateTime: edgy.DateTimeField,
     sqltypes.Numeric: edgy.DecimalField,
     sqltypes.Float: edgy.FloatField,
+    sqltypes.Double: edgy.FloatField,
     sqltypes.SmallInteger: edgy.SmallIntegerField,
     sqltypes.Text: edgy.TextField,
     sqltypes.Time: edgy.TimeField,
     sqltypes.Uuid: edgy.UUIDField,
 }
 
-FOREIGN_KEY_MAPPING = {sqlalchemy.ForeignKey: edgy.ForeignKey}
 DB_MODULE = "edgy"
 
 
@@ -105,10 +105,11 @@ def inspect_db(
 
     # Generates a registry based on the passed connection details
     if registry is None:
-        logger.info("`Registry` not found in the application. Using credentials...")
         if db_url:
+            logger.info("'Registry' not found in the application. Using db_url...")
             connection_string = db_url
         else:
+            logger.info("'Registry' not found in the application. Using credentials...")
             connection_string = build_connection_string(
                 port, scheme, user, password, host, database
             )
@@ -203,7 +204,7 @@ def get_field_type(column: sqlalchemy.Column, is_fk: bool = False) -> Any:
     if field_type == "CharField":
         field_params["max_length"] = real_field.length
 
-    if field_type in {"CharField", "TextField"} and real_field.collation:
+    if field_type in {"CharField", "TextField"} and hasattr(real_field, "collation"):
         field_params["collation"] = real_field.collation
 
     if field_type == "DecimalField":

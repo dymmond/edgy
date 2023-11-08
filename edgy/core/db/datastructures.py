@@ -31,8 +31,7 @@ class Index:
 
         if name is None:
             suffix = values.kwargs.get("suffix", cls.suffix)
-            values["name"] = f"{'_'.join(fields)}_{suffix}"
-
+            values.kwargs["name"] = f"{suffix}_{'_'.join(fields)}"
         return values
 
 
@@ -43,11 +42,18 @@ class UniqueConstraint:
     """
 
     fields: List[str]
+    suffix: str = "uq"
+    name: Optional[str] = None
+    max_name_length: int = 30
 
     @model_validator(mode="before")
     def validate_data(cls, values: Any) -> Any:
-        fields = values.kwargs.get("fields")
+        name = values.kwargs.get("name")
 
+        if name is not None and len(name) > cls.max_name_length:
+            raise ValueError(f"The max length of the index name must be 30. Got {len(name)}")
+
+        fields = values.kwargs.get("fields")
         if not isinstance(fields, (tuple, list)):
             raise ValueError("UniqueConstraint.fields must be a list or a tuple.")
 
