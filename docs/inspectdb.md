@@ -34,10 +34,9 @@ In other words, it is a *safety measure* of **Edgy**.
 
 ## How does it work
 
-Now it is time for the good stuff right? Well, there are two ways of doing this.
+Now it is time for the good stuff right? Well, it is actually very simple.
 
 * Via [database url](#database-url).
-* Via [application registry](#via-application-registry).
 
 ### Database url
 
@@ -68,48 +67,3 @@ edgy inspectdb --help
 This will be probably used on rare occasions by it is available just in case you need.
 * **database** - The fully qualified connection string to the database. Example:
 `postgres+asyncpg://user:password@localhost:5432/my_db`.
-
-### Via application registry
-
-Well, if you are familiar with the [discovery](./migrations/discovery.md#auto-discovery) of the
-application, then this will be easier.
-
-When the `--database` is not provided, the **discovery**  will try to find your application and also
-a [Migration](./migrations/migrations.md#migration) or an [EdgyExtra](./extras.md#edgyextra) object
-and in the end extracts the connection string for the `inspectdb`.
-
-**Example**
-
-Imagine the following folder and file structure:
-
-```shell hl_lines="16" title="myproject"
-.
-├── Makefile
-└── myproject
-    ├── __init__.py
-    ├── apps
-    │   ├── __init__.py
-    ├── configs
-    │   ├── __init__.py
-    │   ├── development
-    │   │   ├── __init__.py
-    │   │   └── settings.py
-    │   ├── settings.py
-    │   └── testing
-    │       ├── __init__.py
-    │       └── settings.py
-    ├── main.py
-    ├── tests
-    │   ├── __init__.py
-    │   └── test_app.py
-    └── urls.py
-```
-
-Inside the root folder, run:
-
-```shell
-edgy inspectdb > models.py
-```
-
-If you have a `Migration` or `EdgyExtra` object somewhere in the root or first level folder, then
-Edgy will find it and extract the connection string.

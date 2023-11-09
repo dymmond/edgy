@@ -10,7 +10,6 @@ from typing_extensions import NoReturn
 
 import edgy
 from edgy import Database, Registry
-from edgy.cli.env import MigrationEnv
 from edgy.core.sync import execsync
 from edgy.core.terminal import Print
 
@@ -42,7 +41,7 @@ DB_MODULE = "edgy"
 
 @click.option(
     "--database",
-    default=None,
+    required=True,
     help=("Connection string. Example: postgres+asyncpg://user:password@localhost:5432/my_db"),
 )
 @click.option(
@@ -52,34 +51,15 @@ DB_MODULE = "edgy"
 )
 @click.command()
 def inspect_db(
-    env: MigrationEnv,
-    database: Union[str, None] = None,
+    database: str,
     schema: Union[str, None] = None,
 ) -> None:
     """
     Inspects an existing database and generates the Edgy reflect models.
     """
-    registry: Union[Registry, None] = None
-    if database is None:
-        try:
-            registry = env.app._edgy_db["migrate"].registry  # type: ignore
-        except AttributeError:
-            try:
-                registry = env.app._edgy_extra["extra"].registry  # type: ignore
-            except AttributeError:
-                registry = None
-
-    if registry is None and database is None:
-        raise ValueError(
-            "When the 'Registry' is not found inside an application, the `database` url must be provided."
-        )
-
     # Generates a registry based on the passed connection details
-    if registry is None:
-        logger.info("'Registry' not found in the application. Using db_url...")
-        connection_string = database
-        _database: Database = Database(connection_string)
-        registry = Registry(database=_database)
+    _database: Database = Database(database)
+    registry = Registry(database=_database)
 
     # Get the engine to connect
     engine: AsyncEngine = registry.engine
@@ -93,7 +73,7 @@ def inspect_db(
     # Generate the tables
     tables, models = generate_table_information(metadata)
 
-    for line in write_output(tables, models, connection_string):
+    for line in write_output(tables, models, _database.url._url):
         sys.stdout.writelines(line)  # type: ignore
 
 
@@ -188,14 +168,18 @@ def write_output(tables: List[Any], models: Dict[str, str], connection_string: s
     Writes to stdout.
     """
     yield f"# This is an auto-generated Edgy model module. Edgy version `{edgy.__version__}`.\n"
-    yield "#   * Rearrange models' order\n"
-    yield "#   * Make sure each model has one field with primary_key=True\n"
+    yield "#   * Rearrange models' order.\n"
+    yield "#   * Make sure each model has one field with primary_key=True.\n"
     yield (
-        "#   * Make sure each ForeignKey and OneToOneField has `on_delete` set "
-        "to the desired behavior\n"
+        "#   * Make sure each ForeignKey and OneToOne has `on_delete` set "
+        "to the desired behavior.\n"
     )
     yield (
         "# Feel free to rename the models, but don't rename tablename values or " "field names.\n"
+    )
+    yield (
+        "# The generated models do not manage migrations. Those are handled by `%s.Model`.\n"
+        % DB_MODULE
     )
     yield "# The automatic generated models will be subclassed as `%s.ReflectModel`.\n\n\n" % DB_MODULE
     yield "import %s \n" % DB_MODULE
@@ -292,7 +276,7 @@ def get_meta(table: Dict[str, Any], unique_constraints: Set[str], _indexes: Set[
                 for column in constraint.columns
                 if column.name not in unique_constraints
             ]
-            unique_definition = edgy.UniqueConstraint(fields=columns)
+            unique_definition = edgy.UniqueConstraint(fields=columns, name=constraint.name)
             unique_together.append(unique_definition)
 
     # Handle the indexes
