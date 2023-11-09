@@ -22,6 +22,7 @@ SQL_GENERIC_TYPES = {
     sqltypes.JSON: edgy.JSONField,
     sqltypes.Date: edgy.DateField,
     sqltypes.String: edgy.CharField,
+    sqltypes.Unicode: edgy.CharField,
     sqltypes.BINARY: edgy.BinaryField,
     sqltypes.Boolean: edgy.BooleanField,
     sqltypes.Enum: edgy.ChoiceField,
@@ -34,6 +35,7 @@ SQL_GENERIC_TYPES = {
     sqltypes.Time: edgy.TimeField,
     sqltypes.Uuid: edgy.UUIDField,
 }
+
 
 DB_MODULE = "edgy"
 
@@ -165,7 +167,8 @@ def get_field_type(column: sqlalchemy.Column, is_fk: bool = False) -> Any:
         field_params["max_length"] = real_field.length
 
     if field_type in {"CharField", "TextField"} and hasattr(real_field, "collation"):
-        field_params["collation"] = real_field.collation
+        if real_field.collation is not None:
+            field_params["collation"] = real_field.collation
 
     if field_type == "DecimalField":
         field_params["max_digits"] = real_field.precision
@@ -246,7 +249,7 @@ def write_output(tables: List[Any], models: Dict[str, str], connection_string: s
                 field_params["on_update"] = foreign_keys[0]["on_update"]
                 field_params["on_delete"] = foreign_keys[0]["on_update"]
                 field_params["related_name"] = "{}_{}_set".format(
-                    attr_name,
+                    attr_name.lower(),
                     field_params["to"].lower(),
                 )
 
