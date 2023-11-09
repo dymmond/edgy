@@ -94,10 +94,10 @@ nav:
           - Contrib: "tenancy/contrib.md"
       - Registry: "registry.md"
       - Shell Support: "shell.md"
+      - Inspect DB: "inspectdb.md"
       - Migrations:
           - Discovery: "migrations/discovery.md"
           - Migrations: "migrations/migrations.md"
-
       - Settings: "settings.md"
   - Extras:
       - Exceptions: "exceptions.md"

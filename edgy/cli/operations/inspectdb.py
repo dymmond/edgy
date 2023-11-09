@@ -43,7 +43,7 @@ DB_MODULE = "edgy"
 @click.option(
     "--database",
     default=None,
-    help=("Database URL. Example: postgres+asyncpg://user:password@localhost:5432/my_db"),
+    help=("Connection string. Example: postgres+asyncpg://user:password@localhost:5432/my_db"),
 )
 @click.option(
     "--schema",
@@ -60,11 +60,14 @@ def inspect_db(
     Inspects an existing database and generates the Edgy reflect models.
     """
     registry: Union[Registry, None] = None
-
-    try:
-        registry = env.app._edgy_db["migrate"].registry  # type: ignore
-    except AttributeError:
-        registry = None
+    if database is None:
+        try:
+            registry = env.app._edgy_db["migrate"].registry  # type: ignore
+        except AttributeError:
+            try:
+                registry = env.app._edgy_extra["extra"].registry  # type: ignore
+            except AttributeError:
+                registry = None
 
     if registry is None and database is None:
         raise ValueError(
