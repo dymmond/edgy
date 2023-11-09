@@ -1,5 +1,3 @@
-from io import StringIO
-
 import pytest
 from tests.cli.utils import run_cmd
 from tests.settings import DATABASE_URL
@@ -59,9 +57,7 @@ async def rollback_transactions():
 
 
 async def test_inspect_db():
-    out = StringIO()
-
-    (out, error, ss) = run_cmd("tests.cli.main:app", f"edgy inspectdb --db_url={DATABASE_URL}")
+    (out, error, ss) = run_cmd("tests.cli.main:app", f"edgy inspectdb --database={DATABASE_URL}")
 
     out = out.decode("utf8")
 

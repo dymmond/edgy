@@ -11,7 +11,6 @@ from typing_extensions import NoReturn
 import edgy
 from edgy import Database, Registry
 from edgy.cli.env import MigrationEnv
-from edgy.cli.exceptions import MissingParameterException
 from edgy.core.sync import execsync
 from edgy.core.terminal import Print
 
@@ -40,58 +39,20 @@ DB_MODULE = "edgy"
 
 
 @click.option(
-    "-u",
-    "--user",
-    default=None,
-    help=("Database username."),
-)
-@click.option(
-    "-p",
-    "--password",
-    default=None,
-    help=("Database password"),
-)
-@click.option(
-    "--host",
-    default=None,
-    help=("Database host."),
-)
-@click.option(
     "--database",
     default=None,
-    help=("Database name."),
-)
-@click.option(
-    "--port",
-    default=5432,
-    help=("Database port."),
-)
-@click.option(
-    "--scheme",
-    default="postgresql+asyncpg",
-    help=("Scheme driver used for the connection. Example: 'postgresql+asyncpg'"),
+    help=("Database URL. Example: postgres+asyncpg://user:password@localhost:5432/my_db"),
 )
 @click.option(
     "--schema",
     default=None,
     help=("Database schema to be applied."),
 )
-@click.option(
-    "--db_url",
-    default=None,
-    help=("Alternative to parameters. This can be used as direct connection string."),
-)
 @click.command()
 def inspect_db(
     env: MigrationEnv,
-    port: int,
-    scheme: str,
-    user: Union[str, None] = None,
-    password: Union[str, None] = None,
-    host: Union[str, None] = None,
     database: Union[str, None] = None,
     schema: Union[str, None] = None,
-    db_url: Union[str, None] = None,
 ) -> None:
     """
     Inspects an existing database and generates the Edgy reflect models.
@@ -103,16 +64,15 @@ def inspect_db(
     except AttributeError:
         registry = None
 
+    if registry is None and database is None:
+        raise ValueError(
+            "When the 'Registry' is not found inside an application, the `database` url must be provided."
+        )
+
     # Generates a registry based on the passed connection details
     if registry is None:
-        if db_url:
-            logger.info("'Registry' not found in the application. Using db_url...")
-            connection_string = db_url
-        else:
-            logger.info("'Registry' not found in the application. Using credentials...")
-            connection_string = build_connection_string(
-                port, scheme, user, password, host, database
-            )
+        logger.info("'Registry' not found in the application. Using db_url...")
+        connection_string = database
         _database: Database = Database(connection_string)
         registry = Registry(database=_database)
 
@@ -367,27 +327,3 @@ async def reflect(
         logger.info("Collecting database tables information...")
         await connection.run_sync(metadata.reflect)
     return metadata
-
-
-def build_connection_string(
-    port: int,
-    scheme: str,
-    user: Union[str, None] = None,
-    password: Union[str, None] = None,
-    host: Union[str, None] = None,
-    database: Union[str, None] = None,
-) -> str:
-    """
-    Builds the database connection string.
-
-    If a user or a password are not provided,
-    then it will generate a connection string without authentication.
-    """
-    if not host and not database:
-        raise MissingParameterException(detail="`host` and `database` must be provided.")
-
-    if not user or not password:
-        printer.write_info("Logging in without authentication.")
-        return f"{scheme}://{host}:{port}/{database}"
-
-    return f"{scheme}://{user}:{password}@{host}:{port}/{database}"
