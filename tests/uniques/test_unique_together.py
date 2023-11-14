@@ -61,7 +61,7 @@ class NewProduct(BaseModel):
         unique_together = ["name", "sku"]
 
 
-@pytest.fixture(autouse=True, scope="module")
+@pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     await models.create_all()
     yield

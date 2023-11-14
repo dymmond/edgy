@@ -144,7 +144,9 @@ class CharField(FieldFactory, str):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.String(length=kwargs.get("max_length"))
+        return sqlalchemy.String(
+            length=kwargs.get("max_length"), collation=kwargs.get("collation", None)
+        )
 
 
 class TextField(FieldFactory, str):
@@ -161,7 +163,7 @@ class TextField(FieldFactory, str):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Text()
+        return sqlalchemy.Text(collation=kwargs.get("collation", None))
 
 
 class Number(FieldFactory):

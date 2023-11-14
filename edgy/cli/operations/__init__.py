@@ -6,6 +6,7 @@ from .edit import edit as edit  # noqa
 from .heads import heads as heads  # noqa
 from .history import history as history  # noqa
 from .init import init as init  # noqa
+from .inspectdb import inspect_db as inspect_db  # noqa
 from .list_templates import list_templates as list_templates  # noqa
 from .makemigrations import makemigrations as makemigrations  # noqa
 from .merge import merge as merge  # noqa

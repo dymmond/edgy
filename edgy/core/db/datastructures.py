@@ -1,4 +1,4 @@
-from typing import Any, List, Optional, Sequence
+from typing import Any, ClassVar, List, Optional, Sequence
 
 from pydantic import model_validator
 from pydantic.dataclasses import dataclass
@@ -11,7 +11,7 @@ class Index:
     """
 
     suffix: str = "idx"
-    max_name_length: int = 30
+    __max_name_length__: ClassVar[int] = 30
     name: Optional[str] = None
     fields: Optional[Sequence[str]] = None
 
@@ -19,8 +19,10 @@ class Index:
     def validate_data(cls, values: Any) -> Any:
         name = values.kwargs.get("name")
 
-        if name is not None and len(name) > cls.max_name_length:
-            raise ValueError(f"The max length of the index name must be 30. Got {len(name)}")
+        if name is not None and len(name) > cls.__max_name_length__:
+            raise ValueError(
+                f"The max length of the index name must be {cls.__max_name_length__}. Got {len(name)}"
+            )
 
         fields = values.kwargs.get("fields")
         if not isinstance(fields, (tuple, list)):
@@ -31,8 +33,7 @@ class Index:
 
         if name is None:
             suffix = values.kwargs.get("suffix", cls.suffix)
-            values["name"] = f"{'_'.join(fields)}_{suffix}"
-
+            values.kwargs["name"] = f"{suffix}_{'_'.join(fields)}"
         return values
 
 
@@ -43,11 +44,19 @@ class UniqueConstraint:
     """
 
     fields: List[str]
+    name: Optional[str] = None
+    __max_name_length__: ClassVar[int] = 30
 
     @model_validator(mode="before")
     def validate_data(cls, values: Any) -> Any:
-        fields = values.kwargs.get("fields")
+        name = values.kwargs.get("name")
 
+        if name is not None and len(name) > cls.__max_name_length__:
+            raise ValueError(
+                f"The max length of the constraint name must be {cls.__max_name_length__}. Got {len(name)}"
+            )
+
+        fields = values.kwargs.get("fields")
         if not isinstance(fields, (tuple, list)):
             raise ValueError("UniqueConstraint.fields must be a list or a tuple.")
 

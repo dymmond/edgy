@@ -18,6 +18,7 @@ from edgy.cli.operations import (
     heads,
     history,
     init,
+    inspect_db,
     list_templates,
     makemigrations,
     merge,
@@ -102,3 +103,4 @@ edgy_cli.add_command(current, name="current")
 edgy_cli.add_command(stamp, name="stamp")
 edgy_cli.add_command(check, name="check")
 edgy_cli.add_command(shell, name="shell")
+edgy_cli.add_command(inspect_db, name="inspectdb")

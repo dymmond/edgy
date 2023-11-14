@@ -198,7 +198,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         if isinstance(columns, str):
             return sqlalchemy.UniqueConstraint(columns)
         elif isinstance(columns, UniqueConstraint):
-            return sqlalchemy.UniqueConstraint(*columns.fields)
+            return sqlalchemy.UniqueConstraint(*columns.fields, name=columns.name)
         return sqlalchemy.UniqueConstraint(*columns)
 
     @classmethod
