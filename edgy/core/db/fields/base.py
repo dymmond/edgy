@@ -29,6 +29,7 @@ class BaseField(FieldInfo, _repr.Representation):
     ) -> None:
         self.max_digits: str = kwargs.pop("max_digits", None)
         self.decimal_places: str = kwargs.pop("decimal_places", None)
+        self.server_default: Any = kwargs.pop("server_default", None)
 
         super().__init__(**kwargs)
 
@@ -37,7 +38,7 @@ class BaseField(FieldInfo, _repr.Representation):
             default = None
         if default is not Undefined:
             self.default = default
-        if default is not None:
+        if default is not None or self.server_default is not None:
             self.null = True
 
         self.defaulf_factory: Optional[Callable[..., Any]] = kwargs.pop(
@@ -75,7 +76,6 @@ class BaseField(FieldInfo, _repr.Representation):
             "multiple_of", None
         )
         self.through: Any = kwargs.pop("through", None)
-        self.server_default: Any = kwargs.pop("server_default", None)
         self.server_onupdate: Any = kwargs.pop("server_onupdate", None)
         self.registry: Registry = kwargs.pop("registry", None)
         self.comment = kwargs.pop("comment", None)
