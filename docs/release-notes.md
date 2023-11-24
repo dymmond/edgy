@@ -5,6 +5,23 @@ hide:
 
 # Release Notes
 
+## 0.6.0
+
+### Changed
+
+- `inspectdb` is now handled by an independent isolated called `InspectDB`.
+
+### Fixed
+
+- `server_default` does not raise a `FieldValidationError`.
+- `server_default` added as validation for nullable.
+- `null` was not being applied properly from the newly added `server_default`.
+
+!!! Warning
+	This could impact your migrations, so the advise would be to generate a new migration
+	after upgrading to the new version of Edgy to make sure the database reflects the proper
+	nullables/non-nullable fields.
+
 ## 0.5.2
 
 ### Changed
