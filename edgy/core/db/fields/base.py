@@ -38,7 +38,11 @@ class BaseField(FieldInfo, _repr.Representation):
             default = None
         if default is not Undefined:
             self.default = default
-        if default is not None or self.server_default is not None:
+        if (
+            (default is not None)
+            and default != Undefined
+            or (self.server_default is not None and self.server_default != Undefined)
+        ):
             self.null = True
 
         self.defaulf_factory: Optional[Callable[..., Any]] = kwargs.pop(
@@ -110,7 +114,15 @@ class BaseField(FieldInfo, _repr.Representation):
         return bool(required and not self.primary_key)
 
     def raise_for_non_default(self, default: Any, server_default: Any) -> Any:
-        if not self.field_type == int and default is None and server_default is None:
+        has_default: bool = True
+        has_server_default: bool = True
+
+        if default is None or default is False:
+            has_default = False
+        if server_default is None or server_default is False:
+            has_server_default = False
+
+        if not self.field_type == int and not has_default and not has_server_default:
             raise FieldDefinitionError(
                 "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
             )
