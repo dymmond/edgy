@@ -82,7 +82,7 @@ class BaseField(FieldInfo, _repr.Representation):
 
         if self.primary_key:
             default_value = default
-            self.raise_for_non_default(default=default_value)
+            self.raise_for_non_default(default=default_value, server_default=self.server_default)
 
         for name, value in kwargs.items():
             edgy_setattr(self, name, value)
@@ -109,8 +109,8 @@ class BaseField(FieldInfo, _repr.Representation):
         required = False if self.null else True
         return bool(required and not self.primary_key)
 
-    def raise_for_non_default(self, default: Any) -> Any:
-        if not self.field_type == int and not default:
+    def raise_for_non_default(self, default: Any, server_default: Any) -> Any:
+        if not self.field_type == int and not default and not server_default:
             raise FieldDefinitionError(
                 "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
             )
