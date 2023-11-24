@@ -29,6 +29,7 @@ class BaseField(FieldInfo, _repr.Representation):
     ) -> None:
         self.max_digits: str = kwargs.pop("max_digits", None)
         self.decimal_places: str = kwargs.pop("decimal_places", None)
+        self.server_default: Any = kwargs.pop("server_default", None)
 
         super().__init__(**kwargs)
 
@@ -37,7 +38,11 @@ class BaseField(FieldInfo, _repr.Representation):
             default = None
         if default is not Undefined:
             self.default = default
-        if default is not None:
+        if (
+            (default is not None)
+            and default != Undefined
+            or (self.server_default is not None and self.server_default != Undefined)
+        ):
             self.null = True
 
         self.defaulf_factory: Optional[Callable[..., Any]] = kwargs.pop(
@@ -75,14 +80,13 @@ class BaseField(FieldInfo, _repr.Representation):
             "multiple_of", None
         )
         self.through: Any = kwargs.pop("through", None)
-        self.server_default: Any = kwargs.pop("server_default", None)
         self.server_onupdate: Any = kwargs.pop("server_onupdate", None)
         self.registry: Registry = kwargs.pop("registry", None)
         self.comment = kwargs.pop("comment", None)
 
         if self.primary_key:
             default_value = default
-            self.raise_for_non_default(default=default_value)
+            self.raise_for_non_default(default=default_value, server_default=self.server_default)
 
         for name, value in kwargs.items():
             edgy_setattr(self, name, value)
@@ -109,8 +113,16 @@ class BaseField(FieldInfo, _repr.Representation):
         required = False if self.null else True
         return bool(required and not self.primary_key)
 
-    def raise_for_non_default(self, default: Any) -> Any:
-        if not self.field_type == int and not default:
+    def raise_for_non_default(self, default: Any, server_default: Any) -> Any:
+        has_default: bool = True
+        has_server_default: bool = True
+
+        if default is None or default is False:
+            has_default = False
+        if server_default is None or server_default is False:
+            has_server_default = False
+
+        if not self.field_type == int and not has_default and not has_server_default:
             raise FieldDefinitionError(
                 "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
             )
