@@ -110,7 +110,7 @@ class BaseField(FieldInfo, _repr.Representation):
         return bool(required and not self.primary_key)
 
     def raise_for_non_default(self, default: Any, server_default: Any) -> Any:
-        if not self.field_type == int and not default and not server_default:
+        if not self.field_type == int and default is None and server_default is None:
             raise FieldDefinitionError(
                 "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
             )
