@@ -45,14 +45,14 @@ def test_raises_error_on_missing_not_null_fields():
         "errors": [
             {
                 "type": "missing",
-                "loc": ["name"],
+                "loc": ["data", "name"],
                 "msg": "Field required",
                 "input": {"language": "EN", "description": "A description"},
                 "url": f"https://errors.pydantic.dev/{pydantic_version}/v/missing",
             },
             {
                 "type": "missing",
-                "loc": ["email"],
+                "loc": ["data", "email"],
                 "msg": "Field required",
                 "input": {"language": "EN", "description": "A description"},
                 "url": f"https://errors.pydantic.dev/{pydantic_version}/v/missing",
