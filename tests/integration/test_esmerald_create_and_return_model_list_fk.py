@@ -109,7 +109,7 @@ async def test_creates_a_user_raises_value_error(async_client):
         "errors": [
             {
                 "type": "missing",
-                "loc": ["posts"],
+                "loc": ["data", "posts"],
                 "msg": "Field required",
                 "input": {
                     "name": "Edgy",

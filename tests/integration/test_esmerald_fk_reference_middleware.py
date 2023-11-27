@@ -103,7 +103,7 @@ async def test_creates_a_user_raises_value_error(async_client):
         "errors": [
             {
                 "type": "list_type",
-                "loc": ["posts"],
+                "loc": ["data", "posts"],
                 "msg": "Input should be a valid list",
                 "input": {"comment": "A comment"},
                 "url": f"https://errors.pydantic.dev/{pydantic_version}/v/list_type",
