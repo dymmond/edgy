@@ -68,6 +68,7 @@ class BaseQuerySet(
         m2m_related: Any = None,
         using_schema: Any = None,
         table: Any = None,
+        exclude_secrets: Any = False,
     ) -> None:
         super().__init__(model_class=model_class)
         self.model_class = cast("Type[Model]", model_class)
@@ -86,6 +87,7 @@ class BaseQuerySet(
         self._cache = None
         self._m2m_related = m2m_related  # type: ignore
         self.using_schema = using_schema
+        self._exclude_secrets = exclude_secrets or False
         self.extra: Dict[str, Any] = {}
 
         # Making sure the queryset always starts without any schema associated unless specified
@@ -225,7 +227,6 @@ class BaseQuerySet(
         Builds the query select based on the given parameters and filters.
         """
         self.validate_only_and_defer()
-
         tables, select_from = self.build_tables_select_from_relationship()
         expression = sqlalchemy.sql.select(*tables)
         expression = expression.select_from(select_from)
@@ -235,6 +236,13 @@ class BaseQuerySet(
 
         if self._defer:
             columns = [column for column in select_from.columns if column.name not in self._defer]
+            expression = expression.with_only_columns(*columns)
+
+        if self._exclude_secrets:
+            model_columns = [
+                name for name, field in self.model_class.fields.items() if not field.secret
+            ]
+            columns = [column for column in select_from.columns if column.name in model_columns]
             expression = expression.with_only_columns(*columns)
 
         if self.filter_clauses:
@@ -263,7 +271,12 @@ class BaseQuerySet(
         self._expression = expression  # type: ignore
         return expression
 
-    def filter_query(self, exclude: bool = False, or_: bool = False, **kwargs: Any) -> "QuerySet":
+    def filter_query(
+        self,
+        exclude: bool = False,
+        or_: bool = False,
+        **kwargs: Any,
+    ) -> "QuerySet":
         from edgy.core.db.models import Model
 
         clauses = []
@@ -374,6 +387,7 @@ class BaseQuerySet(
                 defer_fields=self._defer,
                 m2m_related=self.m2m_related,
                 table=self.table,
+                exclude_secrets=self._exclude_secrets,
             ),
         )
 
@@ -418,6 +432,7 @@ class BaseQuerySet(
         queryset._database = self.database
         queryset.table = self.table
         queryset.extra = self.extra
+        queryset._exclude_secrets = self._exclude_secrets
         return queryset
 
 
@@ -508,7 +523,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Filters the QuerySet by the NOT operand.
         """
-        return self.exclude(clause=clause, **kwargs)
+        queryset: "QuerySet" = self.clone()
+        queryset = queryset.exclude(clause=clause, **kwargs)
+        return queryset
 
     def exclude(
         self,
@@ -518,7 +535,22 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Exactly the same as the filter but for the exclude.
         """
-        return self.filter_or_exclude(clause=clause, exclude=True, **kwargs)
+        queryset: "QuerySet" = self.clone()
+        queryset = self.filter_or_exclude(clause=clause, exclude=True, **kwargs)
+        return queryset
+
+    def exclude_secrets(
+        self,
+        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        **kwargs: Any,
+    ) -> "QuerySet":
+        """
+        Excludes any field that contains the `secret=True` declared from being leaked.
+        """
+        queryset: "QuerySet" = self.clone()
+        queryset._exclude_secrets = True
+        queryset = queryset.filter_or_exclude(clause=clause, **kwargs)
+        return queryset
 
     def lookup(self, term: Any) -> "QuerySet":
         """
@@ -730,7 +762,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             return None
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        return queryset.model_class.from_sqla_row(rows[0], select_related=queryset._select_related)
+        return queryset.model_class.from_sqla_row(
+            rows[0],
+            select_related=queryset._select_related,
+            exclude_secrets=queryset._exclude_secrets,
+        )
 
     async def _all(self, **kwargs: Any) -> List[EdgyModel]:
         """
@@ -762,6 +798,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 is_only_fields=is_only_fields,
                 only_fields=queryset._only,
                 is_defer_fields=is_defer_fields,
+                exclude_secrets=queryset._exclude_secrets,
             )
             for row in rows
         ]
@@ -807,6 +844,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             only_fields=queryset._only,
             is_defer_fields=is_defer_fields,
             prefetch_related=queryset._prefetch_related,
+            exclude_secrets=queryset._exclude_secrets,
         )
 
     async def first(self, **kwargs: Any) -> Union[EdgyModel, None]:
