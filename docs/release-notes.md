@@ -5,6 +5,18 @@ hide:
 
 # Release Notes
 
+## 0.7.0
+
+### Added
+
+- Support for [`or_`, `and_` and `not_`](./queries/queries#edgy-style) for SQLAlchemy style queries and Edgy syntax sugar queries.
+- Support for [`secrets`](./queries/secrets.md) field and queryset allowing to query the fields that are not marked as `secret` directly.
+
+### Changed
+
+- Updated internal support for `databasez` 0.7.0 and this fixes the URL parsing errors for complex passwords
+caused by the `urlsplit`.
+
 ## 0.6.0
 
 ### Changed
