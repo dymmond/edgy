@@ -1,9 +1,6 @@
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import sqlalchemy
-
-if TYPE_CHECKING:  # pragma no cover
-    pass
 
 
 def or_(*args: Any, **kwargs: Any) -> Any:
