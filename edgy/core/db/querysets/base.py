@@ -55,6 +55,7 @@ class BaseQuerySet(
         model_class: Union[Type["Model"], None] = None,
         database: Union["Database", None] = None,
         filter_clauses: Any = None,
+        or_clauses: Any = None,
         select_related: Any = None,
         prefetch_related: Any = None,
         limit_count: Any = None,
@@ -71,6 +72,7 @@ class BaseQuerySet(
         super().__init__(model_class=model_class)
         self.model_class = cast("Type[Model]", model_class)
         self.filter_clauses = [] if filter_clauses is None else filter_clauses
+        self.or_clauses = [] if or_clauses is None else or_clauses
         self.limit_count = limit_count
         self._select_related = [] if select_related is None else select_related
         self._prefetch_related = [] if prefetch_related is None else prefetch_related
@@ -113,6 +115,15 @@ class BaseQuerySet(
             clause = filter_clauses[0]
         else:
             clause = sqlalchemy.sql.and_(*filter_clauses)
+        expression = expression.where(clause)
+        return expression
+
+    def build_or_clauses_expression(self, or_clauses: Any, expression: Any) -> Any:
+        """Builds the filter clauses expression"""
+        if len(or_clauses) == 1:
+            clause = or_clauses[0]
+        else:
+            clause = sqlalchemy.sql.or_(*or_clauses)
         expression = expression.where(clause)
         return expression
 
@@ -231,6 +242,9 @@ class BaseQuerySet(
                 self.filter_clauses, expression=expression
             )
 
+        if self.or_clauses:
+            expression = self.build_or_clauses_expression(self.or_clauses, expression=expression)
+
         if self._order_by:
             expression = self.build_order_by_expression(self._order_by, expression=expression)
 
@@ -249,11 +263,12 @@ class BaseQuerySet(
         self._expression = expression  # type: ignore
         return expression
 
-    def filter_query(self, exclude: bool = False, **kwargs: Any) -> "QuerySet":
+    def filter_query(self, exclude: bool = False, or_: bool = False, **kwargs: Any) -> "QuerySet":
         from edgy.core.db.models import Model
 
         clauses = []
         filter_clauses = self.filter_clauses
+        or_clauses = self.or_clauses
         select_related = list(self._select_related)
         prefetch_related = list(self._prefetch_related)
 
@@ -330,13 +345,18 @@ class BaseQuerySet(
 
             clause = getattr(column, op_attr)(value)
             clause.modifiers["escape"] = "\\" if has_escaped_character else None
-
             clauses.append(clause)
 
         if exclude:
-            filter_clauses.append(sqlalchemy.not_(sqlalchemy.sql.and_(*clauses)))
+            if not or_:
+                filter_clauses.append(sqlalchemy.not_(sqlalchemy.sql.and_(*clauses)))
+            else:
+                or_clauses.append(sqlalchemy.not_(sqlalchemy.sql.and_(*clauses)))
         else:
-            filter_clauses += clauses
+            if not or_:
+                filter_clauses += clauses
+            else:
+                or_clauses += clauses
 
         return cast(
             "QuerySet",
@@ -344,6 +364,7 @@ class BaseQuerySet(
                 model_class=self.model_class,
                 database=self._database,
                 filter_clauses=filter_clauses,
+                or_clauses=or_clauses,
                 select_related=select_related,
                 prefetch_related=prefetch_related,
                 limit_count=self.limit_count,
@@ -382,6 +403,7 @@ class BaseQuerySet(
         queryset = self.__class__.__new__(self.__class__)
         queryset.model_class = self.model_class
         queryset.filter_clauses = copy.copy(self.filter_clauses)
+        queryset.or_clauses = copy.copy(self.or_clauses)
         queryset.limit_count = copy.copy(self.limit_count)
         queryset._select_related = copy.copy(self._select_related)
         queryset._prefetch_related = copy.copy(self._prefetch_related)
@@ -453,6 +475,40 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Filters the QuerySet by the given kwargs and clause.
         """
         return self.filter_or_exclude(clause=clause, **kwargs)
+
+    def or_(
+        self,
+        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        **kwargs: Any,
+    ) -> "QuerySet":
+        """
+        Filters the QuerySet by the OR operand.
+        """
+        queryset: "QuerySet" = self.clone()
+        queryset = self.filter(clause=clause, or_=True, **kwargs)
+        return queryset
+
+    def and_(
+        self,
+        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        **kwargs: Any,
+    ) -> "QuerySet":
+        """
+        Filters the QuerySet by the AND operand.
+        """
+        queryset: "QuerySet" = self.clone()
+        queryset = self.filter(clause=clause, **kwargs)
+        return queryset
+
+    def not_(
+        self,
+        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        **kwargs: Any,
+    ) -> "QuerySet":
+        """
+        Filters the QuerySet by the NOT operand.
+        """
+        return self.exclude(clause=clause, **kwargs)
 
     def exclude(
         self,

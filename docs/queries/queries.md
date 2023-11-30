@@ -109,6 +109,8 @@ users = await User.query.filter(User.columns.id.in_([1, 2, 3]))
 !!! Warning
     The `columns` refers to the columns of the underlying SQLAlchemy table.
 
+All the operations you would normally do in SQLAlchemy syntax, are allowed here.
+
 ### Limit
 
 Limiting the number of results. The `LIMIT` in SQL.
@@ -548,3 +550,166 @@ await User.query.bulk_update(users, fields=['is_active'])
 
 [model]: ../models.md
 [managers]: ../managers.md
+
+## Operators
+
+There are sometimes the need of adding some extra conditions like `AND`, or `OR` or even the `NOT`
+into your queries and therefore Edgy provides a simple integration with those.
+
+Edgy provides the [and_](#and), [or_](#or) and [not_](#not) operators directly for you to use, although
+this ones come with a slighly different approach.
+
+For all the examples, let us use the model below.
+
+```python
+{!> ../docs_src/queries/clauses/model.py !}
+```
+
+### SQLAlchemy style
+
+Since Edgy is built on the top of SQL Alchemy core, that also means we can also use directly that
+same functionality within our queries.
+
+In other words, uses the [SQLAlchemy style](#sqlalchemy-style).
+
+!!! Warning
+    The `or_`, `and_` and `not_` do not work with [related](./related-name.md) operations and only
+    directly with the model itself.
+
+This might sound confusing so let us see some examples.
+
+#### AND
+
+As the name suggests, you want to add the `AND` explicitly.
+
+```python
+{!> ../docs_src/queries/clauses/and.py !}
+```
+
+As mentioned before, applying the [SQLAlchemy style](#sqlalchemy-style) also means you can do this.
+
+```python
+{!> ../docs_src/queries/clauses/and_two.py !}
+```
+
+And you can do nested `querysets` like multiple [filters](#filter).
+
+```python
+{!> ../docs_src/queries/clauses/and_m_filter.py !}
+```
+
+#### OR
+
+The same principle as the [and_](#and) but applied to the `OR`.
+
+```python
+{!> ../docs_src/queries/clauses/or.py !}
+```
+
+As mentioned before, applying the [SQLAlchemy style](#sqlalchemy-style) also means you can do this.
+
+```python
+{!> ../docs_src/queries/clauses/or_two.py !}
+```
+
+And you can do nested `querysets` like multiple [filters](#filter).
+
+```python
+{!> ../docs_src/queries/clauses/or_m_filter.py !}
+```
+
+#### NOT
+
+This is simple and direct, this is where you apply the `NOT`.
+
+```python
+{!> ../docs_src/queries/clauses/not.py !}
+```
+
+As mentioned before, applying the [SQLAlchemy style](#sqlalchemy-style) also means you can do this.
+
+```python
+{!> ../docs_src/queries/clauses/not_two.py !}
+```
+
+And you can do nested `querysets` like multiple [filters](#filter).
+
+```python
+{!> ../docs_src/queries/clauses/not_m_filter.py !}
+```
+
+### Edgy Style
+
+This is the most common used scenario where you can use the [related](./related-name.md) for your
+queries and all the great functionalities of Edgy while using the operands.
+
+!!! Tip
+    The same way you apply the filters for the queries using the [related](./related-name.md), this
+    can also be done with the **Edgy style** but the same cannot be said for the
+    [SQLAlchemy style](#sqlalchemy-style-1). So if you want to leverage the full power of Edgy,
+    it is advised to go Edgy style.
+
+#### AND
+
+The `AND` operand with the syntax is the same as using the [filter](#filter) or any queryset
+operatator but for visualisation purposes this is also available in the format of `and_`.
+
+```python
+{!> ../docs_src/queries/clauses/style/and_two.py !}
+```
+
+With multiple parameters.
+
+```python
+{!> ../docs_src/queries/clauses/style/and.py !}
+```
+
+And you can do nested `querysets` like multiple [filters](#filter).
+
+```python
+{!> ../docs_src/queries/clauses/style/and_m_filter.py !}
+```
+
+#### OR
+
+The same principle as the [and_](#and-1) but applied to the `OR`.
+
+```python
+{!> ../docs_src/queries/clauses/style/or.py !}
+```
+
+With multiple `or_` or nultiple parametes in the same `or_`
+
+```python
+{!> ../docs_src/queries/clauses/style/or_two.py !}
+```
+
+And you can do nested `querysets` like multiple [filters](#filter).
+
+```python
+{!> ../docs_src/queries/clauses/style/or_m_filter.py !}
+```
+
+#### NOT
+
+The `not_` as the same principle as the [exclude](#exclude) and like the [and](#and-1), for
+representation purposes, Edgy also has that function.
+
+```python
+{!> ../docs_src/queries/clauses/style/not.py !}
+```
+
+With multiple `not_`.
+
+```python
+{!> ../docs_src/queries/clauses/style/not_two.py !}
+```
+
+And you can do nested `querysets` like multiple [filters](#filter).
+
+```python
+{!> ../docs_src/queries/clauses/style/not_m_filter.py !}
+```
+
+Internally, the `not_` is calling the [exclude](#exclude) and applying the operators so this is
+more for *cosmetic* purposes than anything else, really.
