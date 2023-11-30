@@ -39,6 +39,7 @@ class ForeignKeyFieldFactory:
         server_default: Any = kwargs.pop("server_default", None)
         server_onupdate: Any = kwargs.pop("server_onupdate", None)
         registry: Registry = kwargs.pop("registry", None)
+        secret: bool = kwargs.pop("secret", False)
         field_type = cls._type
 
         namespace = dict(
@@ -56,6 +57,7 @@ class ForeignKeyFieldFactory:
             through=through,
             registry=registry,
             column_type=field_type,
+            secret=secret,
             constraints=cls.get_constraints(),
             **kwargs,
         )

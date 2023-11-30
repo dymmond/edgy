@@ -82,7 +82,8 @@ class BaseField(FieldInfo, _repr.Representation):
         self.through: Any = kwargs.pop("through", None)
         self.server_onupdate: Any = kwargs.pop("server_onupdate", None)
         self.registry: Registry = kwargs.pop("registry", None)
-        self.comment = kwargs.pop("comment", None)
+        self.comment: str = kwargs.pop("comment", None)
+        self.secret: bool = kwargs.pop("secret", False)
 
         if self.primary_key:
             default_value = default

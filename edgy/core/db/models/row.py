@@ -24,6 +24,7 @@ class ModelRow(EdgyBaseModel):
         is_only_fields: bool = False,
         only_fields: Sequence[str] = None,
         is_defer_fields: bool = False,
+        exclude_secrets: bool = False,
     ) -> Optional[Type["Model"]]:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
@@ -42,6 +43,9 @@ class ModelRow(EdgyBaseModel):
         item: Dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
+        excluded_secrets = (
+            [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
+        )
 
         for related in select_related:
             if "__" in related:
@@ -51,14 +55,17 @@ class ModelRow(EdgyBaseModel):
                 except KeyError:
                     model_cls = getattr(cls, first_part).related_from
                 item[first_part] = model_cls.from_sqla_row(
-                    row, select_related=[remainder], prefetch_related=prefetch_related
+                    row,
+                    select_related=[remainder],
+                    prefetch_related=prefetch_related,
+                    exclude_secrets=exclude_secrets,
                 )
             else:
                 try:
                     model_cls = cls.fields[related].target
                 except KeyError:
                     model_cls = getattr(cls, related).related_from
-                item[related] = model_cls.from_sqla_row(row)
+                item[related] = model_cls.from_sqla_row(row, exclude_secrets=exclude_secrets)
 
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
@@ -72,6 +79,8 @@ class ModelRow(EdgyBaseModel):
             child_item = {}
 
             for column in model_related.table.columns:
+                if column.name in excluded_secrets:
+                    continue
                 if column.name not in cls.fields.keys():
                     continue
                 elif related not in child_item:
@@ -90,6 +99,8 @@ class ModelRow(EdgyBaseModel):
             )
 
             for column, value in row._mapping.items():
+                if column.name in excluded_secrets:
+                    continue
                 # Making sure when a table is reflected, maps the right fields of the ReflectModel
                 if column not in mapping_fields:
                     continue
@@ -108,12 +119,18 @@ class ModelRow(EdgyBaseModel):
             # Pull out the regular column values.
             for column in cls.table.columns:
                 # Making sure when a table is reflected, maps the right fields of the ReflectModel
+                if column.name in excluded_secrets:
+                    continue
                 if column.name not in cls.fields.keys():
                     continue
                 elif column.name not in item:
                     item[column.name] = row[column]
 
-        model = cast("Type[Model]", cls(**item))
+        model = (
+            cast("Type[Model]", cls(**item))
+            if not exclude_secrets
+            else cast("Type[Model]", cls.proxy_model(**item))
+        )
         model = cls.handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )

@@ -55,6 +55,7 @@ class FieldFactory:
         server_onupdate = kwargs.pop("server_onupdate", None)
         format: str = kwargs.pop("format", None)
         read_only: bool = True if primary_key else kwargs.pop("read_only", False)
+        secret: bool = kwargs.pop("secret", False)
         field_type = cls._type
 
         namespace = dict(
@@ -76,6 +77,7 @@ class FieldFactory:
             read_only=read_only,
             column_type=cls.get_column_type(**arguments),
             constraints=cls.get_constraints(),
+            secret=secret,
             **kwargs,
         )
         Field = type(cls.__name__, cls._bases, {})
