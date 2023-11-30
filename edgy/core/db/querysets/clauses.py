@@ -2,8 +2,6 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy
 
-import edgy  # noqa I100
-
 if TYPE_CHECKING:  # pragma no cover
     pass
 
