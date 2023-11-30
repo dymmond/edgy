@@ -63,3 +63,21 @@ async def test_filter_with_and_three():
     )
 
     assert len(results) == 1
+
+
+async def test_filter_with_and_four():
+    await User.query.create(name="Adam")
+    user = await User.query.create(name="Edgy", email="edgy@edgy.dev")
+
+    results = await User.query.filter(and_(User.columns.name == user.name)).filter(
+        and_(User.columns.email == user.email)
+    )
+    assert len(results) == 1
+
+
+async def test_filter_with_contains():
+    await User.query.create(name="Adam", email="adam@edgy.dev")
+    await User.query.create(name="Edgy", email="edgy@edgy.dev")
+
+    results = await User.query.filter(and_(User.columns.email.contains("edgy")))
+    assert len(results) == 2
