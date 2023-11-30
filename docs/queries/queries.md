@@ -548,9 +548,6 @@ for user in users:
 await User.query.bulk_update(users, fields=['is_active'])
 ```
 
-[model]: ../models.md
-[managers]: ../managers.md
-
 ## Operators
 
 There are sometimes the need of adding some extra conditions like `AND`, or `OR` or even the `NOT`
@@ -713,3 +710,6 @@ And you can do nested `querysets` like multiple [filters](#filter).
 
 Internally, the `not_` is calling the [exclude](#exclude) and applying the operators so this is
 more for *cosmetic* purposes than anything else, really.
+
+[model]: ../models.md
+[managers]: ../managers.md

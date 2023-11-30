@@ -1,5 +1,3 @@
-import edgy
-
 # Create some records
 
 await User.query.create(name="Adam", email="adam@edgy.dev")
