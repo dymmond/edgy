@@ -20,6 +20,13 @@ class User(edgy.Model):
         registry = models
 
 
+class Product(edgy.Model):
+    user = edgy.ForeignKey(User, related_name="products")
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     await models.create_all()
@@ -83,3 +90,57 @@ async def test_filter_with_contains():
 
     results = await User.query.filter(or_(User.columns.email.contains("edgy")))
     assert len(results) == 2
+
+
+async def test_filter_or_clause_style_nested():
+    user = await User.query.create(name="Adam", email="adam@edgy.dev")
+    await User.query.create(name="Edgy", email="edgy@edgy.dev")
+
+    results = await User.query.or_(name="Adam").or_(email__icontains=user.email)
+
+    assert len(results) == 1
+    assert results[0].pk == user.pk
+
+    results = await User.query.or_(email__icontains="edgy")
+
+    assert len(results) == 2
+
+
+async def test_filter_or_clause_related():
+    user = await User.query.create(name="Adam", email="adam@edgy.dev")
+    await User.query.create(name="Edgy", email="edgy@edgy.dev")
+    product = await Product.query.create(user=user)
+
+    results = await Product.query.or_(user__id=user.pk)
+
+    assert len(results) == 1
+    assert results[0].pk == product.pk
+
+    results = await User.query.or_(products__id=product.pk)
+
+    assert len(results) == 1
+    assert results[0].pk == user.pk
+
+
+async def test_filter_or_clause_select():
+    user = await User.query.create(name="Adam", email="adam@edgy.dev")
+    await User.query.create(name="Edgy", email="adam@edgy.dev")
+
+    results = await User.query.or_(name="Test").or_(name="Adam")
+
+    assert len(results) == 1
+    assert results[0].pk == user.pk
+
+    results = await User.query.or_(name="Edgy").or_(name="Adam")
+
+    assert len(results) == 2
+
+
+async def test_filter_or_clause_mixed():
+    user = await User.query.create(name="Adam", email="adam@edgy.dev")
+    await User.query.create(name="Edgy", email="adam@edgy.dev")
+
+    results = await User.query.or_(name="Adam", email=user.email).and_(id=1)
+
+    assert len(results) == 1
+    assert results[0].pk == user.pk

@@ -52,3 +52,14 @@ async def test_filter_with_not_two():
 
     assert len(results) == 1
     assert results[0].pk == user.pk
+
+
+async def test_filter_with_not_style():
+    await User.query.create(name="Adam")
+    await User.query.create(name="Edgy")
+    user = await User.query.create(name="Esmerald")
+
+    results = await User.query.not_(name="Edgy").not_(name="Adam")
+
+    assert len(results) == 1
+    assert results[0].pk == user.pk

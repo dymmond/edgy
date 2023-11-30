@@ -20,6 +20,13 @@ class User(edgy.Model):
         registry = models
 
 
+class Product(edgy.Model):
+    user = edgy.ForeignKey(User, related_name="products")
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     await models.create_all()
@@ -81,3 +88,43 @@ async def test_filter_with_contains():
 
     results = await User.query.filter(and_(User.columns.email.contains("edgy")))
     assert len(results) == 2
+
+
+async def test_filter_and_clause_style():
+    user = await User.query.create(name="Adam", email="adam@edgy.dev")
+    await User.query.create(name="Edgy", email="edgy@edgy.dev")
+
+    results = await User.query.and_(name="Adam", email__icontains="edgy")
+
+    assert len(results) == 1
+    assert results[0].pk == user.pk
+
+    results = await User.query.and_(email__icontains="edgy")
+
+    assert len(results) == 2
+
+
+async def test_filter_and_clause_style_nested():
+    user = await User.query.create(name="Adam", email="adam@edgy.dev")
+    await User.query.create(name="Edgy", email="edgy@edgy.dev")
+
+    results = await User.query.and_(name="Adam").and_(email__icontains="edgy")
+
+    assert len(results) == 1
+    assert results[0].pk == user.pk
+
+
+async def test_filter_and_clause_related():
+    user = await User.query.create(name="Adam", email="adam@edgy.dev")
+    await User.query.create(name="Edgy", email="edgy@edgy.dev")
+    product = await Product.query.create(user=user)
+
+    results = await Product.query.and_(user__id=user.pk)
+
+    assert len(results) == 1
+    assert results[0].pk == product.pk
+
+    results = await User.query.and_(products__id=product.pk)
+
+    assert len(results) == 1
+    assert results[0].pk == user.pk
