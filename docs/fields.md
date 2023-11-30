@@ -27,6 +27,8 @@ All the fields are required unless on the the following is set:
 * **server_default** - nstance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
 construct representing the DDL DEFAULT value for the column.
 * **comment** - A comment to be added with the field in the SQL database.
+* **secret** - A special attribute that allows to call the [exclude_secrets](./queries/secrets.md#exclude-secrets) and avoid
+accidental leakage of sensitive data.
 
 ## Available fields
 

@@ -80,6 +80,7 @@ nav:
       - Fields: "fields.md"
       - Queries:
           - Queries: "queries/queries.md"
+          - Secrets: "queries/secrets.md"
           - Related Name: "queries/related-name.md"
           - ManyToMany: "queries/many-to-many.md"
           - Prefetch Related: "queries/prefetch.md"

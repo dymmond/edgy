@@ -43,7 +43,7 @@ class ModelRow(EdgyBaseModel):
         item: Dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
-        excluded_secrets = (
+        secret_fields = (
             [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
         )
 
@@ -79,7 +79,7 @@ class ModelRow(EdgyBaseModel):
             child_item = {}
 
             for column in model_related.table.columns:
-                if column.name in excluded_secrets:
+                if column.name in secret_fields or related in secret_fields:
                     continue
                 if column.name not in cls.fields.keys():
                     continue
@@ -90,7 +90,8 @@ class ModelRow(EdgyBaseModel):
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
             # and rebuild it with the new fields.
-            item[related] = model_related.proxy_model(**child_item)
+            if related not in secret_fields:
+                item[related] = model_related.proxy_model(**child_item)
 
         # Check for the only_fields
         if is_only_fields or is_defer_fields:
@@ -99,7 +100,7 @@ class ModelRow(EdgyBaseModel):
             )
 
             for column, value in row._mapping.items():
-                if column.name in excluded_secrets:
+                if column in secret_fields:
                     continue
                 # Making sure when a table is reflected, maps the right fields of the ReflectModel
                 if column not in mapping_fields:
@@ -119,7 +120,7 @@ class ModelRow(EdgyBaseModel):
             # Pull out the regular column values.
             for column in cls.table.columns:
                 # Making sure when a table is reflected, maps the right fields of the ReflectModel
-                if column.name in excluded_secrets:
+                if column.name in secret_fields:
                     continue
                 if column.name not in cls.fields.keys():
                     continue

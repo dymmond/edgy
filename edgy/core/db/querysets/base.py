@@ -545,7 +545,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         **kwargs: Any,
     ) -> "QuerySet":
         """
-        Exactly the same as the filter but for the exclude.
+        Excludes any field that contains the `secret=True` declared from being leaked.
         """
         queryset: "QuerySet" = self.clone()
         queryset._exclude_secrets = True
