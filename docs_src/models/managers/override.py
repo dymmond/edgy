@@ -27,7 +27,7 @@ class User(edgy.Model):
 
     class Meta:
         registry = models
-        unique_together = ["name", "email"]
+        unique_together = [("name", "email")]
 
 
 # Using ipython that supports await
