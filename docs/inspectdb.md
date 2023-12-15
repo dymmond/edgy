@@ -13,7 +13,7 @@ In other words, it maps existing database tables into an **Edgy like syntax** to
 easier to manage.
 
 !!! Tip
-    If you are not familiar with [ReflectModel](./reflection.md), not is is a good time to catch-up.
+    If you are not familiar with [ReflectModel](./reflection.md), now is a good time to catch-up.
 
 ## Reflect models
 
