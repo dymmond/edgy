@@ -20,6 +20,7 @@ import sqlalchemy
 
 from edgy.conf import settings
 from edgy.core.db.fields import CharField, TextField
+from edgy.core.db.fields._base_fk import BaseForeignKey
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.querysets.mixins import QuerySetPropsMixin, TenancyMixin
@@ -222,6 +223,27 @@ class BaseQuerySet(
         if self._only and self._defer:
             raise QuerySetError("You cannot use .only() and .defer() at the same time.")
 
+    def secret_recursive_names(
+        self, model_class: Any, columns: Union[List[str], None] = None
+    ) -> List[str]:
+        """
+        Recursively gets the names of the fields excluding the secrets.
+        """
+        if columns is None:
+            columns = []
+
+        for name, field in model_class.fields.items():
+            if isinstance(field, BaseForeignKey):
+                columns.extend(
+                    self.secret_recursive_names(model_class=field.target, columns=columns)
+                )
+                continue
+            if not field.secret:
+                columns.append(name)
+
+        columns = list(set(columns))
+        return columns
+
     def build_select(self) -> Any:
         """
         Builds the query select based on the given parameters and filters.
@@ -239,9 +261,7 @@ class BaseQuerySet(
             expression = expression.with_only_columns(*columns)
 
         if self._exclude_secrets:
-            model_columns = [
-                name for name, field in self.model_class.fields.items() if not field.secret
-            ]
+            model_columns = self.secret_recursive_names(model_class=self.model_class)
             columns = [column for column in select_from.columns if column.name in model_columns]
             expression = expression.with_only_columns(*columns)
 
@@ -549,7 +569,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self.clone()
         queryset._exclude_secrets = True
-        queryset = queryset.filter_or_exclude(clause=clause, **kwargs)
+        queryset = queryset.filter(clause=clause, **kwargs)
         return queryset
 
     def lookup(self, term: Any) -> "QuerySet":
