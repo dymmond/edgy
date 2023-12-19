@@ -26,9 +26,7 @@ class Gratitude(edgy.Model):
     title: str = edgy.CharField(max_length=100)
     description: str = edgy.TextField()
     color: str = edgy.CharField(max_length=10, null=True)
-    tags: list[str] = edgy.JSONField(default=[])
     is_visible: bool = edgy.BooleanField(default=False)
-    images: list[bytes] = edgy.JSONField(default=[])
     created_at: datetime.datetime = edgy.DateTimeField(auto_now=True)
     updated_at: datetime.datetime = edgy.DateTimeField(auto_now_add=True)
 
