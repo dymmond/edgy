@@ -5,6 +5,13 @@ hide:
 
 # Release Notes
 
+### 0.7.1
+
+### Fixed
+
+- `exclude_secrets` quick patch for the way it can recursively understand the model fields when
+filtering the query.
+
 ## 0.7.0
 
 ### Added
