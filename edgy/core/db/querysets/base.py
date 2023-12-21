@@ -408,6 +408,7 @@ class BaseQuerySet(
                 m2m_related=self.m2m_related,
                 table=self.table,
                 exclude_secrets=self._exclude_secrets,
+                using_schema=self.using_schema,
             ),
         )
 
@@ -453,6 +454,7 @@ class BaseQuerySet(
         queryset.table = self.table
         queryset.extra = self.extra
         queryset._exclude_secrets = self._exclude_secrets
+        queryset.using_schema = self.using_schema
         return queryset
 
 
@@ -857,6 +859,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             raise ObjectNotFound()
         if len(rows) > 1:
             raise MultipleObjectsReturned()
+
         return queryset.model_class.from_sqla_row(
             rows[0],
             select_related=queryset._select_related,
