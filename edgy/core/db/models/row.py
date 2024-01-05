@@ -25,6 +25,7 @@ class ModelRow(EdgyBaseModel):
         only_fields: Sequence[str] = None,
         is_defer_fields: bool = False,
         exclude_secrets: bool = False,
+        using_schema: Union[str, None] = None,
     ) -> Optional[Type["Model"]]:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
@@ -59,13 +60,16 @@ class ModelRow(EdgyBaseModel):
                     select_related=[remainder],
                     prefetch_related=prefetch_related,
                     exclude_secrets=exclude_secrets,
+                    using_schema=using_schema,
                 )
             else:
                 try:
                     model_cls = cls.fields[related].target
                 except KeyError:
                     model_cls = getattr(cls, related).related_from
-                item[related] = model_cls.from_sqla_row(row, exclude_secrets=exclude_secrets)
+                item[related] = model_cls.from_sqla_row(
+                    row, exclude_secrets=exclude_secrets, using_schema=using_schema
+                )
 
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
@@ -135,6 +139,10 @@ class ModelRow(EdgyBaseModel):
         model = cls.handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
+
+        # Apply the schema to the model
+        if using_schema is not None:
+            model.table = model.build(using_schema)  # type: ignore
         return model
 
     @classmethod

@@ -42,6 +42,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
     __db_model__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
+    __using_schema__: ClassVar[Union[str, None]] = None
     __model_references__: ClassVar[Any] = None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

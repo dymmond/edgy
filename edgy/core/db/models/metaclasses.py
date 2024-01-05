@@ -481,7 +481,9 @@ class BaseModelMeta(ModelMetaclass):
         Returns a db_schema from registry if any is passed.
         """
         if hasattr(cls, "meta") and hasattr(cls.meta, "registry"):
-            return cast("str", cls.meta.registry.db_schema)
+            return cast(str, cls.meta.registry.db_schema)
+        elif hasattr(cls, "__using_schema__") and cls.__using_schema__ is not None:
+            return cast(str, cls.__using_schema__)
         return None
 
     @property
@@ -498,7 +500,6 @@ class BaseModelMeta(ModelMetaclass):
         3. If none is passed, defaults to the shared schema of the database connected.
         """
         db_schema = cls.get_db_shema()
-
         if not hasattr(cls, "_table"):
             cls._table = cls.build(db_schema)
         elif hasattr(cls, "_table"):
@@ -506,6 +507,10 @@ class BaseModelMeta(ModelMetaclass):
             if table.name.lower() != cls.meta.tablename:
                 cls._table = cls.build(db_schema)
         return cls._table
+
+    @table.setter
+    def table(self, value: sqlalchemy.Table) -> None:
+        self._table = value
 
     @property
     def signals(cls) -> "Broadcaster":
