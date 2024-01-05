@@ -9,7 +9,7 @@ hide:
 
 ### Added
 
-- Support for `sync` queries. This will enable Edgy to run in blocking framworks like
+- Support for `sync` queries. This will enable Edgy to run in blocking frameworks like
 Flask, bottle or any other by using the newly added [run_sync](./queries/queries.md#blocking-queries). [#60](https://github.com/tarsil/edgy/pull/60).
 
 ### Fixed
