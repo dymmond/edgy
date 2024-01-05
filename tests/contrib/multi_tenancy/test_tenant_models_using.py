@@ -67,7 +67,6 @@ async def test_schema_with_using_in_different_place():
     tenant = await Tenant.query.create(
         schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
     )
-
     for i in range(5):
         await Product.query.using(tenant.schema_name).create(name=f"product-{i}")
 

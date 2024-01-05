@@ -176,15 +176,17 @@ class BaseQuerySet(
         destination table, a lookup for the related field is made to understand
         from which foreign key the table is looked up from.
         """
-        tables = [self.table]
-        select_from = self.table
+        queryset: "QuerySet" = self.clone()
+
+        tables = [queryset.table]
+        select_from = queryset.table
         has_many_fk_same_table = False
 
         # Select related
-        for item in self._select_related:
+        for item in queryset._select_related:
             # For m2m relationships
-            model_class = self.model_class
-            select_from = self.table
+            model_class = queryset.model_class
+            select_from = queryset.table
 
             for part in item.split("__"):
                 try:
@@ -248,47 +250,59 @@ class BaseQuerySet(
         """
         Builds the query select based on the given parameters and filters.
         """
-        self.validate_only_and_defer()
-        tables, select_from = self.build_tables_select_from_relationship()
+        queryset: "QuerySet" = self.clone()
+
+        queryset.validate_only_and_defer()
+        tables, select_from = queryset.build_tables_select_from_relationship()
         expression = sqlalchemy.sql.select(*tables)
         expression = expression.select_from(select_from)
 
-        if self._only:
-            expression = expression.with_only_columns(*self._only)
+        if queryset._only:
+            expression = expression.with_only_columns(*queryset._only)
 
-        if self._defer:
-            columns = [column for column in select_from.columns if column.name not in self._defer]
+        if queryset._defer:
+            columns = [
+                column for column in select_from.columns if column.name not in queryset._defer
+            ]
             expression = expression.with_only_columns(*columns)
 
-        if self._exclude_secrets:
-            model_columns = self.secret_recursive_names(model_class=self.model_class)
+        if queryset._exclude_secrets:
+            model_columns = queryset.secret_recursive_names(model_class=queryset.model_class)
             columns = [column for column in select_from.columns if column.name in model_columns]
             expression = expression.with_only_columns(*columns)
 
-        if self.filter_clauses:
-            expression = self.build_filter_clauses_expression(
-                self.filter_clauses, expression=expression
+        if queryset.filter_clauses:
+            expression = queryset.build_filter_clauses_expression(
+                queryset.filter_clauses, expression=expression
             )
 
-        if self.or_clauses:
-            expression = self.build_or_clauses_expression(self.or_clauses, expression=expression)
+        if queryset.or_clauses:
+            expression = queryset.build_or_clauses_expression(
+                queryset.or_clauses, expression=expression
+            )
 
-        if self._order_by:
-            expression = self.build_order_by_expression(self._order_by, expression=expression)
+        if queryset._order_by:
+            expression = queryset.build_order_by_expression(
+                queryset._order_by, expression=expression
+            )
 
-        if self.limit_count:
-            expression = expression.limit(self.limit_count)
+        if queryset.limit_count:
+            expression = expression.limit(queryset.limit_count)
 
-        if self._offset:
-            expression = expression.offset(self._offset)
+        if queryset._offset:
+            expression = expression.offset(queryset._offset)
 
-        if self._group_by:
-            expression = self.build_group_by_expression(self._group_by, expression=expression)
+        if queryset._group_by:
+            expression = queryset.build_group_by_expression(
+                queryset._group_by, expression=expression
+            )
 
-        if self.distinct_on:
-            expression = self.build_select_distinct(self.distinct_on, expression=expression)
+        if queryset.distinct_on:
+            expression = queryset.build_select_distinct(
+                queryset.distinct_on, expression=expression
+            )
 
-        self._expression = expression  # type: ignore
+        queryset._expression = expression  # type: ignore
         return expression
 
     def filter_query(
@@ -437,6 +451,12 @@ class BaseQuerySet(
         """
         queryset = self.__class__.__new__(self.__class__)
         queryset.model_class = self.model_class
+
+        # Making sure the registry schema takes precendent with
+        # Any provided using
+        if not self.model_class.meta.registry.db_schema:
+            queryset.model_class.table = self.model_class.build(self.using_schema)
+
         queryset.filter_clauses = copy.copy(self.filter_clauses)
         queryset.or_clauses = copy.copy(self.or_clauses)
         queryset.limit_count = copy.copy(self.limit_count)
@@ -455,6 +475,7 @@ class BaseQuerySet(
         queryset.extra = self.extra
         queryset._exclude_secrets = self._exclude_secrets
         queryset.using_schema = self.using_schema
+
         return queryset
 
 
@@ -788,6 +809,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             rows[0],
             select_related=queryset._select_related,
             exclude_secrets=queryset._exclude_secrets,
+            using_schema=queryset.using_schema,
         )
 
     async def _all(self, **kwargs: Any) -> List[EdgyModel]:
@@ -821,6 +843,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                 only_fields=queryset._only,
                 is_defer_fields=is_defer_fields,
                 exclude_secrets=queryset._exclude_secrets,
+                using_schema=queryset.using_schema,
             )
             for row in rows
         ]
@@ -868,6 +891,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             is_defer_fields=is_defer_fields,
             prefetch_related=queryset._prefetch_related,
             exclude_secrets=queryset._exclude_secrets,
+            using_schema=queryset.using_schema,
         )
 
     async def first(self, **kwargs: Any) -> Union[EdgyModel, None]:
@@ -912,7 +936,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Bulk creates records in a table
         """
         queryset: "QuerySet" = self.clone()
-        new_objs = [self.validate_kwargs(**obj) for obj in objs]
+        new_objs = [queryset.validate_kwargs(**obj) for obj in objs]
 
         expression = queryset.table.insert().values(new_objs)
         queryset.set_query_expression(expression)
