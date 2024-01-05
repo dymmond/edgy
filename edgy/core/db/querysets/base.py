@@ -11,7 +11,6 @@ from typing import (
     Set,
     Tuple,
     Type,
-    TypeVar,
     Union,
     cast,
 )
@@ -23,7 +22,7 @@ from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields._base_fk import BaseForeignKey
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
-from edgy.core.db.querysets.mixins import QuerySetPropsMixin, TenancyMixin
+from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import PrefetchMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
 from edgy.core.utils.models import DateParser, ModelParser
@@ -33,12 +32,6 @@ from edgy.protocols.queryset import QuerySetProtocol
 if TYPE_CHECKING:  # pragma: no cover
     from edgy import Database
     from edgy.core.db.models import Model, ReflectModel
-
-
-_EdgyModel = TypeVar("_EdgyModel", bound="Model")
-ReflectEdgyModel = TypeVar("ReflectEdgyModel", bound="ReflectModel")
-
-EdgyModel = Union[_EdgyModel, ReflectEdgyModel]
 
 
 class BaseQuerySet(
