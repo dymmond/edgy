@@ -236,9 +236,12 @@ class BaseQuerySet(
 
         for name, field in model_class.fields.items():
             if isinstance(field, BaseForeignKey):
-                columns.extend(
-                    self.secret_recursive_names(model_class=field.target, columns=columns)
-                )
+                # Making sure the foreign key is always added unless is a secret
+                if not field.secret:
+                    columns.append(name)
+                    columns.extend(
+                        self.secret_recursive_names(model_class=field.target, columns=columns)
+                    )
                 continue
             if not field.secret:
                 columns.append(name)
