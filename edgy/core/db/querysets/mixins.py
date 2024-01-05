@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Type, cast
+from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar, Union, cast
 
 import sqlalchemy
 
@@ -7,6 +7,13 @@ from edgy.core.db.context_vars import set_queryset_database, set_queryset_schema
 
 if TYPE_CHECKING:
     from edgy import QuerySet, Registry
+    from edgy.core.db.models import Model, ReflectModel
+
+
+_EdgyModel = TypeVar("_EdgyModel", bound="Model")
+ReflectEdgyModel = TypeVar("ReflectEdgyModel", bound="ReflectModel")
+
+EdgyModel = Union[_EdgyModel, ReflectEdgyModel]
 
 
 class QuerySetPropsMixin:
