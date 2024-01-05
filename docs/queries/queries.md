@@ -711,5 +711,46 @@ And you can do nested `querysets` like multiple [filters](#filter).
 Internally, the `not_` is calling the [exclude](#exclude) and applying the operators so this is
 more for *cosmetic* purposes than anything else, really.
 
+## Blocking Queries
+
+What happens if you want to use Edgy with a blocking operation? So by blocking means `sync`.
+For instance, Flask does not support natively `async` and Edgy is an async agnotic ORM and you
+probably would like to take advantage of Edgy but you want without doing a lot of magic behind.
+
+Well, Edgy also supports the `run_sync` functionality that allows you to run the queries in
+*blocking* mode with ease!
+
+### How to use
+
+You simply need to use the `run_sync` functionality from Edgy and make it happen almost immediatly.
+
+```python
+from edgy import run_sync
+```
+
+All the available functionalities of Edgy run within this wrapper without extra syntax.
+
+Let us see some examples.
+
+**Async mode**
+
+```python
+await User.query.all()
+await User.query.filter(name__icontains="example")
+await User.query.create(name="Edgy")
+```
+
+**With run_sync**
+
+```python
+from edgy import run_sync
+
+run_sync(User.query.all())
+run_sync(User.query.filter(name__icontains="example"))
+run_sync(User.query.create(name="Edgy"))
+```
+
+And that is it! You can now run all queries synchronously within any framework, literally.
+
 [model]: ../models.md
 [managers]: ../managers.md
