@@ -691,7 +691,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if not isinstance(related, (list, tuple)):
             related = [related]
 
-        related = list(self._select_related) + related
+        related = list(queryset._select_related) + related
         queryset._select_related = related
         return queryset
 
