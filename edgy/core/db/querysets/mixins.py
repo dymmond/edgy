@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar, Union, cast
 import sqlalchemy
 
 from edgy.core.connection.database import Database
-from edgy.core.db.context_vars import set_queryset_database, set_queryset_schema
+from edgy.core.db.context_vars import set_queryset_database, set_queryset_schema, set_schema
 
 if TYPE_CHECKING:
     from edgy import QuerySet, Registry
@@ -90,3 +90,17 @@ class TenancyMixin:
             return set_queryset_database(self, self.model_class, connection, schema)
         queryset = set_queryset_database(self, self.model_class, connection)
         return queryset
+
+
+def activate_tenant(tenant_name: str) -> None:
+    """
+    Activates the tenant for the context of the query.
+    """
+    set_schema(tenant_name)
+
+
+def deativate_tenant() -> None:
+    """
+    Deactivates the tenant for the context of the query.
+    """
+    set_schema(None)

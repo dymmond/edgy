@@ -5,9 +5,10 @@ if TYPE_CHECKING:
     from edgy import Database, Model, QuerySet
 
 TENANT: ContextVar[str] = ContextVar("tenant", default=None)
+SHEMA: ContextVar[str] = ContextVar("SHEMA", default=None)
 
 
-def get_tenant() -> str:
+def get_tenant() -> Union[str, None]:
     """
     Gets the current active tenant in the context.
     """
@@ -20,6 +21,14 @@ def set_tenant(value: Union[str, None]) -> None:
     When a global tenant is set the `get_context_schema` -> `SCHEMA` is ignored.
     """
     TENANT.set(value)
+
+
+def get_schema() -> Union[str, None]:
+    return SHEMA.get()
+
+
+def set_schema(value: Union[str, None]) -> None:
+    SHEMA.set(value)
 
 
 def set_queryset_schema(

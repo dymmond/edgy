@@ -98,7 +98,7 @@ class Model(ModelRow, DeclarativeMixin):
 
     async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
         """
-        If there is any MoedlRef declared in the model, it will generate the subsquent model
+        If there is any ModelRef declared in the model, it will generate the subsquent model
         reference records for that same model created.
         """
 
