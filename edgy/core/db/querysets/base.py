@@ -18,6 +18,7 @@ from typing import (
 import sqlalchemy
 
 from edgy.conf import settings
+from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields._base_fk import BaseForeignKey
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
@@ -225,7 +226,6 @@ class BaseQuerySet(
         """
         Recursively gets the names of the fields excluding the secrets.
         """
-
         if columns is None:
             columns = []
 
@@ -453,7 +453,15 @@ class BaseQuerySet(
         # Making sure the registry schema takes precendent with
         # Any provided using
         if not self.model_class.meta.registry.db_schema:
-            queryset.model_class.table = self.model_class.build(self.using_schema)
+            schema = get_schema()
+            using: Union[str, None] = None
+
+            if self.using_schema:
+                using = self.using_schema
+            elif self.using_schema is None and schema is not None:
+                using = schema
+
+            queryset.model_class.table = self.model_class.build(using)
 
         queryset.filter_clauses = copy.copy(self.filter_clauses)
         queryset.or_clauses = copy.copy(self.or_clauses)
