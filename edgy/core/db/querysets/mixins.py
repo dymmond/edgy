@@ -92,14 +92,14 @@ class TenancyMixin:
         return queryset
 
 
-def activate_tenant(tenant_name: str) -> None:
+def activate_schema(tenant_name: str) -> None:
     """
     Activates the tenant for the context of the query.
     """
     set_schema(tenant_name)
 
 
-def deativate_tenant() -> None:
+def deativate_schema() -> None:
     """
     Deactivates the tenant for the context of the query.
     """

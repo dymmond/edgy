@@ -7,7 +7,7 @@ from tests.settings import DATABASE_URL
 import edgy
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.models import TenantMixin
-from edgy.core.db.querysets.mixins import activate_tenant, deativate_tenant
+from edgy.core.db.querysets.mixins import activate_schema, deativate_schema
 from edgy.testclient import DatabaseTestClient as Database
 
 database = Database(url=DATABASE_URL)
@@ -78,7 +78,7 @@ async def test_activate_using_takes_precedence():
     saffier = await Tenant.query.create(schema_name="saffier", tenant_name="saffier")
 
     # Activate the schema and query always the tenant set
-    activate_tenant(tenant.schema_name)
+    activate_schema(tenant.schema_name)
     designation = await Designation.query.create(name="admin")
     module = await AppModule.query.create(name="payroll")
 
@@ -90,7 +90,7 @@ async def test_activate_using_takes_precedence():
     assert query[0].pk == permission.pk
 
     # Deactivate the schema and set to None (default)
-    deativate_tenant()
+    deativate_schema()
 
     query = await Permission.query.all()
 
@@ -101,9 +101,9 @@ async def test_activate_using_takes_precedence():
     assert len(query) == 1
     assert query[0].pk == permission.pk
 
-    activate_tenant(saffier.tenant_name)
+    activate_schema(saffier.tenant_name)
 
-    # Even if the activate_tenant pointing to a different schema is enabled
+    # Even if the activate_schema pointing to a different schema is enabled
     # The use of `using` takes precedence all the time
     query = await Permission.query.using(tenant.schema_name).select_related("designation").all()
 

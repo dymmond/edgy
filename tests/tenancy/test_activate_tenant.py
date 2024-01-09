@@ -7,7 +7,7 @@ from tests.settings import DATABASE_URL
 import edgy
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.models import TenantMixin
-from edgy.core.db.querysets.mixins import activate_tenant, deativate_tenant
+from edgy.core.db.querysets.mixins import activate_schema, deativate_schema
 from edgy.testclient import DatabaseTestClient as Database
 
 database = Database(url=DATABASE_URL)
@@ -77,7 +77,7 @@ async def test_activate_related_tenant():
     tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
 
     # Activate the schema and query always the tenant set
-    activate_tenant(tenant.schema_name)
+    activate_schema(tenant.schema_name)
     designation = await Designation.query.create(name="admin")
     module = await AppModule.query.create(name="payroll")
 
@@ -89,13 +89,13 @@ async def test_activate_related_tenant():
     assert query[0].pk == permission.pk
 
     # Deactivate the schema and set to None (default)
-    deativate_tenant()
+    deativate_schema()
 
     query = await Permission.query.all()
 
     assert len(query) == 0
 
-    # Even if the activate_tenant is enabled
+    # Even if the activate_schema is enabled
     # The use of `using` takes precedence
     query = await Permission.query.using(tenant.schema_name).select_related("designation").all()
 
