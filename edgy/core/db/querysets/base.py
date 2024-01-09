@@ -211,6 +211,7 @@ class BaseQuerySet(
                         select_from.c.id == getattr(table.c, lookup_field),
                     )
 
+                # select_froms.append(select_from)
                 tables.append(table)
         return tables, select_from
 
@@ -224,6 +225,7 @@ class BaseQuerySet(
         """
         Recursively gets the names of the fields excluding the secrets.
         """
+
         if columns is None:
             columns = []
 

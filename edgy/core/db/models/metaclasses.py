@@ -68,17 +68,17 @@ class MetaInfo:
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.pk: Optional[BaseField] = None
+        self.pk: Optional[BaseField] = getattr(meta, "pk", None)
         self.pk_attribute: Union[BaseField, str] = getattr(meta, "pk_attribute", "")
         self.abstract: bool = getattr(meta, "abstract", False)
-        self.fields: Set[Any] = set()
-        self.fields_mapping: Dict[str, BaseField] = {}
+        self.fields: Set[Any] = getattr(meta, "fields", set())
+        self.fields_mapping: Dict[str, BaseField] = getattr(meta, "fields_mapping", {})
         self.registry: Optional[Type[Registry]] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
-        self.parents: Any = getattr(meta, "parents", None) or []
-        self.many_to_many_fields: Set[str] = set()
-        self.foreign_key_fields: Dict[str, Any] = {}
-        self.model_references: Dict["ModelRef", str] = {}
+        self.parents: Any = getattr(meta, "parents", [])
+        self.many_to_many_fields: Set[str] = getattr(meta, "many_to_many_fields", set())
+        self.foreign_key_fields: Dict[str, Any] = getattr(meta, "foreign_key_fields", {})
+        self.model_references: Dict["ModelRef", str] = getattr(meta, "model_references", {})
         self.model: Optional[Type["Model"]] = None
         self.manager: "Manager" = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
@@ -87,10 +87,13 @@ class MetaInfo:
         self.managers: List[Manager] = getattr(meta, "managers", [])
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
-        self.related_names: Set[str] = set()
-        self.related_fields: Dict[str, Any] = {}
-        self.related_names_mapping: Dict[str, Any] = {}
-        self.signals: Optional[Broadcaster] = {}  # type: ignore
+        self.related_names: Set[str] = getattr(meta, "related_names", set())
+        self.related_fields: Dict[str, Any] = getattr(meta, "related_fields", {})
+        self.related_names_mapping: Dict[str, Any] = getattr(meta, "related_names_mapping", {})
+        self.signals: Optional[Broadcaster] = getattr(meta, "signals", {})  # type: ignore
+
+        for k, v in kwargs.items():
+            edgy_setattr(self, k, v)
 
     def model_dump(self) -> Dict[Any, Any]:
         return {k: getattr(self, k, None) for k in self.__slots__}
