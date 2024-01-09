@@ -84,6 +84,52 @@ a different database instead? Well, that is possible with the use of the `using_
 
 {!> ../docs_src/shared/extra.md !}
 
+### Using with `activate_schema`
+
+!!! Warning
+    This feature is experimental and might be inconsistent with the intended results. Use it at your
+    own discretion.
+
+This is an **alternative** to [using](#using) and serves solely as the purpose of avoiding
+writing all the time `Model.query.using(...)`.
+
+You can use `activate_schema(...)` and `deactivate_schema()` to tell the query to always query
+a specific tenant, in other words, using the `activate_schema()` you don't need to constantly
+write `using(...)`.
+
+Importing is as simple as this:
+
+```python
+from edgy.core.db.querysets.mixins import activate_schema, deativate_schema
+```
+
+Let us see an example:
+
+**With the classic .using()**
+
+```python
+# Using the 'main' schema
+
+User.query.using('main').all()
+User.query.using('main').filter(email__icontains="user@example.com")
+User.query.using('main').get(pk=1)
+```
+
+**Using the activate_schema**
+
+```python
+# Using the 'main' schema
+activate_schema("main")
+
+# Query the 'User' from the 'main' schema
+User.query.all()
+User.query.filter(email__icontains="user@example.com")
+User.query.get(pk=1)
+
+# Deactivate the schema and default to the public
+deactivate_schema("main")
+```
+
 ### Set tenant
 
 This is another way to create a global `tenant` for your application. Instead if [using](#using) or
