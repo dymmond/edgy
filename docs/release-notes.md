@@ -5,6 +5,18 @@ hide:
 
 # Release Notes
 
+## 0.8.1
+
+### Added
+
+- Added new experimental [activate_schema](./tenancy/edgy.md#using-with-activate_schema) for tenant models using the `using` queryset operator.
+
+### Fixed
+
+- Multiple join tables were not generating the complete join statement when using `select_related`.
+- Fixed metaclass for TenantMixin making sure all the queries are correctly pointing
+to the right tenant.
+
 ## 0.8.0
 
 ### Added
