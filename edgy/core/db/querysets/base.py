@@ -212,8 +212,8 @@ class BaseQuerySet(
                         select_from.c.id == getattr(table.c, lookup_field),
                     )
 
-                # select_froms.append(select_from)
                 tables.append(table)
+
         return tables, select_from
 
     def validate_only_and_defer(self) -> None:
