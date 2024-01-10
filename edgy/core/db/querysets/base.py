@@ -454,14 +454,9 @@ class BaseQuerySet(
         # Any provided using
         if not self.model_class.meta.registry.db_schema:
             schema = get_schema()
-            using: Union[str, None] = None
-
-            if self.using_schema:
-                using = self.using_schema
-            elif self.using_schema is None and schema is not None:
-                using = schema
-
-            queryset.model_class.table = self.model_class.build(using)
+            if self.using_schema is None and schema is not None:
+                self.using_schema = schema
+            queryset.model_class.table = self.model_class.build(self.using_schema)
 
         queryset.filter_clauses = copy.copy(self.filter_clauses)
         queryset.or_clauses = copy.copy(self.or_clauses)
