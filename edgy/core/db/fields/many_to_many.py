@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
 
 import sqlalchemy
 
@@ -17,6 +17,7 @@ T = TypeVar("T", bound="Model")
 
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
+CHAR_LIMIT = 63
 terminal = Print()
 
 
@@ -100,12 +101,14 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         from edgy.core.db.models.metaclasses import MetaInfo
 
+        self.to = self.target
+
         if self.through:
             if isinstance(self.through, str):
                 self.through = self.owner.meta.registry.models[self.through]
 
             self.through.meta.is_multi = True
-            self.through.meta.multi_related = [self.to.__name__.lower()]  # type: ignore
+            self.through.meta.multi_related = [self.to.__name__.lower()]
             return self.through
 
         owner_name = self.owner.__name__
@@ -158,7 +161,24 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.through = through_model
         self.add_model_to_register(self.through)
 
+    def get_fk_name(self, name: str) -> str:
+        """
+        Builds the fk name for the engine.
+
+        Engines have a limitation of the foreign key being bigger than 63
+        characters.
+
+        if that happens, we need to assure it is small.
+        """
+        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{self.target.pkname}_{name}"
+        if not len(fk_name) > CHAR_LIMIT:
+            return fk_name
+        return fk_name[:CHAR_LIMIT]
+
     def get_column(self, name: str) -> sqlalchemy.Column:
+        """
+        Builds the column for thr target.
+        """
         target = self.target
         to_field = target.fields[target.pkname]
 
@@ -168,8 +188,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 f"{target.meta.tablename}.{target.pkname}",
                 ondelete=CASCADE,
                 onupdate=CASCADE,
-                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
-                f"_{target.pkname}_{name}",
+                name=self.get_fk_name(name=name),
             )
         ]
         return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
@@ -184,7 +203,7 @@ class ManyToManyField(ForeignKeyFieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        to: "Model",
+        to: Union["Model", str],
         *,
         through: Optional["Model"] = None,
         **kwargs: Any,

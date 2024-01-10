@@ -80,8 +80,11 @@ class ModelRow(EdgyBaseModel):
                 continue
 
             model_related = foreign_key.target
-            child_item = {}
 
+            # Apply the schema to the model
+            model_related = cls.apply_schema(model_related, using_schema)
+
+            child_item = {}
             for column in model_related.table.columns:
                 if column.name in secret_fields or related in secret_fields:
                     continue
@@ -116,6 +119,10 @@ class ModelRow(EdgyBaseModel):
             # We need to generify the model fields to make sure we can populate the
             # model without mandatory fields
             model = cast("Type[Model]", cls.proxy_model(**item))
+
+            # Apply the schema to the model
+            model = cls.apply_schema(model, using_schema)
+
             model = cls.handle_prefetch_related(
                 row=row, model=model, prefetch_related=prefetch_related
             )
@@ -136,13 +143,21 @@ class ModelRow(EdgyBaseModel):
             if not exclude_secrets
             else cast("Type[Model]", cls.proxy_model(**item))
         )
+        # Apply the schema to the model
+        model = cls.apply_schema(model, using_schema)
+
+        # Handle prefetch related fields.
         model = cls.handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
+        return model
 
+    @classmethod
+    def apply_schema(cls, model: Type["Model"], schema: Optional[str] = None) -> Type["Model"]:
         # Apply the schema to the model
-        if using_schema is not None:
-            model.table = model.build(using_schema)  # type: ignore
+        if schema is not None:
+            model.table = model.build(schema)  # type: ignore
+            model.proxy_model.table = model.proxy_model.build(schema)  # type: ignore
         return model
 
     @classmethod
