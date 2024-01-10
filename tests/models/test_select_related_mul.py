@@ -86,3 +86,6 @@ async def test_select_related():
 
     assert len(query) == 1
     assert query[0].pk == permission.pk
+
+    assert query[0].designation.model_dump() == {"id": 1, "name": "admin"}
+    assert query[0].module.model_dump() == {"id": 1, "name": "payroll"}
