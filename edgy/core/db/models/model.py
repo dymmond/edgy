@@ -51,7 +51,7 @@ class Model(ModelRow, DeclarativeMixin):
         """
         await self.signals.pre_update.send(sender=self.__class__, instance=self)
 
-        kwargs = self.update_auto_now_fields(kwargs, self.fields)
+        kwargs = self._update_auto_now_fields(kwargs, self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         await self.database.execute(expression)
@@ -175,10 +175,10 @@ class Model(ModelRow, DeclarativeMixin):
 
         self.update_from_dict(dict_values=dict(extracted_fields.items()))
 
-        validated_values = values or self.extract_values_from_field(
+        validated_values = values or self._extract_values_from_field(
             extracted_values=extracted_fields
         )
-        kwargs = self.update_auto_now_fields(values=validated_values, fields=self.fields)
+        kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
         kwargs, model_references = self.update_model_references(**kwargs)
 
         # Performs the update or the create based on a possible existing primary key
@@ -207,6 +207,8 @@ class Model(ModelRow, DeclarativeMixin):
 
         await self.signals.post_save.send(sender=self.__class__, instance=self)
         return self
+
+    # def __get__
 
 
 class ReflectModel(Model, EdgyBaseReflectModel):

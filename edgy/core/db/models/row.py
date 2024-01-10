@@ -75,14 +75,14 @@ class ModelRow(EdgyBaseModel):
         # Making sure if the model being queried is not inside a select related
         # This way it is not overritten by any value
         for related, foreign_key in cls.meta.foreign_key_fields.items():
-            ignore_related: bool = cls.should_ignore_related_name(related, select_related)
+            ignore_related: bool = cls.__should_ignore_related_name(related, select_related)
             if ignore_related:
                 continue
 
             model_related = foreign_key.target
 
             # Apply the schema to the model
-            model_related = cls.apply_schema(model_related, using_schema)
+            model_related = cls.__apply_schema(model_related, using_schema)
 
             child_item = {}
             for column in model_related.table.columns:
@@ -121,9 +121,9 @@ class ModelRow(EdgyBaseModel):
             model = cast("Type[Model]", cls.proxy_model(**item))
 
             # Apply the schema to the model
-            model = cls.apply_schema(model, using_schema)
+            model = cls.__apply_schema(model, using_schema)
 
-            model = cls.handle_prefetch_related(
+            model = cls.__handle_prefetch_related(
                 row=row, model=model, prefetch_related=prefetch_related
             )
             return model
@@ -143,17 +143,18 @@ class ModelRow(EdgyBaseModel):
             if not exclude_secrets
             else cast("Type[Model]", cls.proxy_model(**item))
         )
+
         # Apply the schema to the model
-        model = cls.apply_schema(model, using_schema)
+        model = cls.__apply_schema(model, using_schema)
 
         # Handle prefetch related fields.
-        model = cls.handle_prefetch_related(
+        model = cls.__handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
         return model
 
     @classmethod
-    def apply_schema(cls, model: Type["Model"], schema: Optional[str] = None) -> Type["Model"]:
+    def __apply_schema(cls, model: Type["Model"], schema: Optional[str] = None) -> Type["Model"]:
         # Apply the schema to the model
         if schema is not None:
             model.table = model.build(schema)  # type: ignore
@@ -161,7 +162,9 @@ class ModelRow(EdgyBaseModel):
         return model
 
     @classmethod
-    def should_ignore_related_name(cls, related_name: str, select_related: Sequence[str]) -> bool:
+    def __should_ignore_related_name(
+        cls, related_name: str, select_related: Sequence[str]
+    ) -> bool:
         """
         Validates if it should populate the related field if select related is not considered.
         """
@@ -172,7 +175,7 @@ class ModelRow(EdgyBaseModel):
         return False
 
     @classmethod
-    def handle_prefetch_related(
+    def __handle_prefetch_related(
         cls,
         row: Row,
         model: Type["Model"],
@@ -216,7 +219,7 @@ class ModelRow(EdgyBaseModel):
 
                 # Recursively continue the process of handling the
                 # new prefetch
-                model_cls.handle_prefetch_related(
+                model_cls.__handle_prefetch_related(
                     row,
                     model,
                     prefetch_related=[remainder_prefetch],

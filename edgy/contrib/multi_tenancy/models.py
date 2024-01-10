@@ -168,7 +168,7 @@ class TenantUserMixin(edgy.Model):
         Obtains the active user tenant.
         """
         try:
-            tenant = await get_model(
+            tenant = await get_model(  # type: ignore
                 registry=cls.meta.registry, model_name=cls.__name__
             ).query.get(user=user, is_active=True)
             await tenant.tenant.load()
@@ -183,7 +183,7 @@ class TenantUserMixin(edgy.Model):
     async def save(self, *args: Any, **kwargs: Any) -> Type["TenantUserMixin"]:
         await super().save(*args, **kwargs)
         if self.is_active:
-            await get_model(
+            await get_model(  # type: ignore
                 registry=self.meta.registry, model_name=self.__class__.__name__
             ).query.filter(is_active=True, user=self.user).exclude(pk=self.pk).update(
                 is_active=False

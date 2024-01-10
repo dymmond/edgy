@@ -94,19 +94,19 @@ class BaseQuerySet(
         if database is not None:
             self.database = database
 
-    def build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
+    def _build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
-        order_by = list(map(self.prepare_order_by, order_by))
+        order_by = list(map(self._prepare_order_by, order_by))
         expression = expression.order_by(*order_by)
         return expression
 
-    def build_group_by_expression(self, group_by: Any, expression: Any) -> Any:
+    def _build_group_by_expression(self, group_by: Any, expression: Any) -> Any:
         """Builds the group by expression"""
-        group_by = list(map(self.prepare_group_by, group_by))
+        group_by = list(map(self._prepare_group_by, group_by))
         expression = expression.group_by(*group_by)
         return expression
 
-    def build_filter_clauses_expression(self, filter_clauses: Any, expression: Any) -> Any:
+    def _build_filter_clauses_expression(self, filter_clauses: Any, expression: Any) -> Any:
         """Builds the filter clauses expression"""
         if len(filter_clauses) == 1:
             clause = filter_clauses[0]
@@ -115,7 +115,7 @@ class BaseQuerySet(
         expression = expression.where(clause)
         return expression
 
-    def build_or_clauses_expression(self, or_clauses: Any, expression: Any) -> Any:
+    def _build_or_clauses_expression(self, or_clauses: Any, expression: Any) -> Any:
         """Builds the filter clauses expression"""
         if len(or_clauses) == 1:
             clause = or_clauses[0]
@@ -124,13 +124,13 @@ class BaseQuerySet(
         expression = expression.where(clause)
         return expression
 
-    def build_select_distinct(self, distinct_on: Any, expression: Any) -> Any:
+    def _build_select_distinct(self, distinct_on: Any, expression: Any) -> Any:
         """Filters selects only specific fields"""
-        distinct_on = list(map(self.prepare_fields_for_distinct, distinct_on))
+        distinct_on = list(map(self._prepare_fields_for_distinct, distinct_on))
         expression = expression.distinct(*distinct_on)
         return expression
 
-    def is_multiple_foreign_key(
+    def _is_multiple_foreign_key(
         self, model_class: Union[Type["Model"], Type["ReflectModel"]]
     ) -> Tuple[bool, List[Tuple[str, str, str]]]:
         """
@@ -163,14 +163,14 @@ class BaseQuerySet(
 
         return has_many, foreign_keys
 
-    def build_tables_select_from_relationship(self) -> Any:
+    def _build_tables_select_from_relationship(self) -> Any:
         """
         Builds the tables relationships and joins.
         When a table contains more than one foreign key pointing to the same
         destination table, a lookup for the related field is made to understand
         from which foreign key the table is looked up from.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
 
         tables = [queryset.table]
         select_from = queryset.table
@@ -188,7 +188,7 @@ class BaseQuerySet(
                 except KeyError:
                     # Check related fields
                     model_class = getattr(model_class, part).related_from
-                    has_many_fk_same_table, keys = self.is_multiple_foreign_key(model_class)
+                    has_many_fk_same_table, keys = self._is_multiple_foreign_key(model_class)
 
                 table = model_class.table
 
@@ -216,11 +216,11 @@ class BaseQuerySet(
 
         return tables, select_from
 
-    def validate_only_and_defer(self) -> None:
+    def _validate_only_and_defer(self) -> None:
         if self._only and self._defer:
             raise QuerySetError("You cannot use .only() and .defer() at the same time.")
 
-    def secret_recursive_names(
+    def _secret_recursive_names(
         self, model_class: Any, columns: Union[List[str], None] = None
     ) -> List[str]:
         """
@@ -235,7 +235,7 @@ class BaseQuerySet(
                 if not field.secret:
                     columns.append(name)
                     columns.extend(
-                        self.secret_recursive_names(model_class=field.target, columns=columns)
+                        self._secret_recursive_names(model_class=field.target, columns=columns)
                     )
                 continue
             if not field.secret:
@@ -244,14 +244,14 @@ class BaseQuerySet(
         columns = list(set(columns))
         return columns
 
-    def build_select(self) -> Any:
+    def _build_select(self) -> Any:
         """
         Builds the query select based on the given parameters and filters.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
 
-        queryset.validate_only_and_defer()
-        tables, select_from = queryset.build_tables_select_from_relationship()
+        queryset._validate_only_and_defer()
+        tables, select_from = queryset._build_tables_select_from_relationship()
         expression = sqlalchemy.sql.select(*tables)
         expression = expression.select_from(select_from)
 
@@ -265,22 +265,22 @@ class BaseQuerySet(
             expression = expression.with_only_columns(*columns)
 
         if queryset._exclude_secrets:
-            model_columns = queryset.secret_recursive_names(model_class=queryset.model_class)
+            model_columns = queryset._secret_recursive_names(model_class=queryset.model_class)
             columns = [column for column in select_from.columns if column.name in model_columns]
             expression = expression.with_only_columns(*columns)
 
         if queryset.filter_clauses:
-            expression = queryset.build_filter_clauses_expression(
+            expression = queryset._build_filter_clauses_expression(
                 queryset.filter_clauses, expression=expression
             )
 
         if queryset.or_clauses:
-            expression = queryset.build_or_clauses_expression(
+            expression = queryset._build_or_clauses_expression(
                 queryset.or_clauses, expression=expression
             )
 
         if queryset._order_by:
-            expression = queryset.build_order_by_expression(
+            expression = queryset._build_order_by_expression(
                 queryset._order_by, expression=expression
             )
 
@@ -291,19 +291,19 @@ class BaseQuerySet(
             expression = expression.offset(queryset._offset)
 
         if queryset._group_by:
-            expression = queryset.build_group_by_expression(
+            expression = queryset._build_group_by_expression(
                 queryset._group_by, expression=expression
             )
 
         if queryset.distinct_on:
-            expression = queryset.build_select_distinct(
+            expression = queryset._build_select_distinct(
                 queryset.distinct_on, expression=expression
             )
 
         queryset._expression = expression  # type: ignore
         return expression
 
-    def filter_query(
+    def _filter_query(
         self,
         exclude: bool = False,
         or_: bool = False,
@@ -424,25 +424,25 @@ class BaseQuerySet(
             ),
         )
 
-    def validate_kwargs(self, **kwargs: Any) -> Any:
-        return self.extract_values_from_field(kwargs, model_class=self.model_class)
+    def _validate_kwargs(self, **kwargs: Any) -> Any:
+        return self._extract_values_from_field(kwargs, model_class=self.model_class)
 
-    def prepare_order_by(self, order_by: str) -> Any:
+    def _prepare_order_by(self, order_by: str) -> Any:
         reverse = order_by.startswith("-")
         order_by = order_by.lstrip("-")
         order_col = self.table.columns[order_by]
         return order_col.desc() if reverse else order_col
 
-    def prepare_group_by(self, group_by: str) -> Any:
+    def _prepare_group_by(self, group_by: str) -> Any:
         group_by = group_by.lstrip("-")
         group_col = self.table.columns[group_by]
         return group_col
 
-    def prepare_fields_for_distinct(self, distinct_on: str) -> Any:
+    def _prepare_fields_for_distinct(self, distinct_on: str) -> Any:
         _distinct_on: sqlalchemy.Column = self.table.columns[distinct_on]
         return _distinct_on
 
-    def clone(self) -> Any:
+    def _clone(self) -> Any:
         """
         Return a copy of the current QuerySet that's ready for another
         operation.
@@ -485,7 +485,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     QuerySet object used for query retrieving.
     """
 
-    def __get__(self, instance: Any, owner: Any) -> Any:
+    def __get__(self, instance: Any, owner: Any) -> "QuerySet":
         return self.__class__(model_class=owner)
 
     @property
@@ -500,14 +500,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         for value in await self:
             yield value
 
-    def set_query_expression(self, expression: Any) -> None:
+    def _set_query_expression(self, expression: Any) -> None:
         """
         Sets the value of the sql property to the expression used.
         """
         self.sql = expression
         self.model_class.raw_query = self.sql
 
-    def filter_or_exclude(
+    def _filter_or_exclude(
         self,
         clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
         exclude: bool = False,
@@ -516,11 +516,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Filters or excludes a given clause for a specific QuerySet.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         if clause is None:
             if not exclude:
-                return queryset.filter_query(**kwargs)
-            return queryset.filter_query(exclude=exclude, **kwargs)
+                return queryset._filter_query(**kwargs)
+            return queryset._filter_query(exclude=exclude, **kwargs)
 
         queryset.filter_clauses.append(clause)
         return queryset
@@ -533,7 +533,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Filters the QuerySet by the given kwargs and clause.
         """
-        return self.filter_or_exclude(clause=clause, **kwargs)
+        return self._filter_or_exclude(clause=clause, **kwargs)
 
     def or_(
         self,
@@ -543,7 +543,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Filters the QuerySet by the OR operand.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset = self.filter(clause=clause, or_=True, **kwargs)
         return queryset
 
@@ -555,7 +555,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Filters the QuerySet by the AND operand.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset = self.filter(clause=clause, **kwargs)
         return queryset
 
@@ -567,7 +567,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Filters the QuerySet by the NOT operand.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset = queryset.exclude(clause=clause, **kwargs)
         return queryset
 
@@ -579,8 +579,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Exactly the same as the filter but for the exclude.
         """
-        queryset: "QuerySet" = self.clone()
-        queryset = self.filter_or_exclude(clause=clause, exclude=True, **kwargs)
+        queryset: "QuerySet" = self._clone()
+        queryset = self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
         return queryset
 
     def exclude_secrets(
@@ -591,7 +591,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Excludes any field that contains the `secret=True` declared from being leaked.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset._exclude_secrets = True
         queryset = queryset.filter(clause=clause, **kwargs)
         return queryset
@@ -600,7 +600,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Broader way of searching for a given term
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         if not term:
             return queryset
 
@@ -625,7 +625,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a QuerySet ordered by the given fields.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset._order_by = order_by
         return queryset
 
@@ -633,7 +633,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a QuerySet limited by.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset.limit_count = limit_count
         return queryset
 
@@ -641,7 +641,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a Queryset limited by the offset.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset._offset = offset
         return queryset
 
@@ -649,7 +649,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns the values grouped by the given fields.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset._group_by = group_by
         return queryset
 
@@ -657,7 +657,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a queryset with distinct results.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset.distinct_on = distinct_on
         return queryset
 
@@ -670,7 +670,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if self.model_class.pkname not in fields:
             only_fields.insert(0, sqlalchemy.text(self.model_class.pkname))
 
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset._only = only_fields
         return queryset
 
@@ -679,7 +679,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Returns a list of models with the selected only fields and always the primary
         key.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset._defer = fields
         return queryset
 
@@ -692,7 +692,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         later use of foreign-key relationships won’t require database queries.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         if not isinstance(related, (list, tuple)):
             related = [related]
 
@@ -712,7 +712,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Returns the results in a python dictionary format.
         """
         fields = fields or []
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         rows: List[Type["Model"]] = await queryset.all()
 
         if not isinstance(fields, list):
@@ -750,7 +750,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns the results in a python dictionary format.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         fields = fields or []
         if flat and len(fields) > 1:
             raise QuerySetError(
@@ -775,10 +775,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a boolean indicating if a record exists or not.
         """
-        queryset: "QuerySet" = self.clone()
-        expression = queryset.build_select()
+        queryset: "QuerySet" = self._clone()
+        expression = queryset._build_select()
         expression = sqlalchemy.exists(expression).select()
-        queryset.set_query_expression(expression)
+        queryset._set_query_expression(expression)
         _exists = await queryset.database.fetch_val(expression)
         return cast("bool", _exists)
 
@@ -786,10 +786,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns an indicating the total records.
         """
-        queryset: "QuerySet" = self.clone()
-        expression = queryset.build_select().alias("subquery_for_count")
+        queryset: "QuerySet" = self._clone()
+        expression = queryset._build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
-        queryset.set_query_expression(expression)
+        queryset._set_query_expression(expression)
         _count = await queryset.database.fetch_val(expression)
         return cast("int", _count)
 
@@ -798,8 +798,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Fetch one object matching the parameters or returns None.
         """
         queryset: "QuerySet" = self.filter(**kwargs)
-        expression = queryset.build_select().limit(2)
-        queryset.set_query_expression(expression)
+        expression = queryset._build_select().limit(2)
+        queryset._set_query_expression(expression)
         rows = await queryset.database.fetch_all(expression)
 
         if not rows:
@@ -817,15 +817,15 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Executes the query.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         if queryset.is_m2m:
             queryset.distinct_on = [queryset.m2m_related]
 
         if kwargs:
             return await queryset.filter(**kwargs).all()
 
-        expression = queryset.build_select()
-        queryset.set_query_expression(expression)
+        expression = queryset._build_select()
+        queryset._set_query_expression(expression)
 
         rows = await queryset.database.fetch_all(expression)
 
@@ -859,7 +859,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns the queryset records based on specific filters
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         queryset.extra = kwargs
         return queryset
 
@@ -867,14 +867,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a single record based on the given kwargs.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
 
         if kwargs:
             return await queryset.filter(**kwargs).get()
 
-        expression = queryset.build_select().limit(2)
+        expression = queryset._build_select().limit(2)
         rows = await queryset.database.fetch_all(expression)
-        queryset.set_query_expression(expression)
+        queryset._set_query_expression(expression)
 
         is_only_fields = True if queryset._only else False
         is_defer_fields = True if queryset._defer else False
@@ -899,7 +899,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns the first record of a given queryset.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         if kwargs:
             return await queryset.filter(**kwargs).order_by("id").get()
 
@@ -912,7 +912,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns the last record of a given queryset.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         if kwargs:
             return await queryset.filter(**kwargs).order_by("-id").get()
 
@@ -925,8 +925,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Creates a record in a specific table.
         """
-        queryset: "QuerySet" = self.clone()
-        kwargs = queryset.validate_kwargs(**kwargs)
+        queryset: "QuerySet" = self._clone()
+        kwargs = queryset._validate_kwargs(**kwargs)
         instance = queryset.model_class(**kwargs)
         instance.table = queryset.table
         instance = await instance.save(force_save=True, values=kwargs)
@@ -936,11 +936,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Bulk creates records in a table
         """
-        queryset: "QuerySet" = self.clone()
-        new_objs = [queryset.validate_kwargs(**obj) for obj in objs]
+        queryset: "QuerySet" = self._clone()
+        new_objs = [queryset._validate_kwargs(**obj) for obj in objs]
 
         expression = queryset.table.insert().values(new_objs)
-        queryset.set_query_expression(expression)
+        queryset._set_query_expression(expression)
         await queryset.database.execute(expression)
 
     async def bulk_update(self, objs: List[EdgyModel], fields: List[str]) -> None:
@@ -952,18 +952,18 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         It is thought to be a clean approach to a simple problem so it was added here and
         refactored to be compatible with Edgy.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
 
         new_objs = []
         for obj in objs:
             new_obj = {}
             for key, value in obj.__dict__.items():
                 if key in fields:
-                    new_obj[key] = self.resolve_value(value)
+                    new_obj[key] = self._resolve_value(value)
             new_objs.append(new_obj)
 
         new_objs = [
-            queryset.extract_values_from_field(obj, queryset.model_class) for obj in new_objs
+            queryset._extract_values_from_field(obj, queryset.model_class) for obj in new_objs
         ]
 
         pk = getattr(queryset.table.c, queryset.pkname)
@@ -978,11 +978,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             query_list.append({**pk, **value})
 
         expression = expression.values(kwargs)
-        queryset.set_query_expression(expression)
+        queryset._set_query_expression(expression)
         await queryset.database.execute_many(str(expression), query_list)
 
     async def delete(self) -> None:
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
 
         await self.model_class.signals.pre_delete.send(sender=self.__class__, instance=self)
 
@@ -990,7 +990,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         for filter_clause in queryset.filter_clauses:
             expression = expression.where(filter_clause)
 
-        queryset.set_query_expression(expression)
+        queryset._set_query_expression(expression)
         await queryset.database.execute(expression)
 
         await self.model_class.signals.post_delete.send(sender=self.__class__, instance=self)
@@ -999,12 +999,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Updates a record in a specific table with the given kwargs.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
 
-        extracted_fields = queryset.extract_values_from_field(
+        extracted_fields = queryset._extract_values_from_field(
             kwargs, model_class=queryset.model_class
         )
-        kwargs = queryset.update_auto_now_fields(extracted_fields, queryset.model_class.fields)
+        kwargs = queryset._update_auto_now_fields(extracted_fields, queryset.model_class.fields)
 
         # Broadcast the initial update details
         await self.model_class.signals.pre_update.send(
@@ -1016,7 +1016,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         for filter_clause in queryset.filter_clauses:
             expression = expression.where(filter_clause)
 
-        queryset.set_query_expression(expression)
+        queryset._set_query_expression(expression)
         await queryset.database.execute(expression)
 
         # Broadcast the update executed
@@ -1028,7 +1028,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Creates a record in a specific table or updates if already exists.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
 
         try:
             instance = await queryset.get(**kwargs)
@@ -1044,7 +1044,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Updates a record in a specific table or creates a new one.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
         try:
             instance = await queryset.get(**kwargs)
             await instance.update(**defaults)
@@ -1058,21 +1058,21 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """Returns true if the QuerySet contains the provided object.
         False if otherwise.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
 
         if getattr(instance, "pk", None) is None:
             raise ValueError("'obj' must be a model or reflect model instance.")
         return await queryset.filter(pk=instance.pk).exists()
 
-    async def execute(self) -> Any:
-        queryset: "QuerySet" = self.clone()
+    async def _execute(self) -> Any:
+        queryset: "QuerySet" = self._clone()
         records = await queryset._all(**queryset.extra)
         return records
 
     def __await__(
         self,
     ) -> Generator[Any, None, List[EdgyModel]]:
-        return self.execute().__await__()
+        return self._execute().__await__()
 
     def __class_getitem__(cls, *args: Any, **kwargs: Any) -> Any:
         return cls

@@ -17,28 +17,28 @@ edgy_setattr = object.__setattr__
 
 
 class DateParser:
-    def has_auto_now(self, field: Type[BaseField]) -> bool:
+    def _has_auto_now(self, field: Type[BaseField]) -> bool:
         """
         Checks if the field is auto now
         """
         return True if hasattr(field, "auto_now") and field.auto_now else False
 
-    def is_datetime(self, field: Type[BaseField]) -> bool:
+    def _is_datetime(self, field: Type[BaseField]) -> bool:
         """
         Validates if the field type is a datetime type.
         """
         return bool(field.field_type == datetime)
 
-    def update_auto_now_fields(self, values: Any, fields: Any) -> Any:
+    def _update_auto_now_fields(self, values: Any, fields: Any) -> Any:
         """
         Updates the auto fields
         """
         for name, field in fields.items():
-            if isinstance(field, Field) and self.has_auto_now(field) and self.is_datetime(field):
+            if isinstance(field, Field) and self._has_auto_now(field) and self._is_datetime(field):
                 values[name] = field.get_default_value()  # type: ignore
         return values
 
-    def resolve_value(self, value: typing.Any) -> typing.Any:
+    def _resolve_value(self, value: typing.Any) -> typing.Any:
         if isinstance(value, dict):
             return dumps(
                 value,
@@ -50,7 +50,7 @@ class DateParser:
 
 
 class ModelParser:
-    def extract_model_references(
+    def _extract_model_references(
         self, extracted_values: Any, model_class: Optional[Type["Model"]]
     ) -> Any:
         """
@@ -63,7 +63,7 @@ class ModelParser:
         }
         return model_references
 
-    def extract_values_from_field(
+    def _extract_values_from_field(
         self, extracted_values: Any, model_class: Optional[Type["Model"]] = None
     ) -> Any:
         """
@@ -88,10 +88,10 @@ class ModelParser:
             validated[name] = value
 
         # Update with any ModelRef
-        validated.update(self.extract_model_references(extracted_values, model_cls))
+        validated.update(self._extract_model_references(extracted_values, model_cls))
         return validated
 
-    def extract_db_fields_from_model(self, model_class: Type["Model"]) -> Dict[Any, Any]:
+    def _extract_db_fields_from_model(self, model_class: Type["Model"]) -> Dict[Any, Any]:
         """
         Extacts all the db fields and excludes the related_names since those
         are simply relations.
