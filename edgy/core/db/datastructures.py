@@ -11,7 +11,7 @@ class Index:
     """
 
     suffix: str = "idx"
-    __max_name_length__: ClassVar[int] = 30
+    __max_name_length__: ClassVar[int] = 63
     name: Optional[str] = None
     fields: Optional[Sequence[str]] = None
 
@@ -45,7 +45,7 @@ class UniqueConstraint:
 
     fields: List[str]
     name: Optional[str] = None
-    __max_name_length__: ClassVar[int] = 30
+    __max_name_length__: ClassVar[int] = 63
 
     @model_validator(mode="before")
     def validate_data(cls, values: Any) -> Any:
