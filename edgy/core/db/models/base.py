@@ -252,6 +252,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:
             return False
+
         for key in self.fields.keys():
             if getattr(self, key, None) != getattr(other, key, None):
                 return False

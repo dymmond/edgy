@@ -62,8 +62,7 @@ async def test_model_only_attribute_error():
     assert len(users) == 1
     assert users[0].pk == john.pk
 
-    with pytest.raises(AttributeError):
-        john.description  # noqa
+    assert "description" not in john.model_dump()
 
 
 async def test_model_only_with_all():

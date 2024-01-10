@@ -4,6 +4,7 @@ from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
 from edgy.core.utils.functional import edgy_setattr
+from edgy.core.utils.sync import run_sync
 from edgy.exceptions import RelationshipNotFound
 
 
@@ -59,7 +60,7 @@ class Model(ModelRow, DeclarativeMixin):
 
         # Update the model instance.
         for key, value in kwargs.items():
-            edgy_setattr(self, key, value)
+            setattr(self, key, value)
 
         return self
 
@@ -75,6 +76,7 @@ class Model(ModelRow, DeclarativeMixin):
 
     async def load(self) -> None:
         # Build the select expression.
+
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.select().where(pk_column == self.pk)
 
@@ -83,7 +85,7 @@ class Model(ModelRow, DeclarativeMixin):
 
         # Update the instance.
         for key, value in dict(row._mapping).items():
-            edgy_setattr(self, key, value)
+            setattr(self, key, value)
 
     async def _save(self, **kwargs: Any) -> "Model":
         """
@@ -208,7 +210,11 @@ class Model(ModelRow, DeclarativeMixin):
         await self.signals.post_save.send(sender=self.__class__, instance=self)
         return self
 
-    # def __get__
+    def __getattr__(self, name: str) -> Any:
+        if name not in self.__dict__ and name in self.fields and name != self.pkname:
+            run_sync(self.load())
+            return self.__dict__[name]
+        return super().__getattr__(name)
 
 
 class ReflectModel(Model, EdgyBaseReflectModel):

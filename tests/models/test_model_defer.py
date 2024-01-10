@@ -42,11 +42,19 @@ async def test_model_defer():
     assert len(users) == 2
     assert users[0].model_dump() == {"id": 1, "name": "John", "language": "PT"}
 
-    with pytest.raises(AttributeError):
-        users[0].description  # noqa
+    assert "description" not in users[0].model_dump()
+    assert "description" not in users[1].model_dump()
 
-    with pytest.raises(AttributeError):
-        users[1].description  # noqa
+    users[0].description  # noqa
+    users[1].description  # noqa
+
+    assert "description" in users[0].model_dump()
+    assert "description" in users[1].model_dump()
+
+    users = await User.query.defer("description")
+
+    assert "description" not in users[0].model_dump()
+    assert "description" not in users[1].model_dump()
 
 
 async def test_model_defer_attribute_error():
@@ -56,8 +64,7 @@ async def test_model_defer_attribute_error():
     assert len(users) == 1
     assert users[0].pk == john.pk
 
-    with pytest.raises(AttributeError):
-        john.description  # noqa
+    assert "description" not in john.model_dump()
 
 
 async def test_model_defer_with_all():

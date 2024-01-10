@@ -24,8 +24,24 @@ class EdgyTenantBaseModel(edgy.Model):
         abstract = True
 
 
+class Profle(edgy.Model):
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class User(edgy.Model):
+    name = edgy.CharField(max_length=100)
+    profile: Profle = edgy.ForeignKey(Profle)
+
+    class Meta:
+        registry = models
+
+
 class Designation(EdgyTenantBaseModel):
     name: str = edgy.CharField(max_length=100)
+    user: User = edgy.ForeignKey(User, null=True)
 
     class Meta:
         tablename = "ut_designation"
@@ -51,7 +67,7 @@ class Permission(EdgyTenantBaseModel):
         tablename = "ut_permission"
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     await models.create_all()
     yield
@@ -65,20 +81,55 @@ async def rollback_connections():
             yield
 
 
-async def test_select_related():
+async def test_inner_select():
     designation = await Designation.query.create(name="admin")
     module = await AppModule.query.create(name="payroll")
 
-    permission = await Permission.query.create(designation=designation, module=module)
+    await Permission.query.create(designation=designation, module=module)
 
     query = await Permission.query.all()
 
     assert len(query) == 1
 
-    query = await Permission.query.select_related(["designation", "module"]).all()
+    query = await Permission.query.first()
+
+    name = query.designation.name
+
+    assert name == designation.name
+
+
+async def test_inner_select_nested():
+    profile = await Profle.query.create(name="super_admin")
+    user = await User.query.create(name="user", profile=profile)
+    designation = await Designation.query.create(name="admin", user=user)
+    module = await AppModule.query.create(name="payroll")
+
+    await Permission.query.create(designation=designation, module=module)
+
+    query = await Permission.query.all()
 
     assert len(query) == 1
-    assert query[0].pk == permission.pk
 
-    assert query[0].designation.model_dump() == {"id": 1, "name": "admin"}
-    assert query[0].module.model_dump() == {"id": 1, "name": "payroll"}
+    query = await Permission.query.first()
+
+    name = query.designation.name
+
+    assert name == designation.name
+    assert query.designation.user.name == user.name
+    assert query.designation.user.profile.name == profile.name
+
+
+async def test_raise_attribute_error_select():
+    designation = await Designation.query.create(name="admin")
+    module = await AppModule.query.create(name="payroll")
+
+    await Permission.query.create(designation=designation, module=module)
+
+    query = await Permission.query.all()
+
+    assert len(query) == 1
+
+    query = await Permission.query.first()
+
+    with pytest.raises(AttributeError):
+        query.designation.test  # noqa
