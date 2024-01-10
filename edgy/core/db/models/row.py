@@ -121,7 +121,7 @@ class ModelRow(EdgyBaseModel):
             model = cast("Type[Model]", cls.proxy_model(**item))
 
             # Apply the schema to the model
-            model = cls.apply_schema(model_related, using_schema)
+            model = cls.apply_schema(model, using_schema)
 
             model = cls.handle_prefetch_related(
                 row=row, model=model, prefetch_related=prefetch_related
