@@ -29,7 +29,7 @@ def test_raises_value_error_on_wrong_max_length():
 
             class Meta:
                 registry = models
-                indexes = [Index(fields=["name", "title"], name=get_random_string(31))]
+                indexes = [Index(fields=["name", "title"], name=get_random_string(64))]
 
 
 def test_raises_value_error_on_wrong_type_passed_fields():

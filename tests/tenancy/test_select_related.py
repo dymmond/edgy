@@ -67,3 +67,4 @@ async def test_select_related_tenant():
     prod = await Product.query.using(tenant.schema_name).select_related("user").get(pk=1)
 
     assert prod.pk == product.pk
+    assert prod.user.name == "user"

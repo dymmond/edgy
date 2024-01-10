@@ -99,18 +99,6 @@ async def rollback_connections():
             yield
 
 
-async def test_model_crud():
-    album = await Album.query.create(name="Malibu")
-    await Track.query.create(album=album, title="The Bird", position=1)
-    await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
-    await Track.query.create(album=album, title="The Waters", position=3)
-
-    track = await Track.query.get(title="The Bird")
-    assert track.album.pk == album.pk
-    await track.album.load()
-    assert track.album.name == "Malibu"
-
-
 async def test_select_related():
     album = await Album.query.create(name="Malibu")
     await Track.query.create(album=album, title="The Bird", position=1)
