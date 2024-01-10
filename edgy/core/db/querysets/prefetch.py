@@ -35,7 +35,7 @@ class PrefetchMixin:
         from the select_related. Select related performs a follows the SQL foreign relation
         whereas the prefetch_related follows the python relations.
         """
-        queryset: "QuerySet" = self.clone()
+        queryset: "QuerySet" = self._clone()
 
         if not isinstance(prefetch, (list, tuple)):
             prefetch = cast("List[Prefetch]", [prefetch])  # type: ignore
