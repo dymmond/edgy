@@ -38,28 +38,6 @@ class TenantMeta(MetaInfo):
         self.is_tenant = is_tenant
 
 
-class xBaseTenantMeta(BaseModelMeta):
-    meta_info: "TenantMeta" = TenantMeta(None)
-
-    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
-        meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
-        meta = TenantMeta(meta_class)
-        attrs["Meta"] = meta
-        new_model = super().__new__(cls, name, bases, attrs)
-
-        cls.meta_info = meta
-        registry = new_model.meta.registry
-
-        if registry:
-            try:
-                if meta.is_tenant:
-                    registry.tenant_models[new_model.__name__] = new_model
-            except KeyError:
-                ...  # pragma: no cover
-
-        return new_model
-
-
 class BaseTenantMeta(BaseModelMeta):
     """
     The metaclass for the base tenant used by the Edgy contrib mixin.
