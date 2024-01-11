@@ -211,6 +211,10 @@ class Model(ModelRow, DeclarativeMixin):
         return self
 
     def __getattr__(self, name: str) -> Any:
+        """
+        Run an one off query to populate any foreign key making sure
+        it runs only once per foreign key avoiding multiple database calls.
+        """
         if name not in self.__dict__ and name in self.fields and name != self.pkname:
             run_sync(self.load())
             return self.__dict__[name]
