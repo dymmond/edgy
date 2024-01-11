@@ -10,7 +10,7 @@ When making queries in a [model][model], the ORM uses the [managers][managers] t
 perform those same actions.
 
 If you haven't yet seen the [models][model] and [managers][managers] section, now would
-be a great time to have a look and get yourself acquainted .
+be a great time to have a look and get yourself acquainted.
 
 ## QuerySet
 
@@ -49,6 +49,30 @@ await User.query.filter(is_active=True, first_name__icontains="a").order_by("id"
 
 And that is it. Of course there are more filters and operations that you can do with the ORM and
 we will be covering that in this document but in a nutshell, querying the database is this simple.
+
+## Load the foreign keys beforehand with select related
+
+Select related is a functionality that *follows the foreign-key relationships* by selecting any
+additional related object when a query is executed. You can imagine it as a classic `join`.
+
+The difference is that when you execute the [select_related](../relationships.md#load-an-instance-with-the-foreign-key-relationship-on-it-with-select-related),
+the foreign keys of the model being used by that operation will be opulated with the database results.
+
+You can use the classic [select_related](../relationships.md#load-an-instance-with-the-foreign-key-relationship-on-it-with-select-related):
+
+```python
+await Profile.query.select_related("user").get(id=1)
+```
+
+Or you can use the `load()` function of the model for the foreign key. Let us refactor the example above.
+
+```python
+profile = await Profile.query.get(id=1)
+await profile.user.load()
+```
+
+The `load()` works on any foreign key declared and it will automatically load the data into that
+field.
 
 ## Returning querysets
 

@@ -78,6 +78,35 @@ print(profile.user.pk)    # 1
 print(profile.user.email)  # foo@bar.com
 ```
 
+### Access the foreign key values directly from the model
+
+!!! Note
+    This is only possible since the version 0.9.0 of **Edgy**, before this version, the only way was
+    by using the [select_related](#load-an-instance-with-the-foreign-key-relationship-on-it-with-select-related) or
+    using the [load()](./queries/queries.md#load-the-foreign-keys-beforehand-with-select-related).
+
+You can access the values of the foreign keys of your model directly via model instance without
+using the [select_related](#load-an-instance-with-the-foreign-key-relationship-on-it-with-select-related) or
+the [load()](./queries/queries.md#load-the-foreign-keys-beforehand-with-select-related).
+
+Let us see an example.
+
+**Create a user and a profile**
+
+```python
+user = await User.query.create(first_name="Foo", email="foo@bar.com")
+await Profile.query.create(user=user)
+```
+
+**Accessing the user data from the profile**
+
+```python
+profile = await Profile.query.get(user__email="foo@bar.com")
+
+print(profile.user.email) # "foo@bar.com"
+print(profile.user.first_name) # "Foo"
+```
+
 ## ForeignKey constraints
 
 As mentioned in the [foreign key field](./fields.md#foreignkey), you can specify constraints in

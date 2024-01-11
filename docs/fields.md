@@ -286,7 +286,7 @@ from edgy import RefForeignKey
 This is unique to **Edgy** and has [dedicated place](./reference-foreignkey.md) in the documentation
 just to explain what it is and how to use it.
 
-#### ManyToManyField
+#### ManyToMany
 
 ```python
 from typing import List
@@ -302,13 +302,13 @@ class Organisation(edgy.Model):
 
 
 class MyModel(edgy.Model):
-    users: List[User] = edgy.ManyToManyField(User)
-    organisations: List[Organisation] = edgy.ManyToManyField(Organisation)
+    users: List[User] = edgy.ManyToMany(User)
+    organisations: List[Organisation] = edgy.ManyToMany("Organisation")
 
 ```
 
 !!! Tip
-    You can use `edgy.ManyToMany` as alternative to `ManyToManyField` instead.
+    You can use `edgy.ManyToManyField` as alternative to `ManyToMany` instead.
 
 ##### Parameters
 
@@ -347,7 +347,7 @@ class MyModel(edgy.Model):
 
 Simple JSON representation object.
 
-#### OneToOneField
+#### OneToOne
 
 ```python
 import edgy
@@ -358,7 +358,7 @@ class User(edgy.Model):
 
 
 class MyModel(edgy.Model):
-    user: User = edgy.OneToOneField("User")
+    user: User = edgy.OneToOne("User")
     ...
 
 ```
@@ -366,7 +366,7 @@ class MyModel(edgy.Model):
 Derives from the same as [ForeignKey](#foreignkey) and applies a One to One direction.
 
 !!! Tip
-    You can use `edgy.OneToOne` as alternative to `OneToOneField` instead.
+    You can use `edgy.OneToOneField` as alternative to `OneToOne` instead.
 
 #### TextField
 
