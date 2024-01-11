@@ -5,6 +5,27 @@ hide:
 
 # Release Notes
 
+## 0.9.0
+
+### Added
+
+- Tenancy for internal `proxy_model` validation added.
+- Support for ManyToMany to accept strings to the `to` attribute.
+- Allowing querying inner foreign keys without needing to use `select_related` or `load`
+
+### Changed
+
+- Increased maximum of 63 characters the name of the index/unique.
+- ModelRow now contains private methods.
+- Updated documentation with missing [select_related](./queries/queries.md#load-the-foreign-keys-beforehand-with-select-related).
+- Updated documentation for [access of data via foreign keys](./relationships.md#access-the-foreign-key-values-directly-from-the-model).
+
+### Fixed
+
+- When generating a many to many through model, the maximum length is enforced to be 63 characters.
+- Allow `ManyToMany` to also accept a string as a parameter for the `to`.
+- Object discovery for intellisense in any IDE.
+
 ## 0.8.1
 
 ### Added
