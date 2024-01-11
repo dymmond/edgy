@@ -38,7 +38,6 @@ class ForeignKeyFieldFactory:
         server_default: Any = kwargs.pop("server_default", None)
         server_onupdate: Any = kwargs.pop("server_onupdate", None)
         registry: Registry = kwargs.pop("registry", None)
-        secret: bool = kwargs.pop("secret", False)
         field_type = list
 
         namespace = dict(
@@ -56,7 +55,6 @@ class ForeignKeyFieldFactory:
             through=through,
             registry=registry,
             column_type=field_type,
-            secret=secret,
             constraints=cls.get_constraints(),
             **kwargs,
         )
@@ -111,11 +109,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         except TypeError:
             return False
 
-    def __new__(  # type: ignore
-        cls,
-        to: "ModelRef",
-        null: bool = False,
-    ) -> BaseField:
+    def __new__(cls, to: "ModelRef", null: bool = False) -> BaseField:  # type: ignore
         if not cls.is_class_and_subclass(to, edgy.ModelRef):
             raise ModelReferenceError(
                 detail="A model reference must be an object of type ModelRef"

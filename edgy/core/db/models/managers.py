@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Type, cast
 
 from edgy.core.db.context_vars import get_tenant, set_tenant
 from edgy.core.db.querysets.base import QuerySet
@@ -37,6 +37,9 @@ class Manager:
 
     def __init__(self, model_class: Any = None):
         self.model_class = model_class
+
+    def __get__(self, _: Any, owner: Any) -> Type["QuerySet"]:
+        return cast("Type[QuerySet]", self.__class__(model_class=owner))
 
     def get_queryset(self) -> "QuerySet":
         """

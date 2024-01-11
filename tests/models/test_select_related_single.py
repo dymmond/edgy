@@ -5,8 +5,7 @@ from pydantic import __version__
 from tests.settings import DATABASE_URL
 
 import edgy
-from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
-from edgy.contrib.multi_tenancy.models import TenantMixin
+from edgy.contrib.multi_tenancy import TenantRegistry
 from edgy.testclient import DatabaseTestClient as Database
 
 database = Database(url=DATABASE_URL)
@@ -17,16 +16,10 @@ pytestmark = pytest.mark.anyio
 pydantic_version = __version__[:3]
 
 
-class Tenant(TenantMixin):
-    class Meta:
-        registry = models
-
-
-class EdgyTenantBaseModel(TenantModel):
+class EdgyTenantBaseModel(edgy.Model):
     id: int = edgy.IntegerField(primary_key=True)
 
     class Meta:
-        is_tenant = True
         registry = models
         abstract = True
 

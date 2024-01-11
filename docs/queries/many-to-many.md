@@ -13,7 +13,24 @@ What happens internally is the creation of an intermediary table that links the 
 As mentioned before, a many to many it is not possible in a relational database, instead, an
 intermediary table needs to be created and connect the tables for the said many to many.
 
-This is exactly what edgy does with the [ManyToManyField][many_to_many] automatically.
+This is exactly what edgy does with the [ManyToMany][many_to_many] automatically.
+
+### Quick note
+
+The `ManyToMany` or `ManyToMany` accepts both [Model](../models.md) and string as
+a parameter for the `to`.
+
+**Example**
+
+```python
+# Using the model directly
+class Profile(edgy.Model):
+    users: List[User] = edgy.ManyToMany(User)
+
+# Using a string
+class Profile(edgy.Model):
+    users: List[User] = edgy.ManyToMany("User")
+```
 
 ### Operations
 
@@ -64,7 +81,6 @@ organisation.teams.add(red_team)
 organisation.teams.remove(red_team)
 organisation.teams.remove(blue_team)
 ```
-
 
 #### Related name
 

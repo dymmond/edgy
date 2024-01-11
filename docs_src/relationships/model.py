@@ -7,10 +7,10 @@ models = Registry(database=database)
 
 class User(edgy.Model):
     is_active: bool = edgy.BooleanField(default=True)
-    first_name: str = edgy.CharField(max_length=50)
-    last_name: str = edgy.CharField(max_length=50)
+    first_name: str = edgy.CharField(max_length=50, null=True)
+    last_name: str = edgy.CharField(max_length=50, null=True)
     email: str = edgy.EmailField(max_lengh=100)
-    password: str = edgy.CharField(max_length=1000)
+    password: str = edgy.CharField(max_length=1000, null=True)
 
     class Meta:
         registry = models

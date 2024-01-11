@@ -33,7 +33,7 @@ class RelatedField:
 
     @functools.cached_property
     def queryset(self) -> "QuerySet":
-        return self.manager.get_queryset()
+        return cast("QuerySet", self.manager.get_queryset())
 
     def m2m_related(self) -> Any:
         """
