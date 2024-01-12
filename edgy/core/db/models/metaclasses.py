@@ -426,7 +426,6 @@ class BaseModelMeta(ModelMetaclass):
                         raise ValueError("Meta.indexes must be a list of Index types.")
 
         registry = meta.registry
-        # registries = meta.registries
         new_class.database = registry.database
 
         # Making sure it does not generate tables if abstract it set
