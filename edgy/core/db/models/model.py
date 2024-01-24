@@ -132,15 +132,6 @@ class Model(ModelRow, DeclarativeMixin):
             data[foreign_key_target_field] = self
             await model.query.create(**data)
 
-    async def _update(self, **kwargs: Any) -> Any:
-        """
-        Performs the save instruction.
-        """
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
-        awaitable = await self.database.execute(expression)
-        return awaitable
-
     def update_model_references(self, **kwargs: Any) -> Any:
         model_refs_set: Set[str] = set()
         model_references: Dict[str, Any] = {}
