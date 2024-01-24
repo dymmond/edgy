@@ -156,7 +156,7 @@ class Model(ModelRow, DeclarativeMixin):
         return kwargs, model_references
 
     async def save(
-        self: Any,
+        self,
         force_save: bool = False,
         values: Dict[str, Any] = None,
         **kwargs: Any,
@@ -177,19 +177,28 @@ class Model(ModelRow, DeclarativeMixin):
 
         self.update_from_dict(dict_values=dict(extracted_fields.items()))
 
-        validated_values = values or self._extract_values_from_field(
-            extracted_values=extracted_fields
-        )
-        kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
-        kwargs, model_references = self.update_model_references(**kwargs)
-
         # Performs the update or the create based on a possible existing primary key
         if getattr(self, "pk", None) is None or force_save:
+            validated_values = values or self._extract_values_from_field(
+                extracted_values=extracted_fields
+            )
+            kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
+            kwargs, model_references = self.update_model_references(**kwargs)
             await self._save(**kwargs)
         else:
             # Broadcast the initial update details
-            await self.signals.pre_update.send(sender=self.__class__, instance=self, kwargs=kwargs)
-            await self._update(**kwargs)
+            # Making sure it only updates the fields that should be updated
+            # and excludes the fields aith `auto_now` as true
+            validated_values = values or self._extract_values_from_field(
+                extracted_values=extracted_fields, is_update=True
+            )
+            kwargs, model_references = self.update_model_references(**validated_values)
+            update_model = {k: v for k, v in validated_values.items() if k in kwargs}
+
+            await self.signals.pre_update.send(
+                sender=self.__class__, instance=self, kwargs=update_model
+            )
+            await self.update(**update_model)
 
             # Broadcast the update complete
             await self.signals.post_update.send(sender=self.__class__, instance=self)
