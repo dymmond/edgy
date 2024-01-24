@@ -170,9 +170,9 @@ class MyModel(edgy.Model):
 
 ##### Parameters
 
-* **auto_now** - A boolean indicating the `auto_now` enabled.
-* **auto_now_add** - A boolean indicating the `auto_now_add` enabled.
-
+* **auto_now** - A boolean indicating the `auto_now` enabled. Useful for auto updates.
+* **auto_now_add** - A boolean indicating the `auto_now_add` enabled. This will ensure that its
+only added once.
 
 #### DateTimeField
 
@@ -189,9 +189,9 @@ class MyModel(edgy.Model):
 
 ##### Parameters
 
-* **auto_now** - A boolean indicating the `auto_now` enabled.
-* **auto_now_add** - A boolean indicating the `auto_now_add` enabled.
-
+* **auto_now** - A boolean indicating the `auto_now` enabled. Useful for auto updates.
+* **auto_now_add** - A boolean indicating the `auto_now_add` enabled. This will ensure that its
+only added once.
 
 #### DecimalField
 

@@ -16,25 +16,34 @@ if TYPE_CHECKING:
 edgy_setattr = object.__setattr__
 
 
+def _has_auto_now(field: Type[BaseField]) -> bool:
+    """
+    Checks if the field is auto now
+    """
+    return True if hasattr(field, "auto_now") and field.auto_now else False
+
+
+def _has_auto_now_add(field: Type[BaseField]) -> bool:
+    """
+    Checks if the field is auto now add
+    """
+    return True if hasattr(field, "auto_now_add") and field.auto_now_add else False
+
+
+def _is_datetime(field: Type[BaseField]) -> bool:
+    """
+    Validates if the field type is a datetime type.
+    """
+    return bool(field.field_type == datetime)
+
+
 class DateParser:
-    def _has_auto_now(self, field: Type[BaseField]) -> bool:
-        """
-        Checks if the field is auto now
-        """
-        return True if hasattr(field, "auto_now") and field.auto_now else False
-
-    def _is_datetime(self, field: Type[BaseField]) -> bool:
-        """
-        Validates if the field type is a datetime type.
-        """
-        return bool(field.field_type == datetime)
-
     def _update_auto_now_fields(self, values: Any, fields: Any) -> Any:
         """
-        Updates the auto fields
+        Updates the `auto_now` fields
         """
         for name, field in fields.items():
-            if isinstance(field, Field) and self._has_auto_now(field) and self._is_datetime(field):
+            if isinstance(field, Field) and _has_auto_now(field) and _is_datetime(field):
                 values[name] = field.get_default_value()  # type: ignore
         return values
 
@@ -64,7 +73,10 @@ class ModelParser:
         return model_references
 
     def _extract_values_from_field(
-        self, extracted_values: Any, model_class: Optional[Type["Model"]] = None
+        self,
+        extracted_values: Any,
+        model_class: Optional[Type["Model"]] = None,
+        is_update: bool = False,
     ) -> Any:
         """
         Extracts all the deffault values from the given fields and returns the raw
@@ -75,7 +87,12 @@ class ModelParser:
         for name, field in model_cls.fields.items():  # type: ignore
             if field.read_only:
                 if field.has_default():
-                    validated[name] = field.get_default_value()
+                    if not is_update:
+                        validated[name] = field.get_default_value()
+                    else:
+                        # For datetimes with `auto_now` and `auto_now_add`
+                        if not _has_auto_now_add(field):
+                            validated[name] = field.get_default_value()
                 continue
 
             if name not in extracted_values:
