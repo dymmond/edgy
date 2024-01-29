@@ -1,5 +1,4 @@
 from edgy.exceptions import EdgyException
 
 
-class ModelSchemaError(EdgyException):
-    ...
+class ModelSchemaError(EdgyException): ...

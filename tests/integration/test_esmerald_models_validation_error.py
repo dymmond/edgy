@@ -27,8 +27,7 @@ class User(edgy.Model):
 
 
 @post("/create")
-async def create_user(data: User) -> None:
-    ...  # pragma: no cover
+async def create_user(data: User) -> None: ...  # pragma: no cover
 
 
 app = Esmerald(routes=[Gateway(handler=create_user)])

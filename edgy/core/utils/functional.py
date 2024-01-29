@@ -1,6 +1,7 @@
 """
 All functional common to Edgy
 """
+
 from typing import Any, Dict, Tuple, Union
 
 from edgy.core.db.fields.base import BaseField

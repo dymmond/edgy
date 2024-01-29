@@ -1,6 +1,7 @@
 """
 Client to interact with Edgy models and migrations.
 """
+
 import inspect
 import sys
 import typing

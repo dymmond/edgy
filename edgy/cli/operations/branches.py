@@ -2,7 +2,6 @@
 Client to interact with Edgy models and migrations.
 """
 
-
 import click
 
 from edgy.cli.base import branches as _branches
