@@ -1,5 +1,4 @@
 from edgy.exceptions import EdgyException
 
 
-class MissingParameterException(EdgyException):
-    ...
+class MissingParameterException(EdgyException): ...

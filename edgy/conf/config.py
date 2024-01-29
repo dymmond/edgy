@@ -1,4 +1,5 @@
 """Configuration for Pydantic models."""
+
 from __future__ import annotations as _annotations
 
 from typing_extensions import TypedDict

@@ -48,8 +48,7 @@ async def rollback_connections():
             yield
 
 
-class Test:
-    ...
+class Test: ...
 
 
 async def test_raise_prefetch_related_error():
