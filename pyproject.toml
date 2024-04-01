@@ -89,6 +89,7 @@ test = [
     "mock==5.1.0",
     "pytest-benchmark>=4.0.0,<5.0.0",
     "pymysql>=1.0.2,<2.0.0",
+    "starlette",
     "types-orjson==3.6.2",
     "ruff>=0.0.256,<1.0.0",
 ]
