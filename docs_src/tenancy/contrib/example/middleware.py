@@ -2,8 +2,8 @@ from typing import Any, Coroutine
 
 from esmerald import Request
 from esmerald.protocols.middleware import MiddlewareProtocol
+from lilya.types import ASGIApp, Receive, Scope, Send
 from myapp.models import Tenant, TenantUser, User
-from starlette.types import ASGIApp, Receive, Scope, Send
 
 from edgy import ObjectNotFound
 from edgy.core.db import set_tenant

@@ -2,7 +2,7 @@ from typing import Any, Coroutine
 
 from esmerald import Request
 from esmerald.protocols.middleware import MiddlewareProtocol
-from starlette.types import ASGIApp, Receive, Scope, Send
+from lilya.types import ASGIApp, Receive, Scope, Send
 
 from edgy.core.db import set_tenant
 from edgy.exceptions import ObjectNotFound
