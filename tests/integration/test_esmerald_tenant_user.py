@@ -5,8 +5,8 @@ from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, Request, get
 from esmerald.protocols.middleware import MiddlewareProtocol
 from httpx import AsyncClient
+from lilya.types import ASGIApp, Receive, Scope, Send
 from pydantic import __version__
-from starlette.types import ASGIApp, Receive, Scope, Send
 from tests.settings import DATABASE_URL
 
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry

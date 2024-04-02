@@ -3,8 +3,8 @@ import os
 import sys
 from pathlib import Path
 
+from lilya.apps import Lilya
 from my_project.utils import get_db_connection
-from starlette.applications import Starlette
 
 from edgy import Migrate
 
@@ -28,7 +28,7 @@ def get_application():
     build_path()
     database, registry = get_db_connection()
 
-    app = Starlette(__name__)
+    app = Lilya(__name__)
 
     Migrate(app=app, registry=registry)
     return app
