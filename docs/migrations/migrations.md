@@ -72,7 +72,7 @@ This makes Edgy unique and extremely flexible to be used within any of the Frame
 such as [Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic... You choose.
 
 ```python
-from edgy import Migration
+from edgy import Migrate
 ```
 
 ### Parameters
