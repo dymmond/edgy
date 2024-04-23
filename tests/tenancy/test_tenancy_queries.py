@@ -1,11 +1,11 @@
 import pytest
 from pydantic import __version__
-from tests.settings import DATABASE_URL
 
 from edgy import fields
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = TenantRegistry(database=database)

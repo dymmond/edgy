@@ -1,12 +1,12 @@
 from typing import ClassVar
 
 import pytest
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy import Manager, QuerySet
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

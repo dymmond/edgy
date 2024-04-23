@@ -6,11 +6,11 @@ from uuid import UUID
 
 import pytest
 from asyncpg.exceptions import UndefinedTableError
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.core.db import fields
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

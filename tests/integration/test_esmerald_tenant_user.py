@@ -7,13 +7,13 @@ from esmerald.protocols.middleware import MiddlewareProtocol
 from httpx import AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
 from pydantic import __version__
-from tests.settings import DATABASE_URL
 
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.models import TenantMixin, TenantUserMixin
 from edgy.core.db import fields, set_tenant
 from edgy.exceptions import ObjectNotFound
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = TenantRegistry(database=database)

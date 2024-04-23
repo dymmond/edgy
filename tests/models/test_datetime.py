@@ -2,10 +2,10 @@ import datetime
 import time
 
 import pytest
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = edgy.Registry(database=database)

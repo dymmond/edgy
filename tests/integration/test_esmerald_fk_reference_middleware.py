@@ -5,10 +5,10 @@ from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, post
 from httpx import AsyncClient
 from pydantic import __version__
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = edgy.Registry(database=database)

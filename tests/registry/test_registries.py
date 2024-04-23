@@ -1,8 +1,8 @@
 import pytest
-from tests.settings import DATABASE_ALTERNATIVE_URL, DATABASE_URL
 
 import edgy
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_ALTERNATIVE_URL, DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 another_db = Database(url=DATABASE_ALTERNATIVE_URL)

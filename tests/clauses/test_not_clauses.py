@@ -1,8 +1,8 @@
 import pytest
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.core.db.querysets.clauses import not_
+from tests.settings import DATABASE_URL
 
 database = edgy.Database(url=DATABASE_URL)
 models = edgy.Registry(database=database)

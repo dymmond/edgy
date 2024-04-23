@@ -2,11 +2,11 @@ from typing import Optional
 
 import pytest
 from pydantic import __version__
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.contrib.multi_tenancy import TenantRegistry
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = TenantRegistry(database=database)

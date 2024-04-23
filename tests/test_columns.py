@@ -5,12 +5,12 @@ import uuid
 from enum import Enum
 
 import pytest
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.core.db import fields
 from edgy.exceptions import FieldDefinitionError
 from edgy.testclient import DatabaseTestClient
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

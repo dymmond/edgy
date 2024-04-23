@@ -137,7 +137,7 @@ class Model(ModelRow, DeclarativeMixin):
         model_references: Dict[str, Any] = {}
 
         for name, value in kwargs.items():
-            if name in self.meta.model_references:
+            if name in self.meta.model_references:  # type: ignore
                 model_references[name] = value
                 model_refs_set.add(name)
 

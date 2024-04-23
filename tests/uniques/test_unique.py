@@ -3,10 +3,10 @@ from enum import Enum
 
 import pytest
 from asyncpg.exceptions import UniqueViolationError
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

@@ -10,7 +10,6 @@ fi
 export SOURCE_FILES="edgy tests"
 set -x
 
-${PREFIX}ruff $SOURCE_FILES --fix --line-length 99
+${PREFIX}ruff check $SOURCE_FILES --fix --line-length 99
 ${PREFIX}black $SOURCE_FILES --line-length 99
-${PREFIX}isort $SOURCE_FILES --project=edgy --line-length 99
 ${PREFIX}mypy edgy

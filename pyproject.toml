@@ -146,19 +146,10 @@ disable_error_code = "attr-defined,arg-type,override,misc"
 warn_unused_ignores = true
 warn_redundant_casts = true
 
-[tool.ruff]
-select = [
-    "E", # pycodestyle errors
-    "W", # pycodestyle warnings
-    "F", # pyflakes
-    "C", # flake8-comprehensions
-    "B", # flake8-bugbear
-]
-ignore = [
-    "E501", # line too long, handled by black
-    "B008", # do not perform function calls in argument defaults
-    "C901", # too complex
-]
+[tool.ruff.lint]
+select = ["E", "W", "F", "C", "B", "I"]
+ignore = ["E501", "B008", "C901", "B026"]
+
 exclude = ["docs_src/*"]
 
 [[tool.mypy.overrides]]

@@ -1,6 +1,5 @@
 import pytest
 from loguru import logger
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.core.signals import (
@@ -14,6 +13,7 @@ from edgy.core.signals import (
 )
 from edgy.exceptions import SignalError
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = edgy.Registry(database=database)

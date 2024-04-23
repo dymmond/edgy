@@ -1,9 +1,9 @@
 import pytest
-from tests.cli.utils import run_cmd
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.core.db.datastructures import Index
+from tests.cli.utils import run_cmd
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

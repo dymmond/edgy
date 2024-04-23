@@ -5,12 +5,12 @@ from typing import Any, Dict
 from uuid import UUID
 
 import pytest
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy import run_sync
 from edgy.core.db import fields
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

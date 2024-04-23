@@ -1,11 +1,11 @@
 import pytest
 from pydantic import __version__
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy import ModelRef
 from edgy.exceptions import ModelReferenceError
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

@@ -5,13 +5,13 @@ from typing import Any, Dict
 from uuid import UUID
 
 import pytest
-from tests.settings import DATABASE_URL
 
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.exceptions import ModelSchemaError
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.core.db import fields
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = TenantRegistry(database=database)

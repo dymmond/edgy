@@ -7,11 +7,11 @@ from logging.config import fileConfig
 from alembic import context
 from rich.console import Console
 from sqlalchemy.ext.asyncio import create_async_engine
-from tests.settings import TEST_DATABASE
 
 from edgy.cli.constants import APP_PARAMETER
 from edgy.cli.env import MigrationEnv
 from edgy.exceptions import EdgyException
+from tests.settings import TEST_DATABASE
 
 # The console used for the outputs
 console = Console()

@@ -3,6 +3,7 @@ import shutil
 
 import pytest
 from esmerald import Esmerald
+
 from tests.cli.utils import run_cmd
 
 app = Esmerald(routes=[])

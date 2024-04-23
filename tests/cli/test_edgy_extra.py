@@ -1,9 +1,9 @@
 from esmerald import Esmerald
-from tests.cli.main import app as main_app
-from tests.cli.main_extra import app as extra_app
 
 from edgy import Registry
 from edgy.cli.constants import EDGY_DB, EDGY_EXTRA
+from tests.cli.main import app as main_app
+from tests.cli.main_extra import app as extra_app
 
 
 def test_has_saffier_extra():

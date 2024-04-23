@@ -1,11 +1,11 @@
 import random
 
 import pytest
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.exceptions import SchemaError
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 
 def get_random_string(

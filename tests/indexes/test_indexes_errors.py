@@ -2,11 +2,11 @@ import random
 import string
 
 import pytest
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.core.db.datastructures import Index
 from edgy.testclient import DatabaseTestClient
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

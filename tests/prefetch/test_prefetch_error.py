@@ -1,10 +1,10 @@
 import pytest
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy.core.db.querysets import Prefetch
 from edgy.exceptions import QuerySetError
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 

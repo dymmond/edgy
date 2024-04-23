@@ -1,11 +1,11 @@
 import pytest
-from tests.settings import DATABASE_URL
 
 import edgy
 from edgy import Manager
 from edgy.core.db.querysets import QuerySet
 from edgy.exceptions import ImproperlyConfigured
 from edgy.testclient import DatabaseTestClient as Database
+from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = edgy.Registry(database=database)
