@@ -1,10 +1,7 @@
-from typing import TYPE_CHECKING, Any, Type, cast
+from typing import Any, Type, cast
 
 from edgy.core.db.context_vars import get_tenant, set_tenant
 from edgy.core.db.querysets.base import QuerySet
-
-if TYPE_CHECKING:
-    pass
 
 
 class Manager:
