@@ -1,7 +1,10 @@
 import argparse
+import inspect
 import os
 import typing
-from typing import TYPE_CHECKING, Any, Callable, Optional
+import warnings
+from importlib import import_module
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
 
 from alembic import __version__ as __alembic_version__
 from alembic import command
@@ -11,6 +14,7 @@ from edgy.cli.constants import DEFAULT_TEMPLATE_NAME, EDGY_DB
 from edgy.cli.decorators import catch_errors
 from edgy.core.extras.base import BaseExtra
 from edgy.core.utils.functional import edgy_setattr
+from edgy.utils.compat import is_class_and_subclass
 
 if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
@@ -59,6 +63,7 @@ class Migrate(BaseExtra):
         self,
         app: typing.Any,
         registry: "Registry",
+        model_apps: Dict[str, str] = None,
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: Any,
@@ -68,12 +73,53 @@ class Migrate(BaseExtra):
         self.app = app
         self.configure_callbacks: typing.List[Callable] = []
         self.registry = registry
+        self.model_apps = model_apps or {}
+
+        assert isinstance(
+            model_apps, dict
+        ), "`model_apps` must be a dict of 'app_name:location' format."
+
+        models = self.check_db_models(self.model_apps)
+
+        for name, _ in models.items():
+            if name in self.registry.models:
+                warnings.warn(
+                    f"There is already a model with the name {name} declared. Overriding the model will occur unless you rename it.",
+                    stacklevel=2,
+                )
+
+        if self.registry.models:
+            self.registry.models = {**models, **self.registry.models}
+        else:
+            self.registry.models = models
+
         self.directory = "migrations"
         self.alembic_ctx_kwargs = kwargs
         self.alembic_ctx_kwargs["compare_type"] = compare_type
         self.alembic_ctx_kwargs["render_as_batch"] = render_as_batch
 
         self.set_edgy_extension(app)
+
+    def check_db_models(self, model_apps: Dict[str, str]) -> Dict[str, Any]:
+        """
+        Goes through all the model applications declared in the migrate and
+        adds them into the registry.
+        """
+        from edgy.core.db.models import Model, ReflectModel
+
+        models: Dict[str, Any] = {}
+
+        for _, location in model_apps.items():
+            module = import_module(location)
+            members = inspect.getmembers(
+                module,
+                lambda attr: is_class_and_subclass(attr, Model)
+                and not attr.meta.abstract
+                and not is_class_and_subclass(attr, ReflectModel),
+            )
+            for name, model in members:
+                models[name] = model
+        return models
 
     def set_edgy_extension(self, app: Any, **kwargs: Any) -> None:
         """

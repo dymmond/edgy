@@ -82,6 +82,8 @@ The parameters availabe when using instantiating a [Migrate](#migration) object 
 * **app** - The application instance. Any application you want your migrations to be attached to.
 * **registry** - The registry being used for your models. The registry **must be** an instance
 of `edgy.Registry` or an `AssertationError` is raised.
+* **model_apps** - A dictionary like object containing the string name and the location of the models
+used for inspection.
 * **compare_type** - Flag option that configures the automatic migration generation subsystem
 to detect column type changes.
 
@@ -150,6 +152,72 @@ I believe you got the idea with the examples above, It was not specified any spe
 unique-like parameter that demanded special attention, just the application itself.
 
 This means you can plug something else like Quart, Ella or even Sanic... Your pick.
+
+### Using the `model_apps`
+
+Since Edgy is framework agnostic, there is no way sometimes to tell where the models are unless
+you are using them somewhere and this can be annoying if you want to generate migrations and manage
+them without passing the models into the `__init__.py` of a python module
+
+The **Migrate** object allows also to pass an extra parameter called `model_apps`. This is nothing
+more nothing less than the location of the file containing the models used by your same application.
+
+#### Example
+
+Let us assume we have an application with the following structure.
+
+```shell
+.
+└── README.md
+└── .gitignore
+└── myproject
+    ├── __init__.py
+    ├── apps
+    │   ├── __init__.py
+    │   └── accounts
+    │       ├── __init__.py
+    │       ├── tests.py
+    │       ├── models.py
+    │       └── v1
+    │           ├── __init__.py
+    │           ├── schemas.py
+    │           ├── urls.py
+    │           └── views.py
+    ├── configs
+    │   ├── __init__.py
+    │   ├── development
+    │   │   ├── __init__.py
+    │   │   └── settings.py
+    │   ├── settings.py
+    │   └── testing
+    │       ├── __init__.py
+    │       └── settings.py
+    ├── main.py
+    ├── serve.py
+    ├── utils.py
+    ├── tests
+    │   ├── __init__.py
+    │   └── test_app.py
+    └── urls.py
+```
+
+As you can see, it is quite structured but let us focus specifically on `accounts/models.py`.
+
+There is where your models for the `accounts` application will be placed. Something like this:
+
+```python
+{!> ../docs_src/migrations/accounts_models.py !}
+```
+
+Now we want to tell the **Migrate** object to make sure it knows about this.
+
+```python
+{!> ../docs_src/migrations/accounts_migrate.py !}
+```
+
+As you can see the `model_apps = {"accounts": "accounts.models"}` was added in a simple fashion.
+Every time you add new model or any changes, it should behave as normal as before with the key difference
+that **now Edgy has a way to know exactly where your models are specifically**.
 
 ## Generating and working with migrations
 
