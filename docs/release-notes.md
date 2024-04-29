@@ -5,6 +5,19 @@ hide:
 
 # Release Notes
 
+## 0.10.0
+
+### Added
+
+- Support for `model_apps` inside the `Migrate` object allowing
+global discovery by application. This will make sure all apps will be properly
+inspected.
+- Add documentation about the new [model_apps](./migrations/migrations.md#using-the-model_apps)
+
+### Changed
+
+- Upgrade internal requirements.
+
 ## 0.9.2
 
 ### Changed
