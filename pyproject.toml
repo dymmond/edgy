@@ -93,7 +93,7 @@ test = [
     "ruff>=0.0.256,<1.0.0",
 ]
 
-dev = ["ipdb>=0.13.13,<1.0.0", "pre-commit>=3.3.1,<4.0.0"]
+dev = ["ipdb>=0.13.13,<1.0.0", "pdbpp", "pre-commit>=3.3.1,<4.0.0"]
 
 doc = [
     "griffe-typingdoc>=0.2.2",

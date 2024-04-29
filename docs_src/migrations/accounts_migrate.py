@@ -32,7 +32,11 @@ def get_application():
         routes=[Include(namespace="my_project.urls")],
     )
 
-    Migrate(app=app, registry=registry)
+    Migrate(
+        app=app,
+        registry=registry,
+        model_apps={"accounts": "accounts.models"},
+    )
     return app
 
 
