@@ -76,7 +76,7 @@ class Migrate(BaseExtra):
         self.model_apps = model_apps or {}
 
         assert isinstance(
-            model_apps, dict
+            self.model_apps, dict
         ), "`model_apps` must be a dict of 'app_name:location' format."
 
         models = self.check_db_models(self.model_apps)
