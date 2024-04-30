@@ -5,6 +5,12 @@ hide:
 
 # Release Notes
 
+## 0.10.1
+
+### Added
+
+- Support for `list` and `tuples` as a type for [model_apps](./migrations/migrations#using-the-model_apps).
+
 ## 0.10.0
 
 ### Added
