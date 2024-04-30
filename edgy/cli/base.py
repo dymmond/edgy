@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import argparse
 import inspect
 import os
 import typing
 import warnings
 from importlib import import_module
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, cast
 
 from alembic import __version__ as __alembic_version__
 from alembic import command
@@ -23,7 +25,7 @@ alembic_version = tuple(int(v) for v in __alembic_version__.split(".")[0:3])
 
 
 class MigrateConfig:
-    def __init__(self, migrate: typing.Any, registry: "Registry", **kwargs: Any) -> None:
+    def __init__(self, migrate: typing.Any, registry: Registry, **kwargs: Any) -> None:
         self.migrate = migrate
         self.registry = registry
         self.directory = migrate.directory
@@ -62,8 +64,8 @@ class Migrate(BaseExtra):
     def __init__(
         self,
         app: typing.Any,
-        registry: "Registry",
-        model_apps: Dict[str, str] = None,
+        registry: Registry,
+        model_apps: Dict[str, str] | tuple[str] | list[str] | None = None,
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: Any,
@@ -76,8 +78,11 @@ class Migrate(BaseExtra):
         self.model_apps = model_apps or {}
 
         assert isinstance(
-            self.model_apps, dict
-        ), "`model_apps` must be a dict of 'app_name:location' format."
+            self.model_apps, (dict, tuple, list)
+        ), "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
+
+        if isinstance(self.model_apps, dict):
+            self.model_apps = cast(dict[str, str], self.model_apps.values())
 
         models = self.check_db_models(self.model_apps)
 
@@ -100,7 +105,9 @@ class Migrate(BaseExtra):
 
         self.set_edgy_extension(app)
 
-    def check_db_models(self, model_apps: Dict[str, str]) -> Dict[str, Any]:
+    def check_db_models(
+        self, model_apps: Dict[str, str] | tuple[str] | list[str]
+    ) -> Dict[str, Any]:
         """
         Goes through all the model applications declared in the migrate and
         adds them into the registry.
@@ -109,7 +116,7 @@ class Migrate(BaseExtra):
 
         models: Dict[str, Any] = {}
 
-        for _, location in model_apps.items():
+        for location in model_apps:
             module = import_module(location)
             members = inspect.getmembers(
                 module,
