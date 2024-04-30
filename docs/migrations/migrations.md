@@ -162,6 +162,12 @@ them without passing the models into the `__init__.py` of a python module
 The **Migrate** object allows also to pass an extra parameter called `model_apps`. This is nothing
 more nothing less than the location of the file containing the models used by your same application.
 
+There are **three ways of passing values into the model_apps**.
+
+* Via [dictionary](#via-dictionary).
+* Via [tuple](#via-tuple).
+* Via [list](#via-list).
+
 #### Example
 
 Let us assume we have an application with the following structure.
@@ -211,13 +217,30 @@ There is where your models for the `accounts` application will be placed. Someth
 
 Now we want to tell the **Migrate** object to make sure it knows about this.
 
+##### Via dictionary
+
 ```python
-{!> ../docs_src/migrations/accounts_migrate.py !}
+{!> ../docs_src/migrations/via_dict.py !}
 ```
 
 As you can see the `model_apps = {"accounts": "accounts.models"}` was added in a simple fashion.
 Every time you add new model or any changes, it should behave as normal as before with the key difference
 that **now Edgy has a way to know exactly where your models are specifically**.
+
+##### Via tuple
+
+```python
+{!> ../docs_src/migrations/via_tuple.py !}
+```
+
+The same for the tuple. You can simply pass `("accounts.models",)` as the location for the models.
+
+##### Via list
+
+```python
+{!> ../docs_src/migrations/via_list.py !}
+```
+Finally, for the `list`. You can pass `["accounts.models"]` as the location for the models.
 
 ## Generating and working with migrations
 
