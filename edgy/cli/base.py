@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 import argparse
 import inspect
 import os
 import typing
 import warnings
 from importlib import import_module
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union, cast
 
 from alembic import __version__ as __alembic_version__
 from alembic import command
@@ -65,7 +63,7 @@ class Migrate(BaseExtra):
         self,
         app: typing.Any,
         registry: Registry,
-        model_apps: Dict[str, str] | tuple[str] | list[str] | None = None,
+        model_apps: Union[Dict[str, str], Tuple[str], List[str], None] = None,
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: Any,
@@ -106,7 +104,7 @@ class Migrate(BaseExtra):
         self.set_edgy_extension(app)
 
     def check_db_models(
-        self, model_apps: Dict[str, str] | tuple[str] | list[str]
+        self, model_apps: Union[Dict[str, str], Tuple[str], List[str]]
     ) -> Dict[str, Any]:
         """
         Goes through all the model applications declared in the migrate and
