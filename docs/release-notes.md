@@ -9,7 +9,7 @@ hide:
 
 ### Added
 
-- Support for `list` and `tuples` as a type for [model_apps](./migrations/migrations#using-the-model_apps).
+- Support for `list` and `tuples` as a type for [model_apps](./migrations/migrations.md#using-the-model_apps).
 
 ## 0.10.0
 
