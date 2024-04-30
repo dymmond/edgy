@@ -80,7 +80,7 @@ class Migrate(BaseExtra):
         ), "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
 
         if isinstance(self.model_apps, dict):
-            self.model_apps = cast(dict[str, str], self.model_apps.values())
+            self.model_apps = cast(Dict[str, str], self.model_apps.values())
 
         models = self.check_db_models(self.model_apps)
 
