@@ -23,7 +23,7 @@ alembic_version = tuple(int(v) for v in __alembic_version__.split(".")[0:3])
 
 
 class MigrateConfig:
-    def __init__(self, migrate: typing.Any, registry: Registry, **kwargs: Any) -> None:
+    def __init__(self, migrate: typing.Any, registry: "Registry", **kwargs: Any) -> None:
         self.migrate = migrate
         self.registry = registry
         self.directory = migrate.directory
@@ -62,7 +62,7 @@ class Migrate(BaseExtra):
     def __init__(
         self,
         app: typing.Any,
-        registry: Registry,
+        registry: "Registry",
         model_apps: Union[Dict[str, str], Tuple[str], List[str], None] = None,
         compare_type: bool = True,
         render_as_batch: bool = True,
