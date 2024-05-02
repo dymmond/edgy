@@ -1,13 +1,5 @@
 #!/bin/sh -e
 
-VERSION_FILE="edgy/__init__.py"
-
-if [ -d 'venv' ] ; then
-    PREFIX="venv/bin/"
-else
-    PREFIX=""
-fi
-
 if [ ! -z "$GITHUB_ACTIONS" ]; then
   git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
   git config --local user.name "GitHub Action"
@@ -22,4 +14,4 @@ fi
 
 set -x
 
-${PREFIX}twine upload dist/*
+hatch run twine upload dist/*

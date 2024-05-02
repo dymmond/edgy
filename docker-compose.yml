@@ -10,8 +10,6 @@ services:
       POSTGRES_DB: "edgy"
     expose:
       - "5432"
-    volumes:
-      - "edgy:/var/lib/postgresql/data"
       # - ./create_db.sh:/docker-entrypoint-initdb.d/create_db.sh
     command: >-
         --jit=false
@@ -26,15 +24,7 @@ services:
       POSTGRES_USER: "postgres"
       POSTGRES_PASSWORD: "postgres"
       POSTGRES_DB: "edgy_alt"
-    volumes:
-      - "edgy_alt:/var/lib/postgresql/data"
     command: >-
         --jit=false
     ports:
       - "5433:5432"
-
-volumes:
-  edgy:
-    external: true
-  edgy_alt:
-    external: true
