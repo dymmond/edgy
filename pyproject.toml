@@ -88,6 +88,12 @@ dependencies = [
     "pre-commit>=2.17.0,<3.0.0",
     "twine"
 ]
+[tool.hatch.envs.default.scripts]
+clean_pyc = "find . -type f -name \"*.pyc\" -delete"
+clean_pycache = "find . -type d -name \"*__pycache__*\" -delete"
+lint = "ruff check --fix --line-length 99  edgy tests docs_src {args}"
+build_with_check = "hatch build; twine check dist/*"
+
 
 [tool.hatch.envs.docs]
 dependencies = [
