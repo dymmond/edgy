@@ -59,11 +59,11 @@ jobs:
           key: ${{ runner.os }}-python-${{ env.pythonLocation }}-${{ hashFiles('pyproject.toml') }}-test-v02
       - name: "Install dependencies"
         if: steps.cache.outputs.cache-hit != 'true'
-        run: "scripts/install"
+        run: "pip install hatch"
       - name: "Run linting"
-        run: "scripts/lint"
+        run: "hatch run lint"
       - name: "Run tests"
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/edgy"
           TEST_DATABASE_ALTERNATIVE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5433/edgy_alt"
-        run: "scripts/test"
+        run: "hatch run test:coverage"

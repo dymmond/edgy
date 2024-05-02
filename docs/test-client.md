@@ -11,7 +11,7 @@ Before continuing, make sure you have the Edgy test client installed with the ne
 requirements.
 
 ```
-$ pip install edgy[testing]
+$ pip install edgy[test]
 ```
 
 ## DatabaseTestClient
