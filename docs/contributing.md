@@ -51,12 +51,15 @@ Not necessary because the dependencies are automatically installed by hatch.
 But if environments should be pre-initialized it can be done with `hatch env`
 
 ```shell
-$ cd esmerald
+$ cd edgy
 $ hatch env create
 $ hatch env create test
 $ hatch env create docs
 ```
 
+!!! Tip
+    This is the recommended way but if you still feel you want your own virtual environment and
+    all the packages installed there, you can always run `scripts/install`.
 
 ### Enable pre-commit
 
