@@ -17,4 +17,4 @@ else
 fi
 
 "$PIP" install -U pip
-"$PIP" install -e .[dev,test,doc,templates,jwt,encoders,schedulers,ipython,ptpython]
+"$PIP" install -e .[dev,test,doc,postgres,mysql,mssql,sqlite,testing,ipython,ptpython]
