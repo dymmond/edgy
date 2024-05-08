@@ -984,7 +984,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     async def delete(self) -> None:
         queryset: "QuerySet" = self._clone()
 
-        await self.model_class.signals.pre_delete.send(sender=self.__class__, instance=self)
+        await self.model_class.signals.pre_delete.send_async(self.__class__, instance=self)
 
         expression = queryset.table.delete()
         for filter_clause in queryset.filter_clauses:
@@ -993,7 +993,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._set_query_expression(expression)
         await queryset.database.execute(expression)
 
-        await self.model_class.signals.post_delete.send(sender=self.__class__, instance=self)
+        await self.model_class.signals.post_delete.send_async(self.__class__, instance=self)
 
     async def update(self, **kwargs: Any) -> None:
         """
@@ -1007,8 +1007,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         kwargs = queryset._update_auto_now_fields(extracted_fields, queryset.model_class.fields)
 
         # Broadcast the initial update details
-        await self.model_class.signals.pre_update.send(
-            sender=self.__class__, instance=self, kwargs=kwargs
+        await self.model_class.signals.pre_update.send_async(
+            self.__class__, instance=self, kwargs=kwargs
         )
 
         expression = queryset.table.update().values(**kwargs)
@@ -1020,7 +1020,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         await queryset.database.execute(expression)
 
         # Broadcast the update executed
-        await self.model_class.signals.post_update.send(sender=self.__class__, instance=self)
+        await self.model_class.signals.post_update.send_async(self.__class__, instance=self)
 
     async def get_or_create(
         self, defaults: Dict[str, Any], **kwargs: Any

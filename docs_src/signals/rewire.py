@@ -17,18 +17,8 @@ class User(edgy.Model):
         registry = registry
 
 
-# Create the custom signal
-User.meta.signals.on_verify = Signal()
+# Overwrite a model lifecycle Signal; this way the main signals.pre_delete is not triggered
+User.meta.signals.pre_delete = Signal()
 
-
-# Create the receiver
-async def trigger_notifications(sender, instance, **kwargs):
-    """
-    Sends email and push notification
-    """
-    send_email(instance.email)
-    send_push_notification(instance.email)
-
-
-# Register the receiver into the new Signal.
-User.meta.signals.on_verify.connect(trigger_notifications)
+# Update all lifecyle signals. Replace pre_delete again with the default
+User.meta.signals.set_lifecycle_signals_from(signals)

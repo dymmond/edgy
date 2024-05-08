@@ -58,19 +58,6 @@ async def rollback_connections():
             yield
 
 
-@pytest.mark.parametrize("func", ["bad", 1, 3, [3], {"name": "test"}])
-def test_passing_not_callable(func):
-    with pytest.raises(SignalError):
-        pre_save(User)(func)
-
-
-def test_passing_no_kwargs():
-    with pytest.raises(SignalError):
-
-        @pre_save(User)
-        def execute(sender, instance): ...
-
-
 def test_invalid_signal():
     broadcaster = Broadcaster()
     with pytest.raises(SignalError):
@@ -78,32 +65,32 @@ def test_invalid_signal():
 
 
 async def test_signals():
-    @pre_save(User)
+    @pre_save.connect_via(User)
     async def pre_saving(sender, instance, **kwargs):
         await Log.query.create(signal="pre_save", instance=instance.model_dump())
         logger.info(f"pre_save signal broadcasted for {instance.get_instance_name()}")
 
-    @post_save(User)
+    @post_save.connect_via(User)
     async def post_saving(sender, instance, **kwargs):
         await Log.query.create(signal="post_save", instance=instance.model_dump())
         logger.info(f"post_save signal broadcasted for {instance.get_instance_name()}")
 
-    @pre_update(User)
+    @pre_update.connect_via(User)
     async def pre_updating(sender, instance, **kwargs):
         await Log.query.create(signal="pre_update", instance=instance.model_dump())
         logger.info(f"pre_update signal broadcasted for {instance.get_instance_name()}")
 
-    @post_update(User)
+    @post_update.connect_via(User)
     async def post_updating(sender, instance, **kwargs):
         await Log.query.create(signal="post_update", instance=instance.model_dump())
         logger.info(f"post_update signal broadcasted for {instance.get_instance_name()}")
 
-    @pre_delete(User)
+    @pre_delete.connect_via(User)
     async def pre_deleting(sender, instance, **kwargs):
         await Log.query.create(signal="pre_delete", instance=instance.model_dump())
         logger.info(f"pre_delete signal broadcasted for {instance.get_instance_name()}")
 
-    @post_delete(User)
+    @post_delete.connect_via(User)
     async def post_deleting(sender, instance, **kwargs):
         await Log.query.create(signal="post_delete", instance=instance.model_dump())
         logger.info(f"post_delete signal broadcasted for {instance.get_instance_name()}")
@@ -159,12 +146,12 @@ async def test_signals():
 async def test_staticmethod_signals():
     class Static:
         @staticmethod
-        @pre_save(User)
+        @pre_save.connect_via(User)
         async def pre_save_one(sender, instance, **kwargs):
             await Log.query.create(signal="pre_save_one", instance=instance.model_dump_json())
 
         @staticmethod
-        @pre_save(User)
+        @pre_save.connect_via(User)
         async def pre_save_two(sender, instance, **kwargs):
             await Log.query.create(signal="pre_save_two", instance=instance.model_dump_json())
 
@@ -178,30 +165,15 @@ async def test_staticmethod_signals():
     user.signals.pre_save.disconnect(Static.pre_save_two)
 
 
-async def test_multiple_senders():
-    @pre_save([User, Profile])
-    async def pre_saving(sender, instance, **kwargs):
-        await Log.query.create(signal="pre_save", instance=instance.model_dump_json())
-
-    user = await User.query.create(name="Edgy")
-    profile = await User.query.create(name="Profile Edgy")
-
-    logs = await Log.query.all()
-    assert len(logs) == 2
-
-    user.signals.pre_save.disconnect(pre_saving)
-    profile.signals.pre_save.disconnect(pre_saving)
-
-
 async def test_custom_signal():
     async def processing(sender, instance, **kwargs):
         instance.name = f"{instance.name} ORM"
         await instance.save()
 
-    User.meta.signals.custom.connect(processing)
+    User.meta.signals.custom.connect(receiver=processing)
 
     user = await User.query.create(name="Edgy")
-    await User.meta.signals.custom.send(sender=User, instance=user)
+    await User.meta.signals.custom.send_async(User, instance=user)
 
     assert user.name == "Edgy ORM"
 

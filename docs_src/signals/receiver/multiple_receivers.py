@@ -11,7 +11,7 @@ def send_email(email: str) -> None:
     ...
 
 
-@post_save(User)
+@post_save.connect_via(User)
 async def after_creation(sender, instance, **kwargs):
     """
     Sends a notification to the user
@@ -19,7 +19,7 @@ async def after_creation(sender, instance, **kwargs):
     send_email(instance.email)
 
 
-@post_save(User)
+@post_save.connect_via(User)
 async def do_something_else(sender, instance, **kwargs):
     """
     Sends a notification to the user

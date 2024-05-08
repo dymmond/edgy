@@ -50,13 +50,13 @@ class Model(ModelRow, DeclarativeMixin):
         """
         Update operation of the database fields.
         """
-        await self.signals.pre_update.send(sender=self.__class__, instance=self)
+        await self.signals.pre_update.send_async(self.__class__, instance=self)
 
         kwargs = self._update_auto_now_fields(kwargs, self.fields)
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
         await self.database.execute(expression)
-        await self.signals.post_update.send(sender=self.__class__, instance=self)
+        await self.signals.post_update.send_async(self.__class__, instance=self)
 
         # Update the model instance.
         for key, value in kwargs.items():
@@ -66,13 +66,13 @@ class Model(ModelRow, DeclarativeMixin):
 
     async def delete(self) -> None:
         """Delete operation from the database"""
-        await self.signals.pre_delete.send(sender=self.__class__, instance=self)
+        await self.signals.pre_delete.send_async(self.__class__, instance=self)
 
         pk_column = getattr(self.table.c, self.pkname)
         expression = self.table.delete().where(pk_column == self.pk)
         await self.database.execute(expression)
 
-        await self.signals.post_delete.send(sender=self.__class__, instance=self)
+        await self.signals.post_delete.send_async(self.__class__, instance=self)
 
     async def load(self) -> None:
         # Build the select expression.
@@ -157,7 +157,7 @@ class Model(ModelRow, DeclarativeMixin):
         When creating a user it will make sure it can update existing or
         create a new one.
         """
-        await self.signals.pre_save.send(sender=self.__class__, instance=self)
+        await self.signals.pre_save.send_async(self.__class__, instance=self)
 
         extracted_fields = self.extract_db_fields()
         extracted_model_references = self.extract_db_model_references()
@@ -186,13 +186,13 @@ class Model(ModelRow, DeclarativeMixin):
             kwargs, model_references = self.update_model_references(**validated_values)
             update_model = {k: v for k, v in validated_values.items() if k in kwargs}
 
-            await self.signals.pre_update.send(
-                sender=self.__class__, instance=self, kwargs=update_model
+            await self.signals.pre_update.send_async(
+                self.__class__, instance=self, kwargs=update_model
             )
             await self.update(**update_model)
 
             # Broadcast the update complete
-            await self.signals.post_update.send(sender=self.__class__, instance=self)
+            await self.signals.post_update.send_async(self.__class__, instance=self)
 
         # Save the model references
         if model_references:
@@ -207,7 +207,7 @@ class Model(ModelRow, DeclarativeMixin):
         ):
             await self.load()
 
-        await self.signals.post_save.send(sender=self.__class__, instance=self)
+        await self.signals.post_save.send_async(self.__class__, instance=self)
         return self
 
     def __getattr__(self, name: str) -> Any:

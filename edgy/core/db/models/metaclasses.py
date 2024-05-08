@@ -31,7 +31,7 @@ from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
-from edgy.core.signals import Broadcaster, Signal
+from edgy.core import signals as signals_module
 from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
@@ -90,7 +90,7 @@ class MetaInfo:
         self.related_names: Set[str] = getattr(meta, "related_names", set())
         self.related_fields: Dict[str, Any] = getattr(meta, "related_fields", {})
         self.related_names_mapping: Dict[str, Any] = getattr(meta, "related_names_mapping", {})
-        self.signals: Optional[Broadcaster] = getattr(meta, "signals", {})  # type: ignore
+        self.signals: Optional[signals_module.Broadcaster] = getattr(meta, "signals", {})  # type: ignore
 
         for k, v in kwargs.items():
             edgy_setattr(self, k, v)
@@ -203,13 +203,8 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
     """
     Registers the signals in the model's Broadcaster and sets the defaults.
     """
-    signals = Broadcaster()
-    signals.pre_save = Signal()
-    signals.pre_update = Signal()
-    signals.pre_delete = Signal()
-    signals.post_save = Signal()
-    signals.post_update = Signal()
-    signals.post_delete = Signal()
+    signals = signals_module.Broadcaster()
+    signals.set_lifecycle_signals_from(signals_module, overwrite=False)
     model_class.meta.signals = signals
 
 
@@ -515,11 +510,11 @@ class BaseModelMeta(ModelMetaclass):
         self._table = value
 
     @property
-    def signals(cls) -> "Broadcaster":
+    def signals(cls) -> signals_module.Broadcaster:
         """
         Returns the signals of a class
         """
-        return cast("Broadcaster", cls.meta.signals)
+        return cast(signals_module.Broadcaster, cls.meta.signals)
 
     def table_schema(cls, schema: str) -> Any:
         """
