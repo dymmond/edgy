@@ -33,15 +33,22 @@ class BaseForeignKey(BaseField):
         if isinstance(value, target):
             return value
 
-        fields_filtered = {
-            target.proxy_model.pkname: target.proxy_model.fields.get(target.proxy_model.pkname)
-        }
+        if not isinstance(value, dict):
+            if len(target.proxy_model.pknames) != 1:
+                raise
+            value = {target.proxy_model.pknames[0]: value}
+        fields_filtered = {}
+        query = {}
+        for pkname, val in value.items():
+            fields_filtered[pkname] = target.proxy_model.fields.get(pkname)
+            query[pkname] = val
         target.proxy_model.model_fields = fields_filtered
         target.proxy_model.model_rebuild(force=True)
-        return target.proxy_model(pk=value)
+        return target.proxy_model(**query)
 
     def check(self, value: Any) -> Any:
         """
         Runs the checks for the fields being validated.
         """
+        assert len(self.target.pknames) == 1
         return value.pk

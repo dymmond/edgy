@@ -230,8 +230,10 @@ class ModelRow(EdgyBaseModel):
 
             # Check for individual not nested querysets
             elif related.queryset is not None and not is_nested:
-                filter_by_pk = row[cls.pkname]
-                extra = {f"{related.related_name}__id": filter_by_pk}
+                extra = {}
+                for pkname in cls.pknames:
+                    filter_by_pk = row[kname]
+                    extra[f"{related.related_name}__{pkname}"] = filter_by_pk
                 related.queryset.extra = extra
 
                 # Execute the queryset
@@ -281,9 +283,10 @@ class ModelRow(EdgyBaseModel):
         query = "__".join(query_split)
 
         # Extact foreign key value
-        filter_by_pk = row[parent_cls.pkname]
-
-        extra = {f"{query}__id": filter_by_pk}
+        extra = {}
+        for pkname in parent_cls.pknames:
+            filter_by_pk = row[pkname]
+            extra[f"{query}__{pkname}"] = filter_by_pk
 
         records = asyncio.get_event_loop().run_until_complete(
             cls.run_query(model_class, extra, queryset)

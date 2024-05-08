@@ -323,8 +323,10 @@ class BaseQuerySet(
             self.model_class = self.model_class.parent
 
         if kwargs.get("pk"):
-            pk_name = self.model_class.pkname
-            kwargs[pk_name] = kwargs.pop("pk")
+            pkval = kwargs.pop("pk")
+            if len(self.model_class.pknames) != 1:
+                raise
+            kwargs[self.model_class.pknames[0]] = pkval
 
         for key, value in kwargs.items():
             if "__" in key:
@@ -667,9 +669,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         key.
         """
         only_fields = [sqlalchemy.text(field) for field in fields]
-        if self.model_class.pkname not in fields:
-            only_fields.insert(0, sqlalchemy.text(self.model_class.pkname))
-
+        missing = []
+        for pkname in self,model_class.pknames:
+            if pkname not in fields:
+                missing.append(sqlalchemy.text(pkname))
+        if missing:
+            only_fields = missing + only_fields
         queryset: "QuerySet" = self._clone()
         queryset._only = only_fields
         return queryset
@@ -966,12 +971,16 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             queryset._extract_values_from_field(obj, queryset.model_class) for obj in new_objs
         ]
 
-        pk = getattr(queryset.table.c, queryset.pkname)
-        expression = queryset.table.update().where(pk == sqlalchemy.bindparam(queryset.pkname))
+        pks = {}
+        for pkname in queryset.model_class.pknames:
+            pks[pkname] = getattr(queryset.table.c, pkname) == sqlalchemy.bindparam(pkname)
+        expression = queryset.table.update().where(*pks.values())
         kwargs: Dict[Any, Any] = {
             field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()
         }
-        pks = [{queryset.pkname: getattr(obj, queryset.pkname)} for obj in objs]
+        pks = []
+        for obj in objs:
+            pks.append(ob.pks())
 
         query_list = []
         for pk, value in zip(pks, new_objs):  # noqa

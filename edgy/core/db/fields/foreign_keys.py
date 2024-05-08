@@ -81,21 +81,25 @@ class ForeignKeyFieldFactory:
 
 
 class BaseForeignKeyField(BaseForeignKey):
-    def get_column(self, name: str) -> Any:
+    def get_columns(self, name: str) -> Any:
         target = self.target
-        to_field = target.fields[target.pkname]
+        columns = []
+        for pkname in target.pknames:
 
-        column_type = to_field.column_type
-        constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}",
-                ondelete=self.on_delete,
-                onupdate=self.on_update,
-                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
-                f"_{target.pkname}_{name}",
-            )
-        ]
-        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+            to_field = target.fields[pkname]
+
+            column_type = to_field.column_type
+            constraints = [
+                sqlalchemy.schema.ForeignKey(
+                    f"{target.meta.tablename}.{pkname}",
+                    ondelete=self.on_delete,
+                    onupdate=self.on_update,
+                    name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
+                    f"_{pkname}_{name}",
+                )
+            ]
+            columns.append(sqlalchemy.Column(name, column_type, *constraints, nullable=self.null))
+        return columns
 
 
 class ForeignKey(ForeignKeyFieldFactory):

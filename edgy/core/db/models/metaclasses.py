@@ -42,7 +42,6 @@ if TYPE_CHECKING:
 class MetaInfo:
     __slots__ = (
         "pk",
-        "pk_attribute",
         "abstract",
         "fields",
         "fields_mapping",
@@ -68,8 +67,7 @@ class MetaInfo:
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.pk: Optional[BaseField] = getattr(meta, "pk", None)
-        self.pk_attribute: Union[BaseField, str] = getattr(meta, "pk_attribute", "")
+        self.pk: dict[str, BaseField] = getattr(meta, "pk", [])
         self.abstract: bool = getattr(meta, "abstract", False)
         self.fields: Set[Any] = getattr(meta, "fields", set())
         self.fields_mapping: Dict[str, BaseField] = getattr(meta, "fields_mapping", {})
@@ -244,7 +242,7 @@ class BaseModelMeta(ModelMetaclass):
         model_references: Dict["ModelRef", str] = {}
         many_to_many_fields: Any = set()
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
-        pk_attribute: str = "id"
+        pk_attributes: list[str] = []
         registry: Any = None
         base_annotations: Dict[str, Any] = {}
 
@@ -290,26 +288,19 @@ class BaseModelMeta(ModelMetaclass):
             attrs = {**inherited_fields, **attrs}
 
         # Handle with multiple primary keys and auto generated field if no primary key is provided
-        if name != "Model":
-            is_pk_present = False
-            for key, value in attrs.items():
-                if isinstance(value, BaseField):
-                    if value.primary_key:
-                        if is_pk_present:
-                            raise ImproperlyConfigured(
-                                f"Cannot create model {name} with multiple primary keys."
-                            )
-                        is_pk_present = True
-                        pk_attribute = key
+        for key, value in attrs.items():
+            if isinstance(value, BaseField):
+                if value.primary_key:
+                    pk_attributes.append(key)
 
-            if not is_pk_present and not getattr(meta_class, "abstract", None):
-                if "id" not in attrs:
-                    attrs = {"id": BigIntegerField(primary_key=True, autoincrement=True), **attrs}
-
-                if not isinstance(attrs["id"], BaseField) or not attrs["id"].primary_key:
-                    raise ImproperlyConfigured(
-                        f"Cannot create model {name} without explicit primary key if field 'id' is already present."
-                    )
+        if not pk_attributes and not getattr(meta_class, "abstract", None):
+            if "id" not in attrs:
+                attrs = {"id": BigIntegerField(primary_key=True, autoincrement=True), **attrs}
+                pk_attributes.append("id")
+            else:
+                raise ImproperlyConfigured(
+                    f"Cannot create model {name} without explicit primary key if field 'id' is already present."
+                )
 
         for key, value in attrs.items():
             if isinstance(value, BaseField):
@@ -338,8 +329,8 @@ class BaseModelMeta(ModelMetaclass):
         meta.foreign_key_fields = foreign_key_fields
         meta.many_to_many_fields = many_to_many_fields
         meta.model_references = model_references
-        meta.pk_attribute = pk_attribute
-        meta.pk = fields.get(pk_attribute)
+        pk_attributes.sort()
+        meta.pk = {field: fields.get(field) for field in pk_attributes}
 
         if not fields:
             meta.abstract = True
@@ -432,10 +423,13 @@ class BaseModelMeta(ModelMetaclass):
         if not meta.abstract:
             registry.models[name] = new_class
 
+        new_class.pknames = []
         for name, field in meta.fields_mapping.items():
             field.registry = registry
             if field.primary_key:
-                new_class.pkname = name
+                new_class.pknames.append(name)
+        # for nicer output
+        new_class.pknames.sort()
 
         new_class.__db_model__ = True
         new_class.fields = meta.fields_mapping

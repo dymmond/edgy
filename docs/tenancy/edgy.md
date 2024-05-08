@@ -112,7 +112,7 @@ Let us see an example:
 
 User.query.using('main').all()
 User.query.using('main').filter(email__icontains="user@example.com")
-User.query.using('main').get(pk=1)
+User.query.using('main').get(pk=(1,))
 ```
 
 **Using the activate_schema**

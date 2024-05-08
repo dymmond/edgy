@@ -170,28 +170,31 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
         if that happens, we need to assure it is small.
         """
-        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{self.target.pkname}_{name}"
+        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{name}_{','.join(self.target.pknames)}"
         if not len(fk_name) > CHAR_LIMIT:
             return fk_name
         return fk_name[:CHAR_LIMIT]
 
-    def get_column(self, name: str) -> sqlalchemy.Column:
+    def get_columns(self, name: str) -> list[sqlalchemy.Column]:
         """
         Builds the column for thr target.
         """
         target = self.target
-        to_field = target.fields[target.pkname]
+        columns = []
+        for pkname in target.pknames:
+            to_field = target.fields[pkname]
 
-        column_type = to_field.column_type
-        constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}",
-                ondelete=CASCADE,
-                onupdate=CASCADE,
-                name=self.get_fk_name(name=name),
-            )
-        ]
-        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+            column_type = to_field.column_type
+            constraints = [
+                sqlalchemy.schema.ForeignKey(
+                    f"{target.meta.tablename}.{pkname}",
+                    ondelete=CASCADE,
+                    onupdate=CASCADE,
+                    name=self.get_fk_name(name=name),
+                )
+            ]
+            columns.append(sqlalchemy.Column(name, column_type, *constraints, nullable=self.null))
+        return columns
 
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""

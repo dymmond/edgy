@@ -146,15 +146,15 @@ class BaseField(FieldInfo, _repr.Representation):
         """Checks if the field has a default value set"""
         return bool(self.default is not None and self.default is not Undefined)
 
-    def get_column(self, name: str) -> Any:
+    def get_columns(self, name: str) -> Any:
         """
         Returns the column type of the field being declared.
         """
         if self.column_type == sqlalchemy.ForeignKey:
-            return self.get_column(name)
+            return self.get_columns(name)
 
         constraints = self.get_constraints()
-        return sqlalchemy.Column(
+        return [sqlalchemy.Column(
             name,
             self.column_type,
             *constraints,
@@ -166,7 +166,7 @@ class BaseField(FieldInfo, _repr.Representation):
             comment=self.comment,
             server_default=self.server_default,
             server_onupdate=self.server_onupdate,
-        )
+        )]
 
     def expand_relationship(self, value: Any) -> Any:
         """

@@ -43,8 +43,8 @@ class QuerySetPropsMixin:
         self._table = value
 
     @property
-    def pkname(self) -> Any:
-        return self.model_class.pkname  # type: ignore
+    def pknames(self) -> Any:
+        return self.model_class.pknames  # type: ignore
 
     @property
     def is_m2m(self) -> bool:

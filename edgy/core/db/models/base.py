@@ -64,7 +64,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         Loops and setup the kwargs of the model
         """
         if "pk" in kwargs:
-            kwargs[self.pkname] = kwargs.pop("pk")
+            pk = kwargs.pop("pk")
+            if len(self.pknames) != 1:
+                raise
+            kwargs[self.pknames[0]] = pk
 
         kwargs = {
             k: v
@@ -82,13 +85,35 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             kwargs[key] = value
         return kwargs
 
+    def pks(self, namespace=None) -> dict[str, Any]:
+        pkdict = {}
+        if namespace is None:
+            namespace = self
+        for pkname in self.pknames:
+            pkdict[pkname] = getattr(namespace, pkname, None)
+        return pkdict
+
+    def pks_equal(self, namespace=None) -> list[Any]:
+        return [item[1] == item[0] for item in self.pks(namespace).items()]
+    
+    @property
+    def any_pks_null(self):
+        for pkname in self.pknames:
+            if getattr(self, pkname, None) is None:
+                return True
+        return False
+
     @property
     def pk(self) -> Any:
-        return getattr(self, self.pkname, None)
+        if len(self.pknames) != 1:
+            raise
+        return getattr(self, self.pknames[0], None)
 
     @pk.setter
     def pk(self, value: Any) -> Any:
-        edgy_setattr(self, self.pkname, value)
+        if len(self.pknames) != 1:
+            raise
+        edgy_setattr(self, self.pknames[0], val)
 
     @property
     def raw_query(self) -> Any:
@@ -102,7 +127,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return f"<{self.__class__.__name__}: {self}>"
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}({self.pkname}={self.pk})"
+        pkl = []
+        for pkname in self.pknames:
+            pkl.append(f"{pkname}={getattr(self, pkname)}")
+        return f"{self.__class__.__name__}({', '.join(pkl)})"
 
     @cached_property
     def proxy_model(self) -> Any:
@@ -151,8 +179,13 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             show_pk: bool - Enforces showing the primary key in the model_dump.
         """
         model = super().model_dump(**kwargs)
-        if self.pkname not in model and show_pk:
-            model = {**{self.pkname: self.pk}, **model}
+        isfirst = True
+        for pkname in self.pknames:
+            if pkname not in model and show_pk:
+                if isfirst:
+                    model = {**model}
+                    isfirst = False
+                model[pkname] = getattr(self, pkname)
         return model
 
     @classmethod
@@ -169,7 +202,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
         columns = []
         for name, field in cls.fields.items():
-            columns.append(field.get_column(name))
+            columns.extend(field.get_columns(name))
 
         # Handle the uniqueness together
         uniques = []
@@ -278,13 +311,6 @@ class EdgyBaseReflectModel(EdgyBaseModel, metaclass=BaseModelReflectMeta):
     def get_engine(cls, url: str) -> Engine:
         return sqlalchemy.create_engine(url)
 
-    @property
-    def pk(self) -> Any:
-        return getattr(self, self.pkname, None)
-
-    @pk.setter
-    def pk(self, value: Any) -> Any:
-        setattr(self, self.pkname, value)
 
     @classmethod
     def build(cls, schema: Optional[str] = None) -> Any:

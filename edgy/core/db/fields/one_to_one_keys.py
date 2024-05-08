@@ -81,23 +81,26 @@ class ForeignKeyFieldFactory:
 
 
 class BaseOneToOneKeyField(BaseForeignKey):
-    def get_column(self, name: str) -> Any:
+    def get_columns(self, name: str) -> Any:
         target = self.target
-        to_field = target.fields[target.pkname]
+        columns = []
+        for pkname in target.pknames:
+            to_field = target.fields[pkname]
 
-        column_type = to_field.column_type
-        constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}", ondelete=self.on_delete
-            )
-        ]
-        return sqlalchemy.Column(
-            name,
-            column_type,
-            *constraints,
-            nullable=self.null,
-            unique=True,
-        )
+            column_type = to_field.column_type
+            constraints = [
+                sqlalchemy.schema.ForeignKey(
+                    f"{target.meta.tablename}.{pkname}", ondelete=self.on_delete
+                )
+            ]
+            columns.append(sqlalchemy.Column(
+                name,
+                column_type,
+                *constraints,
+                nullable=self.null,
+                unique=True,
+            ))
+        return columns
 
 
 class OneToOneField(ForeignKeyFieldFactory):

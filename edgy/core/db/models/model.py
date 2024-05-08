@@ -44,7 +44,10 @@ class Model(ModelRow, DeclarativeMixin):
         return f"<{self.__class__.__name__}: {self}>"
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}({self.pkname}={self.pk})"
+        pkl = []
+        for pkname in self.pknames:
+            pkl.append(f"{pkname}={getattr(self, pkname)}")
+        return f"{self.__class__.__name__}({', '.join(pkl)})"
 
     async def update(self, **kwargs: Any) -> Any:
         """
@@ -53,8 +56,8 @@ class Model(ModelRow, DeclarativeMixin):
         await self.signals.pre_update.send(sender=self.__class__, instance=self)
 
         kwargs = self._update_auto_now_fields(kwargs, self.fields)
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
+
+        expression = self.table.update().where(*self.pks_equal(self.table.c))
         await self.database.execute(expression)
         await self.signals.post_update.send(sender=self.__class__, instance=self)
 
@@ -68,8 +71,7 @@ class Model(ModelRow, DeclarativeMixin):
         """Delete operation from the database"""
         await self.signals.pre_delete.send(sender=self.__class__, instance=self)
 
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.delete().where(pk_column == self.pk)
+        expression = self.table.delete().where(*self.pks_equal(self.table.c))
         await self.database.execute(expression)
 
         await self.signals.post_delete.send(sender=self.__class__, instance=self)
@@ -77,8 +79,7 @@ class Model(ModelRow, DeclarativeMixin):
     async def load(self) -> None:
         # Build the select expression.
 
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.select().where(pk_column == self.pk)
+        expression = self.table.select().where(*self.pks_equal(self.table.c))
 
         # Perform the fetch.
         row = await self.database.fetch_one(expression)
@@ -94,8 +95,12 @@ class Model(ModelRow, DeclarativeMixin):
         expression = self.table.insert().values(**kwargs)
         awaitable = await self.database.execute(expression)
         if not awaitable:
-            awaitable = kwargs.get(self.pkname)
-        edgy_setattr(self, self.pkname, awaitable)
+            for pkname in self.pknames:
+                edgy_setattr(self, pkname, kwargs.get(pkname))
+        else:
+            if len(self.pknames) != 1:
+                raise
+            edgy_setattr(self, self.pknames[0], awaitable)
         return self
 
     async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
@@ -162,14 +167,14 @@ class Model(ModelRow, DeclarativeMixin):
         extracted_fields = self.extract_db_fields()
         extracted_model_references = self.extract_db_model_references()
         extracted_fields.update(extracted_model_references)
-
-        if getattr(self, "pk", None) is None and self.fields[self.pkname].autoincrement:
-            extracted_fields.pop(self.pkname, None)
+        for pkname in self.pknames:
+            if getattr(self, pkname, None) is None and self.fields[pkname].autoincrement:
+                extracted_fields.pop(pkname, None)
 
         self.update_from_dict(dict_values=dict(extracted_fields.items()))
 
         # Performs the update or the create based on a possible existing primary key
-        if getattr(self, "pk", None) is None or force_save:
+        if force_save or self.any_pks_null:
             validated_values = values or self._extract_values_from_field(
                 extracted_values=extracted_fields
             )
@@ -215,7 +220,7 @@ class Model(ModelRow, DeclarativeMixin):
         Run an one off query to populate any foreign key making sure
         it runs only once per foreign key avoiding multiple database calls.
         """
-        if name not in self.__dict__ and name in self.fields and name != self.pkname:
+        if name not in self.__dict__ and name in self.fields and name not in self.pknames:
             run_sync(self.load())
             return self.__dict__[name]
         return super().__getattr__(name)

@@ -117,8 +117,8 @@ class DomainMixin(edgy.Model):
         self: Any, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
     ) -> Type[Model]:
         async with self.meta.registry.database.transaction():
-            domains = self.__class__.query.filter(tenant=self.tenant, is_priamry=True).exclude(
-                id=self.pk
+            domains = self.__class__.query.filter(tenant=self.tenant, is_primary=True).exclude(
+                **self.pks()
             )
 
             exists = await domains.exists()
@@ -185,7 +185,7 @@ class TenantUserMixin(edgy.Model):
         if self.is_active:
             await get_model(  # type: ignore
                 registry=self.meta.registry, model_name=self.__class__.__name__
-            ).query.filter(is_active=True, user=self.user).exclude(pk=self.pk).update(
+            ).query.filter(is_active=True, user=self.user).exclude(**self.pks()).update(
                 is_active=False
             )
         return cast("Type[TenantUserMixin]", self)
