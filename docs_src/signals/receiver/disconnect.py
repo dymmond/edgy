@@ -8,7 +8,7 @@ def send_notification(email: str) -> None:
     send_email_confirmation(email)
 
 
-@post_save(User)
+@post_save.connect_via(User)
 async def after_creation(sender, instance, **kwargs):
     """
     Sends a notification to the user

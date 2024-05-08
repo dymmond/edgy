@@ -1,7 +1,18 @@
 import copy
 import functools
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, Set, Type, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Dict,
+    Optional,
+    Sequence,
+    Set,
+    Type,
+    Union,
+    cast,
+)
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
@@ -14,7 +25,11 @@ from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.models._internal import DescriptiveMeta
 from edgy.core.db.models.managers import Manager
-from edgy.core.db.models.metaclasses import BaseModelMeta, BaseModelReflectMeta, MetaInfo
+from edgy.core.db.models.metaclasses import (
+    BaseModelMeta,
+    BaseModelReflectMeta,
+    MetaInfo,
+)
 from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.utils.functional import edgy_setattr
 from edgy.core.utils.models import DateParser, ModelParser, generify_model_fields
@@ -56,7 +71,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         Loops and setup the kwargs of the model
         """
-        model_references = {k: v for k, v in kwargs.items() if k in self.meta.model_references}
+        model_references = {
+            k: v for k, v in kwargs.items() if k in self.meta.model_references
+        }
         return model_references
 
     def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
@@ -75,7 +92,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         for key, value in kwargs.items():
             if key not in self.fields:
                 if not hasattr(self, key):
-                    raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
+                    raise ValueError(
+                        f"Invalid keyword {key} for class {self.__class__.__name__}"
+                    )
 
             # Set model field and add to the kwargs dict
             edgy_setattr(self, key, value)
@@ -161,7 +180,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         Builds the SQLAlchemy table representation from the loaded fields.
         """
         tablename: str = cls.meta.tablename  # type: ignore
-        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
+        metadata: sqlalchemy.MetaData = cast(
+            "sqlalchemy.MetaData", cls.meta.registry._metadata
+        )  # type: ignore
         metadata.schema = schema
 
         unique_together = cls.meta.unique_together
@@ -184,11 +205,18 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             indexes.append(index)
 
         return sqlalchemy.Table(
-            tablename, metadata, *columns, *uniques, *indexes, extend_existing=True  # type: ignore
+            tablename,
+            metadata,
+            *columns,
+            *uniques,
+            *indexes,
+            extend_existing=True,  # type: ignore
         )
 
     @classmethod
-    def _get_unique_constraints(cls, columns: Sequence) -> Optional[sqlalchemy.UniqueConstraint]:
+    def _get_unique_constraints(
+        cls, columns: Sequence
+    ) -> Optional[sqlalchemy.UniqueConstraint]:
         """
         Returns the unique constraints for the model.
 
@@ -220,7 +248,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         Extracts all the model references (ModelRef) from the model
         """
         related_names = self.meta.related_names
-        return {k: v for k, v in self.__model_references__.items() if k not in related_names}
+        return {
+            k: v for k, v in self.__model_references__.items() if k not in related_names
+        }
 
     def extract_db_fields(self) -> Dict[str, Any]:
         """
@@ -291,7 +321,9 @@ class EdgyBaseReflectModel(EdgyBaseModel, metaclass=BaseModelReflectMeta):
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", cls.meta.registry._metadata)  # type: ignore
+        metadata: sqlalchemy.MetaData = cast(
+            "sqlalchemy.MetaData", cls.meta.registry._metadata
+        )  # type: ignore
         metadata.schema = schema
 
         tablename: str = cast("str", cls.meta.tablename)

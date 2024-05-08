@@ -1,4 +1,8 @@
 import edgy
+from edgy.core import signals
+from edgy import Signal
+# or:
+# from blinker import Signal
 
 database = edgy.Database("sqlite:///db.sqlite")
 registry = edgy.Registry(database=database)
@@ -14,4 +18,4 @@ class User(edgy.Model):
 
 
 # Create the custom signal
-User.meta.signals.on_verify = edgy.Signal()
+User.meta.signals.on_verify = Signal()

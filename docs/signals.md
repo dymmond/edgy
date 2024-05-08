@@ -10,14 +10,14 @@ Other ORMs did a similar approach to this and a fantastic one was Ormar which to
 to its own implementation.
 
 Edgy being the way it is designed, got the inspiration from both of these approaches and also
-supports the `Signal`.
+supports the `Signal` from blinker. This is in blinker terminology called an anonymous signal.
 
 ## What are Signals
 
 Signals are a mechanism used to trigger specific actions upon a given type of event happens within
 the Edgy models.
 
-The same way Django approaches signals in terms of registration, Edgy does it in the similar fashion.
+The same way Django approaches signals in terms of registration, Edgy does it in the similar fashion using the blinker library.
 
 ## Default signals
 
@@ -193,7 +193,7 @@ and logic.
 
 So define it, you can simply do:
 
-```python hl_lines="17"
+```python hl_lines="21"
 {!> ../docs_src/signals/custom.py !}
 ```
 
@@ -212,6 +212,20 @@ Now you want to create a custom functionality to be listened in your new Signal.
 
 Now not only you created the new receiver `trigger_notifications` but also connected it to the
 the new `on_verify` signal.
+
+### Rewire signals
+
+To not call the default lifecycle signals you can overwrite them per class.
+You can either overwrite some or use the `set_lifecycle_signals_from` method of the Broadcaster (signals)
+
+This can be used to not call the default lifecycle signals in signals but custom ones or to use namespaces.
+
+Lifecycle methods are the former mentioned signals
+`
+```python
+{!> ../docs_src/signals/receiver/rewire.py !}
+```
+
 
 ### How to use it
 
@@ -233,3 +247,5 @@ The process of disconnecting the signal is exactly the [same as before](#disconn
 ```python hl_lines="10"
 {!> ../docs_src/signals/disconnect.py !}
 ```
+
+# Further documentation
