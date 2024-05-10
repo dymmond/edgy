@@ -41,7 +41,7 @@ async def rollback_connections():
             yield
 
 async def test_filter_with_empty_and():
-    user = await User.query.create(name="Adam", language="EN")
+    await User.query.create(name="Adam", language="EN")
 
     results = await User.query.filter(and_())
 
