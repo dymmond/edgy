@@ -109,6 +109,25 @@ The same special operators are also automatically added on every column.
 * **gt** - Filter instances having values `Greater Than`.
 * **gte** - Filter instances having values `Greater Than Equal`.
 
+There is also a Q object which behaves like Q in django, without keywords. It is an alias of `and_()` of edgy.
+There is also a helper named: `or_()`. When empty `or_()` blocks in contrast to `and_()` and its alias `Q`.
+
+Note: this behaviour differs from sqlalchemy
+
+##### Using  `and_` and `or_` with kwargs
+
+Often you want to check against an dict of key-values which should all match.
+For this there is an extension of edgy's `and_` and `or_` which takes a model or columns and
+matches kwargs against:
+
+```python
+users = await User.query.filter(_and.from_kwargs(User, name="foo", email="foo@example.com"))
+# or
+
+users = await User.query.filter(_and.from_kwargs(User, **my_dict))
+```
+
+
 ##### Example
 
 ```python

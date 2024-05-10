@@ -34,7 +34,7 @@ from .core.db.fields.many_to_many import ManyToMany, ManyToManyField
 from .core.db.fields.one_to_one_keys import OneToOne, OneToOneField
 from .core.db.models import Model, ModelRef, ReflectModel
 from .core.db.models.managers import Manager
-from .core.db.querysets import Prefetch, QuerySet, and_, not_, or_
+from .core.db.querysets import Prefetch, QuerySet, and_, not_, or_, Q
 from .core.extras import EdgyExtra
 from .core.signals import Signal
 from .core.utils.sync import run_sync
@@ -44,6 +44,7 @@ __all__ = [
     "and_",
     "not_",
     "or_",
+    "Q",
     "BigIntegerField",
     "BinaryField",
     "BooleanField",
