@@ -95,6 +95,7 @@ postgres = ["databasez[postgresql]"]
 mysql = ["databasez[mysql]"]
 sqlite = ["databasez[sqlite]"]
 mssql = ["databasez[aioodbc]"]
+# all except testing
 all = ["edgy[test,postgres,mysql,sqlite,mssql]", "ipython", "ptpython"]
 
 [tool.hatch.envs.default]
@@ -125,9 +126,7 @@ serve = "mkdocs serve --dev-addr localhost:8000"
 
 
 [tool.hatch.envs.test]
-features = ["all"]
-dependencies = ["edgy[testing]"]
-
+features = ["all","testing"]
 
 [tool.hatch.envs.test.scripts]
 # needs docker services running
