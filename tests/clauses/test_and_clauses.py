@@ -1,7 +1,7 @@
 import pytest
 
 import edgy
-from edgy.core.db.querysets.clauses import and_, Q
+from edgy.core.db.querysets.clauses import Q, and_
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -48,7 +48,7 @@ async def test_filter_with_empty_and():
     assert len(results) == 1
 
 async def test_filter_with_empty_Q():
-    user = await User.query.create(name="Adam", language="EN")
+    await User.query.create(name="Adam", language="EN")
 
     results = await User.query.filter(Q())
 

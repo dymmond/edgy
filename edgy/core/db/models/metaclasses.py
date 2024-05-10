@@ -20,6 +20,7 @@ import sqlalchemy
 from pydantic._internal._model_construction import ModelMetaclass
 
 from edgy.conf import settings
+from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
@@ -31,7 +32,6 @@ from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
-from edgy.core import signals as signals_module
 from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 

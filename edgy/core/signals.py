@@ -2,7 +2,6 @@ from blinker import Signal
 
 from edgy.exceptions import SignalError
 
-
 post_delete = Signal()
 post_save = Signal()
 post_update = Signal()

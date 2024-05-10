@@ -1,6 +1,8 @@
 from typing import Any
+
 import sqlalchemy
 from sqlalchemy.sql.base import ReadOnlyColumnCollection
+
 
 class _EnhancedClausesHelper:
     def __init__(self, op, default_empty):
@@ -15,7 +17,7 @@ class _EnhancedClausesHelper:
     def from_kwargs(self, columns_or_model, /, **kwargs: Any) -> Any:
         if not isinstance(columns_or_model, ReadOnlyColumnCollection) and hasattr(columns_or_model, "columns"):
             columns_or_model = columns_or_model.columns
-        return self.op(*map(lambda item: getattr(columns_or_model, item[0]) == item[1], kwargs.items()))
+        return self.op(*(getattr(columns_or_model, item[0]) == item[1] for item in kwargs.items()))
 
 or_ = _EnhancedClausesHelper(sqlalchemy.or_, sqlalchemy.false())
 or_.__doc__ = """
