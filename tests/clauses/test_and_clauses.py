@@ -1,7 +1,7 @@
 import pytest
 
 import edgy
-from edgy.core.db.querysets.clauses import and_
+from edgy.core.db.querysets.clauses import Q, and_
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -40,6 +40,20 @@ async def rollback_connections():
         async with database:
             yield
 
+async def test_filter_with_empty_and():
+    await User.query.create(name="Adam", language="EN")
+
+    results = await User.query.filter(and_())
+
+    assert len(results) == 1
+
+async def test_filter_with_empty_Q():
+    await User.query.create(name="Adam", language="EN")
+
+    results = await User.query.filter(Q())
+
+    assert len(results) == 1
+
 
 async def test_filter_with_and():
     user = await User.query.create(name="Adam", language="EN")
@@ -59,6 +73,24 @@ async def test_filter_with_and_two():
     )
 
     assert len(results) == 0
+
+async def test_filter_with_and_two_kwargs():
+    user = await User.query.create(name="Adam", email="edgy@edgy.dev")
+    await User.query.create(name="Edgy", email="edgy2@edgy.dev")
+
+    results = await User.query.filter(
+        and_.from_kwargs(User.columns, name="Adam", email="edgy@edgy.dev")
+    )
+
+    assert len(results) == 1
+    assert results[0].pk == user.pk
+
+    results = await User.query.filter(
+        and_.from_kwargs(User, name="Adam", email="edgy@edgy.dev")
+    )
+
+    assert len(results) == 1
+    assert results[0].pk == user.pk
 
 
 async def test_filter_with_and_three():

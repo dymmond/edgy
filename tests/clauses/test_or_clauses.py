@@ -40,6 +40,12 @@ async def rollback_connections():
         async with database:
             yield
 
+async def test_filter_with_empty_or():
+    await User.query.create(name="Adam", language="EN")
+
+    results = await User.query.filter(or_())
+
+    assert len(results) == 0
 
 async def test_filter_with_or():
     user = await User.query.create(name="Adam")
@@ -58,6 +64,24 @@ async def test_filter_with_or_two():
 
     results = await User.query.filter(
         or_(User.columns.name == "Adam", User.columns.name == "Edgy")
+    )
+
+    assert len(results) == 2
+
+
+async def test_filter_with_or_two_kwargs():
+    await User.query.create(name="Adam", email="edgy@edgy.dev")
+    await User.query.create(name="Edgy", email="edgy2@edgy.dev")
+
+    results = await User.query.filter(
+        or_.from_kwargs(User.columns, name="Adam", email="edgy2@edgy.dev")
+    )
+
+    assert len(results) == 2
+
+
+    results = await User.query.filter(
+        or_.from_kwargs(User, name="Adam", email="edgy2@edgy.dev")
     )
 
     assert len(results) == 2

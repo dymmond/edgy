@@ -109,12 +109,54 @@ The same special operators are also automatically added on every column.
 * **gt** - Filter instances having values `Greater Than`.
 * **gte** - Filter instances having values `Greater Than Equal`.
 
+
 ##### Example
 
 ```python
 users = await User.query.filter(email__icontains="foo")
 
 users = await User.query.filter(id__in=[1, 2, 3])
+```
+
+##### Using `Q` or other boolean clauses outside of filter
+
+`Q` is in fact the same like `and_` of edgy (alias). It is a helper for django users, which are used to `Q`.
+It can be used to combine where clauses outside of the `filter` function.
+
+Note: the `or_` c which differs in this way, that it blocks when empty instead of allowing all.
+
+###### Example:
+
+```python
+from edgy import and_, or_, Q
+# only valid with edgy Q() or and_()
+q = Q()
+# returns results
+User.query.filter(q)
+q &= and_(User.columns.name == "Edgy")
+# returns Users named Edgy
+User.query.filter(q)
+# only valid with edgy or_
+q = or_()
+# returns nothing
+User.query.filter(q)
+q &= Q(User.columns.name == "Edgy")
+# returns Users named Edgy
+User.query.filter(q)
+```
+
+
+##### Using  `and_` and `or_` with kwargs
+
+Often you want to check against an dict of key-values which should all match.
+For this there is an extension of edgy's `and_` and `or_` which takes a model or columns and
+matches kwargs against:
+
+```python
+users = await User.query.filter(_and.from_kwargs(User, name="foo", email="foo@example.com"))
+# or
+
+users = await User.query.filter(_and.from_kwargs(User, **my_dict))
 ```
 
 #### SQLAlchemy style
