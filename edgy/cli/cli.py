@@ -9,7 +9,12 @@ from functools import wraps
 
 import click
 
-from edgy.cli.constants import APP_PARAMETER, EXCLUDED_COMMANDS, HELP_PARAMETER, IGNORE_COMMANDS
+from edgy.cli.constants import (
+    APP_PARAMETER,
+    EXCLUDED_COMMANDS,
+    HELP_PARAMETER,
+    IGNORE_COMMANDS,
+)
 from edgy.cli.env import MigrationEnv
 from edgy.cli.operations import (
     check,
@@ -38,7 +43,9 @@ printer = Print()
 class EdgyGroup(click.Group):
     """Edgy command group with extras for the commands"""
 
-    def add_command(self, cmd: click.Command, name: typing.Optional[str] = None) -> None:
+    def add_command(
+        self, cmd: click.Command, name: typing.Optional[str] = None
+    ) -> None:
         if cmd.callback:
             cmd.callback = self.wrap_args(cmd.callback)
         return super().add_command(cmd, name)
@@ -47,7 +54,9 @@ class EdgyGroup(click.Group):
         params = inspect.signature(func).parameters
 
         @wraps(func)
-        def wrapped(ctx: click.Context, /, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+        def wrapped(
+            ctx: click.Context, /, *args: typing.Any, **kwargs: typing.Any
+        ) -> typing.Any:
             scaffold = ctx.ensure_object(MigrationEnv)
             if "env" in params:
                 kwargs["env"] = scaffold

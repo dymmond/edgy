@@ -27,7 +27,6 @@ from edgy.core.db.models._internal import DescriptiveMeta
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.models.metaclasses import (
     BaseModelMeta,
-    BaseModelReflectMeta,
     MetaInfo,
 )
 from edgy.core.db.models.model_proxy import ProxyModel
@@ -56,6 +55,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
     __db_model__: ClassVar[bool] = False
+    __reflected__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
     __using_schema__: ClassVar[Union[str, None]] = None
     __model_references__: ClassVar[Any] = None
@@ -297,11 +297,13 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return True
 
 
-class EdgyBaseReflectModel(EdgyBaseModel, metaclass=BaseModelReflectMeta):
+class EdgyBaseReflectModel(EdgyBaseModel):
     """
     Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
     call.
     """
+
+    __reflected__: ClassVar[bool] = True
 
     @classmethod
     @functools.lru_cache
