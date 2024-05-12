@@ -34,7 +34,9 @@ class BaseForeignKey(BaseField):
             return value
 
         fields_filtered = {
-            target.proxy_model.pkname: target.proxy_model.fields.get(target.proxy_model.pkname)
+            target.proxy_model.pkname: target.proxy_model.fields.get(
+                target.proxy_model.pkname
+            )
         }
         target.proxy_model.model_fields = fields_filtered
         target.proxy_model.model_rebuild(force=True)

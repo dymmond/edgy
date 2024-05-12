@@ -43,7 +43,11 @@ class DateParser:
         Updates the `auto_now` fields
         """
         for name, field in fields.items():
-            if isinstance(field, Field) and _has_auto_now(field) and _is_datetime(field):
+            if (
+                isinstance(field, Field)
+                and _has_auto_now(field)
+                and _is_datetime(field)
+            ):
                 values[name] = field.get_default_value()  # type: ignore
         return values
 
@@ -101,20 +105,44 @@ class ModelParser:
                 continue
 
             item = extracted_values[name]
-            value = field.check(item) if hasattr(field, "check") else None
-            validated[name] = value
+            for inner_field_name in field.get_inner_field_names(name):
+                if inner_field_name not in validated:
+                    inner_field = model_cls.fields[inner_field_name]
+                    if inner_field.read_only:
+                        if inner_field.has_default():
+                            if not is_update:
+                                validated[inner_field_name] = (
+                                    inner_field.get_default_value()
+                                )
+                            else:
+                                # For datetimes with `auto_now` and `auto_now_add`
+                                if not _has_auto_now_add(inner_field):
+                                    validated[inner_field_name] = (
+                                        inner_field.get_default_value()
+                                    )
+                        continue
+                    value = (
+                        inner_field.check(item)
+                        if hasattr(inner_field, "check")
+                        else None
+                    )
+                    validated[inner_field_name] = value
 
         # Update with any ModelRef
         validated.update(self._extract_model_references(extracted_values, model_cls))
         return validated
 
-    def _extract_db_fields_from_model(self, model_class: Type["Model"]) -> Dict[Any, Any]:
+    def _extract_db_fields_from_model(
+        self, model_class: Type["Model"]
+    ) -> Dict[Any, Any]:
         """
         Extacts all the db fields and excludes the related_names since those
         are simply relations.
         """
         related_names = model_class.meta.related_names
-        return {k: v for k, v in model_class.model_fields.items() if k not in related_names}
+        return {
+            k: v for k, v in model_class.model_fields.items() if k not in related_names
+        }
 
 
 def create_edgy_model(

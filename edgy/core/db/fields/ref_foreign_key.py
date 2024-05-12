@@ -8,7 +8,7 @@ from typing_extensions import get_origin
 import edgy
 from edgy.core.connection.registry import Registry
 from edgy.core.db.constants import CASCADE, RESTRICT
-from edgy.core.db.fields._base_fk import BaseField, BaseForeignKey
+from edgy.core.db.fields._base_fk import BaseForeignKey
 from edgy.core.terminal import Print
 from edgy.exceptions import ModelReferenceError
 
@@ -24,7 +24,7 @@ terminal = Print()
 
 
 class ForeignKeyFieldFactory:
-    def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
+    def __new__(cls, *args: Any, **kwargs: Any) -> BaseForeignKey:  # type: ignore
         cls.validate(**kwargs)
 
         to: Any = kwargs.pop("to", None)
@@ -58,7 +58,7 @@ class ForeignKeyFieldFactory:
             constraints=cls.get_constraints(),
             **kwargs,
         )
-        Field = type(cls.__name__, (BaseRefForeignKeyField, BaseField), {})
+        Field = type(cls.__name__, (BaseRefForeignKeyField,), {})
         return Field(**namespace)  # type: ignore
 
     @classmethod
@@ -109,15 +109,21 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         except TypeError:
             return False
 
-    def __new__(cls, to: "ModelRef", null: bool = False) -> BaseField:  # type: ignore
+    def __new__(cls, to: "ModelRef", null: bool = False) -> BaseForeignKey:  # type: ignore
         if not cls.is_class_and_subclass(to, edgy.ModelRef):
             raise ModelReferenceError(
                 detail="A model reference must be an object of type ModelRef"
             )
         if not hasattr(to, "__model__") or getattr(to, "__model__", None) is None:
-            raise ModelReferenceError("'__model__' must bre declared when subclassing ModelRef.")
+            raise ModelReferenceError(
+                "'__model__' must bre declared when subclassing ModelRef."
+            )
 
         kwargs = {
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
+            **{
+                key: value
+                for key, value in locals().items()
+                if key not in CLASS_DEFAULTS
+            },
         }
         return super().__new__(cls, **kwargs)

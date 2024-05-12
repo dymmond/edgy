@@ -6,7 +6,7 @@ import ipaddress
 import re
 import uuid
 from enum import EnumMeta
-from typing import Any, Optional, Pattern, Sequence, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Optional, Pattern, Sequence, Set, Tuple, Union
 
 import pydantic
 import sqlalchemy
@@ -14,8 +14,11 @@ from pydantic import EmailStr
 
 from edgy.core.db.fields._internal import IPAddress
 from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
-from edgy.core.db.fields.base import BaseField
+from edgy.core.db.fields.base import BaseCompositeField, BaseField
 from edgy.exceptions import FieldDefinitionError
+
+if TYPE_CHECKING:
+    from edgy.db.models import Model
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
@@ -37,7 +40,7 @@ class FieldFactory:
     )
     _type: Any = None
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
+    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
         cls.validate(**kwargs)
         arguments = copy.deepcopy(kwargs)
 
@@ -101,6 +104,75 @@ class FieldFactory:
         return []
 
 
+class CompositeField(Field, BaseCompositeField):
+    """Aggregates multiple fields into one pseudo field"""
+
+    def __new__(cls, **kwargs: Any) -> BaseField:
+        cls.validate(**kwargs)
+        return super().__new__(cls)
+
+    def __init__(self, **kwargs):
+        default = kwargs.pop("default", None)
+        name: str = kwargs.pop("name", None)
+        comment: str = kwargs.pop("comment", None)
+        owner = kwargs.pop("owner", None)
+        read_only: bool = kwargs.pop("read_only", False)
+        secret: bool = kwargs.pop("secret", False)
+        field_type = dict[str, Any]
+
+        return super().__init__(
+            __type__=field_type,
+            annotation=field_type,
+            name=name,
+            primary_key=False,
+            default=default,
+            null=False,
+            index=False,
+            exclude=True,
+            unique=False,
+            autoincrement=False,
+            choices=False,
+            comment=comment,
+            owner=owner,
+            server_default=False,
+            server_onupdate=False,
+            read_only=read_only,
+            column_type=None,
+            constraints=[],
+            secret=secret,
+            **kwargs,
+        )
+
+    def __get__(self, instance: "Model", owner: Any = None) -> dict[str, Any]:
+        d = {}
+        for key in self.inner_fields:
+            d[key] = getattr(instance, key)
+        return d
+
+    def __set__(self, instance: "Model", value: dict | Any) -> None:
+        if isinstance(value, dict):
+            for key in self.inner_fields:
+                setattr(instance, key, value[key])
+        else:
+            for key in self.inner_fields:
+                setattr(instance, key, getattr(value, key))
+
+    def get_composite_fields(self, instance) -> dict[str, BaseField]:
+        return {field: instance.fields[field] for field in self.inner_fields}
+
+    def check(self, value: Any) -> Any:
+        raise NotImplementedError()
+
+    def get_column(self, name: str) -> None:
+        return None
+
+    @classmethod
+    def validate(cls, **kwargs: Any) -> None:
+        inner_fields = kwargs.get("inner_fields")
+        if inner_fields and not isinstance(inner_fields, Sequence):
+            raise FieldDefinitionError("inner_fields must be a Sequence")
+
+
 class CharField(FieldFactory, str):
     """String field representation that constructs the Field class and populates the values"""
 
@@ -126,7 +198,11 @@ class CharField(FieldFactory, str):
 
         kwargs = {
             **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
+            **{
+                key: value
+                for key, value in locals().items()
+                if key not in CLASS_DEFAULTS
+            },
         }
 
         return super().__new__(cls, **kwargs)
@@ -135,7 +211,9 @@ class CharField(FieldFactory, str):
     def validate(cls, **kwargs: Any) -> None:
         max_length = kwargs.get("max_length", 0)
         if max_length <= 0:
-            raise FieldDefinitionError(detail=f"'max_length' is required for {cls.__name__}")
+            raise FieldDefinitionError(
+                detail=f"'max_length' is required for {cls.__name__}"
+            )
 
         min_length = kwargs.get("min_length")
         pattern = kwargs.get("regex")
@@ -159,7 +237,11 @@ class TextField(FieldFactory, str):
     def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
         kwargs = {
             **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
+            **{
+                key: value
+                for key, value in locals().items()
+                if key not in CLASS_DEFAULTS
+            },
         }
         return super().__new__(cls, **kwargs)
 
@@ -175,7 +257,9 @@ class Number(FieldFactory):
         maximum = kwargs.get("maximum", None)
 
         if (minimum is not None and maximum is not None) and minimum > maximum:
-            raise FieldDefinitionError(detail="'minimum' cannot be bigger than 'maximum'")
+            raise FieldDefinitionError(
+                detail="'minimum' cannot be bigger than 'maximum'"
+            )
 
 
 class IntegerField(Number, int):
@@ -195,11 +279,17 @@ class IntegerField(Number, int):
     ) -> BaseField:
         autoincrement = kwargs.pop("autoincrement", None)
         autoincrement = (
-            autoincrement if autoincrement is not None else kwargs.get("primary_key", False)
+            autoincrement
+            if autoincrement is not None
+            else kwargs.get("primary_key", False)
         )
         kwargs = {
             **kwargs,
-            **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
+            **{
+                k: v
+                for k, v in locals().items()
+                if k not in ["cls", "__class__", "kwargs"]
+            },
         }
         return super().__new__(cls, **kwargs)
 
@@ -223,7 +313,11 @@ class FloatField(Number, float):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
+            **{
+                key: value
+                for key, value in locals().items()
+                if key not in CLASS_DEFAULTS
+            },
         }
         return super().__new__(cls, **kwargs)
 
@@ -263,7 +357,11 @@ class DecimalField(Number, decimal.Decimal):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
+            **{
+                k: v
+                for k, v in locals().items()
+                if k not in ["cls", "__class__", "kwargs"]
+            },
         }
         return super().__new__(cls, **kwargs)
 
@@ -279,7 +377,12 @@ class DecimalField(Number, decimal.Decimal):
 
         max_digits = kwargs.get("max_digits")
         decimal_places = kwargs.get("decimal_places")
-        if max_digits is None or max_digits < 0 or decimal_places is None or decimal_places < 0:
+        if (
+            max_digits is None
+            or max_digits < 0
+            or decimal_places is None
+            or decimal_places < 0
+        ):
             raise FieldDefinitionError(
                 "max_digits and decimal_places are required for DecimalField"
             )
@@ -298,7 +401,11 @@ class BooleanField(FieldFactory, int):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
+            **{
+                key: value
+                for key, value in locals().items()
+                if key not in CLASS_DEFAULTS
+            },
         }
         return super().__new__(cls, **kwargs)
 
@@ -316,7 +423,9 @@ class AutoNowMixin(FieldFactory):
         **kwargs: Any,
     ) -> BaseField:
         if auto_now_add and auto_now:
-            raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
+            raise FieldDefinitionError(
+                "'auto_now' and 'auto_now_add' cannot be both True"
+            )
 
         if auto_now_add or auto_now:
             kwargs["read_only"] = True
@@ -423,7 +532,9 @@ class BinaryField(FieldFactory, bytes):
     def validate(cls, **kwargs: Any) -> None:
         max_length = kwargs.get("max_length", None)
         if max_length <= 0:
-            raise FieldDefinitionError(detail="Parameter 'max_length' is required for BinaryField")
+            raise FieldDefinitionError(
+                detail="Parameter 'max_length' is required for BinaryField"
+            )
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
@@ -506,7 +617,7 @@ class IPAddressField(FieldFactory, str):
     def is_native_type(self, value: str) -> bool:
         return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
 
-    def check(self, value: Any) -> Any:
+    def check(self, name: str, value: Any) -> Any:
         if self.is_native_type(value):
             return value
 
@@ -527,7 +638,11 @@ class IPAddressField(FieldFactory, str):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
+            **{
+                key: value
+                for key, value in locals().items()
+                if key not in CLASS_DEFAULTS
+            },
         }
 
         return super().__new__(cls, **kwargs)

@@ -1,5 +1,14 @@
 import decimal
-from typing import Any, Callable, ClassVar, Dict, Optional, Pattern, Sequence, Union
+from typing import (
+    Any,
+    Callable,
+    ClassVar,
+    Dict,
+    Optional,
+    Pattern,
+    Sequence,
+    Union,
+)
 
 import sqlalchemy
 from pydantic._internal import _repr
@@ -52,7 +61,9 @@ class BaseField(FieldInfo, _repr.Representation):
         self.__original_type__: type = kwargs.pop("__original_type__", None)
         self.primary_key: bool = kwargs.pop("primary_key", False)
         self.column_type: sqlalchemy.Column = kwargs.pop("column_type", None)
-        self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop("constraints", None)
+        self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop(
+            "constraints", None
+        )
         self.title = title
         self.description = description
         self.read_only: bool = kwargs.pop("read_only", False)
@@ -74,8 +85,12 @@ class BaseField(FieldInfo, _repr.Representation):
         self.max_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
             "max_length", None
         )
-        self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("minimum", None)
-        self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("maximum", None)
+        self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "minimum", None
+        )
+        self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
+            "maximum", None
+        )
         self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
             "multiple_of", None
         )
@@ -87,7 +102,9 @@ class BaseField(FieldInfo, _repr.Representation):
 
         if self.primary_key:
             default_value = default
-            self.raise_for_non_default(default=default_value, server_default=self.server_default)
+            self.raise_for_non_default(
+                default=default_value, server_default=self.server_default
+            )
 
         for name, value in kwargs.items():
             edgy_setattr(self, name, value)
@@ -98,7 +115,9 @@ class BaseField(FieldInfo, _repr.Representation):
 
         if isinstance(self.default, bool):
             self.null = True
-        self.__namespace__ = {k: v for k, v in self.__dict__.items() if k != "__namespace__"}
+        self.__namespace__ = {
+            k: v for k, v in self.__dict__.items() if k != "__namespace__"
+        }
 
     @property
     def namespace(self) -> Any:
@@ -146,13 +165,10 @@ class BaseField(FieldInfo, _repr.Representation):
         """Checks if the field has a default value set"""
         return bool(self.default is not None and self.default is not Undefined)
 
-    def get_column(self, name: str) -> Any:
+    def get_column(self, name: str) -> Optional[sqlalchemy.Column]:
         """
         Returns the column type of the field being declared.
         """
-        if self.column_type == sqlalchemy.ForeignKey:
-            return self.get_column(name)
-
         constraints = self.get_constraints()
         return sqlalchemy.Column(
             name,
@@ -168,9 +184,12 @@ class BaseField(FieldInfo, _repr.Representation):
             server_onupdate=self.server_onupdate,
         )
 
+    def get_inner_field_names(self, name) -> Sequence[str]:
+        return [name]
+
     def expand_relationship(self, value: Any) -> Any:
         """
-        Used to be overritten by any Link class.
+        Used to be overwritten by any Link class.
         """
         return value
 
@@ -186,3 +205,8 @@ class BaseField(FieldInfo, _repr.Representation):
         if callable(default):
             return default()
         return default
+
+
+class BaseCompositeField(BaseField):
+    def get_composite_fields(self, instance) -> dict[str, BaseField]:
+        raise NotImplementedError

@@ -188,7 +188,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
         columns = []
         for name, field in cls.fields.items():
-            columns.append(field.get_column(name))
+            column = field.get_column(name)
+            if column is not None:
+                columns.append(column)
 
         # Handle the uniqueness together
         uniques = []

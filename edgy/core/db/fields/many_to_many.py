@@ -5,7 +5,7 @@ import sqlalchemy
 import edgy
 from edgy.core.connection.registry import Registry
 from edgy.core.db.constants import CASCADE, RESTRICT
-from edgy.core.db.fields._base_fk import BaseField, BaseForeignKey
+from edgy.core.db.fields._base_fk import BaseForeignKey
 from edgy.core.db.fields.foreign_keys import ForeignKey
 from edgy.core.terminal import Print
 from edgy.core.utils.models import create_edgy_model
@@ -26,7 +26,7 @@ class ForeignKeyFieldFactory:
 
     _type: Any = None
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
+    def __new__(cls, *args: Any, **kwargs: Any) -> BaseForeignKey:  # type: ignore
         cls.validate(**kwargs)
 
         to: Any = kwargs.pop("to", None)
@@ -62,7 +62,7 @@ class ForeignKeyFieldFactory:
             constraints=cls.get_constraints(),
             **kwargs,
         )
-        Field = type(cls.__name__, (BaseManyToManyForeignKeyField, BaseField), {})
+        Field = type(cls.__name__, (BaseManyToManyForeignKeyField,), {})
         return Field(**namespace)  # type: ignore
 
     @classmethod
@@ -177,7 +177,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
     def get_column(self, name: str) -> sqlalchemy.Column:
         """
-        Builds the column for thr target.
+        Builds the column for the target.
         """
         target = self.target
         to_field = target.fields[target.pkname]
@@ -207,14 +207,20 @@ class ManyToManyField(ForeignKeyFieldFactory):
         *,
         through: Optional["Model"] = None,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseForeignKey:
         null = kwargs.get("null", None)
         if null:
-            terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
+            terminal.write_warning(
+                "Declaring `null` on a ManyToMany relationship has no effect."
+            )
 
         kwargs = {
             **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
+            **{
+                key: value
+                for key, value in locals().items()
+                if key not in CLASS_DEFAULTS
+            },
         }
         kwargs["null"] = True
         return super().__new__(cls, **kwargs)
