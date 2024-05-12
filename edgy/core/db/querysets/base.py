@@ -30,6 +30,8 @@ from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.protocols.queryset import QuerySetProtocol
 
+from . import clauses as clauses_mod
+
 if TYPE_CHECKING:  # pragma: no cover
     from edgy import Database
     from edgy.core.db.models import Model, ReflectModel
@@ -106,12 +108,14 @@ class BaseQuerySet(
         expression = expression.group_by(*group_by)
         return expression
 
-    def _build_filter_clauses_expression(self, filter_clauses: Any, expression: Any) -> Any:
+    def _build_filter_clauses_expression(
+        self, filter_clauses: Any, expression: Any
+    ) -> Any:
         """Builds the filter clauses expression"""
         if len(filter_clauses) == 1:
             clause = filter_clauses[0]
         else:
-            clause = sqlalchemy.sql.and_(*filter_clauses)
+            clause = clauses_mod.and_(*filter_clauses)
         expression = expression.where(clause)
         return expression
 
@@ -120,7 +124,7 @@ class BaseQuerySet(
         if len(or_clauses) == 1:
             clause = or_clauses[0]
         else:
-            clause = sqlalchemy.sql.or_(*or_clauses)
+            clause = clauses_mod.or_(*or_clauses)
         expression = expression.where(clause)
         return expression
 
@@ -188,7 +192,9 @@ class BaseQuerySet(
                 except KeyError:
                     # Check related fields
                     model_class = getattr(model_class, part).related_from
-                    has_many_fk_same_table, keys = self._is_multiple_foreign_key(model_class)
+                    has_many_fk_same_table, keys = self._is_multiple_foreign_key(
+                        model_class
+                    )
 
                 table = model_class.table
 
@@ -235,7 +241,9 @@ class BaseQuerySet(
                 if not field.secret:
                     columns.append(name)
                     columns.extend(
-                        self._secret_recursive_names(model_class=field.target, columns=columns)
+                        self._secret_recursive_names(
+                            model_class=field.target, columns=columns
+                        )
                     )
                 continue
             if not field.secret:
@@ -260,13 +268,19 @@ class BaseQuerySet(
 
         if queryset._defer:
             columns = [
-                column for column in select_from.columns if column.name not in queryset._defer
+                column
+                for column in select_from.columns
+                if column.name not in queryset._defer
             ]
             expression = expression.with_only_columns(*columns)
 
         if queryset._exclude_secrets:
-            model_columns = queryset._secret_recursive_names(model_class=queryset.model_class)
-            columns = [column for column in select_from.columns if column.name in model_columns]
+            model_columns = queryset._secret_recursive_names(
+                model_class=queryset.model_class
+            )
+            columns = [
+                column for column in select_from.columns if column.name in model_columns
+            ]
             expression = expression.with_only_columns(*columns)
 
         if queryset.filter_clauses:
@@ -368,7 +382,9 @@ class BaseQuerySet(
                     # It raises the KeyError from the previous check
                     try:
                         model_class = getattr(self.model_class, key).related_to
-                        column = model_class.table.columns[settings.default_related_lookup_field]
+                        column = model_class.table.columns[
+                            settings.default_related_lookup_field
+                        ]
                     except AttributeError:
                         raise KeyError(str(error)) from error
 
@@ -378,7 +394,9 @@ class BaseQuerySet(
             has_escaped_character = False
 
             if op in ["contains", "icontains"]:
-                has_escaped_character = any(c for c in self.ESCAPE_CHARACTERS if c in value)
+                has_escaped_character = any(
+                    c for c in self.ESCAPE_CHARACTERS if c in value
+                )
                 if has_escaped_character:
                     # enable escape modifier
                     for char in self.ESCAPE_CHARACTERS:
@@ -394,9 +412,9 @@ class BaseQuerySet(
 
         if exclude:
             if not or_:
-                filter_clauses.append(sqlalchemy.not_(sqlalchemy.sql.and_(*clauses)))
+                filter_clauses.append(clauses_mod.not_(clauses_mod.and_(*clauses)))
             else:
-                or_clauses.append(sqlalchemy.not_(sqlalchemy.sql.and_(*clauses)))
+                or_clauses.append(clauses_mod.not_(clauses_mod.and_(*clauses)))
         else:
             if not or_:
                 filter_clauses += clauses
@@ -612,7 +630,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             for name, field in queryset.model_class.fields.items()
             if isinstance(field, (CharField, TextField))
         ]
-        search_clauses = [queryset.table.columns[name].ilike(value) for name in search_fields]
+        search_clauses = [
+            queryset.table.columns[name].ilike(value) for name in search_fields
+        ]
 
         if len(search_clauses) > 1:
             filter_clauses.append(sqlalchemy.sql.or_(*search_clauses))
@@ -719,10 +739,15 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             raise QuerySetError(detail="Fields must be an iterable.")
 
         if not fields:
-            rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]  # type: ignore
+            rows = [
+                row.model_dump(exclude=exclude, exclude_none=exclude_none)
+                for row in rows
+            ]  # type: ignore
         else:
             rows = [
-                row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)  # type: ignore
+                row.model_dump(
+                    exclude=exclude, exclude_none=exclude_none, include=fields
+                )  # type: ignore
                 for row in rows
             ]
 
@@ -737,7 +762,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             try:
                 rows = [row[fields[0]] for row in rows]  # type: ignore
             except KeyError:
-                raise QuerySetError(detail=f"{fields[0]} does not exist in the results.") from None
+                raise QuerySetError(
+                    detail=f"{fields[0]} does not exist in the results."
+                ) from None
         return rows
 
     async def values_list(
@@ -963,13 +990,18 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             new_objs.append(new_obj)
 
         new_objs = [
-            queryset._extract_values_from_field(obj, queryset.model_class) for obj in new_objs
+            queryset._extract_values_from_field(obj, queryset.model_class)
+            for obj in new_objs
         ]
 
         pk = getattr(queryset.table.c, queryset.pkname)
-        expression = queryset.table.update().where(pk == sqlalchemy.bindparam(queryset.pkname))
+        expression = queryset.table.update().where(
+            pk == sqlalchemy.bindparam(queryset.pkname)
+        )
         kwargs: Dict[Any, Any] = {
-            field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()
+            field: sqlalchemy.bindparam(field)
+            for obj in new_objs
+            for field in obj.keys()
         }
         pks = [{queryset.pkname: getattr(obj, queryset.pkname)} for obj in objs]
 
@@ -984,7 +1016,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     async def delete(self) -> None:
         queryset: "QuerySet" = self._clone()
 
-        await self.model_class.signals.pre_delete.send_async(self.__class__, instance=self)
+        await self.model_class.signals.pre_delete.send_async(
+            self.__class__, instance=self
+        )
 
         expression = queryset.table.delete()
         for filter_clause in queryset.filter_clauses:
@@ -993,7 +1027,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._set_query_expression(expression)
         await queryset.database.execute(expression)
 
-        await self.model_class.signals.post_delete.send_async(self.__class__, instance=self)
+        await self.model_class.signals.post_delete.send_async(
+            self.__class__, instance=self
+        )
 
     async def update(self, **kwargs: Any) -> None:
         """
@@ -1004,7 +1040,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         extracted_fields = queryset._extract_values_from_field(
             kwargs, model_class=queryset.model_class
         )
-        kwargs = queryset._update_auto_now_fields(extracted_fields, queryset.model_class.fields)
+        kwargs = queryset._update_auto_now_fields(
+            extracted_fields, queryset.model_class.fields
+        )
 
         # Broadcast the initial update details
         await self.model_class.signals.pre_update.send_async(
@@ -1020,7 +1058,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         await queryset.database.execute(expression)
 
         # Broadcast the update executed
-        await self.model_class.signals.post_update.send_async(self.__class__, instance=self)
+        await self.model_class.signals.post_update.send_async(
+            self.__class__, instance=self
+        )
 
     async def get_or_create(
         self, defaults: Dict[str, Any], **kwargs: Any

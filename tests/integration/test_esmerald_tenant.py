@@ -4,7 +4,7 @@ import pytest
 from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, Request, get
 from esmerald.protocols.middleware import MiddlewareProtocol
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
 from pydantic import __version__
 
@@ -123,14 +123,18 @@ def another_app():
 
 @pytest.fixture()
 async def async_cli(another_app) -> AsyncGenerator:
-    async with AsyncClient(app=another_app, base_url="http://test") as acli:
+    async with AsyncClient(
+        transport=ASGITransport(app=another_app), base_url="http://test"
+    ) as acli:
         await to_thread.run_sync(blocking_function)
         yield acli
 
 
 @pytest.fixture()
 async def async_client(app) -> AsyncGenerator:
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         await to_thread.run_sync(blocking_function)
         yield ac
 
@@ -148,7 +152,9 @@ async def create_data():
 
     # Products for Edgy
     for i in range(10):
-        await Product.query.using(edgy_tenant.schema_name).create(name=f"Product-{i}", user=edgy)
+        await Product.query.using(edgy_tenant.schema_name).create(
+            name=f"Product-{i}", user=edgy
+        )
 
     # Products for Saffier
     for i in range(25):
