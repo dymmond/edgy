@@ -4,7 +4,7 @@ import pytest
 from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, Request, get
 from esmerald.protocols.middleware import MiddlewareProtocol
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
 from pydantic import __version__
 
@@ -136,14 +136,18 @@ def another_app():
 
 @pytest.fixture()
 async def async_cli(another_app) -> AsyncGenerator:
-    async with AsyncClient(app=another_app, base_url="http://test") as acli:
+    async with AsyncClient(
+        transport=ASGITransport(app=another_app), base_url="http://test"
+    ) as acli:
         await to_thread.run_sync(blocking_function)
         yield acli
 
 
 @pytest.fixture()
 async def async_client(app) -> AsyncGenerator:
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         await to_thread.run_sync(blocking_function)
         yield ac
 
@@ -164,7 +168,9 @@ async def create_data():
 
     # Products for Edgy
     for i in range(10):
-        await Product.query.using(edgy_tenant.schema_name).create(name=f"Product-{i}", user=edgy)
+        await Product.query.using(edgy_tenant.schema_name).create(
+            name=f"Product-{i}", user=edgy
+        )
 
     # Products for Saffier
     for i in range(25):
@@ -204,7 +210,9 @@ async def test_user_query_tenant_data(async_client, async_cli):
 async def test_active_schema_user():
     tenant = await Tenant.query.create(schema_name="edgy", tenant_name="Edgy")
     user = await User.query.create(name="edgy", email="edgy@esmerald.dev")
-    tenant_user = await TenantUser.query.create(user=user, tenant=tenant, is_active=True)
+    tenant_user = await TenantUser.query.create(
+        user=user, tenant=tenant, is_active=True
+    )
 
     await tenant_user.tenant.load()
 
@@ -229,7 +237,9 @@ async def test_multiple_tenants_one_active():
     # Tenant 1
     tenant = await Tenant.query.create(schema_name="edgy", tenant_name="Edgy")
     user = await User.query.create(name="edgy", email="edgy@esmerald.dev")
-    tenant_user = await TenantUser.query.create(user=user, tenant=tenant, is_active=True)
+    tenant_user = await TenantUser.query.create(
+        user=user, tenant=tenant, is_active=True
+    )
 
     await tenant_user.tenant.load()
 
@@ -246,7 +256,9 @@ async def test_multiple_tenants_one_active():
     another_tenant_three = await Tenant.query.create(
         schema_name="another_edgy_three", tenant_name="Another Edgy Three"
     )
-    await TenantUser.query.create(user=user, tenant=another_tenant_three, is_active=True)
+    await TenantUser.query.create(
+        user=user, tenant=another_tenant_three, is_active=True
+    )
 
     active_user_tenant = await TenantUser.get_active_user_tenant(user)
 
