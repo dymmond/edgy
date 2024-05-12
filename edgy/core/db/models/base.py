@@ -306,19 +306,6 @@ class EdgyBaseReflectModel(EdgyBaseModel):
     __reflected__: ClassVar[bool] = True
 
     @classmethod
-    @functools.lru_cache
-    def get_engine(cls, url: str) -> Engine:
-        return sqlalchemy.create_engine(url)
-
-    @property
-    def pk(self) -> Any:
-        return getattr(self, self.pkname, None)
-
-    @pk.setter
-    def pk(self, value: Any) -> Any:
-        setattr(self, self.pkname, value)
-
-    @classmethod
     def build(cls, schema: Optional[str] = None) -> Any:
         """
         The inspect is done in an async manner and reflects the objects from the database.
