@@ -178,9 +178,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         Builds the SQLAlchemy table representation from the loaded fields.
         """
         tablename: str = cls.meta.tablename  # type: ignore
-        metadata: sqlalchemy.MetaData = cast(
-            "sqlalchemy.MetaData", cls.meta.registry._metadata
-        )  # type: ignore
+        registry = cls.meta.registry
+        assert registry is not None
+        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", registry._metadata)  # type: ignore
         metadata.schema = schema
 
         unique_together = cls.meta.unique_together
@@ -210,7 +210,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             *columns,
             *uniques,
             *indexes,
-            extend_existing=True,  # type: ignore
+            extend_existing=True,
         )
 
     @classmethod
@@ -310,9 +310,9 @@ class EdgyBaseReflectModel(EdgyBaseModel):
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-        metadata: sqlalchemy.MetaData = cast(
-            "sqlalchemy.MetaData", cls.meta.registry._metadata
-        )  # type: ignore
+        registry = cls.meta.registry
+        assert registry is not None
+        metadata: sqlalchemy.MetaData = registry._metadata
         metadata.schema = schema
 
         tablename: str = cast("str", cls.meta.tablename)

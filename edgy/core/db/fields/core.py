@@ -6,7 +6,17 @@ import ipaddress
 import re
 import uuid
 from enum import EnumMeta
-from typing import TYPE_CHECKING, Any, Optional, Pattern, Sequence, Set, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Optional,
+    Pattern,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 import pydantic
 import sqlalchemy
@@ -18,7 +28,7 @@ from edgy.core.db.fields.base import BaseCompositeField, BaseField
 from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
-    from edgy.db.models import Model
+    from edgy.core.db.models.model import Model
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
@@ -111,14 +121,14 @@ class CompositeField(Field, BaseCompositeField):
         cls.validate(**kwargs)
         return super().__new__(cls)
 
-    def __init__(self, **kwargs):
+    def __init__(self, **kwargs: Any):
         default = kwargs.pop("default", None)
         name: str = kwargs.pop("name", None)
         comment: str = kwargs.pop("comment", None)
         owner = kwargs.pop("owner", None)
         read_only: bool = kwargs.pop("read_only", False)
         secret: bool = kwargs.pop("secret", False)
-        field_type = dict[str, Any]
+        field_type = Dict[str, Any]
 
         return super().__init__(
             __type__=field_type,
@@ -143,13 +153,13 @@ class CompositeField(Field, BaseCompositeField):
             **kwargs,
         )
 
-    def __get__(self, instance: "Model", owner: Any = None) -> dict[str, Any]:
+    def __get__(self, instance: "Model", owner: Any = None) -> Dict[str, Any]:
         d = {}
         for key in self.inner_fields:
             d[key] = getattr(instance, key)
         return d
 
-    def __set__(self, instance: "Model", value: dict | Any) -> None:
+    def __set__(self, instance: "Model", value: Union[Dict, Any]) -> None:
         if isinstance(value, dict):
             for key in self.inner_fields:
                 setattr(instance, key, value[key])
@@ -157,7 +167,7 @@ class CompositeField(Field, BaseCompositeField):
             for key in self.inner_fields:
                 setattr(instance, key, getattr(value, key))
 
-    def get_composite_fields(self, instance) -> dict[str, BaseField]:
+    def get_composite_fields(self, instance: Any) -> Dict[str, BaseField]:
         return {field: instance.fields[field] for field in self.inner_fields}
 
     def check(self, value: Any) -> Any:

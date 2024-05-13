@@ -137,7 +137,7 @@ def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
 
     if not found_registry:
         raise ImproperlyConfigured(
-            "Registry for the table not found in the Meta class or any of the superclasses. You must set thr registry in the Meta."
+            "Registry for the table not found in the Meta class or any of the superclasses. You must set the registry in the Meta."
         )
     return found_registry
 

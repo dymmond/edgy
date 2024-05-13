@@ -184,7 +184,7 @@ class BaseField(FieldInfo, _repr.Representation):
             server_onupdate=self.server_onupdate,
         )
 
-    def get_inner_field_names(self, name) -> Sequence[str]:
+    def get_inner_field_names(self, name: str) -> Sequence[str]:
         return [name]
 
     def expand_relationship(self, value: Any) -> Any:
@@ -208,5 +208,5 @@ class BaseField(FieldInfo, _repr.Representation):
 
 
 class BaseCompositeField(BaseField):
-    def get_composite_fields(self, instance) -> dict[str, BaseField]:
+    def get_composite_fields(self, instance: Any) -> Dict[str, BaseField]:
         raise NotImplementedError

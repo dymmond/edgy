@@ -79,7 +79,7 @@ class ModelParser:
     def _extract_values_from_field(
         self,
         extracted_values: Any,
-        model_class: Optional[Type["Model"]] = None,
+        model_class: Optional["Model"] = None,
         is_update: bool = False,
     ) -> Any:
         """

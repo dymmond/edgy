@@ -733,7 +733,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         fields = fields or []
         queryset: "QuerySet" = self._clone()
-        rows: List[Type["Model"]] = await queryset.all()
+        rows: List["Model"] = await queryset.all()
 
         if not isinstance(fields, list):
             raise QuerySetError(detail="Fields must be an iterable.")
@@ -742,12 +742,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             rows = [
                 row.model_dump(exclude=exclude, exclude_none=exclude_none)
                 for row in rows
-            ]  # type: ignore
+            ]
         else:
             rows = [
                 row.model_dump(
                     exclude=exclude, exclude_none=exclude_none, include=fields
-                )  # type: ignore
+                )
                 for row in rows
             ]
 

@@ -229,8 +229,9 @@ class Model(ModelRow, DeclarativeMixin):
 
     def __setattr__(self, name: str, value: Any) -> None:
         if isinstance(self.fields.get(name), BaseCompositeField):
-            return self.fields[name].__set__(self, value)
-        return super().__setattr__(name, value)
+            self.fields[name].__set__(self, value)
+        else:
+            super().__setattr__(name, value)
 
 
 class ReflectModel(Model, EdgyBaseReflectModel):
