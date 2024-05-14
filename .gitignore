@@ -10,3 +10,5 @@ __pycache__/
 htmlcov/
 venv/
 .idea/
+docker-compose.override.yml
+compose.override.yml
