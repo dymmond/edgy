@@ -192,10 +192,8 @@ Currently the field is always excluded from serialization.
 
 ##### Parameters
 
-* **inner_fields** - A sequence containing the fields, at least two.
+* **inner_fields** - A sequence containing the field names, at least two.
 * **read_only** - Prevent writes
-
-#####
 
 #### DateField
 

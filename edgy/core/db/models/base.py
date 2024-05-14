@@ -179,7 +179,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         tablename: str = cls.meta.tablename  # type: ignore
         registry = cls.meta.registry
-        assert registry is not None
+        assert registry is not None, "registry is not set"
         metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", registry._metadata)  # type: ignore
         metadata.schema = schema
 
@@ -311,7 +311,7 @@ class EdgyBaseReflectModel(EdgyBaseModel):
         The inspect is done in an async manner and reflects the objects from the database.
         """
         registry = cls.meta.registry
-        assert registry is not None
+        assert registry is not None, "registry is not set"
         metadata: sqlalchemy.MetaData = registry._metadata
         metadata.schema = schema
 
