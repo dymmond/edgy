@@ -155,6 +155,40 @@ class MyModel(edgy.Model):
 
 * **choices** - An enum containing the choices for the field.
 
+#### CompositeField
+
+The **CompositeField** is a little bit different from normal fields. It takes a parameter `inner_fields` and distributes write or read access to the fields
+referenced in `inner_fields`. It hasn't currently all field parameters. Especially not the server parameters.
+It implements a pseudo descriptor protocol (heavy lifting is done in Model).
+
+**CompositeField** defines no column. It is a meta field.
+
+Note there is also **BaseCompositeField**. It can be used for implementing own **CompositeField**-like fields.
+
+
+```python
+import edgy
+
+
+class MyModel(edgy.Model):
+    email: str = edgy.EmailField(max_length=60, null=True)
+    sent: datetime.datetime = edgy.DateTimeField(, null=True)
+    composite = edgy.CompositeField(inner_fields=["email", "sent"])
+    ...
+
+
+obj = MyModel()
+obj.composite = {"email": "foobar@example.com", "sent": datetime.datetime.now()}
+# retrieve as dict
+ddict = obj.composite
+```
+
+##### Parameters
+
+* **inner_fields** - A sequence containing the fields.
+
+#####
+
 #### DateField
 
 ```python
