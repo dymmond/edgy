@@ -1,6 +1,6 @@
 import uuid
 from datetime import date
-from typing import Any, Dict, Type, Union, cast
+from typing import Any, Dict, Union, cast
 from uuid import UUID
 
 from loguru import logger
@@ -47,8 +47,11 @@ class TenantMixin(edgy.Model):
         return f"{self.tenant_name} - {self.schema_name}"
 
     async def save(
-        self: Any, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
-    ) -> Type["TenantMixin"]:
+        self: Any,
+        force_save: bool = False,
+        values: Dict[str, Any] = None,
+        **kwargs: Any,
+    ) -> Model:
         """
         Creates a tenant record and generates a schema in the database.
 
@@ -73,19 +76,19 @@ class TenantMixin(edgy.Model):
                 % current_schema
             )
 
-        tenant: Type["Model"] = await super().save(force_save, values, **kwargs)
+        tenant = await super().save(force_save, values, **kwargs)
+        registry = self.meta.registry
+        assert registry is not None
         try:
-            await self.meta.registry.schema.create_schema(
+            await registry.schema.create_schema(
                 schema=tenant.schema_name, if_not_exists=True
             )
-            await create_tables(
-                self.meta.registry, self.meta.registry.tenant_models, tenant.schema_name
-            )
+            await create_tables(registry, registry.tenant_models, tenant.schema_name)
         except Exception as e:
             message = f"Rolling back... {str(e)}"
             logger.error(message)
             await self.delete()
-        return cast("Type[TenantMixin]", tenant)
+        return cast(edgy.Model, tenant)
 
     async def delete(self, force_drop: bool = False) -> None:
         """
@@ -93,8 +96,12 @@ class TenantMixin(edgy.Model):
         """
         if self.schema_name == settings.tenant_schema_default:
             raise ValueError("Cannot drop public schema.")
+        registry = self.meta.registry
+        assert registry is not None
 
-        await self.meta.registry.schema.drop_schema(schema=self.schema_name, cascade=True, if_exists=True)  # type: ignore
+        await registry.schema.drop_schema(
+            schema=self.schema_name, cascade=True, if_exists=True
+        )
         await super().delete()
 
 
@@ -114,12 +121,15 @@ class DomainMixin(edgy.Model):
         return self.domain
 
     async def save(
-        self: Any, force_save: bool = False, values: Dict[str, Any] = None, **kwargs: Any
-    ) -> Type[Model]:
+        self: Any,
+        force_save: bool = False,
+        values: Dict[str, Any] = None,
+        **kwargs: Any,
+    ) -> Model:
         async with self.meta.registry.database.transaction():
-            domains = self.__class__.query.filter(tenant=self.tenant, is_priamry=True).exclude(
-                id=self.pk
-            )
+            domains = self.__class__.query.filter(
+                tenant=self.tenant, is_primary=True
+            ).exclude(id=self.pk)
 
             exists = await domains.exists()
 
@@ -163,7 +173,7 @@ class TenantUserMixin(edgy.Model):
         abstract = True
 
     @classmethod
-    async def get_active_user_tenant(cls, user: Type["Model"]) -> Union[Type["Model"], None]:
+    async def get_active_user_tenant(cls, user: edgy.Model) -> Union[edgy.Model, None]:
         """
         Obtains the active user tenant.
         """
@@ -175,17 +185,20 @@ class TenantUserMixin(edgy.Model):
 
         except ObjectNotFound:
             return None
-        return cast("Type[Model]", tenant.tenant)
+        return cast(edgy.Model, tenant.tenant)
 
     def __str__(self) -> str:
         return f"User: {self.user.pk}, Tenant: {self.tenant}"
 
-    async def save(self, *args: Any, **kwargs: Any) -> Type["TenantUserMixin"]:
+    async def save(self, *args: Any, **kwargs: Any) -> edgy.Model:
         await super().save(*args, **kwargs)
         if self.is_active:
-            await get_model(  # type: ignore
-                registry=self.meta.registry, model_name=self.__class__.__name__
-            ).query.filter(is_active=True, user=self.user).exclude(pk=self.pk).update(
-                is_active=False
+            await (
+                get_model(  # type: ignore
+                    registry=self.meta.registry, model_name=self.__class__.__name__
+                )
+                .query.filter(is_active=True, user=self.user)
+                .exclude(pk=self.pk)
+                .update(is_active=False)
             )
-        return cast("Type[TenantUserMixin]", self)
+        return self

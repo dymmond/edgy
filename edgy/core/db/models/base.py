@@ -1,5 +1,4 @@
 import copy
-import functools
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -17,7 +16,6 @@ from typing import (
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
-from sqlalchemy import Engine
 from typing_extensions import Self
 
 from edgy.conf import settings
