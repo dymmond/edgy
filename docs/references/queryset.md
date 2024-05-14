@@ -11,5 +11,5 @@
         - "!^__get__"
         - "!^ESCAPE_CHARACTERS"
         - "!^m2m_related"
-        - "!^pkname"
+        - "!^pknames"
         - "!^_m2m_related"

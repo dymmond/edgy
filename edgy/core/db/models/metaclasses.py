@@ -32,7 +32,10 @@ from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
-from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_and_defaults
+from edgy.core.utils.functional import (
+    edgy_setattr,
+    extract_field_annotations_and_defaults,
+)
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
@@ -68,8 +71,7 @@ class MetaInfo:
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.pk: Optional[BaseField] = getattr(meta, "pk", None)
-        self.pk_attribute: Union[BaseField, str] = getattr(meta, "pk_attribute", "")
+        self.pk: dict[str, BaseField] = getattr(meta, "pk", {})
         self.abstract: bool = getattr(meta, "abstract", False)
         self.fields: Set[Any] = getattr(meta, "fields", set())
         self.fields_mapping: Dict[str, BaseField] = getattr(meta, "fields_mapping", {})
@@ -77,8 +79,12 @@ class MetaInfo:
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.parents: Any = getattr(meta, "parents", [])
         self.many_to_many_fields: Set[str] = getattr(meta, "many_to_many_fields", set())
-        self.foreign_key_fields: Dict[str, Any] = getattr(meta, "foreign_key_fields", {})
-        self.model_references: Dict["ModelRef", str] = getattr(meta, "model_references", {})
+        self.foreign_key_fields: Dict[str, Any] = getattr(
+            meta, "foreign_key_fields", {}
+        )
+        self.model_references: Dict["ModelRef", str] = getattr(
+            meta, "model_references", {}
+        )
         self.model: Optional[Type["Model"]] = None
         self.manager: "Manager" = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
@@ -89,7 +95,9 @@ class MetaInfo:
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
         self.related_names: Set[str] = getattr(meta, "related_names", set())
         self.related_fields: Dict[str, Any] = getattr(meta, "related_fields", {})
-        self.related_names_mapping: Dict[str, Any] = getattr(meta, "related_names_mapping", {})
+        self.related_names_mapping: Dict[str, Any] = getattr(
+            meta, "related_names_mapping", {}
+        )
         self.signals: Optional[signals_module.Broadcaster] = getattr(
             meta, "signals", {}
         )  # type: ignore
@@ -150,7 +158,9 @@ def _check_manager_for_bases(
                         f"Managers must be type annotated and '{key}' is not annotated. Managers must be annotated with ClassVar."
                     )
                 if get_origin(base.__annotations__[key]) is not ClassVar:
-                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
+                    raise ImproperlyConfigured(
+                        "Managers must be ClassVar type annotated."
+                    )
                 attrs[key] = value.__class__()
 
 
@@ -244,7 +254,7 @@ class BaseModelMeta(ModelMetaclass):
         model_references: Dict["ModelRef", str] = {}
         many_to_many_fields: Any = set()
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
-        pk_attribute: str = "id"
+        pk_attributes: list[str] = []
         registry: Any = None
         base_annotations: Dict[str, Any] = {}
 
@@ -290,29 +300,22 @@ class BaseModelMeta(ModelMetaclass):
             attrs = {**inherited_fields, **attrs}
 
         # Handle with multiple primary keys and auto generated field if no primary key is provided
-        if name != "Model":
-            is_pk_present = False
-            for key, value in attrs.items():
-                if isinstance(value, BaseField):
-                    if value.primary_key:
-                        if is_pk_present:
-                            raise ImproperlyConfigured(
-                                f"Cannot create model {name} with multiple primary keys."
-                            )
-                        is_pk_present = True
-                        pk_attribute = key
+        for key, value in attrs.items():
+            if isinstance(value, BaseField):
+                if value.primary_key:
+                    pk_attributes.append(key)
 
-            if not is_pk_present and not getattr(meta_class, "abstract", None):
-                if "id" not in attrs:
-                    attrs = {
-                        "id": BigIntegerField(primary_key=True, autoincrement=True),
-                        **attrs,
-                    }
-
-                if not isinstance(attrs["id"], BaseField) or not attrs["id"].primary_key:
-                    raise ImproperlyConfigured(
-                        f"Cannot create model {name} without explicit primary key if field 'id' is already present."
-                    )
+        if not pk_attributes and not getattr(meta_class, "abstract", None):
+            if "id" not in attrs:
+                attrs = {
+                    "id": BigIntegerField(primary_key=True, autoincrement=True),
+                    **attrs,
+                }
+                pk_attributes.append("id")
+            else:
+                raise ImproperlyConfigured(
+                    f"Cannot create model {name} without explicit primary key if field 'id' is already present."
+                )
 
         for key, value in attrs.items():
             if isinstance(value, BaseField):
@@ -341,8 +344,8 @@ class BaseModelMeta(ModelMetaclass):
         meta.foreign_key_fields = foreign_key_fields
         meta.many_to_many_fields = many_to_many_fields
         meta.model_references = model_references
-        meta.pk_attribute = pk_attribute
-        meta.pk = fields.get(pk_attribute)
+        pk_attributes.sort()
+        meta.pk = {field: fields.get(field) for field in pk_attributes}
 
         if not fields:
             meta.abstract = True
@@ -361,7 +364,9 @@ class BaseModelMeta(ModelMetaclass):
                         f"Managers must be type annotated and '{k}' is not annotated. Managers must be annotated with ClassVar."
                     )
                 if annotations and get_origin(annotations[k]) is not ClassVar:
-                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
+                    raise ImproperlyConfigured(
+                        "Managers must be ClassVar type annotated."
+                    )
 
         # Ensure the initialization is only performed for subclasses of Model
         attrs["__init_annotations__"] = annotations
@@ -384,7 +389,9 @@ class BaseModelMeta(ModelMetaclass):
                 )
 
             if getattr(meta, "unique_together", None) is not None:
-                raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
+                raise ImproperlyConfigured(
+                    "unique_together cannot be in abstract classes."
+                )
 
             if getattr(meta, "indexes", None) is not None:
                 raise ImproperlyConfigured("indexes cannot be in abstract classes.")
@@ -459,10 +466,12 @@ class BaseModelMeta(ModelMetaclass):
                         sub_field.registry = registry
                         meta.fields_mapping[sub_field_name] = sub_field
                         if sub_field.primary_key:
-                            new_class.pkname = sub_field_name
+                            new_class.pknames.append(sub_field_name)
 
             if field.primary_key:
-                new_class.pkname = name
+                new_class.pknames.append(name)
+        # for a nicer output
+        new_class.pknames.sort()
 
         new_class.__db_model__ = True
         new_class.fields = meta.fields_mapping
@@ -475,7 +484,9 @@ class BaseModelMeta(ModelMetaclass):
 
         # Sets the foreign key fields
         if meta.foreign_key_fields and not new_class.is_proxy_model:
-            related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
+            related_name = _set_related_name_for_foreign_keys(
+                meta.foreign_key_fields, new_class
+            )
             meta.related_names.add(related_name)
 
         for field, value in new_class.fields.items():  # type: ignore

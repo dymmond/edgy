@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar, Union, cast, Dict
 
 import sqlalchemy
 
@@ -43,8 +43,8 @@ class QuerySetPropsMixin:
         self._table = value
 
     @property
-    def pkname(self) -> Any:
-        return self.model_class.pkname  # type: ignore
+    def pknames(self) -> Union[Any, Dict[str, Any]]:
+        return self.model_class.pknames  # type: ignore
 
     @property
     def is_m2m(self) -> bool:

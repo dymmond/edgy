@@ -3,7 +3,7 @@ from typing import Any, Dict, Set, Type, Union
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
-from edgy.core.utils.functional import edgy_setattr
+from edgy.core.utils.functional import edgy_setattr, pk_from_model_to_clauses, pk_to_dict
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import RelationshipNotFound
 
@@ -40,12 +40,6 @@ class Model(ModelRow, DeclarativeMixin):
     ```
     """
 
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}: {self}>"
-
-    def __str__(self) -> str:
-        return f"{self.__class__.__name__}({self.pkname}={self.pk})"
-
     async def update(self, **kwargs: Any) -> Any:
         """
         Update operation of the database fields.
@@ -53,8 +47,7 @@ class Model(ModelRow, DeclarativeMixin):
         await self.signals.pre_update.send_async(self.__class__, instance=self)
 
         kwargs = self._update_auto_now_fields(kwargs, self.fields)
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
+        expression = self.table.update().values(**kwargs).where(*pk_from_model_to_clauses(self))
         await self.database.execute(expression)
         await self.signals.post_update.send_async(self.__class__, instance=self)
 
@@ -68,8 +61,7 @@ class Model(ModelRow, DeclarativeMixin):
         """Delete operation from the database"""
         await self.signals.pre_delete.send_async(self.__class__, instance=self)
 
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.delete().where(pk_column == self.pk)
+        expression = self.table.delete().where(*pk_from_model_to_clauses(self))
         await self.database.execute(expression)
 
         await self.signals.post_delete.send_async(self.__class__, instance=self)
@@ -77,8 +69,7 @@ class Model(ModelRow, DeclarativeMixin):
     async def load(self) -> None:
         # Build the select expression.
 
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.select().where(pk_column == self.pk)
+        expression = self.table.select().where(*pk_from_model_to_clauses(self))
 
         # Perform the fetch.
         row = await self.database.fetch_one(expression)
@@ -94,8 +85,8 @@ class Model(ModelRow, DeclarativeMixin):
         expression = self.table.insert().values(**kwargs)
         awaitable = await self.database.execute(expression)
         if not awaitable:
-            awaitable = kwargs.get(self.pkname)
-        edgy_setattr(self, self.pkname, awaitable)
+            awaitable = pk_to_dict(self, kwargs)
+        self.pk = awaitable
         return self
 
     async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
@@ -163,8 +154,9 @@ class Model(ModelRow, DeclarativeMixin):
         extracted_model_references = self.extract_db_model_references()
         extracted_fields.update(extracted_model_references)
 
-        if getattr(self, "pk", None) is None and self.fields[self.pkname].autoincrement:
-            extracted_fields.pop(self.pkname, None)
+        for pkname in self.pknames:
+            if getattr(self, pkname, None) is None and self.fields[pkname].autoincrement:
+                extracted_fields.pop(pkname, None)
 
         self.update_from_dict(dict_values=dict(extracted_fields.items()))
 
@@ -217,7 +209,7 @@ class Model(ModelRow, DeclarativeMixin):
         """
         if hasattr(self.fields.get(name), "__get__"):
             return self.fields[name].__get__(self)
-        if name not in self.__dict__ and name in self.fields and name != self.pkname:
+        if name not in self.__dict__ and name in self.fields and name not in self.pknames:
             run_sync(self.load())
             return self.__dict__[name]
         return super().__getattr__(name)

@@ -182,6 +182,8 @@ def generify_model_fields(model: Type["Model"]) -> Dict[Any, Any]:
     for name, field in model.model_fields.items():
         edgy_setattr(field, "annotation", Any)
         edgy_setattr(field, "null", True)
-        edgy_setattr(field, "metadata", [])
+        # not every field has metadata, e.g. if dataclasses, compiutedFields are used
+        if hasattr(field, "metadata"):
+            edgy_setattr(field, "metadata", [])
         fields[name] = field
     return fields
