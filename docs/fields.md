@@ -176,6 +176,11 @@ class MyModel(edgy.Model):
     composite = edgy.CompositeField(inner_fields=["email", "sent"])
     ...
 
+class MyModel(edgy.Model):
+    email: str = edgy.EmailField(max_length=60, null=True, read_only=True)
+    sent: datetime.datetime = edgy.DateTimeField(, null=True, read_only=True)
+    composite = edgy.CompositeField(inner_fields=["email", "sent"])
+    ...
 
 obj = MyModel()
 obj.composite = {"email": "foobar@example.com", "sent": datetime.datetime.now()}
@@ -183,9 +188,12 @@ obj.composite = {"email": "foobar@example.com", "sent": datetime.datetime.now()}
 ddict = obj.composite
 ```
 
+Currently the field is always excluded from serialization.
+
 ##### Parameters
 
-* **inner_fields** - A sequence containing the fields.
+* **inner_fields** - A sequence containing the fields, at least two.
+* **read_only** - Prevent writes
 
 #####
 

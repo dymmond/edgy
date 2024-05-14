@@ -122,9 +122,7 @@ class CompositeField(Field, BaseCompositeField):
         return super().__new__(cls)
 
     def __init__(self, **kwargs: Any):
-        default = kwargs.pop("default", None)
         name: str = kwargs.pop("name", None)
-        comment: str = kwargs.pop("comment", None)
         owner = kwargs.pop("owner", None)
         read_only: bool = kwargs.pop("read_only", False)
         secret: bool = kwargs.pop("secret", False)
@@ -135,14 +133,12 @@ class CompositeField(Field, BaseCompositeField):
             annotation=field_type,
             name=name,
             primary_key=False,
-            default=default,
-            null=False,
+            null=True,
             index=False,
             exclude=True,
             unique=False,
             autoincrement=False,
             choices=False,
-            comment=comment,
             owner=owner,
             server_default=False,
             server_onupdate=False,
@@ -179,8 +175,13 @@ class CompositeField(Field, BaseCompositeField):
     @classmethod
     def validate(cls, **kwargs: Any) -> None:
         inner_fields = kwargs.get("inner_fields")
-        if inner_fields and not isinstance(inner_fields, Sequence):
-            raise FieldDefinitionError("inner_fields must be a Sequence")
+        if inner_fields is not None:
+            if not isinstance(inner_fields, Sequence):
+                raise FieldDefinitionError("inner_fields must be a Sequence")
+            if len(inner_fields) < 2:
+                raise FieldDefinitionError(
+                    "inner_fields should reference at least two fields"
+                )
 
 
 class CharField(FieldFactory, str):
