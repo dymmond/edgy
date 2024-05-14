@@ -100,7 +100,7 @@ filtering the query.
 
 ### Added
 
-- Support for [`or_`, `and_` and `not_`](./queries/queries#edgy-style) for SQLAlchemy style queries and Edgy syntax sugar queries.
+- Support for [`or_`, `and_` and `not_`](./queries/queries.md#edgy-style) for SQLAlchemy style queries and Edgy syntax sugar queries.
 - Support for [`secrets`](./queries/secrets.md) field and queryset allowing to query the fields that are not marked as `secret` directly.
 
 ### Changed
