@@ -1,6 +1,7 @@
 import os
 import sys
 from functools import cached_property
+from io import BytesIO, StringIO
 from typing import Any, Generator, Union
 
 from edgy.core.files.mixins import FileProxyMixin
@@ -172,6 +173,30 @@ class File(FileProxyMixin):
 
     def close(self) -> None:
         self.file.close()
+
+
+class ContentFile(File):
+
+    def __init__(self, content: Any, name: Union[str, None] = None):
+        stream_class = StringIO if isinstance(content, str) else BytesIO
+        super().__init__(stream_class(content), name=name)
+        self.size = len(content)
+
+    def __str__(self) -> str:
+        return "Raw content"
+
+    def __bool__(self) -> bool:
+        return True
+
+    def open(self, mode: Union[str, Any] = None) -> "ContentFile":
+        self.seek(0)
+        return self
+
+    def close(self) -> None: ...
+
+    def write(self, data: Any) -> Any:
+        self.__dict__.pop("size", None)
+        return self.file.write(data)
 
 
 def endswith_cr(line: str) -> str:

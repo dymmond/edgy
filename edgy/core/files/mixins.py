@@ -101,3 +101,9 @@ class FileProxyMixin:
     def __iter__(self):
         """Return an iterator object."""
         return iter(self._file)
+
+
+class StorageMixin:
+
+    def value_or_setting(self, value, setting):
+        return setting if value is None else value
