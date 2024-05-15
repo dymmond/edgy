@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar
 
 import sqlalchemy
 
@@ -81,7 +81,7 @@ class ForeignKeyFieldFactory:
 
 
 class BaseForeignKeyField(BaseForeignKey):
-    def get_column(self, name: str) -> sqlalchemy.Column:
+    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         target = self.target
         to_field = target.fields[target.pkname]
 
@@ -95,7 +95,7 @@ class BaseForeignKeyField(BaseForeignKey):
                 f"_{target.pkname}_{name}",
             )
         ]
-        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+        return [sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)]
 
 
 class ForeignKey(ForeignKeyFieldFactory):

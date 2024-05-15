@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar, Union
 
 import sqlalchemy
 
@@ -175,7 +175,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             return fk_name
         return fk_name[:CHAR_LIMIT]
 
-    def get_column(self, name: str) -> sqlalchemy.Column:
+    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         """
         Builds the column for the target.
         """
@@ -191,7 +191,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 name=self.get_fk_name(name=name),
             )
         ]
-        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+        return [sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)]
 
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""

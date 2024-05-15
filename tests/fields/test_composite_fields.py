@@ -1,7 +1,6 @@
 import pytest
 
 import edgy
-from edgy.exceptions import FieldDefinitionError
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -33,20 +32,13 @@ async def rollback_connections():
             yield
 
 
-def test_too_few_fields():
-    with pytest.raises(FieldDefinitionError):
-        edgy.CompositeField(inner_fields=["foo"])
-    with pytest.raises(FieldDefinitionError):
-        edgy.CompositeField(inner_fields=[])
-
-
 def test_column_type():
     assert edgy.CompositeField(inner_fields=["foo", "fa"]).column_type is None
 
 
-def test_get_column():
+def test_get_columns():
     assert (
-        edgy.CompositeField(inner_fields=["foo", "fa"]).get_column("composite") is None
+        len(edgy.CompositeField(inner_fields=["foo", "fa"]).get_columns("composite")) == 0
     )
 
 

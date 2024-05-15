@@ -456,8 +456,22 @@ class BaseModelMeta(ModelMetaclass):
             else:
                 registry.models[name] = new_class
 
-        for name, field in meta.fields_mapping.items():
+        fieldnames_to_check = list(meta.fields_mapping.keys())
+        while fieldnames_to_check:
+            name = fieldnames_to_check.pop()
+            field = meta.fields_mapping[name]
             field.registry = registry
+            embedded_fields = field.get_embedded_fields(name, meta.fields_mapping)
+            if embedded_fields:
+                for sub_field_name, sub_field in embedded_fields.items():
+                    if sub_field_name in meta.fields_mapping:
+                        raise ValueError(f"sub field name collision: {sub_field_name}")
+                    fieldnames_to_check.append(sub_field_name)
+                    sub_field.registry = registry
+                    meta.fields_mapping[sub_field_name] = sub_field
+                    if sub_field.primary_key:
+                        new_class.pkname = sub_field_name
+
             if field.primary_key:
                 new_class.pkname = name
 

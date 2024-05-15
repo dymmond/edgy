@@ -1,4 +1,5 @@
 import decimal
+from functools import cached_property
 from typing import (
     Any,
     Callable,
@@ -165,27 +166,20 @@ class BaseField(FieldInfo, _repr.Representation):
         """Checks if the field has a default value set"""
         return bool(self.default is not None and self.default is not Undefined)
 
-    def get_column(self, name: str) -> Optional[sqlalchemy.Column]:
+    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         """
-        Returns the column type of the field being declared.
+        Returns the columns of the field being declared.
         """
-        constraints = self.get_constraints()
-        return sqlalchemy.Column(
-            name,
-            self.column_type,
-            *constraints,
-            primary_key=self.primary_key,
-            nullable=self.null and not self.primary_key,
-            index=self.index,
-            unique=self.unique,
-            default=self.default,
-            comment=self.comment,
-            server_default=self.server_default,
-            server_onupdate=self.server_onupdate,
-        )
+        raise NotImplementedError()
 
-    def get_inner_field_names(self, name: str) -> Sequence[str]:
-        return [name]
+    def clean(self, name: str, value: Any) -> Dict[str, Any]:
+        """
+        Runs the checks for the fields being validated.
+        """
+        raise NotImplementedError()
+
+    def get_embedded_fields(self, name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
+        return {}
 
     def expand_relationship(self, value: Any) -> Any:
         """
@@ -201,12 +195,52 @@ class BaseField(FieldInfo, _repr.Representation):
         return self.constraints
 
     def get_default_value(self) -> Any:
+        # single default
         default = getattr(self, "default", None)
         if callable(default):
             return default()
         return default
 
+    def get_default_values(self, name: str, cleaned_data: Dict[str, Any]) -> Any:
+        # for multidefaults overwrite in subclasses get_default_values to
+        # parse default values differently
+        # NOTE: multi value fields should always check here if defaults were already applied
+        if name in cleaned_data:
+            return {}
+        return {name: self.get_default_value()}
 
 class BaseCompositeField(BaseField):
-    def get_composite_fields(self, instance: Any) -> Dict[str, BaseField]:
-        raise NotImplementedError
+    def get_composite_fields(self) -> Dict[str, BaseField]:
+        raise NotImplementedError()
+
+    @cached_property
+    def composite_fields(self) -> Dict[str, BaseField]:
+        return self.get_composite_fields()
+
+    def clean(self, name: str, value: Any) -> Dict[str, Any]:
+        """
+        Runs the checks for the fields being validated.
+        """
+        result = {}
+        if isinstance(value, dict):
+            for sub_name, field in self.composite_fields.items():
+                if sub_name not in value:
+                    raise ValueError(f"Missing key: {sub_name} for {name}")
+                for k, v in field.clean(sub_name, value[sub_name]):
+                    result[k] = v
+        else:
+            for sub_name, field in self.composite_fields.items():
+                if not hasattr(value, sub_name):
+                    raise ValueError(f"Missing attribute: {sub_name} for {name}")
+                for k, v in field.clean(sub_name, getattr(value, sub_name)):
+                    result[k] = v
+
+        return result
+
+    def get_default_values(self, name: str, cleaned_data: Dict[str, Any]) -> Any:
+        cleaned_data_result = {}
+        for sub_field_name, field in self.composite_fields.items():
+            for sub_field_name_new, default_value in field.get_default_values(sub_field_name, cleaned_data):
+                if sub_field_name_new not in cleaned_data and sub_field_name_new not in cleaned_data_result:
+                    cleaned_data_result[sub_field_name_new] = default_value
+        return cleaned_data_result

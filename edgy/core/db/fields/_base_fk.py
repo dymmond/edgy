@@ -47,3 +47,6 @@ class BaseForeignKey(BaseField):
         Runs the checks for the fields being validated.
         """
         return value.pk
+
+    def clean(self, name: str, value: Any) -> Any:
+        return {name: self.check(value)}

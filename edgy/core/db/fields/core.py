@@ -34,11 +34,43 @@ CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
 
 class Field:
+
     def check(self, value: Any) -> Any:
         """
-        Runs the checks for the fields being validated.
+        Runs the checks for the fields being validated. Legacy.
         """
         return value
+
+    def clean(self, name: str, value: Any):
+        """
+        Runs the checks for the fields being validated. Multiple columns possible
+        """
+        return {name: self.check(value)}
+
+    def get_column(self, name: str) -> Optional[sqlalchemy.Column]:
+        """
+        Returns the column type of the field being declared.
+        """
+        constraints = self.get_constraints()
+        return sqlalchemy.Column(
+            name,
+            self.column_type,
+            *constraints,
+            primary_key=self.primary_key,
+            nullable=self.null and not self.primary_key,
+            index=self.index,
+            unique=self.unique,
+            default=self.default,
+            comment=self.comment,
+            server_default=self.server_default,
+            server_onupdate=self.server_onupdate,
+        )
+
+    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
+        column = self.get_column(name)
+        if column is None:
+            return None
+        return [column]
 
 
 class FieldFactory:
@@ -114,7 +146,7 @@ class FieldFactory:
         return []
 
 
-class CompositeField(Field, BaseCompositeField):
+class CompositeField(BaseCompositeField):
     """Aggregates multiple fields into one pseudo field"""
 
     def __new__(cls, **kwargs: Any) -> BaseField:
@@ -126,7 +158,18 @@ class CompositeField(Field, BaseCompositeField):
         owner = kwargs.pop("owner", None)
         read_only: bool = kwargs.pop("read_only", False)
         secret: bool = kwargs.pop("secret", False)
+        inner_fields: Sequence[Union[str, Tuple[str, BaseField]]] = kwargs.pop("inner_fields", [])
         field_type = Dict[str, Any]
+        self.inner_field_names = []
+        self.embedded_field_defs = {}
+        for field in inner_fields:
+            if isinstance(field, str):
+                self.inner_field_names.append(field)
+            else:
+                self.inner_field_names.append(field[0])
+                self.embedded_field_defs[field[0]] = field[1]
+                # will be overwritten later
+                field[1].owner = owner
 
         return super().__init__(
             __type__=field_type,
@@ -151,26 +194,29 @@ class CompositeField(Field, BaseCompositeField):
 
     def __get__(self, instance: "Model", owner: Any = None) -> Dict[str, Any]:
         d = {}
-        for key in self.inner_fields:
+        for key in self.inner_field_names:
             d[key] = getattr(instance, key)
         return d
 
     def __set__(self, instance: "Model", value: Union[Dict, Any]) -> None:
         if isinstance(value, dict):
-            for key in self.inner_fields:
+            for key in self.inner_field_names:
                 setattr(instance, key, value[key])
         else:
-            for key in self.inner_fields:
+            for key in self.inner_field_names:
                 setattr(instance, key, getattr(value, key))
 
-    def get_composite_fields(self, instance: Any) -> Dict[str, BaseField]:
-        return {field: instance.fields[field] for field in self.inner_fields}
+    def get_embedded_fields(self, name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
+        duplicate_fields = set(self.embedded_field_defs.keys()).intersection(field_mapping.keys())
+        if duplicate_fields:
+            raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
+        return self.embedded_field_defs
 
-    def check(self, value: Any) -> Any:
-        raise NotImplementedError()
+    def get_composite_fields(self) -> Dict[str, BaseField]:
+        return {field: self.owner.fields[field] for field in self.inner_field_names}
 
-    def get_column(self, name: str) -> None:
-        return None
+    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
+        return []
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:
@@ -178,10 +224,14 @@ class CompositeField(Field, BaseCompositeField):
         if inner_fields is not None:
             if not isinstance(inner_fields, Sequence):
                 raise FieldDefinitionError("inner_fields must be a Sequence")
-            if len(inner_fields) < 2:
-                raise FieldDefinitionError(
-                    "inner_fields should reference at least two fields"
-                )
+            inner_field_names = set()
+            for field in inner_fields:
+                if isinstance(field, str):
+                    if field in inner_field_names:
+                        raise FieldDefinitionError(f"duplicate inner field {field}")
+                else:
+                    if field[0] in inner_field_names:
+                        raise FieldDefinitionError(f"duplicate inner field {field}")
 
 
 class CharField(FieldFactory, str):
@@ -628,7 +678,7 @@ class IPAddressField(FieldFactory, str):
     def is_native_type(self, value: str) -> bool:
         return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
 
-    def check(self, name: str, value: Any) -> Any:
+    def check(self, value: Any) -> Any:
         if self.is_native_type(value):
             return value
 
