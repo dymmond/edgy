@@ -20,7 +20,7 @@ from typing import (
 
 import pydantic
 import sqlalchemy
-from pydantic import EmailStr
+from pydantic import EmailStr, BaseModel
 
 from edgy.core.db.fields._internal import IPAddress
 from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
@@ -34,10 +34,11 @@ CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
 
 class Field:
+    # defines compatibility fallbacks check and get_column
 
     def check(self, value: Any) -> Any:
         """
-        Runs the checks for the fields being validated. Legacy.
+        Runs the checks for the fields being validated. Single Column.
         """
         return value
 
@@ -88,6 +89,7 @@ class FieldFactory:
 
         default = kwargs.pop("default", None)
         null: bool = kwargs.pop("null", False)
+        skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
         primary_key: bool = kwargs.pop("primary_key", False)
         autoincrement: bool = kwargs.pop("autoincrement", False)
         unique: bool = kwargs.pop("unique", False)
@@ -123,6 +125,7 @@ class FieldFactory:
             column_type=cls.get_column_type(**arguments),
             constraints=cls.get_constraints(),
             secret=secret,
+            skip_absorption_check=skip_absorption_check,
             **kwargs,
         )
         Field = type(cls.__name__, cls._bases, {})
@@ -160,6 +163,8 @@ class CompositeField(BaseCompositeField):
         secret: bool = kwargs.pop("secret", False)
         inner_fields: Sequence[Union[str, Tuple[str, BaseField]]] = kwargs.pop("inner_fields", [])
         field_type = Dict[str, Any]
+        self.absorb_existing_fields: bool = kwargs.pop("absorb_existing_fields", False)
+        self.model: Optional[BaseModel] = kwargs.pop("model", None)
         self.inner_field_names = []
         self.embedded_field_defs = {}
         for field in inner_fields:
@@ -196,6 +201,8 @@ class CompositeField(BaseCompositeField):
         d = {}
         for key in self.inner_field_names:
             d[key] = getattr(instance, key)
+        if self.model is not None:
+            return self.model(**d)
         return d
 
     def __set__(self, instance: "Model", value: Union[Dict, Any]) -> None:
@@ -207,10 +214,20 @@ class CompositeField(BaseCompositeField):
                 setattr(instance, key, getattr(value, key))
 
     def get_embedded_fields(self, name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
-        duplicate_fields = set(self.embedded_field_defs.keys()).intersection(field_mapping.keys())
-        if duplicate_fields:
-            raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
-        return self.embedded_field_defs
+        if not self.absorb_existing_fields:
+            duplicate_fields = set(self.embedded_field_defs.keys()).intersection(field_mapping.keys())
+            if duplicate_fields:
+                raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
+            return dict(self.embedded_field_defs)
+        retdict = {}
+        for item in self.embedded_field_defs.items():
+            if item[0] not in field_mapping:
+                retdict[item[0]] = item[1]
+            else:
+                absorbed_field =field_mapping[item[0]]
+                if not issubclass(absorbed_field.field_type, item[1].field_type) and not getattr(absorbed_field, "skip_absorption_check", False):
+                    raise ValueError(f"absorption failed: field \"{item[0]}\" handle the type: {absorbed_field.field_type}, required: {item[1].field_type}")
+        return retdict
 
     def get_composite_fields(self) -> Dict[str, BaseField]:
         return {field: self.owner.fields[field] for field in self.inner_field_names}

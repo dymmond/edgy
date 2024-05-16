@@ -192,8 +192,11 @@ Currently the field is always excluded from serialization.
 
 ##### Parameters
 
-* **inner_fields** - A sequence containing the field names, at least two.
+* **inner_fields** - A sequence containing the field names mixed with (name, Field) tuples
 * **read_only** - Prevent writes
+* **absorb_existing_fields** - Don't fail if fields speficied with (name, Field) tuples already exists. Treat them as internal fields. The existing fields are checked if they are a subclass of the Field or have the attribute `skip_absorption_check` set
+* **model** - Return a pydantic model instead of a dict
+
 
 #### DateField
 

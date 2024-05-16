@@ -67,6 +67,7 @@ class BaseField(FieldInfo, _repr.Representation):
         )
         self.title = title
         self.description = description
+        self.skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
         self.read_only: bool = kwargs.pop("read_only", False)
         self.help_text: str = kwargs.pop("help_text", None)
         self.pattern: Pattern = kwargs.pop("pattern", None)
