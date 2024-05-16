@@ -48,7 +48,7 @@ class MarshallField(BaseMarshallField):
     def __init__(
         self,
         field_type: type,
-        source: str | None = None,
+        source: Union[str, None] = None,
         **kwargs: _FieldInfoInputs,
     ) -> None:
         super().__init__(field_type, source, allow_null=True, default=None, **kwargs)
