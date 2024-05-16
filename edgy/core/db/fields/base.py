@@ -1,5 +1,5 @@
 import decimal
-from typing import Any, Callable, ClassVar, Dict, Optional, Pattern, Sequence, Union
+from typing import Any, ClassVar, Dict, Optional, Pattern, Sequence, Union
 
 import sqlalchemy
 from pydantic._internal import _repr
@@ -45,9 +45,6 @@ class BaseField(FieldInfo, _repr.Representation):
         ):
             self.null = True
 
-        self.defaulf_factory: Optional[Callable[..., Any]] = kwargs.pop(
-            "defaulf_factory", Undefined
-        )
         self.field_type: Any = kwargs.pop("__type__", None)
         self.__original_type__: type = kwargs.pop("__original_type__", None)
         self.primary_key: bool = kwargs.pop("primary_key", False)

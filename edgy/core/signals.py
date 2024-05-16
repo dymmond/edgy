@@ -19,19 +19,20 @@ class Broadcaster(dict):
             raise SignalError(f"{__value} is not valid signal")
         self[__name] = __value
 
-    def set_lifecycle_signals_from(self, namespace, overwrite=True):
+    def set_lifecycle_signals_from(self, namespace: str, overwrite: bool = True) -> None:
         for name in (
             "post_delete",
             "post_save",
             "post_update",
             "pre_delete",
             "pre_save",
-            "pre_update"
+            "pre_update",
         ):
             if overwrite:
                 setattr(self, name, getattr(namespace, name))
             else:
                 self.setdefault(name, getattr(namespace, name))
+
 
 __all__ = [
     "Signal",

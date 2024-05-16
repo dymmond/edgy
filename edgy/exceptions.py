@@ -22,6 +22,9 @@ class EdgyException(Exception):
 class FieldDefinitionError(EdgyException): ...
 
 
+class MarshallFieldDefinitionError(FieldDefinitionError): ...
+
+
 class ObjectNotFound(EdgyException): ...
 
 
