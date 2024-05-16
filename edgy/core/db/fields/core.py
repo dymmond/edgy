@@ -20,7 +20,7 @@ from typing import (
 
 import pydantic
 import sqlalchemy
-from pydantic import EmailStr, BaseModel
+from pydantic import BaseModel, EmailStr
 
 from edgy.core.db.fields._internal import IPAddress
 from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX

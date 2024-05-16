@@ -1,9 +1,9 @@
 import pytest
+from pydantic import BaseModel
 
 import edgy
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
-from pydantic import BaseModel
 
 pytestmark = pytest.mark.anyio
 database = Database(DATABASE_URL)
@@ -62,7 +62,7 @@ def test_get_columns_inner_fields_mixed():
 
 async def test_assign_dict(rollback_connections):
     obj = await MyModel2.query.create(first_name="edgy", last_name="edgytoo")
-    assert obj.fields["last_name"].skip_absorption_check == True
+    assert obj.fields["last_name"].skip_absorption_check is True
     assert obj.composite["first_name"] == "edgy"
     assert obj.composite["last_name"] == "edgytoo"
     assert obj.composite2["age"] is None
@@ -81,7 +81,7 @@ async def test_assign_dict(rollback_connections):
 
 async def test_assign_obj(rollback_connections):
     obj = await MyModel2.query.create(first_name="edgy", last_name="edgytoo")
-    assert obj.fields["last_name"].skip_absorption_check == True
+    assert obj.fields["last_name"].skip_absorption_check is True
     assert obj.composite["first_name"] == "edgy"
     assert obj.composite["last_name"] == "edgytoo"
     # the composites share fields
