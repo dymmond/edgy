@@ -61,9 +61,9 @@ class MarshallMeta(ModelMetaclass):
         # Define the fields for the Marshall
         if base_fields_exclude is not None:
             base_model_fields = {
-                k: v for k, v in model.model_fields.items() if k in base_fields_exclude
+                k: v for k, v in model.model_fields.items() if k not in base_fields_exclude
             }
-        if "__all__" in base_fields_include:  # type: ignore
+        elif base_fields_include is not None and "__all__" in base_fields_include:
             base_model_fields = {
                 k: v for k, v in model.meta.fields_mapping.items() if k not in model_fields
             }
@@ -82,7 +82,7 @@ class MarshallMeta(ModelMetaclass):
         for k, v in attrs.items():
             if isinstance(v, BaseMarshallField):
                 # Make sure the custom fields are flagged.
-                if k not in model.model_fields:
+                if k not in model.meta.fields_mapping:
                     custom_fields[k] = v
 
         # Handle the check of the custom fields
@@ -99,6 +99,7 @@ class MarshallMeta(ModelMetaclass):
         annotations: Dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
         model_class.__init_annotations__ = annotations
         model_class.__show_pk__ = show_pk
+        model_class.__custom_fields__ = custom_fields
         model_class.marshall_config = marshall_config
         model_class.model_fields.update(base_model_fields)
         model_class.model_rebuild(force=True)

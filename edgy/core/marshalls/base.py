@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict
 
 from pydantic import BaseModel, ConfigDict
 
@@ -22,8 +22,34 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
     model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True)
 
     __show_pk__: ClassVar[bool] = False
+    __custom_fields__: ClassVar[Dict[str, BaseMarshallField]] = {}
 
-    def _resolve_serializer(self, instance: Union["Model", None] = None) -> "BaseMarshall":
+    def __init__(self, /, **data: Any) -> None:
+        super().__init__(**data)
+        self._instance: "Model" = self._setup()
+
+    def _setup(self) -> "Model":
+        """
+        Assemble the Marshall object with all the given details.
+
+        Returns:
+            Model or None: The assembled model instance, or None if the assembly fails.
+        """
+        data = self.model_dump(exclude={"id"})
+        data["__show_pk__"] = self.__show_pk__
+        instance: "Model" = self.marshall_config["model"](**data)  # type: ignore
+        self._resolve_serializer(instance=instance)
+        return instance
+
+    @property
+    def instance(self) -> "Model":
+        return self._instance
+
+    @instance.setter
+    def instance(self, value: "Model") -> None:
+        self._instance = value
+
+    def _resolve_serializer(self, instance: "Model") -> "BaseMarshall":
         """
         Resolve serializer fields and populate them with data from the provided instance.
 
@@ -33,18 +59,20 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         Returns:
             BaseMarshall: The resolved serializer instance.
         """
-        # Extract fields that are instances of BaseMarshallField
-        fields = {k: v for k, v in self.model_fields.items() if isinstance(v, BaseMarshallField)}
-
         # Dump model data excluding fields extracted above
-        data = self.model_dump(exclude=set(fields.keys()))
+        data = self.model_dump(exclude=set(self.__custom_fields__.keys()))
 
         # Iterate over fields to populate them with data
-        for name, field in fields.items():
+        for name, field in self.__custom_fields__.items():
             if field.source and field.source in data:
                 setattr(self, name, getattr(instance, field.source))
             elif field.source and not field.__is_method__:
-                attribute = getattr(instance, field.source)
+                # For primary key exceptions
+                if name == instance.pkname:
+                    attribute = instance.pk
+                else:
+                    attribute = getattr(instance, field.source)
+
                 # If attribute is callable, execute it and set the value
                 if callable(attribute):
                     value = run_sync(attribute()) if is_async_callable(attribute) else attribute()
@@ -54,7 +82,6 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
             elif field.__is_method__:
                 value = self._get_method_value(name, instance)
                 setattr(self, name, value)
-
         return self
 
     def _get_method_value(self, name: str, instance: "Model") -> Any:
@@ -77,11 +104,8 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         Handles the field of a the primary key if present in the
         fields.
         """
-        # Extract fields that are instances of BaseMarshallField
-        fields = {k: v for k, v in self.model_fields.items() if isinstance(v, BaseMarshallField)}
-
         # Dump model data excluding fields extracted above
-        data = self.model_dump(exclude=set(fields.keys()))
+        data = self.model_dump(exclude=set(self.__custom_fields__.keys()))
 
         if instance.meta.pk_attribute in data:
             setattr(self, instance.meta.pk_attribute, instance.pk)
@@ -106,11 +130,16 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
 
         We add the save here to make sure we have compatibility with
         the interface of Edgy.
+
+        This is optional! This should only be called if you indeed
+        want to persist the object in the database and have access to a
+        primary key.
+
+        !!! Tip
+            All the field and model validations **are still performed**
+            in the model level, not in a marshall level.
         """
-        data = self.model_dump(exclude={"id"})
-        data["__show_pk__"] = self.__show_pk__
-        instance = await self.marshall_config["model"](**data).save()  # type: ignore
-        self._resolve_serializer(instance=instance)
+        instance = await self.instance.save()
         self._handle_primary_key(instance=instance)
         return self
 

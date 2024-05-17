@@ -32,10 +32,7 @@ from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.db.relationships.relation import Relation
-from edgy.core.utils.functional import (
-    edgy_setattr,
-    extract_field_annotations_and_defaults,
-)
+from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
@@ -80,12 +77,8 @@ class MetaInfo:
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.parents: Any = getattr(meta, "parents", [])
         self.many_to_many_fields: Set[str] = getattr(meta, "many_to_many_fields", set())
-        self.foreign_key_fields: Dict[str, Any] = getattr(
-            meta, "foreign_key_fields", {}
-        )
-        self.model_references: Dict["ModelRef", str] = getattr(
-            meta, "model_references", {}
-        )
+        self.foreign_key_fields: Dict[str, Any] = getattr(meta, "foreign_key_fields", {})
+        self.model_references: Dict["ModelRef", str] = getattr(meta, "model_references", {})
         self.model: Optional[Type["Model"]] = None
         self.manager: "Manager" = getattr(meta, "manager", Manager())
         self.unique_together: Any = getattr(meta, "unique_together", None)
@@ -96,9 +89,7 @@ class MetaInfo:
         self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
         self.related_names: Set[str] = getattr(meta, "related_names", set())
         self.related_fields: Dict[str, Any] = getattr(meta, "related_fields", {})
-        self.related_names_mapping: Dict[str, Any] = getattr(
-            meta, "related_names_mapping", {}
-        )
+        self.related_names_mapping: Dict[str, Any] = getattr(meta, "related_names_mapping", {})
         self.signals: Optional[signals_module.Broadcaster] = getattr(
             meta, "signals", {}
         )  # type: ignore
@@ -159,9 +150,7 @@ def _check_manager_for_bases(
                         f"Managers must be type annotated and '{key}' is not annotated. Managers must be annotated with ClassVar."
                     )
                 if get_origin(base.__annotations__[key]) is not ClassVar:
-                    raise ImproperlyConfigured(
-                        "Managers must be ClassVar type annotated."
-                    )
+                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
                 attrs[key] = value.__class__()
 
 
@@ -320,10 +309,7 @@ class BaseModelMeta(ModelMetaclass):
                         **attrs,
                     }
 
-                if (
-                    not isinstance(attrs["id"], BaseField)
-                    or not attrs["id"].primary_key
-                ):
+                if not isinstance(attrs["id"], BaseField) or not attrs["id"].primary_key:
                     raise ImproperlyConfigured(
                         f"Cannot create model {name} without explicit primary key if field 'id' is already present."
                     )
@@ -375,9 +361,7 @@ class BaseModelMeta(ModelMetaclass):
                         f"Managers must be type annotated and '{k}' is not annotated. Managers must be annotated with ClassVar."
                     )
                 if annotations and get_origin(annotations[k]) is not ClassVar:
-                    raise ImproperlyConfigured(
-                        "Managers must be ClassVar type annotated."
-                    )
+                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
 
         # Ensure the initialization is only performed for subclasses of Model
         attrs["__init_annotations__"] = annotations
@@ -400,9 +384,7 @@ class BaseModelMeta(ModelMetaclass):
                 )
 
             if getattr(meta, "unique_together", None) is not None:
-                raise ImproperlyConfigured(
-                    "unique_together cannot be in abstract classes."
-                )
+                raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
 
             if getattr(meta, "indexes", None) is not None:
                 raise ImproperlyConfigured("indexes cannot be in abstract classes.")
@@ -472,9 +454,7 @@ class BaseModelMeta(ModelMetaclass):
 
         # Sets the foreign key fields
         if meta.foreign_key_fields and not new_class.is_proxy_model:
-            related_name = _set_related_name_for_foreign_keys(
-                meta.foreign_key_fields, new_class
-            )
+            related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
             meta.related_names.add(related_name)
 
         for field, value in new_class.fields.items():  # type: ignore

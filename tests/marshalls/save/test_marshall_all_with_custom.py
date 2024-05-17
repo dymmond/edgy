@@ -1,13 +1,13 @@
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator, Dict
 
 import pytest
 from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, post
 from httpx import ASGITransport, AsyncClient
-from pydantic import __version__
+from pydantic import BaseModel, __version__
 
 import edgy
-from edgy.core.marshalls import Marshall
+from edgy.core.marshalls import Marshall, fields
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
@@ -52,17 +52,35 @@ class User(edgy.Model):
     def get_name(self) -> str:
         return f"Details about {self.name}"
 
+    @property
+    def age(self) -> int:
+        return 2
+
+
+class Item(BaseModel):
+    sku: str
+    name: str
+    age: int
+
 
 class UserMarshall(Marshall):
     marshall_config = ConfigMarshall(model=User, fields=["__all__"])
+    details: fields.MarshallMethodField = fields.MarshallMethodField(field_type=str)
+    age: fields.MarshallField = fields.MarshallField(int, source="age")
+    data: fields.MarshallMethodField = fields.MarshallMethodField(Dict[str, Any])
 
     def get_details(self, instance) -> str:
         return instance.get_name()
 
+    def get_data(self, instance) -> Dict[str, Any]:
+        item = Item(sku="1234", name="laptop", age=1)
+        return item.model_dump()
+
 
 @post("/create")
 async def create_user(data: UserMarshall) -> UserMarshall:
-    return data
+    user = await data.save()
+    return user
 
 
 @pytest.fixture()
@@ -82,7 +100,7 @@ async def async_client(app) -> AsyncGenerator:
         yield ac
 
 
-async def test_marshall_all_fields(async_client):
+async def test_marshall_all_with_custom_fields(async_client):
     data = {
         "name": "Edgy",
         "email": "edgy@esmerald.dev",
@@ -92,9 +110,12 @@ async def test_marshall_all_fields(async_client):
     response = await async_client.post("/create", json=data)
     assert response.status_code == 201
     assert response.json() == {
-        "id": None,
+        "id": 1,
         "name": "Edgy",
         "email": "edgy@esmerald.dev",
         "language": "EN",
         "description": "A description",
+        "details": "Details about Edgy",
+        "age": 2,
+        "data": {"sku": "1234", "name": "laptop", "age": 1},
     }

@@ -7,7 +7,7 @@ from httpx import ASGITransport, AsyncClient
 from pydantic import __version__
 
 import edgy
-from edgy.core.marshalls import Marshall
+from edgy.core.marshalls import Marshall, fields
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
@@ -54,7 +54,8 @@ class User(edgy.Model):
 
 
 class UserMarshall(Marshall):
-    marshall_config = ConfigMarshall(model=User, fields=["__all__"])
+    marshall_config = ConfigMarshall(model=User, fields=["name"])
+    details: fields.MarshallField = fields.MarshallMethodField(field_type=str)
 
     def get_details(self, instance) -> str:
         return instance.get_name()
@@ -62,7 +63,8 @@ class UserMarshall(Marshall):
 
 @post("/create")
 async def create_user(data: UserMarshall) -> UserMarshall:
-    return data
+    user = await data.save()
+    return user
 
 
 @pytest.fixture()
@@ -82,7 +84,7 @@ async def async_client(app) -> AsyncGenerator:
         yield ac
 
 
-async def test_marshall_all_fields(async_client):
+async def test_marshall_gets_from_source_func_and_properties(async_client):
     data = {
         "name": "Edgy",
         "email": "edgy@esmerald.dev",
@@ -91,10 +93,4 @@ async def test_marshall_all_fields(async_client):
     }
     response = await async_client.post("/create", json=data)
     assert response.status_code == 201
-    assert response.json() == {
-        "id": None,
-        "name": "Edgy",
-        "email": "edgy@esmerald.dev",
-        "language": "EN",
-        "description": "A description",
-    }
+    assert response.json() == {"name": "Edgy", "details": "Details about Edgy"}

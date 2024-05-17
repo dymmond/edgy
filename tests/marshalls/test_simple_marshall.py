@@ -55,8 +55,7 @@ class UserMarshall(Marshall):
 
 @post("/create")
 async def create_user(data: UserMarshall) -> UserMarshall:
-    user = await data.save()
-    return user
+    return data
 
 
 @pytest.fixture()

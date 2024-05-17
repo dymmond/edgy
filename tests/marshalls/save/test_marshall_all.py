@@ -62,7 +62,8 @@ class UserMarshall(Marshall):
 
 @post("/create")
 async def create_user(data: UserMarshall) -> UserMarshall:
-    return data
+    user = await data.save()
+    return user
 
 
 @pytest.fixture()
@@ -92,7 +93,7 @@ async def test_marshall_all_fields(async_client):
     response = await async_client.post("/create", json=data)
     assert response.status_code == 201
     assert response.json() == {
-        "id": None,
+        "id": 1,
         "name": "Edgy",
         "email": "edgy@esmerald.dev",
         "language": "EN",
