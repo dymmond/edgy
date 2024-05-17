@@ -1,5 +1,6 @@
 .vscode/
 .idea/
+/site/
 *.pyc
 test.db
 .coverage

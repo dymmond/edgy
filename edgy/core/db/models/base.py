@@ -178,9 +178,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         Builds the SQLAlchemy table representation from the loaded fields.
         """
         tablename: str = cls.meta.tablename  # type: ignore
-        metadata: sqlalchemy.MetaData = cast(
-            "sqlalchemy.MetaData", cls.meta.registry._metadata
-        )  # type: ignore
+        registry = cls.meta.registry
+        assert registry is not None, "registry is not set"
+        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", registry._metadata)  # type: ignore
         metadata.schema = schema
 
         unique_together = cls.meta.unique_together
@@ -188,8 +188,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
         columns = []
         for name, field in cls.fields.items():
-            columns.append(field.get_column(name))
-
+            columns.extend(field.get_columns(name))
         # Handle the uniqueness together
         uniques = []
         for field in unique_together or []:
@@ -208,7 +207,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             *columns,
             *uniques,
             *indexes,
-            extend_existing=True,  # type: ignore
+            extend_existing=True,
         )
 
     @classmethod
@@ -308,9 +307,9 @@ class EdgyBaseReflectModel(EdgyBaseModel):
         """
         The inspect is done in an async manner and reflects the objects from the database.
         """
-        metadata: sqlalchemy.MetaData = cast(
-            "sqlalchemy.MetaData", cls.meta.registry._metadata
-        )  # type: ignore
+        registry = cls.meta.registry
+        assert registry is not None, "registry is not set"
+        metadata: sqlalchemy.MetaData = registry._metadata
         metadata.schema = schema
 
         tablename: str = cast("str", cls.meta.tablename)

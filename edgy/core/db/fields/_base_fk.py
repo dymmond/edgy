@@ -34,7 +34,9 @@ class BaseForeignKey(BaseField):
             return value
 
         fields_filtered = {
-            target.proxy_model.pkname: target.proxy_model.fields.get(target.proxy_model.pkname)
+            target.proxy_model.pkname: target.proxy_model.fields.get(
+                target.proxy_model.pkname
+            )
         }
         target.proxy_model.model_fields = fields_filtered
         target.proxy_model.model_rebuild(force=True)
@@ -45,3 +47,6 @@ class BaseForeignKey(BaseField):
         Runs the checks for the fields being validated.
         """
         return value.pk
+
+    def clean(self, name: str, value: Any) -> Any:
+        return {name: self.check(value)}

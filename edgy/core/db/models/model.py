@@ -219,10 +219,18 @@ class Model(ModelRow, DeclarativeMixin):
         Run an one off query to populate any foreign key making sure
         it runs only once per foreign key avoiding multiple database calls.
         """
+        if hasattr(self.fields.get(name), "__get__"):
+            return self.fields[name].__get__(self)
         if name not in self.__dict__ and name in self.fields and name != self.pkname:
             run_sync(self.load())
             return self.__dict__[name]
         return super().__getattr__(name)
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        if hasattr(self.fields.get(name), "__set__"):
+            self.fields[name].__set__(self, value)
+        else:
+            super().__setattr__(name, value)
 
 
 class ReflectModel(Model, EdgyBaseReflectModel):

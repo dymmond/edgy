@@ -1,10 +1,10 @@
-from typing import TYPE_CHECKING, Any, Optional, TypeVar
+from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar
 
 import sqlalchemy
 
 from edgy.core.connection.registry import Registry
 from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL
-from edgy.core.db.fields._base_fk import BaseField, BaseForeignKey
+from edgy.core.db.fields._base_fk import BaseForeignKey
 from edgy.core.terminal import Print
 from edgy.exceptions import FieldDefinitionError
 
@@ -23,7 +23,7 @@ class ForeignKeyFieldFactory:
 
     _type: Any = None
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
+    def __new__(cls, *args: Any, **kwargs: Any) -> BaseForeignKey:  # type: ignore
         cls.validate(**kwargs)
 
         to: Any = kwargs.pop("to", None)
@@ -59,7 +59,7 @@ class ForeignKeyFieldFactory:
             constraints=cls.get_constraints(),
             **kwargs,
         )
-        Field = type(cls.__name__, (BaseForeignKeyField, BaseField), {})
+        Field = type(cls.__name__, (BaseForeignKeyField,), {})
         return Field(**namespace)  # type: ignore
 
     @classmethod
@@ -81,7 +81,7 @@ class ForeignKeyFieldFactory:
 
 
 class BaseForeignKeyField(BaseForeignKey):
-    def get_column(self, name: str) -> Any:
+    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         target = self.target
         to_field = target.fields[target.pkname]
 
@@ -95,7 +95,7 @@ class BaseForeignKeyField(BaseForeignKey):
                 f"_{target.pkname}_{name}",
             )
         ]
-        return sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)
+        return [sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)]
 
 
 class ForeignKey(ForeignKeyFieldFactory):
@@ -110,10 +110,14 @@ class ForeignKey(ForeignKeyFieldFactory):
         on_delete: Optional[str] = RESTRICT,
         related_name: Optional[str] = None,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseForeignKey:
         kwargs = {
             **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
+            **{
+                key: value
+                for key, value in locals().items()
+                if key not in CLASS_DEFAULTS
+            },
         }
 
         return super().__new__(cls, **kwargs)

@@ -137,7 +137,7 @@ def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
 
     if not found_registry:
         raise ImproperlyConfigured(
-            "Registry for the table not found in the Meta class or any of the superclasses. You must set thr registry in the Meta."
+            "Registry for the table not found in the Meta class or any of the superclasses. You must set the registry in the Meta."
         )
     return found_registry
 
@@ -456,8 +456,29 @@ class BaseModelMeta(ModelMetaclass):
             else:
                 registry.models[name] = new_class
 
-        for name, field in meta.fields_mapping.items():
+        fieldnames_to_check = list(meta.fields_mapping.keys())
+        while fieldnames_to_check:
+            name = fieldnames_to_check.pop()
+            field = meta.fields_mapping[name]
             field.registry = registry
+            # WORKAROUND
+            # FIXME: should only initialize metaclasses one time not multiple times
+            # FIXME: when reinitializing, the fields should be original
+            if not field.embedded_fields_initialized:
+                embedded_fields = field.get_embedded_fields(name, meta.fields_mapping)
+                field.embedded_fields_initialized = True
+                if embedded_fields:
+                    for sub_field_name, sub_field in embedded_fields.items():
+                        if sub_field_name in meta.fields_mapping:
+                            raise ValueError(
+                                f"sub field name collision: {sub_field_name}"
+                            )
+                        fieldnames_to_check.append(sub_field_name)
+                        sub_field.registry = registry
+                        meta.fields_mapping[sub_field_name] = sub_field
+                        if sub_field.primary_key:
+                            new_class.pkname = sub_field_name
+
             if field.primary_key:
                 new_class.pkname = name
 

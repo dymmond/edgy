@@ -223,7 +223,7 @@ This can be used to not call the default lifecycle signals in signals but custom
 Lifecycle methods are the former mentioned signals
 `
 ```python
-{!> ../docs_src/signals/receiver/rewire.py !}
+{!> ../docs_src/signals/rewire.py !}
 ```
 
 
