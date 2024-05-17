@@ -62,6 +62,8 @@ jobs:
         run: "pip install hatch"
       - name: "Run linting"
         run: "hatch run lint"
+      - name: "Run typing test"
+        run: "hatch run test:check_types"
       - name: "Run doc test"
         run: "hatch run docs:build"
       - name: "Run tests"
