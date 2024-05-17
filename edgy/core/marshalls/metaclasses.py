@@ -1,8 +1,8 @@
-import copy
 from typing import TYPE_CHECKING, Any, Dict, Set, Tuple, Type
 
 from pydantic._internal._model_construction import ModelMetaclass
 
+from edgy.core.db.models.metaclasses import handle_annotations
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
 from edgy.core.utils.functional import extract_field_annotations_and_defaults
@@ -11,30 +11,6 @@ from edgy.exceptions import MarshallFieldDefinitionError
 if TYPE_CHECKING:
     from edgy import Model
     from edgy.core.marshalls import Marshall
-
-
-def handle_annotations(
-    bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any
-) -> Dict[str, Any]:
-    """
-    Handles and copies some of the annotations for
-    initialiasation.
-    """
-    for base in bases:
-        if hasattr(base, "__init_annotations__") and base.__init_annotations__:
-            base_annotations.update(base.__init_annotations__)
-        elif hasattr(base, "__annotations__") and base.__annotations__:
-            base_annotations.update(base.__annotations__)
-
-    annotations: Dict[str, Any] = {}
-    if "__init_annotations__" in attrs:
-        annotations = copy.copy(attrs["__init_annotations__"])
-    else:
-        if "__annotations__" in attrs:
-            annotations = copy.copy(attrs["__annotations__"])
-
-    annotations.update(base_annotations)
-    return annotations
 
 
 class MarshallMeta(ModelMetaclass):
@@ -128,7 +104,7 @@ class MarshallMeta(ModelMetaclass):
         # Raise for error if any of the required fields is not in the Marshall
         required_fields: Set[str] = {f"'{k}'" for k, v in model.model_fields.items() if not v.null}
         if any(value not in model_class.model_fields.keys() for value in required_fields):
-            fields = ", ".join(required_fields)
+            fields = ", ".join(sorted(required_fields))
             raise MarshallFieldDefinitionError(
                 f"'{model.__name__}' model requires the following mandatory fields: [{fields}]."
             )
