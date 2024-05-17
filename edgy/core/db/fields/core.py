@@ -10,6 +10,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
+    List,
     Optional,
     Pattern,
     Sequence,
@@ -42,7 +43,7 @@ class Field:
         """
         return value
 
-    def clean(self, name: str, value: Any):
+    def clean(self, name: str, value: Any) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated. Multiple columns possible
         """
@@ -50,7 +51,7 @@ class Field:
 
     def get_column(self, name: str) -> Optional[sqlalchemy.Column]:
         """
-        Returns the column type of the field being declared.
+        Return a single column for the field declared. Return None for meta fields.
         """
         constraints = self.get_constraints()
         return sqlalchemy.Column(
@@ -70,7 +71,7 @@ class Field:
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         column = self.get_column(name)
         if column is None:
-            return None
+            return []
         return [column]
 
 
@@ -161,20 +162,25 @@ class CompositeField(BaseCompositeField):
         owner = kwargs.pop("owner", None)
         read_only: bool = kwargs.pop("read_only", False)
         secret: bool = kwargs.pop("secret", False)
-        inner_fields: Sequence[Union[str, Tuple[str, BaseField]]] = kwargs.pop("inner_fields", [])
+        inner_fields: Sequence[Union[str, Tuple[str, BaseField]]] = kwargs.pop(
+            "inner_fields", []
+        )
         field_type = Dict[str, Any]
         self.absorb_existing_fields: bool = kwargs.pop("absorb_existing_fields", False)
         self.model: Optional[BaseModel] = kwargs.pop("model", None)
-        self.inner_field_names = []
-        self.embedded_field_defs = {}
+        self.inner_field_names: List[str] = []
+        self.embedded_field_defs: Dict[str, BaseField] = {}
+        self.prefix_embedded: str = kwargs.pop("prefix_embedded", "")
         for field in inner_fields:
             if isinstance(field, str):
                 self.inner_field_names.append(field)
             else:
-                self.inner_field_names.append(field[0])
-                self.embedded_field_defs[field[0]] = field[1]
+                field_name = f"{self.prefix_embedded}{field[0]}"
+                field_def = copy.deepcopy(field[1])
+                self.inner_field_names.append(field_name)
+                self.embedded_field_defs[field_name] = field_def
                 # will be overwritten later
-                field[1].owner = owner
+                field_def.owner = owner
 
         return super().__init__(
             __type__=field_type,
@@ -197,25 +203,39 @@ class CompositeField(BaseCompositeField):
             **kwargs,
         )
 
-    def __get__(self, instance: "Model", owner: Any = None) -> Dict[str, Any]:
+    def translate_name(self, name: str) -> str:
+        if self.prefix_embedded and name in self.embedded_field_defs:
+            return name.removeprefix(self.prefix_embedded)
+        return name
+
+    def __get__(
+        self, instance: "Model", owner: Any = None
+    ) -> Union[Dict[str, Any], Any]:
         d = {}
         for key in self.inner_field_names:
-            d[key] = getattr(instance, key)
+            translated_name = self.translate_name(key)
+            d[translated_name] = getattr(instance, key)
         if self.model is not None:
-            return self.model(**d)
+            return self.model(**d)  # type: ignore
         return d
 
     def __set__(self, instance: "Model", value: Union[Dict, Any]) -> None:
         if isinstance(value, dict):
             for key in self.inner_field_names:
-                setattr(instance, key, value[key])
+                translated_name = self.translate_name(key)
+                setattr(instance, key, value[translated_name])
         else:
             for key in self.inner_field_names:
-                setattr(instance, key, getattr(value, key))
+                translated_name = self.translate_name(key)
+                setattr(instance, key, getattr(value, translated_name))
 
-    def get_embedded_fields(self, name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
+    def get_embedded_fields(
+        self, name: str, field_mapping: Dict[str, "BaseField"]
+    ) -> Dict[str, "BaseField"]:
         if not self.absorb_existing_fields:
-            duplicate_fields = set(self.embedded_field_defs.keys()).intersection(field_mapping.keys())
+            duplicate_fields = set(self.embedded_field_defs.keys()).intersection(
+                field_mapping.keys()
+            )
             if duplicate_fields:
                 raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
             return dict(self.embedded_field_defs)
@@ -224,9 +244,13 @@ class CompositeField(BaseCompositeField):
             if item[0] not in field_mapping:
                 retdict[item[0]] = item[1]
             else:
-                absorbed_field =field_mapping[item[0]]
-                if not issubclass(absorbed_field.field_type, item[1].field_type) and not getattr(absorbed_field, "skip_absorption_check", False):
-                    raise ValueError(f"absorption failed: field \"{item[0]}\" handle the type: {absorbed_field.field_type}, required: {item[1].field_type}")
+                absorbed_field = field_mapping[item[0]]
+                if not getattr(
+                    absorbed_field, "skip_absorption_check", False
+                ) and not issubclass(absorbed_field.field_type, item[1].field_type):
+                    raise ValueError(
+                        f'absorption failed: field "{item[0]}" handle the type: {absorbed_field.field_type}, required: {item[1].field_type}'
+                    )
         return retdict
 
     def get_composite_fields(self) -> Dict[str, BaseField]:
@@ -241,7 +265,7 @@ class CompositeField(BaseCompositeField):
         if inner_fields is not None:
             if not isinstance(inner_fields, Sequence):
                 raise FieldDefinitionError("inner_fields must be a Sequence")
-            inner_field_names = set()
+            inner_field_names: Set[str] = set()
             for field in inner_fields:
                 if isinstance(field, str):
                     if field in inner_field_names:

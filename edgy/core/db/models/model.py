@@ -1,6 +1,5 @@
 from typing import Any, Dict, Set, Type, Union
 
-from edgy.core.db.fields.base import BaseCompositeField
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
@@ -220,7 +219,7 @@ class Model(ModelRow, DeclarativeMixin):
         Run an one off query to populate any foreign key making sure
         it runs only once per foreign key avoiding multiple database calls.
         """
-        if isinstance(self.fields.get(name), BaseCompositeField):
+        if hasattr(self.fields.get(name), "__get__"):
             return self.fields[name].__get__(self)
         if name not in self.__dict__ and name in self.fields and name != self.pkname:
             run_sync(self.load())
@@ -228,7 +227,7 @@ class Model(ModelRow, DeclarativeMixin):
         return super().__getattr__(name)
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if isinstance(self.fields.get(name), BaseCompositeField):
+        if hasattr(self.fields.get(name), "__set__"):
             self.fields[name].__set__(self, value)
         else:
             super().__setattr__(name, value)

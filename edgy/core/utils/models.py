@@ -7,7 +7,7 @@ from orjson import OPT_OMIT_MICROSECONDS, OPT_SERIALIZE_NUMPY, dumps
 from pydantic import ConfigDict
 
 import edgy
-from edgy.core.db.fields.core import BaseField, Field
+from edgy.core.db.fields.base import BaseField
 
 if TYPE_CHECKING:
     from edgy import Model
@@ -44,11 +44,11 @@ class DateParser:
         """
         for name, field in fields.items():
             if (
-                isinstance(field, Field)
+                isinstance(field, BaseField)
                 and _has_auto_now(field)
                 and _is_datetime(field)
             ):
-                values.update(field.get_default_values(name, values))  # type: ignore
+                values.update(field.get_default_values(name, values))
         return values
 
     def _resolve_value(self, value: typing.Any) -> typing.Any:
@@ -87,7 +87,7 @@ class ModelParser:
         value corresponding to each field.
         """
         model_cls = model_class or self
-        validated = {}
+        validated: Dict[str, Any] = {}
         for name, field in model_cls.fields.items():  # type: ignore
             if field.read_only:
                 if field.has_default():

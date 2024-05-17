@@ -461,16 +461,23 @@ class BaseModelMeta(ModelMetaclass):
             name = fieldnames_to_check.pop()
             field = meta.fields_mapping[name]
             field.registry = registry
-            embedded_fields = field.get_embedded_fields(name, meta.fields_mapping)
-            if embedded_fields:
-                for sub_field_name, sub_field in embedded_fields.items():
-                    if sub_field_name in meta.fields_mapping:
-                        raise ValueError(f"sub field name collision: {sub_field_name}")
-                    fieldnames_to_check.append(sub_field_name)
-                    sub_field.registry = registry
-                    meta.fields_mapping[sub_field_name] = sub_field
-                    if sub_field.primary_key:
-                        new_class.pkname = sub_field_name
+            # WORKAROUND
+            # FIXME: should only initialize metaclasses one time not multiple times
+            # FIXME: when reinitializing, the fields should be original
+            if not field.embedded_fields_initialized:
+                embedded_fields = field.get_embedded_fields(name, meta.fields_mapping)
+                field.embedded_fields_initialized = True
+                if embedded_fields:
+                    for sub_field_name, sub_field in embedded_fields.items():
+                        if sub_field_name in meta.fields_mapping:
+                            raise ValueError(
+                                f"sub field name collision: {sub_field_name}"
+                            )
+                        fieldnames_to_check.append(sub_field_name)
+                        sub_field.registry = registry
+                        meta.fields_mapping[sub_field_name] = sub_field
+                        if sub_field.primary_key:
+                            new_class.pkname = sub_field_name
 
             if field.primary_key:
                 new_class.pkname = name

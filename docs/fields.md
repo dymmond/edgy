@@ -15,6 +15,7 @@ supported in **all field types**.
 Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions with Edgy.
 * **default** - A value or a callable (function).
 * **index** - A boolean. Determine if a database index should be created.
+* **skip_absorption_check** - A boolean. Default False. Dangerous option! By default when defining a CompositeField with embedded fields and the `absorb_existing_fields` option it is checked that the field type of the absorbed field is compatible with the field type of the embedded field. This option skips the check.
 * **unique** - A boolean. Determine if a unique constraint should be created for the field.
 Check the [unique_together](./models.md#unique-together) for more details.
 
@@ -159,9 +160,11 @@ class MyModel(edgy.Model):
 
 The **CompositeField** is a little bit different from normal fields. It takes a parameter `inner_fields` and distributes write or read access to the fields
 referenced in `inner_fields`. It hasn't currently all field parameters. Especially not the server parameters.
-It implements a pseudo descriptor protocol (heavy lifting is done in Model).
+For distributing the field parameters it uses the Descriptor Protocol.
 
-**CompositeField** defines no column. It is a meta field.
+Optionally a pydantic model can be provided via the **model** argument
+
+**CompositeField** defines no columns. It is a meta field.
 
 Note there is also **BaseCompositeField**. It can be used for implementing own **CompositeField**-like fields.
 
@@ -192,11 +195,13 @@ Currently the field is always excluded from serialization.
 
 ##### Parameters
 
-* **inner_fields** - A sequence containing the field names mixed with (name, Field) tuples
-* **read_only** - Prevent writes
-* **absorb_existing_fields** - Don't fail if fields speficied with (name, Field) tuples already exists. Treat them as internal fields. The existing fields are checked if they are a subclass of the Field or have the attribute `skip_absorption_check` set
-* **model** - Return a pydantic model instead of a dict
+* **inner_fields** - Required. A sequence containing the external field names mixed with embedded field definitions (name, Field) tuples.
+* **read_only** - Default False. Prevent writes
+* **absorb_existing_fields** - Default False. Don't fail if fields speficied with (name, Field) tuples already exists. Treat them as internal fields. The existing fields are checked if they are a subclass of the Field or have the attribute `skip_absorption_check` set
+* **model** - Default None (not set).Return a pydantic model instead of a dict
+* **prefix_embedded** - Default "". Prefix the field names of embedded fields (not references to external fields). Useful for implementing embeddables
 
+Note: embedded fields are deepcopied. This way it is safe to provide the same inner_fields object to multiple CompositeFields
 
 #### DateField
 
@@ -484,3 +489,41 @@ class MyModel(edgy.Model):
 ```
 
 Derives from the same as [CharField](#charfield) and validates the value of an UUID.
+
+
+
+## Custom Fields
+
+### Simple one column fields
+
+If you merely want to customize an existing field in `edgy.db.fields.core` you can just inherit from it and provide the customization.
+
+For examples look in the mentioned path.
+
+Note: instance checks should be done against the `__type__` attribute,
+``` python
+isinstance(edgy.CharField(max_length=255), edgy.CharField)  # return False
+isinstance(edgy.CharField(max_length=255).__type__, edgy.CharField(max_length=255).__type__)  # returns the expected result True
+```
+
+
+### Special fields
+
+
+Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide following methods to work:
+
+* **get_columns(self, field_name)** - returns the sqlalchemy columns which should be created by this field.
+* **clean(self, field_name, value)** - returns the cleaned column values.
+
+Additional they can provide following methods:
+* **`__get__`** - Descriptor protocol like get access customization.
+* **`__set__`** - Descriptor protocol like set access customization.
+* **get_embedded_fields(self, field_name, field_mapping)** - (Optionally) define internal fields.
+* **get_default_values(self, field_name, cleaned_data)** - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
+* **get_default_value(self)** - return default value for one column fields. 
+
+You should also provide an init method which sets following attributes:
+
+* **column_type** - either None (default) or the sqlalchemy column type
+
+for examples have a look in `tests/fields/test_composite_fields.py` or in `edgy/core/db/fields/core.py`

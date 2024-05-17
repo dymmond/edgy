@@ -1,6 +1,7 @@
 import decimal
 from functools import cached_property
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
@@ -11,13 +12,15 @@ from typing import (
     Union,
 )
 
-import sqlalchemy
 from pydantic._internal import _repr
 from pydantic.fields import FieldInfo
 
 from edgy.core.connection.registry import Registry
 from edgy.exceptions import FieldDefinitionError
 from edgy.types import Undefined
+
+if TYPE_CHECKING:
+    from sqlalchemy import Column, Constraint
 
 edgy_setattr = object.__setattr__
 
@@ -61,10 +64,8 @@ class BaseField(FieldInfo, _repr.Representation):
         self.field_type: Any = kwargs.pop("__type__", None)
         self.__original_type__: type = kwargs.pop("__original_type__", None)
         self.primary_key: bool = kwargs.pop("primary_key", False)
-        self.column_type: sqlalchemy.Column = kwargs.pop("column_type", None)
-        self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop(
-            "constraints", None
-        )
+        self.column_type: Optional[Any] = kwargs.pop("column_type", None)
+        self.constraints: Sequence["Constraint"] = kwargs.pop("constraints", None)
         self.title = title
         self.description = description
         self.skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
@@ -101,6 +102,9 @@ class BaseField(FieldInfo, _repr.Representation):
         self.registry: Registry = kwargs.pop("registry", None)
         self.comment: str = kwargs.pop("comment", None)
         self.secret: bool = kwargs.pop("secret", False)
+        # hackaround to prevent multi call of get_embedded_fields
+        # FIXME: should only call the metaclasses
+        self.embedded_fields_initialized = False
 
         if self.primary_key:
             default_value = default
@@ -167,19 +171,28 @@ class BaseField(FieldInfo, _repr.Representation):
         """Checks if the field has a default value set"""
         return bool(self.default is not None and self.default is not Undefined)
 
-    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
+    def get_columns(self, field_name: str) -> Sequence["Column"]:
         """
         Returns the columns of the field being declared.
         """
         raise NotImplementedError()
 
-    def clean(self, name: str, value: Any) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
         raise NotImplementedError()
 
-    def get_embedded_fields(self, name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
+    def get_embedded_fields(
+        self, field_name: str, field_mapping: Dict[str, "BaseField"]
+    ) -> Dict[str, "BaseField"]:
+        """
+        Define extra fields on the fly. Often no owner is available yet.
+
+        Arguments are:
+        name: the field name
+        field_mapping: the existing fields
+        """
         return {}
 
     def expand_relationship(self, value: Any) -> Any:
@@ -202,46 +215,63 @@ class BaseField(FieldInfo, _repr.Representation):
             return default()
         return default
 
-    def get_default_values(self, name: str, cleaned_data: Dict[str, Any]) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any]) -> Any:
         # for multidefaults overwrite in subclasses get_default_values to
         # parse default values differently
         # NOTE: multi value fields should always check here if defaults were already applied
-        if name in cleaned_data:
+        if field_name in cleaned_data:
             return {}
-        return {name: self.get_default_value()}
+        return {field_name: self.get_default_value()}
+
 
 class BaseCompositeField(BaseField):
+    def translate_name(self, name: str) -> str:
+        """translate name for inner objects and parsing values"""
+        return name
+
     def get_composite_fields(self) -> Dict[str, BaseField]:
+        """return dictionary of fields with untranslated names"""
         raise NotImplementedError()
 
     @cached_property
     def composite_fields(self) -> Dict[str, BaseField]:
+        # return untranslated names
         return self.get_composite_fields()
 
-    def clean(self, name: str, value: Any) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
         result = {}
         if isinstance(value, dict):
             for sub_name, field in self.composite_fields.items():
-                if sub_name not in value:
-                    raise ValueError(f"Missing key: {sub_name} for {name}")
-                for k, v in field.clean(sub_name, value[sub_name]):
+                translated_name = self.translate_name(sub_name)
+                if translated_name not in value:
+                    raise ValueError(f"Missing key: {sub_name} for {field_name}")
+                for k, v in field.clean(sub_name, value[translated_name]).items():
                     result[k] = v
         else:
             for sub_name, field in self.composite_fields.items():
-                if not hasattr(value, sub_name):
-                    raise ValueError(f"Missing attribute: {sub_name} for {name}")
-                for k, v in field.clean(sub_name, getattr(value, sub_name)):
+                translated_name = self.translate_name(sub_name)
+                if not hasattr(value, translated_name):
+                    raise ValueError(
+                        f"Missing attribute: {translated_name} for {field_name}"
+                    )
+                for k, v in field.clean(sub_name, getattr(value, translated_name)):
                     result[k] = v
 
         return result
 
-    def get_default_values(self, name: str, cleaned_data: Dict[str, Any]) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any]) -> Any:
         cleaned_data_result = {}
         for sub_field_name, field in self.composite_fields.items():
-            for sub_field_name_new, default_value in field.get_default_values(sub_field_name, cleaned_data):
-                if sub_field_name_new not in cleaned_data and sub_field_name_new not in cleaned_data_result:
+            # here we don't need to translate, there is no inner object
+            for sub_field_name_new, default_value in field.get_default_values(
+                sub_field_name, cleaned_data
+            ):
+                if (
+                    sub_field_name_new not in cleaned_data
+                    and sub_field_name_new not in cleaned_data_result
+                ):
                     cleaned_data_result[sub_field_name_new] = default_value
         return cleaned_data_result
