@@ -45,7 +45,6 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
                 setattr(self, name, getattr(instance, field.source))
             elif field.source and not field.__is_method__:
                 attribute = getattr(instance, field.source)
-
                 # If attribute is callable, execute it and set the value
                 if callable(attribute):
                     value = run_sync(attribute()) if is_async_callable(attribute) else attribute()
@@ -73,13 +72,19 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         func = getattr(self, func_name)
         return func(instance)
 
-    @property
-    def data(self) -> Dict[str, Any]:
+    def _handle_primary_key(self, instance: "Model") -> None:
         """
-        Returns the data in a dictionary like
-        format.
+        Handles the field of a the primary key if present in the
+        fields.
         """
-        return {}
+        # Extract fields that are instances of BaseMarshallField
+        fields = {k: v for k, v in self.model_fields.items() if isinstance(v, BaseMarshallField)}
+
+        # Dump model data excluding fields extracted above
+        data = self.model_dump(exclude=set(fields.keys()))
+
+        if instance.meta.pk_attribute in data:
+            setattr(self, instance.meta.pk_attribute, instance.pk)
 
     def _get_fields(self) -> Dict[str, Any]:
         return self.model_fields.copy()
@@ -106,6 +111,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         data["__show_pk__"] = self.__show_pk__
         instance = await self.marshall_config["model"](**data).save()  # type: ignore
         self._resolve_serializer(instance=instance)
+        self._handle_primary_key(instance=instance)
         return self
 
 

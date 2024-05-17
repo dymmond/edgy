@@ -64,7 +64,9 @@ class MarshallMeta(ModelMetaclass):
                 k: v for k, v in model.model_fields.items() if k in base_fields_exclude
             }
         if "__all__" in base_fields_include:  # type: ignore
-            base_model_fields = model.meta.fields_mapping
+            base_model_fields = {
+                k: v for k, v in model.meta.fields_mapping.items() if k not in model_fields
+            }
             show_pk = True
         else:
             base_model_fields = {
