@@ -126,10 +126,10 @@ class MarshallMeta(ModelMetaclass):
         model_class.model_rebuild(force=True)
 
         # Raise for error if any of the required fields is not in the Marshall
-        required_fields: Set[str] = {k for k, v in model.model_fields.items() if not v.null}
+        required_fields: Set[str] = {f"'{k}'" for k, v in model.model_fields.items() if not v.null}
         if any(value not in model_class.model_fields.keys() for value in required_fields):
             fields = ", ".join(required_fields)
             raise MarshallFieldDefinitionError(
-                f"'{fields}' is required for the model '{model.__name__}'."
+                f"'{model.__name__}' model requires the following mandatory fields: [{fields}]."
             )
         return model_class

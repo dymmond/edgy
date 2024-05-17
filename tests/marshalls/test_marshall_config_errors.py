@@ -47,6 +47,14 @@ class User(edgy.Model):
         registry = models
 
 
+class Profile(edgy.Model):
+    name: str = edgy.CharField(max_length=100)
+    email: str = edgy.EmailField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
 def test_raises_error_on_missing_marshall_config():
     with pytest.raises(MarshallFieldDefinitionError) as raised:
 
@@ -89,4 +97,16 @@ def test_raises_error_on_missing_declared_function_on_method_field():
     assert (
         raised.value.args[0]
         == "Field 'details' declared but no 'get_details' found in 'UserMarshall'."
+    )
+
+
+def test_raises_error_on_missing_required_fields():
+    with pytest.raises(MarshallFieldDefinitionError) as raised:
+
+        class ProfileMarshall(Marshall):
+            marshall_config = ConfigMarshall(model=Profile, fields=["email"])
+
+    assert (
+        raised.value.args[0]
+        == "'Profile' model requires the following mandatory fields: ['email', 'name']."
     )
