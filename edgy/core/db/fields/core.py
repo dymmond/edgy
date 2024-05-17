@@ -6,6 +6,7 @@ import ipaddress
 import re
 import uuid
 from enum import EnumMeta
+from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -17,6 +18,7 @@ from typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
 
 import pydantic
@@ -82,63 +84,45 @@ class Field:
             return []
         return [column]
 
+    @classmethod
+    def get_constraints(cls, **kwargs: Any) -> Any:
+        return []
 
-class FieldFactory:
+
+class FieldFactoryMeta(type):
+    def __instancecheck__(self, instance: Any) -> bool:
+        return super().__instancecheck__(instance) or isinstance(
+            instance, self._get_field_cls(self)
+        )
+
+    def __subclasscheck__(self, subclass: Any) -> bool:
+        return super().__subclasscheck__(subclass) or issubclass(
+            subclass, self._get_field_cls(self)
+        )
+
+
+class FieldFactory(metaclass=FieldFactoryMeta):
     """The base for all model fields to be used with Edgy"""
 
-    _bases = (
-        Field,
-        BaseField,
-    )
+    _bases: Sequence[Any] = (Field, BaseField)
     _type: Any = None
 
-    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
+    def __new__(cls, **kwargs: Any) -> BaseField:
         cls.validate(**kwargs)
-        arguments = copy.deepcopy(kwargs)
-
-        default = kwargs.pop("default", None)
-        null: bool = kwargs.pop("null", False)
-        skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
-        primary_key: bool = kwargs.pop("primary_key", False)
-        autoincrement: bool = kwargs.pop("autoincrement", False)
-        unique: bool = kwargs.pop("unique", False)
-        index: bool = kwargs.pop("index", False)
-        name: str = kwargs.pop("name", None)
-        choices: Set[Any] = set(kwargs.pop("choices", []))
-        comment: str = kwargs.pop("comment", None)
-        owner = kwargs.pop("owner", None)
-        server_default = kwargs.pop("server_default", None)
-        server_onupdate = kwargs.pop("server_onupdate", None)
-        format: str = kwargs.pop("format", None)
-        read_only: bool = True if primary_key else kwargs.pop("read_only", False)
-        secret: bool = kwargs.pop("secret", False)
         field_type = cls._type
+        column_type = cls.get_column_type(**kwargs)
+        default: None = kwargs.pop("default", None)
+        server_default: None = kwargs.pop("server_default", None)
 
-        namespace = dict(
+        new_field = cls._get_field_cls(cls)
+        return new_field(  # type: ignore
             __type__=field_type,
             annotation=field_type,
-            name=name,
-            primary_key=primary_key,
+            column_type=column_type,
             default=default,
-            null=null,
-            index=index,
-            unique=unique,
-            autoincrement=autoincrement,
-            choices=choices,
-            comment=comment,
-            owner=owner,
             server_default=server_default,
-            server_onupdate=server_onupdate,
-            format=format,
-            read_only=read_only,
-            column_type=cls.get_column_type(**arguments),
-            constraints=cls.get_constraints(),
-            secret=secret,
-            skip_absorption_check=skip_absorption_check,
             **kwargs,
         )
-        Field = type(cls.__name__, cls._bases, {})
-        return Field(**namespace)  # type: ignore
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:  # pragma no cover
@@ -153,27 +137,22 @@ class FieldFactory:
         """Returns the propery column type for the field"""
         return None
 
-    @classmethod
-    def get_constraints(cls, **kwargs: Any) -> Any:
-        return []
+    @staticmethod
+    @lru_cache(None)
+    def _get_field_cls(cls: "FieldFactory") -> BaseField:
+        return cast(BaseField, type(cls.__name__, cast(Any, cls._bases), {}))
 
 
-class CompositeField(BaseCompositeField):
-    """Aggregates multiple fields into one pseudo field"""
-
-    def __new__(cls, **kwargs: Any) -> BaseField:
-        cls.validate(**kwargs)
-        return super().__new__(cls)
+class ConcreteCompositeField:
+    """
+    Conrete, internal implementation of the CompositeField
+    """
 
     def __init__(self, **kwargs: Any):
-        name: str = kwargs.pop("name", None)
         owner = kwargs.pop("owner", None)
-        read_only: bool = kwargs.pop("read_only", False)
-        secret: bool = kwargs.pop("secret", False)
         inner_fields: Sequence[Union[str, Tuple[str, BaseField]]] = kwargs.pop(
             "inner_fields", []
         )
-        field_type = Dict[str, Any]
         self.absorb_existing_fields: bool = kwargs.pop("absorb_existing_fields", False)
         self.model: Optional[BaseModel] = kwargs.pop("model", None)
         self.inner_field_names: List[str] = []
@@ -190,24 +169,18 @@ class CompositeField(BaseCompositeField):
                 # will be overwritten later
                 field_def.owner = owner
 
-        return super().__init__(
-            __type__=field_type,
-            annotation=field_type,
-            name=name,
+        return super().__init__(  # type: ignore
+            name=None,
             primary_key=False,
-            null=True,
+            autoincrement=False,
             index=False,
             exclude=True,
+            null=True,
             unique=False,
-            autoincrement=False,
             choices=False,
             owner=owner,
-            server_default=False,
-            server_onupdate=False,
-            read_only=read_only,
-            column_type=None,
+            server_onupdate=None,
             constraints=[],
-            secret=secret,
             **kwargs,
         )
 
@@ -267,6 +240,15 @@ class CompositeField(BaseCompositeField):
 
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         return []
+
+
+class CompositeField(FieldFactory):
+    """
+    Meta field that aggregates multiple fields in a pseudo field
+    """
+
+    _type = Union[Dict[str, Any], object]
+    _bases = (ConcreteCompositeField, BaseCompositeField)
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:

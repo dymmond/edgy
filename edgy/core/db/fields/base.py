@@ -36,13 +36,12 @@ class BaseField(FieldInfo, _repr.Representation):
         self,
         *,
         default: Any = Undefined,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
+        server_default: Any = Undefined,
         **kwargs: Any,
     ) -> None:
         self.max_digits: str = kwargs.pop("max_digits", None)
         self.decimal_places: str = kwargs.pop("decimal_places", None)
-        self.server_default: Any = kwargs.pop("server_default", None)
+        self.server_default: Any = server_default
 
         super().__init__(**kwargs)
 
@@ -63,20 +62,23 @@ class BaseField(FieldInfo, _repr.Representation):
         )
         self.field_type: Any = kwargs.pop("__type__", None)
         self.__original_type__: type = kwargs.pop("__original_type__", None)
+        self.read_only: bool = kwargs.pop("read_only", False)
+        self.autoincrement: bool = kwargs.pop("autoincrement", False)
         self.primary_key: bool = kwargs.pop("primary_key", False)
+        if self.primary_key:
+            self.read_only = True
+
         self.column_type: Optional[Any] = kwargs.pop("column_type", None)
         self.constraints: Sequence["Constraint"] = kwargs.pop("constraints", None)
-        self.title = title
-        self.description = description
+        self.title: Optional[str] = kwargs.pop("title", None)
+        self.description: Optional[str] = kwargs.pop("description", None)
         self.skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
-        self.read_only: bool = kwargs.pop("read_only", False)
-        self.help_text: str = kwargs.pop("help_text", None)
+        self.help_text: Optional[str] = kwargs.pop("help_text", None)
         self.pattern: Pattern = kwargs.pop("pattern", None)
-        self.autoincrement: bool = kwargs.pop("autoincrement", False)
         self.related_name: str = kwargs.pop("related_name", None)
         self.unique: bool = kwargs.pop("unique", False)
         self.index: bool = kwargs.pop("index", False)
-        self.choices: Sequence = kwargs.pop("choices", None)
+        self.choices: Sequence = kwargs.pop("choices", [])
         self.owner: Any = kwargs.pop("owner", None)
         self.name: str = kwargs.pop("name", None)
         self.alias: str = kwargs.pop("name", None)
@@ -158,14 +160,6 @@ class BaseField(FieldInfo, _repr.Representation):
         Used to translate the model column names into database column tables.
         """
         return self.name
-
-    def is_primary_key(self) -> bool:
-        """
-        Sets the autoincrement to True if the field is primary key.
-        """
-        if self.primary_key:
-            self.autoincrement = True
-        return False
 
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""

@@ -500,10 +500,11 @@ If you merely want to customize an existing field in `edgy.db.fields.core` you c
 
 For examples look in the mentioned path.
 
-Note: instance checks should be done against the `__type__` attribute,
+Note: instance checks can also be done against the `__type__` attribute,
 ``` python
-isinstance(edgy.CharField(max_length=255), edgy.CharField)  # return False
-isinstance(edgy.CharField(max_length=255).__type__, edgy.CharField(max_length=255).__type__)  # returns the expected result True
+isinstance(edgy.CharField(max_length=255), edgy.CharField)  # return True
+isinstance(edgy.CharField(max_length=255).__type__, edgy.CharField(max_length=255).__type__)  # returns ´ True
+isinstance(edgy.TextField(max_length=255), edgy.CharField)  # return False
 ```
 
 
