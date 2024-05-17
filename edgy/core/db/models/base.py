@@ -1,6 +1,18 @@
 import copy
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Sequence, Set, Type, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Type,
+    Union,
+    cast,
+)
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
@@ -151,8 +163,13 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         Args:
             show_pk: bool - Enforces showing the primary key in the model_dump.
         """
+        exclude: List[str] = kwargs.pop("exclude", None) or []
+        if exclude and not isinstance(exclude, list):
+            exclude = list(exclude)  # type: ignore
+        exclude.append("__show_pk__")
+
         should_show_pk = show_pk or self.__show_pk__
-        model = super().model_dump(exclude={"__show_pk__"}, **kwargs)
+        model = super().model_dump(exclude=exclude, **kwargs)
         if self.pkname not in model and should_show_pk:
             model = {**{self.pkname: self.pk}, **model}
         return model
