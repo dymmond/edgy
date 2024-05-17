@@ -34,6 +34,14 @@ if TYPE_CHECKING:
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
 
+def _removeprefix(text: str, prefix: str) -> str:
+    # TODO: replace with removeprefix when python3.9 is minimum
+    if text.startswith(prefix):
+        return text[len(prefix) :]
+    else:
+        return text
+
+
 class Field:
     # defines compatibility fallbacks check and get_column
 
@@ -205,7 +213,8 @@ class CompositeField(BaseCompositeField):
 
     def translate_name(self, name: str) -> str:
         if self.prefix_embedded and name in self.embedded_field_defs:
-            return name.removeprefix(self.prefix_embedded)
+            # PYTHON 3.8 compatibility
+            return _removeprefix(name, self.prefix_embedded)
         return name
 
     def __get__(
