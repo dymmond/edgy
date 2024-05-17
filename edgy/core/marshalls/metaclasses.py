@@ -96,6 +96,7 @@ class MarshallMeta(ModelMetaclass):
             }
 
         base_model_fields.update(model_fields)
+
         # Handles with the fields not declared in the model.
         custom_fields: Dict[str, BaseMarshallField] = {}
 
@@ -111,11 +112,8 @@ class MarshallMeta(ModelMetaclass):
             if field.__is_method__ and not field.source:
                 if not hasattr(model_class, f"get_{name}"):
                     raise MarshallFieldDefinitionError(
-                        f"Field '{name}' declared but no 'get_{name}' with @field_validator decorator found."
+                        f"Field '{name}' declared but no 'get_{name}' found in '{model_class.__name__}'."
                     )
-            # elif not field.__is_method__ and field.source:
-            #     # Assign to the proper source of the model
-            #     base_model_fields[name] = base_model_fields[field.source]
 
         model_class.model_fields = base_model_fields
 

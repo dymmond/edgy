@@ -1,7 +1,8 @@
-from typing import Any, ClassVar, Union, Unpack
+from typing import Any, ClassVar, Union
 
 from pydantic._internal import _repr
 from pydantic.fields import FieldInfo, _FieldInfoInputs
+from typing_extensions import Unpack
 
 from edgy.types import Undefined
 
@@ -43,6 +44,16 @@ class MarshallMethodField(BaseMarshallField):
 
     __is_method__: ClassVar[bool] = True
 
+    def __init__(
+        self,
+        field_type: type,
+        **kwargs: _FieldInfoInputs,
+    ) -> None:
+        kwargs.pop("default", None)
+        kwargs.pop("source", None)
+        kwargs.pop("allow_null", None)
+        super().__init__(field_type, source=None, allow_null=True, default=None, **kwargs)
+
 
 class MarshallField(BaseMarshallField):
     def __init__(
@@ -51,4 +62,6 @@ class MarshallField(BaseMarshallField):
         source: Union[str, None] = None,
         **kwargs: _FieldInfoInputs,
     ) -> None:
+        kwargs.pop("default", None)
+        kwargs.pop("allow_null", None)
         super().__init__(field_type, source, allow_null=True, default=None, **kwargs)

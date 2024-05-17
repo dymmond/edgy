@@ -13,7 +13,7 @@ set -ex
 #   scripts/check
 # fi
 
-${PREFIX}coverage run -m pytest $@
+${PREFIX}pytest $@
 
 # if [ -z $GITHUB_ACTIONS ]; then
 #   scripts/coverage

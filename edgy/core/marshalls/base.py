@@ -43,7 +43,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         for name, field in fields.items():
             if field.source and field.source in data:
                 setattr(self, name, getattr(instance, field.source))
-            elif field.source:
+            elif field.source and not field.__is_method__:
                 attribute = getattr(instance, field.source)
 
                 # If attribute is callable, execute it and set the value
@@ -52,7 +52,26 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
                 else:
                     value = attribute
                 setattr(self, name, value)
+            elif field.__is_method__:
+                value = self._get_method_value(name, instance)
+                setattr(self, name, value)
+
         return self
+
+    def _get_method_value(self, name: str, instance: "Model") -> Any:
+        """
+        Retrieve the value for a method-based field.
+
+        Args:
+            name (str): The name of the method-based field.
+            instance (Model): The instance to retrieve the value from.
+
+        Returns:
+            Optional: The value retrieved from the method-based field.
+        """
+        func_name: str = f"get_{name}"
+        func = getattr(self, func_name)
+        return func(instance)
 
     @property
     def data(self) -> Dict[str, Any]:
@@ -76,6 +95,13 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         return fields
 
     async def save(self) -> Any:
+        """
+        This save is not actually performing any specific action,
+        in fact, its using the Edgy saving method and nothing else.
+
+        We add the save here to make sure we have compatibility with
+        the interface of Edgy.
+        """
         data = self.model_dump(exclude={"id"})
         data["__show_pk__"] = self.__show_pk__
         instance = await self.marshall_config["model"](**data).save()  # type: ignore
