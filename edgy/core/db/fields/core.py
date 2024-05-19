@@ -6,6 +6,7 @@ import ipaddress
 import re
 import uuid
 from enum import EnumMeta
+from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -17,12 +18,14 @@ from typing import (
     Set,
     Tuple,
     Union,
+    cast,
 )
 
 import pydantic
 import sqlalchemy
 from pydantic import BaseModel, EmailStr
 
+from edgy.core.db.constants import CASCADE, RESTRICT
 from edgy.core.db.fields._internal import IPAddress
 from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
 from edgy.core.db.fields.base import BaseCompositeField, BaseField
@@ -42,7 +45,7 @@ def _removeprefix(text: str, prefix: str) -> str:
         return text
 
 
-class Field:
+class Field(BaseField):
     # defines compatibility fallbacks check and get_column
 
     def check(self, value: Any) -> Any:
@@ -83,62 +86,42 @@ class Field:
         return [column]
 
 
-class FieldFactory:
+class FieldFactoryMeta(type):
+    def __instancecheck__(self, instance: Any) -> bool:
+        return super().__instancecheck__(instance) or isinstance(
+            instance, self._get_field_cls(self)
+        )
+
+    def __subclasscheck__(self, subclass: Any) -> bool:
+        return super().__subclasscheck__(subclass) or issubclass(
+            subclass, self._get_field_cls(self)
+        )
+
+
+class FieldFactory(metaclass=FieldFactoryMeta):
     """The base for all model fields to be used with Edgy"""
 
-    _bases = (
-        Field,
-        BaseField,
-    )
+    _bases: Sequence[Any] = (Field,)
     _type: Any = None
 
-    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
+    def __new__(cls, **kwargs: Any) -> BaseField:
         cls.validate(**kwargs)
-        arguments = copy.deepcopy(kwargs)
+        column_type = cls.get_column_type(**kwargs)
+        pydantic_type = cls.get_pydantic_type(**kwargs)
+        constraints = cls.get_constraints(**kwargs)
+        default: None = kwargs.pop("default", None)
+        server_default: None = kwargs.pop("server_default", None)
 
-        default = kwargs.pop("default", None)
-        null: bool = kwargs.pop("null", False)
-        skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
-        primary_key: bool = kwargs.pop("primary_key", False)
-        autoincrement: bool = kwargs.pop("autoincrement", False)
-        unique: bool = kwargs.pop("unique", False)
-        index: bool = kwargs.pop("index", False)
-        name: str = kwargs.pop("name", None)
-        choices: Set[Any] = set(kwargs.pop("choices", []))
-        comment: str = kwargs.pop("comment", None)
-        owner = kwargs.pop("owner", None)
-        server_default = kwargs.pop("server_default", None)
-        server_onupdate = kwargs.pop("server_onupdate", None)
-        format: str = kwargs.pop("format", None)
-        read_only: bool = True if primary_key else kwargs.pop("read_only", False)
-        secret: bool = kwargs.pop("secret", False)
-        field_type = cls._type
-
-        namespace = dict(
-            __type__=field_type,
-            annotation=field_type,
-            name=name,
-            primary_key=primary_key,
+        new_field = cls._get_field_cls(cls)
+        return new_field(  # type: ignore
+            __type__=pydantic_type,
+            annotation=pydantic_type,
+            column_type=column_type,
             default=default,
-            null=null,
-            index=index,
-            unique=unique,
-            autoincrement=autoincrement,
-            choices=choices,
-            comment=comment,
-            owner=owner,
             server_default=server_default,
-            server_onupdate=server_onupdate,
-            format=format,
-            read_only=read_only,
-            column_type=cls.get_column_type(**arguments),
-            constraints=cls.get_constraints(),
-            secret=secret,
-            skip_absorption_check=skip_absorption_check,
+            constraints=constraints,
             **kwargs,
         )
-        Field = type(cls.__name__, cls._bases, {})
-        return Field(**namespace)  # type: ignore
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:  # pragma no cover
@@ -149,31 +132,77 @@ class FieldFactory:
         """
 
     @classmethod
+    def get_constraints(cls, **kwargs: Any) -> Sequence[Any]:
+        """Returns the propery column type for the field, None for Metafields"""
+        return []
+
+    @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        """Returns the propery column type for the field"""
+        """Returns the propery column type for the field, None for Metafields"""
         return None
 
     @classmethod
-    def get_constraints(cls, **kwargs: Any) -> Any:
-        return []
+    def get_pydantic_type(cls, **kwargs: Any) -> Any:
+        """Returns the type for pydantic"""
+        return cls._type
+
+    @staticmethod
+    @lru_cache(None)
+    def _get_field_cls(cls: "FieldFactory") -> BaseField:
+        return cast(BaseField, type(cls.__name__, cast(Any, cls._bases), {}))
 
 
-class CompositeField(BaseCompositeField):
-    """Aggregates multiple fields into one pseudo field"""
+class ForeignKeyFieldFactory(FieldFactory):
+    """The base for all model fields to be used with Edgy"""
 
-    def __new__(cls, **kwargs: Any) -> BaseField:
+    _type: Any = Any
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
         cls.validate(**kwargs)
-        return super().__new__(cls)
+
+        to: Any = kwargs.pop("to", None)
+        null: bool = kwargs.pop("null", False)
+        on_update: str = kwargs.pop("on_update", CASCADE)
+        on_delete: str = kwargs.pop("on_delete", RESTRICT)
+        related_name: str = kwargs.pop("related_name", None)
+        through: Any = kwargs.pop("through", None)
+        server_onupdate: Any = kwargs.pop("server_onupdate", None)
+
+        pydantic_type = cls.get_pydantic_type(**kwargs)
+        column_type = cls.get_column_type(**kwargs)
+        default: None = kwargs.pop("default", None)
+        server_default: None = kwargs.pop("server_default", None)
+        constraints = cls.get_constraints(**kwargs)
+
+        new_field = cls._get_field_cls(cls)
+        return new_field(  # type: ignore
+            __type__=pydantic_type,
+            annotation=pydantic_type,
+            column_type=column_type,
+            default=default,
+            server_default=server_default,
+            to=to,
+            on_update=on_update,
+            on_delete=on_delete,
+            related_name=related_name,
+            null=null,
+            server_onupdate=server_onupdate,
+            through=through,
+            constraints=constraints,
+            **kwargs,
+        )
+
+
+class ConcreteCompositeField(BaseCompositeField):
+    """
+    Conrete, internal implementation of the CompositeField
+    """
 
     def __init__(self, **kwargs: Any):
-        name: str = kwargs.pop("name", None)
         owner = kwargs.pop("owner", None)
-        read_only: bool = kwargs.pop("read_only", False)
-        secret: bool = kwargs.pop("secret", False)
         inner_fields: Sequence[Union[str, Tuple[str, BaseField]]] = kwargs.pop(
             "inner_fields", []
         )
-        field_type = Dict[str, Any]
         self.absorb_existing_fields: bool = kwargs.pop("absorb_existing_fields", False)
         self.model: Optional[BaseModel] = kwargs.pop("model", None)
         self.inner_field_names: List[str] = []
@@ -189,25 +218,8 @@ class CompositeField(BaseCompositeField):
                 self.embedded_field_defs[field_name] = field_def
                 # will be overwritten later
                 field_def.owner = owner
-
         return super().__init__(
-            __type__=field_type,
-            annotation=field_type,
-            name=name,
-            primary_key=False,
-            null=True,
-            index=False,
-            exclude=True,
-            unique=False,
-            autoincrement=False,
-            choices=False,
             owner=owner,
-            server_default=False,
-            server_onupdate=False,
-            read_only=read_only,
-            column_type=None,
-            constraints=[],
-            secret=secret,
             **kwargs,
         )
 
@@ -265,8 +277,20 @@ class CompositeField(BaseCompositeField):
     def get_composite_fields(self) -> Dict[str, BaseField]:
         return {field: self.owner.fields[field] for field in self.inner_field_names}
 
-    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
-        return []
+
+class CompositeField(FieldFactory):
+    """
+    Meta field that aggregates multiple fields in a pseudo field
+    """
+
+    _bases = (ConcreteCompositeField,)
+
+    @classmethod
+    def get_pydantic_type(cls, **kwargs: Any) -> Any:
+        """Returns the type for pydantic"""
+        if "model" in kwargs:
+            return kwargs.get("model")
+        return Dict[str, Any]
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:
@@ -722,12 +746,7 @@ class URLField(CharField):
         return sqlalchemy.String(length=kwargs.get("max_length"))
 
 
-class IPAddressField(FieldFactory, str):
-    _type = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
-
-    def is_native_type(self, value: str) -> bool:
-        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
-
+class _IPAddressField(Field):
     def check(self, value: Any) -> Any:
         if self.is_native_type(value):
             return value
@@ -742,6 +761,14 @@ class IPAddressField(FieldFactory, str):
             return ipaddress.ip_address(value)
         except ValueError:
             raise ValueError("Must be a real IP.")  # noqa
+
+
+class IPAddressField(FieldFactory, str):
+    _bases = (_IPAddressField,)
+    _type = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+
+    def is_native_type(self, value: str) -> bool:
+        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
 
     def __new__(  # type: ignore
         cls,

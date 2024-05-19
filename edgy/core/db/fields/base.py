@@ -3,7 +3,6 @@ from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     ClassVar,
     Dict,
     Optional,
@@ -12,7 +11,6 @@ from typing import (
     Union,
 )
 
-from pydantic._internal import _repr
 from pydantic.fields import FieldInfo
 
 from edgy.core.connection.registry import Registry
@@ -25,7 +23,7 @@ if TYPE_CHECKING:
 edgy_setattr = object.__setattr__
 
 
-class BaseField(FieldInfo, _repr.Representation):
+class BaseField(FieldInfo):
     """
     The base field for all Edgy data model fields.
     """
@@ -36,13 +34,17 @@ class BaseField(FieldInfo, _repr.Representation):
         self,
         *,
         default: Any = Undefined,
-        title: Optional[str] = None,
-        description: Optional[str] = None,
+        server_default: Any = Undefined,
         **kwargs: Any,
     ) -> None:
         self.max_digits: str = kwargs.pop("max_digits", None)
         self.decimal_places: str = kwargs.pop("decimal_places", None)
-        self.server_default: Any = kwargs.pop("server_default", None)
+        self.server_default: Any = server_default
+        self.read_only: bool = kwargs.pop("read_only", False)
+        self.primary_key: bool = kwargs.pop("primary_key", False)
+        if self.primary_key:
+            self.read_only = True
+            kwargs["frozen"] = True
 
         super().__init__(**kwargs)
 
@@ -51,32 +53,22 @@ class BaseField(FieldInfo, _repr.Representation):
             default = None
         if default is not Undefined:
             self.default = default
-        if (
-            (default is not None)
-            and default != Undefined
-            or (self.server_default is not None and self.server_default != Undefined)
+        if (default is not None and default is not Undefined) or (
+            self.server_default is not None and self.server_default != Undefined
         ):
             self.null = True
-
-        self.defaulf_factory: Optional[Callable[..., Any]] = kwargs.pop(
-            "defaulf_factory", Undefined
-        )
         self.field_type: Any = kwargs.pop("__type__", None)
         self.__original_type__: type = kwargs.pop("__original_type__", None)
-        self.primary_key: bool = kwargs.pop("primary_key", False)
-        self.column_type: Optional[Any] = kwargs.pop("column_type", None)
-        self.constraints: Sequence["Constraint"] = kwargs.pop("constraints", None)
-        self.title = title
-        self.description = description
-        self.skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
-        self.read_only: bool = kwargs.pop("read_only", False)
-        self.help_text: str = kwargs.pop("help_text", None)
-        self.pattern: Pattern = kwargs.pop("pattern", None)
         self.autoincrement: bool = kwargs.pop("autoincrement", False)
+        self.column_type: Optional[Any] = kwargs.pop("column_type", None)
+        self.constraints: Sequence["Constraint"] = kwargs.pop("constraints", [])
+        self.skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
+        self.help_text: Optional[str] = kwargs.pop("help_text", None)
+        self.pattern: Pattern = kwargs.pop("pattern", None)
         self.related_name: str = kwargs.pop("related_name", None)
         self.unique: bool = kwargs.pop("unique", False)
         self.index: bool = kwargs.pop("index", False)
-        self.choices: Sequence = kwargs.pop("choices", None)
+        self.choices: Sequence = kwargs.pop("choices", [])
         self.owner: Any = kwargs.pop("owner", None)
         self.name: str = kwargs.pop("name", None)
         self.alias: str = kwargs.pop("name", None)
@@ -112,6 +104,7 @@ class BaseField(FieldInfo, _repr.Representation):
                 default=default_value, server_default=self.server_default
             )
 
+        # set remaining attributes
         for name, value in kwargs.items():
             edgy_setattr(self, name, value)
 
@@ -158,14 +151,6 @@ class BaseField(FieldInfo, _repr.Representation):
         Used to translate the model column names into database column tables.
         """
         return self.name
-
-    def is_primary_key(self) -> bool:
-        """
-        Sets the autoincrement to True if the field is primary key.
-        """
-        if self.primary_key:
-            self.autoincrement = True
-        return False
 
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
@@ -275,3 +260,58 @@ class BaseCompositeField(BaseField):
                 ):
                     cleaned_data_result[sub_field_name_new] = default_value
         return cleaned_data_result
+
+    def get_columns(self, name: str) -> Sequence["Column"]:
+        return []
+
+    def is_required(self) -> bool:
+        return False
+
+
+class BaseForeignKey(BaseField):
+    @property
+    def target(self) -> Any:
+        """
+        The target of the ForeignKey model.
+        """
+        if not hasattr(self, "_target"):
+            if isinstance(self.to, str):
+                self._target = self.registry.models[self.to]  # type: ignore
+            else:
+                self._target = self.to
+        return self._target
+
+    @target.setter
+    def target(self, value: Any) -> Any:
+        self._target = value
+
+    def get_related_name(self) -> str:
+        """
+        Returns the name of the related name of the current relationship between the to and target.
+
+        :return: Name of the related_name attribute field.
+        """
+        return self.related_name
+
+    def expand_relationship(self, value: Any) -> Any:
+        target = self.target
+        if isinstance(value, target):
+            return value
+
+        fields_filtered = {
+            target.proxy_model.pkname: target.proxy_model.fields.get(
+                target.proxy_model.pkname
+            )
+        }
+        target.proxy_model.model_fields = fields_filtered
+        target.proxy_model.model_rebuild(force=True)
+        return target.proxy_model(pk=value)
+
+    def check(self, value: Any) -> Any:
+        """
+        Runs the checks for the fields being validated.
+        """
+        return value.pk
+
+    def clean(self, name: str, value: Any) -> Any:
+        return {name: self.check(value)}

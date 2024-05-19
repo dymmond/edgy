@@ -20,7 +20,7 @@ import sqlalchemy
 from edgy.conf import settings
 from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields import CharField, TextField
-from edgy.core.db.fields._base_fk import BaseForeignKey
+from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin

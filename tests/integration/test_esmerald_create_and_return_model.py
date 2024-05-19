@@ -1,4 +1,4 @@
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator, Dict
 
 import pytest
 from anyio import from_thread, sleep, to_thread
@@ -41,7 +41,15 @@ class User(edgy.Model):
     name: str = edgy.CharField(max_length=100)
     email: str = edgy.EmailField(max_length=100)
     language: str = edgy.CharField(max_length=200, null=True)
-    description: str = edgy.TextField(max_length=5000, null=True)
+    # in best case id_name would be exposed in dumps, but currently just ignored, which is safe
+    id_name: Dict[str, Any] = edgy.CompositeField(
+        inner_fields=[
+            "id",
+            "name",
+            ("description", edgy.TextField(max_length=5000, null=True)),
+        ],
+        exclude=False,
+    )
 
     class Meta:
         registry = models

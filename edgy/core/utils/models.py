@@ -83,7 +83,7 @@ class ModelParser:
         is_update: bool = False,
     ) -> Any:
         """
-        Extracts all the deffault values from the given fields and returns the raw
+        Extracts all the default values from the given fields and returns the raw
         value corresponding to each field.
         """
         model_cls = model_class or self
