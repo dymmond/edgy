@@ -194,7 +194,7 @@ ddict = obj.composite
 
 Limitations:
 
-Currently the compositefield is excluded from serialization and model dumps. The contained fields are serialized like the others.
+Currently the CompositeFIeld is excluded from serialization and model dumps. The contained fields are serialized like the others.
 
 ##### Parameters
 
@@ -499,7 +499,7 @@ Derives from the same as [CharField](#charfield) and validates the value of an U
 
 ### Simple fields
 
-If you merely want to customize an existing field in `edgy.db.fields.core` you can just inherit from it and provide the customization via the `FieldFactory` (or you can `FieldFactory` for handling a new sqlalchemy tpye).
+If you merely want to customize an existing field in `edgy.db.fields.core` you can just inherit from it and provide the customization via the `FieldFactory` (or you can `FieldFactory` for handling a new sqlalchemy type).
 Valid methods to overwrite are `__new__`, `get_column_type`, `get_pydatic_type`, `get_constraints` and `validate`
 
 For examples look in the mentioned path.
@@ -509,8 +509,8 @@ For examples look in the mentioned path.
 
 If you want to customize the entire field (e.g. checks), you have to split the field in 2 parts:
 
-- one inherits from `edgy.db.fields.base.BaseField` (or one of the derived classes) and provides the missing parts. It shall not be used for the Enduser (though possible)
-- one inherits from `edgy.db.fields.field.FieldFactory`. Here the _bases attribute is adjusted to point to the Field from the first step
+- One inherits from `edgy.db.fields.base.BaseField` (or one of the derived classes) and provides the missing parts. It shall not be used for the Enduser (though possible).
+- One inherits from `edgy.db.fields.field.FieldFactory`. Here the _bases attribute is adjusted to point to the Field from the first step.
 
 Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide following methods to work:
 
