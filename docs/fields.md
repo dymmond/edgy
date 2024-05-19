@@ -191,7 +191,10 @@ obj.composite = {"email": "foobar@example.com", "sent": datetime.datetime.now()}
 ddict = obj.composite
 ```
 
-Currently the field is always excluded from serialization.
+
+Limitations:
+
+Currently the compositefield is excluded from serialization and model dumps. The contained fields are serialized like the others.
 
 ##### Parameters
 
@@ -494,22 +497,20 @@ Derives from the same as [CharField](#charfield) and validates the value of an U
 
 ## Custom Fields
 
-### Simple one column fields
+### Simple fields
 
-If you merely want to customize an existing field in `edgy.db.fields.core` you can just inherit from it and provide the customization.
+If you merely want to customize an existing field in `edgy.db.fields.core` you can just inherit from it and provide the customization via the `FieldFactory` (or you can `FieldFactory` for handling a new sqlalchemy tpye).
+Valid methods to overwrite are `__new__`, `get_column_type`, `get_pydatic_type`, `get_constraints` and `validate`
 
 For examples look in the mentioned path.
-
-Note: instance checks can also be done against the `__type__` attribute,
-``` python
-isinstance(edgy.CharField(max_length=255), edgy.CharField)  # return True
-isinstance(edgy.CharField(max_length=255).__type__, edgy.CharField(max_length=255).__type__)  # returns ´ True
-isinstance(edgy.TextField(max_length=255), edgy.CharField)  # return False
-```
 
 
 ### Special fields
 
+If you want to customize the entire field (e.g. checks), you have to split the field in 2 parts:
+
+- one inherits from `edgy.db.fields.base.BaseField` (or one of the derived classes) and provides the missing parts. It shall not be used for the Enduser (though possible)
+- one inherits from `edgy.db.fields.field.FieldFactory`. Here the _bases attribute is adjusted to point to the Field from the first step
 
 Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide following methods to work:
 
@@ -526,5 +527,11 @@ Additional they can provide following methods:
 You should also provide an init method which sets following attributes:
 
 * **column_type** - either None (default) or the sqlalchemy column type
+
+
+Note: instance checks can also be done against the `field_type` attribute in case you want to check the compatibility with other fields (composite style)
+
+The `annotation` parameter is for pydantic, the `__type___` parameter is transformed into the `field_type` attribute
+
 
 for examples have a look in `tests/fields/test_composite_fields.py` or in `edgy/core/db/fields/core.py`

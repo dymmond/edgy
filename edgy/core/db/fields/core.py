@@ -25,6 +25,7 @@ import pydantic
 import sqlalchemy
 from pydantic import BaseModel, EmailStr
 
+from edgy.core.db.constants import CASCADE, RESTRICT
 from edgy.core.db.fields._internal import IPAddress
 from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
 from edgy.core.db.fields.base import BaseCompositeField, BaseField
@@ -44,7 +45,7 @@ def _removeprefix(text: str, prefix: str) -> str:
         return text
 
 
-class Field:
+class Field(BaseField):
     # defines compatibility fallbacks check and get_column
 
     def check(self, value: Any) -> Any:
@@ -84,10 +85,6 @@ class Field:
             return []
         return [column]
 
-    @classmethod
-    def get_constraints(cls, **kwargs: Any) -> Any:
-        return []
-
 
 class FieldFactoryMeta(type):
     def __instancecheck__(self, instance: Any) -> bool:
@@ -104,23 +101,25 @@ class FieldFactoryMeta(type):
 class FieldFactory(metaclass=FieldFactoryMeta):
     """The base for all model fields to be used with Edgy"""
 
-    _bases: Sequence[Any] = (Field, BaseField)
+    _bases: Sequence[Any] = (Field,)
     _type: Any = None
 
     def __new__(cls, **kwargs: Any) -> BaseField:
         cls.validate(**kwargs)
-        field_type = cls._type
         column_type = cls.get_column_type(**kwargs)
+        pydantic_type = cls.get_pydantic_type(**kwargs)
+        constraints = cls.get_constraints(**kwargs)
         default: None = kwargs.pop("default", None)
         server_default: None = kwargs.pop("server_default", None)
 
         new_field = cls._get_field_cls(cls)
         return new_field(  # type: ignore
-            __type__=field_type,
-            annotation=field_type,
+            __type__=pydantic_type,
+            annotation=pydantic_type,
             column_type=column_type,
             default=default,
             server_default=server_default,
+            constraints=constraints,
             **kwargs,
         )
 
@@ -133,9 +132,19 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         """
 
     @classmethod
+    def get_constraints(cls, **kwargs: Any) -> Sequence[Any]:
+        """Returns the propery column type for the field, None for Metafields"""
+        return []
+
+    @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        """Returns the propery column type for the field"""
+        """Returns the propery column type for the field, None for Metafields"""
         return None
+
+    @classmethod
+    def get_pydantic_type(cls, **kwargs: Any) -> Any:
+        """Returns the type for pydantic"""
+        return cls._type
 
     @staticmethod
     @lru_cache(None)
@@ -143,7 +152,48 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         return cast(BaseField, type(cls.__name__, cast(Any, cls._bases), {}))
 
 
-class ConcreteCompositeField:
+class ForeignKeyFieldFactory(FieldFactory):
+    """The base for all model fields to be used with Edgy"""
+
+    _type: Any = Any
+
+    def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
+        cls.validate(**kwargs)
+
+        to: Any = kwargs.pop("to", None)
+        null: bool = kwargs.pop("null", False)
+        on_update: str = kwargs.pop("on_update", CASCADE)
+        on_delete: str = kwargs.pop("on_delete", RESTRICT)
+        related_name: str = kwargs.pop("related_name", None)
+        through: Any = kwargs.pop("through", None)
+        server_onupdate: Any = kwargs.pop("server_onupdate", None)
+
+        pydantic_type = cls.get_pydantic_type(**kwargs)
+        column_type = cls.get_column_type(**kwargs)
+        default: None = kwargs.pop("default", None)
+        server_default: None = kwargs.pop("server_default", None)
+        constraints = cls.get_constraints(**kwargs)
+
+        new_field = cls._get_field_cls(cls)
+        return new_field(  # type: ignore
+            __type__=pydantic_type,
+            annotation=pydantic_type,
+            column_type=column_type,
+            default=default,
+            server_default=server_default,
+            to=to,
+            on_update=on_update,
+            on_delete=on_delete,
+            related_name=related_name,
+            null=null,
+            server_onupdate=server_onupdate,
+            through=through,
+            constraints=constraints,
+            **kwargs,
+        )
+
+
+class ConcreteCompositeField(BaseCompositeField):
     """
     Conrete, internal implementation of the CompositeField
     """
@@ -168,19 +218,8 @@ class ConcreteCompositeField:
                 self.embedded_field_defs[field_name] = field_def
                 # will be overwritten later
                 field_def.owner = owner
-
-        return super().__init__(  # type: ignore
-            name=None,
-            primary_key=False,
-            autoincrement=False,
-            index=False,
-            exclude=True,
-            null=True,
-            unique=False,
-            choices=False,
+        return super().__init__(
             owner=owner,
-            server_onupdate=None,
-            constraints=[],
             **kwargs,
         )
 
@@ -238,17 +277,20 @@ class ConcreteCompositeField:
     def get_composite_fields(self) -> Dict[str, BaseField]:
         return {field: self.owner.fields[field] for field in self.inner_field_names}
 
-    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
-        return []
-
 
 class CompositeField(FieldFactory):
     """
     Meta field that aggregates multiple fields in a pseudo field
     """
 
-    _type = Union[Dict[str, Any], object]
-    _bases = (ConcreteCompositeField, BaseCompositeField)
+    _bases = (ConcreteCompositeField,)
+
+    @classmethod
+    def get_pydantic_type(cls, **kwargs: Any) -> Any:
+        """Returns the type for pydantic"""
+        if "model" in kwargs:
+            return kwargs.get("model")
+        return Dict[str, Any]
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:
@@ -704,12 +746,7 @@ class URLField(CharField):
         return sqlalchemy.String(length=kwargs.get("max_length"))
 
 
-class IPAddressField(FieldFactory, str):
-    _type = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
-
-    def is_native_type(self, value: str) -> bool:
-        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
-
+class _IPAddressField(Field):
     def check(self, value: Any) -> Any:
         if self.is_native_type(value):
             return value
@@ -724,6 +761,14 @@ class IPAddressField(FieldFactory, str):
             return ipaddress.ip_address(value)
         except ValueError:
             raise ValueError("Must be a real IP.")  # noqa
+
+
+class IPAddressField(FieldFactory, str):
+    _bases = (_IPAddressField,)
+    _type = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+
+    def is_native_type(self, value: str) -> bool:
+        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
 
     def __new__(  # type: ignore
         cls,
