@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 class ConfigMarshall(TypedDict, total=False):
     """A TypedDict for configuring Marshall behaviour."""
 
-    model: Union["Model", None]
+    model: Union["Model", str]
     """The model from there the marshall will read from."""
 
     fields: Union[List[str], None]
