@@ -26,9 +26,7 @@ class _EnhancedClausesHelper:
             columns_or_model, "columns"
         ):
             columns_or_model = columns_or_model.columns
-        return self.op(
-            *(getattr(columns_or_model, item[0]) == item[1] for item in kwargs.items())
-        )
+        return self.op(*(getattr(columns_or_model, item[0]) == item[1] for item in kwargs.items()))
 
 
 or_ = _EnhancedClausesHelper(sqlalchemy.or_, sqlalchemy.false())

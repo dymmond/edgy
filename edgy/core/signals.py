@@ -21,9 +21,7 @@ class Broadcaster(dict):
             raise SignalError(f"{__value} is not valid signal")
         self[__name] = __value
 
-    def set_lifecycle_signals_from(
-        self, namespace: Any, overwrite: bool = True
-    ) -> None:
+    def set_lifecycle_signals_from(self, namespace: Any, overwrite: bool = True) -> None:
         for name in (
             "post_delete",
             "post_save",

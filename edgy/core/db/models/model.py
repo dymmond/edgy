@@ -98,9 +98,7 @@ class Model(ModelRow, DeclarativeMixin):
         edgy_setattr(self, self.pkname, awaitable)
         return self
 
-    async def save_model_references(
-        self, model_references: Any, model_ref: Any = None
-    ) -> None:
+    async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
         """
         If there is any ModelRef declared in the model, it will generate the subsquent model
         reference records for that same model created.
@@ -175,9 +173,7 @@ class Model(ModelRow, DeclarativeMixin):
             validated_values = values or self._extract_values_from_field(
                 extracted_values=extracted_fields
             )
-            kwargs = self._update_auto_now_fields(
-                values=validated_values, fields=self.fields
-            )
+            kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
             kwargs, model_references = self.update_model_references(**kwargs)
             await self._save(**kwargs)
         else:

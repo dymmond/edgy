@@ -1,15 +1,6 @@
 import decimal
 from functools import cached_property
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    ClassVar,
-    Dict,
-    Optional,
-    Pattern,
-    Sequence,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Pattern, Sequence, Union
 
 from pydantic.fields import FieldInfo
 
@@ -80,12 +71,8 @@ class BaseField(FieldInfo):
         self.max_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
             "max_length", None
         )
-        self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "minimum", None
-        )
-        self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "maximum", None
-        )
+        self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("minimum", None)
+        self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("maximum", None)
         self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
             "multiple_of", None
         )
@@ -100,9 +87,7 @@ class BaseField(FieldInfo):
 
         if self.primary_key:
             default_value = default
-            self.raise_for_non_default(
-                default=default_value, server_default=self.server_default
-            )
+            self.raise_for_non_default(default=default_value, server_default=self.server_default)
 
         # set remaining attributes
         for name, value in kwargs.items():
@@ -114,9 +99,7 @@ class BaseField(FieldInfo):
 
         if isinstance(self.default, bool):
             self.null = True
-        self.__namespace__ = {
-            k: v for k, v in self.__dict__.items() if k != "__namespace__"
-        }
+        self.__namespace__ = {k: v for k, v in self.__dict__.items() if k != "__namespace__"}
 
     @property
     def namespace(self) -> Any:
@@ -239,9 +222,7 @@ class BaseCompositeField(BaseField):
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if not hasattr(value, translated_name):
-                    raise ValueError(
-                        f"Missing attribute: {translated_name} for {field_name}"
-                    )
+                    raise ValueError(f"Missing attribute: {translated_name} for {field_name}")
                 for k, v in field.clean(sub_name, getattr(value, translated_name)):
                     result[k] = v
 
@@ -299,9 +280,7 @@ class BaseForeignKey(BaseField):
             return value
 
         fields_filtered = {
-            target.proxy_model.pkname: target.proxy_model.fields.get(
-                target.proxy_model.pkname
-            )
+            target.proxy_model.pkname: target.proxy_model.fields.get(target.proxy_model.pkname)
         }
         target.proxy_model.model_fields = fields_filtered
         target.proxy_model.model_rebuild(force=True)
