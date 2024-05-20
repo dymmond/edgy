@@ -158,13 +158,13 @@ class MyModel(edgy.Model):
 
 #### CompositeField
 
-The **CompositeField** is a little bit different from normal fields. It takes a parameter `inner_fields` and distributes write or read access to the fields
+The **CompositeField** is a little bit different from the normal fields. It takes a parameter `inner_fields` and distributes write or read access to the fields
 referenced in `inner_fields`. It hasn't currently all field parameters. Especially not the server parameters.
-For distributing the field parameters it uses the Descriptor Protocol.
+For distributing the field parameters it uses the `Descriptor Protocol`.
 
-Optionally a pydantic model can be provided via the **model** argument
+Optionally a pydantic model can be provided via the **model** argument.
 
-**CompositeField** defines no columns. It is a meta field.
+**CompositeField** defines no columns as it is a meta field.
 
 Note there is also **BaseCompositeField**. It can be used for implementing own **CompositeField**-like fields.
 
@@ -176,7 +176,7 @@ import edgy
 class MyModel(edgy.Model):
     email: str = edgy.EmailField(max_length=60, null=True)
     sent: datetime.datetime = edgy.DateTimeField(, null=True)
-    composite = edgy.CompositeField(inner_fields=["email", "sent"])
+    composite: edgy.CompositeField = edgy.CompositeField(inner_fields=["email", "sent"])
     ...
 
 class MyModel(edgy.Model):
@@ -187,6 +187,7 @@ class MyModel(edgy.Model):
 
 obj = MyModel()
 obj.composite = {"email": "foobar@example.com", "sent": datetime.datetime.now()}
+
 # retrieve as dict
 ddict = obj.composite
 ```
@@ -522,7 +523,7 @@ Additional they can provide following methods:
 * **`__set__`** - Descriptor protocol like set access customization.
 * **get_embedded_fields(self, field_name, field_mapping)** - (Optionally) define internal fields.
 * **get_default_values(self, field_name, cleaned_data)** - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
-* **get_default_value(self)** - return default value for one column fields. 
+* **get_default_value(self)** - return default value for one column fields.
 
 You should also provide an init method which sets following attributes:
 
