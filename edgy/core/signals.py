@@ -1,3 +1,5 @@
+from typing import Any
+
 from blinker import Signal
 
 from edgy.exceptions import SignalError
@@ -19,7 +21,7 @@ class Broadcaster(dict):
             raise SignalError(f"{__value} is not valid signal")
         self[__name] = __value
 
-    def set_lifecycle_signals_from(self, namespace: str, overwrite: bool = True) -> None:
+    def set_lifecycle_signals_from(self, namespace: Any, overwrite: bool = True) -> None:
         for name in (
             "post_delete",
             "post_save",

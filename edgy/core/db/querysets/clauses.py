@@ -1,7 +1,12 @@
-from typing import Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Union
 
 import sqlalchemy
 from sqlalchemy import ColumnCollection
+
+if TYPE_CHECKING:
+    from edgy.core.db.models import Model
 
 
 class _EnhancedClausesHelper:
@@ -11,10 +16,12 @@ class _EnhancedClausesHelper:
 
     def __call__(self, *args: Any) -> Any:
         if len(args) == 0:
-            args = [self.default_empty]  # type: ignore
+            args = (self.default_empty,)
         return self.op(*args)
 
-    def from_kwargs(self, columns_or_model: Any, /, **kwargs: Any) -> Any:
+    def from_kwargs(
+        self, columns_or_model: Union[Model, ColumnCollection], /, **kwargs: Any
+    ) -> Any:
         if not isinstance(columns_or_model, ColumnCollection) and hasattr(
             columns_or_model, "columns"
         ):

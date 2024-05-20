@@ -78,7 +78,7 @@ class TenantMixin(edgy.Model):
 
         tenant = await super().save(force_save, values, **kwargs)
         registry = self.meta.registry
-        assert registry is not None
+        assert registry is not None, "registry is not set"
         try:
             await registry.schema.create_schema(
                 schema=tenant.schema_name, if_not_exists=True
@@ -97,7 +97,7 @@ class TenantMixin(edgy.Model):
         if self.schema_name == settings.tenant_schema_default:
             raise ValueError("Cannot drop public schema.")
         registry = self.meta.registry
-        assert registry is not None
+        assert registry is not None, "registry is not set"
 
         await registry.schema.drop_schema(
             schema=self.schema_name, cascade=True, if_exists=True

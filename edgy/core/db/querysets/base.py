@@ -20,7 +20,7 @@ import sqlalchemy
 from edgy.conf import settings
 from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields import CharField, TextField
-from edgy.core.db.fields._base_fk import BaseForeignKey
+from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
@@ -715,18 +715,16 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         fields = fields or []
         queryset: "QuerySet" = self._clone()
-        rows: List[Type["Model"]] = await queryset.all()
+        rows: List["Model"] = await queryset.all()
 
         if not isinstance(fields, list):
             raise QuerySetError(detail="Fields must be an iterable.")
 
         if not fields:
-            rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]  # type: ignore
+            rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
         else:
             rows = [
-                row.model_dump(
-                    exclude=exclude, exclude_none=exclude_none, include=fields
-                )  # type: ignore
+                row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)
                 for row in rows
             ]
 

@@ -7,6 +7,7 @@ from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
 from edgy.core.marshalls.helpers import MarshallFieldMapping
 from edgy.core.marshalls.metaclasses import MarshallMeta
+from edgy.core.utils.functional import edgy_setattr
 from edgy.core.utils.sync import run_sync
 
 if TYPE_CHECKING:
@@ -108,7 +109,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         data = self.model_dump(exclude=set(self.__custom_fields__.keys()))
 
         if instance.meta.pk_attribute in data:
-            setattr(self, instance.meta.pk_attribute, instance.pk)
+            edgy_setattr(self, instance.meta.pk_attribute, instance.pk)
 
     def _get_fields(self) -> Dict[str, Any]:
         return self.model_fields.copy()
