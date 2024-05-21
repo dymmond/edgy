@@ -1,3 +1,5 @@
+from typing import Any, Dict
+
 import pytest
 from pydantic import BaseModel
 
@@ -37,15 +39,21 @@ class MyModel2(edgy.Model):
         registry = models
 
 
+class EmbeddedModel(BaseModel):
+    first_name: str
+    last_name: str
+
+
 class MyModelEmbedded(edgy.Model):
     first_name: str = edgy.CharField(max_length=255)
     last_name: str = edgy.CharField(max_length=255, skip_absorption_check=True)
-    embedded: dict = edgy.CompositeField(
+    embedded: Dict[str, Any] = edgy.CompositeField(
         inner_fields=[
-            ("first_name", edgy.CharField(max_length=255)),
-            ("last_name", edgy.CharField(max_length=255)),
+            ("first_name", edgy.CharField(max_length=255, exclude=True)),
+            ("last_name", edgy.CharField(max_length=255, exclude=True)),
         ],
         prefix_embedded="embedded_",
+        exclude=False,
     )
 
     class Meta:
@@ -111,6 +119,7 @@ async def test_assign(rollback_connections, assign_object):
     assert obj.composite2["age"] == 300
     for key in ["first_name", "last_name", "age"]:
         assert getattr(obj, key) == getattr(obj.plain, key)
+    # check if saving object is possible
     await obj.save()
 
 
@@ -139,4 +148,61 @@ async def test_assign_embedded(rollback_connections, assign_object):
     assert obj.embedded["last_name"] == "Clause"
     assert obj.first_name == "edgy"
     assert obj.last_name == "edgytoo"
+    # check if saving object is possible
     await obj.save()
+
+
+def test_dump_composite_dict():
+    obj = MyModelEmbedded(
+        first_name="edgy",
+        last_name="edgytoo",
+        embedded_first_name="edgy2embedded",
+        embedded_last_name="edgytoo2embedded",
+    )
+    assert obj.fields["embedded_first_name"].exclude
+    assert obj.model_dump() == {
+        "first_name": "edgy",
+        "last_name": "edgytoo",
+        "embedded": {
+            "first_name": "edgy2embedded",
+            "last_name": "edgytoo2embedded",
+        },
+    }
+    assert obj.model_dump(exclude=("embedded",)) == {
+        "first_name": "edgy",
+        "last_name": "edgytoo",
+    }
+
+    # we cannot filter the dict
+    with pytest.raises(AssertionError):
+        obj.model_dump(
+            exclude={
+                "embedded": "first_name",
+            }
+        )
+    with pytest.raises(AssertionError):
+        obj.model_dump(
+            include={
+                "embedded": "first_name",
+            }
+        )
+
+
+def test_dump_composite_model():
+    obj = MyModel2(first_name="edgy", last_name="edgytoo", age=100)
+    assert obj.model_dump(include={"plain": {"first_name": True}}) == {
+        "plain": {
+            "first_name": "edgy",
+        },
+    }
+    assert obj.model_dump(
+        exclude={"plain": {"first_name": True, "age": True}}, include=("plain",)
+    ) == {
+        "plain": {
+            "last_name": "edgytoo",
+        },
+    }
+    # now we stress test with both
+    assert obj.model_dump(
+        exclude={"age": True}, include=("first_name", "last_name", "age")
+    ) == {"first_name": "edgy", "last_name": "edgytoo"}
