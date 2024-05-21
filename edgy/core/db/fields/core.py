@@ -88,14 +88,10 @@ class Field(BaseField):
 
 class FieldFactoryMeta(type):
     def __instancecheck__(self, instance: Any) -> bool:
-        return super().__instancecheck__(instance) or isinstance(
-            instance, self._get_field_cls(self)
-        )
+        return super().__instancecheck__(instance) or isinstance(instance, self._get_field_cls(self))
 
     def __subclasscheck__(self, subclass: Any) -> bool:
-        return super().__subclasscheck__(subclass) or issubclass(
-            subclass, self._get_field_cls(self)
-        )
+        return super().__subclasscheck__(subclass) or issubclass(subclass, self._get_field_cls(self))
 
 
 class FieldFactory(metaclass=FieldFactoryMeta):
@@ -200,9 +196,8 @@ class ConcreteCompositeField(BaseCompositeField):
 
     def __init__(self, **kwargs: Any):
         owner = kwargs.pop("owner", None)
-        inner_fields: Sequence[Union[str, Tuple[str, BaseField]]] = kwargs.pop(
-            "inner_fields", []
-        )
+        inner_fields: Sequence[Union[str, Tuple[str, BaseField]]] = kwargs.pop("inner_fields", [])
+        self.unsafe_json_serialization: bool = kwargs.pop("unsafe_json_serialization", False)
         self.absorb_existing_fields: bool = kwargs.pop("absorb_existing_fields", False)
         self.model: Optional[BaseModel] = kwargs.pop("model", None)
         self.inner_field_names: List[str] = []
@@ -229,9 +224,7 @@ class ConcreteCompositeField(BaseCompositeField):
             return _removeprefix(name, self.prefix_embedded)
         return name
 
-    def __get__(
-        self, instance: "Model", owner: Any = None
-    ) -> Union[Dict[str, Any], Any]:
+    def __get__(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
         d = {}
         for key in self.inner_field_names:
             translated_name = self.translate_name(key)
@@ -250,13 +243,9 @@ class ConcreteCompositeField(BaseCompositeField):
                 translated_name = self.translate_name(key)
                 setattr(instance, key, getattr(value, translated_name))
 
-    def get_embedded_fields(
-        self, name: str, field_mapping: Dict[str, "BaseField"]
-    ) -> Dict[str, "BaseField"]:
+    def get_embedded_fields(self, name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
         if not self.absorb_existing_fields:
-            duplicate_fields = set(self.embedded_field_defs.keys()).intersection(
-                field_mapping.keys()
-            )
+            duplicate_fields = set(self.embedded_field_defs.keys()).intersection(field_mapping.keys())
             if duplicate_fields:
                 raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
             return dict(self.embedded_field_defs)
@@ -266,9 +255,9 @@ class ConcreteCompositeField(BaseCompositeField):
                 retdict[item[0]] = item[1]
             else:
                 absorbed_field = field_mapping[item[0]]
-                if not getattr(
-                    absorbed_field, "skip_absorption_check", False
-                ) and not issubclass(absorbed_field.field_type, item[1].field_type):
+                if not getattr(absorbed_field, "skip_absorption_check", False) and not issubclass(
+                    absorbed_field.field_type, item[1].field_type
+                ):
                     raise ValueError(
                         f'absorption failed: field "{item[0]}" handle the type: {absorbed_field.field_type}, required: {item[1].field_type}'
                     )
@@ -333,11 +322,7 @@ class CharField(FieldFactory, str):
 
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
 
         return super().__new__(cls, **kwargs)
@@ -346,9 +331,7 @@ class CharField(FieldFactory, str):
     def validate(cls, **kwargs: Any) -> None:
         max_length = kwargs.get("max_length", 0)
         if max_length <= 0:
-            raise FieldDefinitionError(
-                detail=f"'max_length' is required for {cls.__name__}"
-            )
+            raise FieldDefinitionError(detail=f"'max_length' is required for {cls.__name__}")
 
         min_length = kwargs.get("min_length")
         pattern = kwargs.get("regex")
@@ -359,9 +342,7 @@ class CharField(FieldFactory, str):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.String(
-            length=kwargs.get("max_length"), collation=kwargs.get("collation", None)
-        )
+        return sqlalchemy.String(length=kwargs.get("max_length"), collation=kwargs.get("collation", None))
 
 
 class TextField(FieldFactory, str):
@@ -372,11 +353,7 @@ class TextField(FieldFactory, str):
     def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
         return super().__new__(cls, **kwargs)
 
@@ -392,9 +369,7 @@ class Number(FieldFactory):
         maximum = kwargs.get("maximum", None)
 
         if (minimum is not None and maximum is not None) and minimum > maximum:
-            raise FieldDefinitionError(
-                detail="'minimum' cannot be bigger than 'maximum'"
-            )
+            raise FieldDefinitionError(detail="'minimum' cannot be bigger than 'maximum'")
 
 
 class IntegerField(Number, int):
@@ -413,18 +388,10 @@ class IntegerField(Number, int):
         **kwargs: Any,
     ) -> BaseField:
         autoincrement = kwargs.pop("autoincrement", None)
-        autoincrement = (
-            autoincrement
-            if autoincrement is not None
-            else kwargs.get("primary_key", False)
-        )
+        autoincrement = autoincrement if autoincrement is not None else kwargs.get("primary_key", False)
         kwargs = {
             **kwargs,
-            **{
-                k: v
-                for k, v in locals().items()
-                if k not in ["cls", "__class__", "kwargs"]
-            },
+            **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
         }
         return super().__new__(cls, **kwargs)
 
@@ -448,11 +415,7 @@ class FloatField(Number, float):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
         return super().__new__(cls, **kwargs)
 
@@ -492,19 +455,13 @@ class DecimalField(Number, decimal.Decimal):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{
-                k: v
-                for k, v in locals().items()
-                if k not in ["cls", "__class__", "kwargs"]
-            },
+            **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
         }
         return super().__new__(cls, **kwargs)
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Numeric(
-            precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places")
-        )
+        return sqlalchemy.Numeric(precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places"))
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:
@@ -512,15 +469,8 @@ class DecimalField(Number, decimal.Decimal):
 
         max_digits = kwargs.get("max_digits")
         decimal_places = kwargs.get("decimal_places")
-        if (
-            max_digits is None
-            or max_digits < 0
-            or decimal_places is None
-            or decimal_places < 0
-        ):
-            raise FieldDefinitionError(
-                "max_digits and decimal_places are required for DecimalField"
-            )
+        if max_digits is None or max_digits < 0 or decimal_places is None or decimal_places < 0:
+            raise FieldDefinitionError("max_digits and decimal_places are required for DecimalField")
 
 
 class BooleanField(FieldFactory, int):
@@ -536,11 +486,7 @@ class BooleanField(FieldFactory, int):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
         return super().__new__(cls, **kwargs)
 
@@ -558,9 +504,7 @@ class AutoNowMixin(FieldFactory):
         **kwargs: Any,
     ) -> BaseField:
         if auto_now_add and auto_now:
-            raise FieldDefinitionError(
-                "'auto_now' and 'auto_now_add' cannot be both True"
-            )
+            raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
 
         if auto_now_add or auto_now:
             kwargs["read_only"] = True
@@ -667,9 +611,7 @@ class BinaryField(FieldFactory, bytes):
     def validate(cls, **kwargs: Any) -> None:
         max_length = kwargs.get("max_length", None)
         if max_length <= 0:
-            raise FieldDefinitionError(
-                detail="Parameter 'max_length' is required for BinaryField"
-            )
+            raise FieldDefinitionError(detail="Parameter 'max_length' is required for BinaryField")
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
@@ -776,11 +718,7 @@ class IPAddressField(FieldFactory, str):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
 
         return super().__new__(cls, **kwargs)

@@ -31,17 +31,10 @@ class MyModel2(edgy.Model):
         ],
         absorb_existing_fields=True,
     )
-    plain: PlainModel = edgy.CompositeField(
-        inner_fields=["first_name", "last_name", "age"], model=PlainModel
-    )
+    plain: PlainModel = edgy.CompositeField(inner_fields=["first_name", "last_name", "age"], model=PlainModel)
 
     class Meta:
         registry = models
-
-
-class EmbeddedModel(BaseModel):
-    first_name: str
-    last_name: str
 
 
 class MyModelEmbedded(edgy.Model):
@@ -54,6 +47,23 @@ class MyModelEmbedded(edgy.Model):
         ],
         prefix_embedded="embedded_",
         exclude=False,
+    )
+
+    class Meta:
+        registry = models
+
+
+class MyModelEmbedded2(edgy.Model):
+    first_name: str = edgy.CharField(max_length=255)
+    last_name: str = edgy.CharField(max_length=255, skip_absorption_check=True)
+    embedded: Dict[str, Any] = edgy.CompositeField(
+        inner_fields=[
+            ("first_name", edgy.CharField(max_length=255, exclude=True)),
+            ("last_name", edgy.CharField(max_length=255, exclude=True)),
+        ],
+        prefix_embedded="embedded_",
+        exclude=False,
+        unsafe_json_serialization=True,
     )
 
     class Meta:
@@ -79,18 +89,15 @@ def test_column_type():
 
 
 def test_get_columns_external_fields():
-    assert (
-        len(edgy.CompositeField(inner_fields=["foo", "fa"]).get_columns("composite"))
-        == 0
-    )
+    assert len(edgy.CompositeField(inner_fields=["foo", "fa"]).get_columns("composite")) == 0
 
 
 def test_get_columns_inner_fields_mixed():
     assert (
         len(
-            edgy.CompositeField(
-                inner_fields=["foo", ("last_name", edgy.CharField(max_length=255))]
-            ).get_columns("composite")
+            edgy.CompositeField(inner_fields=["foo", ("last_name", edgy.CharField(max_length=255))]).get_columns(
+                "composite"
+            )
         )
         == 0
     )
@@ -188,6 +195,24 @@ def test_dump_composite_dict():
         )
 
 
+def test_dump_composite_dict_json():
+    obj1 = MyModelEmbedded(
+        first_name="edgy",
+        last_name="edgytoo",
+        embedded_first_name="edgy2embedded",
+        embedded_last_name="edgytoo2embedded",
+    )
+    obj2 = MyModelEmbedded2(
+        first_name="edgy",
+        last_name="edgytoo",
+        embedded_first_name="edgy2embedded",
+        embedded_last_name="edgytoo2embedded",
+    )
+    assert "embedded" not in obj1.model_dump(mode="json")
+    assert "embedded" in obj2.model_dump(mode="json")
+    assert obj1.model_dump(mode="json", exclude=("embedded",)) == obj2.model_dump(mode="json", exclude=("embedded",))
+
+
 def test_dump_composite_model():
     obj = MyModel2(first_name="edgy", last_name="edgytoo", age=100)
     assert obj.model_dump(include={"plain": {"first_name": True}}) == {
@@ -195,14 +220,13 @@ def test_dump_composite_model():
             "first_name": "edgy",
         },
     }
-    assert obj.model_dump(
-        exclude={"plain": {"first_name": True, "age": True}}, include=("plain",)
-    ) == {
+    assert obj.model_dump(exclude={"plain": {"first_name": True, "age": True}}, include=("plain",)) == {
         "plain": {
             "last_name": "edgytoo",
         },
     }
     # now we stress test with both
-    assert obj.model_dump(
-        exclude={"age": True}, include=("first_name", "last_name", "age")
-    ) == {"first_name": "edgy", "last_name": "edgytoo"}
+    assert obj.model_dump(exclude={"age": True}, include=("first_name", "last_name", "age")) == {
+        "first_name": "edgy",
+        "last_name": "edgytoo",
+    }
