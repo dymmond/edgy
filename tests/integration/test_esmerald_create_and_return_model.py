@@ -4,6 +4,7 @@ import pytest
 from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, post
 from httpx import ASGITransport, AsyncClient
+from pydantic import BaseModel
 
 import edgy
 from edgy.testclient import DatabaseTestClient as Database
@@ -36,12 +37,29 @@ def blocking_function():
     from_thread.run(sleep, 0.1)
 
 
+class IdNameDesc(BaseModel):
+    id: int
+    name: str
+    description: str
+
+
 class User(edgy.Model):
     id: int = edgy.IntegerField(primary_key=True)
     name: str = edgy.CharField(max_length=100)
     email: str = edgy.EmailField(max_length=100)
     language: str = edgy.CharField(max_length=200, null=True)
     description: str = edgy.TextField(max_length=5000, null=True)
+    # we hijack the test to test the CompositeField in esmerald context
+    id_name_desc: IdNameDesc = edgy.CompositeField(
+        inner_fields=[
+            "id",
+            "name",
+            ("description", edgy.TextField(max_length=5000, null=True)),
+        ],
+        exclude=False,
+        absorb_existing_fields=True,
+        model=IdNameDesc,
+    )
 
     class Meta:
         registry = models
@@ -84,6 +102,11 @@ async def test_creates_a_user_directly(async_client):
     assert response.json() == {
         "name": "Edgy",
         "email": "edgy@esmerald.dev",
+        "id_name_desc": {
+            "description": "A description",
+            "id": 1,
+            "name": "Edgy",
+        },
         "language": "EN",
         "description": "A description",
         "id": 1,
@@ -104,6 +127,11 @@ async def test_creates_many_users(async_client):
         assert response.json() == {
             "name": "Edgy",
             "email": "edgy@esmerald.dev",
+            "id_name_desc": {
+                "description": "A description",
+                "id": i + 1,
+                "name": "Edgy",
+            },
             "language": "EN",
             "description": "A description",
             "id": i + 1,

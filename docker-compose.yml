@@ -2,7 +2,7 @@ version: "3.8"
 services:
   db:
     restart: always
-    image: postgres:12.3
+    image: postgres:16
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
       POSTGRES_USER: "postgres"
@@ -18,7 +18,7 @@ services:
 
   edgy_alt:
     restart: always
-    image: postgres:12.3
+    image: postgres:16
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
       POSTGRES_USER: "postgres"

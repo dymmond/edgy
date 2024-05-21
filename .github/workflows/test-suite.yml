@@ -6,7 +6,7 @@ on:
     branches:
       - "**"
   pull_request:
-    branches: ["main"]
+    branches: ["main", "release"]
   schedule:
     - cron: "0 0 * * *"
 
@@ -19,7 +19,7 @@ jobs:
         python-version: ["3.8", "3.9", "3.10", "3.11", "3.12"]
     services:
       postgres:
-        image: postgres:10.8
+        image: postgres:16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -33,7 +33,7 @@ jobs:
           --health-retries 5
 
       postgres_alt:
-        image: postgres:10.8
+        image: postgres:16
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -62,6 +62,8 @@ jobs:
         run: "pip install hatch"
       - name: "Run linting"
         run: "hatch run lint"
+      - name: "Run mypy"
+        run: "hatch run test:check_types"
       - name: "Run tests"
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/edgy"
