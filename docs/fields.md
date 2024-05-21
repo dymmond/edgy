@@ -199,6 +199,7 @@ the fields need the exclude attribute/parameter set
 ##### Parameters
 
 * **inner_fields** - Required. A sequence containing the external field names mixed with embedded field definitions (name, Field) tuples.
+* **unsafe_json_serialization** - Default False. Normally when serializing in json mode, CompositeFields are ignored when they don't have a pydantic model set. This option includes such CompositeFields in the dump.
 * **absorb_existing_fields** - Default False. Don't fail if fields speficied with (name, Field) tuples already exists. Treat them as internal fields. The existing fields are checked if they are a subclass of the Field or have the attribute `skip_absorption_check` set
 * **model** - Default None (not set).Return a pydantic model instead of a dict
 * **prefix_embedded** - Default "". Prefix the field names of embedded fields (not references to external fields). Useful for implementing embeddables
