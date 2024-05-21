@@ -5,6 +5,25 @@ hide:
 
 # Release Notes
 
+## 0.11.0
+
+### Added
+
+- Support for [Marshall](./marshalls.md) allowing custom serialization of an Edgy model by [@tarsil](https://github.com/tarsil).
+- Support for the new [CompositeField](./fields.md#compositefield) enhancing the ability of
+having multiple primary keys (or composed keys) in an Edgy model by [@devkral](https://github.com/devkral).
+- Support for the `Q` queryset clause by [@devkral](https://github.com/devkral).
+
+### Changed
+
+- Cleaned up `FieldFactory` internals by [@devkral](https://github.com/devkral).
+- `pyproject.toml` definitions by [@devkral](https://github.com/devkral).
+- Internal Edgy `model_dump` covering internals of Edgy and corner cases of Pydantic for compatibility reasons by [@devkral](https://github.com/devkral).
+
+### Fixed
+
+- Typos in `is_primary` key attribute by [@devkral](https://github.com/devkral).
+
 ## 0.10.1
 
 ### Added
