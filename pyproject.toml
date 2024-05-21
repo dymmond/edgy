@@ -153,6 +153,9 @@ disable_error_code = "attr-defined,arg-type,override,misc"
 warn_unused_ignores = true
 warn_redundant_casts = true
 
+[tool.ruff]
+line-length = 120
+
 [tool.ruff.lint]
 select = ["E", "W", "F", "C", "B", "I"]
 ignore = ["E501", "B008", "C901", "B026"]
