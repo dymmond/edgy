@@ -5,7 +5,7 @@ from typing import (
     Any,
     ClassVar,
     Dict,
-    List,
+    Literal,
     Optional,
     Sequence,
     Set,
@@ -35,6 +35,8 @@ if TYPE_CHECKING:
     from edgy.core.signals import Broadcaster
 
 EXCLUDED_LOOKUP = ["__model_references__", "_table"]
+
+_empty = cast(Set[str], frozenset())
 
 
 class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta):
@@ -69,7 +71,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         Loops and setup the kwargs of the model
         """
-        model_references = {k: v for k, v in kwargs.items() if k in self.meta.model_references}
+        model_references = {
+            k: v for k, v in kwargs.items() if k in self.meta.model_references
+        }
         return model_references
 
     def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
@@ -88,7 +92,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         for key, value in kwargs.items():
             if key not in self.fields:
                 if not hasattr(self, key):
-                    raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
+                    raise ValueError(
+                        f"Invalid keyword {key} for class {self.__class__.__name__}"
+                    )
 
             # Set model field and add to the kwargs dict
             edgy_setattr(self, key, value)
@@ -156,22 +162,117 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         generify_model_fields(proxy_model.model)
         return proxy_model.model
 
-    def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
+    @cached_property
+    def special_getter_fields(self) -> Set[str]:
         """
-        An updated version of the model dump if the primary key is not provided.
+        Pydantic computed fields can't be used as field yet.
+        This reimplements the pydantic logic for fields with __get__ method
+        """
+        return cast(
+            Set[str],
+            frozenset(
+                key for key, field in self.fields.items() if hasattr(field, "__get__")
+            ),
+        )
 
-        Args:
+    @cached_property
+    def excluded_fields(self) -> Set[str]:
+        """
+        Pydantic should exclude fields with exclude flag set, but it doesn't
+        so work around here
+        """
+        # should be handled by pydantic but isn't so workaround
+        return cast(
+            Set[str],
+            frozenset(
+                key
+                for key, field in self.fields.items()
+                if getattr(field, "exclude", False)
+            ),
+        )
+
+    def model_dump(
+        self, show_pk: Union[bool, None] = None, **kwargs: Any
+    ) -> Dict[str, Any]:
+        """
+        An updated version of the model dump.
+        It can show the pk always and handles the exclude attribute on fields correctly and
+        contains the custom logic for fields with getters
+
+        Extra Args:
             show_pk: bool - Enforces showing the primary key in the model_dump.
         """
-        exclude: List[str] = kwargs.pop("exclude", None) or []
-        if exclude and not isinstance(exclude, list):
-            exclude = list(exclude)  # type: ignore
-        exclude.append("__show_pk__")
+        # we want a copy
+        exclude: Union[Set[str], Dict[str, Any], None] = kwargs.pop("exclude", None)
+        if exclude is None:
+            initial_full_field_exclude = _empty
+            # must be writable
+            exclude = set()
+        elif isinstance(exclude, dict):
+            initial_full_field_exclude = {k for k, v in exclude.items() if v is True}
+            exclude = copy.copy(exclude)
+        else:
+            initial_full_field_exclude = set(exclude)
+            exclude = copy.copy(initial_full_field_exclude)
+
+        if isinstance(exclude, dict):
+            exclude["__show_pk__"] = True
+            for field in self.excluded_fields:
+                exclude[field] = True
+        else:
+            exclude.update(self.special_getter_fields)
+            exclude.update(self.excluded_fields)
+            exclude.add("__show_pk__")
+        include: Union[Set[str], Dict[str, Any], None] = kwargs.pop("include", None)
+        mode: Union[Literal["json", "python"], str] = kwargs.pop("mode", "python")
 
         should_show_pk = show_pk or self.__show_pk__
-        model = super().model_dump(exclude=exclude, **kwargs)
+        model = dict(
+            super().model_dump(exclude=exclude, include=include, mode=mode, **kwargs)
+        )
         if self.pkname not in model and should_show_pk:
-            model = {**{self.pkname: self.pk}, **model}
+            model[self.pkname] = self.pk
+        # Workaround for metafields, computed field logic introduces many problems
+        # so reimplement the logic here
+        for field_name in self.special_getter_fields:
+            if field_name in initial_full_field_exclude:
+                continue
+            if include is not None and field_name not in include:
+                continue
+            if getattr(field_name, "exclude", False):
+                continue
+            field = self.fields[field_name]
+            retval = field.__get__(self)
+            sub_include = None
+            if isinstance(include, dict):
+                sub_include = include.get(field_name, None)
+                if sub_include is True:
+                    sub_include = None
+            sub_exclude = None
+            if isinstance(exclude, dict):
+                sub_exclude = exclude.get(field_name, None)
+                if sub_exclude is True:
+                    sub_exclude = None
+            if isinstance(retval, BaseModel):
+                retval = retval.model_dump(
+                    include=sub_include, exclude=sub_exclude, mode=mode, **kwargs
+                )
+            else:
+                assert (
+                    sub_include is None
+                ), "sub include filters for CompositeField specified, but no Pydantic model is set"
+                assert (
+                    sub_exclude is None
+                ), "sub exclude filters for CompositeField specified, but no Pydantic model is set"
+                if mode == "json":
+                    # skip field if it isn't a BaseModel and the mode is json
+                    continue
+            alias = field_name
+            if getattr(field, "serialization_alias", None):
+                alias = field.serialization_alias
+            elif getattr(field, "alias", None):
+                alias = field.alias
+            model[alias] = retval
         return model
 
     @classmethod
@@ -213,7 +314,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         )
 
     @classmethod
-    def _get_unique_constraints(cls, columns: Sequence) -> Optional[sqlalchemy.UniqueConstraint]:
+    def _get_unique_constraints(
+        cls, columns: Sequence
+    ) -> Optional[sqlalchemy.UniqueConstraint]:
         """
         Returns the unique constraints for the model.
 
@@ -245,7 +348,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         Extracts all the model references (ModelRef) from the model
         """
         related_names = self.meta.related_names
-        return {k: v for k, v in self.__model_references__.items() if k not in related_names}
+        return {
+            k: v for k, v in self.__model_references__.items() if k not in related_names
+        }
 
     def extract_db_fields(self) -> Dict[str, Any]:
         """

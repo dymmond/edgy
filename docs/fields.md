@@ -13,6 +13,7 @@ supported in **all field types**.
 
 * **primary_key** - A boolean. Determine if a column is primary key.
 Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions with Edgy.
+* **exclude** - An bool indicating if the field is included in model_dump
 * **default** - A value or a callable (function).
 * **index** - A boolean. Determine if a database index should be created.
 * **skip_absorption_check** - A boolean. Default False. Dangerous option! By default when defining a CompositeField with embedded fields and the `absorb_existing_fields` option it is checked that the field type of the absorbed field is compatible with the field type of the embedded field. This option skips the check.
@@ -192,15 +193,12 @@ obj.composite = {"email": "foobar@example.com", "sent": datetime.datetime.now()}
 ddict = obj.composite
 ```
 
-
-Limitations:
-
-Currently the CompositeFIeld is excluded from serialization and model dumps. The contained fields are serialized like the others.
+The contained fields are serialized like normal fields. So if this is not wanted,
+the fields need the exclude attribute/parameter set
 
 ##### Parameters
 
 * **inner_fields** - Required. A sequence containing the external field names mixed with embedded field definitions (name, Field) tuples.
-* **read_only** - Default False. Prevent writes
 * **absorb_existing_fields** - Default False. Don't fail if fields speficied with (name, Field) tuples already exists. Treat them as internal fields. The existing fields are checked if they are a subclass of the Field or have the attribute `skip_absorption_check` set
 * **model** - Default None (not set).Return a pydantic model instead of a dict
 * **prefix_embedded** - Default "". Prefix the field names of embedded fields (not references to external fields). Useful for implementing embeddables
