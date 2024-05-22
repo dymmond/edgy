@@ -1,6 +1,10 @@
 #!/bin/sh -e
 
 if [ ! -z "$GITHUB_ACTIONS" ]; then
+  if [ -z "$VERSION_FILE" ]; then
+    echo "VERSION_FILE is missing"
+    exit 1
+  fi
   git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
   git config --local user.name "GitHub Action"
 

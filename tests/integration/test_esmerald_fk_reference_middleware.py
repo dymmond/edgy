@@ -83,9 +83,7 @@ def app():
 
 @pytest.fixture()
 async def async_client(app) -> AsyncGenerator:
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         await to_thread.run_sync(blocking_function)
         yield ac
 
@@ -105,7 +103,7 @@ async def test_creates_a_user_raises_value_error(async_client):
         "errors": [
             {
                 "type": "list_type",
-                "loc": ["data", "posts"],
+                "loc": ["posts"],
                 "msg": "Input should be a valid list",
                 "input": {"comment": "A comment"},
                 "url": f"https://errors.pydantic.dev/{pydantic_version}/v/list_type",
