@@ -25,6 +25,7 @@ jobs:
         env:
           TWINE_USERNAME: __token__
           TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+          VERSION_FILE: "edgy/__init__.py"
       - name: "Deploy docs"
         run: |
           curl -X POST '${{ secrets.DEPLOY_DOCS }}'
