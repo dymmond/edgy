@@ -65,3 +65,16 @@ async def test_inspect_db():
     assert "class Hubusers" in out
     assert "class Transactions" in out
     assert ss == 0
+
+
+async def test_inspect_db_with_schema():
+    (out, error, ss) = run_cmd(
+        "tests.cli.main:app", f"edgy inspectdb --database={DATABASE_URL} --schema='public'"
+    )
+
+    out = out.decode("utf8")
+    assert "class Users" in out
+    assert "class Hubusers" in out
+    assert "class Transactions" in out
+    assert "registry = edgy.Registry(database=database, schema='public')" in out
+    assert ss == 0
