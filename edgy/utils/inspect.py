@@ -106,8 +106,8 @@ class InspectDB:
             table_details: Dict[str, Any] = {}
             table_details["tablename"] = key
 
-            table_name = key.split(".")
-            table_name = table_name[1] if len(table_name) > 1 else table_name[0]
+            table_name_list: List[str] = key.split(".")
+            table_name = table_name_list[1] if len(table_name_list) > 1 else table_name_list[0]
             table_details["class_name"] = table_name.replace("_", "").replace(".", "").capitalize()
             table_details["class"] = None
             table_details["table"] = table
@@ -251,7 +251,6 @@ class InspectDB:
         """
         Writes to stdout and runs some internal validations.
         """
-        registry: str = None
         if schema is not None:
             registry = "registry = {}.Registry(database=database, schema='{}')\n".format(
                 DB_MODULE,
