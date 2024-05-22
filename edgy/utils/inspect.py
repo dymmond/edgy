@@ -89,7 +89,7 @@ class InspectDB:
         # Generate the tables
         tables, _ = self.generate_table_information(metadata)
 
-        for line in self.write_output(tables, self.database.url._url):
+        for line in self.write_output(tables, self.database.url._url, schema=self.schema):
             sys.stdout.writelines(line)  # type: ignore
 
     def generate_table_information(
@@ -105,7 +105,10 @@ class InspectDB:
         for key, table in tables_dict.items():
             table_details: Dict[str, Any] = {}
             table_details["tablename"] = key
-            table_details["class_name"] = key.replace("_", "").capitalize()
+
+            table_name_list: List[str] = key.split(".")
+            table_name = table_name_list[1] if len(table_name_list) > 1 else table_name_list[0]
+            table_details["class_name"] = table_name.replace("_", "").replace(".", "").capitalize()
             table_details["class"] = None
             table_details["table"] = table
             models[key] = key.replace("_", "").capitalize()
@@ -148,7 +151,14 @@ class InspectDB:
         if is_fk:
             return "ForeignKey" if not column.unique else "OneToOne", {}
 
-        real_field: Any = column.type.as_generic()
+        try:
+            real_field: Any = column.type.as_generic()
+        except Exception:
+            logger.info(
+                f"Unable to understand the field type for `{column.type}`, defaulting to TextField."
+            )
+            real_field = "TextField"
+
         try:
             field_type = SQL_GENERIC_TYPES[type(real_field)].__name__
         except KeyError:
@@ -235,10 +245,20 @@ class InspectDB:
             await connection.run_sync(metadata.reflect)
         return metadata
 
-    def write_output(self, tables: List[Any], connection_string: str) -> NoReturn:
+    def write_output(
+        self, tables: List[Any], connection_string: str, schema: Union[str, None] = None
+    ) -> NoReturn:
         """
-        Writes to stdout.
+        Writes to stdout and runs some internal validations.
         """
+        if schema is not None:
+            registry = "registry = {}.Registry(database=database, schema='{}')\n".format(
+                DB_MODULE,
+                schema,
+            )
+        else:
+            registry = "registry = %s.Registry(database=database)\n" % DB_MODULE
+
         yield f"# This is an auto-generated Edgy model module. Edgy version `{edgy.__version__}`.\n"
         yield "#   * Rearrange models' order.\n"
         yield "#   * Make sure each model has one field with primary_key=True.\n"
@@ -261,7 +281,7 @@ class InspectDB:
         yield "\n"
         yield "\n"
         yield "database = {}.Database('{}')\n".format(DB_MODULE, connection_string)
-        yield "registry = %s.Registry(database=database)\n" % DB_MODULE
+        yield registry
 
         # Start writing the classes
         for table in tables:
