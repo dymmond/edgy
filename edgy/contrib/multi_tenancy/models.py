@@ -7,11 +7,10 @@ from loguru import logger
 
 import edgy
 from edgy import settings
-from edgy.contrib.multi_tenancy.exceptions import ModelSchemaError
 from edgy.contrib.multi_tenancy.utils import create_tables
 from edgy.core.db.models.model import Model
 from edgy.core.db.models.utils import get_model
-from edgy.exceptions import ObjectNotFound
+from edgy.exceptions import ModelSchemaError, ObjectNotFound
 
 
 class TenantMixin(edgy.Model):
@@ -80,9 +79,7 @@ class TenantMixin(edgy.Model):
         registry = self.meta.registry
         assert registry is not None, "registry is not set"
         try:
-            await registry.schema.create_schema(
-                schema=tenant.schema_name, if_not_exists=True
-            )
+            await registry.schema.create_schema(schema=tenant.schema_name, if_not_exists=True)
             await create_tables(registry, registry.tenant_models, tenant.schema_name)
         except Exception as e:
             message = f"Rolling back... {str(e)}"
@@ -99,9 +96,7 @@ class TenantMixin(edgy.Model):
         registry = self.meta.registry
         assert registry is not None, "registry is not set"
 
-        await registry.schema.drop_schema(
-            schema=self.schema_name, cascade=True, if_exists=True
-        )
+        await registry.schema.drop_schema(schema=self.schema_name, cascade=True, if_exists=True)
         await super().delete()
 
 
@@ -127,9 +122,9 @@ class DomainMixin(edgy.Model):
         **kwargs: Any,
     ) -> Model:
         async with self.meta.registry.database.transaction():
-            domains = self.__class__.query.filter(
-                tenant=self.tenant, is_primary=True
-            ).exclude(id=self.pk)
+            domains = self.__class__.query.filter(tenant=self.tenant, is_primary=True).exclude(
+                id=self.pk
+            )
 
             exists = await domains.exists()
 
