@@ -23,6 +23,7 @@ having multiple primary keys (or composed keys) in an Edgy model by [@devkral](h
 ### Fixed
 
 - Typos in `is_primary` key attribute by [@devkral](https://github.com/devkral).
+- InspectDB when provided with a `schema` name was not using it in the registry.
 
 ## 0.10.1
 

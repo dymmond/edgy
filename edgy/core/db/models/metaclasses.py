@@ -452,9 +452,7 @@ class BaseModelMeta(ModelMetaclass):
                 if embedded_fields:
                     for sub_field_name, sub_field in embedded_fields.items():
                         if sub_field_name in meta.fields_mapping:
-                            raise ValueError(
-                                f"sub field name collision: {sub_field_name}"
-                            )
+                            raise ValueError(f"sub field name collision: {sub_field_name}")
                         fieldnames_to_check.append(sub_field_name)
                         sub_field.registry = registry
                         meta.fields_mapping[sub_field_name] = sub_field
