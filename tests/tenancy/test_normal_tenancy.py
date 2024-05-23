@@ -3,8 +3,8 @@ from uuid import uuid4
 import pytest
 
 import edgy
-from edgy.core.tenancy.utils import create_tenant_schema
-from edgy.testclient import DatabaseTestClient as Database
+from edgy import Database
+from edgy.core.tenancy.utils import create_schema
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
@@ -38,7 +38,7 @@ async def rollback_connections():
 async def test_can_create_tenant_records():
     # Create the tenant
     # using the defaults from Edgy.
-    await create_tenant_schema(
+    await create_schema(
         registry=models, schema_name="esmerald", if_not_exists=True, should_create_tables=True
     )
 

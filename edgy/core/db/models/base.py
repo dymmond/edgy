@@ -17,6 +17,7 @@ from typing import (
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
+from sqlalchemy.ext.asyncio import AsyncConnection
 from typing_extensions import Self
 
 from edgy.conf import settings
@@ -28,10 +29,11 @@ from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
 from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.utils.functional import edgy_setattr
 from edgy.core.utils.models import DateParser, ModelParser, generify_model_fields
+from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
-    from edgy import Model
+    from edgy import Model, Registry
     from edgy.core.signals import Broadcaster
 
 EXCLUDED_LOOKUP = ["__model_references__", "_table"]
@@ -82,7 +84,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             kwargs[self.pkname] = kwargs.pop("pk")
 
         kwargs = {
-            k: v for k, v in kwargs.items() if k in self.meta.fields_mapping and k not in self.meta.model_references
+            k: v
+            for k, v in kwargs.items()
+            if k in self.meta.fields_mapping and k not in self.meta.model_references
         }
 
         for key, value in kwargs.items():
@@ -176,7 +180,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         # should be handled by pydantic but isn't so workaround
         return cast(
             Set[str],
-            frozenset(key for key, field in self.fields.items() if getattr(field, "exclude", False)),
+            frozenset(
+                key for key, field in self.fields.items() if getattr(field, "exclude", False)
+            ),
         )
 
     def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
@@ -238,7 +244,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 if sub_exclude is True:
                     sub_exclude = None
             if isinstance(retval, BaseModel):
-                retval = retval.model_dump(include=sub_include, exclude=sub_exclude, mode=mode, **kwargs)
+                retval = retval.model_dump(
+                    include=sub_include, exclude=sub_exclude, mode=mode, **kwargs
+                )
             else:
                 assert (
                     sub_include is None
@@ -267,7 +275,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         registry = cls.meta.registry
         assert registry is not None, "registry is not set"
         metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", registry._metadata)  # type: ignore
-        metadata.schema = schema
+        metadata.schema = schema or registry.db_schema
 
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
@@ -275,6 +283,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         columns = []
         for name, field in cls.fields.items():
             columns.extend(field.get_columns(name))
+
         # Handle the uniqueness together
         uniques = []
         for field in unique_together or []:
@@ -337,7 +346,11 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         are simply relations.
         """
         related_names = self.meta.related_names
-        return {k: v for k, v in self.__dict__.items() if k not in related_names and k not in EXCLUDED_LOOKUP}
+        return {
+            k: v
+            for k, v in self.__dict__.items()
+            if k not in related_names and k not in EXCLUDED_LOOKUP
+        }
 
     def get_instance_name(self) -> str:
         """
@@ -355,7 +368,11 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         edgy_setattr(self, key, value)
 
     def __get_instance_values(self, instance: Any) -> Set[Any]:
-        return {v for k, v in instance.__dict__.items() if k in instance.fields.keys() and v is not None}
+        return {
+            v
+            for k, v in instance.__dict__.items()
+            if k in instance.fields.keys() and v is not None
+        }
 
     def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:
@@ -384,18 +401,53 @@ class EdgyBaseReflectModel(EdgyBaseModel):
         registry = cls.meta.registry
         assert registry is not None, "registry is not set"
         metadata: sqlalchemy.MetaData = registry._metadata
-        metadata.schema = schema
+        schema_name = schema or registry.db_schema
+        metadata.schema = schema_name
 
         tablename: str = cast("str", cls.meta.tablename)
-        return cls.reflect(tablename, metadata)
+        return run_sync(cls.reflect(registry, tablename, metadata, schema_name))
 
     @classmethod
-    def reflect(cls, tablename: str, metadata: sqlalchemy.MetaData) -> sqlalchemy.Table:
+    async def reflect(
+        cls,
+        registry: "Registry",
+        tablename: str,
+        metadata: sqlalchemy.MetaData,
+        schema: Union[str, None] = None,
+    ) -> sqlalchemy.Table:
+        """
+        Reflect a table from the database and return its SQLAlchemy Table object.
+
+        This method connects to the database using the provided registry, reflects
+        the table with the given name and metadata, and returns the SQLAlchemy
+        Table object.
+
+        Parameters:
+            registry (Registry): The registry object containing the database engine.
+            tablename (str): The name of the table to reflect.
+            metadata (sqlalchemy.MetaData): The SQLAlchemy MetaData object to associate with the reflected table.
+            schema (Union[str, None], optional): The schema name where the table is located. Defaults to None.
+
+        Returns:
+            sqlalchemy.Table: The reflected SQLAlchemy Table object.
+
+        Raises:
+            ImproperlyConfigured: If there is an error during the reflection process.
+        """
+
+        def execute_reflection(connection: AsyncConnection) -> sqlalchemy.Table:
+            """Helper function to create and reflect the table."""
+            try:
+                return sqlalchemy.Table(
+                    tablename, metadata, schema=schema, autoload_with=connection
+                )
+            except Exception as e:
+                raise e
+
         try:
-            return sqlalchemy.Table(
-                tablename,
-                metadata,
-                autoload_with=cast("sqlalchemy.Engine", cls.meta.registry.sync_engine),  # type: ignore
-            )
+            async with registry.engine.begin() as connection:
+                table = await connection.run_sync(execute_reflection)
+            await registry.engine.dispose()
+            return table
         except Exception as e:
-            raise ImproperlyConfigured(detail=f"Table with the name {tablename} does not exist.") from e
+            raise ImproperlyConfigured(detail=str(e)) from e

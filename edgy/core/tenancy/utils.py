@@ -45,7 +45,7 @@ async def create_tables(
             ...
 
 
-async def create_tenant_schema(
+async def create_schema(
     registry: "Registry",
     schema_name: str,
     models: Union[Dict[str, "Model"], None] = None,
@@ -53,7 +53,7 @@ async def create_tenant_schema(
     should_create_tables: bool = False,
 ) -> None:
     """
-    Creates a tenant in a given registry.
+    Creates a schema in a given registry.
 
     This function creates a new schema for a tenant in the provided registry.
     It optionally checks if the schema already exists and creates tables within

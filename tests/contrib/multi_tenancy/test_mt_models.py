@@ -7,9 +7,9 @@ from uuid import UUID
 import pytest
 
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
-from edgy.contrib.multi_tenancy.exceptions import ModelSchemaError
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.core.db import fields
+from edgy.exceptions import ModelSchemaError
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
