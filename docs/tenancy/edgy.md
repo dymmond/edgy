@@ -23,6 +23,50 @@ Edgy has three different ways of achieving this in a simple and clean fashion.
 
 You can also use the [Edgy helpers for schemas][schemas] if you need to use it.
 
+### The schema creation
+
+Edgy by default provides a functionality that allows the creation of schemas in an easy way by
+calling `create_schema` in the tenancy module.
+
+```python
+from edgy.core.tenancy.utils import create_schema
+```
+
+This function is very powerful and yet simple to use and allows the creation of schemas based
+on a given registry.
+
+This means, if you have different registries pointing to different databases, you only need to
+provide the `registry` instance and some extra parameters to generate a brand new schema.
+
+#### Parameters
+
+* **registry** - An instance of a [Registry](../registry.md).
+* **schema_name** - The name for the new schema.
+* **models** - Optional dictionary containing the name of the Edgy Model as key and the model
+class as value. The reason for being optional its because if not provided, it will generate the
+tables from the `models` of the `registry` object. This allows the flexibility of you manipulating
+what tables should be passed into the new schema.
+* **if_not_exists** - If True, the schema will be created only if it does not already exist. Defaults to False.
+* **should_create_tables** - If True, tables will be created within the new schema. Defaults to False.
+
+**Example**
+
+```python
+import edgy
+from edgy.core.tenancy.utils import create_schema
+
+database = edgy.Database("sqlite:///db.sqlite")
+registry = edgy.Registry(database=database)
+
+# Create the schema
+await create_schema(
+    registry=registry,
+    schema_name="edgy",
+    if_not_exists=True,
+    should_create_tables=True
+)
+```
+
 ### Using
 
 This is probably the one that is more commonly used and probably the one you will be using more
