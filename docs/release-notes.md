@@ -5,6 +5,19 @@ hide:
 
 # Release Notes
 
+## 0.11.1
+
+### Added
+
+- [create_schema](./tenancy/edgy.md#the-schema-creation) allowing a dynamic and programatically
+way of creating schemas in the database.
+
+### Changed
+
+- Updated `reflection` from `edgy.ReflectModel` to use the internal database session and avoid
+deadlocks.
+- Internal cleaning for tenancy.
+
 ## 0.11.0
 
 ### Added
