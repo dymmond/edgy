@@ -69,8 +69,8 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
                 setattr(self, name, getattr(instance, field.source))
             elif field.source and not field.__is_method__:
                 # For primary key exceptions
-                if name == instance.pkname:
-                    attribute = instance.pk
+                if name in instance.pknames:
+                    attribute = getattr(instance, name)
                 else:
                     attribute = getattr(instance, field.source)
 
@@ -108,8 +108,15 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         # Dump model data excluding fields extracted above
         data = self.model_dump(exclude=set(self.__custom_fields__.keys()))
 
-        if instance.meta.pk_attribute in data:
-            edgy_setattr(self, instance.meta.pk_attribute, instance.pk)
+        pk_attribute_in_data = False
+        for pk_attribute in instance.meta.pk_attributes:
+            if pk_attribute in data:
+                pk_attribute_in_data = True
+                break
+
+        if pk_attribute_in_data:
+            for pk_attribute in instance.meta.pk_attributes:
+                edgy_setattr(self, pk_attribute, getattr(instance, pk_attribute))
 
     def _get_fields(self) -> Dict[str, Any]:
         return self.model_fields.copy()

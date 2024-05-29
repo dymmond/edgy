@@ -41,9 +41,7 @@ class Relation(ManyRelationProtocol):
         }
 
     def __get__(self, instance: Any, owner: Any) -> Any:
-        return self.__class__(
-            instance=instance, through=self.through, to=self.to, owner=self.owner
-        )
+        return self.__class__(instance=instance, through=self.through, to=self.to, owner=self.owner)
 
     def __getattr__(self, item: Any) -> Any:
         """

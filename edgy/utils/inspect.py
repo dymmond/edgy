@@ -42,11 +42,7 @@ def func_accepts_kwargs(func: Callable) -> bool:
     """
     Checks if a function accepts **kwargs.
     """
-    return any(
-        param
-        for param in inspect.signature(func).parameters.values()
-        if param.kind == param.VAR_KEYWORD
-    )
+    return any(param for param in inspect.signature(func).parameters.values() if param.kind == param.VAR_KEYWORD)
 
 
 class InspectDB:
@@ -80,9 +76,7 @@ class InspectDB:
 
         # Connect to a schema
         metadata: sqlalchemy.MetaData = (
-            sqlalchemy.MetaData(schema=self.schema)
-            if self.schema is not None
-            else sqlalchemy.MetaData()
+            sqlalchemy.MetaData(schema=self.schema) if self.schema is not None else sqlalchemy.MetaData()
         )
         metadata = execsync(self.reflect)(engine=engine, metadata=metadata)
 
@@ -92,9 +86,7 @@ class InspectDB:
         for line in self.write_output(tables, self.database.url._url, schema=self.schema):
             sys.stdout.writelines(line)  # type: ignore
 
-    def generate_table_information(
-        self, metadata: sqlalchemy.MetaData
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    def generate_table_information(self, metadata: sqlalchemy.MetaData) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
         """
         Generates the tables from the reflection and maps them into the
         `reflected` dictionary of the `Registry`.
@@ -123,9 +115,7 @@ class InspectDB:
 
         return tables, models
 
-    def get_foreign_keys(
-        self, table_or_column: Union[sqlalchemy.Table, sqlalchemy.Column]
-    ) -> List[Dict[str, Any]]:
+    def get_foreign_keys(self, table_or_column: Union[sqlalchemy.Table, sqlalchemy.Column]) -> List[Dict[str, Any]]:
         """
         Extracts all the information needed of the foreign keys.
         """
@@ -154,17 +144,13 @@ class InspectDB:
         try:
             real_field: Any = column.type.as_generic()
         except Exception:
-            logger.info(
-                f"Unable to understand the field type for `{column.type}`, defaulting to TextField."
-            )
+            logger.info(f"Unable to understand the field type for `{column.type}`, defaulting to TextField.")
             real_field = "TextField"
 
         try:
             field_type = SQL_GENERIC_TYPES[type(real_field)].__name__
         except KeyError:
-            logger.info(
-                f"Unable to understand the field type for `{column.name}`, defaulting to TextField."
-            )
+            logger.info(f"Unable to understand the field type for `{column.name}`, defaulting to TextField.")
             field_type = "TextField"
 
         field_params: Dict[str, Any] = {}
@@ -185,9 +171,7 @@ class InspectDB:
 
         return field_type, field_params
 
-    def get_meta(
-        self, table: Dict[str, Any], unique_constraints: Set[str], _indexes: Set[str]
-    ) -> NoReturn:
+    def get_meta(self, table: Dict[str, Any], unique_constraints: Set[str], _indexes: Set[str]) -> NoReturn:
         """
         Produces the Meta class.
         """
@@ -199,11 +183,7 @@ class InspectDB:
         # Handle the unique together
         for constraint in constraints:
             if isinstance(constraint, schema.UniqueConstraint):
-                columns = [
-                    column.name
-                    for column in constraint.columns
-                    if column.name not in unique_constraints
-                ]
+                columns = [column.name for column in constraint.columns if column.name not in unique_constraints]
                 unique_definition = edgy.UniqueConstraint(fields=columns, name=constraint.name)
                 unique_together.append(unique_definition)
 
@@ -232,9 +212,7 @@ class InspectDB:
             )
         return meta
 
-    async def reflect(
-        self, *, engine: sqlalchemy.Engine, metadata: sqlalchemy.MetaData
-    ) -> sqlalchemy.MetaData:
+    async def reflect(self, *, engine: sqlalchemy.Engine, metadata: sqlalchemy.MetaData) -> sqlalchemy.MetaData:
         """
         Connects to the database and reflects all the information about the
         schema bringing all the data available.
@@ -245,9 +223,7 @@ class InspectDB:
             await connection.run_sync(metadata.reflect)
         return metadata
 
-    def write_output(
-        self, tables: List[Any], connection_string: str, schema: Union[str, None] = None
-    ) -> NoReturn:
+    def write_output(self, tables: List[Any], connection_string: str, schema: Union[str, None] = None) -> NoReturn:
         """
         Writes to stdout and runs some internal validations.
         """
@@ -262,18 +238,9 @@ class InspectDB:
         yield f"# This is an auto-generated Edgy model module. Edgy version `{edgy.__version__}`.\n"
         yield "#   * Rearrange models' order.\n"
         yield "#   * Make sure each model has one field with primary_key=True.\n"
-        yield (
-            "#   * Make sure each ForeignKey and OneToOne has `on_delete` set "
-            "to the desired behavior.\n"
-        )
-        yield (
-            "# Feel free to rename the models, but don't rename tablename values or "
-            "field names.\n"
-        )
-        yield (
-            "# The generated models do not manage migrations. Those are handled by `%s.Model`.\n"
-            % DB_MODULE
-        )
+        yield ("#   * Make sure each ForeignKey and OneToOne has `on_delete` set " "to the desired behavior.\n")
+        yield ("# Feel free to rename the models, but don't rename tablename values or " "field names.\n")
+        yield ("# The generated models do not manage migrations. Those are handled by `%s.Model`.\n" % DB_MODULE)
         yield "# The automatic generated models will be subclassed as `%s.ReflectModel`.\n\n\n" % DB_MODULE
         yield "import %s \n" % DB_MODULE
         yield "from %s import UniqueConstraint, Index \n" % DB_MODULE
@@ -342,9 +309,7 @@ class InspectDB:
                 if field_params:
                     if not field_description.endswith("("):
                         field_description += ", "
-                    field_description += ", ".join(
-                        "{}={!r}".format(k, v) for k, v in field_params.items()
-                    )
+                    field_description += ", ".join("{}={!r}".format(k, v) for k, v in field_params.items())
                 field_description += ")\n"
                 yield "    %s" % field_description
 

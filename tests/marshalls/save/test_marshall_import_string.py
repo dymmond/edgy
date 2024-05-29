@@ -54,9 +54,7 @@ class User(edgy.Model):
 
 
 class UserMarshall(Marshall):
-    marshall_config = ConfigMarshall(
-        model="tests.marshalls.save.test_marshall_import_string.User", fields=["__all__"]
-    )
+    marshall_config = ConfigMarshall(model="tests.marshalls.save.test_marshall_import_string.User", fields=["__all__"])
 
     def get_details(self, instance) -> str:
         return instance.get_name()

@@ -59,16 +59,12 @@ async def test_queryset_update():
 
 
 async def test_model_update_or_create():
-    user, created = await User.query.update_or_create(
-        name="Test", language="English", defaults={"name": "Jane"}
-    )
+    user, created = await User.query.update_or_create(name="Test", language="English", defaults={"name": "Jane"})
     assert created is True
     assert user.name == "Jane"
     assert user.language == "English"
 
-    user, created = await User.query.update_or_create(
-        name="Jane", language="English", defaults={"name": "Test"}
-    )
+    user, created = await User.query.update_or_create(name="Jane", language="English", defaults={"name": "Test"})
     assert created is False
     assert user.name == "Test"
     assert user.language == "English"

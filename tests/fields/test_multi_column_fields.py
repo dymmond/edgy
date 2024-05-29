@@ -88,6 +88,4 @@ async def test_create_and_assign(rollback_connections):
     assert hasattr(MyModel.table.columns, "multi_inner")
     obj.multi = "test"
     await obj.save()
-    assert await MyModel.query.filter(
-        MyModel.table.columns.multi_inner == "test"
-    ).exists()
+    assert await MyModel.query.filter(MyModel.table.columns.multi_inner == "test").exists()

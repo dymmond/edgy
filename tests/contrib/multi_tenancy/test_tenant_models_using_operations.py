@@ -67,9 +67,7 @@ async def test_schema_with_using():
     does not updated the data
     also User.query.using('tenant_schema').get(email="foo@bar.com")
     """
-    tenant = await Tenant.query.create(
-        schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
-    )
+    tenant = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
 
     user = await User.query.using(tenant.schema_name).create(name="Edgy", email="edgy@edgy.dev")
     total = await User.query.using(tenant.schema_name).all()
@@ -77,9 +75,7 @@ async def test_schema_with_using():
     assert user.email == "edgy@edgy.dev"
     assert len(total) == 1
 
-    await User.query.using(tenant.schema_name).filter(email="edgy@edgy.dev").update(
-        email="bar@foo.com"
-    )
+    await User.query.using(tenant.schema_name).filter(email="edgy@edgy.dev").update(email="bar@foo.com")
 
     users = await User.query.using(tenant.schema_name).all()
     assert len(users) == 1

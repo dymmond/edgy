@@ -59,9 +59,7 @@ async def test_can_create_record():
 
     assert len(users) == 0
 
-    user = await User.mang.create(
-        password="12345", username="user2", email="test1@test.com", is_admin=False
-    )
+    user = await User.mang.create(password="12345", username="user2", email="test1@test.com", is_admin=False)
 
     users = await User.mang.all()
 

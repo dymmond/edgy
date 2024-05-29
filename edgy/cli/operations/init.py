@@ -10,9 +10,7 @@ from edgy.cli.env import MigrationEnv
     default=None,
     help=('Migration script directory (default is "migrations")'),
 )
-@click.option(
-    "-t", "--template", default=None, help=('Repository template to use (default is "flask")')
-)
+@click.option("-t", "--template", default=None, help=('Repository template to use (default is "flask")'))
 @click.option(
     "--package",
     is_flag=True,

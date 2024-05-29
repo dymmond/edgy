@@ -65,9 +65,7 @@ async def test_model_inheritance():
 
 
 async def test_model_triple_inheritace():
-    contact = edgy.run_sync(
-        Contact.query.create(name="Test", language="EN", age="25", address="Far")
-    )
+    contact = edgy.run_sync(Contact.query.create(name="Test", language="EN", age="25", address="Far"))
 
     contacts = edgy.run_sync(Contact.query.all())
 

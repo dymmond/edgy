@@ -23,8 +23,10 @@ from edgy.conf import settings
 from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
+from edgy.core.db.constants import ConditionalRedirect
 from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.fields.core import BaseField, BigIntegerField
+from edgy.core.db.fields.base import BaseField
+from edgy.core.db.fields.core import ConcreteCompositeField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
@@ -42,7 +44,7 @@ if TYPE_CHECKING:
 class MetaInfo:
     __slots__ = (
         "pk",
-        "pk_attribute",
+        "pk_attributes",
         "abstract",
         "fields",
         "fields_mapping",
@@ -69,11 +71,11 @@ class MetaInfo:
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.pk: Optional[BaseField] = getattr(meta, "pk", None)
-        self.pk_attribute: Union[BaseField, str] = getattr(meta, "pk_attribute", "")
+        self.pk_attributes: Sequence[str] = getattr(meta, "pk_attributes", "")
         self.abstract: bool = getattr(meta, "abstract", False)
         self.fields: Set[Any] = getattr(meta, "fields", set())
         self.fields_mapping: Dict[str, BaseField] = getattr(meta, "fields_mapping", {})
-        self.registry: Optional[Type[Registry]] = getattr(meta, "registry", None)
+        self.registry: Optional[Registry] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.parents: Any = getattr(meta, "parents", [])
         self.many_to_many_fields: Set[str] = getattr(meta, "many_to_many_fields", set())
@@ -90,9 +92,7 @@ class MetaInfo:
         self.related_names: Set[str] = getattr(meta, "related_names", set())
         self.related_fields: Dict[str, Any] = getattr(meta, "related_fields", {})
         self.related_names_mapping: Dict[str, Any] = getattr(meta, "related_names_mapping", {})
-        self.signals: Optional[signals_module.Broadcaster] = getattr(
-            meta, "signals", {}
-        )  # type: ignore
+        self.signals: Optional[signals_module.Broadcaster] = getattr(meta, "signals", {})  # type: ignore
 
         for k, v in kwargs.items():
             edgy_setattr(self, k, v)
@@ -108,14 +108,14 @@ class MetaInfo:
             edgy_setattr(self, key, value)
 
 
-def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Type[Registry]:
+def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Registry:
     """
     When a registry is missing from the Meta class, it should look up for the bases
     and obtain the first found registry.
 
     If not found, then a ImproperlyConfigured exception is raised.
     """
-    found_registry: Optional[Type[Registry]] = None
+    found_registry: Optional[Registry] = None
 
     for base in bases:
         meta: MetaInfo = getattr(base, "meta", None)  # type: ignore
@@ -213,9 +213,7 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
     model_class.meta.signals = signals
 
 
-def handle_annotations(
-    bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any
-) -> Dict[str, Any]:
+def handle_annotations(bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any) -> Dict[str, Any]:
     """
     Handles and copies some of the annotations for
     initialiasation.
@@ -244,9 +242,9 @@ class BaseModelMeta(ModelMetaclass):
         model_references: Dict["ModelRef", str] = {}
         many_to_many_fields: Any = set()
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
-        pk_attribute: str = "id"
-        registry: Any = None
+        pk_attributes: Set[str] = set()
         base_annotations: Dict[str, Any] = {}
+        is_abstract: bool = getattr(meta_class, "abstract", False)
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
@@ -290,35 +288,32 @@ class BaseModelMeta(ModelMetaclass):
             attrs = {**inherited_fields, **attrs}
 
         # Handle with multiple primary keys and auto generated field if no primary key is provided
-        if name != "Model":
-            is_pk_present = False
-            for key, value in attrs.items():
-                if isinstance(value, BaseField):
-                    if value.primary_key:
-                        if is_pk_present:
-                            raise ImproperlyConfigured(
-                                f"Cannot create model {name} with multiple primary keys."
-                            )
-                        is_pk_present = True
-                        pk_attribute = key
-
-            if not is_pk_present and not getattr(meta_class, "abstract", None):
-                if "id" not in attrs:
-                    attrs = {
-                        "id": BigIntegerField(primary_key=True, autoincrement=True),
-                        **attrs,
-                    }
-
-                if not isinstance(attrs["id"], BaseField) or not attrs["id"].primary_key:
-                    raise ImproperlyConfigured(
-                        f"Cannot create model {name} without explicit primary key if field 'id' is already present."
-                    )
-
         for key, value in attrs.items():
             if isinstance(value, BaseField):
-                if getattr(meta_class, "abstract", None):
+                if key == "pk" and not isinstance(value, ConcreteCompositeField):
+                    raise ImproperlyConfigured(f"Cannot add a field named pk to model {name}. Protected name.")
+                if value.primary_key:
+                    pk_attributes.add(key)
+        attrs = {**attrs}
+
+        if not is_abstract:
+            if not pk_attributes:
+                if "id" not in attrs:
+                    attrs["id"] = edgy_fields.BigIntegerField(primary_key=True, autoincrement=True)
+                    pk_attributes.add("id")
+
+            if not isinstance(attrs["id"], BaseField) or not attrs["id"].primary_key:
+                raise ImproperlyConfigured(
+                    f"Cannot create model {name} without explicit primary key if field 'id' is already present."
+                )
+        for key, value in attrs.items():
+            if isinstance(value, BaseField):
+                # TODO: really only when abstract??
+                if is_abstract:
                     value = copy.copy(value)
 
+                # add fields and non BaseRefForeignKeyField to fields
+                # TODO: check if to change with the new descriptor stuff
                 if not isinstance(value, BaseRefForeignKeyField):
                     fields[key] = value
 
@@ -336,13 +331,47 @@ class BaseModelMeta(ModelMetaclass):
         for slot in fields:
             attrs.pop(slot, None)
 
+        fieldnames_to_check = list(fields.keys())
+        while fieldnames_to_check:
+            field_name = fieldnames_to_check.pop()
+            field = fields[field_name]
+            # WORKAROUND
+            # FIXME: should only initialize metaclasses one time not multiple times
+            # FIXME: when reinitializing, the fields should be original
+            if not field.embedded_fields_initialized:
+                embedded_fields = field.get_embedded_fields(field_name, fields)
+                field.embedded_fields_initialized = True
+                if embedded_fields:
+                    for sub_field_name, sub_field in embedded_fields.items():
+                        if sub_field_name == "pk":
+                            raise ValueError("sub field uses reserved name pk")
+
+                        if sub_field_name in fields or sub_field_name in attrs:
+                            raise ValueError(f"sub field name collision: {sub_field_name}")
+                        fieldnames_to_check.append(sub_field_name)
+                        fields[sub_field_name] = sub_field
+                        model_fields[sub_field_name] = sub_field
+                        if sub_field.primary_key:
+                            pk_attributes.add(sub_field_name)
+
+        # create a sorted tuple from pk_attributes for nicer outputs
+        pk_attributes_finalized = tuple(sorted(pk_attributes))
+        del pk_attributes
+
+        fields["pk"] = cast(
+            BaseField,
+            edgy_fields.CompositeField(inner_fields=pk_attributes_finalized, model=ConditionalRedirect, exclude=True),
+        )
+
+        del is_abstract
+
         attrs["meta"] = meta = MetaInfo(meta_class)
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
         meta.many_to_many_fields = many_to_many_fields
         meta.model_references = model_references
-        meta.pk_attribute = pk_attribute
-        meta.pk = fields.get(pk_attribute)
+        meta.pk_attributes = pk_attributes_finalized
+        meta.pk = fields.get("pk")
 
         if not fields:
             meta.abstract = True
@@ -367,21 +396,21 @@ class BaseModelMeta(ModelMetaclass):
         attrs["__init_annotations__"] = annotations
         parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
         if not parents:
+            # TODO: document for what is this shortcut
             return model_class(cls, name, bases, attrs)
 
         meta.parents = parents
         new_class = cast("Type[Model]", model_class(cls, name, bases, attrs))
 
         # Update the model_fields are updated to the latest
-        new_class.model_fields.update(model_fields)
+        new_class.model_fields = {**new_class.model_fields, **model_fields}
+        new_class.pknames = pk_attributes_finalized
 
         # Validate meta for managers, uniques and indexes
         if meta.abstract:
             managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
             if len(managers) > 1:
-                raise ImproperlyConfigured(
-                    "Multiple managers are not allowed in abstract classes."
-                )
+                raise ImproperlyConfigured("Multiple managers are not allowed in abstract classes.")
 
             if getattr(meta, "unique_together", None) is not None:
                 raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
@@ -405,9 +434,7 @@ class BaseModelMeta(ModelMetaclass):
             unique_together = meta.unique_together
             if not isinstance(unique_together, (list, tuple)):
                 value_type = type(unique_together).__name__
-                raise ImproperlyConfigured(
-                    f"unique_together must be a tuple or list. Got {value_type} instead."
-                )
+                raise ImproperlyConfigured(f"unique_together must be a tuple or list. Got {value_type} instead.")
             else:
                 for value in unique_together:
                     if not isinstance(value, (str, tuple, UniqueConstraint)):
@@ -420,15 +447,14 @@ class BaseModelMeta(ModelMetaclass):
             indexes = meta.indexes
             if not isinstance(indexes, (list, tuple)):
                 value_type = type(indexes).__name__
-                raise ImproperlyConfigured(
-                    f"indexes must be a tuple or list. Got {value_type} instead."
-                )
+                raise ImproperlyConfigured(f"indexes must be a tuple or list. Got {value_type} instead.")
             else:
                 for value in indexes:
                     if not isinstance(value, Index):
                         raise ValueError("Meta.indexes must be a list of Index types.")
 
         registry = meta.registry
+        assert registry, "no registry found, should not happen here"
         new_class.database = registry.database
 
         # Making sure it does not generate tables if abstract it set
@@ -438,38 +464,15 @@ class BaseModelMeta(ModelMetaclass):
             else:
                 registry.models[name] = new_class
 
-        fieldnames_to_check = list(meta.fields_mapping.keys())
-        while fieldnames_to_check:
-            name = fieldnames_to_check.pop()
-            field = meta.fields_mapping[name]
-            field.registry = registry
-            # WORKAROUND
-            # FIXME: should only initialize metaclasses one time not multiple times
-            # FIXME: when reinitializing, the fields should be original
-            if not field.embedded_fields_initialized:
-                embedded_fields = field.get_embedded_fields(name, meta.fields_mapping)
-                field.embedded_fields_initialized = True
-                if embedded_fields:
-                    for sub_field_name, sub_field in embedded_fields.items():
-                        if sub_field_name in meta.fields_mapping:
-                            raise ValueError(f"sub field name collision: {sub_field_name}")
-                        fieldnames_to_check.append(sub_field_name)
-                        sub_field.registry = registry
-                        meta.fields_mapping[sub_field_name] = sub_field
-                        if sub_field.primary_key:
-                            new_class.pkname = sub_field_name
-
-            if field.primary_key:
-                new_class.pkname = name
-
         new_class.__db_model__ = True
         new_class.fields = meta.fields_mapping
         meta.model = new_class
         meta.manager.model_class = new_class
 
-        # Set the owner of the field
+        # Set the owner and registry of the field
         for _, value in new_class.fields.items():
             value.owner = new_class
+            value.registry = registry
 
         # Sets the foreign key fields
         if meta.foreign_key_fields and not new_class.is_proxy_model:

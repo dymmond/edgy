@@ -19,12 +19,8 @@ class _EnhancedClausesHelper:
             args = (self.default_empty,)
         return self.op(*args)
 
-    def from_kwargs(
-        self, columns_or_model: Union[Model, ColumnCollection], /, **kwargs: Any
-    ) -> Any:
-        if not isinstance(columns_or_model, ColumnCollection) and hasattr(
-            columns_or_model, "columns"
-        ):
+    def from_kwargs(self, columns_or_model: Union[Model, ColumnCollection], /, **kwargs: Any) -> Any:
+        if not isinstance(columns_or_model, ColumnCollection) and hasattr(columns_or_model, "columns"):
             columns_or_model = columns_or_model.columns
         return self.op(*(getattr(columns_or_model, item[0]) == item[1] for item in kwargs.items()))
 

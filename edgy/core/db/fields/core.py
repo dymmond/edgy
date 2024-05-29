@@ -17,6 +17,7 @@ from typing import (
     Sequence,
     Set,
     Tuple,
+    Type,
     Union,
     cast,
 )
@@ -25,7 +26,7 @@ import pydantic
 import sqlalchemy
 from pydantic import BaseModel, EmailStr
 
-from edgy.core.db.constants import CASCADE, RESTRICT
+from edgy.core.db.constants import CASCADE, RESTRICT, ConditionalRedirect
 from edgy.core.db.fields._internal import IPAddress
 from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
 from edgy.core.db.fields.base import BaseCompositeField, BaseField
@@ -199,7 +200,7 @@ class ConcreteCompositeField(BaseCompositeField):
         inner_fields: Sequence[Union[str, Tuple[str, BaseField]]] = kwargs.pop("inner_fields", [])
         self.unsafe_json_serialization: bool = kwargs.pop("unsafe_json_serialization", False)
         self.absorb_existing_fields: bool = kwargs.pop("absorb_existing_fields", False)
-        self.model: Optional[BaseModel] = kwargs.pop("model", None)
+        self.model: Optional[Union[Type[BaseModel], Type[ConditionalRedirect]]] = kwargs.pop("model", None)
         self.inner_field_names: List[str] = []
         self.embedded_field_defs: Dict[str, BaseField] = {}
         self.prefix_embedded: str = kwargs.pop("prefix_embedded", "")
@@ -225,23 +226,41 @@ class ConcreteCompositeField(BaseCompositeField):
         return name
 
     def __get__(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
+        if self.model is ConditionalRedirect and len(self.inner_field_names) == 1:
+            return getattr(instance, self.inner_field_names[0], None)
         d = {}
         for key in self.inner_field_names:
             translated_name = self.translate_name(key)
-            d[translated_name] = getattr(instance, key)
+            field = instance.fields.get(key)
+            if field and hasattr(field, "__get__"):
+                d[translated_name] = field.__get__(instance)
+            else:
+                d[translated_name] = getattr(instance, key, None)
         if self.model is not None:
-            return self.model(**d)  # type: ignore
+            return self.model(**d)
         return d
 
-    def __set__(self, instance: "Model", value: Union[Dict, Any]) -> None:
-        if isinstance(value, dict):
-            for key in self.inner_field_names:
-                translated_name = self.translate_name(key)
-                setattr(instance, key, value[translated_name])
-        else:
-            for key in self.inner_field_names:
-                translated_name = self.translate_name(key)
-                setattr(instance, key, getattr(value, translated_name))
+    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
+        if (
+            self.model is ConditionalRedirect
+            and len(self.inner_field_names) == 1
+            # we first only redirect both
+            and not isinstance(value, (dict, BaseModel))
+        ):
+            field = self.owner.fields[self.inner_field_names[0]]
+            return field.clean(self.inner_field_names[0], value)  # type: ignore
+        return super().clean(field_name, value)
+
+    def to_python(self, field_name: str, value: Any) -> Dict[str, Any]:
+        if (
+            self.model is ConditionalRedirect
+            and len(self.inner_field_names) == 1
+            # we first only redirect both
+            and not isinstance(value, (dict, BaseModel))
+        ):
+            field = self.owner.fields[self.inner_field_names[0]]
+            return field.to_python(self.inner_field_names[0], value)  # type: ignore
+        return super().to_python(field_name, value)
 
     def get_embedded_fields(self, name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
         if not self.absorb_existing_fields:

@@ -13,9 +13,7 @@ class TenantMiddleware(MiddlewareProtocol):
         super().__init__(app)
         self.app = app
 
-    async def __call__(
-        self, scope: Scope, receive: Receive, send: Send
-    ) -> Coroutine[Any, Any, None]:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> Coroutine[Any, Any, None]:
         """
         Receives a header with the tenant information and lookup in
         the database if exists.
