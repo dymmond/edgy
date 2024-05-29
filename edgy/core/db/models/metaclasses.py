@@ -213,7 +213,9 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
     model_class.meta.signals = signals
 
 
-def handle_annotations(bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any) -> Dict[str, Any]:
+def handle_annotations(
+    bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any
+) -> Dict[str, Any]:
     """
     Handles and copies some of the annotations for
     initialiasation.
@@ -291,7 +293,9 @@ class BaseModelMeta(ModelMetaclass):
         for key, value in attrs.items():
             if isinstance(value, BaseField):
                 if key == "pk" and not isinstance(value, ConcreteCompositeField):
-                    raise ImproperlyConfigured(f"Cannot add a field named pk to model {name}. Protected name.")
+                    raise ImproperlyConfigured(
+                        f"Cannot add a field named pk to model {name}. Protected name."
+                    )
                 if value.primary_key:
                     pk_attributes.add(key)
         attrs = {**attrs}
@@ -308,12 +312,22 @@ class BaseModelMeta(ModelMetaclass):
                 )
         for key, value in attrs.items():
             if isinstance(value, BaseField):
-                # TODO: really only when abstract??
+                # When it is abstract we don't want to instantiate
+                # The model as a model to be used to store data
+                # Instead, we just want to copy the fields declared
+                # In the abstract and be able to "inherit" them in
+                # the next model
                 if is_abstract:
                     value = copy.copy(value)
 
                 # add fields and non BaseRefForeignKeyField to fields
-                # TODO: check if to change with the new descriptor stuff
+                # The BaseRefForeignKeyField is actually not a normal SQL Foreignkey
+                # It is an Edgy specific operation that creates a reference to a ForeignKey
+                # That is why is not stored as a normal FK but as a reference but
+                # stored also as a field to be able later or to access anywhere in the model
+                # and use the value for the creation of the records via RefForeignKey.
+                # This is then used in `save_model_references()` and `update_model_references  saving a reference foreign key.
+                # We split the keys (store them) in different places to be able to easily maintain and know what is what.
                 if not isinstance(value, BaseRefForeignKeyField):
                     fields[key] = value
 
@@ -360,7 +374,9 @@ class BaseModelMeta(ModelMetaclass):
 
         fields["pk"] = cast(
             BaseField,
-            edgy_fields.CompositeField(inner_fields=pk_attributes_finalized, model=ConditionalRedirect, exclude=True),
+            edgy_fields.CompositeField(
+                inner_fields=pk_attributes_finalized, model=ConditionalRedirect, exclude=True
+            ),
         )
 
         del is_abstract
@@ -395,8 +411,10 @@ class BaseModelMeta(ModelMetaclass):
         # Ensure the initialization is only performed for subclasses of Model
         attrs["__init_annotations__"] = annotations
         parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
+
+        # Ensure initialization is only performed for subclasses of Model
+        # (excluding the Model class itself).
         if not parents:
-            # TODO: document for what is this shortcut
             return model_class(cls, name, bases, attrs)
 
         meta.parents = parents
@@ -410,7 +428,9 @@ class BaseModelMeta(ModelMetaclass):
         if meta.abstract:
             managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
             if len(managers) > 1:
-                raise ImproperlyConfigured("Multiple managers are not allowed in abstract classes.")
+                raise ImproperlyConfigured(
+                    "Multiple managers are not allowed in abstract classes."
+                )
 
             if getattr(meta, "unique_together", None) is not None:
                 raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
@@ -434,7 +454,9 @@ class BaseModelMeta(ModelMetaclass):
             unique_together = meta.unique_together
             if not isinstance(unique_together, (list, tuple)):
                 value_type = type(unique_together).__name__
-                raise ImproperlyConfigured(f"unique_together must be a tuple or list. Got {value_type} instead.")
+                raise ImproperlyConfigured(
+                    f"unique_together must be a tuple or list. Got {value_type} instead."
+                )
             else:
                 for value in unique_together:
                     if not isinstance(value, (str, tuple, UniqueConstraint)):
@@ -447,7 +469,9 @@ class BaseModelMeta(ModelMetaclass):
             indexes = meta.indexes
             if not isinstance(indexes, (list, tuple)):
                 value_type = type(indexes).__name__
-                raise ImproperlyConfigured(f"indexes must be a tuple or list. Got {value_type} instead.")
+                raise ImproperlyConfigured(
+                    f"indexes must be a tuple or list. Got {value_type} instead."
+                )
             else:
                 for value in indexes:
                     if not isinstance(value, Index):
