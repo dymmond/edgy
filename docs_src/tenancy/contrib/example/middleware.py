@@ -14,9 +14,7 @@ class TenantMiddleware(MiddlewareProtocol):
         super().__init__(app)
         self.app = app
 
-    async def __call__(
-        self, scope: Scope, receive: Receive, send: Send
-    ) -> Coroutine[Any, Any, None]:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> Coroutine[Any, Any, None]:
         """
         The middleware reads the `tenant` and `email` from the headers
         and uses it to run the queries against the database records.

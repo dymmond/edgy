@@ -25,9 +25,7 @@ class BaseOneToOneKeyField(BaseForeignKey):
 
         column_type = to_field.column_type
         constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}", ondelete=self.on_delete
-            )
+            sqlalchemy.schema.ForeignKey(f"{target.meta.tablename}.{target.pkname}", ondelete=self.on_delete)
         ]
         return [
             sqlalchemy.Column(
@@ -61,11 +59,7 @@ class OneToOneField(ForeignKeyFieldFactory):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
 
         return super().__new__(cls, **kwargs)

@@ -43,11 +43,7 @@ class DateParser:
         Updates the `auto_now` fields
         """
         for name, field in fields.items():
-            if (
-                isinstance(field, BaseField)
-                and _has_auto_now(field)
-                and _is_datetime(field)
-            ):
+            if isinstance(field, BaseField) and _has_auto_now(field) and _is_datetime(field):
                 values.update(field.get_default_values(name, values))
         return values
 
@@ -63,9 +59,7 @@ class DateParser:
 
 
 class ModelParser:
-    def _extract_model_references(
-        self, extracted_values: Any, model_class: Optional[Type["Model"]]
-    ) -> Any:
+    def _extract_model_references(self, extracted_values: Any, model_class: Optional[Type["Model"]]) -> Any:
         """
         Exracts any possible model references from the EdgyModel and returns a dictionary.
         """
@@ -115,17 +109,13 @@ class ModelParser:
         validated.update(self._extract_model_references(extracted_values, model_cls))
         return validated
 
-    def _extract_db_fields_from_model(
-        self, model_class: Type["Model"]
-    ) -> Dict[Any, Any]:
+    def _extract_db_fields_from_model(self, model_class: Type["Model"]) -> Dict[Any, Any]:
         """
         Extacts all the db fields and excludes the related_names since those
         are simply relations.
         """
         related_names = model_class.meta.related_names
-        return {
-            k: v for k, v in model_class.model_fields.items() if k not in related_names
-        }
+        return {k: v for k, v in model_class.model_fields.items() if k not in related_names}
 
 
 def create_edgy_model(

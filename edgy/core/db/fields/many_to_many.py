@@ -72,9 +72,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         )
 
         to_related_name = (
-            f"{self.related_name}"
-            if self.related_name
-            else f"{to_name.lower()}_{class_name.lower()}s_set"
+            f"{self.related_name}" if self.related_name else f"{to_name.lower()}_{class_name.lower()}s_set"
         )
         fields = {
             "id": edgy.IntegerField(primary_key=True),
@@ -84,9 +82,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 on_delete=CASCADE,
                 related_name=owner_related_name,
             ),
-            f"{to_name.lower()}": ForeignKey(
-                self.to, null=True, on_delete=CASCADE, related_name=to_related_name
-            ),
+            f"{to_name.lower()}": ForeignKey(self.to, null=True, on_delete=CASCADE, related_name=to_related_name),
         }
 
         # Create the through model
@@ -149,17 +145,11 @@ class ManyToManyField(ForeignKeyFieldFactory):
     ) -> BaseField:
         null = kwargs.get("null", None)
         if null:
-            terminal.write_warning(
-                "Declaring `null` on a ManyToMany relationship has no effect."
-            )
+            terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
 
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
         kwargs["null"] = True
         return super().__new__(cls, **kwargs)

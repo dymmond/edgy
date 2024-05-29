@@ -44,9 +44,7 @@ class ModelRow(EdgyBaseModel):
         item: Dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
-        secret_fields = (
-            [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
-        )
+        secret_fields = [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
 
         for related in select_related:
             if "__" in related:
@@ -67,9 +65,7 @@ class ModelRow(EdgyBaseModel):
                     model_cls = cls.fields[related].target
                 except KeyError:
                     model_cls = getattr(cls, related).related_from
-                item[related] = model_cls.from_sqla_row(
-                    row, exclude_secrets=exclude_secrets, using_schema=using_schema
-                )
+                item[related] = model_cls.from_sqla_row(row, exclude_secrets=exclude_secrets, using_schema=using_schema)
 
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
@@ -123,9 +119,7 @@ class ModelRow(EdgyBaseModel):
             # Apply the schema to the model
             model = cls.__apply_schema(model, using_schema)
 
-            model = cls.__handle_prefetch_related(
-                row=row, model=model, prefetch_related=prefetch_related
-            )
+            model = cls.__handle_prefetch_related(row=row, model=model, prefetch_related=prefetch_related)
             return model
         else:
             # Pull out the regular column values.
@@ -139,18 +133,14 @@ class ModelRow(EdgyBaseModel):
                     item[column.name] = row[column]
 
         model = (
-            cast("Type[Model]", cls(**item))
-            if not exclude_secrets
-            else cast("Type[Model]", cls.proxy_model(**item))
+            cast("Type[Model]", cls(**item)) if not exclude_secrets else cast("Type[Model]", cls.proxy_model(**item))
         )
 
         # Apply the schema to the model
         model = cls.__apply_schema(model, using_schema)
 
         # Handle prefetch related fields.
-        model = cls.__handle_prefetch_related(
-            row=row, model=model, prefetch_related=prefetch_related
-        )
+        model = cls.__handle_prefetch_related(row=row, model=model, prefetch_related=prefetch_related)
         return model
 
     @classmethod
@@ -162,9 +152,7 @@ class ModelRow(EdgyBaseModel):
         return model
 
     @classmethod
-    def __should_ignore_related_name(
-        cls, related_name: str, select_related: Sequence[str]
-    ) -> bool:
+    def __should_ignore_related_name(cls, related_name: str, select_related: Sequence[str]) -> bool:
         """
         Validates if it should populate the related field if select related is not considered.
         """
@@ -235,9 +223,7 @@ class ModelRow(EdgyBaseModel):
                 related.queryset.extra = extra
 
                 # Execute the queryset
-                records = asyncio.get_event_loop().run_until_complete(
-                    cls.run_query(queryset=related.queryset)
-                )
+                records = asyncio.get_event_loop().run_until_complete(cls.run_query(queryset=related.queryset))
                 setattr(model, related.to_attr, records)
             else:
                 model_cls = getattr(cls, related.related_name).related_from
@@ -285,9 +271,7 @@ class ModelRow(EdgyBaseModel):
 
         extra = {f"{query}__id": filter_by_pk}
 
-        records = asyncio.get_event_loop().run_until_complete(
-            cls.run_query(model_class, extra, queryset)
-        )
+        records = asyncio.get_event_loop().run_until_complete(cls.run_query(model_class, extra, queryset))
         return records
 
     @classmethod

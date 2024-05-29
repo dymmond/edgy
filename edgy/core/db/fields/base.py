@@ -65,17 +65,11 @@ class BaseField(FieldInfo):
         self.alias: str = kwargs.pop("name", None)
         self.regex: str = kwargs.pop("regex", None)
         self.format: str = kwargs.pop("format", None)
-        self.min_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "min_length", None
-        )
-        self.max_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "max_length", None
-        )
+        self.min_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("min_length", None)
+        self.max_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("max_length", None)
         self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("minimum", None)
         self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("maximum", None)
-        self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "multiple_of", None
-        )
+        self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("multiple_of", None)
         self.through: Any = kwargs.pop("through", None)
         self.server_onupdate: Any = kwargs.pop("server_onupdate", None)
         self.registry: Registry = kwargs.pop("registry", None)
@@ -151,9 +145,7 @@ class BaseField(FieldInfo):
         """
         raise NotImplementedError()
 
-    def get_embedded_fields(
-        self, field_name: str, field_mapping: Dict[str, "BaseField"]
-    ) -> Dict[str, "BaseField"]:
+    def get_embedded_fields(self, field_name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
         """
         Define extra fields on the fly. Often no owner is available yet.
 
@@ -232,13 +224,8 @@ class BaseCompositeField(BaseField):
         cleaned_data_result = {}
         for sub_field_name, field in self.composite_fields.items():
             # here we don't need to translate, there is no inner object
-            for sub_field_name_new, default_value in field.get_default_values(
-                sub_field_name, cleaned_data
-            ):
-                if (
-                    sub_field_name_new not in cleaned_data
-                    and sub_field_name_new not in cleaned_data_result
-                ):
+            for sub_field_name_new, default_value in field.get_default_values(sub_field_name, cleaned_data):
+                if sub_field_name_new not in cleaned_data and sub_field_name_new not in cleaned_data_result:
                     cleaned_data_result[sub_field_name_new] = default_value
         return cleaned_data_result
 
@@ -279,9 +266,7 @@ class BaseForeignKey(BaseField):
         if isinstance(value, target):
             return value
 
-        fields_filtered = {
-            target.proxy_model.pkname: target.proxy_model.fields.get(target.proxy_model.pkname)
-        }
+        fields_filtered = {target.proxy_model.pkname: target.proxy_model.fields.get(target.proxy_model.pkname)}
         target.proxy_model.model_fields = fields_filtered
         target.proxy_model.model_rebuild(force=True)
         return target.proxy_model(pk=value)

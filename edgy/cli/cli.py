@@ -43,9 +43,7 @@ printer = Print()
 class EdgyGroup(click.Group):
     """Edgy command group with extras for the commands"""
 
-    def add_command(
-        self, cmd: click.Command, name: typing.Optional[str] = None
-    ) -> None:
+    def add_command(self, cmd: click.Command, name: typing.Optional[str] = None) -> None:
         if cmd.callback:
             cmd.callback = self.wrap_args(cmd.callback)
         return super().add_command(cmd, name)
@@ -54,9 +52,7 @@ class EdgyGroup(click.Group):
         params = inspect.signature(func).parameters
 
         @wraps(func)
-        def wrapped(
-            ctx: click.Context, /, *args: typing.Any, **kwargs: typing.Any
-        ) -> typing.Any:
+        def wrapped(ctx: click.Context, /, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
             scaffold = ctx.ensure_object(MigrationEnv)
             if "env" in params:
                 kwargs["env"] = scaffold
@@ -72,9 +68,7 @@ class EdgyGroup(click.Group):
         path = ctx.params.get("path", None)
 
         # Process any settings
-        if HELP_PARAMETER not in sys.argv and not any(
-            value in sys.argv for value in EXCLUDED_COMMANDS
-        ):
+        if HELP_PARAMETER not in sys.argv and not any(value in sys.argv for value in EXCLUDED_COMMANDS):
             try:
                 migration = MigrationEnv()
                 app_env = migration.load_from_env(path=path)

@@ -170,9 +170,7 @@ class Model(ModelRow, DeclarativeMixin):
 
         # Performs the update or the create based on a possible existing primary key
         if getattr(self, "pk", None) is None or force_save:
-            validated_values = values or self._extract_values_from_field(
-                extracted_values=extracted_fields
-            )
+            validated_values = values or self._extract_values_from_field(extracted_values=extracted_fields)
             kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
             kwargs, model_references = self.update_model_references(**kwargs)
             await self._save(**kwargs)
@@ -186,9 +184,7 @@ class Model(ModelRow, DeclarativeMixin):
             kwargs, model_references = self.update_model_references(**validated_values)
             update_model = {k: v for k, v in validated_values.items() if k in kwargs}
 
-            await self.signals.pre_update.send_async(
-                self.__class__, instance=self, kwargs=update_model
-            )
+            await self.signals.pre_update.send_async(self.__class__, instance=self, kwargs=update_model)
             await self.update(**update_model)
 
             # Broadcast the update complete
@@ -200,11 +196,7 @@ class Model(ModelRow, DeclarativeMixin):
                 await self.save_model_references(references or [], model_ref=model_ref)
 
         # Refresh the results
-        if any(
-            field.server_default is not None
-            for name, field in self.fields.items()
-            if name not in extracted_fields
-        ):
+        if any(field.server_default is not None for name, field in self.fields.items() if name not in extracted_fields):
             await self.load()
 
         await self.signals.post_save.send_async(self.__class__, instance=self)

@@ -29,8 +29,7 @@ class BaseForeignKeyField(BaseForeignKey):
                 f"{target.meta.tablename}.{target.pkname}",
                 ondelete=self.on_delete,
                 onupdate=self.on_update,
-                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}"
-                f"_{target.pkname}_{name}",
+                name=f"fk_{self.owner.meta.tablename}_{target.meta.tablename}" f"_{target.pkname}_{name}",
             )
         ]
         return [sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)]
@@ -52,11 +51,7 @@ class ForeignKey(ForeignKeyFieldFactory):
     ) -> BaseField:
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
 
         return super().__new__(cls, **kwargs)

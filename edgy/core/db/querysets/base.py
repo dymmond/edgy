@@ -222,9 +222,7 @@ class BaseQuerySet(
         if self._only and self._defer:
             raise QuerySetError("You cannot use .only() and .defer() at the same time.")
 
-    def _secret_recursive_names(
-        self, model_class: Any, columns: Union[List[str], None] = None
-    ) -> List[str]:
+    def _secret_recursive_names(self, model_class: Any, columns: Union[List[str], None] = None) -> List[str]:
         """
         Recursively gets the names of the fields excluding the secrets.
         """
@@ -236,9 +234,7 @@ class BaseQuerySet(
                 # Making sure the foreign key is always added unless is a secret
                 if not field.secret:
                     columns.append(name)
-                    columns.extend(
-                        self._secret_recursive_names(model_class=field.target, columns=columns)
-                    )
+                    columns.extend(self._secret_recursive_names(model_class=field.target, columns=columns))
                 continue
             if not field.secret:
                 columns.append(name)
@@ -261,9 +257,7 @@ class BaseQuerySet(
             expression = expression.with_only_columns(*queryset._only)
 
         if queryset._defer:
-            columns = [
-                column for column in select_from.columns if column.name not in queryset._defer
-            ]
+            columns = [column for column in select_from.columns if column.name not in queryset._defer]
             expression = expression.with_only_columns(*columns)
 
         if queryset._exclude_secrets:
@@ -272,19 +266,13 @@ class BaseQuerySet(
             expression = expression.with_only_columns(*columns)
 
         if queryset.filter_clauses:
-            expression = queryset._build_filter_clauses_expression(
-                queryset.filter_clauses, expression=expression
-            )
+            expression = queryset._build_filter_clauses_expression(queryset.filter_clauses, expression=expression)
 
         if queryset.or_clauses:
-            expression = queryset._build_or_clauses_expression(
-                queryset.or_clauses, expression=expression
-            )
+            expression = queryset._build_or_clauses_expression(queryset.or_clauses, expression=expression)
 
         if queryset._order_by:
-            expression = queryset._build_order_by_expression(
-                queryset._order_by, expression=expression
-            )
+            expression = queryset._build_order_by_expression(queryset._order_by, expression=expression)
 
         if queryset.limit_count:
             expression = expression.limit(queryset.limit_count)
@@ -293,14 +281,10 @@ class BaseQuerySet(
             expression = expression.offset(queryset._offset)
 
         if queryset._group_by:
-            expression = queryset._build_group_by_expression(
-                queryset._group_by, expression=expression
-            )
+            expression = queryset._build_group_by_expression(queryset._group_by, expression=expression)
 
         if queryset.distinct_on:
-            expression = queryset._build_select_distinct(
-                queryset.distinct_on, expression=expression
-            )
+            expression = queryset._build_select_distinct(queryset.distinct_on, expression=expression)
 
         queryset._expression = expression  # type: ignore
         return expression
@@ -610,9 +594,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         value = f"%{term}%"
 
         search_fields = [
-            name
-            for name, field in queryset.model_class.fields.items()
-            if isinstance(field, (CharField, TextField))
+            name for name, field in queryset.model_class.fields.items() if isinstance(field, (CharField, TextField))
         ]
         search_clauses = [queryset.table.columns[name].ilike(value) for name in search_fields]
 
@@ -723,10 +705,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if not fields:
             rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
         else:
-            rows = [
-                row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)
-                for row in rows
-            ]
+            rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields) for row in rows]
 
         as_tuple = kwargs.pop("__as_tuple__", False)
 
@@ -964,15 +943,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                     new_obj[key] = self._resolve_value(value)
             new_objs.append(new_obj)
 
-        new_objs = [
-            queryset._extract_values_from_field(obj, queryset.model_class) for obj in new_objs
-        ]
+        new_objs = [queryset._extract_values_from_field(obj, queryset.model_class) for obj in new_objs]
 
         pk = getattr(queryset.table.c, queryset.pkname)
         expression = queryset.table.update().where(pk == sqlalchemy.bindparam(queryset.pkname))
-        kwargs: Dict[Any, Any] = {
-            field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()
-        }
+        kwargs: Dict[Any, Any] = {field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()}
         pks = [{queryset.pkname: getattr(obj, queryset.pkname)} for obj in objs]
 
         query_list = []
@@ -1003,15 +978,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self._clone()
 
-        extracted_fields = queryset._extract_values_from_field(
-            kwargs, model_class=queryset.model_class
-        )
+        extracted_fields = queryset._extract_values_from_field(kwargs, model_class=queryset.model_class)
         kwargs = queryset._update_auto_now_fields(extracted_fields, queryset.model_class.fields)
 
         # Broadcast the initial update details
-        await self.model_class.signals.pre_update.send_async(
-            self.__class__, instance=self, kwargs=kwargs
-        )
+        await self.model_class.signals.pre_update.send_async(self.__class__, instance=self, kwargs=kwargs)
 
         expression = queryset.table.update().values(**kwargs)
 
@@ -1024,9 +995,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         # Broadcast the update executed
         await self.model_class.signals.post_update.send_async(self.__class__, instance=self)
 
-    async def get_or_create(
-        self, defaults: Dict[str, Any], **kwargs: Any
-    ) -> Tuple[EdgyModel, bool]:
+    async def get_or_create(self, defaults: Dict[str, Any], **kwargs: Any) -> Tuple[EdgyModel, bool]:
         """
         Creates a record in a specific table or updates if already exists.
         """
@@ -1040,9 +1009,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             instance = await queryset.create(**kwargs)
             return instance, True
 
-    async def update_or_create(
-        self, defaults: Dict[str, Any], **kwargs: Any
-    ) -> Tuple[EdgyModel, bool]:
+    async def update_or_create(self, defaults: Dict[str, Any], **kwargs: Any) -> Tuple[EdgyModel, bool]:
         """
         Updates a record in a specific table or creates a new one.
         """

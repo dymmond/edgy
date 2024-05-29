@@ -84,9 +84,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             kwargs[self.pkname] = kwargs.pop("pk")
 
         kwargs = {
-            k: v
-            for k, v in kwargs.items()
-            if k in self.meta.fields_mapping and k not in self.meta.model_references
+            k: v for k, v in kwargs.items() if k in self.meta.fields_mapping and k not in self.meta.model_references
         }
 
         for key, value in kwargs.items():
@@ -180,9 +178,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         # should be handled by pydantic but isn't so workaround
         return cast(
             Set[str],
-            frozenset(
-                key for key, field in self.fields.items() if getattr(field, "exclude", False)
-            ),
+            frozenset(key for key, field in self.fields.items() if getattr(field, "exclude", False)),
         )
 
     def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
@@ -244,9 +240,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 if sub_exclude is True:
                     sub_exclude = None
             if isinstance(retval, BaseModel):
-                retval = retval.model_dump(
-                    include=sub_include, exclude=sub_exclude, mode=mode, **kwargs
-                )
+                retval = retval.model_dump(include=sub_include, exclude=sub_exclude, mode=mode, **kwargs)
             else:
                 assert (
                     sub_include is None
@@ -346,11 +340,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         are simply relations.
         """
         related_names = self.meta.related_names
-        return {
-            k: v
-            for k, v in self.__dict__.items()
-            if k not in related_names and k not in EXCLUDED_LOOKUP
-        }
+        return {k: v for k, v in self.__dict__.items() if k not in related_names and k not in EXCLUDED_LOOKUP}
 
     def get_instance_name(self) -> str:
         """
@@ -368,11 +358,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         edgy_setattr(self, key, value)
 
     def __get_instance_values(self, instance: Any) -> Set[Any]:
-        return {
-            v
-            for k, v in instance.__dict__.items()
-            if k in instance.fields.keys() and v is not None
-        }
+        return {v for k, v in instance.__dict__.items() if k in instance.fields.keys() and v is not None}
 
     def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:
@@ -438,9 +424,7 @@ class EdgyBaseReflectModel(EdgyBaseModel):
         def execute_reflection(connection: AsyncConnection) -> sqlalchemy.Table:
             """Helper function to create and reflect the table."""
             try:
-                return sqlalchemy.Table(
-                    tablename, metadata, schema=schema, autoload_with=connection
-                )
+                return sqlalchemy.Table(tablename, metadata, schema=schema, autoload_with=connection)
             except Exception as e:
                 raise e
 

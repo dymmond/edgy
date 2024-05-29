@@ -55,9 +55,7 @@ async def test_exclude_secrets():
         email="edgy@edgy.dev",
     )
 
-    gratitude = await Gratitude.query.create(
-        owner=user, title="test", description="A desc", color="green"
-    )
+    gratitude = await Gratitude.query.create(owner=user, title="test", description="A desc", color="green")
 
     results = (
         await Gratitude.query.or_(

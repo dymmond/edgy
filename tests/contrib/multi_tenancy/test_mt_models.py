@@ -73,9 +73,7 @@ class Product(TenantModel):
 
 
 async def test_create_a_tenant_schema():
-    tenant = await Tenant.query.create(
-        schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
-    )
+    tenant = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
 
     assert tenant.schema_name == "edgy"
     assert tenant.tenant_name == "edgy"
@@ -83,9 +81,7 @@ async def test_create_a_tenant_schema():
 
 async def test_raises_ModelSchemaError_on_public_schema():
     with pytest.raises(ModelSchemaError) as raised:
-        await Tenant.query.create(
-            schema_name="public", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
-        )
+        await Tenant.query.create(schema_name="public", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
 
     assert (
         raised.value.args[0]

@@ -20,9 +20,7 @@ class Index:
         name = values.kwargs.get("name")
 
         if name is not None and len(name) > cls.__max_name_length__:
-            raise ValueError(
-                f"The max length of the index name must be {cls.__max_name_length__}. Got {len(name)}"
-            )
+            raise ValueError(f"The max length of the index name must be {cls.__max_name_length__}. Got {len(name)}")
 
         fields = values.kwargs.get("fields")
         if not isinstance(fields, (tuple, list)):

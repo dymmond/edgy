@@ -47,9 +47,7 @@ class StatusEnum(Enum):
         "ChoiceField",
     ],
 )
-async def test_model_custom_primary_key_raised_error_without_default(
-    field, max_length, max_digits, decimal_places
-):
+async def test_model_custom_primary_key_raised_error_without_default(field, max_length, max_digits, decimal_places):
     with pytest.raises(FieldDefinitionError) as raised:
         kwargs = {
             "max_length": max_length,

@@ -64,9 +64,7 @@ class Product(TenantModel):
 
 
 async def test_schema_with_using_in_different_place():
-    tenant = await Tenant.query.create(
-        schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
-    )
+    tenant = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
     for i in range(5):
         await Product.query.using(tenant.schema_name).create(name=f"product-{i}")
 
@@ -91,9 +89,7 @@ async def test_schema_with_using_in_different_place():
 
 
 async def test_can_have_multiple_tenants_with_different_records_with_using():
-    edgy = await Tenant.query.create(
-        schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
-    )
+    edgy = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
     saffier = await Tenant.query.create(
         schema_name="saffier", domain_url="https://saffier.tarsild.io", tenant_name="saffier"
     )
@@ -103,18 +99,14 @@ async def test_can_have_multiple_tenants_with_different_records_with_using():
 
     # Create products for user_edgy
     for i in range(5):
-        await Product.query.defer().using(edgy.schema_name).create(
-            name=f"product-{i}", user=user_edgy
-        )
+        await Product.query.defer().using(edgy.schema_name).create(name=f"product-{i}", user=user_edgy)
 
     # Create a user for saffier
     user_saffier = await User.query.group_by().using(saffier.schema_name).create(name="Saffier")
 
     # Create products for user_saffier
     for i in range(25):
-        await Product.query.exclude().using(saffier.schema_name).create(
-            name=f"product-{i}", user=user_saffier
-        )
+        await Product.query.exclude().using(saffier.schema_name).create(name=f"product-{i}", user=user_saffier)
 
     # Create top level users
     for name in range(10):

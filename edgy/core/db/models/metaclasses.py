@@ -90,9 +90,7 @@ class MetaInfo:
         self.related_names: Set[str] = getattr(meta, "related_names", set())
         self.related_fields: Dict[str, Any] = getattr(meta, "related_fields", {})
         self.related_names_mapping: Dict[str, Any] = getattr(meta, "related_names_mapping", {})
-        self.signals: Optional[signals_module.Broadcaster] = getattr(
-            meta, "signals", {}
-        )  # type: ignore
+        self.signals: Optional[signals_module.Broadcaster] = getattr(meta, "signals", {})  # type: ignore
 
         for k, v in kwargs.items():
             edgy_setattr(self, k, v)
@@ -213,9 +211,7 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
     model_class.meta.signals = signals
 
 
-def handle_annotations(
-    bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any
-) -> Dict[str, Any]:
+def handle_annotations(bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any) -> Dict[str, Any]:
     """
     Handles and copies some of the annotations for
     initialiasation.
@@ -296,9 +292,7 @@ class BaseModelMeta(ModelMetaclass):
                 if isinstance(value, BaseField):
                     if value.primary_key:
                         if is_pk_present:
-                            raise ImproperlyConfigured(
-                                f"Cannot create model {name} with multiple primary keys."
-                            )
+                            raise ImproperlyConfigured(f"Cannot create model {name} with multiple primary keys.")
                         is_pk_present = True
                         pk_attribute = key
 
@@ -379,9 +373,7 @@ class BaseModelMeta(ModelMetaclass):
         if meta.abstract:
             managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
             if len(managers) > 1:
-                raise ImproperlyConfigured(
-                    "Multiple managers are not allowed in abstract classes."
-                )
+                raise ImproperlyConfigured("Multiple managers are not allowed in abstract classes.")
 
             if getattr(meta, "unique_together", None) is not None:
                 raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
@@ -405,9 +397,7 @@ class BaseModelMeta(ModelMetaclass):
             unique_together = meta.unique_together
             if not isinstance(unique_together, (list, tuple)):
                 value_type = type(unique_together).__name__
-                raise ImproperlyConfigured(
-                    f"unique_together must be a tuple or list. Got {value_type} instead."
-                )
+                raise ImproperlyConfigured(f"unique_together must be a tuple or list. Got {value_type} instead.")
             else:
                 for value in unique_together:
                     if not isinstance(value, (str, tuple, UniqueConstraint)):
@@ -420,9 +410,7 @@ class BaseModelMeta(ModelMetaclass):
             indexes = meta.indexes
             if not isinstance(indexes, (list, tuple)):
                 value_type = type(indexes).__name__
-                raise ImproperlyConfigured(
-                    f"indexes must be a tuple or list. Got {value_type} instead."
-                )
+                raise ImproperlyConfigured(f"indexes must be a tuple or list. Got {value_type} instead.")
             else:
                 for value in indexes:
                     if not isinstance(value, Index):

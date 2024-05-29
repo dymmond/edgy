@@ -36,9 +36,7 @@ def test_database_url_properties():
     assert url.hostname == "/var/run/edgedb/.s.PGSQL.5656"
     assert url.database == "mydatabase"
 
-    url = DatabaseURL(
-        "edgedb://username:password@/mydatabase?unix_sock=/var/run/edgedb/.s.PGSQL.5656"
-    )
+    url = DatabaseURL("edgedb://username:password@/mydatabase?unix_sock=/var/run/edgedb/.s.PGSQL.5656")
     assert url.hostname == "/var/run/edgedb/.s.PGSQL.5656"
 
 
