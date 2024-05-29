@@ -122,9 +122,7 @@ class DomainMixin(edgy.Model):
         **kwargs: Any,
     ) -> Model:
         async with self.meta.registry.database.transaction():
-            domains = self.__class__.query.filter(tenant=self.tenant, is_primary=True).exclude(
-                id=self.pk
-            )
+            domains = self.__class__.query.filter(tenant=self.tenant, is_primary=True).exclude(pk=self.pk)
 
             exists = await domains.exists()
 
@@ -136,10 +134,7 @@ class DomainMixin(edgy.Model):
 
     async def delete(self) -> None:
         tenant = await self.tenant.load()
-        if (
-            tenant.schema_name.lower() == settings.tenant_schema_default.lower()
-            and self.domain == settings.domain_name
-        ):
+        if tenant.schema_name.lower() == settings.tenant_schema_default.lower() and self.domain == settings.domain_name:
             raise ValueError("Cannot drop public domain.")
         return await super().delete()
 

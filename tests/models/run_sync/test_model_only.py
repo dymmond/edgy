@@ -36,21 +36,15 @@ async def rollback_connections():
 
 
 async def test_raise_QuerySetError_on_only_and_defer():
-    edgy.run_sync(
-        User.query.create(name="John", language="PT", description="A simple description")
-    )
+    edgy.run_sync(User.query.create(name="John", language="PT", description="A simple description"))
 
     with pytest.raises(QuerySetError):
         edgy.run_sync(User.query.only("name").defer("language"))
 
 
 async def test_model_only():
-    john = edgy.run_sync(
-        User.query.create(name="John", language="PT", description="A simple description")
-    )
-    jane = edgy.run_sync(
-        User.query.create(name="Jane", language="EN", description="Another simple description")
-    )
+    john = edgy.run_sync(User.query.create(name="John", language="PT", description="A simple description"))
+    jane = edgy.run_sync(User.query.create(name="Jane", language="EN", description="Another simple description"))
     users = edgy.run_sync(User.query.only("name", "language"))
 
     assert len(users) == 2
@@ -71,9 +65,7 @@ async def test_model_only_attribute_error():
 
 async def test_model_only_with_all():
     edgy.run_sync(User.query.create(name="John", language="PT"))
-    edgy.run_sync(
-        User.query.create(name="Jane", language="EN", description="Another simple description")
-    )
+    edgy.run_sync(User.query.create(name="Jane", language="EN", description="Another simple description"))
 
     users = edgy.run_sync(User.query.only("name", "language").all())
 
@@ -82,9 +74,7 @@ async def test_model_only_with_all():
 
 async def test_model_only_with_filter():
     edgy.run_sync(User.query.create(name="John", language="PT"))
-    edgy.run_sync(
-        User.query.create(name="Jane", language="EN", description="Another simple description")
-    )
+    edgy.run_sync(User.query.create(name="Jane", language="EN", description="Another simple description"))
 
     users = edgy.run_sync(User.query.filter(pk=1).only("name", "language"))
 
@@ -101,9 +91,7 @@ async def test_model_only_with_filter():
 
 async def test_model_only_with_exclude():
     edgy.run_sync(User.query.create(name="John", language="PT"))
-    edgy.run_sync(
-        User.query.create(name="Jane", language="EN", description="Another simple description")
-    )
+    edgy.run_sync(User.query.create(name="Jane", language="EN", description="Another simple description"))
 
     users = edgy.run_sync(User.query.filter(pk=1).only("name", "language").exclude(id=2))
 

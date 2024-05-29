@@ -16,12 +16,10 @@ class Manager:
     from saffier.models import Model
 
 
-    class MyCustomManager(ModelManager):
-        ...
+    class MyCustomManager(ModelManager): ...
 
 
-    class MyOtherManager(ModelManager):
-        ...
+    class MyOtherManager(ModelManager): ...
 
 
     class MyModel(saffier.Model):
@@ -48,7 +46,8 @@ class Manager:
         if tenant:
             set_tenant(None)
             return QuerySet(
-                self.model_class, table=self.model_class.table_schema(tenant)  # type: ignore
+                self.model_class,
+                table=self.model_class.table_schema(tenant),  # type: ignore
             )
         return QuerySet(self.model_class)
 

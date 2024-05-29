@@ -40,12 +40,14 @@ async def rollback_connections():
         async with database:
             yield
 
+
 async def test_filter_with_empty_and():
     await User.query.create(name="Adam", language="EN")
 
     results = await User.query.filter(and_())
 
     assert len(results) == 1
+
 
 async def test_filter_with_empty_Q():
     await User.query.create(name="Adam", language="EN")
@@ -68,26 +70,21 @@ async def test_filter_with_and_two():
     await User.query.create(name="Adam")
     await User.query.create(name="Edgy")
 
-    results = await User.query.filter(
-        and_(User.columns.name == "Adam", User.columns.name == "Edgy")
-    )
+    results = await User.query.filter(and_(User.columns.name == "Adam", User.columns.name == "Edgy"))
 
     assert len(results) == 0
+
 
 async def test_filter_with_and_two_kwargs():
     user = await User.query.create(name="Adam", email="edgy@edgy.dev")
     await User.query.create(name="Edgy", email="edgy2@edgy.dev")
 
-    results = await User.query.filter(
-        and_.from_kwargs(User.columns, name="Adam", email="edgy@edgy.dev")
-    )
+    results = await User.query.filter(and_.from_kwargs(User.columns, name="Adam", email="edgy@edgy.dev"))
 
     assert len(results) == 1
     assert results[0].pk == user.pk
 
-    results = await User.query.filter(
-        and_.from_kwargs(User, name="Adam", email="edgy@edgy.dev")
-    )
+    results = await User.query.filter(and_.from_kwargs(User, name="Adam", email="edgy@edgy.dev"))
 
     assert len(results) == 1
     assert results[0].pk == user.pk
@@ -97,9 +94,7 @@ async def test_filter_with_and_three():
     await User.query.create(name="Adam")
     user = await User.query.create(name="Edgy", email="edgy@edgy.dev")
 
-    results = await User.query.filter(
-        and_(User.columns.name == user.name, User.columns.email == user.email)
-    )
+    results = await User.query.filter(and_(User.columns.name == user.name, User.columns.email == user.email))
 
     assert len(results) == 1
 

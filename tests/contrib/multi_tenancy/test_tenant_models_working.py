@@ -68,9 +68,7 @@ async def test_tenant_model_metaclass_tenant_models():
 
 
 async def test_schema():
-    tenant = await Tenant.query.create(
-        schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
-    )
+    tenant = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
 
     for i in range(5):
         await Product.query.using(tenant.schema_name).create(name=f"product-{i}")
@@ -96,9 +94,13 @@ async def test_schema():
 
 
 async def test_can_have_multiple_tenants_with_different_records():
+<<<<<<< HEAD
     edgy = await Tenant.query.create(
         schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
     )
+=======
+    edgy = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
+>>>>>>> 8ced2ad (Feature multiple primary keys and cleanup (#99))
     saffier = await Tenant.query.create(
         schema_name="saffier", domain_url="https://saffier.tarsild.io", tenant_name="saffier"
     )
@@ -115,9 +117,7 @@ async def test_can_have_multiple_tenants_with_different_records():
 
     # Create products for user_saffier
     for i in range(25):
-        await Product.query.using(saffier.schema_name).create(
-            name=f"product-{i}", user=user_saffier
-        )
+        await Product.query.using(saffier.schema_name).create(name=f"product-{i}", user=user_saffier)
 
     # Create top level users
     for name in range(10):
@@ -137,9 +137,13 @@ async def test_can_have_multiple_tenants_with_different_records():
 
 
 async def test_model_crud():
+<<<<<<< HEAD
     edgy = await Tenant.query.create(
         schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
     )
+=======
+    edgy = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
+>>>>>>> 8ced2ad (Feature multiple primary keys and cleanup (#99))
 
     users = await User.query.using(edgy.schema_name).all()
     assert users == []

@@ -5,13 +5,13 @@ from typing import Any, Dict
 from uuid import UUID
 
 import pytest
+from tests.settings import DATABASE_URL
 
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.core.db import fields
 from edgy.exceptions import ModelSchemaError
 from edgy.testclient import DatabaseTestClient as Database
-from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = TenantRegistry(database=database)
@@ -74,7 +74,7 @@ class Product(TenantModel):
 
 async def test_create_a_tenant_schema():
     tenant = await Tenant.query.create(
-        schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
+        schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
     )
 
     assert tenant.schema_name == "edgy"
@@ -84,7 +84,7 @@ async def test_create_a_tenant_schema():
 async def test_raises_ModelSchemaError_on_public_schema():
     with pytest.raises(ModelSchemaError) as raised:
         await Tenant.query.create(
-            schema_name="public", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
+            schema_name="public", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
         )
 
     assert (

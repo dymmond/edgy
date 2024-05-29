@@ -72,9 +72,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         )
 
         to_related_name = (
-            f"{self.related_name}"
-            if self.related_name
-            else f"{to_name.lower()}_{class_name.lower()}s_set"
+            f"{self.related_name}" if self.related_name else f"{to_name.lower()}_{class_name.lower()}s_set"
         )
         fields = {
             "id": edgy.IntegerField(primary_key=True),
@@ -84,9 +82,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 on_delete=CASCADE,
                 related_name=owner_related_name,
             ),
-            f"{to_name.lower()}": ForeignKey(
-                self.to, null=True, on_delete=CASCADE, related_name=to_related_name
-            ),
+            f"{to_name.lower()}": ForeignKey(self.to, null=True, on_delete=CASCADE, related_name=to_related_name),
         }
 
         # Create the through model
@@ -108,7 +104,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
         if that happens, we need to assure it is small.
         """
-        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{self.target.pkname}_{name}"
+        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{self.target.pknames[0]}_{name}"
         if not len(fk_name) > CHAR_LIMIT:
             return fk_name
         return fk_name[:CHAR_LIMIT]
@@ -118,12 +114,12 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         Builds the column for the target.
         """
         target = self.target
-        to_field = target.fields[target.pkname]
+        to_field = target.fields[target.pknames[0]]
 
         column_type = to_field.column_type
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}",
+                f"{target.meta.tablename}.{target.pknames[0]}",
                 ondelete=CASCADE,
                 onupdate=CASCADE,
                 name=self.get_fk_name(name=name),
@@ -149,17 +145,11 @@ class ManyToManyField(ForeignKeyFieldFactory):
     ) -> BaseField:
         null = kwargs.get("null", None)
         if null:
-            terminal.write_warning(
-                "Declaring `null` on a ManyToMany relationship has no effect."
-            )
+            terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
 
         kwargs = {
             **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
         kwargs["null"] = True
         return super().__new__(cls, **kwargs)

@@ -100,9 +100,7 @@ async def test_bulk_update():
     products[0].value = 1
     products[1].value = 2
 
-    edgy.run_sync(
-        Product.query.bulk_update(products, fields=["created_day", "status", "data", "value"])
-    )
+    edgy.run_sync(Product.query.bulk_update(products, fields=["created_day", "status", "data", "value"]))
 
     products = edgy.run_sync(Product.query.all())
 

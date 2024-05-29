@@ -1,13 +1,13 @@
 from datetime import datetime
 
 import pytest
+from tests.settings import DATABASE_URL
 
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.core.db import fields
 from edgy.exceptions import ObjectNotFound
 from edgy.testclient import DatabaseTestClient as Database
-from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
 models = TenantRegistry(database=database)
@@ -68,7 +68,7 @@ async def test_schema_with_using():
     also User.query.using('tenant_schema').get(email="foo@bar.com")
     """
     tenant = await Tenant.query.create(
-        schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
+        schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
     )
 
     user = await User.query.using(tenant.schema_name).create(name="Edgy", email="edgy@edgy.dev")

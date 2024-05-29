@@ -28,9 +28,7 @@ class Registry:
         self.schema = Schema(registry=self)
 
         self._metadata: sqlalchemy.MetaData = (
-            sqlalchemy.MetaData(schema=self.db_schema)
-            if self.db_schema is not None
-            else sqlalchemy.MetaData()
+            sqlalchemy.MetaData(schema=self.db_schema) if self.db_schema is not None else sqlalchemy.MetaData()
         )
 
     @property

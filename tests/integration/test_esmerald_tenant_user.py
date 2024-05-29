@@ -49,12 +49,8 @@ class Product(TenantModel):
 
 
 class TenantUser(TenantUserMixin):
-    user = fields.ForeignKey(
-        "User", null=False, blank=False, related_name="tenant_user_users_test"
-    )
-    tenant = fields.ForeignKey(
-        "Tenant", null=False, blank=False, related_name="tenant_users_tenant_test"
-    )
+    user = fields.ForeignKey("User", null=False, blank=False, related_name="tenant_user_users_test")
+    tenant = fields.ForeignKey("Tenant", null=False, blank=False, related_name="tenant_users_tenant_test")
 
     class Meta:
         registry = models
@@ -65,9 +61,7 @@ class TenantMiddleware(MiddlewareProtocol):
         super().__init__(app)
         self.app = app
 
-    async def __call__(
-        self, scope: Scope, receive: Receive, send: Send
-    ) -> Coroutine[Any, Any, None]:
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> Coroutine[Any, Any, None]:
         request = Request(scope=scope, receive=receive, send=send)
 
         tenant_header = request.headers.get("tenant", None)
@@ -136,18 +130,14 @@ def another_app():
 
 @pytest.fixture()
 async def async_cli(another_app) -> AsyncGenerator:
-    async with AsyncClient(
-        transport=ASGITransport(app=another_app), base_url="http://test"
-    ) as acli:
+    async with AsyncClient(transport=ASGITransport(app=another_app), base_url="http://test") as acli:
         await to_thread.run_sync(blocking_function)
         yield acli
 
 
 @pytest.fixture()
 async def async_client(app) -> AsyncGenerator:
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         await to_thread.run_sync(blocking_function)
         yield ac
 
@@ -160,17 +150,13 @@ async def create_data():
     user = await User.query.create(name="edgy", email="edgy@esmerald.dev")
     edgy_tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
 
-    edgy = await User.query.using(edgy_tenant.schema_name).create(
-        name="edgy", email="edgy@esmerald.dev"
-    )
+    edgy = await User.query.using(edgy_tenant.schema_name).create(name="edgy", email="edgy@esmerald.dev")
 
     await TenantUser.query.create(user=user, tenant=edgy_tenant)
 
     # Products for Edgy
     for i in range(10):
-        await Product.query.using(edgy_tenant.schema_name).create(
-            name=f"Product-{i}", user=edgy
-        )
+        await Product.query.using(edgy_tenant.schema_name).create(name=f"Product-{i}", user=edgy)
 
     # Products for Saffier
     for i in range(25):
@@ -181,9 +167,7 @@ async def test_user_query_tenant_data(async_client, async_cli):
     await create_data()
 
     # Test Edgy Response intercepted in the
-    response_edgy = await async_client.get(
-        "/products", headers={"tenant": "edgy", "email": "edgy@esmerald.dev"}
-    )
+    response_edgy = await async_client.get("/products", headers={"tenant": "edgy", "email": "edgy@esmerald.dev"})
     assert response_edgy.status_code == 200
 
     assert len(response_edgy.json()) == 10
@@ -195,9 +179,7 @@ async def test_user_query_tenant_data(async_client, async_cli):
     assert len(response_saffier.json()) == 25
 
     # Check edgy again
-    response_edgy = await async_client.get(
-        "/products", headers={"tenant": "edgy", "email": "edgy@esmerald.dev"}
-    )
+    response_edgy = await async_client.get("/products", headers={"tenant": "edgy", "email": "edgy@esmerald.dev"})
     assert response_edgy.status_code == 200
 
     assert len(response_edgy.json()) == 10
@@ -210,9 +192,7 @@ async def test_user_query_tenant_data(async_client, async_cli):
 async def test_active_schema_user():
     tenant = await Tenant.query.create(schema_name="edgy", tenant_name="Edgy")
     user = await User.query.create(name="edgy", email="edgy@esmerald.dev")
-    tenant_user = await TenantUser.query.create(
-        user=user, tenant=tenant, is_active=True
-    )
+    tenant_user = await TenantUser.query.create(user=user, tenant=tenant, is_active=True)
 
     await tenant_user.tenant.load()
 
@@ -237,9 +217,7 @@ async def test_multiple_tenants_one_active():
     # Tenant 1
     tenant = await Tenant.query.create(schema_name="edgy", tenant_name="Edgy")
     user = await User.query.create(name="edgy", email="edgy@esmerald.dev")
-    tenant_user = await TenantUser.query.create(
-        user=user, tenant=tenant, is_active=True
-    )
+    tenant_user = await TenantUser.query.create(user=user, tenant=tenant, is_active=True)
 
     await tenant_user.tenant.load()
 
@@ -247,18 +225,12 @@ async def test_multiple_tenants_one_active():
     assert active_user_tenant.tenant_uuid == tenant_user.tenant.tenant_uuid
 
     # Tenant 2
-    another_tenant = await Tenant.query.create(
-        schema_name="another_edgy", tenant_name="Another Edgy"
-    )
+    another_tenant = await Tenant.query.create(schema_name="another_edgy", tenant_name="Another Edgy")
     await TenantUser.query.create(user=user, tenant=another_tenant, is_active=True)
 
     # Tenant 2
-    another_tenant_three = await Tenant.query.create(
-        schema_name="another_edgy_three", tenant_name="Another Edgy Three"
-    )
-    await TenantUser.query.create(
-        user=user, tenant=another_tenant_three, is_active=True
-    )
+    another_tenant_three = await Tenant.query.create(schema_name="another_edgy_three", tenant_name="Another Edgy Three")
+    await TenantUser.query.create(user=user, tenant=another_tenant_three, is_active=True)
 
     active_user_tenant = await TenantUser.get_active_user_tenant(user)
 

@@ -22,7 +22,6 @@ class MarshallMeta(ModelMetaclass):
     __slots__ = ()
 
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any]) -> Any:
-
         base_annotations: Dict[str, Any] = {}
         show_pk: bool = False
         marshall_config: ConfigMarshall = attrs.pop("marshall_config", None)
@@ -39,9 +38,7 @@ class MarshallMeta(ModelMetaclass):
             return model_class
 
         if marshall_config is None:
-            raise MarshallFieldDefinitionError(
-                "The 'marshall_config' was not found. Make sure it is declared and set."
-            )
+            raise MarshallFieldDefinitionError("The 'marshall_config' was not found. Make sure it is declared and set.")
 
         # The declared model
         model: "Model" = marshall_config.get("model", None)  # type: ignore
@@ -54,9 +51,7 @@ class MarshallMeta(ModelMetaclass):
         base_fields_include = marshall_config.get("fields", None)
         base_fields_exclude = marshall_config.get("exclude", None)
 
-        assert (
-            base_fields_include is None or base_fields_exclude is None
-        ), "Use either 'fields' or 'exclude', not both."
+        assert base_fields_include is None or base_fields_exclude is None, "Use either 'fields' or 'exclude', not both."
         assert (
             base_fields_include is not None or base_fields_exclude is not None
         ), "Either 'fields' or 'exclude' must be declared."
@@ -65,17 +60,15 @@ class MarshallMeta(ModelMetaclass):
 
         # Define the fields for the Marshall
         if base_fields_exclude is not None:
-            base_model_fields = {
-                k: v for k, v in model.model_fields.items() if k not in base_fields_exclude
-            }
+            base_model_fields = {k: v for k, v in model.model_fields.items() if k not in base_fields_exclude}
         elif base_fields_include is not None and "__all__" in base_fields_include:
-            base_model_fields = {
-                k: v for k, v in model.meta.fields_mapping.items() if k not in model_fields
-            }
+            base_model_fields = {k: v for k, v in model.meta.fields_mapping.items() if k not in model_fields}
             show_pk = True
         else:
             base_model_fields = {
-                k: v for k, v in model.model_fields.items() if k in base_fields_include  # type: ignore
+                k: v
+                for k, v in model.model_fields.items()
+                if k in base_fields_include  # type: ignore
             }
 
         base_model_fields.update(model_fields)
