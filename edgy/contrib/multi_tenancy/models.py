@@ -122,7 +122,7 @@ class DomainMixin(edgy.Model):
         **kwargs: Any,
     ) -> Model:
         async with self.meta.registry.database.transaction():
-            domains = self.__class__.query.filter(tenant=self.tenant, is_primary=True).exclude(id=self.pk)
+            domains = self.__class__.query.filter(tenant=self.tenant, is_primary=True).exclude(pk=self.pk)
 
             exists = await domains.exists()
 

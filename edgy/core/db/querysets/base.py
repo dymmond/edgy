@@ -37,6 +37,38 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.models import Model, ReflectModel
 
 
+def clean_query_kwargs(model: "Model", kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    new_kwargs: Dict[str, Any] = {}
+    for key, val in kwargs.items():
+        model_class = model
+        field_name = key
+        if "__" in key:
+            parts = key.split("__")
+
+            # Determine if we should treat the final part as a
+            # filter operator or as a related field.
+            if parts[-1] in settings.filter_operators:
+                field_name = parts[-2]
+                related_parts = parts[:-2]
+            else:
+                field_name = parts[-1]
+                related_parts = parts[:-1]
+            if related_parts:
+                # Walk the relationships to the actual model class
+                # against which the comparison is being made.
+                for part in related_parts:
+                    try:
+                        model_class = model_class.fields[part].target
+                    except KeyError:
+                        model_class = getattr(model_class, part).related_from
+        if field_name in model_class.fields:
+            new_kwargs.update(model_class.fields[field_name].clean(key, val))
+        else:
+            new_kwargs[key] = val
+    assert "pk" not in new_kwargs
+    return new_kwargs
+
+
 class BaseQuerySet(
     TenancyMixin,
     QuerySetPropsMixin,
@@ -308,9 +340,7 @@ class BaseQuerySet(
         if self.model_class.is_proxy_model:
             self.model_class = self.model_class.parent
 
-        if kwargs.get("pk"):
-            pk_name = self.model_class.pkname
-            kwargs[pk_name] = kwargs.pop("pk")
+        kwargs = clean_query_kwargs(self.model_class, kwargs)
 
         for key, value in kwargs.items():
             if "__" in key:
@@ -651,8 +681,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         key.
         """
         only_fields = [sqlalchemy.text(field) for field in fields]
-        if self.model_class.pkname not in fields:
-            only_fields.insert(0, sqlalchemy.text(self.model_class.pkname))
+        missing = []
+        for pkname in self.model_class.pknames:
+            if pkname not in fields:
+                missing.append(sqlalchemy.text(pkname))
+        if missing:
+            only_fields = missing + only_fields
 
         queryset: "QuerySet" = self._clone()
         queryset._only = only_fields
@@ -945,13 +979,13 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         new_objs = [queryset._extract_values_from_field(obj, queryset.model_class) for obj in new_objs]
 
-        pk = getattr(queryset.table.c, queryset.pkname)
-        expression = queryset.table.update().where(pk == sqlalchemy.bindparam(queryset.pkname))
+        pks1 = (getattr(queryset.table.c, pkname) == sqlalchemy.bindparam(pkname) for pkname in queryset.pknames)
+        expression = queryset.table.update().where(*pks1)
         kwargs: Dict[Any, Any] = {field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()}
-        pks = [{queryset.pkname: getattr(obj, queryset.pkname)} for obj in objs]
+        pks2 = [{pkname: getattr(obj, pkname) for pkname in queryset.pknames} for obj in objs]
 
         query_list = []
-        for pk, value in zip(pks, new_objs):  # noqa
+        for pk, value in zip(pks2, new_objs):  # noqa
             query_list.append({**pk, **value})
 
         expression = expression.values(kwargs)

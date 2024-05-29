@@ -519,8 +519,9 @@ Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide follo
 
 Additional they can provide following methods:
 * **`__get__`** - Descriptor protocol like get access customization.
-* **`__set__`** - Descriptor protocol like set access customization.
-* **get_embedded_fields(self, field_name, field_mapping)** - (Optionally) define internal fields.
+* **`__set__`** - Descriptor protocol like set access customization. Dangerous to use. Better use to_python.
+* **to_python** - like clean, just for setting attributes or initializing a model.
+* **get_embedded_fields(self, field_name, field_mapping)** - Define internal fields.
 * **get_default_values(self, field_name, cleaned_data)** - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
 * **get_default_value(self)** - return default value for one column fields.
 

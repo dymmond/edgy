@@ -21,11 +21,11 @@ terminal = Print()
 class BaseOneToOneKeyField(BaseForeignKey):
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         target = self.target
-        to_field = target.fields[target.pkname]
+        to_field = target.fields[target.pknames[0]]
 
         column_type = to_field.column_type
         constraints = [
-            sqlalchemy.schema.ForeignKey(f"{target.meta.tablename}.{target.pkname}", ondelete=self.on_delete)
+            sqlalchemy.schema.ForeignKey(f"{target.meta.tablename}.{target.pknames[0]}", ondelete=self.on_delete)
         ]
         return [
             sqlalchemy.Column(

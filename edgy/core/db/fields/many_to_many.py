@@ -104,7 +104,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
         if that happens, we need to assure it is small.
         """
-        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{self.target.pkname}_{name}"
+        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{self.target.pknames[0]}_{name}"
         if not len(fk_name) > CHAR_LIMIT:
             return fk_name
         return fk_name[:CHAR_LIMIT]
@@ -114,12 +114,12 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         Builds the column for the target.
         """
         target = self.target
-        to_field = target.fields[target.pkname]
+        to_field = target.fields[target.pknames[0]]
 
         column_type = to_field.column_type
         constraints = [
             sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}",
+                f"{target.meta.tablename}.{target.pknames[0]}",
                 ondelete=CASCADE,
                 onupdate=CASCADE,
                 name=self.get_fk_name(name=name),

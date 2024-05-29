@@ -61,7 +61,7 @@ class BaseField(FieldInfo):
         self.index: bool = kwargs.pop("index", False)
         self.choices: Sequence = kwargs.pop("choices", [])
         self.owner: Any = kwargs.pop("owner", None)
-        self.name: str = kwargs.pop("name", None)
+        self.name: str = kwargs.get("name", None)
         self.alias: str = kwargs.pop("name", None)
         self.regex: str = kwargs.pop("regex", None)
         self.format: str = kwargs.pop("format", None)
@@ -145,6 +145,12 @@ class BaseField(FieldInfo):
         """
         raise NotImplementedError()
 
+    def to_python(self, field_name: str, value: Any) -> Dict[str, Any]:
+        """
+        Like clean just for the internal input transformation. Validation happens later.
+        """
+        return {field_name: value}
+
     def get_embedded_fields(self, field_name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
         """
         Define extra fields on the fly. Often no owner is available yet.
@@ -167,6 +173,9 @@ class BaseField(FieldInfo):
 
     def get_constraints(self) -> Any:
         return self.constraints
+
+    def get_global_constraints(self, name: str) -> Sequence[Any]:
+        return []
 
     def get_default_value(self) -> Any:
         # single default
@@ -220,6 +229,28 @@ class BaseCompositeField(BaseField):
 
         return result
 
+    def to_python(self, field_name: str, value: Any) -> Dict[str, Any]:
+        """
+        Runs the checks for the fields being validated.
+        """
+        result = {}
+        if isinstance(value, dict):
+            for sub_name, field in self.composite_fields.items():
+                translated_name = self.translate_name(sub_name)
+                if translated_name not in value:
+                    continue
+                for k, v in field.to_python(sub_name, value.get(translated_name, None)).items():
+                    result[k] = v
+        else:
+            for sub_name, field in self.composite_fields.items():
+                translated_name = self.translate_name(sub_name)
+                if not hasattr(value, translated_name):
+                    continue
+                for k, v in field.to_python(sub_name, getattr(value, translated_name, None)).items():
+                    result[k] = v
+
+        return result
+
     def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any]) -> Any:
         cleaned_data_result = {}
         for sub_field_name, field in self.composite_fields.items():
@@ -266,7 +297,7 @@ class BaseForeignKey(BaseField):
         if isinstance(value, target):
             return value
 
-        fields_filtered = {target.proxy_model.pkname: target.proxy_model.fields.get(target.proxy_model.pkname)}
+        fields_filtered = {pkname: target.proxy_model.fields.get(pkname) for pkname in target.proxy_model.pknames}
         target.proxy_model.model_fields = fields_filtered
         target.proxy_model.model_rebuild(force=True)
         return target.proxy_model(pk=value)
@@ -275,7 +306,11 @@ class BaseForeignKey(BaseField):
         """
         Runs the checks for the fields being validated.
         """
-        return value.pk
+        from edgy.core.db.models.base import EdgyBaseModel
 
-    def clean(self, name: str, value: Any) -> Any:
+        if isinstance(value, EdgyBaseModel):
+            return value.pk
+        return value
+
+    def clean(self, name: str, value: Any) -> Dict[str, Any]:
         return {name: self.check(value)}

@@ -59,20 +59,6 @@ async def test_improperly_configured_for_primary_key():
     )
 
 
-async def test_improperly_configured_for_multiple_primary_keys():
-    with pytest.raises(ImproperlyConfigured) as raised:
-
-        class BaseModel(edgy.Model):
-            name = edgy.IntegerField(primary_key=True)
-            query: ClassVar[Manager] = ObjectsManager()
-            languages: ClassVar[Manager] = ObjectsManager()
-
-            class Meta:
-                registry = models
-
-    assert raised.value.args[0] == "Cannot create model BaseModel with multiple primary keys."
-
-
 @pytest.mark.parametrize("_type,value", [("int", 1), ("dict", {"name": "test"}), ("set", set())])
 async def test_improperly_configured_for_unique_together(_type, value):
     with pytest.raises(ImproperlyConfigured) as raised:
