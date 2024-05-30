@@ -251,7 +251,7 @@ class ConcreteCompositeField(BaseCompositeField):
             return field.clean(self.inner_field_names[0], value)  # type: ignore
         return super().clean(field_name, value)
 
-    def to_python(self, field_name: str, value: Any) -> Dict[str, Any]:
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         if (
             self.model is ConditionalRedirect
             and len(self.inner_field_names) == 1
@@ -259,8 +259,8 @@ class ConcreteCompositeField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.fields[self.inner_field_names[0]]
-            return field.to_python(self.inner_field_names[0], value)  # type: ignore
-        return super().to_python(field_name, value)
+            return field.to_model(self.inner_field_names[0], value, phase=phase)  # type: ignore
+        return super().to_model(field_name, value, phase=phase)
 
     def get_embedded_fields(self, name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
         retdict = {}
@@ -340,15 +340,14 @@ class ConcreteExclude(BaseField):
         """remove any value from input"""
         return {}
 
-    def to_python(self, name: str, value: Any) -> Dict[str, Any]:
-        """remove any value from input"""
+    def to_model(self, name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+        """remove any value from input and raise when setting an attribute"""
+        if phase == "set":
+            raise AttributeError("field is excluded")
         return {}
 
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         return []
-
-    def __set__(self, instance: "Model", value: Any) -> None:
-        raise AttributeError("field is excluded")
 
     def __get__(self, instance: "Model", owner: Any = None) -> None:
         raise AttributeError("field is excluded")
