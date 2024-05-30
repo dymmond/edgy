@@ -263,15 +263,26 @@ class ConcreteCompositeField(BaseCompositeField):
         return super().to_python(field_name, value)
 
     def get_embedded_fields(self, name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
+        retdict = {}
         if not self.absorb_existing_fields:
-            duplicate_fields = set(self.embedded_field_defs.keys()).intersection(field_mapping.keys())
+            duplicate_fields = set(self.embedded_field_defs.keys()).intersection(
+                {k for k, v in field_mapping.items() if v.owner is None}
+            )
             if duplicate_fields:
                 raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
-            return dict(self.embedded_field_defs)
-        retdict = {}
+            for item in self.embedded_field_defs.items():
+                # now there should be no collisions anymore
+                cloned_field = copy.copy(item[1])
+                # set to the current owner of this field, required in collision checks
+                cloned_field.owner = self.owner
+                retdict[item[0]] = cloned_field
+            return retdict
         for item in self.embedded_field_defs.items():
             if item[0] not in field_mapping:
-                retdict[item[0]] = item[1]
+                cloned_field = copy.copy(item[1])
+                # set to the current owner of this field, required in collision checks
+                cloned_field.owner = self.owner
+                retdict[item[0]] = cloned_field
             else:
                 absorbed_field = field_mapping[item[0]]
                 if not getattr(absorbed_field, "skip_absorption_check", False) and not issubclass(
@@ -314,6 +325,42 @@ class CompositeField(FieldFactory):
                 else:
                     if field[0] in inner_field_names:
                         raise FieldDefinitionError(f"duplicate inner field {field}")
+
+
+class ConcreteExclude(BaseField):
+    def __init__(self, **kwargs: Any):
+        kwargs["exclude"] = True
+        kwargs["null"] = True
+        kwargs["primary_key"] = False
+        return super().__init__(
+            **kwargs,
+        )
+
+    def clean(self, name: str, value: Any) -> Dict[str, Any]:
+        """remove any value from input"""
+        return {}
+
+    def to_python(self, name: str, value: Any) -> Dict[str, Any]:
+        """remove any value from input"""
+        return {}
+
+    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
+        return []
+
+    def __set__(self, instance: "Model", value: Any) -> None:
+        raise AttributeError("field is excluded")
+
+    def __get__(self, instance: "Model", owner: Any = None) -> None:
+        raise AttributeError("field is excluded")
+
+
+class ExcludeField(FieldFactory, Type[None]):
+    """
+    Meta field that masks fields
+    """
+
+    _bases = (ConcreteExclude,)
+    _type: Any = None
 
 
 class CharField(FieldFactory, str):
