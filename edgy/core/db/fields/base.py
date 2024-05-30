@@ -144,7 +144,7 @@ class BaseField(FieldInfo):
         """
         raise NotImplementedError()
 
-    def to_python(self, field_name: str, value: Any) -> Dict[str, Any]:
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         """
         Like clean just for the internal input transformation. Validation happens later.
         """
@@ -161,12 +161,6 @@ class BaseField(FieldInfo):
         Note: the returned fields are changed after return, so you should return new fields or copies. Also set the owner of the field to them before returning
         """
         return {}
-
-    def expand_relationship(self, value: Any) -> Any:
-        """
-        Used to be overwritten by any Link class.
-        """
-        return value
 
     def get_related_name(self) -> str:
         """Returns the related name used for reverse relations"""
@@ -230,7 +224,7 @@ class BaseCompositeField(BaseField):
 
         return result
 
-    def to_python(self, field_name: str, value: Any) -> Dict[str, Any]:
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
@@ -240,14 +234,14 @@ class BaseCompositeField(BaseField):
                 translated_name = self.translate_name(sub_name)
                 if translated_name not in value:
                     continue
-                for k, v in field.to_python(sub_name, value.get(translated_name, None)).items():
+                for k, v in field.to_model(sub_name, value.get(translated_name, None), phase=phase).items():
                     result[k] = v
         else:
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if not hasattr(value, translated_name):
                     continue
-                for k, v in field.to_python(sub_name, getattr(value, translated_name, None)).items():
+                for k, v in field.to_model(sub_name, getattr(value, translated_name, None), phase=phase).items():
                     result[k] = v
 
         return result
@@ -315,3 +309,11 @@ class BaseForeignKey(BaseField):
 
     def clean(self, name: str, value: Any) -> Dict[str, Any]:
         return {name: self.check(value)}
+
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+        """
+        Like clean just for the internal input transformation. Validation happens later.
+        """
+        if phase == "set":
+            value = self.expand_relationship(value)
+        return {field_name: value}

@@ -88,7 +88,7 @@ class Model(ModelRow, DeclarativeMixin):
         awaitable = await self.database.execute(expression)
         if not awaitable:
             awaitable = pk_to_dict(self, kwargs)
-        for k, v in self.fields["pk"].to_python("pk", awaitable).items():
+        for k, v in self.fields["pk"].to_model("pk", awaitable, phase="set").items():
             setattr(self, k, v)
         return self
 

@@ -131,6 +131,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """Checks if the field has a default value set"""
         return hasattr(self, "default")
 
+    def expand_relationship(self, value: Any) -> Any:
+        return value
+
 
 class ManyToManyField(ForeignKeyFieldFactory):
     _type: Any = Any
