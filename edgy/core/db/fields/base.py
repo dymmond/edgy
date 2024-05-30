@@ -56,7 +56,6 @@ class BaseField(FieldInfo):
         self.skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
         self.help_text: Optional[str] = kwargs.pop("help_text", None)
         self.pattern: Pattern = kwargs.pop("pattern", None)
-        self.related_name: str = kwargs.pop("related_name", None)
         self.unique: bool = kwargs.pop("unique", False)
         self.index: bool = kwargs.pop("index", False)
         self.choices: Sequence = kwargs.pop("choices", [])
@@ -70,7 +69,6 @@ class BaseField(FieldInfo):
         self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("minimum", None)
         self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("maximum", None)
         self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("multiple_of", None)
-        self.through: Any = kwargs.pop("through", None)
         self.server_onupdate: Any = kwargs.pop("server_onupdate", None)
         self.registry: Registry = kwargs.pop("registry", None)
         self.comment: str = kwargs.pop("comment", None)
@@ -161,10 +159,6 @@ class BaseField(FieldInfo):
         Note: the returned fields are changed after return, so you should return new fields or copies. Also set the owner of the field to them before returning
         """
         return {}
-
-    def get_related_name(self) -> str:
-        """Returns the related name used for reverse relations"""
-        return self.related_name
 
     def get_constraints(self) -> Any:
         return self.constraints
@@ -263,6 +257,17 @@ class BaseCompositeField(BaseField):
 
 
 class BaseForeignKey(BaseField):
+    def __init__(
+        self,
+        *,
+        related_name: str = "",
+        through: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        self.related_name = related_name
+        self.through = through
+        super().__init__(**kwargs)
+
     @property
     def target(self) -> Any:
         """
@@ -278,14 +283,6 @@ class BaseForeignKey(BaseField):
     @target.setter
     def target(self, value: Any) -> Any:
         self._target = value
-
-    def get_related_name(self) -> str:
-        """
-        Returns the name of the related name of the current relationship between the to and target.
-
-        :return: Name of the related_name attribute field.
-        """
-        return self.related_name
 
     def expand_relationship(self, value: Any) -> Any:
         target = self.target

@@ -16,7 +16,6 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="Model")
 
 
-CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 CHAR_LIMIT = 63
 terminal = Print()
 
@@ -149,13 +148,8 @@ class ManyToManyField(ForeignKeyFieldFactory):
         null = kwargs.get("null", None)
         if null:
             terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
-
-        kwargs = {
-            **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
-        }
         kwargs["null"] = True
-        return super().__new__(cls, **kwargs)
+        return super().__new__(cls, to=to, through=through, **kwargs)
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:
