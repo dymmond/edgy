@@ -75,8 +75,7 @@ class BaseField(FieldInfo):
         self.registry: Registry = kwargs.pop("registry", None)
         self.comment: str = kwargs.pop("comment", None)
         self.secret: bool = kwargs.pop("secret", False)
-        # hackaround to prevent multi call of get_embedded_fields
-        # FIXME: should only call the metaclasses
+        # Prevent multiple initialization
         self.embedded_fields_initialized = False
 
         if self.primary_key:
@@ -158,6 +157,8 @@ class BaseField(FieldInfo):
         Arguments are:
         name: the field name
         field_mapping: the existing fields
+
+        Note: the returned fields are changed after return, so you should return new fields or copies. Also set the owner of the field to them before returning
         """
         return {}
 

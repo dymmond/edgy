@@ -72,12 +72,14 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     def transform_kwargs(self, kwargs: Any) -> Any:
         """
-        Expand to_python
+        Expand to_python.
         """
         new_kwargs: Dict[str, Any] = {}
+        # abstract classes without registry have no fields
+        fields = self.meta.fields_mapping
         for key, value in kwargs.items():
-            field = self.fields.get(key, None)
-            if field:
+            field = fields.get(key, None)
+            if field is not None:
                 new_kwargs.update(**field.to_python(key, value))
             else:
                 new_kwargs[key] = value
@@ -100,13 +102,12 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         }
 
         for key, value in kwargs.items():
-            field = self.fields.get(key, None)
+            field = self.meta.fields_mapping.get(key, None)
             if not field:
                 if not hasattr(self, key):
                     raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
 
-            # Set model field and add to the kwargs dict
-            # edgy_setattr(self, key, value)
+            # Add to the kwargs dict
             kwargs[key] = value
         return kwargs
 
@@ -122,8 +123,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return f"<{self.__class__.__name__}: {self}>"
 
     def __str__(self) -> str:
+        pknames = self.meta.pk_attributes
         pkl = []
-        for pkname in self.pknames:
+        for pkname in pknames:
             pkl.append(f"{pkname}={getattr(self, pkname, None)}")
         return f"{self.__class__.__name__}({', '.join(pkl)})"
 
@@ -154,7 +156,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         if cls.__proxy_model__:
             return cls.__proxy_model__
 
-        fields = {key: copy.copy(field) for key, field in cls.fields.items()}
+        fields = {key: copy.copy(field) for key, field in cls.meta.fields_mapping.items()}
         proxy_model = ProxyModel(
             name=cls.__name__,
             module=cls.__module__,
@@ -174,7 +176,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         return cast(
             Set[str],
-            frozenset(key for key, field in self.fields.items() if hasattr(field, "__get__")),
+            frozenset(key for key, field in self.meta.fields_mapping.items() if hasattr(field, "__get__")),
         )
 
     @cached_property
@@ -186,7 +188,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         # should be handled by pydantic but isn't so workaround
         return cast(
             Set[str],
-            frozenset(key for key, field in self.fields.items() if getattr(field, "exclude", False)),
+            frozenset(key for key, field in self.meta.fields_mapping.items() if getattr(field, "exclude", False)),
         )
 
     def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
@@ -362,17 +364,25 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         return self.__class__.__name__.lower()
 
-    def __setattr__(self, key: Any, value: Any) -> Any:
-        if key in self.fields:
-            field = self.fields[key]
-            if isinstance(field, BaseManyToManyForeignKeyField):
-                value = getattr(self, settings.many_to_many_relation.format(key=key))
+    def __setattr__(self, key: str, value: Any) -> Any:
+        fields = self.meta.fields_mapping
+        if key in fields:
+            field = fields[key]
+            if hasattr(field, "__set__"):
+                field.__set__(self, value)
             else:
-                value = self.fields[key].expand_relationship(value)
-        edgy_setattr(self, key, value)
+                if isinstance(field, BaseManyToManyForeignKeyField):
+                    value = getattr(self, settings.many_to_many_relation.format(key=key))
+                    edgy_setattr(self, key, value)
+                else:
+                    for k, v in field.to_python(key, value).items():
+                        edgy_setattr(self, k, self.fields[key].expand_relationship(v))
+        else:
+            edgy_setattr(self, key, value)
 
     def __get_instance_values(self, instance: Any) -> Set[Any]:
-        return {v for k, v in instance.__dict__.items() if k in instance.fields.keys() and v is not None}
+        fields = self.meta.fields_mapping
+        return {v for k, v in instance.__dict__.items() if k in fields and v is not None}
 
     def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:

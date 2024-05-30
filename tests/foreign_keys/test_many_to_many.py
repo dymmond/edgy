@@ -167,6 +167,14 @@ async def test_raises_RelationshipNotFound():
     assert raised.value.args[0] == f"There is no relationship between 'album' and 'track: {track3.pk}'."
 
 
+@pytest.mark.xfail(reason="issue #101")
+async def test_many_to_many_many_related_manager():
+    album1 = await Album.query.create(name="Malibu")
+    assert album1.tracks is not None
+    album1 = await Album.query.get(name="Malibu")
+    assert album1.tracks is not None
+
+
 async def test_many_to_many_many_fields():
     track1 = await Track.query.create(title="The Bird", position=1)
     track2 = await Track.query.create(title="Heart don't stand a chance", position=2)

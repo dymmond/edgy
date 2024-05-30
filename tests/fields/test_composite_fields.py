@@ -230,3 +230,64 @@ def test_dump_composite_model():
         "first_name": "edgy",
         "last_name": "edgytoo",
     }
+
+
+def test_inheritance():
+    class AbstractModel(edgy.Model):
+        composite: Dict[str, Any] = edgy.CompositeField(
+            inner_fields=[
+                ("first_name", edgy.CharField(max_length=255)),
+                ("last_name", edgy.CharField(max_length=255)),
+                ("age", edgy.IntegerField(null=True)),
+            ],
+        )
+
+        class Meta:
+            abstract = True
+
+    class ConcreteModel1(AbstractModel):
+        composite: Dict[str, Any] = edgy.CompositeField(
+            inner_fields=[
+                ("first_name", edgy.CharField(max_length=255)),
+                ("last_name", edgy.CharField(max_length=255)),
+            ],
+        )
+
+    class ConcreteModel2(AbstractModel):
+        composite2: Dict[str, Any] = edgy.CompositeField(
+            inner_fields=[
+                ("first_name", edgy.CharField(max_length=255)),
+                ("last_name", edgy.CharField(max_length=50)),
+            ],
+            absorb_existing_fields=True,
+        )
+
+    class ConcreteModel3(AbstractModel):
+        composite2: Dict[str, Any] = edgy.CompositeField(
+            inner_fields=[
+                ("first_name", edgy.CharField(max_length=255)),
+                ("last_name", edgy.CharField(max_length=50)),
+            ],
+        )
+
+    assert "age" not in ConcreteModel1.meta.fields_mapping
+    assert "age" in ConcreteModel2.meta.fields_mapping
+    assert ConcreteModel2.meta.fields_mapping["last_name"].max_length == 255
+    assert ConcreteModel3.meta.fields_mapping["last_name"].max_length == 50
+    assert "age" in ConcreteModel3.meta.fields_mapping
+
+
+def test_copying():
+    field = edgy.CompositeField(
+        inner_fields=[
+            ("first_name", edgy.CharField(max_length=255)),
+            ("last_name", edgy.CharField(max_length=255)),
+        ],
+    )
+    fields = field.get_embedded_fields("field", {})
+    assert fields["first_name"].owner is None
+    fields["first_name"].owner = "test"
+    fields["first_name"].newattribute = "test"
+    fields2 = field.get_embedded_fields("field", {})
+    assert fields2["first_name"].owner is None
+    assert not hasattr(fields2["first_name"], "newattribute")

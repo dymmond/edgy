@@ -206,6 +206,17 @@ the fields need the exclude attribute/parameter set
 
 Note: embedded fields are deepcopied. This way it is safe to provide the same inner_fields object to multiple CompositeFields
 
+
+##### Inheritance
+
+CompositeFields are evaluated in non-abstract models. When overwritten by another field and the evaluation didn't take place yet no fields are generated.
+
+When overwritten after evaluation the fields are still lingering around.
+
+You can also overwrite from CompositeField generated fields in subclasses regardless if the CompositeField used absorb_existing_fields inside.
+
+You may want to use **ExcludeField** to remove fields.
+
 #### DateField
 
 ```python
@@ -277,6 +288,33 @@ class MyModel(edgy.Model):
 ```
 
 Derives from the same as [CharField](#charfield) and validates the email value.
+
+#### ExcludeField
+
+Remove inherited fields by masking them from the model.
+This way a field can be removed.
+
+ExcludeField is a stub field and can be overwritten itself.
+
+When providing in constructor and argument, the argument is ignored.
+
+In contrast: get and set operations are prohibited, they raise an AttributeError.
+
+```python
+import edgy
+
+
+class AbstractModel(edgy.Model):
+    email: str = edgy.EmailField(max_length=60, null=True)
+    price: float = edgy.FloatField(null=True)
+
+    class Meta:
+        abstract = True
+
+class ConcreteModel(AbstractModel):
+    email: Type[None] = edgy.ExcludeField()
+
+```
 
 #### FloatField
 
