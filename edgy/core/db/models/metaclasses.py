@@ -1,10 +1,12 @@
 import copy
 import inspect
+from collections import deque
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
     Dict,
+    FrozenSet,
     List,
     Optional,
     Sequence,
@@ -40,6 +42,9 @@ from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 if TYPE_CHECKING:
     from edgy.core.db.models import Model, ModelRef, ReflectModel
 
+_empty_dict: Dict[str, Any] = {}
+_empty_set: FrozenSet[Any] = frozenset()
+
 
 class MetaInfo:
     __slots__ = (
@@ -73,26 +78,28 @@ class MetaInfo:
         self.pk: Optional[BaseField] = getattr(meta, "pk", None)
         self.pk_attributes: Sequence[str] = getattr(meta, "pk_attributes", "")
         self.abstract: bool = getattr(meta, "abstract", False)
-        self.fields: Set[Any] = getattr(meta, "fields", set())
-        self.fields_mapping: Dict[str, BaseField] = getattr(meta, "fields_mapping", {})
+        self.fields: Set[Any] = {*getattr(meta, "fields", _empty_set)}
+        self.fields_mapping: Dict[str, BaseField] = {**getattr(meta, "fields_mapping", _empty_dict)}
         self.registry: Optional[Registry] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
-        self.parents: Any = getattr(meta, "parents", [])
-        self.many_to_many_fields: Set[str] = getattr(meta, "many_to_many_fields", set())
-        self.foreign_key_fields: Dict[str, Any] = getattr(meta, "foreign_key_fields", {})
-        self.model_references: Dict["ModelRef", str] = getattr(meta, "model_references", {})
+        self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
+        self.many_to_many_fields: Set[str] = {*getattr(meta, "many_to_many_fields", _empty_set)}
+        self.foreign_key_fields: Dict[str, Any] = {**getattr(meta, "foreign_key_fields", _empty_dict)}
+        self.model_references: Dict["ModelRef", str] = {**getattr(meta, "model_references", _empty_dict)}
         self.model: Optional[Type["Model"]] = None
         self.manager: "Manager" = getattr(meta, "manager", Manager())
+        self.managers: List[Manager] = [*getattr(meta, "managers", _empty_set)]
         self.unique_together: Any = getattr(meta, "unique_together", None)
         self.indexes: Any = getattr(meta, "indexes", None)
         self.reflect: bool = getattr(meta, "reflect", False)
-        self.managers: List[Manager] = getattr(meta, "managers", [])
         self.is_multi: bool = getattr(meta, "is_multi", False)
-        self.multi_related: Sequence[str] = getattr(meta, "multi_related", [])
-        self.related_names: Set[str] = getattr(meta, "related_names", set())
-        self.related_fields: Dict[str, Any] = getattr(meta, "related_fields", {})
-        self.related_names_mapping: Dict[str, Any] = getattr(meta, "related_names_mapping", {})
-        self.signals: Optional[signals_module.Broadcaster] = getattr(meta, "signals", {})  # type: ignore
+        self.multi_related: Sequence[str] = [*getattr(meta, "multi_related", _empty_set)]
+        self.related_names: Set[str] = {*getattr(meta, "related_names", _empty_set)}
+        self.related_fields: Dict[str, Any] = {**getattr(meta, "related_fields", _empty_dict)}
+        self.related_names_mapping: Dict[str, Any] = {**getattr(meta, "related_names_mapping", _empty_dict)}
+        self.signals: Optional[signals_module.Broadcaster] = signals_module.Broadcaster(
+            **getattr(meta, "signals", _empty_dict)
+        )
 
         for k, v in kwargs.items():
             edgy_setattr(self, k, v)
@@ -213,9 +220,7 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
     model_class.meta.signals = signals
 
 
-def handle_annotations(
-    bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any
-) -> Dict[str, Any]:
+def handle_annotations(bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any) -> Dict[str, Any]:
     """
     Handles and copies some of the annotations for
     initialiasation.
@@ -288,17 +293,17 @@ class BaseModelMeta(ModelMetaclass):
         if inherited_fields:
             # Making sure the inherited fields are before the new defined.
             attrs = {**inherited_fields, **attrs}
+        else:
+            # copy anyway
+            attrs = {**attrs}
 
         # Handle with multiple primary keys and auto generated field if no primary key is provided
         for key, value in attrs.items():
             if isinstance(value, BaseField):
                 if key == "pk" and not isinstance(value, ConcreteCompositeField):
-                    raise ImproperlyConfigured(
-                        f"Cannot add a field named pk to model {name}. Protected name."
-                    )
+                    raise ImproperlyConfigured(f"Cannot add a field named pk to model {name}. Protected name.")
                 if value.primary_key:
                     pk_attributes.add(key)
-        attrs = {**attrs}
 
         if not is_abstract:
             if not pk_attributes:
@@ -312,13 +317,8 @@ class BaseModelMeta(ModelMetaclass):
                 )
         for key, value in attrs.items():
             if isinstance(value, BaseField):
-                # When it is abstract we don't want to instantiate
-                # The model as a model to be used to store data
-                # Instead, we just want to copy the fields declared
-                # In the abstract and be able to "inherit" them in
-                # the next model
-                if is_abstract:
-                    value = copy.copy(value)
+                # make sure we have a fresh copy where we can set the owner
+                value = copy.copy(value)
 
                 # add fields and non BaseRefForeignKeyField to fields
                 # The BaseRefForeignKeyField is actually not a normal SQL Foreignkey
@@ -342,42 +342,44 @@ class BaseModelMeta(ModelMetaclass):
                     foreign_key_fields[key] = value
                     continue
 
+        if not is_abstract:
+            # the order is important because it reflects the inheritance order
+            fieldnames_to_check = deque(fields.keys())
+            while fieldnames_to_check:
+                field_name = fieldnames_to_check.popleft()
+                field = fields[field_name]
+                # call only when initialized, when inherited this should not be called anymore
+                # this way subclasses can overwrite the fields
+                if not field.embedded_fields_initialized:
+                    field.embedded_fields_initialized = True
+                    embedded_fields = field.get_embedded_fields(field_name, fields)
+                    if embedded_fields:
+                        for sub_field_name, sub_field in embedded_fields.items():
+                            if sub_field_name == "pk":
+                                raise ValueError("sub field uses reserved name pk")
+
+                            if sub_field_name in fields and fields[sub_field_name].owner is None:
+                                raise ValueError(f"sub field name collision: {sub_field_name}")
+                            fieldnames_to_check.append(sub_field_name)
+                            fields[sub_field_name] = sub_field
+                            model_fields[sub_field_name] = sub_field
+                            if sub_field.primary_key:
+                                pk_attributes.add(sub_field_name)
+
         for slot in fields:
             attrs.pop(slot, None)
-
-        fieldnames_to_check = list(fields.keys())
-        while fieldnames_to_check:
-            field_name = fieldnames_to_check.pop()
-            field = fields[field_name]
-            # WORKAROUND
-            # FIXME: should only initialize metaclasses one time not multiple times
-            # FIXME: when reinitializing, the fields should be original
-            if not field.embedded_fields_initialized:
-                embedded_fields = field.get_embedded_fields(field_name, fields)
-                field.embedded_fields_initialized = True
-                if embedded_fields:
-                    for sub_field_name, sub_field in embedded_fields.items():
-                        if sub_field_name == "pk":
-                            raise ValueError("sub field uses reserved name pk")
-
-                        if sub_field_name in fields or sub_field_name in attrs:
-                            raise ValueError(f"sub field name collision: {sub_field_name}")
-                        fieldnames_to_check.append(sub_field_name)
-                        fields[sub_field_name] = sub_field
-                        model_fields[sub_field_name] = sub_field
-                        if sub_field.primary_key:
-                            pk_attributes.add(sub_field_name)
 
         # create a sorted tuple from pk_attributes for nicer outputs
         pk_attributes_finalized = tuple(sorted(pk_attributes))
         del pk_attributes
 
-        fields["pk"] = cast(
-            BaseField,
-            edgy_fields.CompositeField(
-                inner_fields=pk_attributes_finalized, model=ConditionalRedirect, exclude=True
-            ),
-        )
+        if not is_abstract:
+            fields["pk"] = cast(
+                BaseField,
+                edgy_fields.CompositeField(
+                    inner_fields=pk_attributes_finalized, model=ConditionalRedirect, exclude=True
+                ),
+            )
 
         del is_abstract
 
@@ -424,13 +426,15 @@ class BaseModelMeta(ModelMetaclass):
         new_class.model_fields = {**new_class.model_fields, **model_fields}
         new_class.pknames = pk_attributes_finalized
 
+        # Set the owner of the field, must be done as early as possible
+        for _, value in fields.items():
+            value.owner = new_class
+
         # Validate meta for managers, uniques and indexes
         if meta.abstract:
             managers = [k for k, v in attrs.items() if isinstance(v, Manager)]
             if len(managers) > 1:
-                raise ImproperlyConfigured(
-                    "Multiple managers are not allowed in abstract classes."
-                )
+                raise ImproperlyConfigured("Multiple managers are not allowed in abstract classes.")
 
             if getattr(meta, "unique_together", None) is not None:
                 raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
@@ -439,11 +443,16 @@ class BaseModelMeta(ModelMetaclass):
                 raise ImproperlyConfigured("indexes cannot be in abstract classes.")
 
         # Handle the registry of models
-        if getattr(meta, "registry", None) is None:
+        if meta.registry is None:
             if hasattr(new_class, "__db_model__") and new_class.__db_model__:
                 meta.registry = _check_model_inherited_registry(bases)
             else:
+                new_class.model_rebuild(force=True)
                 return new_class
+
+        registry = meta.registry
+        assert registry, "no registry found, should not happen here"
+        new_class.database = registry.database
 
         # Making sure the tablename is always set if the value is not provided
         if getattr(meta, "tablename", None) is None:
@@ -454,9 +463,7 @@ class BaseModelMeta(ModelMetaclass):
             unique_together = meta.unique_together
             if not isinstance(unique_together, (list, tuple)):
                 value_type = type(unique_together).__name__
-                raise ImproperlyConfigured(
-                    f"unique_together must be a tuple or list. Got {value_type} instead."
-                )
+                raise ImproperlyConfigured(f"unique_together must be a tuple or list. Got {value_type} instead.")
             else:
                 for value in unique_together:
                     if not isinstance(value, (str, tuple, UniqueConstraint)):
@@ -469,17 +476,15 @@ class BaseModelMeta(ModelMetaclass):
             indexes = meta.indexes
             if not isinstance(indexes, (list, tuple)):
                 value_type = type(indexes).__name__
-                raise ImproperlyConfigured(
-                    f"indexes must be a tuple or list. Got {value_type} instead."
-                )
+                raise ImproperlyConfigured(f"indexes must be a tuple or list. Got {value_type} instead.")
             else:
                 for value in indexes:
                     if not isinstance(value, Index):
                         raise ValueError("Meta.indexes must be a list of Index types.")
 
-        registry = meta.registry
-        assert registry, "no registry found, should not happen here"
-        new_class.database = registry.database
+        # Set the registry of the field
+        for _, value in fields.items():
+            value.registry = registry
 
         # Making sure it does not generate tables if abstract it set
         if not meta.abstract:
@@ -525,7 +530,7 @@ class BaseModelMeta(ModelMetaclass):
             new_class.__proxy_model__ = proxy_model
             new_class.__proxy_model__.parent = new_class
             new_class.__proxy_model__.model_rebuild(force=True)
-            meta.registry.models[new_class.__name__] = new_class  # type: ignore
+            meta.registry.models[new_class.__name__] = new_class
 
         new_class.model_rebuild(force=True)
         return new_class

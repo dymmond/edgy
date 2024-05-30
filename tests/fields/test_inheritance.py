@@ -1,3 +1,5 @@
+from typing import Type
+
 import pytest
 
 from edgy.core.db.fields import (
@@ -7,6 +9,7 @@ from edgy.core.db.fields import (
     DateField,
     DateTimeField,
     DecimalField,
+    ExcludeField,
     FloatField,
     IntegerField,
     JSONField,
@@ -15,6 +18,7 @@ from edgy.core.db.fields import (
     TimeField,
     UUIDField,
 )
+from edgy.core.db.models import Model
 
 
 @pytest.mark.parametrize(
@@ -39,3 +43,55 @@ def test_isinstance_issubclass(field, _class):
     assert isinstance(field, _class)
     assert issubclass(field.__class__, _class)
     assert issubclass(_class, _class)
+
+
+def test_overwriting_fields_with_fields():
+    class AbstractModel(Model):
+        first_name: str = CharField(max_length=255)
+        last_name: str = CharField(max_length=255)
+
+        class Meta:
+            abstract = True
+
+    class ConcreteModel1(AbstractModel):
+        last_name: int = IntegerField()
+
+    class ConcreteModel2(ConcreteModel1):
+        first_name: str = CharField(max_length=50)
+
+    assert ConcreteModel1.meta.fields_mapping["first_name"].max_length == 255
+    assert isinstance(ConcreteModel1.meta.fields_mapping["last_name"], IntegerField)
+    assert ConcreteModel2.meta.fields_mapping["first_name"].max_length == 50
+
+
+def test_deleting_fields():
+    class AbstractModel(Model):
+        first_name: str = CharField(max_length=255)
+        last_name: str = CharField(max_length=255)
+
+        class Meta:
+            abstract = True
+
+    class ConcreteModel1(AbstractModel):
+        last_name: Type[None] = ExcludeField()
+
+    class ConcreteModel2(ConcreteModel1):
+        first_name: Type[None] = ExcludeField()
+
+    assert ConcreteModel1.meta.fields_mapping["first_name"].max_length == 255
+    model1 = ConcreteModel1(first_name="edgy", last_name="edgy")
+    model2 = ConcreteModel2(first_name="edgy", last_name="edgy")
+    assert model1.first_name == "edgy"
+    with pytest.raises(AttributeError):
+        _ = model1.last_name
+    with pytest.raises(AttributeError):
+        model1.last_name = "edgy"
+
+    with pytest.raises(AttributeError):
+        _ = model2.first_name
+    with pytest.raises(AttributeError):
+        model2.first_name = "edgy"
+    with pytest.raises(AttributeError):
+        _ = model2.last_name
+    with pytest.raises(AttributeError):
+        model2.last_name = "edgy"
