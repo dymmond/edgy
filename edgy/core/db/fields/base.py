@@ -158,7 +158,7 @@ class BaseField(FieldInfo):
         name: the field name
         field_mapping: the existing fields
 
-        Note: the returned fields are changed after returnal, so you should return new fields or copies. Also set the owner of the field to them before returning
+        Note: the returned fields are changed after return, so you should return new fields or copies. Also set the owner of the field to them before returning
         """
         return {}
 

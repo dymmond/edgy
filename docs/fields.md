@@ -213,7 +213,7 @@ CompositeFields are evaluated in non-abstract models. When overwritten by anothe
 
 When overwritten after evaluation the fields are still lingering around.
 
-You can also overwrite from CompositeField generated fields in subclasses regardless if the CompositeField used absorb_existing_fields.
+You can also overwrite from CompositeField generated fields in subclasses regardless if the CompositeField used absorb_existing_fields inside.
 
 You may want to use **ExcludeField** to remove fields.
 
