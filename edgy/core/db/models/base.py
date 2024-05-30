@@ -72,7 +72,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     def transform_kwargs(self, kwargs: Any) -> Any:
         """
-        Expand to_python.
+        Expand to_model.
         """
         new_kwargs: Dict[str, Any] = {}
         # abstract classes without registry have no fields
@@ -80,7 +80,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         for key, value in kwargs.items():
             field = fields.get(key, None)
             if field is not None:
-                new_kwargs.update(**field.to_python(key, value))
+                new_kwargs.update(**field.to_model(key, value, phase="creation"))
             else:
                 new_kwargs[key] = value
         return new_kwargs
@@ -364,19 +364,20 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         return self.__class__.__name__.lower()
 
-    def __setattr__(self, key: str, value: Any) -> Any:
-        fields = self.meta.fields_mapping
-        if key in fields:
-            field = fields[key]
+    def __setattr__(self, key: str, value: Any) -> None:
+        field = self.meta.fields_mapping.get(key, None)
+        if field is not None:
             if hasattr(field, "__set__"):
+                # not recommended, better to use to_model instead
                 field.__set__(self, value)
+            elif isinstance(field, BaseManyToManyForeignKeyField):
+                # settings is the culprit we can not move BaseManyToManyForeignKeyField in to_model
+                # TODO: find out if the tests tamper with the settings and must be adjusted
+                value = getattr(self, settings.many_to_many_relation.format(key=key))
+                edgy_setattr(self, key, value)
             else:
-                if isinstance(field, BaseManyToManyForeignKeyField):
-                    value = getattr(self, settings.many_to_many_relation.format(key=key))
-                    edgy_setattr(self, key, value)
-                else:
-                    for k, v in field.to_python(key, value).items():
-                        edgy_setattr(self, k, self.fields[key].expand_relationship(v))
+                for k, v in field.to_model(key, value, phase="set").items():
+                    edgy_setattr(self, k, v)
         else:
             edgy_setattr(self, key, value)
 
