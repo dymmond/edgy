@@ -288,8 +288,12 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         columns = []
         global_constraints = []
         for name, field in cls.fields.items():
-            columns.extend(field.get_columns(name))
-            global_constraints.extend(field.get_global_constraints(name))
+            # aliasing
+            if field.name:
+                name = field.name
+            current_columns = field.get_columns(name)
+            columns.extend(current_columns)
+            global_constraints.extend(field.get_global_constraints(name, current_columns))
 
         # Handle the uniqueness together
         uniques = []

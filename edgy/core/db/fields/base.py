@@ -1,17 +1,26 @@
 import decimal
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Optional, Pattern, Sequence, Union
+from typing import Any, ClassVar, Dict, Optional, Pattern, Sequence, Union
 
+from pydantic import BaseModel
 from pydantic.fields import FieldInfo
+from sqlalchemy import Column, Constraint, ForeignKeyConstraint
 
 from edgy.core.connection.registry import Registry
 from edgy.exceptions import FieldDefinitionError
 from edgy.types import Undefined
 
-if TYPE_CHECKING:
-    from sqlalchemy import Column, Constraint
-
 edgy_setattr = object.__setattr__
+
+FK_CHAR_LIMIT = 63
+
+
+def _removeprefix(text: str, prefix: str) -> str:
+    # TODO: replace with removeprefix when python3.9 is minimum
+    if text.startswith(prefix):
+        return text[len(prefix) :]
+    else:
+        return text
 
 
 class BaseField(FieldInfo):
@@ -64,8 +73,8 @@ class BaseField(FieldInfo):
         self.alias: str = kwargs.pop("name", None)
         self.regex: str = kwargs.pop("regex", None)
         self.format: str = kwargs.pop("format", None)
-        self.min_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("min_length", None)
-        self.max_length: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("max_length", None)
+        self.min_length: Optional[int] = kwargs.pop("min_length", None)
+        self.max_length: Optional[int] = kwargs.pop("max_length", None)
         self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("minimum", None)
         self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("maximum", None)
         self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("multiple_of", None)
@@ -130,7 +139,7 @@ class BaseField(FieldInfo):
         """Checks if the field has a default value set"""
         return bool(self.default is not None and self.default is not Undefined)
 
-    def get_columns(self, field_name: str) -> Sequence["Column"]:
+    def get_columns(self, name: str) -> Sequence["Column"]:
         """
         Returns the columns of the field being declared.
         """
@@ -163,7 +172,7 @@ class BaseField(FieldInfo):
     def get_constraints(self) -> Any:
         return self.constraints
 
-    def get_global_constraints(self, name: str) -> Sequence[Any]:
+    def get_global_constraints(self, name: str, columns: Sequence[Column]) -> Sequence[Constraint]:
         return []
 
     def get_default_value(self) -> Any:
@@ -260,12 +269,16 @@ class BaseForeignKey(BaseField):
     def __init__(
         self,
         *,
+        on_update: str,
+        on_delete: str,
         related_name: str = "",
         through: Any = None,
         **kwargs: Any,
     ) -> None:
         self.related_name = related_name
         self.through = through
+        self.on_update = on_update
+        self.on_delete = on_delete
         super().__init__(**kwargs)
 
     @property
@@ -294,18 +307,18 @@ class BaseForeignKey(BaseField):
         target.proxy_model.model_rebuild(force=True)
         return target.proxy_model(pk=value)
 
-    def check(self, value: Any) -> Any:
-        """
-        Runs the checks for the fields being validated.
-        """
-        from edgy.core.db.models.base import EdgyBaseModel
-
-        if isinstance(value, EdgyBaseModel):
-            return value.pk
-        return value
-
     def clean(self, name: str, value: Any) -> Dict[str, Any]:
-        return {name: self.check(value)}
+        target = self.target
+        if value is None:
+            return {self.get_fk_field_name(name, pkname): None for pkname in target.pknames}
+        elif isinstance(value, dict):
+            return {self.get_fk_field_name(name, pkname): value[pkname] for pkname in target.pknames}
+        elif isinstance(value, BaseModel):
+            return {self.get_fk_field_name(name, pkname): getattr(value, pkname) for pkname in target.pknames}
+        elif len(target.pknames) == 1:
+            return {self.get_fk_field_name(name, target.pknames[0]): value}
+        else:
+            raise ValueError(f"cannot handle: {value} of type {type(value)}")
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         """
@@ -314,3 +327,56 @@ class BaseForeignKey(BaseField):
         if phase == "set":
             value = self.expand_relationship(value)
         return {field_name: value}
+
+    def get_fk_name(self, name: str) -> str:
+        """
+        Builds the fk name for the engine.
+
+        Engines have a limitation of the foreign key being bigger than 63
+        characters.
+
+        if that happens, we need to assure it is small.
+        """
+        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{name}"
+        if not len(fk_name) > FK_CHAR_LIMIT:
+            return fk_name
+        return fk_name[:FK_CHAR_LIMIT]
+
+    def get_fk_field_name(self, name: str, pkname: str) -> str:
+        target = self.target
+        if len(target.pknames) == 1:
+            return name
+        return f"{name}_{pkname}"
+
+    def from_fk_field_name(self, name: str, fk_field_name: str) -> str:
+        target = self.target
+        if len(target.pknames) == 1:
+            return target.pknames[0]
+        return _removeprefix(fk_field_name, name)
+
+    def get_columns(self, name: str) -> Sequence[Column]:
+        target = self.target
+        columns = []
+        for pkname in target.pknames:
+            to_field = target.fields[pkname]
+            found_columns = to_field.get_columns(self.get_fk_field_name(name, pkname))
+            if not self.primary_key:
+                for column in found_columns:
+                    column.primary_key = False
+            if self.null:
+                for column in found_columns:
+                    column.nullable = True
+            columns.extend(found_columns)
+        return columns
+
+    def get_global_constraints(self, name: str, columns: Sequence[Column]) -> Sequence[Constraint]:
+        target = self.target
+        return [
+            ForeignKeyConstraint(
+                columns,
+                [f"{target.meta.tablename}.{self.from_fk_field_name(name, column.name)}" for column in columns],
+                ondelete=self.on_delete,
+                onupdate=self.on_update,
+                name=self.get_fk_name(name),
+            ),
+        ]

@@ -1,6 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar, Union
-
-import sqlalchemy
+from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
 
 import edgy
 from edgy.core.db.constants import CASCADE
@@ -16,7 +14,6 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="Model")
 
 
-CHAR_LIMIT = 63
 terminal = Print()
 
 
@@ -94,38 +91,6 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.through = through_model
         self.add_model_to_register(self.through)
 
-    def get_fk_name(self, name: str) -> str:
-        """
-        Builds the fk name for the engine.
-
-        Engines have a limitation of the foreign key being bigger than 63
-        characters.
-
-        if that happens, we need to assure it is small.
-        """
-        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{self.target.pknames[0]}_{name}"
-        if not len(fk_name) > CHAR_LIMIT:
-            return fk_name
-        return fk_name[:CHAR_LIMIT]
-
-    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
-        """
-        Builds the column for the target.
-        """
-        target = self.target
-        to_field = target.fields[target.pknames[0]]
-
-        column_type = to_field.column_type
-        constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pknames[0]}",
-                ondelete=CASCADE,
-                onupdate=CASCADE,
-                name=self.get_fk_name(name=name),
-            )
-        ]
-        return [sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)]
-
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
         return hasattr(self, "default")
@@ -145,10 +110,13 @@ class ManyToManyField(ForeignKeyFieldFactory):
         through: Optional["Model"] = None,
         **kwargs: Any,
     ) -> BaseField:
-        null = kwargs.get("null", None)
-        if null:
-            terminal.write_warning("Declaring `null` on a ManyToMany relationship has no effect.")
+        for argument in ["null", "on_delete", "on_update"]:
+            if kwargs.get(argument, None):
+                terminal.write_warning(f"Declaring `{argument}` on a ManyToMany relationship has no effect.")
         kwargs["null"] = True
+        kwargs["on_delete"] = CASCADE
+        kwargs["on_update"] = CASCADE
+
         return super().__new__(cls, to=to, through=through, **kwargs)
 
     @classmethod

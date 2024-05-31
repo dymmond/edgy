@@ -15,22 +15,12 @@ terminal = Print()
 
 
 class BaseOneToOneKeyField(BaseForeignKey):
-    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
-        target = self.target
-        to_field = target.fields[target.pknames[0]]
-
-        column_type = to_field.column_type
-        constraints = [
-            sqlalchemy.schema.ForeignKey(f"{target.meta.tablename}.{target.pknames[0]}", ondelete=self.on_delete)
-        ]
+    def get_global_constraints(
+        self, name: str, columns: Sequence[sqlalchemy.Column]
+    ) -> Sequence[sqlalchemy.Constraint]:
         return [
-            sqlalchemy.Column(
-                name,
-                column_type,
-                *constraints,
-                nullable=self.null,
-                unique=True,
-            )
+            *super().get_global_constraints(name, columns),
+            sqlalchemy.UniqueConstraint(*columns),
         ]
 
 
