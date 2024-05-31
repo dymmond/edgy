@@ -317,4 +317,4 @@ def test_assertation_error_on_missing_on_delete():
         class MyOtherModel(edgy.Model):
             model = edgy.ForeignKey(MyModel, on_delete=None)
 
-    assert raised.value.args[0] == "on_delete must not be null"
+    assert raised.value.args[0] == "on_delete must not be null."

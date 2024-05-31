@@ -21,7 +21,6 @@ from typing import (
 import sqlalchemy
 from pydantic._internal._model_construction import ModelMetaclass
 
-from edgy.conf import settings
 from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
@@ -35,7 +34,6 @@ from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.relationships.related_field import RelatedField
-from edgy.core.db.relationships.relation import Relation
 from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
@@ -59,7 +57,6 @@ class MetaInfo:
         "indexes",
         "foreign_key_fields",
         "parents",
-        "many_to_many_fields",
         "manager",
         "model",
         "reflect",
@@ -83,8 +80,7 @@ class MetaInfo:
         self.registry: Optional[Registry] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
-        self.many_to_many_fields: Set[str] = {*getattr(meta, "many_to_many_fields", _empty_set)}
-        self.foreign_key_fields: Dict[str, Any] = {**getattr(meta, "foreign_key_fields", _empty_dict)}
+        self.foreign_key_fields: Dict[str, BaseField] = {**getattr(meta, "foreign_key_fields", _empty_dict)}
         self.model_references: Dict["ModelRef", str] = {**getattr(meta, "model_references", _empty_dict)}
         self.model: Optional[Type["Model"]] = None
         self.manager: "Manager" = getattr(meta, "manager", Manager())
@@ -201,16 +197,6 @@ def _set_related_name_for_foreign_keys(
     return default_related_name
 
 
-def _set_many_to_many_relation(
-    m2m: BaseManyToManyForeignKeyField,
-    model_class: Union["Model", "ReflectModel"],
-    field: str,
-) -> None:
-    m2m.create_through_model()
-    relation = Relation(through=m2m.through, to=m2m.to, owner=m2m.owner)
-    setattr(model_class, settings.many_to_many_relation.format(key=field), relation)
-
-
 def _register_model_signals(model_class: Type["Model"]) -> None:
     """
     Registers the signals in the model's Broadcaster and sets the defaults.
@@ -245,9 +231,8 @@ class BaseModelMeta(ModelMetaclass):
 
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
         fields: Dict[str, BaseField] = {}
-        foreign_key_fields: Any = {}
+        foreign_key_fields: Dict[str, BaseField] = {}
         model_references: Dict["ModelRef", str] = {}
-        many_to_many_fields: Any = set()
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attributes: Set[str] = set()
         base_annotations: Dict[str, Any] = {}
@@ -319,6 +304,8 @@ class BaseModelMeta(ModelMetaclass):
             if isinstance(value, BaseField):
                 # make sure we have a fresh copy where we can set the owner
                 value = copy.copy(value)
+                # set as soon as possible the field_name
+                value.field_name = key
 
                 # add fields and non BaseRefForeignKeyField to fields
                 # The BaseRefForeignKeyField is actually not a normal SQL Foreignkey
@@ -331,16 +318,10 @@ class BaseModelMeta(ModelMetaclass):
                 if not isinstance(value, BaseRefForeignKeyField):
                     fields[key] = value
 
-                if isinstance(value, BaseOneToOneKeyField):
-                    foreign_key_fields[key] = value
-                elif isinstance(value, BaseManyToManyForeignKeyField):
-                    many_to_many_fields.add(value)
-                    continue
-                elif isinstance(value, BaseRefForeignKeyField):
+                if isinstance(value, BaseRefForeignKeyField):
                     model_references[key] = value.to
-                elif isinstance(value, BaseForeignKeyField):
+                elif isinstance(value, (BaseForeignKeyField, BaseOneToOneKeyField)):
                     foreign_key_fields[key] = value
-                    continue
 
         if not is_abstract:
             # the order is important because it reflects the inheritance order
@@ -355,6 +336,8 @@ class BaseModelMeta(ModelMetaclass):
                     embedded_fields = field.get_embedded_fields(field_name, fields)
                     if embedded_fields:
                         for sub_field_name, sub_field in embedded_fields.items():
+                            # set as soon as possible the field_name
+                            sub_field.field_name = key
                             if sub_field_name == "pk":
                                 raise ValueError("sub field uses reserved name pk")
 
@@ -380,13 +363,13 @@ class BaseModelMeta(ModelMetaclass):
                     inner_fields=pk_attributes_finalized, model=ConditionalRedirect, exclude=True
                 ),
             )
+            fields["pk"].field_name = "pk"
 
         del is_abstract
 
         attrs["meta"] = meta = MetaInfo(meta_class)
         meta.fields_mapping = fields
         meta.foreign_key_fields = foreign_key_fields
-        meta.many_to_many_fields = many_to_many_fields
         meta.model_references = model_references
         meta.pk_attributes = pk_attributes_finalized
         meta.pk = fields.get("pk")
@@ -508,9 +491,9 @@ class BaseModelMeta(ModelMetaclass):
             related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
             meta.related_names.add(related_name)
 
-        for field, value in new_class.fields.items():  # type: ignore
+        for value in new_class.fields.values():  # type: ignore
             if isinstance(value, BaseManyToManyForeignKeyField):
-                _set_many_to_many_relation(value, new_class, field)
+                value.create_through_model()
 
         # Set the manager
         for _, value in attrs.items():
