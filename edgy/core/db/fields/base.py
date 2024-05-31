@@ -354,8 +354,8 @@ class BaseForeignKey(BaseField):
     def from_fk_field_name(self, name: str, fk_field_name: str) -> str:
         target = self.target
         if len(target.pknames) == 1:
-            return target.pknames[0]
-        return _removeprefix(fk_field_name, name)
+            return target.pknames[0]  # type: ignore
+        return _removeprefix(fk_field_name, f"{name}_")
 
     def get_columns(self, name: str) -> Sequence[Column]:
         target = self.target

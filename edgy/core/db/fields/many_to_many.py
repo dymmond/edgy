@@ -1,10 +1,11 @@
-from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar, Union
 
 import edgy
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.fields.core import ForeignKeyFieldFactory
 from edgy.core.db.fields.foreign_keys import ForeignKey
+from edgy.core.db.relationships.relation import Relation
 from edgy.core.terminal import Print
 from edgy.core.utils.models import create_edgy_model
 
@@ -97,6 +98,16 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
     def expand_relationship(self, value: Any) -> Any:
         return value
+
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+        """
+        Meta field
+        """
+        return {}
+
+    def __get__(self, instance: "Model", owner: Any = None) -> Relation:
+        # TODO: cache in the instance
+        return Relation(through=self.through, to=self.to, owner=self.owner, instance=instance)
 
 
 class ManyToManyField(ForeignKeyFieldFactory):
