@@ -69,6 +69,7 @@ class BaseField(FieldInfo):
         self.index: bool = kwargs.pop("index", False)
         self.choices: Sequence = kwargs.pop("choices", [])
         self.owner: Any = kwargs.pop("owner", None)
+        self.field_name: Optional[str] = kwargs.pop("field_name", None)
         self.name: str = kwargs.get("name", None)
         self.alias: str = kwargs.pop("name", None)
         self.regex: str = kwargs.pop("regex", None)
@@ -294,17 +295,21 @@ class BaseForeignKey(BaseField):
         return self._target
 
     @target.setter
-    def target(self, value: Any) -> Any:
+    def target(self, value: Any) -> None:
         self._target = value
+
+    @target.deleter
+    def target(self, value: Any) -> None:
+        try:
+            delattr(self, "_target")
+        except AttributeError:
+            pass
 
     def expand_relationship(self, value: Any) -> Any:
         target = self.target
-        if isinstance(value, target):
-            return value
 
-        fields_filtered = {pkname: target.proxy_model.fields.get(pkname) for pkname in target.proxy_model.pknames}
-        target.proxy_model.model_fields = fields_filtered
-        target.proxy_model.model_rebuild(force=True)
+        if isinstance(value, (target, target.proxy_model)):
+            return value
         return target.proxy_model(pk=value)
 
     def clean(self, name: str, value: Any) -> Dict[str, Any]:
@@ -324,9 +329,7 @@ class BaseForeignKey(BaseField):
         """
         Like clean just for the internal input transformation. Validation happens later.
         """
-        if phase == "set":
-            value = self.expand_relationship(value)
-        return {field_name: value}
+        return {field_name: self.expand_relationship(value)}
 
     def get_fk_name(self, name: str) -> str:
         """

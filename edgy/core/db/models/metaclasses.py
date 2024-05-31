@@ -319,6 +319,8 @@ class BaseModelMeta(ModelMetaclass):
             if isinstance(value, BaseField):
                 # make sure we have a fresh copy where we can set the owner
                 value = copy.copy(value)
+                # set as soon as possible the field_name
+                value.field_name = key
 
                 # add fields and non BaseRefForeignKeyField to fields
                 # The BaseRefForeignKeyField is actually not a normal SQL Foreignkey
@@ -355,6 +357,8 @@ class BaseModelMeta(ModelMetaclass):
                     embedded_fields = field.get_embedded_fields(field_name, fields)
                     if embedded_fields:
                         for sub_field_name, sub_field in embedded_fields.items():
+                            # set as soon as possible the field_name
+                            sub_field.field_name = key
                             if sub_field_name == "pk":
                                 raise ValueError("sub field uses reserved name pk")
 
@@ -380,6 +384,7 @@ class BaseModelMeta(ModelMetaclass):
                     inner_fields=pk_attributes_finalized, model=ConditionalRedirect, exclude=True
                 ),
             )
+            fields["pk"].field_name = "pk"
 
         del is_abstract
 
