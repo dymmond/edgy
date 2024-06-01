@@ -19,17 +19,34 @@ def get_model(registry: Registry, model_name: str) -> "Model":
         raise LookupError(f"Registry doesn't have a {model_name} model.") from None
 
 
-def pk_to_dict(model: "EdgyBaseModel", pk: Any) -> Dict[str, Any]:
-    if len(model.pknames) == 1:
-        if isinstance(pk, dict):
-            pk = pk[model.pknames[0]]
-        elif hasattr(pk, model.pknames[0]):
-            pk = getattr(pk, model.pknames[0])
-        return {model.pknames[0]: pk}
-    elif isinstance(pk, dict):
-        return {pkname: pk[pkname] for pkname in model.pknames}
+def pk_to_dict(model: "EdgyBaseModel", pk: Any, is_partial: bool = False) -> Dict[str, Any]:
+    try:
+        if len(model.pknames) == 1:
+            if isinstance(pk, dict):
+                pk = pk[model.pknames[0]]
+            elif hasattr(pk, model.pknames[0]):
+                pk = getattr(pk, model.pknames[0])
+            return {model.pknames[0]: pk}
+    except (KeyError, AttributeError) as exc:
+        if is_partial:
+            return {}
+        raise exc
+    retdict = {}
+    if isinstance(pk, dict):
+        for pkname in model.pknames:
+            try:
+                retdict[pkname] = pk[pkname]
+            except KeyError as exc:
+                if not is_partial:
+                    raise exc
     else:
-        return {pkname: getattr(pk, pkname) for pkname in model.pknames}
+        for pkname in model.pknames:
+            try:
+                retdict[pkname] = getattr(pk, pkname)
+            except AttributeError as exc:
+                if not is_partial:
+                    raise exc
+    return retdict
 
 
 def pk_from_model(model: "EdgyBaseModel", always_dict: bool = False) -> Union[Dict[str, Any], Any]:

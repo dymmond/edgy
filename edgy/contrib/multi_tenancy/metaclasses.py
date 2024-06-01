@@ -3,8 +3,9 @@ from typing import Any, Optional, Tuple, Type, Union
 from edgy.core.db.models.metaclasses import (
     BaseModelMeta,
     MetaInfo,
-    _check_model_inherited_registry,
+    get_model_registry,
 )
+from edgy.exceptions import ImproperlyConfigured
 
 
 def _check_model_inherited_tenancy(bases: Tuple[Type, ...]) -> Union[bool, None]:
@@ -57,11 +58,15 @@ class BaseTenantMeta(BaseModelMeta):
         # Handle the registry of models
         if getattr(meta, "registry", None) is None:
             if hasattr(new_model, "__db_model__") and new_model.__db_model__:
-                meta.registry = _check_model_inherited_registry(bases)
+                meta.registry = get_model_registry(bases)
             else:
                 return new_model
-
         registry = meta.registry
+        if registry is None:
+            raise ImproperlyConfigured(
+                "Registry for the table not found in the Meta class or any of the superclasses. You must set the registry in the Meta."
+            )
+
         new_model.meta = meta
 
         # Check if is tenant
