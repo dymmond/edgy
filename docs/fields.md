@@ -161,7 +161,7 @@ class MyModel(edgy.Model):
 
 The **CompositeField** is a little bit different from the normal fields. It takes a parameter `inner_fields` and distributes write or read access to the fields
 referenced in `inner_fields`. It hasn't currently all field parameters. Especially not the server parameters.
-For distributing the field parameters it uses the `Descriptor Protocol`.
+For distributing the field parameters it uses the `Descriptor Protocol` for reading and to_model for writing.
 
 Optionally a pydantic model can be provided via the **model** argument.
 
@@ -205,6 +205,13 @@ the fields need the exclude attribute/parameter set
 * **prefix_embedded** - Default "". Prefix the field names of embedded fields (not references to external fields). Useful for implementing embeddables
 
 Note: embedded fields are deepcopied. This way it is safe to provide the same inner_fields object to multiple CompositeFields
+
+
+Note: there is a special parameter for model: `ConditionalRedirect`.
+It changes the behaviour of CompositeField in this way:
+
+- one inner field: Reads and writes are redirected to this field. When setting a dict or pydantic BaseModel the value is tried to be extracted like in the normal mode. Otherwise the logic of the single field is used. When returning only the value of the single field is returned
+- > 1 inner fields: normal behavior. Dicts are returned
 
 
 ##### Inheritance
@@ -292,13 +299,12 @@ Derives from the same as [CharField](#charfield) and validates the email value.
 #### ExcludeField
 
 Remove inherited fields by masking them from the model.
-This way a field can be removed.
+This way a field can be removed in subclasses.
 
-ExcludeField is a stub field and can be overwritten itself.
+ExcludeField is a stub field and can be overwritten itself in case a Model wants to readd the field.
 
-When providing in constructor and argument, the argument is ignored.
-
-In contrast: get and set operations are prohibited, they raise an AttributeError.
+When given an argument in the constructor the argument is silently ignored.
+When trying to set/access the attribute on a model instance, an AttributeError is raised.
 
 ```python
 import edgy
@@ -314,6 +320,11 @@ class AbstractModel(edgy.Model):
 class ConcreteModel(AbstractModel):
     email: Type[None] = edgy.ExcludeField()
 
+# works
+obj = ConcreteModel(email="foo@example.com", price=1.5)
+# fails with AttributeError
+variable = obj.email
+obj.email = "foo@example.com"
 ```
 
 #### FloatField
@@ -559,7 +570,7 @@ Additional they can provide following methods:
 * **`__get__`** - Descriptor protocol like get access customization.
 * **`__set__`** - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
 * **to_model** - like clean, just for setting attributes or initializing a model.
-* **get_embedded_fields(self, field_name, field_mapping)** - Define internal fields.
+* **get_embedded_fields(self, field_name, fields_mapping)** - Define internal fields.
 * **get_default_values(self, field_name, cleaned_data)** - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
 * **get_default_value(self)** - return default value for one column fields.
 

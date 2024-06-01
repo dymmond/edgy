@@ -9,7 +9,7 @@ models = edgy.Registry(database=database)
 # where the `Track` will be also internally filtered
 company = await Company.query.prefetch_related(
     Prefetch(
-        related_name="companies__studios__tracks",
+        related_name="studio__album__tracks",
         to_attr="tracks",
         queryset=Track.query.filter(title__icontains="bird"),
     )

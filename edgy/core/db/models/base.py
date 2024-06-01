@@ -236,14 +236,14 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             if field_name == "pk":
                 continue
             if not should_show_pk or field_name not in self.pknames:
-                if field_name in initial_full_field_exclude or field_name == "pk":
+                if field_name in initial_full_field_exclude:
                     continue
                 if include is not None and field_name not in include:
                     continue
                 if getattr(field_name, "exclude", False):
                     continue
             field = self.fields[field_name]
-            retval = field.__get__(self)
+            retval = field.__get__(self, self.__class__)
             sub_include = None
             if isinstance(include, dict):
                 sub_include = include.get(field_name, None)
@@ -292,9 +292,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         columns = []
         global_constraints = []
         for name, field in cls.fields.items():
-            # aliasing
-            if field.name:
-                name = field.name
             current_columns = field.get_columns(name)
             columns.extend(current_columns)
             global_constraints.extend(field.get_global_constraints(name, current_columns))
@@ -354,16 +351,16 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         Extracts all the model references (ModelRef) from the model
         """
-        related_names = self.meta.related_names
-        return {k: v for k, v in self.__model_references__.items() if k not in related_names}
+        related_fields = self.meta.related_fields
+        return {k: v for k, v in self.__model_references__.items() if k not in related_fields}
 
     def extract_db_fields(self) -> Dict[str, Any]:
         """
-        Extacts all the db fields and excludes the related_names since those
+        Extacts all the db fields and excludes the related_fields since those
         are simply relations.
         """
-        related_names = self.meta.related_names
-        return {k: v for k, v in self.__dict__.items() if k not in related_names and k not in EXCLUDED_LOOKUP}
+        related_fields = self.meta.related_fields
+        return {k: v for k, v in self.__dict__.items() if k not in related_fields and k not in EXCLUDED_LOOKUP}
 
     def get_instance_name(self) -> str:
         """
@@ -376,6 +373,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         if field is not None:
             if hasattr(field, "__set__"):
                 # not recommended, better to use to_model instead
+                # used in related_fields to mask and not to implement to_model
                 field.__set__(self, value)
             else:
                 for k, v in field.to_model(key, value, phase="set").items():
