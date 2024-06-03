@@ -27,7 +27,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         self.registry.models[model.__name__] = model
 
-    def create_through_model(self) -> Any:
+    def create_through_model(self) -> None:
         """
         Creates the default empty through model.
 
@@ -44,7 +44,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
             self.through.meta.is_multi = True
             self.through.meta.multi_related = [self.to.__name__.lower()]
-            return self.through
+            return
 
         owner_name = self.owner.__name__
         to_name = self.to.__name__

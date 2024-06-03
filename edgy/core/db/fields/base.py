@@ -1,6 +1,6 @@
 import decimal
 from functools import cached_property
-from typing import Any, ClassVar, Dict, Optional, Pattern, Sequence, Union
+from typing import Any, ClassVar, Dict, FrozenSet, Optional, Pattern, Sequence, Union
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
@@ -314,16 +314,37 @@ class BaseForeignKey(BaseField):
 
     def clean(self, name: str, value: Any) -> Dict[str, Any]:
         target = self.target
+        retdict: Dict[str, Any] = {}
         if value is None:
-            return {self.get_fk_field_name(name, pkname): None for pkname in target.pknames}
+            for column_name in self.get_column_names(name):
+                retdict[column_name] = None
         elif isinstance(value, dict):
-            return {self.get_fk_field_name(name, pkname): value[pkname] for pkname in target.pknames}
+            for pkname in target.pknames:
+                retdict.update(target.fields[pkname].clean(self.get_fk_field_name(name, pkname), value[pkname]))
         elif isinstance(value, BaseModel):
-            return {self.get_fk_field_name(name, pkname): getattr(value, pkname) for pkname in target.pknames}
+            for pkname in target.pknames:
+                retdict.update(
+                    target.fields[pkname].clean(self.get_fk_field_name(name, pkname), getattr(value, pkname))
+                )
         elif len(target.pknames) == 1:
-            return {self.get_fk_field_name(name, target.pknames[0]): value}
+            retdict.update(
+                target.fields[target.pknames[0]].clean(self.get_fk_field_name(name, target.pknames[0]), value)
+            )
         else:
             raise ValueError(f"cannot handle: {value} of type {type(value)}")
+        return retdict
+
+    def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
+        to_add = {}
+        for column_name in self.get_column_names(name):
+            if column_name in kwargs and column_name != name:
+                to_add[column_name] = kwargs.pop(column_name)
+        # empty
+        if not to_add:
+            return
+        if name in kwargs:
+            raise ValueError("Cannot specify a pk column and the pk itself")
+        kwargs[name] = to_add
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         """
@@ -356,6 +377,16 @@ class BaseForeignKey(BaseField):
         if len(target.pknames) == 1:
             return target.pknames[0]  # type: ignore
         return _removeprefix(fk_field_name, f"{name}_")
+
+    def get_column_names(self, name: str) -> FrozenSet[str]:
+        if not hasattr(self, "_column_names") or name != self.field_name:
+            column_names = set()
+            for column in self.get_columns(name):
+                column_names.add(column.name)
+            if name != self.field_name:
+                return frozenset(column_names)
+            self._column_names = frozenset(column_names)
+        return self._column_names
 
     def get_columns(self, name: str) -> Sequence[Column]:
         target = self.target

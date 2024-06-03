@@ -16,7 +16,6 @@ from typing import (
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
-from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 from sqlalchemy.ext.asyncio import AsyncConnection
 from typing_extensions import Self
@@ -62,24 +61,30 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.__show_pk__ = kwargs.pop("__show_pk__", False)
-        kwargs = self.transform_kwargs(kwargs)
+        kwargs = self.transform_input(kwargs, phase="creation")
         super().__init__(**kwargs)
         model_references = self.setup_model_references_from_kwargs(kwargs)
         values = self.setup_model_fields_from_kwargs(kwargs)
         self.__dict__ = values
         self.__model_references__ = model_references
 
-    def transform_kwargs(self, kwargs: Any) -> Any:
+    @classmethod
+    def transform_input(cls, kwargs: Any, phase: str) -> Any:
         """
         Expand to_model.
         """
+        kwargs = {**kwargs}
         new_kwargs: Dict[str, Any] = {}
-        # abstract classes without registry have no fields
-        fields = self.meta.fields_mapping
+
+        fields = cls.meta.fields_mapping
+        # phase 1: transform
+        for field_name in cls.meta.input_modifying_fields:
+            fields[field_name].modify_input(field_name, kwargs)
+        # phase 2: apply to_model
         for key, value in kwargs.items():
             field = fields.get(key, None)
             if field is not None:
-                new_kwargs.update(**field.to_model(key, value, phase="creation"))
+                new_kwargs.update(**field.to_model(key, value, phase=phase))
             else:
                 new_kwargs[key] = value
         return new_kwargs
@@ -305,7 +310,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         for field in index_constraints or []:
             index = cls._get_indexes(field)
             indexes.append(index)
-
         return sqlalchemy.Table(
             tablename,
             metadata,

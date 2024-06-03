@@ -46,15 +46,16 @@ class Model(ModelRow, DeclarativeMixin):
         """
         await self.signals.pre_update.send_async(self.__class__, instance=self)
 
-        kwargs = self._update_auto_now_fields(kwargs, self.fields)
-        expression = self.table.update().values(**kwargs).where(*pk_from_model_to_clauses(self))
-        await self.database.execute(expression)
+        # empty updates shouldn't cause an error
+        if kwargs:
+            kwargs = self._update_auto_now_fields(kwargs, self.fields)
+            expression = self.table.update().values(**kwargs).where(*pk_from_model_to_clauses(self))
+            await self.database.execute(expression)
         await self.signals.post_update.send_async(self.__class__, instance=self)
 
         # Update the model instance.
         for key, value in kwargs.items():
             setattr(self, key, value)
-
         return self
 
     async def delete(self) -> None:
@@ -77,8 +78,7 @@ class Model(ModelRow, DeclarativeMixin):
         if row is None:
             raise ObjectNotFound("row does not exist anymore")
         # Update the instance.
-        for key, value in dict(row._mapping).items():
-            setattr(self, key, value)
+        self.__dict__.update(self.transform_input(dict(row._mapping), phase="load"))
 
     async def _save(self, **kwargs: Any) -> "Model":
         """
@@ -86,10 +86,14 @@ class Model(ModelRow, DeclarativeMixin):
         """
         expression = self.table.insert().values(**kwargs)
         awaitable = await self.database.execute(expression)
-        if not awaitable:
-            awaitable = pk_to_dict(self, kwargs)
-        for k, v in self.fields["pk"].to_model("pk", awaitable, phase="set").items():
-            setattr(self, k, v)
+        pk_dict = pk_to_dict(self, kwargs, is_partial=True)
+        if awaitable:
+            # autoincrement. search autoincrement field
+            for pkname in self.pknames:
+                if self.fields[pkname].autoincrement:
+                    pk_dict[pkname] = awaitable
+                    break
+        self.__dict__.update(pk_dict)
         return self
 
     async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
@@ -164,8 +168,11 @@ class Model(ModelRow, DeclarativeMixin):
         self.update_from_dict(dict_values=dict(extracted_fields.items()))
 
         # Performs the update or the create based on a possible existing primary key
+
         if getattr(self, "pk", None) is None or force_save:
-            validated_values = values or self._extract_values_from_field(extracted_values=extracted_fields)
+            validated_values = self._extract_values_from_field(
+                extracted_values=extracted_fields if values is None else extracted_fields, is_partial=values is not None
+            )
             kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
             kwargs, model_references = self.update_model_references(**kwargs)
             await self._save(**kwargs)
@@ -173,8 +180,10 @@ class Model(ModelRow, DeclarativeMixin):
             # Broadcast the initial update details
             # Making sure it only updates the fields that should be updated
             # and excludes the fields aith `auto_now` as true
-            validated_values = values or self._extract_values_from_field(
-                extracted_values=extracted_fields, is_update=True
+            validated_values = self._extract_values_from_field(
+                extracted_values=extracted_fields if values is None else extracted_fields,
+                is_update=True,
+                is_partial=values is not None,
             )
             kwargs, model_references = self.update_model_references(**validated_values)
             update_model = {k: v for k, v in validated_values.items() if k in kwargs}
