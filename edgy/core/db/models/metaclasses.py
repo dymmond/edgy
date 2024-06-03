@@ -50,6 +50,7 @@ class MetaInfo:
         "pk_attributes",
         "abstract",
         "fields",
+        "input_modifying_fields",
         "fields_mapping",
         "registry",
         "tablename",
@@ -76,6 +77,7 @@ class MetaInfo:
         self.pk_attributes: Sequence[str] = getattr(meta, "pk_attributes", "")
         self.abstract: bool = getattr(meta, "abstract", False)
         self.fields: Set[Any] = {*getattr(meta, "fields", _empty_set)}
+        self.input_modifying_fields: Set[str] = {*getattr(meta, "input_modifying_fields", _empty_set)}
         self.fields_mapping: Dict[str, BaseField] = {**getattr(meta, "fields_mapping", _empty_dict)}
         self.registry: Optional[Registry] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
@@ -111,29 +113,27 @@ class MetaInfo:
             edgy_setattr(self, key, value)
 
 
-def _check_model_inherited_registry(bases: Tuple[Type, ...]) -> Registry:
+def get_model_registry(
+    bases: Tuple[Type, ...], meta_class: Optional[Union["object", MetaInfo]] = None
+) -> Optional[Registry]:
     """
     When a registry is missing from the Meta class, it should look up for the bases
     and obtain the first found registry.
-
-    If not found, then a ImproperlyConfigured exception is raised.
     """
-    found_registry: Optional[Registry] = None
+    if meta_class is not None:
+        direct_registry: Optional[Registry] = getattr(meta_class, "registry", None)
+        if direct_registry is not None:
+            return direct_registry
 
     for base in bases:
         meta: MetaInfo = getattr(base, "meta", None)  # type: ignore
         if not meta:
             continue
+        found_registry: Optional[Registry] = getattr(meta, "registry", None)
 
-        if getattr(meta, "registry", None) is not None:
-            found_registry = meta.registry
-            break
-
-    if not found_registry:
-        raise ImproperlyConfigured(
-            "Registry for the table not found in the Meta class or any of the superclasses. You must set the registry in the Meta."
-        )
-    return found_registry
+        if found_registry is not None:
+            return found_registry
+    return None
 
 
 def _check_manager_for_bases(
@@ -231,12 +231,14 @@ class BaseModelMeta(ModelMetaclass):
 
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
         fields: Dict[str, BaseField] = {}
+        input_modifying_fields: Set[str] = set()
         foreign_key_fields: Dict[str, BaseField] = {}
         model_references: Dict["ModelRef", str] = {}
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attributes: Set[str] = set()
         base_annotations: Dict[str, Any] = {}
         is_abstract: bool = getattr(meta_class, "abstract", False)
+        registry: Optional[Registry] = get_model_registry(bases, meta_class)
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
@@ -306,6 +308,8 @@ class BaseModelMeta(ModelMetaclass):
                 value = copy.copy(value)
                 # set as soon as possible the field_name
                 value.field_name = key
+                if registry:
+                    value.registry = registry
 
                 # add fields and non BaseRefForeignKeyField to fields
                 # The BaseRefForeignKeyField is actually not a normal SQL Foreignkey
@@ -336,21 +340,25 @@ class BaseModelMeta(ModelMetaclass):
                     embedded_fields = field.get_embedded_fields(field_name, fields)
                     if embedded_fields:
                         for sub_field_name, sub_field in embedded_fields.items():
-                            # set as soon as possible the field_name
-                            sub_field.field_name = key
                             if sub_field_name == "pk":
                                 raise ValueError("sub field uses reserved name pk")
 
                             if sub_field_name in fields and fields[sub_field_name].owner is None:
                                 raise ValueError(f"sub field name collision: {sub_field_name}")
+                            # set as soon as possible the field_name
+                            sub_field.field_name = key
+                            if registry:
+                                sub_field.registry = registry
                             fieldnames_to_check.append(sub_field_name)
                             fields[sub_field_name] = sub_field
                             model_fields[sub_field_name] = sub_field
                             if sub_field.primary_key:
                                 pk_attributes.add(sub_field_name)
 
-        for slot in fields:
-            attrs.pop(slot, None)
+        for field_name, field_value in fields.items():
+            attrs.pop(field_name, None)
+            if hasattr(field_value, "modify_input"):
+                input_modifying_fields.add(field_name)
 
         # create a sorted tuple from pk_attributes for nicer outputs
         pk_attributes_finalized = tuple(sorted(pk_attributes))
@@ -366,9 +374,9 @@ class BaseModelMeta(ModelMetaclass):
             fields["pk"].field_name = "pk"
 
         del is_abstract
-
         attrs["meta"] = meta = MetaInfo(meta_class)
         meta.fields_mapping = fields
+        meta.input_modifying_fields = input_modifying_fields
         meta.foreign_key_fields = foreign_key_fields
         meta.model_references = model_references
         meta.pk_attributes = pk_attributes_finalized
@@ -410,7 +418,7 @@ class BaseModelMeta(ModelMetaclass):
         new_class.pknames = pk_attributes_finalized
 
         # Set the owner of the field, must be done as early as possible
-        for _, value in fields.items():
+        for value in fields.values():
             value.owner = new_class
 
         # Validate meta for managers, uniques and indexes
@@ -425,16 +433,18 @@ class BaseModelMeta(ModelMetaclass):
             if getattr(meta, "indexes", None) is not None:
                 raise ImproperlyConfigured("indexes cannot be in abstract classes.")
 
-        # Handle the registry of models
+        # Now set the registry of models
         if meta.registry is None:
-            if hasattr(new_class, "__db_model__") and new_class.__db_model__:
-                meta.registry = _check_model_inherited_registry(bases)
+            if getattr(new_class, "__db_model__", False):
+                meta.registry = registry
             else:
                 new_class.model_rebuild(force=True)
                 return new_class
+        if registry is None:
+            raise ImproperlyConfigured(
+                "Registry for the table not found in the Meta class or any of the superclasses. You must set the registry in the Meta."
+            )
 
-        registry = meta.registry
-        assert registry, "no registry found, should not happen here"
         new_class.database = registry.database
 
         # Making sure the tablename is always set if the value is not provided
@@ -465,9 +475,9 @@ class BaseModelMeta(ModelMetaclass):
                     if not isinstance(value, Index):
                         raise ValueError("Meta.indexes must be a list of Index types.")
 
-        # Set the registry of the field
-        for _, value in fields.items():
-            value.registry = registry
+        for value in fields.values():
+            if isinstance(value, BaseManyToManyForeignKeyField):
+                value.create_through_model()
 
         # Making sure it does not generate tables if abstract it set
         if not meta.abstract:
@@ -481,22 +491,13 @@ class BaseModelMeta(ModelMetaclass):
         meta.model = new_class
         meta.manager.model_class = new_class
 
-        # Set the owner and registry of the field
-        for _, value in new_class.fields.items():
-            value.owner = new_class
-            value.registry = registry
-
         # Sets the foreign key fields
         if meta.foreign_key_fields and not new_class.is_proxy_model:
             related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
             meta.related_names.add(related_name)
 
-        for value in new_class.fields.values():  # type: ignore
-            if isinstance(value, BaseManyToManyForeignKeyField):
-                value.create_through_model()
-
         # Set the manager
-        for _, value in attrs.items():
+        for value in attrs.values():
             if isinstance(value, Manager):
                 value.model_class = new_class
 
@@ -513,9 +514,11 @@ class BaseModelMeta(ModelMetaclass):
             new_class.__proxy_model__ = proxy_model
             new_class.__proxy_model__.parent = new_class
             new_class.__proxy_model__.model_rebuild(force=True)
-            meta.registry.models[new_class.__name__] = new_class
+            meta.registry.models[new_class.__name__] = new_class  # type: ignore
 
+        # finalize
         new_class.model_rebuild(force=True)
+
         return new_class
 
     def get_db_shema(cls) -> Union[str, None]:
