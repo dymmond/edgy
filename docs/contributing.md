@@ -3,9 +3,9 @@
 Thank you for showing interes in contributing to Edgy. There are many ways you can help and contribute to the
 project.
 
-* Try Edgy and [report bugs and issues](https://github.com/tarsil/edgy/issues/new) you find.
-* [Implement new features](https://github.com/tarsil/edgy/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
-* Help othes by [reviewing pull requests](https://github.com/tarsil/edgy/pulls)
+* Try Edgy and [report bugs and issues](https://github.com/dymmond/edgy/issues/new) you find.
+* [Implement new features](https://github.com/dymmond/edgy/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)
+* Help othes by [reviewing pull requests](https://github.com/dymmond/edgy/pulls)
 * Help writting documentation
 * Use the discussions and actively participate on them.
 * Become an contributor by helping Edgy growing and spread the words across small, medium, large or any company
@@ -17,7 +17,7 @@ It is natural that you might find something that Edgy should support or even exp
 behaviour that needs addressing.
 
 The way we love doing things is very simple, contributions should start out with a
-[discussion](https://github.com/tarsil/edgy/discussions). The potential bugs shall be raised as "Potential Issue"
+[discussion](https://github.com/dymmond/edgy/discussions). The potential bugs shall be raised as "Potential Issue"
 in the discussions, the feature requests may be raised as "Ideas".
 
 We can then decide if the discussion needs to be escalated into an "Issue" or not.
@@ -37,7 +37,7 @@ it clear to understand and get the required help.
 
 ## Development
 
-To develop for Edgy, create a fork of the [Edgy repository](https://github.com/tarsil/edgy) on GitHub.
+To develop for Edgy, create a fork of the [Edgy repository](https://github.com/dymmond/edgy) on GitHub.
 
 After, clone your fork with the follow command replacing `YOUR-USERNAME` wih your GitHub username:
 
@@ -129,7 +129,7 @@ Before releasing a new package into production some considerations need to be ta
 
 * **Changelog**
     * Like many projects, we follow the format from [keepchangelog](https://keepachangelog.com/en/1.0.0/).
-    * [Compare](https://github.com/tarsil/edgy/compare/) `main` with the release tag and list of the entries
+    * [Compare](https://github.com/dymmond/edgy/compare/) `main` with the release tag and list of the entries
 that are of interest to the users of the framework.
         * What **must** go in the changelog? added, changed, removed or deprecated features and the bug fixes.
         * What is **should not go** in the changelog? Documentation changes, tests or anything not specified in the
@@ -142,7 +142,7 @@ point above.
 
 #### Releasing
 
-Once the `release` PR is merged, create a new [release](https://github.com/tarsil/edgy/releases/new)
+Once the `release` PR is merged, create a new [release](https://github.com/dymmond/edgy/releases/new)
 that includes:
 
 Example:

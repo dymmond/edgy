@@ -1,5 +1,5 @@
 This is the part that makes a whole difference if you are thinking about querying a specific
-database using a diffent [connection](https://edgy.tarsild.io/connection).
+database using a diffent [connection](https://edgy.dymmond.com/connection).
 
 What does that even mean? Imagine you have a main database `public` (default) and a database copy somewhere
 else called `alternative` (or whatever name you choose) and both have the model `User`.

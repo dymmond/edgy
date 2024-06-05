@@ -113,14 +113,14 @@ to the right tenant.
 ### Added
 
 - Support for `sync` queries. This will enable Edgy to run in blocking frameworks like
-Flask, bottle or any other by using the newly added [run_sync](./queries/queries.md#blocking-queries). [#60](https://github.com/tarsil/edgy/pull/60).
+Flask, bottle or any other by using the newly added [run_sync](./queries/queries.md#blocking-queries). [#60](https://github.com/dymmond/edgy/pull/60).
 
 ### Fixed
 
-- Fixed multi tenancy from contrib. [#58](https://github.com/tarsil/edgy/pull/58).
+- Fixed multi tenancy from contrib. [#58](https://github.com/dymmond/edgy/pull/58).
 - Fixed `using` where schema name was raising a not found reference for foreign key
-when querying the tenant. [#58](https://github.com/tarsil/edgy/pull/58).
-- Fixed `exclude_secrets` when querying models with foreign keys. [#59](https://github.com/tarsil/edgy/pull/59).
+when querying the tenant. [#58](https://github.com/dymmond/edgy/pull/58).
+- Fixed `exclude_secrets` when querying models with foreign keys. [#59](https://github.com/dymmond/edgy/pull/59).
 
 ### 0.7.1
 
@@ -181,7 +181,7 @@ caused by the `urlsplit`.
 ### Fixed
 
 - Raise `ImproperlyConfigured` for managers that are not typed as `ClassVar` avoiding
-maximum recursion error. [#19](https://github.com/tarsil/edgy/pull/39).
+maximum recursion error. [#19](https://github.com/dymmond/edgy/pull/39).
 
 ## 0.5.0
 
