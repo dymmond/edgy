@@ -35,8 +35,8 @@ theme:
     - navigation.path
     - navigation.tabs
 
-repo_name: tarsil/edgy
-repo_url: https://github.com/tarsil/edgy
+repo_name: dymmond/edgy
+repo_url: https://github.com/dymmond/edgy
 edit_uri: ""
 plugins:
   - search

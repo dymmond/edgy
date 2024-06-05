@@ -64,11 +64,11 @@ keywords = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/tarsil/edgy"
+Homepage = "https://github.com/dymmond/edgy"
 Documentation = "https://edgyorm.tarsild.io"
 Changelog = "https://edgyorm.tarsild.io/release-notes/"
 Funding = "https://github.com/sponsors/tarsil"
-Source = "https://github.com/tarsil/edgy"
+Source = "https://github.com/dymmond/edgy"
 
 [project.scripts]
 edgy = "edgy.__main__:run_cli"

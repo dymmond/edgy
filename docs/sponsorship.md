@@ -11,7 +11,7 @@ Giving a start to Edgy is very simple and helps promoting the work across the de
 
 The button is located at the top right.
 
-[https://github.com/tarsil/edgy](https://github.com/tarsil/edgy).
+[https://github.com/dymmond/edgy](https://github.com/dymmond/edgy).
 
 This will help spreading the word about the tool and how helpful has been.
 

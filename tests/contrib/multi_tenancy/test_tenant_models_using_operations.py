@@ -67,7 +67,7 @@ async def test_schema_with_using():
     does not updated the data
     also User.query.using('tenant_schema').get(email="foo@bar.com")
     """
-    tenant = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
+    tenant = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy")
 
     user = await User.query.using(tenant.schema_name).create(name="Edgy", email="edgy@edgy.dev")
     total = await User.query.using(tenant.schema_name).all()

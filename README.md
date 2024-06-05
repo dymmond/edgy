@@ -1,7 +1,7 @@
 # Edgy
 
 <p align="center">
-  <a href="https://edgy.tarsild.io"><img src="https://res.cloudinary.com/tarsild/image/upload/v1690804138/packages/edgy/logo_wvmjxz.png" alt='Edgy'></a>
+  <a href="https://edgy.dymmond.com"><img src="https://res.cloudinary.com/tarsild/image/upload/v1690804138/packages/edgy/logo_wvmjxz.png" alt='Edgy'></a>
 </p>
 
 <p align="center">
@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-<a href="https://github.com/tarsil/edgy/workflows/Test%20Suite/badge.svg?event=push&branch=main" target="_blank">
-    <img src="https://github.com/tarsil/edgy/workflows/Test%20Suite/badge.svg?event=push&branch=main" alt="Test Suite">
+<a href="https://github.com/dymmond/edgy/workflows/Test%20Suite/badge.svg?event=push&branch=main" target="_blank">
+    <img src="https://github.com/dymmond/edgy/workflows/Test%20Suite/badge.svg?event=push&branch=main" alt="Test Suite">
 </a>
 
 <a href="https://pypi.org/project/edgy" target="_blank">
@@ -24,9 +24,9 @@
 
 ---
 
-**Documentation**: [https://edgy.tarsild.io][edgy] 📚
+**Documentation**: [https://edgy.dymmond.com][edgy] 📚
 
-**Source Code**: [https://github.com/tarsil/edgy](https://github.com/tarsil/edgy)
+**Source Code**: [https://github.com/dymmond/edgy](https://github.com/dymmond/edgy)
 
 ---
 
@@ -323,7 +323,7 @@ The response of the API `/create` should have a format similar to this (assuming
 In the documentation we go deeper in explanations and examples, this was just to warm up. 😁
 
 
-[edgy]: https://edgy.tarsild.io
+[edgy]: https://edgy.dymmond.com
 [saffier]: https://saffier.tarsild.io
 [models]: ./models.md
 [alembic]: https://alembic.sqlalchemy.org/en/latest/

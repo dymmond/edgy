@@ -68,7 +68,7 @@ async def test_tenant_model_metaclass_tenant_models():
 
 
 async def test_schema():
-    tenant = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
+    tenant = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy")
 
     for i in range(5):
         await Product.query.using(tenant.schema_name).create(name=f"product-{i}")
@@ -94,7 +94,7 @@ async def test_schema():
 
 
 async def test_can_have_multiple_tenants_with_different_records():
-    edgy = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
+    edgy = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy")
     saffier = await Tenant.query.create(
         schema_name="saffier", domain_url="https://saffier.tarsild.io", tenant_name="saffier"
     )
@@ -131,7 +131,7 @@ async def test_can_have_multiple_tenants_with_different_records():
 
 
 async def test_model_crud():
-    edgy = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy")
+    edgy = await Tenant.query.create(schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy")
 
     users = await User.query.using(edgy.schema_name).all()
     assert users == []
