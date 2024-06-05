@@ -64,16 +64,14 @@ class MetaInfo:
         "managers",
         "is_multi",
         "multi_related",
-        "related_names",
         "related_fields",
         "model_references",
-        "related_names_mapping",
         "signals",
     )
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         super().__init__(**kwargs)
-        self.pk: Optional[BaseField] = getattr(meta, "pk", None)
+        self.pk: Optional[edgy_fields.CompositeField] = getattr(meta, "pk", None)
         self.pk_attributes: Sequence[str] = getattr(meta, "pk_attributes", "")
         self.abstract: bool = getattr(meta, "abstract", False)
         self.fields: Set[Any] = {*getattr(meta, "fields", _empty_set)}
@@ -92,9 +90,7 @@ class MetaInfo:
         self.reflect: bool = getattr(meta, "reflect", False)
         self.is_multi: bool = getattr(meta, "is_multi", False)
         self.multi_related: Sequence[str] = [*getattr(meta, "multi_related", _empty_set)]
-        self.related_names: Set[str] = {*getattr(meta, "related_names", _empty_set)}
-        self.related_fields: Dict[str, Any] = {**getattr(meta, "related_fields", _empty_dict)}
-        self.related_names_mapping: Dict[str, Any] = {**getattr(meta, "related_names_mapping", _empty_dict)}
+        self.related_fields: Dict[str, RelatedField] = {**getattr(meta, "related_fields", _empty_dict)}
         self.signals: Optional[signals_module.Broadcaster] = signals_module.Broadcaster(
             **getattr(meta, "signals", _empty_dict)
         )
@@ -160,14 +156,14 @@ def _check_manager_for_bases(
 def _set_related_name_for_foreign_keys(
     foreign_keys: Set[Union[edgy_fields.OneToOneField, edgy_fields.ForeignKey]],
     model_class: Union["Model", "ReflectModel"],
-) -> Union[str, None]:
+) -> None:
     """
     Sets the related name for the foreign keys.
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
     if not foreign_keys:
-        return None
+        return
 
     for name, foreign_key in foreign_keys.items():
         default_related_name = getattr(foreign_key, "related_name", None)
@@ -182,19 +178,16 @@ def _set_related_name_for_foreign_keys(
         foreign_key.related_name = default_related_name
 
         related_field = RelatedField(
+            foreign_key_name=name,
             related_name=default_related_name,
             related_to=foreign_key.target,
             related_from=model_class,
         )
 
         # Set the related name
-        setattr(foreign_key.target, default_related_name, related_field)
-        model_class.meta.related_fields[default_related_name] = related_field
-
-        # Set the fields mapping where a related name maps a specific foreign key
-        model_class.meta.related_names_mapping[default_related_name] = name
-
-    return default_related_name
+        target = foreign_key.target
+        setattr(target, default_related_name, related_field)
+        target.meta.related_fields[default_related_name] = related_field
 
 
 def _register_model_signals(model_class: Type["Model"]) -> None:
@@ -249,7 +242,7 @@ class BaseModelMeta(ModelMetaclass):
             Search for class attributes of the type fields.Field in the given class.
 
             If a class attribute is an instance of the Field, then it will be added to the
-            field_mapping but only if the key does not exist already.
+            fields_mapping but only if the key does not exist already.
 
             If a primary_key field is not provided, it it automatically generate one BigIntegerField for the model.
             """
@@ -307,7 +300,7 @@ class BaseModelMeta(ModelMetaclass):
                 # make sure we have a fresh copy where we can set the owner
                 value = copy.copy(value)
                 # set as soon as possible the field_name
-                value.field_name = key
+                value.name = key
                 if registry:
                     value.registry = registry
 
@@ -346,7 +339,7 @@ class BaseModelMeta(ModelMetaclass):
                             if sub_field_name in fields and fields[sub_field_name].owner is None:
                                 raise ValueError(f"sub field name collision: {sub_field_name}")
                             # set as soon as possible the field_name
-                            sub_field.field_name = key
+                            sub_field.name = key
                             if registry:
                                 sub_field.registry = registry
                             fieldnames_to_check.append(sub_field_name)
@@ -364,14 +357,12 @@ class BaseModelMeta(ModelMetaclass):
         pk_attributes_finalized = tuple(sorted(pk_attributes))
         del pk_attributes
 
+        pk: Optional[edgy_fields.CompositeField] = None
+
         if not is_abstract:
-            fields["pk"] = cast(
-                BaseField,
-                edgy_fields.CompositeField(
-                    inner_fields=pk_attributes_finalized, model=ConditionalRedirect, exclude=True
-                ),
+            fields["pk"] = pk = edgy_fields.CompositeField(  # type: ignore
+                inner_fields=pk_attributes_finalized, model=ConditionalRedirect, exclude=True, field_name="pk"
             )
-            fields["pk"].field_name = "pk"
 
         del is_abstract
         attrs["meta"] = meta = MetaInfo(meta_class)
@@ -380,7 +371,7 @@ class BaseModelMeta(ModelMetaclass):
         meta.foreign_key_fields = foreign_key_fields
         meta.model_references = model_references
         meta.pk_attributes = pk_attributes_finalized
-        meta.pk = fields.get("pk")
+        meta.pk = pk
 
         if not fields:
             meta.abstract = True
@@ -493,8 +484,7 @@ class BaseModelMeta(ModelMetaclass):
 
         # Sets the foreign key fields
         if meta.foreign_key_fields and not new_class.is_proxy_model:
-            related_name = _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
-            meta.related_names.add(related_name)
+            _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
 
         # Set the manager
         for value in attrs.values():

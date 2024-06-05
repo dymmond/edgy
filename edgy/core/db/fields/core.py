@@ -71,7 +71,8 @@ class Field(BaseField):
             self.column_type,
             *constraints,
             primary_key=self.primary_key,
-            nullable=self.null and not self.primary_key,
+            autoincrement=self.autoincrement,
+            nullable=self.null,
             index=self.index,
             unique=self.unique,
             default=self.default,
@@ -248,7 +249,7 @@ class ConcreteCompositeField(BaseCompositeField):
             translated_name = self.translate_name(key)
             field = instance.fields.get(key)
             if field and hasattr(field, "__get__"):
-                d[translated_name] = field.__get__(instance)
+                d[translated_name] = field.__get__(instance, owner)
             else:
                 d[translated_name] = getattr(instance, key, None)
         if self.model is not None:
@@ -262,8 +263,8 @@ class ConcreteCompositeField(BaseCompositeField):
             # we first only redirect both
             and not isinstance(value, (dict, BaseModel))
         ):
-            field = self.owner.fields[self.inner_field_names[0]]
-            return field.clean(self.inner_field_names[0], value)  # type: ignore
+            field = self.owner.meta.fields_mapping[self.inner_field_names[0]]
+            return field.clean(self.inner_field_names[0], value)
         return super().clean(field_name, value)
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
@@ -273,15 +274,15 @@ class ConcreteCompositeField(BaseCompositeField):
             # we first only redirect both
             and not isinstance(value, (dict, BaseModel))
         ):
-            field = self.owner.fields[self.inner_field_names[0]]
-            return field.to_model(self.inner_field_names[0], value, phase=phase)  # type: ignore
+            field = self.owner.meta.fields_mapping[self.inner_field_names[0]]
+            return field.to_model(self.inner_field_names[0], value, phase=phase)
         return super().to_model(field_name, value, phase=phase)
 
-    def get_embedded_fields(self, name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
+    def get_embedded_fields(self, name: str, fields_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
         retdict = {}
         if not self.absorb_existing_fields:
             duplicate_fields = set(self.embedded_field_defs.keys()).intersection(
-                {k for k, v in field_mapping.items() if v.owner is None}
+                {k for k, v in fields_mapping.items() if v.owner is None}
             )
             if duplicate_fields:
                 raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
@@ -293,13 +294,13 @@ class ConcreteCompositeField(BaseCompositeField):
                 retdict[item[0]] = cloned_field
             return retdict
         for item in self.embedded_field_defs.items():
-            if item[0] not in field_mapping:
+            if item[0] not in fields_mapping:
                 cloned_field = copy.copy(item[1])
                 # set to the current owner of this field, required in collision checks
                 cloned_field.owner = self.owner
                 retdict[item[0]] = cloned_field
             else:
-                absorbed_field = field_mapping[item[0]]
+                absorbed_field = fields_mapping[item[0]]
                 if not getattr(absorbed_field, "skip_absorption_check", False) and not issubclass(
                     absorbed_field.field_type, item[1].field_type
                 ):
@@ -309,7 +310,7 @@ class ConcreteCompositeField(BaseCompositeField):
         return retdict
 
     def get_composite_fields(self) -> Dict[str, BaseField]:
-        return {field: self.owner.fields[field] for field in self.inner_field_names}
+        return {field: self.owner.meta.fields_mapping[field] for field in self.inner_field_names}
 
 
 class CompositeField(FieldFactory):

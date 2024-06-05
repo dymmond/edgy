@@ -1,6 +1,6 @@
 import decimal
 from functools import cached_property
-from typing import Any, ClassVar, Dict, FrozenSet, Optional, Pattern, Sequence, Union
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, FrozenSet, Optional, Pattern, Sequence, Type, Union
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
@@ -9,6 +9,9 @@ from sqlalchemy import Column, Constraint, ForeignKeyConstraint
 from edgy.core.connection.registry import Registry
 from edgy.exceptions import FieldDefinitionError
 from edgy.types import Undefined
+
+if TYPE_CHECKING:
+    from edgy import Model, ReflectModel
 
 edgy_setattr = object.__setattr__
 
@@ -68,8 +71,8 @@ class BaseField(FieldInfo):
         self.unique: bool = kwargs.pop("unique", False)
         self.index: bool = kwargs.pop("index", False)
         self.choices: Sequence = kwargs.pop("choices", [])
-        self.owner: Any = kwargs.pop("owner", None)
-        self.field_name: Optional[str] = kwargs.pop("field_name", None)
+        self.owner: Union[Type["Model"], Type["ReflectModel"]] = kwargs.pop("owner", None)
+        # field name, set when retrieving
         self.name: str = kwargs.get("name", None)
         self.alias: str = kwargs.pop("name", None)
         self.regex: str = kwargs.pop("regex", None)
@@ -113,8 +116,10 @@ class BaseField(FieldInfo):
         Returns:
             `True` if the argument is required, `False` otherwise.
         """
-        required = False if self.null else True
-        return bool(required and not self.primary_key)
+        if self.primary_key:
+            if self.autoincrement:
+                return False
+        return False if self.null else True
 
     def raise_for_non_default(self, default: Any, server_default: Any) -> Any:
         has_default: bool = True
@@ -148,23 +153,24 @@ class BaseField(FieldInfo):
 
     def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
         """
-        Runs the checks for the fields being validated.
+        Validates a value and transform it into columns which can be used for querying and saving
         """
         raise NotImplementedError()
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         """
-        Like clean just for the internal input transformation. Validation happens later.
+        Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
+        Validation happens later.
         """
         return {field_name: value}
 
-    def get_embedded_fields(self, field_name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
+    def get_embedded_fields(self, field_name: str, fields_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
         """
         Define extra fields on the fly. Often no owner is available yet.
 
         Arguments are:
         name: the field name
-        field_mapping: the existing fields
+        fields_mapping: the existing fields
 
         Note: the returned fields are changed after return, so you should return new fields or copies. Also set the owner of the field to them before returning
         """
@@ -210,22 +216,25 @@ class BaseCompositeField(BaseField):
         """
         Runs the checks for the fields being validated.
         """
+        if field_name.endswith("pk"):
+            prefix = field_name[:-2]
+        else:
+            prefix = ""
         result = {}
         if isinstance(value, dict):
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if translated_name not in value:
                     raise ValueError(f"Missing key: {sub_name} for {field_name}")
-                for k, v in field.clean(sub_name, value[translated_name]).items():
+                for k, v in field.clean(f"{prefix}{sub_name}", value[translated_name]).items():
                     result[k] = v
         else:
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if not hasattr(value, translated_name):
                     raise ValueError(f"Missing attribute: {translated_name} for {field_name}")
-                for k, v in field.clean(sub_name, getattr(value, translated_name)):
+                for k, v in field.clean(f"{prefix}{sub_name}", getattr(value, translated_name)).items():
                     result[k] = v
-
         return result
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
@@ -320,12 +329,14 @@ class BaseForeignKey(BaseField):
                 retdict[column_name] = None
         elif isinstance(value, dict):
             for pkname in target.pknames:
-                retdict.update(target.fields[pkname].clean(self.get_fk_field_name(name, pkname), value[pkname]))
+                if pkname in value:
+                    retdict.update(target.fields[pkname].clean(self.get_fk_field_name(name, pkname), value[pkname]))
         elif isinstance(value, BaseModel):
             for pkname in target.pknames:
-                retdict.update(
-                    target.fields[pkname].clean(self.get_fk_field_name(name, pkname), getattr(value, pkname))
-                )
+                if hasattr(value, pkname):
+                    retdict.update(
+                        target.fields[pkname].clean(self.get_fk_field_name(name, pkname), getattr(value, pkname))
+                    )
         elif len(target.pknames) == 1:
             retdict.update(
                 target.fields[target.pknames[0]].clean(self.get_fk_field_name(name, target.pknames[0]), value)
@@ -335,15 +346,17 @@ class BaseForeignKey(BaseField):
         return retdict
 
     def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
+        if len(self.target.pknames) == 1:
+            return
         to_add = {}
         for column_name in self.get_column_names(name):
-            if column_name in kwargs and column_name != name:
+            if column_name in kwargs:
                 to_add[column_name] = kwargs.pop(column_name)
         # empty
         if not to_add:
             return
         if name in kwargs:
-            raise ValueError("Cannot specify a pk column and the pk itself")
+            raise ValueError("Cannot specify a fk column and the fk itself")
         kwargs[name] = to_add
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
@@ -379,11 +392,11 @@ class BaseForeignKey(BaseField):
         return _removeprefix(fk_field_name, f"{name}_")
 
     def get_column_names(self, name: str) -> FrozenSet[str]:
-        if not hasattr(self, "_column_names") or name != self.field_name:
+        if not hasattr(self, "_column_names") or name != self.name:
             column_names = set()
             for column in self.get_columns(name):
                 column_names.add(column.name)
-            if name != self.field_name:
+            if name != self.name:
                 return frozenset(column_names)
             self._column_names = frozenset(column_names)
         return self._column_names

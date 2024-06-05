@@ -164,12 +164,13 @@ class Model(ModelRow, DeclarativeMixin):
         for pkname in self.pknames:
             if getattr(self, pkname, None) is None and self.fields[pkname].autoincrement:
                 extracted_fields.pop(pkname, None)
+                force_save = True
 
         self.update_from_dict(dict_values=dict(extracted_fields.items()))
 
         # Performs the update or the create based on a possible existing primary key
 
-        if getattr(self, "pk", None) is None or force_save:
+        if force_save:
             validated_values = self._extract_values_from_field(
                 extracted_values=extracted_fields if values is None else extracted_fields, is_partial=values is not None
             )
@@ -213,7 +214,8 @@ class Model(ModelRow, DeclarativeMixin):
         """
         field = self.meta.fields_mapping.get(name)
         if field is not None and hasattr(field, "__get__"):
-            return field.__get__(self)
+            # no need to set an descriptor object
+            return field.__get__(self, self.__class__)
         if name not in self.__dict__ and field is not None and name not in self.pknames:
             run_sync(self.load())
             return self.__dict__[name]

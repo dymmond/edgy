@@ -37,7 +37,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.models import Model, ReflectModel
 
 
-def clean_query_kwargs(model: "Model", kwargs: Dict[str, Any]) -> Dict[str, Any]:
+def clean_query_kwargs(model: Type["Model"], kwargs: Dict[str, Any]) -> Dict[str, Any]:
     new_kwargs: Dict[str, Any] = {}
     for key, val in kwargs.items():
         model_class = model
@@ -58,14 +58,16 @@ def clean_query_kwargs(model: "Model", kwargs: Dict[str, Any]) -> Dict[str, Any]
                 # against which the comparison is being made.
                 for part in related_parts:
                     try:
-                        model_class = model_class.fields[part].target
+                        model_class = model_class.meta.fields_mapping[part].target
                     except KeyError:
-                        model_class = getattr(model_class, part).related_from
-        if field_name in model_class.fields:
-            new_kwargs.update(model_class.fields[field_name].clean(key, val))
+                        model_class = model_class.meta.related_fields[part].related_from
+        if field_name in model_class.meta.fields_mapping:
+            new_kwargs.update(model_class.meta.fields_mapping[field_name].clean(key, val))
+        elif field_name in model_class.meta.related_fields:
+            new_kwargs.update(model_class.meta.related_fields[field_name].clean(key, val))
         else:
             new_kwargs[key] = val
-    assert "pk" not in new_kwargs
+    assert "pk" not in new_kwargs, "pk should be already parsed"
     return new_kwargs
 
 
@@ -221,9 +223,8 @@ class BaseQuerySet(
                     model_class = model_class.fields[part].target
                 except KeyError:
                     # Check related fields
-                    model_class = getattr(model_class, part).related_from
+                    model_class = model_class.meta.related_fields[part].related_from
                     has_many_fk_same_table, keys = self._is_multiple_foreign_key(model_class)
-
                 table = model_class.table
 
                 # If there is multiple FKs to the same table
@@ -265,7 +266,7 @@ class BaseQuerySet(
             if isinstance(field, BaseForeignKey):
                 # Making sure the foreign key is always added unless is a secret
                 if not field.secret:
-                    columns.append(name)
+                    columns.extend(field.get_column_names(name))
                     columns.extend(self._secret_recursive_names(model_class=field.target, columns=columns))
                 continue
             if not field.secret:
@@ -368,10 +369,9 @@ class BaseQuerySet(
                     # against which the comparison is being made.
                     for part in related_parts:
                         try:
-                            model_class = model_class.fields[part].target
+                            model_class = model_class.meta.fields_mapping[part].target
                         except KeyError:
-                            model_class = getattr(model_class, part).related_from
-
+                            model_class = model_class.meta.related_fields[part].related_from
                 column = model_class.table.columns[field_name]
 
             else:
@@ -379,14 +379,15 @@ class BaseQuerySet(
                 try:
                     column = self.table.columns[key]
                 except KeyError as error:
+                    # This error should not happen
                     # Check for related fields
                     # if an Attribute error is raised, we need to make sure
                     # It raises the KeyError from the previous check
-                    try:
-                        model_class = getattr(self.model_class, key).related_to
-                        column = model_class.table.columns[settings.default_related_lookup_field]
-                    except AttributeError:
-                        raise KeyError(str(error)) from error
+                    model_class = self.model_class.meta.related_fields[key].related_to
+                    if len(model_class.meta.pk_attributes) != 1:
+                        raise error
+                    column = model_class.table.columns[model_class.meta.pk_attributes[0]]
+                column = self.table.columns[key]
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
@@ -501,8 +502,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     QuerySet object used for query retrieving.
     """
 
-    def __get__(self, instance: Any, owner: Any) -> "QuerySet":
-        return self.__class__(model_class=owner)
+    def __get__(self, instance: Any, owner: Any = None) -> "QuerySet":
+        return self.__class__(model_class=owner if owner else instance.__class__)
 
     @property
     def sql(self) -> str:
@@ -534,8 +535,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self._clone()
         if clause is None:
-            if not exclude:
-                return queryset._filter_query(**kwargs)
             return queryset._filter_query(exclude=exclude, **kwargs)
 
         queryset.filter_clauses.append(clause)

@@ -30,6 +30,6 @@ class Article(edgy.Model):
 
 # All the tracks that belong to a specific `Company`.
 # The tracks are associated with `albums` and `studios`
-company = await Company.query.prefetch_related(
-    Prefetch(related_name="companies__studios__tracks", to_attr="tracks")
-).get(studio=studio)
+company = await Company.query.prefetch_related(Prefetch(related_name="studio__album__tracks", to_attr="tracks")).get(
+    studio=studio
+)
