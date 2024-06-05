@@ -19,6 +19,7 @@ terminal = Print()
 
 
 class BaseManyToManyForeignKeyField(BaseForeignKey):
+    # Do we need this attribute? we check on other ways
     is_m2m: bool = True
 
     def add_model_to_register(self, model: Any) -> None:
@@ -40,7 +41,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
         if self.through:
             if isinstance(self.through, str):
-                self.through = self.owner.meta.registry.models[self.through]
+                self.through = self.registry.models[self.through]
 
             self.through.meta.is_multi = True
             self.through.meta.multi_related = [self.to.__name__.lower()]
@@ -106,7 +107,6 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         return {}
 
     def __get__(self, instance: "Model", owner: Any = None) -> Relation:
-        # TODO: cache in the instance
         return Relation(through=self.through, to=self.to, owner=self.owner, instance=instance)
 
 

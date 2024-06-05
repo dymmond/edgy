@@ -11,6 +11,20 @@ problem but faces it in a different and more clear way.
 The **Edgy** way of doing it its by also calling the `prefetch_related` queryset but passing
 [Prefetch](#prefetch) instances and utilising the [related_name](./related-name.md) to do it so.
 
+Note:
+
+The syntax is like the django syntax. With `__` a foreign key or related name of a foreign key is traversed.
+Only the last part of the path must be a inversion of a foreign key (`related_name`).
+
+Note:
+
+this kind of traversal for foreign keys is new. Former versions used the `related_name` of foreign keys with the
+effect that a model could only specify a related_name once despite on a different ForeignKey.
+
+Note:
+
+ManyToMany fields create a through model which must be traversed.
+
 ## Prefetch
 
 The main object used for the `prefetch_related` query. This particular object contains a set
@@ -37,12 +51,6 @@ be stored.
 * **queryset** (Optional) - Additional queryset for the type of query being made.
 
 ### Special attention
-
-Using the `Prefetch` also means something. You **must** use the [related names](./related-name.md)
-of the [ForeignKey](../relationships.md#foreignkey) declared.
-
-!!! Warning
-    **The Prefetch does not work on [ManyToMany](./many-to-many.md) fields**.
 
 This means, imagine you have the following:
 
@@ -71,8 +79,8 @@ We have now three [related names](./related-name.md):
 {!> ../docs_src/prefetch/second/prefetch.py !}
 ```
 
-Did you notice what happened there? The [Prefetch](#prefetch) used all the [related_names](./related-name.md)
-associated with the models to perform the query and did the transversal approach.
+The [Prefetch](#prefetch) used the foreign key name and the `related_name` at the last part
+to perform the query and did the transversal approach.
 
 The `company` now has an attribute `tracks` where it contains all the associated `tracks` list.
 
@@ -90,9 +98,6 @@ as the [Prefetch](#prefetch) is another process running internally, so that mean
 any filter you want as you would normal do in a query.
 
 ### How to use
-
-Make sure you **do not skip** the [special attention](#special-attention) section as it explains
-how the `related_name` query works.
 
 Now its where the good stuff starts. How can you take advantage of the `Prefetch` object in your
 queries.

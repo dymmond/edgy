@@ -33,8 +33,9 @@ class Manager:
     def __init__(self, model_class: Any = None):
         self.model_class = model_class
 
-    def __get__(self, _: Any, owner: Any) -> Type["QuerySet"]:
-        return cast("Type[QuerySet]", self.__class__(model_class=owner))
+    def __get__(self, instance: Any, owner: Any = None) -> Type["QuerySet"]:
+        # TODO: cache in instance
+        return cast("Type[QuerySet]", self.__class__(model_class=owner if owner else instance.__class__))
 
     def get_queryset(self) -> "QuerySet":
         """

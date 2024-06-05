@@ -5,6 +5,21 @@ hide:
 
 # Release Notes
 
+## Unreleased
+
+### Added
+
+- allow multiple ForeignKeys with the same related_name in one model
+- add ExcludeField for masking fields in submodels
+- add R
+
+### Changed
+
+- Breaking: Prefetch traversal of foreign keys uses now the foreign key name. For the traversal of RelatedFields everything stays the same.
+- ForeignKeys use now global constraints
+- pk is now a CompositeField (work for multiple primary keys in one model is on the way)
+- ConditionalRedirect constant for CompositeField
+
 ## 0.11.1
 
 ### Added

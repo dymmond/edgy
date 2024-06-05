@@ -50,9 +50,10 @@ class ModelRow(EdgyBaseModel):
             if "__" in related:
                 first_part, remainder = related.split("__", 1)
                 try:
-                    model_cls = cls.fields[first_part].target
+                    model_cls = cls.meta.fields_mapping[first_part].target
                 except KeyError:
-                    model_cls = getattr(cls, first_part).related_from
+                    model_cls = cls.meta.related_fields[first_part].related_from
+
                 item[first_part] = model_cls.from_sqla_row(
                     row,
                     select_related=[remainder],
@@ -62,9 +63,9 @@ class ModelRow(EdgyBaseModel):
                 )
             else:
                 try:
-                    model_cls = cls.fields[related].target
+                    model_cls = cls.meta.fields_mapping[related].target
                 except KeyError:
-                    model_cls = getattr(cls, related).related_from
+                    model_cls = cls.meta.related_fields[related].related_from
                 item[related] = model_cls.from_sqla_row(row, exclude_secrets=exclude_secrets, using_schema=using_schema)
 
         # Populate the related names
@@ -167,9 +168,11 @@ class ModelRow(EdgyBaseModel):
         cls,
         row: Row,
         model: Type["Model"],
+        # for advancing
         prefetch_related: Sequence["Prefetch"],
         parent_cls: Optional[Type["Model"]] = None,
-        original_prefetch: Optional["Prefetch"] = None,
+        # for going back
+        inverse_path: str = "",
         is_nested: bool = False,
     ) -> Type["Model"]:
         """
@@ -183,27 +186,35 @@ class ModelRow(EdgyBaseModel):
             parent_cls = model
 
         for related in prefetch_related:
-            if not original_prefetch:
-                original_prefetch = related
+            if not is_nested:
+                # Check for conflicting names
+                # If to_attr has the same name of any
+                if hasattr(parent_cls, related.to_attr):
+                    raise QuerySetError(
+                        f"Conflicting attribute to_attr='{related.related_name}' with '{related.to_attr}' in {parent_cls.__class__.__name__}"
+                    )
 
-            if original_prefetch and not is_nested:
-                original_prefetch = related
-
-            # Check for conflicting names
-            # If to_attr has the same name of any
-            if hasattr(parent_cls, original_prefetch.to_attr):
-                raise QuerySetError(
-                    f"Conflicting attribute to_attr='{original_prefetch.related_name}' with '{original_prefetch.to_attr}' in {parent_cls.__class__.__name__}"
-                )
+            if not is_nested:
+                inverse_path = ""
 
             if "__" in related.related_name:
                 first_part, remainder = related.related_name.split("__", 1)
-                model_cls = cls.meta.related_fields[first_part].related_to
+
+                try:
+                    model_cls = cls.meta.related_fields[first_part].related_from
+                    reverse_part = cls.meta.related_fields[first_part].foreign_key_name
+                except KeyError:
+                    model_cls = cls.meta.foreign_key_fields[first_part].target
+                    reverse_part = cls.meta.foreign_key_fields[first_part].related_name
 
                 # Build the new nested Prefetch object
                 remainder_prefetch = related.__class__(
                     related_name=remainder, to_attr=related.to_attr, queryset=related.queryset
                 )
+                if inverse_path:
+                    inverse_path = f"{reverse_part}__{inverse_path}"
+                else:
+                    inverse_path = reverse_part
 
                 # Recursively continue the process of handling the
                 # new prefetch
@@ -211,7 +222,7 @@ class ModelRow(EdgyBaseModel):
                     row,
                     model,
                     prefetch_related=[remainder_prefetch],
-                    original_prefetch=original_prefetch,
+                    inverse_path=inverse_path,
                     parent_cls=model,
                     is_nested=True,
                 )
@@ -228,13 +239,12 @@ class ModelRow(EdgyBaseModel):
                 records = asyncio.get_event_loop().run_until_complete(cls.run_query(queryset=related.queryset))
                 setattr(model, related.to_attr, records)
             else:
-                model_cls = getattr(cls, related.related_name).related_from
                 records = cls.process_nested_prefetch_related(
                     row,
                     prefetch_related=related,
-                    original_prefetch=original_prefetch,
+                    inverse_path=inverse_path,
                     parent_cls=model,
-                    queryset=original_prefetch.queryset,
+                    queryset=related.queryset,
                 )
 
                 setattr(model, related.to_attr, records)
@@ -246,33 +256,36 @@ class ModelRow(EdgyBaseModel):
         row: Row,
         prefetch_related: "Prefetch",
         parent_cls: Type["Model"],
-        original_prefetch: "Prefetch",
+        inverse_path: str,
         queryset: "QuerySet",
     ) -> List[Type["Model"]]:
         """
         Processes the nested prefetch related names.
         """
-        query_split = original_prefetch.related_name.split("__")
-        query_split.reverse()
-        query_split.pop(query_split.index(prefetch_related.related_name))
+        # Get the related field
+        try:
+            related_field = cls.meta.related_fields[prefetch_related.related_name]
+            reverse_part = cls.meta.related_fields[prefetch_related.related_name].foreign_key_name
+        except KeyError:
+            fk_field = cls.meta.foreign_key_fields[prefetch_related.related_name]
+            reverse_part = fk_field.related_name
+            related_field = fk_field.target.meta.related_fields[fk_field.related_name]
+
+        if inverse_path:
+            inverse_path = f"{reverse_part}__{inverse_path}"
+        else:
+            inverse_path = reverse_part
 
         # Get the model to query related
-        model_class = getattr(cls, prefetch_related.related_name).related_from
+        model_class = related_field.related_from
 
-        # Get the foreign key name from the model_class
-        foreign_key_name = model_class.meta.related_names_mapping[prefetch_related.related_name]
-
-        # Insert as the entry point of the query
-        query_split.insert(0, foreign_key_name)
-
-        # Build new filter
-        query = "__".join(query_split)
-
-        # Extact foreign key value
+        # TODO: related_field.clean would be better
+        # fix this later when allowing selecting fields for fireign keys
+        # Extract foreign key value
         extra = {}
         for pkname in parent_cls.pknames:
             filter_by_pk = row[pkname]
-            extra[f"{query}__{pkname}"] = filter_by_pk
+            extra[f"{inverse_path}__{pkname}"] = filter_by_pk
 
         records = asyncio.get_event_loop().run_until_complete(cls.run_query(model_class, extra, queryset))
         return records
