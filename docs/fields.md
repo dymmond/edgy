@@ -26,7 +26,7 @@ All the fields are required unless on the the following is set:
 
     <sup>Set default to `None`</sup>
 
-* **server_default** - nstance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
+* **server_default** - instance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
 construct representing the DDL DEFAULT value for the column.
 * **comment** - A comment to be added with the field in the SQL database.
 * **secret** - A special attribute that allows to call the [exclude_secrets](./queries/secrets.md#exclude-secrets) and avoid
@@ -161,7 +161,7 @@ class MyModel(edgy.Model):
 
 The **CompositeField** is a little bit different from the normal fields. It takes a parameter `inner_fields` and distributes write or read access to the fields
 referenced in `inner_fields`. It hasn't currently all field parameters. Especially not the server parameters.
-For distributing the field parameters it uses the `Descriptor Protocol` for reading and to_model for writing.
+For distributing the field parameters it uses the `Descriptor Protocol` for reading and `to_model` for writing.
 
 Optionally a pydantic model can be provided via the **model** argument.
 
@@ -210,8 +210,8 @@ Note: embedded fields are deepcopied. This way it is safe to provide the same in
 Note: there is a special parameter for model: `ConditionalRedirect`.
 It changes the behaviour of CompositeField in this way:
 
-- one inner field: Reads and writes are redirected to this field. When setting a dict or pydantic BaseModel the value is tried to be extracted like in the normal mode. Otherwise the logic of the single field is used. When returning only the value of the single field is returned
-- > 1 inner fields: normal behavior. Dicts are returned
+- `inner_fields` with 1 element: Reads and writes are redirected to this field. When setting a dict or pydantic BaseModel the value is tried to be extracted like in the normal mode. Otherwise the logic of the single field is used. When returning only the value of the single field is returned
+- `inner_fields` with >1 element: normal behavior. Dicts are returned
 
 
 ##### Inheritance
@@ -551,10 +551,10 @@ Derives from the same as [CharField](#charfield) and validates the value of an U
 If you merely want to customize an existing field in `edgy.db.fields.core` you can just inherit from it and provide the customization via the `FieldFactory` (or you can `FieldFactory` for handling a new sqlalchemy type).
 Valid methods to overwrite are `__new__`, `get_column_type`, `get_pydatic_type`, `get_constraints` and `validate`
 
-For examples look in the mentioned path.
+For examples look in the mentioned path (replace dots with slashes).
 
 
-### Special fields
+### Extended, special fields
 
 If you want to customize the entire field (e.g. checks), you have to split the field in 2 parts:
 
@@ -567,12 +567,13 @@ Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide follo
 * **clean(self, field_name, value)** - returns the cleaned column values.
 
 Additional they can provide following methods:
-* **`__get__`** - Descriptor protocol like get access customization.
-* **`__set__`** - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
-* **to_model** - like clean, just for setting attributes or initializing a model.
+* **`__get__(self, instance, owner=None)`** - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
+* **`__set__(self, instance, value)`** - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
+* **to_model(self, field_name, phase="")** - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`
 * **get_embedded_fields(self, field_name, fields_mapping)** - Define internal fields.
 * **get_default_values(self, field_name, cleaned_data)** - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
 * **get_default_value(self)** - return default value for one column fields.
+* **get_global_constraints(self, field_name, columns)** - takes as second parameter (self excluded) the columns defined by this field (by get_columns). Returns a global constraint, which can be multi-column.
 
 You should also provide an init method which sets following attributes:
 

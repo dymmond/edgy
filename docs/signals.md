@@ -247,5 +247,3 @@ The process of disconnecting the signal is exactly the [same as before](#disconn
 ```python hl_lines="10"
 {!> ../docs_src/signals/disconnect.py !}
 ```
-
-# Further documentation
