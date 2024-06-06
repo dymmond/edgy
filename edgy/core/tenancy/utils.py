@@ -62,7 +62,8 @@ async def create_schema(
         schema_name (str): The name of the schema to be created.
         models (dict[str, Model], optional): When models is provided, it will use them to generate
         those same models in a given schema or else it will default to the `registry.models`.
-        if_not_exists (bool, optional): If True, the schema will be created only if it does not already exist. Defaults to False.
+        if_not_exists (bool, optional): If True, the schema will be created only if it does not already exist.
+        Defaults to False.
         should_create_tables (bool, optional): If True, tables will be created within the new schema. Defaults to False.
 
     Raises:

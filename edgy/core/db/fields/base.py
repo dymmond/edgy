@@ -1,6 +1,17 @@
 import decimal
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, FrozenSet, Optional, Pattern, Sequence, Type, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Dict,
+    FrozenSet,
+    Optional,
+    Pattern,
+    Sequence,
+    Type,
+    Union,
+)
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
@@ -172,7 +183,8 @@ class BaseField(FieldInfo):
         name: the field name
         fields_mapping: the existing fields
 
-        Note: the returned fields are changed after return, so you should return new fields or copies. Also set the owner of the field to them before returning
+        Note: the returned fields are changed after return, so you should
+              return new fields or copies. Also set the owner of the field to them before returning
         """
         return {}
 
