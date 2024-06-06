@@ -44,9 +44,7 @@ async def rollback_connections():
 
 async def test_exclude_secrets_query():
     profile = await Profile.query.create(is_enabled=False, name="edgy")
-    await User.query.create(
-        profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
-    )
+    await User.query.create(profile=profile, email="user@dev.com", password="dasrq3213", name="edgy")
 
     user = await User.query.exclude_secrets(id=1).get()
 

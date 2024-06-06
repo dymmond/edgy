@@ -17,4 +17,4 @@ class DescriptiveMeta:
 
     """
 
-    ...  # pragama: no cover
+    ...  # pragma: no cover

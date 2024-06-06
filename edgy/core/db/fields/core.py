@@ -17,6 +17,7 @@ from typing import (
     Sequence,
     Set,
     Tuple,
+    Type,
     Union,
     cast,
 )
@@ -25,7 +26,7 @@ import pydantic
 import sqlalchemy
 from pydantic import BaseModel, EmailStr
 
-from edgy.core.db.constants import CASCADE, RESTRICT
+from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL, ConditionalRedirect
 from edgy.core.db.fields._internal import IPAddress
 from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
 from edgy.core.db.fields.base import BaseCompositeField, BaseField
@@ -70,7 +71,8 @@ class Field(BaseField):
             self.column_type,
             *constraints,
             primary_key=self.primary_key,
-            nullable=self.null and not self.primary_key,
+            autoincrement=self.autoincrement,
+            nullable=self.null,
             index=self.index,
             unique=self.unique,
             default=self.default,
@@ -102,6 +104,10 @@ class FieldFactory(metaclass=FieldFactoryMeta):
 
     def __new__(cls, **kwargs: Any) -> BaseField:
         cls.validate(**kwargs)
+        return cls.build_field(**kwargs)
+
+    @classmethod
+    def build_field(cls, **kwargs: Any) -> BaseField:
         column_type = cls.get_column_type(**kwargs)
         pydantic_type = cls.get_pydantic_type(**kwargs)
         constraints = cls.get_constraints(**kwargs)
@@ -153,40 +159,51 @@ class ForeignKeyFieldFactory(FieldFactory):
 
     _type: Any = Any
 
-    def __new__(cls, *args: Any, **kwargs: Any) -> BaseField:  # type: ignore
-        cls.validate(**kwargs)
-
-        to: Any = kwargs.pop("to", None)
-        null: bool = kwargs.pop("null", False)
-        on_update: str = kwargs.pop("on_update", CASCADE)
-        on_delete: str = kwargs.pop("on_delete", RESTRICT)
-        related_name: str = kwargs.pop("related_name", None)
-        through: Any = kwargs.pop("through", None)
-        server_onupdate: Any = kwargs.pop("server_onupdate", None)
-
-        pydantic_type = cls.get_pydantic_type(**kwargs)
-        column_type = cls.get_column_type(**kwargs)
-        default: None = kwargs.pop("default", None)
-        server_default: None = kwargs.pop("server_default", None)
-        constraints = cls.get_constraints(**kwargs)
-
-        new_field = cls._get_field_cls(cls)
-        return new_field(  # type: ignore
-            __type__=pydantic_type,
-            annotation=pydantic_type,
-            column_type=column_type,
-            default=default,
-            server_default=server_default,
-            to=to,
-            on_update=on_update,
-            on_delete=on_delete,
-            related_name=related_name,
-            null=null,
-            server_onupdate=server_onupdate,
-            through=through,
-            constraints=constraints,
+    def __new__(
+        cls,
+        *,
+        to: Any = None,
+        null: bool = False,
+        on_update: str = CASCADE,
+        on_delete: str = RESTRICT,
+        related_name: str = "",
+        through: Any = None,
+        server_onupdate: Any = None,
+        default: Any = None,
+        server_default: Any = None,
+        **kwargs: Any,
+    ) -> BaseField:
+        kwargs = {
             **kwargs,
-        )
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
+        }
+
+        cls.validate(**kwargs)
+        # update related name when available
+        if related_name:
+            kwargs["related_name"] = related_name.lower()
+        return cls.build_field(**kwargs)
+
+    @classmethod
+    def validate(cls, **kwargs: Any) -> None:
+        """default validation useful for one_to_one and foreign_key"""
+        on_delete = kwargs.get("on_delete", CASCADE)
+        on_update = kwargs.get("on_update", RESTRICT)
+        null = kwargs.get("null", False)
+
+        if on_delete is None:
+            raise FieldDefinitionError("on_delete must not be null.")
+
+        if on_delete == SET_NULL and not null:
+            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
+
+        if on_update and (on_update == SET_NULL and not null):
+            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
+        related_name = kwargs.get("related_name", "")
+
+        # tolerate Nones
+        if related_name and not isinstance(related_name, str):
+            raise FieldDefinitionError("related_name must be a string.")
 
 
 class ConcreteCompositeField(BaseCompositeField):
@@ -199,7 +216,7 @@ class ConcreteCompositeField(BaseCompositeField):
         inner_fields: Sequence[Union[str, Tuple[str, BaseField]]] = kwargs.pop("inner_fields", [])
         self.unsafe_json_serialization: bool = kwargs.pop("unsafe_json_serialization", False)
         self.absorb_existing_fields: bool = kwargs.pop("absorb_existing_fields", False)
-        self.model: Optional[BaseModel] = kwargs.pop("model", None)
+        self.model: Optional[Union[Type[BaseModel], Type[ConditionalRedirect]]] = kwargs.pop("model", None)
         self.inner_field_names: List[str] = []
         self.embedded_field_defs: Dict[str, BaseField] = {}
         self.prefix_embedded: str = kwargs.pop("prefix_embedded", "")
@@ -225,36 +242,65 @@ class ConcreteCompositeField(BaseCompositeField):
         return name
 
     def __get__(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
+        if self.model is ConditionalRedirect and len(self.inner_field_names) == 1:
+            return getattr(instance, self.inner_field_names[0], None)
         d = {}
         for key in self.inner_field_names:
             translated_name = self.translate_name(key)
-            d[translated_name] = getattr(instance, key)
+            field = instance.fields.get(key)
+            if field and hasattr(field, "__get__"):
+                d[translated_name] = field.__get__(instance, owner)
+            else:
+                d[translated_name] = getattr(instance, key, None)
         if self.model is not None:
-            return self.model(**d)  # type: ignore
+            return self.model(**d)
         return d
 
-    def __set__(self, instance: "Model", value: Union[Dict, Any]) -> None:
-        if isinstance(value, dict):
-            for key in self.inner_field_names:
-                translated_name = self.translate_name(key)
-                setattr(instance, key, value[translated_name])
-        else:
-            for key in self.inner_field_names:
-                translated_name = self.translate_name(key)
-                setattr(instance, key, getattr(value, translated_name))
+    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
+        if (
+            self.model is ConditionalRedirect
+            and len(self.inner_field_names) == 1
+            # we first only redirect both
+            and not isinstance(value, (dict, BaseModel))
+        ):
+            field = self.owner.meta.fields_mapping[self.inner_field_names[0]]
+            return field.clean(self.inner_field_names[0], value)
+        return super().clean(field_name, value)
 
-    def get_embedded_fields(self, name: str, field_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+        if (
+            self.model is ConditionalRedirect
+            and len(self.inner_field_names) == 1
+            # we first only redirect both
+            and not isinstance(value, (dict, BaseModel))
+        ):
+            field = self.owner.meta.fields_mapping[self.inner_field_names[0]]
+            return field.to_model(self.inner_field_names[0], value, phase=phase)
+        return super().to_model(field_name, value, phase=phase)
+
+    def get_embedded_fields(self, name: str, fields_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
+        retdict = {}
         if not self.absorb_existing_fields:
-            duplicate_fields = set(self.embedded_field_defs.keys()).intersection(field_mapping.keys())
+            duplicate_fields = set(self.embedded_field_defs.keys()).intersection(
+                {k for k, v in fields_mapping.items() if v.owner is None}
+            )
             if duplicate_fields:
                 raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
-            return dict(self.embedded_field_defs)
-        retdict = {}
+            for item in self.embedded_field_defs.items():
+                # now there should be no collisions anymore
+                cloned_field = copy.copy(item[1])
+                # set to the current owner of this field, required in collision checks
+                cloned_field.owner = self.owner
+                retdict[item[0]] = cloned_field
+            return retdict
         for item in self.embedded_field_defs.items():
-            if item[0] not in field_mapping:
-                retdict[item[0]] = item[1]
+            if item[0] not in fields_mapping:
+                cloned_field = copy.copy(item[1])
+                # set to the current owner of this field, required in collision checks
+                cloned_field.owner = self.owner
+                retdict[item[0]] = cloned_field
             else:
-                absorbed_field = field_mapping[item[0]]
+                absorbed_field = fields_mapping[item[0]]
                 if not getattr(absorbed_field, "skip_absorption_check", False) and not issubclass(
                     absorbed_field.field_type, item[1].field_type
                 ):
@@ -264,7 +310,7 @@ class ConcreteCompositeField(BaseCompositeField):
         return retdict
 
     def get_composite_fields(self) -> Dict[str, BaseField]:
-        return {field: self.owner.fields[field] for field in self.inner_field_names}
+        return {field: self.owner.meta.fields_mapping[field] for field in self.inner_field_names}
 
 
 class CompositeField(FieldFactory):
@@ -295,6 +341,41 @@ class CompositeField(FieldFactory):
                 else:
                     if field[0] in inner_field_names:
                         raise FieldDefinitionError(f"duplicate inner field {field}")
+
+
+class ConcreteExclude(BaseField):
+    def __init__(self, **kwargs: Any):
+        kwargs["exclude"] = True
+        kwargs["null"] = True
+        kwargs["primary_key"] = False
+        return super().__init__(
+            **kwargs,
+        )
+
+    def clean(self, name: str, value: Any) -> Dict[str, Any]:
+        """remove any value from input"""
+        return {}
+
+    def to_model(self, name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+        """remove any value from input and raise when setting an attribute"""
+        if phase == "set":
+            raise AttributeError("field is excluded")
+        return {}
+
+    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
+        return []
+
+    def __get__(self, instance: "Model", owner: Any = None) -> None:
+        raise AttributeError("field is excluded")
+
+
+class ExcludeField(FieldFactory, Type[None]):
+    """
+    Meta field that masks fields
+    """
+
+    _bases = (ConcreteExclude,)
+    _type: Any = None
 
 
 class CharField(FieldFactory, str):

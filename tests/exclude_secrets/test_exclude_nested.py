@@ -48,14 +48,10 @@ async def rollback_connections():
 
 async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_not_secret():
     profile = await Profile.query.create(is_enabled=False, name="edgy")
-    user = await User.query.create(
-        profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
-    )
+    user = await User.query.create(profile=profile, email="user@dev.com", password="dasrq3213", name="edgy")
     await Organisation.query.create(user=user)
 
-    org = (
-        await Organisation.query.select_related(["user", "user__profile"]).exclude_secrets().last()
-    )
+    org = await Organisation.query.select_related(["user", "user__profile"]).exclude_secrets().last()
 
     assert org.model_dump() == {
         "user": {"id": 1, "profile": {"id": 1, "name": "edgy"}, "email": "user@dev.com"},

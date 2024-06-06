@@ -59,9 +59,7 @@ class Tenant(edgy.Model):
         tenant = await super().save(force_save, values, **kwargs)
         try:
             await self.create_schema(schema=tenant.schema_name, if_not_exists=True)
-            await self.create_tables(
-                registry, registry.models, tenant.schema_name, exclude=["Tenant", "TenantUser"]
-            )
+            await self.create_tables(registry, registry.models, tenant.schema_name, exclude=["Tenant", "TenantUser"])
         except Exception as e:
             message = f"Rolling back... {str(e)}"
             logger.error(message)

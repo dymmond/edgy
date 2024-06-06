@@ -26,14 +26,8 @@ class Schema:
         """
         return cast("str", self.registry.engine.dialect.default_schema_name)
 
-    async def activate_schema_path(
-        self, database: Database, schema: str, is_shared: bool = True
-    ) -> None:
-        path = (
-            "SET search_path TO %s, shared;" % schema
-            if is_shared
-            else "SET search_path TO %s;" % schema
-        )
+    async def activate_schema_path(self, database: Database, schema: str, is_shared: bool = True) -> None:
+        path = "SET search_path TO %s, shared;" % schema if is_shared else "SET search_path TO %s;" % schema
         expression = sqlalchemy.text(path)
         await database.execute(expression)
 
@@ -54,9 +48,7 @@ class Schema:
             await connection.run_sync(execute_create)
         await self.registry.engine.dispose()
 
-    async def drop_schema(
-        self, schema: str, cascade: bool = False, if_exists: bool = False
-    ) -> None:
+    async def drop_schema(self, schema: str, cascade: bool = False, if_exists: bool = False) -> None:
         """
         Drops an existing model schema.
         """

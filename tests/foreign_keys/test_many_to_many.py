@@ -164,10 +164,14 @@ async def test_raises_RelationshipNotFound():
     with pytest.raises(RelationshipNotFound) as raised:
         await album.tracks.remove(track3)
 
-    assert (
-        raised.value.args[0]
-        == f"There is no relationship between 'album' and 'track: {track3.pk}'."
-    )
+    assert raised.value.args[0] == f"There is no relationship between 'album' and 'track: {track3.pk}'."
+
+
+async def test_many_to_many_many_related_manager():
+    album1 = await Album.query.create(name="Malibu")
+    assert album1.tracks is not None
+    album1 = await Album.query.get(name="Malibu")
+    assert album1.tracks is not None
 
 
 async def test_many_to_many_many_fields():

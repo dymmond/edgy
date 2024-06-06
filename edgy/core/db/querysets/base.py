@@ -37,6 +37,40 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.models import Model, ReflectModel
 
 
+def clean_query_kwargs(model: Type["Model"], kwargs: Dict[str, Any]) -> Dict[str, Any]:
+    new_kwargs: Dict[str, Any] = {}
+    for key, val in kwargs.items():
+        model_class = model
+        field_name = key
+        if "__" in key:
+            parts = key.split("__")
+
+            # Determine if we should treat the final part as a
+            # filter operator or as a related field.
+            if parts[-1] in settings.filter_operators:
+                field_name = parts[-2]
+                related_parts = parts[:-2]
+            else:
+                field_name = parts[-1]
+                related_parts = parts[:-1]
+            if related_parts:
+                # Walk the relationships to the actual model class
+                # against which the comparison is being made.
+                for part in related_parts:
+                    try:
+                        model_class = model_class.meta.fields_mapping[part].target
+                    except KeyError:
+                        model_class = model_class.meta.related_fields[part].related_from
+        if field_name in model_class.meta.fields_mapping:
+            new_kwargs.update(model_class.meta.fields_mapping[field_name].clean(key, val))
+        elif field_name in model_class.meta.related_fields:
+            new_kwargs.update(model_class.meta.related_fields[field_name].clean(key, val))
+        else:
+            new_kwargs[key] = val
+    assert "pk" not in new_kwargs, "pk should be already parsed"
+    return new_kwargs
+
+
 class BaseQuerySet(
     TenancyMixin,
     QuerySetPropsMixin,
@@ -189,9 +223,8 @@ class BaseQuerySet(
                     model_class = model_class.fields[part].target
                 except KeyError:
                     # Check related fields
-                    model_class = getattr(model_class, part).related_from
+                    model_class = model_class.meta.related_fields[part].related_from
                     has_many_fk_same_table, keys = self._is_multiple_foreign_key(model_class)
-
                 table = model_class.table
 
                 # If there is multiple FKs to the same table
@@ -222,9 +255,7 @@ class BaseQuerySet(
         if self._only and self._defer:
             raise QuerySetError("You cannot use .only() and .defer() at the same time.")
 
-    def _secret_recursive_names(
-        self, model_class: Any, columns: Union[List[str], None] = None
-    ) -> List[str]:
+    def _secret_recursive_names(self, model_class: Any, columns: Union[List[str], None] = None) -> List[str]:
         """
         Recursively gets the names of the fields excluding the secrets.
         """
@@ -235,10 +266,8 @@ class BaseQuerySet(
             if isinstance(field, BaseForeignKey):
                 # Making sure the foreign key is always added unless is a secret
                 if not field.secret:
-                    columns.append(name)
-                    columns.extend(
-                        self._secret_recursive_names(model_class=field.target, columns=columns)
-                    )
+                    columns.extend(field.get_column_names(name))
+                    columns.extend(self._secret_recursive_names(model_class=field.target, columns=columns))
                 continue
             if not field.secret:
                 columns.append(name)
@@ -261,9 +290,7 @@ class BaseQuerySet(
             expression = expression.with_only_columns(*queryset._only)
 
         if queryset._defer:
-            columns = [
-                column for column in select_from.columns if column.name not in queryset._defer
-            ]
+            columns = [column for column in select_from.columns if column.name not in queryset._defer]
             expression = expression.with_only_columns(*columns)
 
         if queryset._exclude_secrets:
@@ -272,19 +299,13 @@ class BaseQuerySet(
             expression = expression.with_only_columns(*columns)
 
         if queryset.filter_clauses:
-            expression = queryset._build_filter_clauses_expression(
-                queryset.filter_clauses, expression=expression
-            )
+            expression = queryset._build_filter_clauses_expression(queryset.filter_clauses, expression=expression)
 
         if queryset.or_clauses:
-            expression = queryset._build_or_clauses_expression(
-                queryset.or_clauses, expression=expression
-            )
+            expression = queryset._build_or_clauses_expression(queryset.or_clauses, expression=expression)
 
         if queryset._order_by:
-            expression = queryset._build_order_by_expression(
-                queryset._order_by, expression=expression
-            )
+            expression = queryset._build_order_by_expression(queryset._order_by, expression=expression)
 
         if queryset.limit_count:
             expression = expression.limit(queryset.limit_count)
@@ -293,14 +314,10 @@ class BaseQuerySet(
             expression = expression.offset(queryset._offset)
 
         if queryset._group_by:
-            expression = queryset._build_group_by_expression(
-                queryset._group_by, expression=expression
-            )
+            expression = queryset._build_group_by_expression(queryset._group_by, expression=expression)
 
         if queryset.distinct_on:
-            expression = queryset._build_select_distinct(
-                queryset.distinct_on, expression=expression
-            )
+            expression = queryset._build_select_distinct(queryset.distinct_on, expression=expression)
 
         queryset._expression = expression  # type: ignore
         return expression
@@ -324,9 +341,7 @@ class BaseQuerySet(
         if self.model_class.is_proxy_model:
             self.model_class = self.model_class.parent
 
-        if kwargs.get("pk"):
-            pk_name = self.model_class.pkname
-            kwargs[pk_name] = kwargs.pop("pk")
+        kwargs = clean_query_kwargs(self.model_class, kwargs)
 
         for key, value in kwargs.items():
             if "__" in key:
@@ -354,10 +369,9 @@ class BaseQuerySet(
                     # against which the comparison is being made.
                     for part in related_parts:
                         try:
-                            model_class = model_class.fields[part].target
+                            model_class = model_class.meta.fields_mapping[part].target
                         except KeyError:
-                            model_class = getattr(model_class, part).related_from
-
+                            model_class = model_class.meta.related_fields[part].related_from
                 column = model_class.table.columns[field_name]
 
             else:
@@ -365,14 +379,15 @@ class BaseQuerySet(
                 try:
                     column = self.table.columns[key]
                 except KeyError as error:
+                    # This error should not happen
                     # Check for related fields
                     # if an Attribute error is raised, we need to make sure
                     # It raises the KeyError from the previous check
-                    try:
-                        model_class = getattr(self.model_class, key).related_to
-                        column = model_class.table.columns[settings.default_related_lookup_field]
-                    except AttributeError:
-                        raise KeyError(str(error)) from error
+                    model_class = self.model_class.meta.related_fields[key].related_to
+                    if len(model_class.meta.pk_attributes) != 1:
+                        raise error
+                    column = model_class.table.columns[model_class.meta.pk_attributes[0]]
+                column = self.table.columns[key]
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
@@ -487,8 +502,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     QuerySet object used for query retrieving.
     """
 
-    def __get__(self, instance: Any, owner: Any) -> "QuerySet":
-        return self.__class__(model_class=owner)
+    def __get__(self, instance: Any, owner: Any = None) -> "QuerySet":
+        return self.__class__(model_class=owner if owner else instance.__class__)
 
     @property
     def sql(self) -> str:
@@ -520,8 +535,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self._clone()
         if clause is None:
-            if not exclude:
-                return queryset._filter_query(**kwargs)
             return queryset._filter_query(exclude=exclude, **kwargs)
 
         queryset.filter_clauses.append(clause)
@@ -610,9 +623,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         value = f"%{term}%"
 
         search_fields = [
-            name
-            for name, field in queryset.model_class.fields.items()
-            if isinstance(field, (CharField, TextField))
+            name for name, field in queryset.model_class.fields.items() if isinstance(field, (CharField, TextField))
         ]
         search_clauses = [queryset.table.columns[name].ilike(value) for name in search_fields]
 
@@ -669,8 +680,12 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         key.
         """
         only_fields = [sqlalchemy.text(field) for field in fields]
-        if self.model_class.pkname not in fields:
-            only_fields.insert(0, sqlalchemy.text(self.model_class.pkname))
+        missing = []
+        for pkname in self.model_class.pknames:
+            if pkname not in fields:
+                missing.append(sqlalchemy.text(pkname))
+        if missing:
+            only_fields = missing + only_fields
 
         queryset: "QuerySet" = self._clone()
         queryset._only = only_fields
@@ -723,10 +738,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if not fields:
             rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
         else:
-            rows = [
-                row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)
-                for row in rows
-            ]
+            rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields) for row in rows]
 
         as_tuple = kwargs.pop("__as_tuple__", False)
 
@@ -964,19 +976,15 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                     new_obj[key] = self._resolve_value(value)
             new_objs.append(new_obj)
 
-        new_objs = [
-            queryset._extract_values_from_field(obj, queryset.model_class) for obj in new_objs
-        ]
+        new_objs = [queryset._extract_values_from_field(obj, queryset.model_class) for obj in new_objs]
 
-        pk = getattr(queryset.table.c, queryset.pkname)
-        expression = queryset.table.update().where(pk == sqlalchemy.bindparam(queryset.pkname))
-        kwargs: Dict[Any, Any] = {
-            field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()
-        }
-        pks = [{queryset.pkname: getattr(obj, queryset.pkname)} for obj in objs]
+        pks1 = (getattr(queryset.table.c, pkname) == sqlalchemy.bindparam(pkname) for pkname in queryset.pknames)
+        expression = queryset.table.update().where(*pks1)
+        kwargs: Dict[Any, Any] = {field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()}
+        pks2 = [{pkname: getattr(obj, pkname) for pkname in queryset.pknames} for obj in objs]
 
         query_list = []
-        for pk, value in zip(pks, new_objs):  # noqa
+        for pk, value in zip(pks2, new_objs):  # noqa
             query_list.append({**pk, **value})
 
         expression = expression.values(kwargs)
@@ -1003,15 +1011,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self._clone()
 
-        extracted_fields = queryset._extract_values_from_field(
-            kwargs, model_class=queryset.model_class
-        )
+        extracted_fields = queryset._extract_values_from_field(kwargs, model_class=queryset.model_class)
         kwargs = queryset._update_auto_now_fields(extracted_fields, queryset.model_class.fields)
 
         # Broadcast the initial update details
-        await self.model_class.signals.pre_update.send_async(
-            self.__class__, instance=self, kwargs=kwargs
-        )
+        await self.model_class.signals.pre_update.send_async(self.__class__, instance=self, kwargs=kwargs)
 
         expression = queryset.table.update().values(**kwargs)
 
@@ -1024,9 +1028,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         # Broadcast the update executed
         await self.model_class.signals.post_update.send_async(self.__class__, instance=self)
 
-    async def get_or_create(
-        self, defaults: Dict[str, Any], **kwargs: Any
-    ) -> Tuple[EdgyModel, bool]:
+    async def get_or_create(self, defaults: Dict[str, Any], **kwargs: Any) -> Tuple[EdgyModel, bool]:
         """
         Creates a record in a specific table or updates if already exists.
         """
@@ -1040,9 +1042,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             instance = await queryset.create(**kwargs)
             return instance, True
 
-    async def update_or_create(
-        self, defaults: Dict[str, Any], **kwargs: Any
-    ) -> Tuple[EdgyModel, bool]:
+    async def update_or_create(self, defaults: Dict[str, Any], **kwargs: Any) -> Tuple[EdgyModel, bool]:
         """
         Updates a record in a specific table or creates a new one.
         """

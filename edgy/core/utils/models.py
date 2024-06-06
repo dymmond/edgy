@@ -43,11 +43,7 @@ class DateParser:
         Updates the `auto_now` fields
         """
         for name, field in fields.items():
-            if (
-                isinstance(field, BaseField)
-                and _has_auto_now(field)
-                and _is_datetime(field)
-            ):
+            if isinstance(field, BaseField) and _has_auto_now(field) and _is_datetime(field):
                 values.update(field.get_default_values(name, values))
         return values
 
@@ -63,9 +59,7 @@ class DateParser:
 
 
 class ModelParser:
-    def _extract_model_references(
-        self, extracted_values: Any, model_class: Optional[Type["Model"]]
-    ) -> Any:
+    def _extract_model_references(self, extracted_values: Any, model_class: Optional[Type["Model"]]) -> Any:
         """
         Exracts any possible model references from the EdgyModel and returns a dictionary.
         """
@@ -81,6 +75,7 @@ class ModelParser:
         extracted_values: Any,
         model_class: Optional["Model"] = None,
         is_update: bool = False,
+        is_partial: bool = False,
     ) -> Any:
         """
         Extracts all the default values from the given fields and returns the raw
@@ -88,44 +83,40 @@ class ModelParser:
         """
         model_cls = model_class or self
         validated: Dict[str, Any] = {}
-        for name, field in model_cls.fields.items():  # type: ignore
-            if field.read_only:
+        # phase 1: transform when required
+        if model_cls.meta.input_modifying_fields:
+            extracted_values = {**extracted_values}
+            for field_name in model_cls.meta.input_modifying_fields:
+                model_cls.fields[field_name].modify_input(field_name, extracted_values)
+        # phase 2: validate fields and set defaults for readonly
+        for field_name, field in model_cls.fields.items():  # type: ignore
+            if not is_partial and field.read_only:
                 if field.has_default():
                     if not is_update:
-                        validated.update(field.get_default_values(name, validated))
+                        validated.update(field.get_default_values(field_name, validated))
                     else:
                         # For datetimes with `auto_now` and `auto_now_add`
                         if not _has_auto_now_add(field):
-                            validated.update(field.get_default_values(name, validated))
+                            validated.update(field.get_default_values(field_name, validated))
                 continue
-            if name in extracted_values:
-                item = extracted_values[name]
-                for sub_name, value in field.clean(name, item).items():
+            if field_name in extracted_values:
+                item = extracted_values[field_name]
+                for sub_name, value in field.clean(field_name, item).items():
                     if sub_name in validated:
-                        raise ValueError("value set twice for key: {sub_name}")
+                        raise ValueError(f"value set twice for key: {sub_name}")
                     validated[sub_name] = value
-        for name, field in model_cls.fields.items():  # type: ignore
-            # we need a second run
-            if not field.read_only and name not in validated:
-                if field.has_default():
-                    validated.update(field.get_default_values(name, validated))
-                continue
+
+        # phase 3: set defaults for the rest if not an update
+        if not is_partial:
+            for field_name, field in model_cls.fields.items():  # type: ignore
+                # we need a second run
+                if not field.read_only and field_name not in validated:
+                    if field.has_default():
+                        validated.update(field.get_default_values(field_name, validated))
 
         # Update with any ModelRef
         validated.update(self._extract_model_references(extracted_values, model_cls))
         return validated
-
-    def _extract_db_fields_from_model(
-        self, model_class: Type["Model"]
-    ) -> Dict[Any, Any]:
-        """
-        Extacts all the db fields and excludes the related_names since those
-        are simply relations.
-        """
-        related_names = model_class.meta.related_names
-        return {
-            k: v for k, v in model_class.model_fields.items() if k not in related_names
-        }
 
 
 def create_edgy_model(

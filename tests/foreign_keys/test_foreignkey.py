@@ -180,9 +180,7 @@ async def test_multiple_fk():
     team = await Team.query.create(org=other, name="Green Team")
     await Member.query.create(team=team, email="e@example.org")
 
-    members = (
-        await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
-    )
+    members = await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
     assert len(members) == 4
     for member in members:
         assert member.team.org.ident == "ACME Ltd"
@@ -319,4 +317,4 @@ def test_assertation_error_on_missing_on_delete():
         class MyOtherModel(edgy.Model):
             model = edgy.ForeignKey(MyModel, on_delete=None)
 
-    assert raised.value.args[0] == "on_delete must not be null"
+    assert raised.value.args[0] == "on_delete must not be null."

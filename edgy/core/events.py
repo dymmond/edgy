@@ -16,9 +16,7 @@ def is_async_callable(obj: typing.Any) -> bool:
     while isinstance(obj, functools.partial):
         obj = obj.func
 
-    return inspect.iscoroutinefunction(obj) or (
-        callable(obj) and inspect.iscoroutinefunction(obj.__call__)
-    )
+    return inspect.iscoroutinefunction(obj) or (callable(obj) and inspect.iscoroutinefunction(obj.__call__))
 
 
 class AyncLifespanContextManager:

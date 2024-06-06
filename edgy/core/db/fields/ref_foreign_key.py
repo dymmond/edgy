@@ -19,7 +19,6 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="Model")
 
 
-CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 terminal = Print()
 
 
@@ -47,19 +46,8 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
 
     def __new__(cls, to: "ModelRef", null: bool = False) -> BaseField:  # type: ignore
         if not cls.is_class_and_subclass(to, edgy.ModelRef):
-            raise ModelReferenceError(
-                detail="A model reference must be an object of type ModelRef"
-            )
+            raise ModelReferenceError(detail="A model reference must be an object of type ModelRef")
         if not hasattr(to, "__model__") or getattr(to, "__model__", None) is None:
-            raise ModelReferenceError(
-                "'__model__' must bre declared when subclassing ModelRef."
-            )
+            raise ModelReferenceError("'__model__' must bre declared when subclassing ModelRef.")
 
-        kwargs = {
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
-        }
-        return super().__new__(cls, **kwargs)
+        return super().__new__(cls, to=to, null=null)

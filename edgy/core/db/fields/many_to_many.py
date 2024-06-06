@@ -1,12 +1,11 @@
-from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar, Union
-
-import sqlalchemy
+from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar, Union
 
 import edgy
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.fields.core import ForeignKeyFieldFactory
 from edgy.core.db.fields.foreign_keys import ForeignKey
+from edgy.core.db.relationships.relation import Relation
 from edgy.core.terminal import Print
 from edgy.core.utils.models import create_edgy_model
 
@@ -16,12 +15,11 @@ if TYPE_CHECKING:
 T = TypeVar("T", bound="Model")
 
 
-CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
-CHAR_LIMIT = 63
 terminal = Print()
 
 
 class BaseManyToManyForeignKeyField(BaseForeignKey):
+    # Do we need this attribute? we check on other ways
     is_m2m: bool = True
 
     def add_model_to_register(self, model: Any) -> None:
@@ -30,7 +28,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         self.registry.models[model.__name__] = model
 
-    def create_through_model(self) -> Any:
+    def create_through_model(self) -> None:
         """
         Creates the default empty through model.
 
@@ -43,11 +41,11 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
         if self.through:
             if isinstance(self.through, str):
-                self.through = self.owner.meta.registry.models[self.through]
+                self.through = self.registry.models[self.through]
 
             self.through.meta.is_multi = True
             self.through.meta.multi_related = [self.to.__name__.lower()]
-            return self.through
+            return
 
         owner_name = self.owner.__name__
         to_name = self.to.__name__
@@ -72,9 +70,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         )
 
         to_related_name = (
-            f"{self.related_name}"
-            if self.related_name
-            else f"{to_name.lower()}_{class_name.lower()}s_set"
+            f"{self.related_name}" if self.related_name else f"{to_name.lower()}_{class_name.lower()}s_set"
         )
         fields = {
             "id": edgy.IntegerField(primary_key=True),
@@ -84,9 +80,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 on_delete=CASCADE,
                 related_name=owner_related_name,
             ),
-            f"{to_name.lower()}": ForeignKey(
-                self.to, null=True, on_delete=CASCADE, related_name=to_related_name
-            ),
+            f"{to_name.lower()}": ForeignKey(self.to, null=True, on_delete=CASCADE, related_name=to_related_name),
         }
 
         # Create the through model
@@ -99,41 +93,21 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.through = through_model
         self.add_model_to_register(self.through)
 
-    def get_fk_name(self, name: str) -> str:
-        """
-        Builds the fk name for the engine.
-
-        Engines have a limitation of the foreign key being bigger than 63
-        characters.
-
-        if that happens, we need to assure it is small.
-        """
-        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{self.target.pkname}_{name}"
-        if not len(fk_name) > CHAR_LIMIT:
-            return fk_name
-        return fk_name[:CHAR_LIMIT]
-
-    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
-        """
-        Builds the column for the target.
-        """
-        target = self.target
-        to_field = target.fields[target.pkname]
-
-        column_type = to_field.column_type
-        constraints = [
-            sqlalchemy.schema.ForeignKey(
-                f"{target.meta.tablename}.{target.pkname}",
-                ondelete=CASCADE,
-                onupdate=CASCADE,
-                name=self.get_fk_name(name=name),
-            )
-        ]
-        return [sqlalchemy.Column(name, column_type, *constraints, nullable=self.null)]
-
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
         return hasattr(self, "default")
+
+    def expand_relationship(self, value: Any) -> Any:
+        return value
+
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+        """
+        Meta field
+        """
+        return {}
+
+    def __get__(self, instance: "Model", owner: Any = None) -> Relation:
+        return Relation(through=self.through, to=self.to, owner=self.owner, instance=instance)
 
 
 class ManyToManyField(ForeignKeyFieldFactory):
@@ -147,22 +121,14 @@ class ManyToManyField(ForeignKeyFieldFactory):
         through: Optional["Model"] = None,
         **kwargs: Any,
     ) -> BaseField:
-        null = kwargs.get("null", None)
-        if null:
-            terminal.write_warning(
-                "Declaring `null` on a ManyToMany relationship has no effect."
-            )
-
-        kwargs = {
-            **kwargs,
-            **{
-                key: value
-                for key, value in locals().items()
-                if key not in CLASS_DEFAULTS
-            },
-        }
+        for argument in ["null", "on_delete", "on_update"]:
+            if kwargs.get(argument, None):
+                terminal.write_warning(f"Declaring `{argument}` on a ManyToMany relationship has no effect.")
         kwargs["null"] = True
-        return super().__new__(cls, **kwargs)
+        kwargs["on_delete"] = CASCADE
+        kwargs["on_update"] = CASCADE
+
+        return super().__new__(cls, to=to, through=through, **kwargs)
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:

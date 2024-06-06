@@ -1,18 +1,28 @@
+import random
+import string
+
 import pytest
 
 import edgy
+from edgy import Registry
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
 database = Database(url=DATABASE_URL)
-models = edgy.Registry(database=database)
+models = Registry(database=database)
+nother = Registry(database=database)
 
 pytestmark = pytest.mark.anyio
 
 
+def get_random_string(length=10):
+    letters = string.ascii_lowercase
+    result_str = "".join(random.choice(letters) for i in range(length))
+    return result_str
+
+
 class User(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    name = edgy.CharField(max_length=100)
+    name = edgy.CharField(max_length=100, primary_key=True, default=get_random_string)
     language = edgy.CharField(max_length=200, null=True)
 
     class Meta:
@@ -33,13 +43,10 @@ async def rollback_connections():
             yield
 
 
-async def test_model_update_or_create():
-    user, created = await User.query.update_or_create(name="Test", language="English", defaults={"name": "Jane"})
-    assert created is True
-    assert user.name == "Jane"
-    assert user.language == "English"
+async def test_model_multiple_primary_key():
+    user = await User.query.create(language="EN")
+    users = await User.query.filter()
 
-    user, created = await User.query.update_or_create(name="Jane", language="English", defaults={"name": "Test"})
-    assert created is False
-    assert user.name == "Test"
-    assert user.language == "English"
+    assert user.id == 1
+    assert user.pk["id"] == 1
+    assert len(users) == 1

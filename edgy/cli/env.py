@@ -38,9 +38,7 @@ class MigrationEnv:
     app: typing.Optional[typing.Any] = None
     command_path: typing.Optional[str] = None
 
-    def load_from_env(
-        self, path: typing.Optional[str] = None, enable_logging: bool = True
-    ) -> "MigrationEnv":
+    def load_from_env(self, path: typing.Optional[str] = None, enable_logging: bool = True) -> "MigrationEnv":
         """
         Loads the environment variables into the scaffold.
         """
@@ -97,9 +95,7 @@ class MigrationEnv:
 
             # Iterates through the elements of the module.
             for attr, value in module.__dict__.items():
-                if (callable(value) and hasattr(value, EDGY_DB)) or (
-                    callable(value) and hasattr(value, EDGY_EXTRA)
-                ):
+                if (callable(value) and hasattr(value, EDGY_DB)) or (callable(value) and hasattr(value, EDGY_EXTRA)):
                     app_path = f"{dotted_path}:{attr}"
                     return Scaffold(app=value, path=app_path)
 

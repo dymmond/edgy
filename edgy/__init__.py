@@ -6,7 +6,7 @@ from .conf.global_settings import EdgySettings
 from .core.connection.database import Database, DatabaseURL
 from .core.connection.registry import Registry
 from .core.db import fields
-from .core.db.constants import CASCADE, RESTRICT, SET_NULL
+from .core.db.constants import CASCADE, RESTRICT, SET_NULL, ConditionalRedirect
 from .core.db.datastructures import Index, UniqueConstraint
 from .core.db.fields import (
     BigIntegerField,
@@ -19,6 +19,7 @@ from .core.db.fields import (
     DateTimeField,
     DecimalField,
     EmailField,
+    ExcludeField,
     FloatField,
     IntegerField,
     JSONField,
@@ -50,6 +51,7 @@ __all__ = [
     "BinaryField",
     "BooleanField",
     "CASCADE",
+    "ConditionalRedirect",
     "CharField",
     "ChoiceField",
     "CompositeField",
@@ -61,6 +63,7 @@ __all__ = [
     "EdgyExtra",
     "EdgySettings",
     "EmailField",
+    "ExcludeField",
     "fields",
     "FloatField",
     "ForeignKey",

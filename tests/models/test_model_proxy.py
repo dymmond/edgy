@@ -42,9 +42,7 @@ class Team(edgy.Model):
 class Member(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     team = edgy.ForeignKey(Team, on_delete=edgy.SET_NULL, null=True, related_name="members")
-    second_team = edgy.ForeignKey(
-        Team, on_delete=edgy.SET_NULL, null=True, related_name="team_members"
-    )
+    second_team = edgy.ForeignKey(Team, on_delete=edgy.SET_NULL, null=True, related_name="team_members")
     email = edgy.CharField(max_length=100)
     name = edgy.CharField(max_length=255, null=True)
 

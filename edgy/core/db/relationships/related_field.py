@@ -1,8 +1,8 @@
 import functools
-from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Optional, Type, Union, cast
 
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
-from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
+from edgy.core.db.models.utils import pk_from_model
 
 if TYPE_CHECKING:
     from edgy import Manager, Model, QuerySet, ReflectModel
@@ -16,11 +16,13 @@ class RelatedField:
 
     def __init__(
         self,
+        foreign_key_name: str,
         related_name: str,
         related_to: Union[Type["Model"], Type["ReflectModel"]],
-        related_from: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
-        instance: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        related_from: Union[Type["Model"], Type["ReflectModel"]],
+        instance: Optional[Union["Model", "ReflectModel"]] = None,
     ) -> None:
+        self.foreign_key_name = foreign_key_name
         self.related_name = related_name
         self.related_to = related_to
         self.related_from = related_from
@@ -35,12 +37,16 @@ class RelatedField:
     def queryset(self) -> "QuerySet":
         return cast("QuerySet", self.manager.get_queryset())
 
+    @functools.cached_property
+    def foreign_key(self) -> BaseForeignKeyField:
+        return cast(BaseForeignKeyField, self.related_from.meta.fields_mapping[self.foreign_key_name])
+
     def m2m_related(self) -> Any:
         """
         Guarantees the the m2m filter is done by the owner of the call
         and not by the children.
         """
-        if not self.related_from.meta.is_multi:  # type: ignore
+        if not self.related_from.meta.is_multi:
             return
 
         related = [
@@ -50,15 +56,16 @@ class RelatedField:
         ]
         return related
 
-    def __get__(self, instance: Any, owner: Any) -> Any:
+    def __get__(self, instance: Any, owner: Any = None) -> Any:
         return self.__class__(
+            foreign_key_name=self.foreign_key_name,
             related_name=self.related_name,
             related_to=self.related_to,
             instance=instance,
             related_from=self.related_from,
         )
 
-    def __getattr__(self, item: Any) -> Any:
+    def __getattr__(self, item: str) -> Any:
         """
         Gets the attribute from the queryset and if it does not
         exist, then lookup in the model.
@@ -71,29 +78,15 @@ class RelatedField:
         func = self.wrap_args(attr)
         return func
 
-    def get_foreign_key_field_name(self) -> str:
-        """
-        Table lookup for the given field containing the related field.
-
-        If there is no field with the related_name declared, find the first field
-        with the FK to the related_to.
-        """
-        field_name: Optional[str] = None
-        for field, value in self.related_from.fields.items():  # type: ignore
-            if isinstance(value, (BaseForeignKeyField, BaseOneToOneKeyField)):
-                if value.related_name == self.related_name:
-                    field_name = field
-                    break
-                elif not value.related_name or value.related_name is None:
-                    field_name = field
-                    break
-        return cast("str", field_name)
+    def clean(self, name: str, value: Any) -> Dict[str, Any]:
+        return self.related_to.meta.pk.clean(name, value)  # type: ignore
 
     def wrap_args(self, func: Any) -> Any:
         @functools.wraps(func)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
-            field = self.get_foreign_key_field_name()
-            kwargs[field] = self.instance.pk  # type: ignore
+            # invert, so use the foreign_key_name
+            # will be parsed later
+            kwargs[self.foreign_key_name] = pk_from_model(self.instance, always_dict=True)
 
             related = self.m2m_related()
             if related:

@@ -3,9 +3,9 @@ from typing import Any, Dict, Set, Type, Union
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
-from edgy.core.utils.functional import edgy_setattr
+from edgy.core.db.models.utils import pk_from_model_to_clauses, pk_to_dict
 from edgy.core.utils.sync import run_sync
-from edgy.exceptions import RelationshipNotFound
+from edgy.exceptions import ObjectNotFound, RelationshipNotFound
 
 
 class Model(ModelRow, DeclarativeMixin):
@@ -40,36 +40,29 @@ class Model(ModelRow, DeclarativeMixin):
     ```
     """
 
-    def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}: {self}>"
-
-    def __str__(self) -> str:
-        return f"{self.__class__.__name__}({self.pkname}={self.pk})"
-
     async def update(self, **kwargs: Any) -> Any:
         """
         Update operation of the database fields.
         """
         await self.signals.pre_update.send_async(self.__class__, instance=self)
 
-        kwargs = self._update_auto_now_fields(kwargs, self.fields)
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.update().values(**kwargs).where(pk_column == self.pk)
-        await self.database.execute(expression)
+        # empty updates shouldn't cause an error
+        if kwargs:
+            kwargs = self._update_auto_now_fields(kwargs, self.fields)
+            expression = self.table.update().values(**kwargs).where(*pk_from_model_to_clauses(self))
+            await self.database.execute(expression)
         await self.signals.post_update.send_async(self.__class__, instance=self)
 
         # Update the model instance.
         for key, value in kwargs.items():
             setattr(self, key, value)
-
         return self
 
     async def delete(self) -> None:
         """Delete operation from the database"""
         await self.signals.pre_delete.send_async(self.__class__, instance=self)
 
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.delete().where(pk_column == self.pk)
+        expression = self.table.delete().where(*pk_from_model_to_clauses(self))
         await self.database.execute(expression)
 
         await self.signals.post_delete.send_async(self.__class__, instance=self)
@@ -77,15 +70,15 @@ class Model(ModelRow, DeclarativeMixin):
     async def load(self) -> None:
         # Build the select expression.
 
-        pk_column = getattr(self.table.c, self.pkname)
-        expression = self.table.select().where(pk_column == self.pk)
+        expression = self.table.select().where(*pk_from_model_to_clauses(self))
 
         # Perform the fetch.
         row = await self.database.fetch_one(expression)
-
+        # check if is in system
+        if row is None:
+            raise ObjectNotFound("row does not exist anymore")
         # Update the instance.
-        for key, value in dict(row._mapping).items():
-            setattr(self, key, value)
+        self.__dict__.update(self.transform_input(dict(row._mapping), phase="load"))
 
     async def _save(self, **kwargs: Any) -> "Model":
         """
@@ -93,9 +86,14 @@ class Model(ModelRow, DeclarativeMixin):
         """
         expression = self.table.insert().values(**kwargs)
         awaitable = await self.database.execute(expression)
-        if not awaitable:
-            awaitable = kwargs.get(self.pkname)
-        edgy_setattr(self, self.pkname, awaitable)
+        pk_dict = pk_to_dict(self, kwargs, is_partial=True)
+        if awaitable:
+            # autoincrement. search autoincrement field
+            for pkname in self.pknames:
+                if self.fields[pkname].autoincrement:
+                    pk_dict[pkname] = awaitable
+                    break
+        self.__dict__.update(pk_dict)
         return self
 
     async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
@@ -163,15 +161,18 @@ class Model(ModelRow, DeclarativeMixin):
         extracted_model_references = self.extract_db_model_references()
         extracted_fields.update(extracted_model_references)
 
-        if getattr(self, "pk", None) is None and self.fields[self.pkname].autoincrement:
-            extracted_fields.pop(self.pkname, None)
+        for pkname in self.pknames:
+            if getattr(self, pkname, None) is None and self.fields[pkname].autoincrement:
+                extracted_fields.pop(pkname, None)
+                force_save = True
 
         self.update_from_dict(dict_values=dict(extracted_fields.items()))
 
         # Performs the update or the create based on a possible existing primary key
-        if getattr(self, "pk", None) is None or force_save:
-            validated_values = values or self._extract_values_from_field(
-                extracted_values=extracted_fields
+
+        if force_save:
+            validated_values = self._extract_values_from_field(
+                extracted_values=extracted_fields if values is None else extracted_fields, is_partial=values is not None
             )
             kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
             kwargs, model_references = self.update_model_references(**kwargs)
@@ -180,15 +181,15 @@ class Model(ModelRow, DeclarativeMixin):
             # Broadcast the initial update details
             # Making sure it only updates the fields that should be updated
             # and excludes the fields aith `auto_now` as true
-            validated_values = values or self._extract_values_from_field(
-                extracted_values=extracted_fields, is_update=True
+            validated_values = self._extract_values_from_field(
+                extracted_values=extracted_fields if values is None else extracted_fields,
+                is_update=True,
+                is_partial=values is not None,
             )
             kwargs, model_references = self.update_model_references(**validated_values)
             update_model = {k: v for k, v in validated_values.items() if k in kwargs}
 
-            await self.signals.pre_update.send_async(
-                self.__class__, instance=self, kwargs=update_model
-            )
+            await self.signals.pre_update.send_async(self.__class__, instance=self, kwargs=update_model)
             await self.update(**update_model)
 
             # Broadcast the update complete
@@ -200,11 +201,7 @@ class Model(ModelRow, DeclarativeMixin):
                 await self.save_model_references(references or [], model_ref=model_ref)
 
         # Refresh the results
-        if any(
-            field.server_default is not None
-            for name, field in self.fields.items()
-            if name not in extracted_fields
-        ):
+        if any(field.server_default is not None for name, field in self.fields.items() if name not in extracted_fields):
             await self.load()
 
         await self.signals.post_save.send_async(self.__class__, instance=self)
@@ -215,18 +212,14 @@ class Model(ModelRow, DeclarativeMixin):
         Run an one off query to populate any foreign key making sure
         it runs only once per foreign key avoiding multiple database calls.
         """
-        if hasattr(self.fields.get(name), "__get__"):
-            return self.fields[name].__get__(self)
-        if name not in self.__dict__ and name in self.fields and name != self.pkname:
+        field = self.meta.fields_mapping.get(name)
+        if field is not None and hasattr(field, "__get__"):
+            # no need to set an descriptor object
+            return field.__get__(self, self.__class__)
+        if name not in self.__dict__ and field is not None and name not in self.pknames:
             run_sync(self.load())
             return self.__dict__[name]
         return super().__getattr__(name)
-
-    def __setattr__(self, name: str, value: Any) -> None:
-        if hasattr(self.fields.get(name), "__set__"):
-            self.fields[name].__set__(self, value)
-        else:
-            super().__setattr__(name, value)
 
 
 class ReflectModel(Model, EdgyBaseReflectModel):

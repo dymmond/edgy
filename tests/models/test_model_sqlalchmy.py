@@ -50,10 +50,7 @@ async def test_model_sqlalchemy_filter_operators():
     assert user == await User.query.filter(User.columns.name == "George").get()
     assert user == await User.query.filter(User.columns.name.is_not(None)).get()
     assert (
-        user
-        == await User.query.filter(User.columns.name.startswith("G"))
-        .filter(User.columns.name.endswith("e"))
-        .get()
+        user == await User.query.filter(User.columns.name.startswith("G")).filter(User.columns.name.endswith("e")).get()
     )
 
     assert user == await User.query.exclude(User.columns.name != "Jack").get()
@@ -70,9 +67,7 @@ async def test_model_sqlalchemy_filter_operators_no_get():
     users = await User.query.filter(User.columns.name.is_not(None))
     assert user == users[0]
 
-    users = await User.query.filter(User.columns.name.startswith("G")).filter(
-        User.columns.name.endswith("e")
-    )
+    users = await User.query.filter(User.columns.name.startswith("G")).filter(User.columns.name.endswith("e"))
     assert user == users[0]
 
     assert user == await User.query.exclude(User.columns.name != "Jack").get()

@@ -70,7 +70,7 @@ async def test_prefetch_related():
     stud = await Studio.query.create(album=album, name="Valentim")
 
     studio = await Studio.query.prefetch_related(
-        Prefetch(related_name="studios__tracks", to_attr="tracks"),
+        Prefetch(related_name="album__tracks", to_attr="tracks"),
     ).get(pk=stud.pk)
 
     assert len(studio.tracks) == 3
@@ -78,7 +78,7 @@ async def test_prefetch_related():
     stud = await Studio.query.create(album=album2, name="New")
 
     studio = await Studio.query.prefetch_related(
-        Prefetch(related_name="studios__tracks", to_attr="tracks"),
+        Prefetch(related_name="album__tracks", to_attr="tracks"),
     ).get(pk=stud.pk)
 
     assert len(studio.tracks) == 1
@@ -95,14 +95,12 @@ async def test_prefetch_related_nested():
 
     await Company.query.create(studio=stud)
 
-    company = await Company.query.prefetch_related(
-        Prefetch(related_name="companies__studios__tracks", to_attr="tracks")
-    )
+    company = await Company.query.prefetch_related(Prefetch(related_name="studio__album__tracks", to_attr="tracks"))
 
     assert len(company[0].tracks) == 1
 
     company = await Company.query.prefetch_related(
-        Prefetch(related_name="companies__studios__tracks", to_attr="tracks")
+        Prefetch(related_name="studio__album__tracks", to_attr="tracks")
     ).get(studio=stud)
 
     assert len(company.tracks) == 1
@@ -121,7 +119,7 @@ async def test_prefetch_related_nested_with_queryset():
 
     company = await Company.query.prefetch_related(
         Prefetch(
-            related_name="companies__studios__tracks",
+            related_name="studio__album__tracks",
             to_attr="tracks",
             queryset=Track.query.filter(title__icontains="bird"),
         )
