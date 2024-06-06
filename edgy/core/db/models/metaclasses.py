@@ -310,8 +310,10 @@ class BaseModelMeta(ModelMetaclass):
                 # That is why is not stored as a normal FK but as a reference but
                 # stored also as a field to be able later or to access anywhere in the model
                 # and use the value for the creation of the records via RefForeignKey.
-                # This is then used in `save_model_references()` and `update_model_references  saving a reference foreign key.
-                # We split the keys (store them) in different places to be able to easily maintain and know what is what.
+                # This is then used in `save_model_references()` and `update_model_references
+                # saving a reference foreign key.
+                # We split the keys (store them) in different places to be able to easily maintain and
+                #  what is what.
                 if not isinstance(value, BaseRefForeignKeyField):
                     fields[key] = value
 

@@ -106,7 +106,7 @@ dependencies = ["ruff", "pre-commit>=2.17.0,<3.0.0", "twine"]
 [tool.hatch.envs.default.scripts]
 clean_pyc = "find . -type f -name \"*.pyc\" -delete"
 clean_pycache = "find . -type d -name \"*__pycache__*\" -delete"
-lint = "ruff check --fix edgy tests docs_src {args}; hatch run test:check_types"
+lint = "ruff check edgy tests docs_src {args}; hatch run test:check_types"
 build_with_check = "hatch build; twine check dist/*"
 
 
@@ -157,13 +157,17 @@ warn_unused_ignores = true
 warn_redundant_casts = true
 
 [tool.ruff]
-line-length = 120
+line-length = 99
+fix = true
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "C", "B", "I"]
 ignore = ["E501", "B008", "C901", "B026"]
-
 exclude = ["docs_src/*"]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 120
+max-doc-length = 120
 
 [[tool.mypy.overrides]]
 module = "edgy.tests.*"
