@@ -15,6 +15,9 @@ class ModelRow(EdgyBaseModel):
     Builds a row for a specific model
     """
 
+    class Meta:
+        abstract = True
+
     @classmethod
     def from_sqla_row(
         cls,

@@ -47,7 +47,7 @@ async def rollback_connections():
 
 
 def test_model_class():
-    assert list(User.fields.keys()) == ["id", "pk", "name", "language"]
+    assert list(sorted(User.fields.keys())) == list(sorted(["pk", "id", "name", "language"]))
     assert isinstance(User.fields["id"], Field)
     assert User.fields["id"].primary_key is True
     assert isinstance(User.fields["name"], Field)

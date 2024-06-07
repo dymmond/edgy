@@ -39,6 +39,8 @@ class Model(ModelRow, DeclarativeMixin):
             registry = models
     ```
     """
+    class Meta:
+        abstract = True
 
     async def update(self, **kwargs: Any) -> Any:
         """
@@ -135,7 +137,7 @@ class Model(ModelRow, DeclarativeMixin):
         model_references: Dict[str, Any] = {}
 
         for name, value in kwargs.items():
-            if name in self.meta.model_references:  # type: ignore
+            if name in self.meta.model_references:
                 model_references[name] = value
                 model_refs_set.add(name)
 
@@ -227,3 +229,6 @@ class ReflectModel(Model, EdgyBaseReflectModel):
     Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
     call.
     """
+
+    class Meta:
+        abstract = True

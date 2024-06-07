@@ -1,5 +1,3 @@
-import random
-import string
 
 import pytest
 
@@ -14,15 +12,9 @@ nother = Registry(database=database)
 
 pytestmark = pytest.mark.anyio
 
-
-def get_random_string(length=10):
-    letters = string.ascii_lowercase
-    result_str = "".join(random.choice(letters) for i in range(length))
-    return result_str
-
-
 class User(edgy.Model):
-    name = edgy.CharField(max_length=100, primary_key=True, default=get_random_string)
+    non_default_id = edgy.BigIntegerField(primary_key=True, autoincrement=True)
+    name = edgy.CharField(max_length=100, primary_key=True)
     language = edgy.CharField(max_length=200, null=True)
 
     class Meta:
@@ -44,9 +36,22 @@ async def rollback_connections():
 
 
 async def test_model_multiple_primary_key():
-    user = await User.query.create(language="EN")
+    user = await User.query.create(language="EN", name="edgy")
     users = await User.query.filter()
 
-    assert user.id == 1
-    assert user.pk["id"] == 1
+    assert user.non_default_id == 1
+    assert user.name == "edgy"
+    assert user.pk["non_default_id"] == 1
+    assert user.pk["name"] == "edgy"
+    assert len(users) == 1
+
+
+async def test_model_multiple_primary_key_explicit_id():
+    user = await User.query.create(language="EN", name="edgy", non_default_id=45)
+    users = await User.query.filter()
+
+    assert user.non_default_id == 45
+    assert user.name == "edgy"
+    assert user.pk["non_default_id"] == 45
+    assert user.pk["name"] == "edgy"
     assert len(users) == 1

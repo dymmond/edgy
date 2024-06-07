@@ -18,7 +18,6 @@ from pydantic.fields import FieldInfo
 from sqlalchemy import Column, Constraint, ForeignKeyConstraint
 
 from edgy.core.connection.registry import Registry
-from edgy.exceptions import FieldDefinitionError
 from edgy.types import Undefined
 
 if TYPE_CHECKING:
@@ -56,9 +55,7 @@ class BaseField(FieldInfo):
         self.server_default: Any = server_default
         self.read_only: bool = kwargs.pop("read_only", False)
         self.primary_key: bool = kwargs.pop("primary_key", False)
-        if self.primary_key:
-            self.read_only = True
-            kwargs["frozen"] = True
+        self.autoincrement: bool = kwargs.pop("autoincrement", False)
 
         super().__init__(**kwargs)
 
@@ -73,7 +70,6 @@ class BaseField(FieldInfo):
             self.null = True
         self.field_type: Any = kwargs.pop("__type__", None)
         self.__original_type__: type = kwargs.pop("__original_type__", None)
-        self.autoincrement: bool = kwargs.pop("autoincrement", False)
         self.column_type: Optional[Any] = kwargs.pop("column_type", None)
         self.constraints: Sequence["Constraint"] = kwargs.pop("constraints", [])
         self.skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
@@ -100,9 +96,6 @@ class BaseField(FieldInfo):
         # Prevent multiple initialization
         self.embedded_fields_initialized = False
 
-        if self.primary_key:
-            default_value = default
-            self.raise_for_non_default(default=default_value, server_default=self.server_default)
 
         # set remaining attributes
         for name, value in kwargs.items():
@@ -131,20 +124,6 @@ class BaseField(FieldInfo):
             if self.autoincrement:
                 return False
         return False if self.null else True
-
-    def raise_for_non_default(self, default: Any, server_default: Any) -> Any:
-        has_default: bool = True
-        has_server_default: bool = True
-
-        if default is None or default is False:
-            has_default = False
-        if server_default is None or server_default is False:
-            has_server_default = False
-
-        if not self.field_type == int and not has_default and not has_server_default:
-            raise FieldDefinitionError(
-                "Primary keys other then IntegerField and BigIntegerField, must provide a default or a server_default."
-            )
 
     def get_alias(self) -> str:
         """

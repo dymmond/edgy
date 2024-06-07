@@ -50,45 +50,47 @@ If no `id` is declared in the model, **Edgy** will automatically generate an `id
 
 ### Restrictions with primary keys
 
-Primary keys **should always** be declared in an `id` field. If you create a different
-`primary_key` within the model in a different attribute, it will raise an `ImproperlyConfigured`.
-
-**Primary keys must be always declared inside an ID attribute**.
-
-Let us go through some examples.
+Earlier there were many restrictions. Now they were lifted
 
 #### What you should not do
 
-The below examples are the practices **you should avoid** and it will raise an error. The examples
+##### Declaring an IntegerField as primary key without autoincrement set
+
+Because of backward compatibility we set for an IntegerField or BigIntegerField which is declared as primary key
+the autoincrement option to `True`. So you need to explicitly set `autoincrement=False` to turn this off.
+
+This maybe can change and is not always wanted when having e.g. an explicit id or a secondary primary key IntegerField.
+
+Note: for every model only one IntegerField/BigIntegerField can be set to autoincrement=True
+
+Note: You can also set the field with autoincrement to an explicit value
+
+#### What you can do
+
+The examples
 are applied to any [field](./fields.md) available in **Edgy**.
+
 
 ##### Declaring a model primary key different from ID
 
-```python hl_lines="11"
+```python hl_lines="11-12"
 {!> ../docs_src/models/declaring_models_pk_no_id.py !}
 ```
 
-This will raise `ImproperlyConfigured` as you cannot have two primary keys.
-One is the auto-generated `id` and the second is the `name`.
+Now this works
 
-**You can only have one and it should always be called `id`**.
+##### Multiple primary keys
 
-##### Declaring a model with ID and without default
+This is novel and maybe a bit buggy in combination with ForeignKeys.
+
+##### Declaring a model with ID and without default and autoincrement
 
 When declaring an `id`, unless the field type is [IntegerField](./fields.md#integerfield) or
-[BigIntegerField](./fields.md#bigintegerfield), you should always declare a `default` or a
-`ValueError` is raised.
+[BigIntegerField](./fields.md#bigintegerfield), you have to provide the primary key when creating the object.
 
 ```python hl_lines="9"
 {!> ../docs_src/models/pk_no_default.py !}
 ```
-
-Since the deafult for a [CharField](./fields.md#charfield) is not provided, a `ValueError`
-is raised.
-
-#### What you should do
-
-When it comes to primary keys, it is actually very simple and clean.
 
 ##### Declaring a model primary key with different field type
 

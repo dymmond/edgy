@@ -404,6 +404,9 @@ class EdgyBaseReflectModel(EdgyBaseModel):
 
     __reflected__: ClassVar[bool] = True
 
+    class Meta:
+        abstract = True
+
     @classmethod
     def build(cls, schema: Optional[str] = None) -> Any:
         """
