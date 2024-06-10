@@ -161,8 +161,6 @@ class Model(ModelRow, DeclarativeMixin):
         await self.signals.pre_save.send_async(self.__class__, instance=self)
 
         extracted_fields = self.extract_db_fields()
-        extracted_model_references = self.extract_db_model_references()
-        extracted_fields.update(extracted_model_references)
 
         for pkname in self.pknames:
             if getattr(self, pkname, None) is None and self.fields[pkname].autoincrement:

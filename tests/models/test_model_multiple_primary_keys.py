@@ -78,7 +78,5 @@ async def test_model_multiple_primary_key_idempotence():
     user = await User.query.create(language="EN", name="edgy")
     user2 = await User.query.create(language="EN", name="edgy2", parent=user)
     extracted_fields = user2.extract_db_fields()
-    extracted_model_references = user2.extract_db_model_references()
-    extracted_fields.update(extracted_model_references)
     column_values = user2._extract_values_from_field(extracted_fields)
     assert User(**column_values).model_dump() == user2.model_dump(exclude={"parent": {"language": True}})
