@@ -34,8 +34,6 @@ if TYPE_CHECKING:
     from edgy import Model, Registry
     from edgy.core.signals import Broadcaster
 
-EXCLUDED_LOOKUP = ["__model_references__", "_table", "signals"]
-
 _empty = cast(Set[str], frozenset())
 
 
@@ -56,8 +54,8 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     __reflected__: ClassVar[bool] = False
     __raw_query__: ClassVar[Optional[str]] = None
     __using_schema__: ClassVar[Union[str, None]] = None
-    __model_references__: ClassVar[Any] = None
     __show_pk__: ClassVar[bool] = False
+    __model_references__: Dict[str, Any]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.__show_pk__ = kwargs.pop("__show_pk__", False)
@@ -66,6 +64,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         model_references = self.setup_model_references_from_kwargs(kwargs)
         values = self.setup_model_fields_from_kwargs(kwargs)
         self.__dict__ = values
+        self.__dict__.update(model_references)
         self.__model_references__ = model_references
 
     @classmethod
@@ -349,18 +348,18 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     def extract_db_model_references(self) -> Dict[str, Any]:
         """
-        Extracts all the model references (ModelRef) from the model
+        Extracts all the model references (ModelRef) from the model.
+        Related fields are not included because they are disjoint.
         """
-        related_fields = self.meta.related_fields
-        return {k: v for k, v in self.__model_references__.items() if k not in related_fields}
+        return self.__model_references__.copy()
 
     def extract_db_fields(self) -> Dict[str, Any]:
         """
-        Extacts all the db fields and excludes the related_fields since those
-        are simply relations.
+        Extracts all the db fields and fields. Related fields are not included because they are disjoint.
         """
-        related_fields = self.meta.related_fields
-        return {k: v for k, v in self.__dict__.items() if k not in related_fields and k not in EXCLUDED_LOOKUP}
+        fields_mapping = self.meta.fields_mapping
+        columns = self.__class__.columns
+        return {k: v for k, v in self.__dict__.items() if k in fields_mapping or k in columns}
 
     def get_instance_name(self) -> str:
         """
@@ -369,7 +368,11 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return self.__class__.__name__.lower()
 
     def __setattr__(self, key: str, value: Any) -> None:
-        field = self.meta.fields_mapping.get(key, None)
+        fields_mapping = self.meta.fields_mapping
+        model_references = self.meta.model_references
+        if key in model_references:
+            self.__model_references__[key] = value
+        field = fields_mapping.get(key, None)
         if field is not None:
             if hasattr(field, "__set__"):
                 # not recommended, better to use to_model instead

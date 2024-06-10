@@ -579,4 +579,4 @@ class BaseModelMeta(ModelMetaclass):
 
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:
-        return cast("sqlalchemy.sql.ColumnCollection", cls._table.columns)
+        return cast("sqlalchemy.sql.ColumnCollection", cls.table.columns)
