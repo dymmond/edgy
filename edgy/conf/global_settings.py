@@ -28,7 +28,6 @@ class EdgySettings(BaseSettings):
         return {"aioodbc"}
 
     # General settings
-    default_related_lookup_field: str = "id"
     filter_operators: Dict[str, str] = {
         "exact": "__eq__",
         "iexact": "ilike",
