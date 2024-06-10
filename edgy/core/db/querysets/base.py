@@ -173,8 +173,8 @@ class BaseQuerySet(
         """
         queryset: "QuerySet" = self._clone()
 
-        tables = [queryset.table]
         select_from = queryset.table
+        tables = {select_from.name: select_from}
 
         # Select related
         for item in queryset._select_related:
@@ -200,9 +200,9 @@ class BaseQuerySet(
                     *self._select_from_relationship_clause_generator(select_from, foreign_key, table, inverse, former_table)
                 )
                 former_table = table
-                tables.append(table)
+                tables[table.name] = table
 
-        return tables, select_from
+        return tables.values(), select_from
 
     @staticmethod
     def _select_from_relationship_clause_generator(select_from: Any, foreign_key: BaseForeignKey, table: Any, inverse: bool, former_table: Any=None) -> Any:
