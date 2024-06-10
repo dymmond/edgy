@@ -55,17 +55,12 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     __raw_query__: ClassVar[Optional[str]] = None
     __using_schema__: ClassVar[Union[str, None]] = None
     __show_pk__: ClassVar[bool] = False
-    __model_references__: Dict[str, Any]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.__show_pk__ = kwargs.pop("__show_pk__", False)
         kwargs = self.transform_input(kwargs, phase="creation")
         super().__init__(**kwargs)
-        model_references = self.setup_model_references_from_kwargs(kwargs)
-        values = self.setup_model_fields_from_kwargs(kwargs)
-        self.__dict__ = values
-        self.__dict__.update(model_references)
-        self.__model_references__ = model_references
+        self.__dict__ = self.setup_model_from_kwargs(kwargs)
 
     @classmethod
     def transform_input(cls, kwargs: Any, phase: str) -> Any:
@@ -88,31 +83,14 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 new_kwargs[key] = value
         return new_kwargs
 
-    def setup_model_references_from_kwargs(self, kwargs: Any) -> Any:
-        """
-        Loops and setup the kwargs of the model
-        """
-        model_references = {k: v for k, v in kwargs.items() if k in self.meta.model_references}
-        return model_references
-
-    def setup_model_fields_from_kwargs(self, kwargs: Any) -> Any:
+    def setup_model_from_kwargs(self, kwargs: Any) -> Any:
         """
         Loops and setup the kwargs of the model
         """
 
-        kwargs = {
-            k: v for k, v in kwargs.items() if k in self.meta.fields_mapping and k not in self.meta.model_references
+        return {
+            k: v for k, v in kwargs.items() if k in self.meta.fields_mapping or k in self.meta.model_references
         }
-
-        for key, value in kwargs.items():
-            field = self.meta.fields_mapping.get(key, None)
-            if not field:
-                if not hasattr(self, key):
-                    raise ValueError(f"Invalid keyword {key} for class {self.__class__.__name__}")
-
-            # Add to the kwargs dict
-            kwargs[key] = value
-        return kwargs
 
     @property
     def raw_query(self) -> Any:
@@ -346,20 +324,15 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             setattr(self, key, value)
         return self
 
-    def extract_db_model_references(self) -> Dict[str, Any]:
-        """
-        Extracts all the model references (ModelRef) from the model.
-        Related fields are not included because they are disjoint.
-        """
-        return self.__model_references__.copy()
-
     def extract_db_fields(self) -> Dict[str, Any]:
         """
-        Extracts all the db fields and fields. Related fields are not included because they are disjoint.
+        Extracts all the db fields, model references and fields.
+        Related fields are not included because they are disjoint.
         """
         fields_mapping = self.meta.fields_mapping
+        model_references = self.meta.model_references
         columns = self.__class__.columns
-        return {k: v for k, v in self.__dict__.items() if k in fields_mapping or k in columns}
+        return {k: v for k, v in self.__dict__.items() if k in fields_mapping or k in columns or k in model_references}
 
     def get_instance_name(self) -> str:
         """
@@ -369,9 +342,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     def __setattr__(self, key: str, value: Any) -> None:
         fields_mapping = self.meta.fields_mapping
-        model_references = self.meta.model_references
-        if key in model_references:
-            self.__model_references__[key] = value
         field = fields_mapping.get(key, None)
         if field is not None:
             if hasattr(field, "__set__"):
