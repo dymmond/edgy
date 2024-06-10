@@ -81,10 +81,10 @@ class MetaInfo:
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
         self.foreign_key_fields: Dict[str, BaseField] = {**getattr(meta, "foreign_key_fields", _empty_dict)}
-        self.model_references: Dict["ModelRef", str] = {**getattr(meta, "model_references", _empty_dict)}
+        self.model_references: Dict[str, "ModelRef"] = {**getattr(meta, "model_references", _empty_dict)}
         self.model: Optional[Type["Model"]] = None
         self.manager: "Manager" = getattr(meta, "manager", Manager())
-        self.managers: List[Manager] = [*getattr(meta, "managers", _empty_set)]
+        self.managers: Dict[str, Manager] = {**getattr(meta, "managers", _empty_dict)}
         self.unique_together: Any = getattr(meta, "unique_together", None)
         self.indexes: Any = getattr(meta, "indexes", None)
         self.reflect: bool = getattr(meta, "reflect", False)
@@ -148,7 +148,7 @@ def _check_manager_for_bases(
                     raise ImproperlyConfigured(
                         f"Managers must be type annotated and '{key}' is not annotated. Managers must be annotated with ClassVar."
                     )
-                if get_origin(base.__annotations__[key]) is not ClassVar:
+                if key not in base.__annotations__ or get_origin(base.__annotations__[key]) is not ClassVar:
                     raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
                 attrs[key] = value.__class__()
 
@@ -198,6 +198,13 @@ def _register_model_signals(model_class: Type["Model"]) -> None:
     signals.set_lifecycle_signals_from(signals_module, overwrite=False)
     model_class.meta.signals = signals
 
+def _handle_annotations(base: Type, base_annotations: Dict[str, Any]) -> None:
+    for parent in base.__mro__[1:]:
+        _handle_annotations(parent, base_annotations)
+    if hasattr(base, "__init_annotations__") and base.__init_annotations__:
+        base_annotations.update(base.__init_annotations__)
+    elif hasattr(base, "__annotations__") and base.__annotations__:
+        base_annotations.update(base.__annotations__)
 
 def handle_annotations(bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any) -> Dict[str, Any]:
     """
@@ -205,10 +212,7 @@ def handle_annotations(bases: Tuple[Type, ...], base_annotations: Dict[str, Any]
     initialiasation.
     """
     for base in bases:
-        if hasattr(base, "__init_annotations__") and base.__init_annotations__:
-            base_annotations.update(base.__init_annotations__)
-        elif hasattr(base, "__annotations__") and base.__annotations__:
-            base_annotations.update(base.__annotations__)
+        _handle_annotations(base, base_annotations)
 
     annotations: Dict[str, Any] = (
         copy.copy(attrs["__init_annotations__"])
@@ -222,16 +226,17 @@ def handle_annotations(bases: Tuple[Type, ...], base_annotations: Dict[str, Any]
 class BaseModelMeta(ModelMetaclass):
     __slots__ = ()
 
-    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
+    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any]) -> Any:
         fields: Dict[str, BaseField] = {}
         input_modifying_fields: Set[str] = set()
         foreign_key_fields: Dict[str, BaseField] = {}
-        model_references: Dict["ModelRef", str] = {}
+        model_references: Dict[str, "ModelRef"] = {}
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         pk_attributes: Set[str] = set()
         base_annotations: Dict[str, Any] = {}
         is_abstract: bool = getattr(meta_class, "abstract", False)
         registry: Optional[Registry] = get_model_registry(bases, meta_class)
+        parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
@@ -277,28 +282,14 @@ class BaseModelMeta(ModelMetaclass):
             # copy anyway
             attrs = {**attrs}
 
-        # Handle with multiple primary keys and auto generated field if no primary key is provided
         for key, value in attrs.items():
             if isinstance(value, BaseField):
                 if key == "pk" and not isinstance(value, ConcreteCompositeField):
                     raise ImproperlyConfigured(f"Cannot add a field named pk to model {name}. Protected name.")
-                if value.primary_key:
-                    pk_attributes.add(key)
-
-        if not is_abstract:
-            if not pk_attributes:
-                if "id" not in attrs:
-                    attrs["id"] = edgy_fields.BigIntegerField(primary_key=True, autoincrement=True)
-                    pk_attributes.add("id")
-
-            if not isinstance(attrs["id"], BaseField) or not attrs["id"].primary_key:
-                raise ImproperlyConfigured(
-                    f"Cannot create model {name} without explicit primary key if field 'id' is already present."
-                )
-        for key, value in attrs.items():
-            if isinstance(value, BaseField):
                 # make sure we have a fresh copy where we can set the owner
                 value = copy.copy(value)
+                if value.primary_key:
+                    pk_attributes.add(key)
                 # set as soon as possible the field_name
                 value.name = key
                 if registry:
@@ -349,6 +340,20 @@ class BaseModelMeta(ModelMetaclass):
                             model_fields[sub_field_name] = sub_field
                             if sub_field.primary_key:
                                 pk_attributes.add(sub_field_name)
+            # Handle with multiple primary keys and auto generated field if no primary key is provided
+            if not pk_attributes and not is_abstract and parents:
+                if "id" not in fields:
+                    if attrs.get("__reflected__", False):
+                        raise ImproperlyConfigured(
+                            f"Cannot create model {name}. No primary key found and reflected."
+                        )
+                    else:
+                        fields["id"] = edgy_fields.BigIntegerField(primary_key=True, autoincrement=True)  # type: ignore
+                        pk_attributes.add("id")
+                if not isinstance(fields["id"], BaseField) or not fields["id"].primary_key:
+                    raise ImproperlyConfigured(
+                        f"Cannot create model {name} without explicit primary key if field 'id' is already present."
+                    )
 
         for field_name, field_value in fields.items():
             attrs.pop(field_name, None)
@@ -385,7 +390,7 @@ class BaseModelMeta(ModelMetaclass):
 
         # Abstract classes do not allow multiple managers. This make sure it is enforced.
         if not meta.abstract:
-            meta.managers = {k: v for k, v in attrs.items() if isinstance(v, Manager)}  # type: ignore
+            meta.managers = {k: v for k, v in attrs.items() if isinstance(v, Manager)}
             for k, _ in meta.managers.items():
                 if annotations and k not in annotations:
                     raise ImproperlyConfigured(
@@ -394,12 +399,11 @@ class BaseModelMeta(ModelMetaclass):
                 if annotations and get_origin(annotations[k]) is not ClassVar:
                     raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
 
-        # Ensure the initialization is only performed for subclasses of Model
+        # Ensure the initialization is only performed for subclasses of EdgyBaseModel
         attrs["__init_annotations__"] = annotations
-        parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
 
-        # Ensure initialization is only performed for subclasses of Model
-        # (excluding the Model class itself).
+        # Ensure initialization is only performed for subclasses of EdgyBaseModel
+        # (excluding the EdgyBaseModel class itself).
         if not parents:
             return model_class(cls, name, bases, attrs)
 

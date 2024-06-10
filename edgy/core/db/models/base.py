@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from edgy import Model, Registry
     from edgy.core.signals import Broadcaster
 
-EXCLUDED_LOOKUP = ["__model_references__", "_table"]
+EXCLUDED_LOOKUP = ["__model_references__", "_table", "signals"]
 
 _empty = cast(Set[str], frozenset())
 
@@ -403,6 +403,9 @@ class EdgyBaseReflectModel(EdgyBaseModel):
     """
 
     __reflected__: ClassVar[bool] = True
+
+    class Meta:
+        abstract = True
 
     @classmethod
     def build(cls, schema: Optional[str] = None) -> Any:

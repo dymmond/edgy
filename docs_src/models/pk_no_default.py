@@ -12,3 +12,5 @@ class User(edgy.Model):
 
     class Meta:
         registry = models
+
+obj = edgy.run_sync(User.query.create(id="edgy", age=19))
