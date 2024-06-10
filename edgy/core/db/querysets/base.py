@@ -21,8 +21,6 @@ from edgy.conf import settings
 from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.base import BaseForeignKey
-from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
-from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import PrefetchMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
@@ -34,7 +32,7 @@ from . import clauses as clauses_mod
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy import Database
-    from edgy.core.db.models import Model, ReflectModel
+    from edgy.core.db.models import Model
 
 
 def clean_query_kwargs(model: Type["Model"], kwargs: Dict[str, Any]) -> Dict[str, Any]:
@@ -166,39 +164,6 @@ class BaseQuerySet(
         expression = expression.distinct(*distinct_on)
         return expression
 
-    def _is_multiple_foreign_key(
-        self, model_class: Union[Type["Model"], Type["ReflectModel"]]
-    ) -> Tuple[bool, List[Tuple[str, str, str]]]:
-        """
-        Checks if the table has multiple foreign keys to the same table.
-        Iterates through all fields of type ForeignKey and OneToOneField and checks if there are
-        multiple FKs to the same destination table.
-
-        Returns a tuple of bool, list of tuples
-        """
-        fields = model_class.fields  # type: ignore
-        foreign_keys = []
-        has_many = False
-
-        counter = 0
-
-        for key, value in fields.items():
-            tablename = None
-
-            if counter > 1:
-                has_many = True
-
-            if isinstance(value, (BaseForeignKeyField, BaseOneToOneKeyField)):
-                tablename = value.to if isinstance(value.to, str) else value.to.__name__  # type: ignore
-
-                if tablename not in foreign_keys:
-                    foreign_keys.append((key, tablename, value.related_name))
-                    counter += 1
-                else:
-                    counter += 1
-
-        return has_many, foreign_keys
-
     def _build_tables_select_from_relationship(self) -> Any:
         """
         Builds the tables relationships and joins.
@@ -210,46 +175,51 @@ class BaseQuerySet(
 
         tables = [queryset.table]
         select_from = queryset.table
-        has_many_fk_same_table = False
 
         # Select related
         for item in queryset._select_related:
             # For m2m relationships
             model_class = queryset.model_class
             select_from = queryset.table
-
+            former_table = None
             for part in item.split("__"):
                 try:
-                    model_class = model_class.fields[part].target
+                    foreign_key = model_class.fields[part]
+                    model_class = foreign_key.target
+                    inverse = False
                 except KeyError:
                     # Check related fields
-                    model_class = model_class.meta.related_fields[part].related_from
-                    has_many_fk_same_table, keys = self._is_multiple_foreign_key(model_class)
+                    related_field = model_class.meta.related_fields[part]
+                    model_class = related_field.related_from
+                    foreign_key = related_field.foreign_key
+                    inverse = True
                 table = model_class.table
-
-                # If there is multiple FKs to the same table
-                if not has_many_fk_same_table:
-                    select_from = sqlalchemy.sql.join(select_from, table)  # type: ignore
-                else:
-                    lookup_field = None
-
-                    # Extract the table field from the related
-                    # Assign to a lookup_field
-                    for values in keys:
-                        field, _, related_name = values
-                        if related_name == part:
-                            lookup_field = field
-                            break
-
-                    select_from = sqlalchemy.sql.join(  # type: ignore
-                        select_from,
-                        table,
-                        select_from.c.id == getattr(table.c, lookup_field),
-                    )
-
+                select_from = sqlalchemy.sql.join(  # type: ignore
+                    select_from,
+                    table,
+                    *self._select_from_relationship_clause_generator(select_from, foreign_key, table, inverse, former_table)
+                )
+                former_table = table
                 tables.append(table)
 
         return tables, select_from
+
+    @staticmethod
+    def _select_from_relationship_clause_generator(select_from: Any, foreign_key: BaseForeignKey, table: Any, inverse: bool, former_table: Any=None) -> Any:
+        column_names = foreign_key.get_column_names(foreign_key.name)
+        for col in column_names:
+            if inverse:
+                colname = foreign_key.from_fk_field_name(foreign_key.name, col)
+            else:
+                colname = col
+            if former_table is None:
+                former_table = select_from
+            if inverse:
+                yield getattr(former_table.c, colname) == getattr(table.c, col)
+            else:
+                yield getattr(former_table.c, colname) == getattr(table.c, foreign_key.from_fk_field_name(foreign_key.name, col))
+
+
 
     def _validate_only_and_defer(self) -> None:
         if self._only and self._defer:
