@@ -76,7 +76,11 @@ class ModelRow(EdgyBaseModel):
         # This way it is not overritten by any value
         for related, foreign_key in cls.meta.foreign_key_fields.items():
             ignore_related: bool = cls.__should_ignore_related_name(related, select_related)
-            if ignore_related:
+            if ignore_related or related in secret_fields:
+                continue
+
+            columns_to_check = foreign_key.get_column_names(related)
+            if secret_fields and not columns_to_check.isdisjoint(secret_fields):
                 continue
 
             model_related = foreign_key.target
@@ -85,20 +89,16 @@ class ModelRow(EdgyBaseModel):
             model_related = cls.__apply_schema(model_related, using_schema)
 
             child_item = {}
-            for column in model_related.table.columns:
-                if column.name in secret_fields or related in secret_fields:
+            for column_name in columns_to_check:
+                if column_name not in row:
                     continue
-                if column.name not in cls.fields.keys():
-                    continue
-                elif related not in child_item:
-                    if row[related] is not None:
-                        child_item[column.name] = row[related]
+                elif row[column_name] is not None:
+                    child_item[foreign_key.from_fk_field_name(related, column_name)] = row[column_name]
 
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
             # and rebuild it with the new fields.
-            if related not in secret_fields:
-                item[related] = model_related.proxy_model(**child_item)
+            item[related] = model_related.proxy_model(**child_item)
 
         # Check for the only_fields
         if is_only_fields or is_defer_fields:

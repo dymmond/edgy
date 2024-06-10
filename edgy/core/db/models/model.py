@@ -89,6 +89,7 @@ class Model(ModelRow, DeclarativeMixin):
         expression = self.table.insert().values(**kwargs)
         awaitable = await self.database.execute(expression)
         pk_dict = pk_to_dict(self, kwargs, is_partial=True)
+        # sqlalchemy supports only one autoincrement column
         if awaitable:
             # autoincrement. search autoincrement field
             for pkname in self.pknames:
@@ -173,8 +174,9 @@ class Model(ModelRow, DeclarativeMixin):
         # Performs the update or the create based on a possible existing primary key
 
         if force_save:
+            # force save must ensure a complete mapping
             validated_values = self._extract_values_from_field(
-                extracted_values=extracted_fields if values is None else extracted_fields, is_partial=values is not None
+                extracted_values=extracted_fields if values is None else values, is_partial=False
             )
             kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
             kwargs, model_references = self.update_model_references(**kwargs)
@@ -184,7 +186,7 @@ class Model(ModelRow, DeclarativeMixin):
             # Making sure it only updates the fields that should be updated
             # and excludes the fields aith `auto_now` as true
             validated_values = self._extract_values_from_field(
-                extracted_values=extracted_fields if values is None else extracted_fields,
+                extracted_values=extracted_fields if values is None else values,
                 is_update=True,
                 is_partial=values is not None,
             )

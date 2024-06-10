@@ -340,14 +340,17 @@ class BaseForeignKey(BaseField):
         if len(self.target.pknames) == 1:
             return
         to_add = {}
+        # for idempotency
         for column_name in self.get_column_names(name):
             if column_name in kwargs:
-                to_add[column_name] = kwargs.pop(column_name)
+                to_add[self.from_fk_field_name(name, column_name)] = kwargs.pop(column_name)
         # empty
         if not to_add:
             return
         if name in kwargs:
-            raise ValueError("Cannot specify a fk column and the fk itself")
+            raise ValueError("Cannot specify a foreign key column and the foreign key itself")
+        if len(self.target.pknames) != len(to_add):
+            raise ValueError("Cannot update the foreign key partially")
         kwargs[name] = to_add
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
