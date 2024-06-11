@@ -47,6 +47,10 @@ class QuerySetPropsMixin:
         return self.model_class.pknames  # type: ignore
 
     @property
+    def pkcolumns(self) -> Sequence[str]:
+        return self.model_class.pkcolumns  # type: ignore
+
+    @property
     def is_m2m(self) -> bool:
         return bool(self.model_class.meta.is_multi)
 

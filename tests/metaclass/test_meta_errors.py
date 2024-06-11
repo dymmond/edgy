@@ -28,20 +28,6 @@ class ObjectsManager(Manager):
         return queryset
 
 
-async def test_improperly_configured_for_multiple_managers_on_abstract_class():
-    with pytest.raises(ImproperlyConfigured) as raised:
-
-        class BaseModel(edgy.Model):
-            query: ClassVar[Manager] = ObjectsManager()
-            languages: ClassVar[Manager] = ObjectsManager()
-
-            class Meta:
-                abstract = True
-                registry = models
-
-    assert raised.value.args[0] == "Multiple managers are not allowed in abstract classes."
-
-
 async def test_improperly_configured_for_primary_key():
     with pytest.raises(ImproperlyConfigured) as raised:
 

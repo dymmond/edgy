@@ -11,6 +11,7 @@ from typing import (
     Sequence,
     Type,
     Union,
+    cast,
 )
 
 from pydantic import BaseModel
@@ -48,6 +49,7 @@ class BaseField(FieldInfo):
         *,
         default: Any = Undefined,
         server_default: Any = Undefined,
+        inherit: bool = True,
         **kwargs: Any,
     ) -> None:
         self.max_digits: str = kwargs.pop("max_digits", None)
@@ -56,6 +58,7 @@ class BaseField(FieldInfo):
         self.read_only: bool = kwargs.pop("read_only", False)
         self.primary_key: bool = kwargs.pop("primary_key", False)
         self.autoincrement: bool = kwargs.pop("autoincrement", False)
+        self.inherit = inherit
 
         super().__init__(**kwargs)
 
@@ -93,8 +96,6 @@ class BaseField(FieldInfo):
         self.registry: Registry = kwargs.pop("registry", None)
         self.comment: str = kwargs.pop("comment", None)
         self.secret: bool = kwargs.pop("secret", False)
-        # Prevent multiple initialization
-        self.embedded_fields_initialized = False
 
 
         # set remaining attributes
@@ -266,6 +267,66 @@ class BaseCompositeField(BaseField):
         return False
 
 
+
+class PKField(BaseCompositeField):
+    """
+    Field for pk
+    """
+
+    def __init__(self, **kwargs: Any):
+        kwargs["default"] = kwargs["server_default"] = None
+        kwargs["__type__"] = kwargs["annotation"] = Any
+        return super().__init__(
+            **kwargs,
+        )
+
+    def __get__(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
+        assert len(self.owner.pknames) >= 1
+        if len(self.owner.pknames) == 1:
+            return getattr(instance, cast(Sequence[str], self.owner.pknames)[0], None)
+        d = {}
+        for key in cast(Sequence[str], self.owner.pknames):
+            translated_name = self.translate_name(key)
+            field = instance.meta.fields_mapping.get(key)
+            if field and hasattr(field, "__get__"):
+                d[translated_name] = field.__get__(instance, owner)
+            else:
+                d[translated_name] = getattr(instance, key, None)
+        return d
+
+    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
+        assert len(cast(Sequence[str], self.owner.pknames)) >= 1
+        if (
+            len(cast(Sequence[str], self.owner.pknames)) == 1
+            # we first only redirect both
+            and not isinstance(value, (dict, BaseModel))
+        ):
+            field = self.owner.meta.fields_mapping[cast(Sequence[str], self.owner.pknames)[0]]
+            return field.clean(cast(Sequence[str], self.owner.pknames)[0], value)
+        return super().clean(field_name, value)
+
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+        assert len(cast(Sequence[str], self.owner.pknames)) >= 1
+        if self.is_incomplete:
+            raise ValueError("Cannot set an incomplete pk")
+        if (len(self.owner.pknames) == 1
+            # we first only redirect both
+            and not isinstance(value, (dict, BaseModel))
+        ):
+            field = self.owner.meta.fields_mapping[cast(Sequence[str], self.owner.pknames)[0]]
+            return field.to_model(cast(Sequence[str], self.owner.pknames)[0], value, phase=phase)
+        return super().to_model(field_name, value, phase=phase)
+
+    def get_composite_fields(self) -> Dict[str, BaseField]:
+        return {field: self.owner.meta.fields_mapping[field] for field in self.owner.pknames if field in self.owner.meta.fields_mapping}
+
+    @cached_property
+    def is_incomplete(self) -> bool:
+        for x in self.owner.pknames:
+            if x not in self.owner.meta.fields_mapping:
+                return True
+        return False
+
 class BaseForeignKey(BaseField):
     def __init__(
         self,
@@ -273,10 +334,12 @@ class BaseForeignKey(BaseField):
         on_update: str,
         on_delete: str,
         related_name: str = "",
+        related_fields: Sequence[str] = (),
         through: Any = None,
         **kwargs: Any,
     ) -> None:
         self.related_name = related_name
+        self.related_fields = related_fields
         self.through = through
         self.on_update = on_update
         self.on_delete = on_delete
@@ -305,6 +368,27 @@ class BaseForeignKey(BaseField):
         except AttributeError:
             pass
 
+    @cached_property
+    def related_columns(self) -> Dict[str, Optional[Column]]:
+        target = self.target
+        columns: Dict[str, Optional[Column]] = {}
+        if self.related_fields:
+            for field_name in self.related_fields:
+                if field_name in target.meta.fields_mapping:
+                    for column in target.meta.fields_mapping[field_name].get_columns(field_name):
+                        columns[column.key] = column
+                else:
+                    columns[field_name] = None
+        else:
+            # try to use explicit primary keys
+            if target.pknames:
+                for pkname in target.pknames:
+                    for column in target.meta.fields_mapping[pkname].get_columns(pkname):
+                        columns[column.key] = column
+            elif target.pkcolumns:
+                columns.update({col: None for col in target.pkcolumns})
+        return columns
+
     def expand_relationship(self, value: Any) -> Any:
         target = self.target
 
@@ -321,16 +405,16 @@ class BaseForeignKey(BaseField):
         elif isinstance(value, dict):
             for pkname in target.pknames:
                 if pkname in value:
-                    retdict.update(target.fields[pkname].clean(self.get_fk_field_name(name, pkname), value[pkname]))
+                    retdict.update(target.meta.fields_mapping[pkname].clean(self.get_fk_field_name(name, pkname), value[pkname]))
         elif isinstance(value, BaseModel):
             for pkname in target.pknames:
                 if hasattr(value, pkname):
                     retdict.update(
-                        target.fields[pkname].clean(self.get_fk_field_name(name, pkname), getattr(value, pkname))
+                        target.meta.fields_mapping[pkname].clean(self.get_fk_field_name(name, pkname), getattr(value, pkname))
                     )
         elif len(target.pknames) == 1:
             retdict.update(
-                target.fields[target.pknames[0]].clean(self.get_fk_field_name(name, target.pknames[0]), value)
+                target.meta.fields_mapping[target.pknames[0]].clean(self.get_fk_field_name(name, target.pknames[0]), value)
             )
         else:
             raise ValueError(f"cannot handle: {value} of type {type(value)}")
@@ -373,22 +457,22 @@ class BaseForeignKey(BaseField):
             return fk_name
         return fk_name[:FK_CHAR_LIMIT]
 
-    def get_fk_field_name(self, name: str, pkname: str) -> str:
+    def get_fk_field_name(self, name: str, fieldname: str) -> str:
         target = self.target
         if len(target.pknames) == 1:
             return name
-        return f"{name}_{pkname}"
+        return f"{name}_{fieldname}"
 
-    def from_fk_field_name(self, name: str, fk_field_name: str) -> str:
+    def from_fk_field_name(self, name: str, fieldname: str) -> str:
         target = self.target
         if len(target.pknames) == 1:
             return target.pknames[0]  # type: ignore
-        return _removeprefix(fk_field_name, f"{name}_")
+        return _removeprefix(fieldname, f"{name}_")
 
     def get_column_names(self, name: str) -> FrozenSet[str]:
         if not hasattr(self, "_column_names") or name != self.name:
             column_names = set()
-            for column in self.get_columns(name):
+            for column in self.owner.meta.field_to_columns[name]:
                 column_names.add(column.name)
             if name != self.name:
                 return frozenset(column_names)
@@ -398,16 +482,19 @@ class BaseForeignKey(BaseField):
     def get_columns(self, name: str) -> Sequence[Column]:
         target = self.target
         columns = []
-        for pkname in target.pknames:
-            to_field = target.fields[pkname]
-            found_columns = to_field.get_columns(self.get_fk_field_name(name, pkname))
-            if not self.primary_key:
-                for column in found_columns:
-                    column.primary_key = False
-            if self.null:
-                for column in found_columns:
-                    column.nullable = True
-            columns.extend(found_columns)
+        for column_name, pkcolumn in self.related_columns.items():
+            if pkcolumn is None:
+                pkcolumn = target.table.columns[column_name]
+            fkcolumn_name = self.get_fk_field_name(name, column_name)
+            fkcolumn = Column(
+                fkcolumn_name,
+                pkcolumn.type,
+                primary_key=self.primary_key,
+                autoincrement=False,
+                nullable=pkcolumn.nullable or self.null,
+                unique=pkcolumn.unique,
+            )
+            columns.append(fkcolumn)
         return columns
 
     def get_global_constraints(self, name: str, columns: Sequence[Column]) -> Sequence[Constraint]:
@@ -415,7 +502,7 @@ class BaseForeignKey(BaseField):
         return [
             ForeignKeyConstraint(
                 columns,
-                [f"{target.meta.tablename}.{self.from_fk_field_name(name, column.name)}" for column in columns],
+                [f"{target.meta.tablename}.{self.from_fk_field_name(name, column.key)}" for column in columns],
                 ondelete=self.on_delete,
                 onupdate=self.on_update,
                 name=self.get_fk_name(name),

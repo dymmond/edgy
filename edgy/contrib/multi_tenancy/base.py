@@ -15,4 +15,4 @@ class TenantModel(Model, metaclass=BaseTenantMeta):
     using Edgy and Edgy models.
     """
 
-    meta: ClassVar[TenantMeta] = TenantMeta(None)
+    meta: ClassVar[TenantMeta] = TenantMeta(None, abstract=True)

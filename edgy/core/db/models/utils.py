@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Set, Union, cast
 
 from edgy.core.connection.registry import Registry
 
@@ -17,6 +17,35 @@ def get_model(registry: Registry, model_name: str) -> "Model":
         return cast("Model", registry.models[model_name])
     except KeyError:
         raise LookupError(f"Registry doesn't have a {model_name} model.") from None
+
+
+def build_pknames(model_class: Any) -> None:
+    """
+    Set explicit pknames
+
+    Raise error if primary key column has no field associated.
+    """
+    meta = model_class.meta
+    pknames: Set[str] = set()
+    for field_name, field in meta.fields_mapping.items():
+        if field.primary_key:
+            pknames.add(field_name)
+    model_class._pknames = tuple(sorted(pknames))
+
+
+def build_pkcolumns(model_class: Any) -> None:
+    """
+    Set pkcolumns
+
+    Raise error if primary key column has no field associated.
+    """
+    table = model_class.table
+    pkcolumns: Set[str] = set()
+    for column in table.columns:
+        if column.primary_key:
+            # key is the sqlalchemy name, in our case name and key should be identically
+            pkcolumns.add(column.key)
+    model_class._pkcolumns = tuple(sorted(pkcolumns))
 
 
 def pk_to_dict(model: "EdgyBaseModel", pk: Any, is_partial: bool = False) -> Dict[str, Any]:
@@ -66,5 +95,5 @@ def pk_from_model(model: "EdgyBaseModel", always_dict: bool = False) -> Union[Di
 
 
 def pk_from_model_to_clauses(model: "EdgyBaseModel") -> Iterable[Any]:
-    for k, v in pk_from_model(model, always_dict=True).items():
-        yield getattr(model.table.columns, k) == v
+    for pkcolumn in model.pkcolumns:
+        yield getattr(model.table.columns, pkcolumn) == getattr(model, pkcolumn)

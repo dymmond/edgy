@@ -87,16 +87,14 @@ class Model(ModelRow, DeclarativeMixin):
         Performs the save instruction.
         """
         expression = self.table.insert().values(**kwargs)
-        awaitable = await self.database.execute(expression)
+        autoincrement_value = await self.database.execute(expression)
         pk_dict = pk_to_dict(self, kwargs, is_partial=True)
-        # sqlalchemy supports only one autoincrement column
-        if awaitable:
-            # autoincrement. search autoincrement field
-            for pkname in self.pknames:
-                if self.fields[pkname].autoincrement:
-                    pk_dict[pkname] = awaitable
-                    break
         self.__dict__.update(pk_dict)
+        # sqlalchemy supports only one autoincrement column
+        if autoincrement_value:
+            column = self.table.autoincrement_column
+            if column is not None:
+                setattr(self, column.key, autoincrement_value)
         return self
 
     async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
@@ -162,9 +160,9 @@ class Model(ModelRow, DeclarativeMixin):
 
         extracted_fields = self.extract_db_fields()
 
-        for pkname in self.pknames:
-            if getattr(self, pkname, None) is None and self.fields[pkname].autoincrement:
-                extracted_fields.pop(pkname, None)
+        for pkcolumn in self.__class__.pkcolumns:
+            if getattr(self, pkcolumn, None) is None and self.table.columns[pkcolumn].autoincrement:
+                extracted_fields.pop(pkcolumn, None)
                 force_save = True
 
         self.update_from_dict(dict_values=dict(extracted_fields.items()))
@@ -218,7 +216,7 @@ class Model(ModelRow, DeclarativeMixin):
         if field is not None and hasattr(field, "__get__"):
             # no need to set an descriptor object
             return field.__get__(self, self.__class__)
-        if name not in self.__dict__ and field is not None and name not in self.pknames:
+        if name not in self.__dict__ and field is not None and name not in self.pkcolumns:
             run_sync(self.load())
             return self.__dict__[name]
         return super().__getattr__(name)

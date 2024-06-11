@@ -69,6 +69,7 @@ def test_model_pk():
     assert user.pk == 1
     assert user.id == 1
     assert User.query.pknames[0] == "id"
+    assert User.query.pkcolumns[0] == "id"
 
 
 async def test_model_crud():

@@ -1,5 +1,5 @@
 import functools
-from typing import TYPE_CHECKING, Any, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
 
 from pydantic import ConfigDict
 
@@ -7,7 +7,7 @@ from edgy.exceptions import RelationshipIncompatible, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
-    from edgy import Model, ReflectModel
+    from edgy import Manager, Model, ReflectModel
 
 
 class Relation(ManyRelationProtocol):
@@ -48,9 +48,11 @@ class Relation(ManyRelationProtocol):
         Gets the attribute from the queryset and if it does not
         exist, then lookup in the model.
         """
-        manager = self.through.meta.manager  # type: ignore
+        manager: Optional["Manager"] = getattr(self.through, "query_related", None)
+        if manager is None:
+            manager = self.through.query  # type: ignore
         try:
-            attr = getattr(manager.get_queryset(), item)
+            attr = getattr(cast("Manager", manager).get_queryset(), item)
         except AttributeError:
             attr = getattr(self.through, item)
 
