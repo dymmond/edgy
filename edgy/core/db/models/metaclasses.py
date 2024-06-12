@@ -140,7 +140,7 @@ class MetaInfo:
         for key, value in values.items():
             edgy_setattr(self, key, value)
 
-    def __setattr__(self, name: str, value: Any):
+    def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
         if name == "fields_mapping":
             self._is_init = False
