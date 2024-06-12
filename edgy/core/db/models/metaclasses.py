@@ -330,12 +330,12 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
             if key not in attrs:
                 # when abstract or inherit passthrough
                 if meta.abstract or value.inherit:
-                    attrs[key] = value.__class__()
+                    attrs[key] = value
                 else:
                     attrs[key] = _occluded_sentinel
             elif attrs[key] is _occluded_sentinel and value.inherit:
                 # when occluded only include if inherit is True
-                attrs[key] = value.__class__()
+                attrs[key] = value
 
     # from strongest to weakest
     for parent in base.__mro__[1:]:
@@ -407,6 +407,10 @@ class BaseModelMeta(ModelMetaclass):
                     model_references[key] = value.to
                 else:
                     fields[key] = value
+            elif isinstance(value, Manager):
+                value = copy.copy(value)
+                value.name = key
+                attrs[key] = value
 
         if not is_abstract:
             # the order is important because it reflects the inheritance order

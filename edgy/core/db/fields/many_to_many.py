@@ -100,7 +100,10 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         return {}
 
     def __get__(self, instance: "Model", owner: Any = None) -> Relation:
-        return Relation(through=self.through, to=self.to, owner=self.owner, instance=instance)
+        relation = Relation(through=self.through, to=self.to, owner=self.owner, instance=instance)
+        if instance:
+            instance.__dict__[self.name] = relation
+        return relation
 
 
 class ManyToManyField(ForeignKeyFieldFactory):

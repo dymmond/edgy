@@ -1,3 +1,4 @@
+import copy
 from typing import Any, Type, cast
 
 from edgy.core.db.context_vars import get_tenant, set_tenant
@@ -30,13 +31,23 @@ class Manager:
     ```
     """
 
-    def __init__(self, model_class: Any = None, inherit: bool=True):
+    def __init__(self, model_class: Any = None, inherit: bool=True, name: str = ""):
         self.model_class = model_class
         self.inherit = inherit
+        self.name = name
 
     def __get__(self, instance: Any, owner: Any = None) -> Type["QuerySet"]:
-        # TODO: cache in instance
-        return cast("Type[QuerySet]", self.__class__(model_class=owner if owner else instance.__class__, inherit=self.inherit))
+        if instance is not None:
+            if self.name in instance.__dict__:
+                return cast("Type[QuerySet]", instance.__dict__[self.name])
+            else:
+                copy_obj = copy.copy(self)
+                copy_obj.model_class = owner if owner else instance.__class__
+                instance.__dict__[self.name] = copy_obj
+        else:
+            copy_obj = copy.copy(self)
+            copy_obj.model_class = owner if owner else instance.__class__
+        return cast("Type[QuerySet]", copy_obj)
 
     def get_queryset(self) -> "QuerySet":
         """
@@ -53,12 +64,14 @@ class Manager:
             )
         return QuerySet(self.model_class)
 
-    def __getattr__(self, item: Any) -> Any:
+    def __getattr__(self, name: str) -> Any:
         """
         Gets the attribute from the queryset and if it does not
         exist, then lookup in the model.
         """
+        if name.startswith("_"):
+            return super().__getattr__(name)
         try:
-            return getattr(self.get_queryset(), item)
+            return getattr(self.get_queryset(), name)
         except AttributeError:
-            return getattr(self.model_class, item)
+            return getattr(self.model_class, name)
