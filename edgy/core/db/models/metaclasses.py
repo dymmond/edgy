@@ -368,7 +368,7 @@ class BaseModelMeta(ModelMetaclass):
 
         if not is_abstract:
             fields["pk"] = pk = edgy_fields.CompositeField(  # type: ignore
-                inner_fields=pk_attributes_finalized, model=ConditionalRedirect, exclude=True, field_name="pk"
+                inner_fields=pk_attributes_finalized, model=ConditionalRedirect, exclude=True, name="pk"
             )
 
         del is_abstract
