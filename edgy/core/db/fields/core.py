@@ -375,7 +375,7 @@ class ExcludeField(FieldFactory, Type[None]):
     """
 
     _bases = (ConcreteExclude,)
-    _type: Any = None
+    _type: Any = Any
 
 
 class CharField(FieldFactory, str):
