@@ -193,6 +193,8 @@ class BaseQuerySet(
                     model_class = related_field.related_from
                     foreign_key = related_field.foreign_key
                     inverse = True
+                if foreign_key.is_cross_db:
+                    raise NotImplementedError("We cannot cross databases yet, this feature is planned")
                 table = model_class.table
                 select_from = sqlalchemy.sql.join(  # type: ignore
                     select_from,
