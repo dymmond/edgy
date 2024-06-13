@@ -117,6 +117,7 @@ _trigger_attributes_MetaInfo = {
 class MetaInfo:
     __slots__ = (
         "abstract",
+        "inherit",
         "fields_mapping",
         "registry",
         "tablename",
@@ -152,6 +153,8 @@ class MetaInfo:
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self._is_init = False
         self.abstract: bool = getattr(meta, "abstract", False)
+        # for embedding
+        self.inherit: bool = getattr(meta, "inherit", True)
         self.registry: Optional[Registry] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.unique_together: Any = getattr(meta, "unique_together", None)
@@ -319,6 +322,7 @@ def handle_annotations(
 _occluded_sentinel = object()
 
 def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
+    from edgy.core.db.fields.composite_field import CompositeField
     meta: Union[MetaInfo, None] = getattr(base, "meta", None)
     if not meta:
         # Mixins and other classes
@@ -331,12 +335,17 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
                     attrs[key] = value
                 elif isinstance(value, Manager):
                     attrs[key] = value.__class__()
+                elif isinstance(value, BaseModelMeta):
+                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=key, inherit=value.meta.inherit)
             elif attrs[key] is _occluded_sentinel:
                 # when occluded only include if inherit is True
                 if isinstance(value, BaseField) and value.inherit:
                     attrs[key] = value
                 elif isinstance(value, Manager) and value.inherit:
                     attrs[key] = value.__class__()
+                elif isinstance(value, BaseModelMeta) and value.meta.inherit:
+                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=key, inherit=value.meta.inherit)
+
     else:
         # abstract classes
         for key, value in meta.fields_mapping.items():
@@ -375,12 +384,18 @@ def extract_fields_and_managers(bases: Sequence[Type], attrs: Optional[Dict[str,
 
     Note: managers and fields with inherit=False are still extracted from mixins as long there is no intermediate model
     """
+
+    from edgy.core.db.fields.composite_field import CompositeField
     attrs = {} if attrs is None else {**attrs}
     for base in bases:
         _extract_fields_and_managers(base, attrs)
     for key in list(attrs.keys()):
-        if attrs[key] is _occluded_sentinel:
+        value = attrs[key]
+        if value is _occluded_sentinel:
             attrs.pop(key)
+        elif isinstance(value, BaseModelMeta):
+            value = attrs[key]
+            attrs[key] = CompositeField(inner_fields=value, prefix_embedded=key, inherit=value.meta.inherit)
     return attrs
 
 

@@ -1,3 +1,4 @@
+from .composite_field import CompositeField
 from .core import (
     AutoNowMixin,
     BaseField,
@@ -6,7 +7,6 @@ from .core import (
     BooleanField,
     CharField,
     ChoiceField,
-    CompositeField,
     DateField,
     DateTimeField,
     DecimalField,

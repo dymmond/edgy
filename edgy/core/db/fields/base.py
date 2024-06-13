@@ -26,6 +26,13 @@ if TYPE_CHECKING:
 
 edgy_setattr = object.__setattr__
 
+def _removesuffix(text: str, suffix: str) -> str:
+    # TODO: replace with _removesuffix when python3.9 is minimum
+    if text.endswith(suffix):
+        return text[: -len(suffix)]
+    else:
+        return text
+
 class BaseField(FieldInfo):
     """
     The base field for all Edgy data model fields.
@@ -199,10 +206,11 @@ class BaseCompositeField(BaseField):
         # return untranslated names
         return self.get_composite_fields()
 
-    def clean(self, field_name: str, value: Any, prefix: str="") -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
+        prefix = _removesuffix(field_name, self.name)
         result = {}
         if isinstance(value, dict):
             for sub_name, field in self.composite_fields.items():
@@ -283,11 +291,8 @@ class PKField(BaseCompositeField):
     def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
         pknames = cast(Sequence[str], self.owner.pknames)
         pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
+        prefix = _removesuffix(field_name, self.name)
         assert len(pkcolumns) >= 1
-        if field_name.endswith("__pk"):
-            prefix = field_name[:-2]
-        else:
-            prefix = ""
         if (
             len(pknames) == 1
             and not self.is_incomplete
@@ -296,7 +301,7 @@ class PKField(BaseCompositeField):
             pkname = pknames[0]
             field = self.owner.meta.fields_mapping[pkname]
             return field.clean(f"{prefix}{pkname}", value)
-        retdict =  super().clean(field_name, value, prefix=prefix)
+        retdict =  super().clean(field_name, value)
         if self.is_incomplete:
             if isinstance(value, dict):
                 for column_name in self.fieldless_pkcolumns:
