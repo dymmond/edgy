@@ -5,6 +5,7 @@ from typing import (
     Any,
     ClassVar,
     Dict,
+    FrozenSet,
     Optional,
     Pattern,
     Sequence,
@@ -130,6 +131,11 @@ class BaseField(FieldInfo):
         """
         return []
 
+    def get_column_names(self, name: str="") -> FrozenSet[str]:
+        if name:
+            return self.owner.meta.field_to_column_names[name]
+        return self.owner.meta.field_to_column_names[self.name]
+
     def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
         """
         Validates a value and transform it into columns which can be used for querying and saving
@@ -193,29 +199,23 @@ class BaseCompositeField(BaseField):
         # return untranslated names
         return self.get_composite_fields()
 
-    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, prefix: str="") -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
-        if field_name.endswith("pk"):
-            prefix = field_name[:-2]
-        else:
-            prefix = ""
         result = {}
         if isinstance(value, dict):
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if translated_name not in value:
                     raise ValueError(f"Missing key: {sub_name} for {field_name}")
-                for k, v in field.clean(f"{prefix}{sub_name}", value[translated_name]).items():
-                    result[k] = v
+                result.update(field.clean(f"{prefix}{sub_name}", value[translated_name]))
         else:
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if not hasattr(value, translated_name):
                     raise ValueError(f"Missing attribute: {translated_name} for {field_name}")
-                for k, v in field.clean(f"{prefix}{sub_name}", getattr(value, translated_name)).items():
-                    result[k] = v
+                result.update(field.clean(f"{prefix}{sub_name}", getattr(value, translated_name)))
         return result
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
@@ -228,15 +228,13 @@ class BaseCompositeField(BaseField):
                 translated_name = self.translate_name(sub_name)
                 if translated_name not in value:
                     continue
-                for k, v in field.to_model(sub_name, value.get(translated_name, None), phase=phase).items():
-                    result[k] = v
+                result.update(field.to_model(sub_name, value.get(translated_name, None), phase=phase))
         else:
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if not hasattr(value, translated_name):
                     continue
-                for k, v in field.to_model(sub_name, getattr(value, translated_name, None), phase=phase).items():
-                    result[k] = v
+                result.update(field.to_model(sub_name, getattr(value, translated_name, None), phase=phase))
 
         return result
 
@@ -264,57 +262,91 @@ class PKField(BaseCompositeField):
         )
 
     def __get__(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
-        assert len(self.owner.pknames) >= 1
-        if len(self.owner.pknames) == 1:
-            return getattr(instance, cast(Sequence[str], self.owner.pknames)[0], None)
+        pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
+        pknames = cast(Sequence[str], self.owner.pknames)
+        assert len(pkcolumns) >= 1
+        if len(pknames) == 1:
+            return getattr(instance, pknames[0], None)
         d = {}
-        for key in cast(Sequence[str], self.owner.pknames):
+        for key in pknames:
             translated_name = self.translate_name(key)
             field = instance.meta.fields_mapping.get(key)
             if field and hasattr(field, "__get__"):
                 d[translated_name] = field.__get__(instance, owner)
             else:
                 d[translated_name] = getattr(instance, key, None)
+        for key in self.fieldless_pkcolumns:
+            translated_name = self.translate_name(key)
+            d[translated_name] = getattr(instance, key, None)
         return d
 
     def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
-        assert len(cast(Sequence[str], self.owner.pknames)) >= 1
+        pknames = cast(Sequence[str], self.owner.pknames)
+        pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
+        assert len(pkcolumns) >= 1
+        if field_name.endswith("__pk"):
+            prefix = field_name[:-2]
+        else:
+            prefix = ""
         if (
-            len(cast(Sequence[str], self.owner.pknames)) == 1
-            # we first only redirect both
+            len(pknames) == 1
+            and not self.is_incomplete
             and not isinstance(value, (dict, BaseModel))
         ):
-            field = self.owner.meta.fields_mapping[cast(Sequence[str], self.owner.pknames)[0]]
-            return field.clean(cast(Sequence[str], self.owner.pknames)[0], value)
-        return super().clean(field_name, value)
+            pkname = pknames[0]
+            field = self.owner.meta.fields_mapping[pkname]
+            return field.clean(f"{prefix}{pkname}", value)
+        retdict =  super().clean(field_name, value, prefix=prefix)
+        if self.is_incomplete:
+            if isinstance(value, dict):
+                for column_name in self.fieldless_pkcolumns:
+                    translated_name = self.translate_name(column_name)
+                    if translated_name in value:
+                        retdict[f"{prefix}{column_name}"] = value[translated_name]
+            else:
+                for column_name in self.fieldless_pkcolumns:
+                    translated_name = self.translate_name(column_name)
+                    if not hasattr(value, translated_name):
+                        retdict[f"{prefix}{column_name}"] = getattr(value, translated_name)
+
+        return retdict
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
-        assert len(cast(Sequence[str], self.owner.pknames)) >= 1
+        pknames = cast(Sequence[str], self.owner.pknames)
+        assert len(cast(Sequence[str], self.owner.pkcolumns)) >= 1
         if self.is_incomplete:
-            raise ValueError("Cannot set an incomplete pk")
-        if (len(self.owner.pknames) == 1
+            raise ValueError("Cannot set an incomplete defined pk!")
+        if (len(pknames) == 1
             # we first only redirect both
             and not isinstance(value, (dict, BaseModel))
         ):
-            field = self.owner.meta.fields_mapping[cast(Sequence[str], self.owner.pknames)[0]]
-            return field.to_model(cast(Sequence[str], self.owner.pknames)[0], value, phase=phase)
+            field = self.owner.meta.fields_mapping[pknames[0]]
+            return field.to_model(pknames[0], value, phase=phase)
         return super().to_model(field_name, value, phase=phase)
 
     def get_composite_fields(self) -> Dict[str, BaseField]:
-        return {field: self.owner.meta.fields_mapping[field] for field in self.owner.pknames if field in self.owner.meta.fields_mapping}
+        return {field: self.owner.meta.fields_mapping[field] for field in cast(Sequence[str], self.owner.pknames)}
 
     @cached_property
+    def fieldless_pkcolumns(self) -> FrozenSet[str]:
+        field_less = set()
+        for colname in self.owner.pkcolumns:
+            if colname not in self.owner.meta.columns_to_field:
+                field_less.add(colname)
+        return frozenset(field_less)
+
+    @property
     def is_incomplete(self) -> bool:
-        for x in self.owner.pknames:
-            if x not in self.owner.meta.fields_mapping:
-                return True
-        return False
+        return bool(self.fieldless_pkcolumns)
+
 
     def is_required(self) -> bool:
         return False
 
 
 class BaseForeignKey(BaseField):
+    is_m2m: bool = False
+
     def __init__(
         self,
         *,
@@ -347,11 +379,15 @@ class BaseForeignKey(BaseField):
         except AttributeError:
             pass
 
+    @property
+    def is_cross_db(self) -> bool:
+        return self.owner.meta.registry is not self.target.meta.registry
+
     def expand_relationship(self, value: Any) -> Any:
+        """
+        Returns the related object or the relationship object
+        """
         return value
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
-        """
-        Like clean just for the internal input transformation. Validation happens later.
-        """
         return {field_name: self.expand_relationship(value)}

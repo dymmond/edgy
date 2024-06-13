@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Optional, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, TypeVar
 
 import sqlalchemy
 from pydantic import BaseModel
@@ -35,11 +35,13 @@ class BaseForeignKeyField(BaseForeignKey):
         on_update: str,
         on_delete: str,
         related_fields: Sequence[str] = (),
+        no_constraint: bool = False,
         **kwargs: Any,
     ) -> None:
         self.related_fields = related_fields
         self.on_update = on_update
         self.on_delete = on_delete
+        self.no_constraint = no_constraint
         super().__init__(**kwargs)
 
     @cached_property
@@ -49,18 +51,21 @@ class BaseForeignKeyField(BaseForeignKey):
         if self.related_fields:
             for field_name in self.related_fields:
                 if field_name in target.meta.fields_mapping:
-                    for column in target.meta.fields_mapping[field_name].get_columns(field_name):
+                    for column in target.meta.field_to_columns[field_name]:
                         columns[column.key] = column
                 else:
+                    # placeholder for extracting column
                     columns[field_name] = None
         else:
             # try to use explicit primary keys
             if target.pknames:
                 for pkname in target.pknames:
-                    for column in target.meta.fields_mapping[pkname].get_columns(pkname):
+                    for column in target.meta.field_to_columns[pkname]:
                         columns[column.key] = column
             elif target.pkcolumns:
-                columns.update({col: None for col in target.pkcolumns})
+                # placeholder for extracting column
+                # WARNING: this can recursively loop
+                columns = {col: None for col in target.pkcolumns}
         return columns
 
     def expand_relationship(self, value: Any) -> Any:
@@ -71,35 +76,37 @@ class BaseForeignKeyField(BaseForeignKey):
         return target.proxy_model(pk=value)
 
     def clean(self, name: str, value: Any) -> Dict[str, Any]:
-        target = self.target
         retdict: Dict[str, Any] = {}
+        column_names = self.owner.meta.field_to_column_names[name]
+        assert len(column_names) >= 1
         if value is None:
-            for column_name in self.get_column_names(name):
+            for column_name in column_names:
                 retdict[column_name] = None
         elif isinstance(value, dict):
-            for pkname in target.pknames:
-                if pkname in value:
-                    retdict.update(target.meta.fields_mapping[pkname].clean(self.get_fk_field_name(name, pkname), value[pkname]))
+            for column_name in column_names:
+                translated_name = self.from_fk_field_name(name, column_name)
+                if translated_name in value:
+                    retdict[column_name] = value[translated_name]
         elif isinstance(value, BaseModel):
-            for pkname in target.pknames:
-                if hasattr(value, pkname):
-                    retdict.update(
-                        target.meta.fields_mapping[pkname].clean(self.get_fk_field_name(name, pkname), getattr(value, pkname))
-                    )
-        elif len(target.pknames) == 1:
-            retdict.update(
-                target.meta.fields_mapping[target.pknames[0]].clean(self.get_fk_field_name(name, target.pknames[0]), value)
-            )
+            for column_name in column_names:
+                translated_name = self.from_fk_field_name(name, column_name)
+                if hasattr(value, translated_name):
+                    retdict[column_name] = getattr(value, translated_name)
+        elif len(column_names) == 1:
+            column_name = next(iter(column_names))
+            retdict[column_name] = value
         else:
             raise ValueError(f"cannot handle: {value} of type {type(value)}")
         return retdict
 
     def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
-        if len(self.target.pknames) == 1:
+        column_names = self.get_column_names(name)
+        assert len(column_names) >= 1
+        if len(column_names) == 1:
             return
         to_add = {}
         # for idempotency
-        for column_name in self.get_column_names(name):
+        for column_name in column_names:
             if column_name in kwargs:
                 to_add[self.from_fk_field_name(name, column_name)] = kwargs.pop(column_name)
         # empty
@@ -107,7 +114,7 @@ class BaseForeignKeyField(BaseForeignKey):
             return
         if name in kwargs:
             raise ValueError("Cannot specify a foreign key column and the foreign key itself")
-        if len(self.target.pknames) != len(to_add):
+        if len(column_names) != len(to_add):
             raise ValueError("Cannot update the foreign key partially")
         kwargs[name] = to_add
 
@@ -126,56 +133,55 @@ class BaseForeignKeyField(BaseForeignKey):
         return fk_name[:FK_CHAR_LIMIT]
 
     def get_fk_field_name(self, name: str, fieldname: str) -> str:
-        target = self.target
-        if len(target.pknames) == 1:
+        if len(self.related_columns) == 1:
             return name
         return f"{name}_{fieldname}"
 
     def from_fk_field_name(self, name: str, fieldname: str) -> str:
-        target = self.target
-        if len(target.pknames) == 1:
-            return target.pknames[0]  # type: ignore
+        if len(self.related_columns) == 1:
+            return next(iter(self.related_columns.keys()))
         return _removeprefix(fieldname, f"{name}_")
-
-    def get_column_names(self, name: str) -> FrozenSet[str]:
-        if not hasattr(self, "_column_names") or name != self.name:
-            column_names = set()
-            for column in self.owner.meta.field_to_columns[name]:
-                column_names.add(column.name)
-            if name != self.name:
-                return frozenset(column_names)
-            self._column_names = frozenset(column_names)
-        return self._column_names
 
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         target = self.target
         columns = []
-        for column_name, pkcolumn in self.related_columns.items():
-            if pkcolumn is None:
-                pkcolumn = target.table.columns[column_name]
+        for column_name, related_column in self.related_columns.items():
+            if related_column is None:
+                related_column = target.table.columns[column_name]
             fkcolumn_name = self.get_fk_field_name(name, column_name)
+            # use the related column as reference
             fkcolumn = sqlalchemy.Column(
                 fkcolumn_name,
-                pkcolumn.type,
+                related_column.type,
                 primary_key=self.primary_key,
                 autoincrement=False,
-                nullable=pkcolumn.nullable or self.null,
-                unique=pkcolumn.unique,
+                nullable=related_column.nullable or self.null,
+                unique=related_column.unique,
             )
             columns.append(fkcolumn)
         return columns
 
     def get_global_constraints(self, name: str, columns: Sequence[sqlalchemy.Column]) -> Sequence[sqlalchemy.Constraint]:
-        target = self.target
-        return [
-            sqlalchemy.ForeignKeyConstraint(
-                columns,
-                [f"{target.meta.tablename}.{self.from_fk_field_name(name, column.key)}" for column in columns],
-                ondelete=self.on_delete,
-                onupdate=self.on_update,
-                name=self.get_fk_name(name),
-            ),
-        ]
+        constraints = []
+        if not self.no_constraint:
+            target = self.target
+            constraints.append(
+                sqlalchemy.ForeignKeyConstraint(
+                    columns,
+                    [f"{target.meta.tablename}.{self.from_fk_field_name(name, column.key)}" for column in columns],
+                    ondelete=self.on_delete,
+                    onupdate=self.on_update,
+                    name=self.get_fk_name(name),
+                ),
+            )
+        if self.index and not self.add_constraint:
+            constraints.append(
+                sqlalchemy.Index(
+                    columns,
+                ),
+            )
+
+        return constraints
 
 
 

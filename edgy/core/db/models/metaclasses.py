@@ -53,6 +53,9 @@ class FieldToColumns(UserDict):
         result = self.data[name] = field.get_columns(name)
         return result
 
+    def __setitem__(self, name: str, value: Any) -> None:
+        raise Exception("Cannot set item here")
+
     def __contains__(self, key: str) -> bool:
         try:
             self[key]
@@ -61,14 +64,54 @@ class FieldToColumns(UserDict):
             return False
 
 
+class FieldToColumnNames(FieldToColumns):
+    def __getitem__(self, name: str) -> FrozenSet[str]:
+        if name in self.data:
+            return cast(FrozenSet[str], self.data[name])
+        column_names = frozenset(column.name for column in self.meta.field_to_columns[name])
+        result = self.data[name] = column_names
+        return result
+
+
+class ColumnsToField(UserDict, Dict[str, str]):
+    def __init__(self, meta: "MetaInfo"):
+        self.meta = meta
+        self._init = False
+        super().__init__()
+
+    def _lazy_init(self) -> None:
+        _columns_to_field: Dict[str, str] = {}
+        for field_name in self.meta.fields_mapping.keys():
+            # init structure
+            column_names = self.meta.field_to_column_names[field_name]
+            for column_name in column_names:
+                if column_name in _columns_to_field:
+                    raise ValueError(f"column collision: {column_name} between field {field_name} and {_columns_to_field[column_name]}")
+                _columns_to_field[column_name] = field_name
+        self.data.update(_columns_to_field)
+
+    def __getitem__(self, name: str) -> str:
+        if not self._init:
+            self._lazy_init()
+        return cast(str, super().__getitem__(name))
+
+    def __setitem__(self, name: str, value: Any) -> None:
+        raise Exception("Cannot set item here")
+
+    def __contains__(self, name: str) -> bool:
+        if not self._init:
+            self._lazy_init()
+        return super().__contains__(name)
+
+
 _trigger_attributes_MetaInfo = {
     "field_to_columns",
+    "field_to_column_names",
     "foreign_key_fields",
+    "columns_to_field",
     "special_getter_fields",
     "input_modifying_fields",
     "excluded_fields",
-    "_columns_to_field",
-    "columns_to_field",
 }
 
 class MetaInfo:
@@ -89,19 +132,22 @@ class MetaInfo:
         "input_modifying_fields",
         "foreign_key_fields",
         "field_to_columns",
-        "_columns_to_field",
+        "field_to_column_names",
+        "columns_to_field",
         "special_getter_fields",
         "excluded_fields",
         "_is_init"
     )
     _include_dump = (*filter(lambda x: x not in {
         "field_to_columns",
-        "_columns_to_field",
+        "field_to_column_names",
+        "columns_to_field",
         "_is_init"
     }, __slots__), "pk", "is_multi")
 
     field_to_columns: FieldToColumns
-    _columns_to_field: Optional[Dict[str, str]]
+    field_to_column_names: FieldToColumnNames
+    columns_to_field: Dict[str, str]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self._is_init = False
@@ -119,7 +165,6 @@ class MetaInfo:
         self.multi_related: List[str] =  [*getattr(meta, "multi_related", _empty_set)]
         self.related_fields: Dict[str, RelatedField] = {**getattr(meta, "related_fields", _empty_dict)}
         self.model: Optional[Type["Model"]] = None
-        self.delete_fields_columns_mappings()
         self.load_dict(kwargs)
 
     @property
@@ -152,7 +197,6 @@ class MetaInfo:
         return super().__getattribute__(name)
 
     def init_fields_mapping(self) -> None:
-        self.delete_fields_columns_mappings()
         special_getter_fields = set()
         excluded_fields = set()
         input_modifying_fields = set()
@@ -170,29 +214,10 @@ class MetaInfo:
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
         self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
         self.foreign_key_fields: Dict[str, BaseField] = foreign_key_fields
-
-    def build_columns_field_mappings(self) -> None:
-        _columns_to_field: Dict[str, str] = {}
-        for field_name in self.fields_mapping.keys():
-            # init structure
-            columns = self.field_to_columns[field_name]
-            for column in columns:
-                if column.key in _columns_to_field:
-                    raise ValueError(f"column collision: {column.key} between field {field_name} and {_columns_to_field[column.key]}")
-                _columns_to_field[column.key] = field_name
-        self._columns_to_field = _columns_to_field
-
-    def delete_fields_columns_mappings(self) -> None:
         self.field_to_columns = FieldToColumns(self)
-        self._columns_to_field = None
-
-    @property
-    def columns_to_field(self) -> Dict[str, str]:
-        if self._columns_to_field is None:
-            self.build_fields_columns_mappings()
-        return cast(Dict[str, str], self._columns_to_field)
-
-    columns_to_field.deleter(delete_fields_columns_mappings)
+        self.field_to_column_names = FieldToColumnNames(self)
+        self.columns_to_field = ColumnsToField(self)
+        self._is_init = True
 
     def get_columns_for_name(self, name: str) -> Sequence["sqlalchemy.Column"]:
         if name in self.field_to_columns:

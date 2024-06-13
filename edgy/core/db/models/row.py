@@ -1,12 +1,12 @@
 import asyncio
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Union, cast
 
-from sqlalchemy.engine.result import Row
-
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
+    from sqlalchemy.engine.result import Row
+
     from edgy import Model, Prefetch, QuerySet
 
 
@@ -21,7 +21,7 @@ class ModelRow(EdgyBaseModel):
     @classmethod
     def from_sqla_row(
         cls,
-        row: Row,
+        row: "Row",
         select_related: Optional[Sequence[Any]] = None,
         prefetch_related: Optional[Sequence["Prefetch"]] = None,
         is_only_fields: bool = False,
@@ -92,8 +92,8 @@ class ModelRow(EdgyBaseModel):
             for column_name in columns_to_check:
                 if column_name not in row:
                     continue
-                elif row[column_name] is not None:
-                    child_item[foreign_key.from_fk_field_name(related, column_name)] = row[column_name]
+                elif row[column_name] is not None:  # type: ignore
+                    child_item[foreign_key.from_fk_field_name(related, column_name)] = row[column_name]  # type: ignore
 
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
@@ -169,7 +169,7 @@ class ModelRow(EdgyBaseModel):
     @classmethod
     def __handle_prefetch_related(
         cls,
-        row: Row,
+        row: "Row",
         model: Type["Model"],
         # for advancing
         prefetch_related: Sequence["Prefetch"],
@@ -256,7 +256,7 @@ class ModelRow(EdgyBaseModel):
     @classmethod
     def process_nested_prefetch_related(
         cls,
-        row: Row,
+        row: "Row",
         prefetch_related: "Prefetch",
         parent_cls: Type["Model"],
         inverse_path: str,

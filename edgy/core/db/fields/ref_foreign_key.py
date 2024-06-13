@@ -1,6 +1,6 @@
 import typing
 from inspect import isclass
-from typing import TYPE_CHECKING, Sequence, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import get_origin
 
@@ -11,7 +11,6 @@ from edgy.core.terminal import Print
 from edgy.exceptions import ModelReferenceError
 
 if TYPE_CHECKING:
-    from sqlalchemy import Column
 
     from edgy import Model
     from edgy.core.db.models.model_reference import ModelRef

@@ -9,7 +9,6 @@ from edgy.core.terminal import Print
 from edgy.core.utils.models import create_edgy_model
 
 if TYPE_CHECKING:
-    from sqlalchemy import Column
 
     from edgy import Model
 
@@ -149,15 +148,5 @@ class ManyToManyField(ForeignKeyFieldFactory):
         kwargs["on_update"] = CASCADE
 
         return super().__new__(cls, to=to, through=through, **kwargs)
-
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        related_name = kwargs.get("related_name", None)
-
-        if related_name:
-            assert isinstance(related_name, str), "related_name must be a string."
-
-        kwargs["related_name"] = related_name.lower() if related_name else None
-
 
 ManyToMany = ManyToManyField
