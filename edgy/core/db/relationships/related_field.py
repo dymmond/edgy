@@ -31,7 +31,10 @@ class RelatedField:
     @functools.cached_property
     def manager(self) -> "Manager":
         """Returns the manager class"""
-        return cast("Manager", self.related_from.meta.manager)  # type: ignore
+        manager: Optional["Manager"] = getattr(self.related_from, "query_related", None)
+        if manager is None:
+            manager = self.related_from.query  # type: ignore
+        return cast("Manager", manager)
 
     @functools.cached_property
     def queryset(self) -> "QuerySet":

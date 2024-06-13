@@ -43,8 +43,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             if isinstance(self.through, str):
                 self.through = self.registry.models[self.through]
 
-            self.through.meta.is_multi = True
-            self.through.meta.multi_related = [self.to.__name__.lower()]
+            name = self.to.__name__.lower()
+            if name not in self.through.meta.multi_related:
+                self.through.meta.multi_related.append(name)
             return
 
         owner_name = self.owner.__name__
@@ -52,15 +53,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         class_name = f"{owner_name}{to_name}"
         tablename = f"{owner_name.lower()}s_{to_name}s".lower()
 
-        new_meta_namespace = {
-            "tablename": tablename,
-            "registry": self.registry,
-            "is_multi": True,
-            "multi_related": [to_name.lower()],
-        }
-
-        new_meta: MetaInfo = MetaInfo(None)
-        new_meta.load_dict(new_meta_namespace)
+        new_meta: MetaInfo = MetaInfo(None, tablename=tablename, registry=self.registry, multi_related=[to_name.lower()])
 
         # Define the related names
         owner_related_name = (
@@ -107,7 +100,10 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         return {}
 
     def __get__(self, instance: "Model", owner: Any = None) -> Relation:
-        return Relation(through=self.through, to=self.to, owner=self.owner, instance=instance)
+        relation = Relation(through=self.through, to=self.to, owner=self.owner, instance=instance)
+        if instance:
+            instance.__dict__[self.name] = relation
+        return relation
 
 
 class ManyToManyField(ForeignKeyFieldFactory):

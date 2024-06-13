@@ -5,6 +5,7 @@ from typing import (
     Any,
     ClassVar,
     Dict,
+    List,
     Literal,
     Optional,
     Sequence,
@@ -25,6 +26,7 @@ from edgy.core.db.models._internal import DescriptiveMeta
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
 from edgy.core.db.models.model_proxy import ProxyModel
+from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.utils.functional import edgy_setattr
 from edgy.core.utils.models import DateParser, ModelParser, generify_model_fields
 from edgy.core.utils.sync import run_sync
@@ -32,6 +34,7 @@ from edgy.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
     from edgy import Model, Registry
+    from edgy.core.db.fields.base import BaseField
     from edgy.core.signals import Broadcaster
 
 _empty = cast(Set[str], frozenset())
@@ -47,7 +50,8 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     is_proxy_model: ClassVar[bool] = False
 
     query: ClassVar[Manager] = Manager()
-    meta: ClassVar[MetaInfo] = MetaInfo(None)
+    query_related: ClassVar[Optional[Manager]] = None
+    meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True)
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
     __db_model__: ClassVar[bool] = False
@@ -104,9 +108,8 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return f"<{self.__class__.__name__}: {self}>"
 
     def __str__(self) -> str:
-        pknames = self.meta.pk_attributes
         pkl = []
-        for pkname in pknames:
+        for pkname in self.pknames:
             pkl.append(f"{pkname}={getattr(self, pkname, None)}")
         return f"{self.__class__.__name__}({', '.join(pkl)})"
 
@@ -126,7 +129,43 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @table.setter
     def table(self, value: sqlalchemy.Table) -> None:
+        try:
+            del self._pknames
+        except AttributeError:
+            pass
+        try:
+            del self._pkcolumns
+        except AttributeError:
+            pass
         self._table = value
+
+    @property
+    def pkcolumns(self) -> Sequence[str]:
+        if not hasattr(self, "_pkcolumns"):
+            if self.__dict__.get("_table", None) is None:
+                self._pkcolumns: Sequence[str] = cast(Sequence[str], self.__class__.pkcolumns)
+            else:
+                build_pkcolumns(self)
+        return self._pkcolumns
+
+    @property
+    def pknames(self) -> Sequence[str]:
+        if not hasattr(self, "_pknames"):
+            if self.__dict__.get("_table", None) is None:
+                self._pknames: Sequence[str] = cast(Sequence[str], self.__class__.pknames)
+            else:
+                build_pknames(self)
+        return self._pknames
+
+    def get_columns_for_name(self, name: str) -> Sequence["sqlalchemy.Column"]:
+        table = self.table
+        meta = self.meta
+        if name in meta.field_to_columns:
+            return meta.field_to_columns[name]
+        elif name in table.columns:
+            return (table.columns[name],)
+        else:
+            return cast(Sequence["sqlalchemy.Column"], _empty)
 
     @classmethod
     def generate_proxy_model(cls) -> Type["Model"]:
@@ -148,29 +187,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         proxy_model.build()
         generify_model_fields(proxy_model.model)
         return proxy_model.model
-
-    @cached_property
-    def special_getter_fields(self) -> Set[str]:
-        """
-        Pydantic computed fields can't be used as field yet.
-        This reimplements the pydantic logic for fields with __get__ method
-        """
-        return cast(
-            Set[str],
-            frozenset(key for key, field in self.meta.fields_mapping.items() if hasattr(field, "__get__")),
-        )
-
-    @cached_property
-    def excluded_fields(self) -> Set[str]:
-        """
-        Pydantic should exclude fields with exclude flag set, but it doesn't
-        so work around here
-        """
-        # should be handled by pydantic but isn't so workaround
-        return cast(
-            Set[str],
-            frozenset(key for key, field in self.meta.fields_mapping.items() if getattr(field, "exclude", False)),
-        )
 
     def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
         """
@@ -196,11 +212,11 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
         if isinstance(exclude, dict):
             exclude["__show_pk__"] = True
-            for field in self.excluded_fields:
-                exclude[field] = True
+            for field_name in self.meta.excluded_fields:
+                exclude[field_name] = True
         else:
-            exclude.update(self.special_getter_fields)
-            exclude.update(self.excluded_fields)
+            exclude.update(self.meta.special_getter_fields)
+            exclude.update(self.meta.excluded_fields)
             exclude.add("__show_pk__")
         include: Union[Set[str], Dict[str, Any], None] = kwargs.pop("include", None)
         mode: Union[Literal["json", "python"], str] = kwargs.pop("mode", "python")
@@ -209,7 +225,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         model = dict(super().model_dump(exclude=exclude, include=include, mode=mode, **kwargs))
         # Workaround for metafields, computed field logic introduces many problems
         # so reimplement the logic here
-        for field_name in self.special_getter_fields:
+        for field_name in self.meta.special_getter_fields:
             if field_name == "pk":
                 continue
             if not should_show_pk or field_name not in self.pknames:
@@ -219,7 +235,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                     continue
                 if getattr(field_name, "exclude", False):
                     continue
-            field = self.fields[field_name]
+            field: BaseField = self.meta.fields_mapping[field_name]
             retval = field.__get__(self, self.__class__)
             sub_include = None
             if isinstance(include, dict):
@@ -244,9 +260,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                     # skip field if it isn't a BaseModel and the mode is json and unsafe_json_serialization is not set
                     # currently unsafe_json_serialization exists only on ConcreteCompositeFields
                     continue
-            alias = field_name
+            alias: str = field_name
             if getattr(field, "serialization_alias", None):
-                alias = field.serialization_alias
+                alias = cast(str, field.serialization_alias)
             elif getattr(field, "alias", None):
                 alias = field.alias
             model[alias] = retval
@@ -266,9 +282,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
 
-        columns = []
-        global_constraints = []
-        for name, field in cls.fields.items():
+        columns: List["sqlalchemy.Column"] = []
+        global_constraints: List[Any] = []
+        for name, field in cls.meta.fields_mapping.items():
             current_columns = field.get_columns(name)
             columns.extend(current_columns)
             global_constraints.extend(field.get_global_constraints(name, current_columns))

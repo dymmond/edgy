@@ -16,7 +16,9 @@ pytestmark = pytest.mark.anyio
 
 class ObjectsManager(Manager):
     def get_queryset(self) -> QuerySet:
-        queryset = super().get_queryset().filter(is_active=True)
+        queryset = super().get_queryset()
+        if "is_active" in queryset.model_class.table.columns:
+            queryset = queryset.filter(is_active=True)
         return queryset
 
 
@@ -83,8 +85,9 @@ async def test_inherited_base_model_managers():
     assert len(users) == 2
 
 
-@pytest.mark.parametrize("manager,total", [("query", 6), ("ratings", 3)])
-async def test_inherited_base_model_managers_product(manager, total):
+@pytest.mark.parametrize("manager,manager_class,total", [("query", ObjectsManager, 0), ("ratings", RatingManager, 3)])
+async def test_inherited_base_model_managers_product(manager, manager_class, total):
+    assert isinstance(getattr(Product, manager), manager_class)
     await Product.query.create(name="test", rating=5)
     await Product.query.create(name="test2", rating=4)
     await Product.query.create(name="test3", rating=3)

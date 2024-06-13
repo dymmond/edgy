@@ -346,17 +346,6 @@ class BaseQuerySet(
 
             else:
                 op = "exact"
-                try:
-                    column = self.table.columns[key]
-                except KeyError as error:
-                    # This error should not happen
-                    # Check for related fields
-                    # if an Attribute error is raised, we need to make sure
-                    # It raises the KeyError from the previous check
-                    model_class = self.model_class.meta.related_fields[key].related_to
-                    if len(model_class.meta.pk_attributes) != 1:
-                        raise error
-                    column = model_class.table.columns[model_class.meta.pk_attributes[0]]
                 column = self.table.columns[key]
 
             # Map the operation code onto SQLAlchemy's ColumnElement
@@ -651,9 +640,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         only_fields = [sqlalchemy.text(field) for field in fields]
         missing = []
-        for pkname in self.model_class.pknames:
-            if pkname not in fields:
-                missing.append(sqlalchemy.text(pkname))
+        if self.model_class.pknames:
+            for pkname in self.model_class.pknames:
+                if pkname not in fields:
+                    for pkcolumn in self.model_class.meta.get_columns_for_name(pkname):
+                        missing.append(sqlalchemy.text(pkcolumn.key))
+        else:
+            for pkcolumn in self.model_class.pkcolumns:
+                missing.append(sqlalchemy.text(pkcolumn.key))
         if missing:
             only_fields = missing + only_fields
 
@@ -948,10 +942,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         new_objs = [queryset._extract_values_from_field(obj, queryset.model_class) for obj in new_objs]
 
-        pks1 = (getattr(queryset.table.c, pkname) == sqlalchemy.bindparam(pkname) for pkname in queryset.pknames)
+        pks1 = (getattr(queryset.table.c, pkcol) == sqlalchemy.bindparam(pkcol) for pkcol in queryset.pkcolumns)
         expression = queryset.table.update().where(*pks1)
         kwargs: Dict[Any, Any] = {field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj.keys()}
-        pks2 = [{pkname: getattr(obj, pkname) for pkname in queryset.pknames} for obj in objs]
+        pks2 = [{pkcol: getattr(obj, pkcol) for pkcol in queryset.pkcolumns} for obj in objs]
 
         query_list = []
         for pk, value in zip(pks2, new_objs):  # noqa

@@ -16,13 +16,17 @@ pytestmark = pytest.mark.anyio
 
 class ObjectsManager(Manager):
     def get_queryset(self) -> QuerySet:
-        queryset = super().get_queryset().filter(is_active=True)
+        queryset = super().get_queryset()
+        if "is_active" in queryset.model_class.table.columns:
+            queryset = queryset.filter(is_active=True)
         return queryset
 
 
 class LanguageManager(Manager):
     def get_queryset(self) -> QuerySet:
-        queryset = super().get_queryset().filter(language="EN")
+        queryset = super().get_queryset()
+        if "language" in queryset.model_class.table.columns:
+            queryset = queryset.filter(language="EN")
         return queryset
 
 

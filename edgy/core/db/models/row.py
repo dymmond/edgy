@@ -233,9 +233,9 @@ class ModelRow(EdgyBaseModel):
             # Check for individual not nested querysets
             elif related.queryset is not None and not is_nested:
                 extra = {}
-                for pkname in cls.pknames:
-                    filter_by_pk = row[pkname]
-                    extra[f"{related.related_name}__{pkname}"] = filter_by_pk
+                for pkcol in cls.pkcolumns:
+                    filter_by_pk = row[pkcol]
+                    extra[f"{related.related_name}__{pkcol}"] = filter_by_pk
                 related.queryset.extra = extra
 
                 # Execute the queryset
@@ -286,9 +286,9 @@ class ModelRow(EdgyBaseModel):
         # fix this later when allowing selecting fields for fireign keys
         # Extract foreign key value
         extra = {}
-        for pkname in parent_cls.pknames:
-            filter_by_pk = row[pkname]
-            extra[f"{inverse_path}__{pkname}"] = filter_by_pk
+        for pkcol in parent_cls.pkcolumns:
+            filter_by_pk = row[pkcol]
+            extra[f"{inverse_path}__{pkcol}"] = filter_by_pk
 
         records = asyncio.get_event_loop().run_until_complete(cls.run_query(model_class, extra, queryset))
         return records

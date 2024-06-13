@@ -242,21 +242,23 @@ class ConcreteCompositeField(BaseCompositeField):
         return name
 
     def __get__(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
+        assert len(self.inner_field_names) >= 1
         if self.model is ConditionalRedirect and len(self.inner_field_names) == 1:
             return getattr(instance, self.inner_field_names[0], None)
         d = {}
         for key in self.inner_field_names:
             translated_name = self.translate_name(key)
-            field = instance.fields.get(key)
+            field = instance.meta.fields_mapping.get(key)
             if field and hasattr(field, "__get__"):
                 d[translated_name] = field.__get__(instance, owner)
             else:
                 d[translated_name] = getattr(instance, key, None)
-        if self.model is not None:
+        if self.model is not None and self.model is not ConditionalRedirect:
             return self.model(**d)
         return d
 
     def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
+        assert len(self.inner_field_names) >= 1
         if (
             self.model is ConditionalRedirect
             and len(self.inner_field_names) == 1
@@ -268,6 +270,7 @@ class ConcreteCompositeField(BaseCompositeField):
         return super().clean(field_name, value)
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+        assert len(self.inner_field_names) >= 1
         if (
             self.model is ConditionalRedirect
             and len(self.inner_field_names) == 1
@@ -291,6 +294,7 @@ class ConcreteCompositeField(BaseCompositeField):
                 cloned_field = copy.copy(item[1])
                 # set to the current owner of this field, required in collision checks
                 cloned_field.owner = self.owner
+                cloned_field.inherit = False
                 retdict[item[0]] = cloned_field
             return retdict
         for item in self.embedded_field_defs.items():
@@ -298,6 +302,7 @@ class ConcreteCompositeField(BaseCompositeField):
                 cloned_field = copy.copy(item[1])
                 # set to the current owner of this field, required in collision checks
                 cloned_field.owner = self.owner
+                cloned_field.inherit = False
                 retdict[item[0]] = cloned_field
             else:
                 absorbed_field = fields_mapping[item[0]]
@@ -333,6 +338,8 @@ class CompositeField(FieldFactory):
         if inner_fields is not None:
             if not isinstance(inner_fields, Sequence):
                 raise FieldDefinitionError("inner_fields must be a Sequence")
+            if not inner_fields:
+                raise FieldDefinitionError("inner_fields mustn't be empty")
             inner_field_names: Set[str] = set()
             for field in inner_fields:
                 if isinstance(field, str):
