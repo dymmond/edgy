@@ -23,8 +23,7 @@ terminal = Print()
 
 
 class BaseRefForeignKeyField(BaseForeignKey):
-    def get_columns(self, name: str) -> Sequence["Column"]:
-        return []
+    pass
 
 
 class RefForeignKey(ForeignKeyFieldFactory, list):

@@ -1,9 +1,8 @@
-from typing import TYPE_CHECKING, Any, Sequence, TypeVar
+from typing import TYPE_CHECKING, Sequence, TypeVar
 
 import sqlalchemy
 
-from edgy.core.db.fields.base import BaseField, BaseForeignKey
-from edgy.core.db.fields.core import ForeignKeyFieldFactory
+from edgy.core.db.fields.foreign_keys import BaseForeignKeyField, ForeignKey
 from edgy.core.terminal import Print
 
 if TYPE_CHECKING:
@@ -14,7 +13,7 @@ T = TypeVar("T", bound="Model")
 terminal = Print()
 
 
-class BaseOneToOneKeyField(BaseForeignKey):
+class BaseOneToOneKeyField(BaseForeignKeyField):
     def get_global_constraints(
         self, name: str, columns: Sequence[sqlalchemy.Column]
     ) -> Sequence[sqlalchemy.Constraint]:
@@ -24,21 +23,12 @@ class BaseOneToOneKeyField(BaseForeignKey):
         ]
 
 
-class OneToOneField(ForeignKeyFieldFactory):
+class OneToOneField(ForeignKey):
     """
     Representation of a one to one field.
     """
 
     _bases = (BaseOneToOneKeyField,)
-
-    _type: Any = Any
-
-    def __new__(  # type: ignore
-        cls,
-        to: "Model",
-        **kwargs: Any,
-    ) -> BaseField:
-        return super().__new__(cls, to=to, **kwargs)
 
 
 OneToOne = OneToOneField

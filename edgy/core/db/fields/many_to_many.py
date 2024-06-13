@@ -1,6 +1,5 @@
-from typing import TYPE_CHECKING, Any, Dict, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
 
-import edgy
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.fields.core import ForeignKeyFieldFactory
@@ -10,6 +9,8 @@ from edgy.core.terminal import Print
 from edgy.core.utils.models import create_edgy_model
 
 if TYPE_CHECKING:
+    from sqlalchemy import Column
+
     from edgy import Model
 
 T = TypeVar("T", bound="Model")
@@ -19,8 +20,20 @@ terminal = Print()
 
 
 class BaseManyToManyForeignKeyField(BaseForeignKey):
-    # Do we need this attribute? we check on other ways
     is_m2m: bool = True
+    def __init__(
+        self,
+        *,
+        to_fields: Sequence[str] = (),
+        from_fields: Sequence[str] = (),
+        through: Union[str, Type["Model"]] = "",
+        **kwargs: Any,
+    ) -> None:
+        self.to_fields = to_fields
+        self.from_fields = from_fields
+        self.through = through
+
+        super().__init__(**kwargs)
 
     def add_model_to_register(self, model: Any) -> None:
         """
@@ -38,15 +51,19 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         from edgy.core.db.models.metaclasses import MetaInfo
 
         self.to = self.target
+        __bases__: Tuple[Type["Model"], ...] = ()
 
         if self.through:
             if isinstance(self.through, str):
                 self.through = self.registry.models[self.through]
-
-            name = self.to.__name__.lower()
-            if name not in self.through.meta.multi_related:
-                self.through.meta.multi_related.append(name)
-            return
+            through = cast(Type["Model"], self.through)
+            if through.meta.abstract:
+                __bases__ = (through,)
+            else:
+                name = self.to.__name__.lower()
+                if name not in through.meta.multi_related:
+                    through.meta.multi_related.append(name)
+                return
 
         owner_name = self.owner.__name__
         to_name = self.to.__name__
@@ -66,14 +83,15 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             f"{self.related_name}" if self.related_name else f"{to_name.lower()}_{class_name.lower()}s_set"
         )
         fields = {
-            "id": edgy.IntegerField(primary_key=True),
             f"{owner_name.lower()}": ForeignKey(
                 self.owner,
                 null=True,
                 on_delete=CASCADE,
                 related_name=owner_related_name,
+                related_fields=self.from_fields
             ),
-            f"{to_name.lower()}": ForeignKey(self.to, null=True, on_delete=CASCADE, related_name=to_related_name),
+            f"{to_name.lower()}": ForeignKey(self.to, null=True, on_delete=CASCADE, related_name=to_related_name,
+                related_fields=self.to_fields),
         }
 
         # Create the through model
@@ -82,18 +100,22 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             __module__=self.__module__,
             __definitions__=fields,
             __metadata__=new_meta,
+            __bases__=__bases__
         )
         self.through = through_model
         self.add_model_to_register(self.through)
 
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+        """
+        Meta field
+        """
+        return {}
+
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
-        return hasattr(self, "default")
+        return False
 
-    def expand_relationship(self, value: Any) -> Any:
-        return value
-
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any]) -> Any:
         """
         Meta field
         """
@@ -115,6 +137,8 @@ class ManyToManyField(ForeignKeyFieldFactory):
         to: Union["Model", str],
         *,
         through: Optional["Model"] = None,
+        from_fields: Sequence[str] = (),
+        to_fields: Sequence[str] = (),
         **kwargs: Any,
     ) -> BaseField:
         for argument in ["null", "on_delete", "on_update"]:

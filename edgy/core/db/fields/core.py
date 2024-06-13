@@ -167,7 +167,6 @@ class ForeignKeyFieldFactory(FieldFactory):
         on_update: str = CASCADE,
         on_delete: str = RESTRICT,
         related_name: str = "",
-        through: Any = None,
         server_onupdate: Any = None,
         default: Any = None,
         server_default: Any = None,
@@ -316,6 +315,9 @@ class ConcreteCompositeField(BaseCompositeField):
 
     def get_composite_fields(self) -> Dict[str, BaseField]:
         return {field: self.owner.meta.fields_mapping[field] for field in self.inner_field_names}
+
+    def is_required(self) -> bool:
+        return False
 
 
 class CompositeField(FieldFactory):
