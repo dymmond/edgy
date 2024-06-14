@@ -141,7 +141,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @property
     def pkcolumns(self) -> Sequence[str]:
-        if not hasattr(self, "_pkcolumns"):
+        if self.__dict__.get("_pkcolumns", None) is None:
             if self.__dict__.get("_table", None) is None:
                 self._pkcolumns: Sequence[str] = cast(Sequence[str], self.__class__.pkcolumns)
             else:
@@ -150,7 +150,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @property
     def pknames(self) -> Sequence[str]:
-        if not hasattr(self, "_pknames"):
+        if self.__dict__.get("_pknames", None) is None:
             if self.__dict__.get("_table", None) is None:
                 self._pknames: Sequence[str] = cast(Sequence[str], self.__class__.pknames)
             else:
