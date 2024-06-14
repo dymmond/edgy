@@ -5,7 +5,7 @@ import sqlalchemy
 from pydantic import BaseModel
 
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
-from edgy.core.db.fields.core import ForeignKeyFieldFactory
+from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.terminal import Print
 
 if TYPE_CHECKING:

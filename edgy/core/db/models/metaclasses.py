@@ -336,7 +336,7 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
                 elif isinstance(value, Manager):
                     attrs[key] = value.__class__()
                 elif isinstance(value, BaseModelMeta):
-                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=key, inherit=value.meta.inherit)
+                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit)
             elif attrs[key] is _occluded_sentinel:
                 # when occluded only include if inherit is True
                 if isinstance(value, BaseField) and value.inherit:
@@ -344,7 +344,7 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
                 elif isinstance(value, Manager) and value.inherit:
                     attrs[key] = value.__class__()
                 elif isinstance(value, BaseModelMeta) and value.meta.inherit:
-                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=key, inherit=value.meta.inherit)
+                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit)
 
     else:
         # abstract classes
@@ -387,15 +387,19 @@ def extract_fields_and_managers(bases: Sequence[Type], attrs: Optional[Dict[str,
 
     from edgy.core.db.fields.composite_field import CompositeField
     attrs = {} if attrs is None else {**attrs}
+    # order is important
+    for key in list(attrs.keys()):
+        value = attrs[key]
+        if isinstance(value, BaseModelMeta):
+            value = attrs[key]
+            attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit, owner=value)
     for base in bases:
         _extract_fields_and_managers(base, attrs)
+    # now remove sentinels
     for key in list(attrs.keys()):
         value = attrs[key]
         if value is _occluded_sentinel:
             attrs.pop(key)
-        elif isinstance(value, BaseModelMeta):
-            value = attrs[key]
-            attrs[key] = CompositeField(inner_fields=value, prefix_embedded=key, inherit=value.meta.inherit)
     return attrs
 
 

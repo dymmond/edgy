@@ -6,7 +6,7 @@ from typing_extensions import get_origin
 
 import edgy
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
-from edgy.core.db.fields.core import ForeignKeyFieldFactory
+from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.terminal import Print
 from edgy.exceptions import ModelReferenceError
 

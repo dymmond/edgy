@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Tuple, Type, Ty
 
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
-from edgy.core.db.fields.core import ForeignKeyFieldFactory
+from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.foreign_keys import ForeignKey
 from edgy.core.db.relationships.relation import Relation
 from edgy.core.terminal import Print

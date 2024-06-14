@@ -1,3 +1,4 @@
+import copy
 import decimal
 from functools import cached_property
 from typing import (
@@ -14,9 +15,9 @@ from typing import (
     cast,
 )
 
+import sqlalchemy
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
-from sqlalchemy import Column, Constraint
 
 from edgy.core.connection.registry import Registry
 from edgy.types import Undefined
@@ -70,7 +71,7 @@ class BaseField(FieldInfo):
         self.field_type: Any = kwargs.pop("__type__", None)
         self.__original_type__: type = kwargs.pop("__original_type__", None)
         self.column_type: Optional[Any] = kwargs.pop("column_type", None)
-        self.constraints: Sequence["Constraint"] = kwargs.pop("constraints", [])
+        self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop("constraints", [])
         self.skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
         self.help_text: Optional[str] = kwargs.pop("help_text", None)
         self.pattern: Pattern = kwargs.pop("pattern", None)
@@ -132,7 +133,7 @@ class BaseField(FieldInfo):
         """Checks if the field has a default value set"""
         return bool(self.default is not None and self.default is not Undefined)
 
-    def get_columns(self, name: str) -> Sequence["Column"]:
+    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         """
         Returns the columns of the field being declared.
         """
@@ -169,10 +170,19 @@ class BaseField(FieldInfo):
         """
         return {}
 
+    def embed_field(self, prefix: str, new_fieldname:str, owner: Optional[Union[Type["Model"], Type["ReflectModel"]]]=None, parent: Optional["BaseField"]=None) -> Optional["BaseField"]:
+        """
+        Embed this field or return None to prevent embedding. Must return a copy when not returning None.
+        """
+        field_copy = copy.copy(self)
+        field_copy.name = new_fieldname
+        field_copy.owner = owner  # type: ignore
+        return field_copy
+
     def get_constraints(self) -> Any:
         return self.constraints
 
-    def get_global_constraints(self, name: str, columns: Sequence[Column]) -> Sequence[Constraint]:
+    def get_global_constraints(self, name: str, columns: Sequence[sqlalchemy.Column]) -> Sequence[sqlalchemy.Constraint]:
         return []
 
     def get_default_value(self) -> Any:
@@ -190,6 +200,48 @@ class BaseField(FieldInfo):
         if field_name in cleaned_data:
             return {}
         return {field_name: self.get_default_value()}
+
+
+class Field(BaseField):
+    # defines compatibility fallbacks check and get_column
+
+    def check(self, value: Any) -> Any:
+        """
+        Runs the checks for the fields being validated. Single Column.
+        """
+        return value
+
+    def clean(self, name: str, value: Any) -> Dict[str, Any]:
+        """
+        Runs the checks for the fields being validated. Multiple columns possible
+        """
+        return {name: self.check(value)}
+
+    def get_column(self, name: str) -> Optional[sqlalchemy.Column]:
+        """
+        Return a single column for the field declared. Return None for meta fields.
+        """
+        constraints = self.get_constraints()
+        return sqlalchemy.Column(
+            name,
+            self.column_type,
+            *constraints,
+            primary_key=self.primary_key,
+            autoincrement=self.autoincrement,
+            nullable=self.null,
+            index=self.index,
+            unique=self.unique,
+            default=self.default,
+            comment=self.comment,
+            server_default=self.server_default,
+            server_onupdate=self.server_onupdate,
+        )
+
+    def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
+        column = self.get_column(name)
+        if column is None:
+            return []
+        return [column]
 
 
 class BaseCompositeField(BaseField):
@@ -216,12 +268,16 @@ class BaseCompositeField(BaseField):
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if translated_name not in value:
+                    if not field.is_required() or field.has_default():
+                        continue
                     raise ValueError(f"Missing key: {sub_name} for {field_name}")
                 result.update(field.clean(f"{prefix}{sub_name}", value[translated_name]))
         else:
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if not hasattr(value, translated_name):
+                    if not field.is_required() or field.has_default():
+                        continue
                     raise ValueError(f"Missing attribute: {translated_name} for {field_name}")
                 result.update(field.clean(f"{prefix}{sub_name}", getattr(value, translated_name)))
         return result
@@ -249,6 +305,8 @@ class BaseCompositeField(BaseField):
     def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any]) -> Any:
         cleaned_data_result = {}
         for sub_field_name, field in self.composite_fields.items():
+            if not field.has_default():
+                continue
             # here we don't need to translate, there is no inner object
             for sub_field_name_new, default_value in field.get_default_values(sub_field_name, cleaned_data):
                 if sub_field_name_new not in cleaned_data and sub_field_name_new not in cleaned_data_result:
@@ -287,6 +345,9 @@ class PKField(BaseCompositeField):
             translated_name = self.translate_name(key)
             d[translated_name] = getattr(instance, key, None)
         return d
+
+    def embed_field(self, prefix: str, new_fieldname:str, owner: Optional[Union[Type["Model"], Type["ReflectModel"]]]=None, parent: Optional["BaseField"]=None) -> Optional[BaseField]:
+        return None
 
     def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
         pknames = cast(Sequence[str], self.owner.pknames)

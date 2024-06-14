@@ -50,26 +50,28 @@ class ModelRow(EdgyBaseModel):
         secret_fields = [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
 
         for related in select_related:
-            if "__" in related:
-                first_part, remainder = related.split("__", 1)
-                try:
-                    model_cls = cls.meta.fields_mapping[first_part].target
-                except KeyError:
-                    model_cls = cls.meta.related_fields[first_part].related_from
-
-                item[first_part] = model_cls.from_sqla_row(
-                    row,
-                    select_related=[remainder],
-                    prefetch_related=prefetch_related,
-                    exclude_secrets=exclude_secrets,
-                    using_schema=using_schema,
-                )
-            else:
+            try:
                 try:
                     model_cls = cls.meta.fields_mapping[related].target
                 except KeyError:
                     model_cls = cls.meta.related_fields[related].related_from
                 item[related] = model_cls.from_sqla_row(row, exclude_secrets=exclude_secrets, using_schema=using_schema)
+            except KeyError:
+                # first check the fields
+                if "__" in related:
+                    first_part, remainder = related.split("__", 1)
+                    try:
+                        model_cls = cls.meta.fields_mapping[first_part].target
+                    except KeyError:
+                        model_cls = cls.meta.related_fields[first_part].related_from
+
+                    item[first_part] = model_cls.from_sqla_row(
+                        row,
+                        select_related=[remainder],
+                        prefetch_related=prefetch_related,
+                        exclude_secrets=exclude_secrets,
+                        using_schema=using_schema,
+                    )
 
         # Populate the related names
         # Making sure if the model being queried is not inside a select related

@@ -199,12 +199,13 @@ the fields need the exclude attribute/parameter set
 ##### Parameters
 
 * **inner_fields** - Required. A sequence containing the external field names mixed with embedded field definitions (name, Field) tuples.
+                     As alternative it is possible to provide an Edgy Model (abstract or non-abstract) or a dictionary in format (name, Field)
 * **unsafe_json_serialization** - Default False. Normally when serializing in json mode, CompositeFields are ignored when they don't have a pydantic model set. This option includes such CompositeFields in the dump.
 * **absorb_existing_fields** - Default False. Don't fail if fields speficied with (name, Field) tuples already exists. Treat them as internal fields. The existing fields are checked if they are a subclass of the Field or have the attribute `skip_absorption_check` set
 * **model** - Default None (not set).Return a pydantic model instead of a dict
 * **prefix_embedded** - Default "". Prefix the field names of embedded fields (not references to external fields). Useful for implementing embeddables
 
-Note: embedded fields are deepcopied. This way it is safe to provide the same inner_fields object to multiple CompositeFields
+Note: embedded fields are shallowcopied. This way it is safe to provide the same inner_fields object to multiple CompositeFields.
 
 
 Note: there is a special parameter for model: `ConditionalRedirect`.
@@ -366,6 +367,8 @@ class MyModel(edgy.Model):
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
 * **related_name** - The name to use for the relation from the related object back to this one.
+* **related_fields** - The columns or fields to use for the foreign key. If unset or empty, the primary key(s) are used.
+* **no_constraint** - Skip creating a constraint. Note: if set and index=True an index will be created instead.
 * **on_delete** - A string indicating the behaviour that should happen on delete of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `edgy`.
@@ -376,6 +379,8 @@ from `edgy`.
     ```python
     from edgy import CASCADE, SET_NULL, RESTRICT
     ```
+
+
 
 #### RefForeignKey
 
@@ -413,9 +418,14 @@ class MyModel(edgy.Model):
 ##### Parameters
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
+* **from_fields** - Provide the **related_fields** for the implicitly generated ForeignKey to the owner model.
+* **to_fields** - Provide the **related_fields** for the implicitly generated ForeignKey to the child model.
 * **related_name** - The name to use for the relation from the related object back to this one.
 * **through** - The model to be used for the relationship. Edgy generates the model by default
-if none is provided.
+if None is provided or **through** is an abstract model.
+
+!!! Note:
+    if **through** is an abstract model it will be used as a template (a new model is generated with through as base).
 
 #### IPAddressField
 
@@ -467,6 +477,9 @@ Derives from the same as [ForeignKey](#foreignkey) and applies a One to One dire
 
 !!! Tip
     You can use `edgy.OneToOneField` as alternative to `OneToOne` instead.
+
+!!! Note
+    the index parameter is here ignored
 
 #### TextField
 
@@ -559,7 +572,7 @@ For examples look in the mentioned path (replace dots with slashes).
 If you want to customize the entire field (e.g. checks), you have to split the field in 2 parts:
 
 - One inherits from `edgy.db.fields.base.BaseField` (or one of the derived classes) and provides the missing parts. It shall not be used for the Enduser (though possible).
-- One inherits from `edgy.db.fields.field.FieldFactory`. Here the _bases attribute is adjusted to point to the Field from the first step.
+- One inherits from `edgy.db.fields.factories.FieldFactory`. Here the _bases attribute is adjusted to point to the Field from the first step.
 
 Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide following methods to work:
 
