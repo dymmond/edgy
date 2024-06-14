@@ -43,6 +43,7 @@ class ConcreteCompositeField(BaseCompositeField):
         self.embedded_field_defs: Dict[str, BaseField] = {}
         if hasattr(inner_fields, "meta"):
             kwargs.setdefault("model", inner_fields)
+            kwargs.setdefault("inherit", inner_fields.meta.inherit)
             inner_fields = inner_fields.meta.fields_mapping
         if isinstance(inner_fields, dict):
             inner_fields = inner_fields.items()  # type: ignore

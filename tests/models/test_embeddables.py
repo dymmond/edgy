@@ -27,13 +27,15 @@ class NonInheritableModel(InheritableModel):
 
 
 class MyModel1(edgy.Model):
+    id2 = edgy.IntegerField(primary_key=True, autoincrement=True, inherit=False, exclude=True)
     model1: ClassVar[InheritableModel] = InheritableModel
-    model2: ClassVar[NonInheritableModel] = NonInheritableModel
+    model2 = NonInheritableModel
 
     class Meta:
         registry = models
 
 class MyModel2(MyModel1):
+    id2 = edgy.IntegerField(primary_key=True, autoincrement=True, inherit=False, exclude=True)
     model3: ClassVar[MyModel1] = MyModel1
     # because of exluding and inheritance we cannot use model3 anymore
     model3_model1_last_name = edgy.ExcludeField()

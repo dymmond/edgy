@@ -194,7 +194,7 @@ class MetaInfo:
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
         if name == "fields_mapping":
-            self._is_init = False
+            self.invalidate()
 
     def __getattribute__(self, name: str) -> Any:
         # lazy execute
@@ -224,6 +224,9 @@ class MetaInfo:
         self.field_to_column_names = FieldToColumnNames(self)
         self.columns_to_field = ColumnsToField(self)
         self._is_init = True
+
+    def invalidate(self) -> None:
+        self._is_init = False
 
     def get_columns_for_name(self, name: str) -> Sequence["sqlalchemy.Column"]:
         if name in self.field_to_columns:
@@ -542,6 +545,7 @@ class BaseModelMeta(ModelMetaclass):
             return model_class(cls, name, bases, attrs)
 
         new_class = cast("Type[Model]", model_class(cls, name, bases, attrs))
+        new_class.fields = fields
 
         # Update the model_fields are updated to the latest
         new_class.model_fields = {**new_class.model_fields, **model_fields}
@@ -622,7 +626,6 @@ class BaseModelMeta(ModelMetaclass):
                 registry.models[name] = new_class
 
         new_class.__db_model__ = True
-        new_class.fields = fields
         meta.model = new_class
 
         # Sets the foreign key fields

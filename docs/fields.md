@@ -16,6 +16,7 @@ Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions
 * **exclude** - An bool indicating if the field is included in model_dump
 * **default** - A value or a callable (function).
 * **index** - A boolean. Determine if a database index should be created.
+* **inherit** - A boolean. Determine if a field can be inherited in submodels. Default is False.
 * **skip_absorption_check** - A boolean. Default False. Dangerous option! By default when defining a CompositeField with embedded fields and the `absorb_existing_fields` option it is checked that the field type of the absorbed field is compatible with the field type of the embedded field. This option skips the check.
 * **unique** - A boolean. Determine if a unique constraint should be created for the field.
 Check the [unique_together](./models.md#unique-together) for more details.
@@ -194,15 +195,18 @@ ddict = obj.composite
 ```
 
 The contained fields are serialized like normal fields. So if this is not wanted,
-the fields need the exclude attribute/parameter set
+the fields need the exclude attribute/parameter set.
+
+!!! Note:
+    The inherit flag is set to False for all fields created by a composite. This is because of inheritance.
 
 ##### Parameters
 
 * **inner_fields** - Required. A sequence containing the external field names mixed with embedded field definitions (name, Field) tuples.
-                     As alternative it is possible to provide an Edgy Model (abstract or non-abstract) or a dictionary in format (name, Field)
+                     As an alternative it is possible to provide an Edgy Model (abstract or non-abstract) or a dictionary in the format: key=name, value=Field
 * **unsafe_json_serialization** - Default False. Normally when serializing in json mode, CompositeFields are ignored when they don't have a pydantic model set. This option includes such CompositeFields in the dump.
 * **absorb_existing_fields** - Default False. Don't fail if fields speficied with (name, Field) tuples already exists. Treat them as internal fields. The existing fields are checked if they are a subclass of the Field or have the attribute `skip_absorption_check` set
-* **model** - Default None (not set).Return a pydantic model instead of a dict
+* **model** - Default None (not set).Return a pydantic model instead of a dict.
 * **prefix_embedded** - Default "". Prefix the field names of embedded fields (not references to external fields). Useful for implementing embeddables
 
 Note: embedded fields are shallow-copied. This way it is safe to provide the same inner_fields object to multiple CompositeFields.
@@ -425,7 +429,7 @@ class MyModel(edgy.Model):
 if None is provided or **through** is an abstract model.
 
 !!! Note:
-    if **through** is an abstract model it will be used as a template (a new model is generated with through as base).
+    If **through** is an abstract model it will be used as a template (a new model is generated with through as base).
 
 #### IPAddressField
 
@@ -476,10 +480,10 @@ class MyModel(edgy.Model):
 Derives from the same as [ForeignKey](#foreignkey) and applies a One to One direction.
 
 !!! Tip
-    You can use `edgy.OneToOneField` as alternative to `OneToOne` instead.
+    You can use `edgy.OneToOneField` as alternative to `OneToOne` instead. Or if you want the basic ForeignKey with unique=True.
 
 !!! Note
-    the index parameter is here ignored
+    The index parameter is here ignored.
 
 #### TextField
 
@@ -599,3 +603,13 @@ The `annotation` parameter is for pydantic, the `__type___` parameter is transfo
 
 
 for examples have a look in `tests/fields/test_composite_fields.py` or in `edgy/core/db/fields/core.py`
+
+
+## Customizing fields
+
+When a model was created it is safe to update the fields or fields_mapping as long as `invalidate()` of meta is called.
+It is auto-called when a new fields_mapping is assigned to meta but with the unfortune side-effect that additionally the fields attribute of the model must be set again.
+
+You can for example set the inherit flag to False to disable inheriting a Field or set other field attributes.
+
+You shouldn't remove fields (use ExcludeField for this) and be carefull when adding fields (maybe the model must be updated, this is no magic, have a look in the metaclasses file)
