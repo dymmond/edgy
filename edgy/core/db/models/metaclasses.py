@@ -694,13 +694,13 @@ class BaseModelMeta(ModelMetaclass):
 
     @property
     def pkcolumns(cls) -> Sequence[str]:
-        if not hasattr(cls, "_pkcolumns"):
+        if cls.__dict__.get("_pkcolumns", None) is None:
             build_pkcolumns(cls)
         return cast(Sequence[str], cls._pkcolumns)
 
     @property
     def pknames(cls) -> Sequence[str]:
-        if not hasattr(cls, "_pknames"):
+        if cls.__dict__.get("_pknames", None) is None:
             build_pknames(cls)
         return cast(Sequence[str], cls._pknames)
 

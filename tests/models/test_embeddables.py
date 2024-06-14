@@ -27,7 +27,7 @@ class NonInheritableModel(InheritableModel):
 
 
 class MyModel1(edgy.Model):
-    id2 = edgy.IntegerField(primary_key=True, autoincrement=True, inherit=False, exclude=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True, inherit=False, exclude=True)
     model1: ClassVar[InheritableModel] = InheritableModel
     model2 = NonInheritableModel
 
@@ -58,6 +58,10 @@ async def rollback_connections(create_test_database):
 
 
 def test_fields():
+    assert "id" in MyModel1.meta.fields_mapping
+    assert "id2" not in MyModel1.meta.fields_mapping
+    assert "id" in MyModel1.pkcolumns
+    assert "id2" not in MyModel1.pkcolumns
     assert "model1" in MyModel1.meta.fields_mapping
     assert "model1_first_name" in MyModel1.meta.fields_mapping
     # prefixed _ is removed
@@ -65,6 +69,10 @@ def test_fields():
     assert "model2" in MyModel1.meta.fields_mapping
     assert "model2_first_name" in MyModel1.meta.fields_mapping
 
+    assert "id2" in MyModel2.meta.fields_mapping
+    assert "id" not in MyModel2.meta.fields_mapping
+    assert "id2" in MyModel2.pkcolumns
+    assert "id" not in MyModel2.pkcolumns
     assert "model1" in MyModel2.meta.fields_mapping
     assert "model2" not in MyModel2.meta.fields_mapping
     assert "model3" in MyModel2.meta.fields_mapping
