@@ -33,12 +33,12 @@ class RelatedField:
         """Returns the manager class"""
         manager: Optional["Manager"] = getattr(self.related_from, "query_related", None)
         if manager is None:
-            manager = self.related_from.query  # type: ignore
-        return cast("Manager", manager)
+            manager = self.related_from.query
+        return manager
 
     @functools.cached_property
     def queryset(self) -> "QuerySet":
-        return cast("QuerySet", self.manager.get_queryset())
+        return self.manager.get_queryset()
 
     @functools.cached_property
     def foreign_key(self) -> BaseForeignKeyField:
@@ -58,7 +58,7 @@ class RelatedField:
 
         related = [
             key
-            for key, value in self.related_from.fields.items()  # type: ignore
+            for key, value in self.related_from.fields.items()
             if key != self.related_to.__name__.lower() and isinstance(value, BaseForeignKeyField)
         ]
         return related

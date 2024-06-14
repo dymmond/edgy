@@ -4,7 +4,6 @@ from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
 from edgy.core.db.models.utils import pk_from_model_to_clauses, pk_to_dict
-from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ObjectNotFound, RelationshipNotFound
 
 
@@ -206,20 +205,6 @@ class Model(ModelRow, DeclarativeMixin):
 
         await self.signals.post_save.send_async(self.__class__, instance=self)
         return self
-
-    def __getattr__(self, name: str) -> Any:
-        """
-        Run an one off query to populate any foreign key making sure
-        it runs only once per foreign key avoiding multiple database calls.
-        """
-        field = self.meta.fields_mapping.get(name)
-        if field is not None and hasattr(field, "__get__"):
-            # no need to set an descriptor object
-            return field.__get__(self, self.__class__)
-        if name not in self.__dict__ and field is not None and name not in self.pkcolumns:
-            run_sync(self.load())
-            return self.__dict__[name]
-        return super().__getattr__(name)
 
 
 class ReflectModel(Model, EdgyBaseReflectModel):

@@ -1,5 +1,4 @@
-import copy
-from typing import Any, Type, cast
+from typing import Any
 
 from edgy.core.db.context_vars import get_tenant, set_tenant
 from edgy.core.db.querysets.base import QuerySet
@@ -35,19 +34,6 @@ class Manager:
         self.model_class = model_class
         self.inherit = inherit
         self.name = name
-
-    def __get__(self, instance: Any, owner: Any = None) -> Type["QuerySet"]:
-        if instance is not None:
-            if self.name in instance.__dict__:
-                return cast("Type[QuerySet]", instance.__dict__[self.name])
-            else:
-                copy_obj = copy.copy(self)
-                copy_obj.model_class = owner if owner else instance.__class__
-                instance.__dict__[self.name] = copy_obj
-        else:
-            copy_obj = copy.copy(self)
-            copy_obj.model_class = owner if owner else instance.__class__
-        return cast("Type[QuerySet]", copy_obj)
 
     def get_queryset(self) -> "QuerySet":
         """

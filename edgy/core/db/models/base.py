@@ -359,6 +359,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         return self.__class__.__name__.lower()
 
+    async def load(self) -> None:
+        raise NotImplementedError()
+
     def __setattr__(self, key: str, value: Any) -> None:
         fields_mapping = self.meta.fields_mapping
         field = fields_mapping.get(key, None)
@@ -372,6 +375,29 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                     edgy_setattr(self, k, v)
         else:
             edgy_setattr(self, key, value)
+
+    def __getattr__(self, name: str) -> Any:
+        """
+        Does following things
+        1. Initialize managers on access
+        2. Redirects get accesses to getter fields
+        3. Run an one off query to populate any foreign key making sure
+           it runs only once per foreign key avoiding multiple database calls.
+        """
+        manager = self.meta.managers.get(name)
+        if manager is not None:
+            if name not in self.__dict__:
+                self.__dict__[name] = copy.copy(manager)
+            return self.__dict__[name]
+
+        field = self.meta.fields_mapping.get(name)
+        if field is not None and hasattr(field, "__get__"):
+            # no need to set an descriptor object
+            return field.__get__(self, self.__class__)
+        if name not in self.__dict__ and field is not None and name not in self.pkcolumns:
+            run_sync(self.load())
+            return self.__dict__[name]
+        return super().__getattr__(name)
 
     def __get_instance_values(self, instance: Any) -> Set[Any]:
         fields = self.meta.fields_mapping
