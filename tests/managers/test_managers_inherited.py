@@ -38,6 +38,7 @@ class BaseModel(edgy.Model):
     query: ClassVar[Manager] = ObjectsManager()
     languages: ClassVar[Manager] = LanguageManager()
     ratings: ClassVar[Manager] = RatingManager()
+    non_inherited: ClassVar[Manager] = Manager(inherit=False)
 
     class Meta:
         registry = models
@@ -73,6 +74,8 @@ async def rollback_connections():
 
 
 async def test_inherited_base_model_managers():
+    assert "non_inherited" in BaseModel.meta.managers
+    assert "non_inherited" not in User.meta.managers
     await User.query.create(name="test", language="EN")
     await User.query.create(name="test2", language="EN")
     await User.query.create(name="test3", language="PT")

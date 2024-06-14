@@ -415,6 +415,7 @@ class BaseModelMeta(ModelMetaclass):
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any]) -> Any:
         fields: Dict[str, BaseField] = {}
         model_references: Dict[str, "ModelRef"] = {}
+        managers: Dict[str, Manager] = {}
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         base_annotations: Dict[str, Any] = {}
         has_explicit_primary_key = False
@@ -460,7 +461,7 @@ class BaseModelMeta(ModelMetaclass):
             elif isinstance(value, Manager):
                 value = copy.copy(value)
                 value.name = key
-                attrs[key] = value
+                managers[key] = value
 
         if not is_abstract:
             # the order is important because it reflects the inheritance order
@@ -507,7 +508,10 @@ class BaseModelMeta(ModelMetaclass):
         for field_name in fields:
             attrs.pop(field_name, None)
 
-        attrs["meta"] = meta = MetaInfo(meta_class, fields_mapping=fields, model_references=model_references, parents=parents)
+        for manager_name in managers:
+            attrs.pop(manager_name, None)
+
+        attrs["meta"] = meta = MetaInfo(meta_class, fields_mapping=fields, model_references=model_references, parents=parents, managers=managers)
         if is_abstract:
             meta.abstract = True
 
@@ -527,7 +531,6 @@ class BaseModelMeta(ModelMetaclass):
         # Handle annotations
         annotations: Dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
 
-        meta.managers = {k: v for k, v in attrs.items() if isinstance(v, Manager)}
         for k, _ in meta.managers.items():
             if annotations and k not in annotations:
                 raise ImproperlyConfigured(
@@ -691,6 +694,16 @@ class BaseModelMeta(ModelMetaclass):
         except AttributeError:
             pass
         cls._table = value
+
+    def __getattr__(cls, name: str) -> Any:
+        """
+        For controlling inheritance we cannot have manager descriptors, so fake them
+        """
+        manager = cls.meta.managers.get(name)
+        if manager is not None:
+            return manager
+        return super().__getattr__(name)
+
 
     @property
     def pkcolumns(cls) -> Sequence[str]:
