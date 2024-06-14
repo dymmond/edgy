@@ -23,7 +23,7 @@ class ConcreteExcludeField(BaseField):
             **kwargs,
         )
 
-    def clean(self, name: str, value: Any) -> Dict[str, Any]:
+    def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
         """remove any value from input"""
         return {}
 

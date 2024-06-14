@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 _empty_dict: Dict[str, Any] = {}
 _empty_set: FrozenSet[Any] = frozenset()
 
-class FieldToColumns(UserDict):
+class FieldToColumns(UserDict, Dict[str, Sequence["sqlalchemy.Column"]]):
     def __init__(self, meta: "MetaInfo"):
         self.meta = meta
         super().__init__()
@@ -56,6 +56,10 @@ class FieldToColumns(UserDict):
     def __setitem__(self, name: str, value: Any) -> None:
         raise Exception("Cannot set item here")
 
+    def __iter__(self) -> Any:
+        self.meta.columns_to_field.init()
+        return super().__iter__()
+
     def __contains__(self, key: str) -> bool:
         try:
             self[key]
@@ -64,7 +68,7 @@ class FieldToColumns(UserDict):
             return False
 
 
-class FieldToColumnNames(FieldToColumns):
+class FieldToColumnNames(FieldToColumns, Dict[str, FrozenSet[str]]):
     def __getitem__(self, name: str) -> FrozenSet[str]:
         if name in self.data:
             return cast(FrozenSet[str], self.data[name])
@@ -79,28 +83,28 @@ class ColumnsToField(UserDict, Dict[str, str]):
         self._init = False
         super().__init__()
 
-    def _lazy_init(self) -> None:
-        _columns_to_field: Dict[str, str] = {}
-        for field_name in self.meta.fields_mapping.keys():
-            # init structure
-            column_names = self.meta.field_to_column_names[field_name]
-            for column_name in column_names:
-                if column_name in _columns_to_field:
-                    raise ValueError(f"column collision: {column_name} between field {field_name} and {_columns_to_field[column_name]}")
-                _columns_to_field[column_name] = field_name
-        self.data.update(_columns_to_field)
+    def init(self) -> None:
+        if not self._init:
+            self._init = True
+            _columns_to_field: Dict[str, str] = {}
+            for field_name in self.meta.fields_mapping.keys():
+                # init structure
+                column_names = self.meta.field_to_column_names[field_name]
+                for column_name in column_names:
+                    if column_name in _columns_to_field:
+                        raise ValueError(f"column collision: {column_name} between field {field_name} and {_columns_to_field[column_name]}")
+                    _columns_to_field[column_name] = field_name
+            self.data.update(_columns_to_field)
 
     def __getitem__(self, name: str) -> str:
-        if not self._init:
-            self._lazy_init()
+        self.init()
         return cast(str, super().__getitem__(name))
 
     def __setitem__(self, name: str, value: Any) -> None:
         raise Exception("Cannot set item here")
 
     def __contains__(self, name: str) -> bool:
-        if not self._init:
-            self._lazy_init()
+        self.init()
         return super().__contains__(name)
 
 
@@ -336,7 +340,7 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
                 elif isinstance(value, Manager):
                     attrs[key] = value.__class__()
                 elif isinstance(value, BaseModelMeta):
-                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit)
+                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit, name=key, owner=value)
             elif attrs[key] is _occluded_sentinel:
                 # when occluded only include if inherit is True
                 if isinstance(value, BaseField) and value.inherit:
@@ -344,7 +348,7 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
                 elif isinstance(value, Manager) and value.inherit:
                     attrs[key] = value.__class__()
                 elif isinstance(value, BaseModelMeta) and value.meta.inherit:
-                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit)
+                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit, name=key, owner=value)
 
     else:
         # abstract classes
@@ -473,7 +477,7 @@ class BaseModelMeta(ModelMetaclass):
                         if sub_field_name in fields and fields[sub_field_name].owner is None:
                             raise ValueError(f"sub field name collision: {sub_field_name}")
                         # set as soon as possible the field_name
-                        sub_field.name = key
+                        sub_field.name = sub_field_name
                         if registry:
                             sub_field.registry = registry
                         if sub_field.primary_key:
@@ -491,7 +495,7 @@ class BaseModelMeta(ModelMetaclass):
                         )
                     else:
                         fields["id"] = edgy_fields.BigIntegerField(
-                            primary_key=True, autoincrement=True, inherit=False
+                            primary_key=True, autoincrement=True, inherit=False, name="id"
                         )  # type: ignore
                 if not isinstance(fields["id"], BaseField) or not fields["id"].primary_key:
                     raise ImproperlyConfigured(

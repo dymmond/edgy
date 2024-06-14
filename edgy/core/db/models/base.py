@@ -236,7 +236,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 if getattr(field_name, "exclude", False):
                     continue
             field: BaseField = self.meta.fields_mapping[field_name]
-            retval = field.__get__(self, self.__class__)
+            try:
+                retval = field.__get__(self, self.__class__)
+            except AttributeError:
+                continue
             sub_include = None
             if isinstance(include, dict):
                 sub_include = include.get(field_name, None)

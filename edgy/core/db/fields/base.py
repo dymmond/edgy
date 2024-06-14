@@ -121,7 +121,7 @@ class BaseField(FieldInfo):
         if self.primary_key:
             if self.autoincrement:
                 return False
-        return False if self.null else True
+        return False if self.null or self.server_default else True
 
     def get_alias(self) -> str:
         """
@@ -144,9 +144,10 @@ class BaseField(FieldInfo):
             return self.owner.meta.field_to_column_names[name]
         return self.owner.meta.field_to_column_names[self.name]
 
-    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool=False) -> Dict[str, Any]:
         """
-        Validates a value and transform it into columns which can be used for querying and saving
+        Validates a value and transform it into columns which can be used for querying and saving.
+        for_query: is used for querying. Should have all columns used for querying set.
         """
         return {}
 
@@ -172,7 +173,8 @@ class BaseField(FieldInfo):
 
     def embed_field(self, prefix: str, new_fieldname:str, owner: Optional[Union[Type["Model"], Type["ReflectModel"]]]=None, parent: Optional["BaseField"]=None) -> Optional["BaseField"]:
         """
-        Embed this field or return None to prevent embedding. Must return a copy when not returning None.
+        Embed this field or return None to prevent embedding.
+        Must return a copy with name and owner set when not returning None.
         """
         field_copy = copy.copy(self)
         field_copy.name = new_fieldname
@@ -183,6 +185,9 @@ class BaseField(FieldInfo):
         return self.constraints
 
     def get_global_constraints(self, name: str, columns: Sequence[sqlalchemy.Column]) -> Sequence[sqlalchemy.Constraint]:
+        """Return global constraints and indexes.
+        Useful for multicolumn fields
+        """
         return []
 
     def get_default_value(self) -> Any:
@@ -211,7 +216,7 @@ class Field(BaseField):
         """
         return value
 
-    def clean(self, name: str, value: Any) -> Dict[str, Any]:
+    def clean(self, name: str, value: Any, for_query: bool=False) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated. Multiple columns possible
         """
@@ -258,7 +263,7 @@ class BaseCompositeField(BaseField):
         # return untranslated names
         return self.get_composite_fields()
 
-    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool=False) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
@@ -268,18 +273,19 @@ class BaseCompositeField(BaseField):
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if translated_name not in value:
-                    if not field.is_required() or field.has_default():
+                    if field.has_default() or not field.is_required():
                         continue
                     raise ValueError(f"Missing key: {sub_name} for {field_name}")
-                result.update(field.clean(f"{prefix}{sub_name}", value[translated_name]))
+                result.update(field.clean(f"{prefix}{sub_name}", value[translated_name], for_query=for_query))
         else:
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if not hasattr(value, translated_name):
-                    if not field.is_required() or field.has_default():
-                        continue
+                    if not for_query:
+                        if field.has_default() or not field.is_required():
+                            continue
                     raise ValueError(f"Missing attribute: {translated_name} for {field_name}")
-                result.update(field.clean(f"{prefix}{sub_name}", getattr(value, translated_name)))
+                result.update(field.clean(f"{prefix}{sub_name}", getattr(value, translated_name), for_query=for_query))
         return result
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
@@ -303,15 +309,8 @@ class BaseCompositeField(BaseField):
         return result
 
     def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any]) -> Any:
-        cleaned_data_result = {}
-        for sub_field_name, field in self.composite_fields.items():
-            if not field.has_default():
-                continue
-            # here we don't need to translate, there is no inner object
-            for sub_field_name_new, default_value in field.get_default_values(sub_field_name, cleaned_data):
-                if sub_field_name_new not in cleaned_data and sub_field_name_new not in cleaned_data_result:
-                    cleaned_data_result[sub_field_name_new] = default_value
-        return cleaned_data_result
+        # fields should provide their own default which is used as long as they are in the fields_mapping
+        return {}
 
 
 
@@ -349,7 +348,7 @@ class PKField(BaseCompositeField):
     def embed_field(self, prefix: str, new_fieldname:str, owner: Optional[Union[Type["Model"], Type["ReflectModel"]]]=None, parent: Optional["BaseField"]=None) -> Optional[BaseField]:
         return None
 
-    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
         pknames = cast(Sequence[str], self.owner.pknames)
         pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
         prefix = _removesuffix(field_name, self.name)
@@ -361,19 +360,25 @@ class PKField(BaseCompositeField):
         ):
             pkname = pknames[0]
             field = self.owner.meta.fields_mapping[pkname]
-            return field.clean(f"{prefix}{pkname}", value)
-        retdict =  super().clean(field_name, value)
+            return field.clean(f"{prefix}{pkname}", value, for_query=for_query)
+        retdict =  super().clean(field_name, value, for_query=for_query)
         if self.is_incomplete:
             if isinstance(value, dict):
                 for column_name in self.fieldless_pkcolumns:
                     translated_name = self.translate_name(column_name)
-                    if translated_name in value:
-                        retdict[f"{prefix}{column_name}"] = value[translated_name]
+                    if translated_name not in value:
+                        if not for_query:
+                            continue
+                        raise ValueError(f"Missing key: {translated_name} for {field_name}")
+                    retdict[f"{prefix}{column_name}"] = value[translated_name]
             else:
                 for column_name in self.fieldless_pkcolumns:
                     translated_name = self.translate_name(column_name)
                     if not hasattr(value, translated_name):
-                        retdict[f"{prefix}{column_name}"] = getattr(value, translated_name)
+                        if not for_query:
+                            continue
+                        raise ValueError(f"Missing attribute: {translated_name} for {field_name}")
+                    retdict[f"{prefix}{column_name}"] = getattr(value, translated_name)
 
         return retdict
 

@@ -19,7 +19,6 @@ from pydantic import BaseModel
 from edgy.core.db.constants import ConditionalRedirect
 from edgy.core.db.fields.base import BaseCompositeField, BaseField
 from edgy.core.db.fields.core import FieldFactory
-from edgy.core.db.fields.exclude_field import ConcreteExcludeField
 from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
@@ -107,15 +106,18 @@ class ConcreteCompositeField(BaseCompositeField):
         for key in self.inner_field_names:
             translated_name = self.translate_name(key)
             field = instance.meta.fields_mapping.get(key)
-            if field and hasattr(field, "__get__"):
-                d[translated_name] = field.__get__(instance, owner)
-            else:
-                d[translated_name] = getattr(instance, key, None)
+            try:
+                if field and hasattr(field, "__get__"):
+                    d[translated_name] = field.__get__(instance, owner)
+                else:
+                    d[translated_name] = getattr(instance, key)
+            except AttributeError:
+                pass
         if self.model is not None and self.model is not ConditionalRedirect:
             return self.model(**d)
         return d
 
-    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool=False) -> Dict[str, Any]:
         assert len(self.inner_field_names) >= 1
         if (
             self.model is ConditionalRedirect
@@ -124,8 +126,8 @@ class ConcreteCompositeField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.meta.fields_mapping[self.inner_field_names[0]]
-            return field.clean(self.inner_field_names[0], value)
-        return super().clean(field_name, value)
+            return field.clean(self.inner_field_names[0], value, for_query=for_query)
+        return super().clean(field_name, value, for_query=for_query)
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         assert len(self.inner_field_names) >= 1
@@ -141,15 +143,19 @@ class ConcreteCompositeField(BaseCompositeField):
 
     def get_embedded_fields(self, name: str, fields_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
         retdict = {}
+        # owner is set: further down in hierarchy, or uninitialized embeddable, where the owner = model
+        # owner is not set: current class
+
         if not self.absorb_existing_fields:
-            duplicate_fields = set(self.embedded_field_defs.keys()).intersection(
-                {k for k, v in fields_mapping.items() if v.owner is None and not isinstance(v, ConcreteExcludeField)}  # type: ignore
-            )
-            if duplicate_fields:
-                raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
+            if self.owner is None:
+                duplicate_fields = set(self.embedded_field_defs.keys()).intersection(  # type: ignore
+                    {k for k, v in fields_mapping.items() if v.owner is None}
+                )
+                if duplicate_fields:
+                    raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
             for field_name, field in self.embedded_field_defs.items():
                 existing_field = fields_mapping.get(field_name, None)
-                if existing_field is not None and existing_field.owner is None and isinstance(existing_field, ConcreteExcludeField):  # type: ignore
+                if existing_field is not None and existing_field.owner is None and self.owner is not None:  # type: ignore
                     continue  # type: ignore
                 # now there should be no collisions anymore
                 cloned_field = copy.copy(field)
@@ -179,6 +185,9 @@ class ConcreteCompositeField(BaseCompositeField):
         return {field: self.owner.meta.fields_mapping[field] for field in self.inner_field_names}
 
     def is_required(self) -> bool:
+        return False
+
+    def has_default(self) -> bool:
         return False
 
 

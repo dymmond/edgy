@@ -60,9 +60,9 @@ def clean_query_kwargs(model: Type["Model"], kwargs: Dict[str, Any]) -> Dict[str
                     except KeyError:
                         model_class = model_class.meta.related_fields[part].related_from
         if field_name in model_class.meta.fields_mapping:
-            new_kwargs.update(model_class.meta.fields_mapping[field_name].clean(key, val))
+            new_kwargs.update(model_class.meta.fields_mapping[field_name].clean(key, val, for_query=True))
         elif field_name in model_class.meta.related_fields:
-            new_kwargs.update(model_class.meta.related_fields[field_name].clean(key, val))
+            new_kwargs.update(model_class.meta.related_fields[field_name].clean(key, val, for_query=True))
         else:
             new_kwargs[key] = val
     assert "pk" not in new_kwargs, "pk should be already parsed"

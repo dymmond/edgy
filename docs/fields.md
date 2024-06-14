@@ -205,7 +205,7 @@ the fields need the exclude attribute/parameter set
 * **model** - Default None (not set).Return a pydantic model instead of a dict
 * **prefix_embedded** - Default "". Prefix the field names of embedded fields (not references to external fields). Useful for implementing embeddables
 
-Note: embedded fields are shallowcopied. This way it is safe to provide the same inner_fields object to multiple CompositeFields.
+Note: embedded fields are shallow-copied. This way it is safe to provide the same inner_fields object to multiple CompositeFields.
 
 
 Note: there is a special parameter for model: `ConditionalRedirect`.

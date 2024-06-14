@@ -13,19 +13,23 @@ hide:
 - support ForeignKeys on multiple columns
 - allow selecting columns for ForeignKeys
 - allow skipping creating a ForeignKeyConstraint
+  - allow creating an Index instead
 - add ExcludeField for masking fields in submodels
 - ConditionalRedirect constant for CompositeField
 - Embeddables via CompositeField
 - add ForeignKeyFactory
 
+
 ### Changed
 
 - Breaking: Prefetch traversal of foreign keys uses now the foreign key name. For the traversal of RelatedFields everything stays the same.
 - ForeignKeys use now global constraints
+- Breaking: clean has now the info if it is cleaning for a query
 - pk is now a PKField (a variant of the BaseCompositeField)
 - clean and to_columns of BaseField do return empty objects instead of raising NotImplementedError
 - major refactory of ForeignKeys, move logic for single ForeignKeys to subclass
 - move FieldFactory to own file
+- make MetaInfo lazy
 
 ## 0.11.1
 

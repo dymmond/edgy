@@ -75,7 +75,7 @@ class BaseForeignKeyField(BaseForeignKey):
             return value
         return target.proxy_model(pk=value)
 
-    def clean(self, name: str, value: Any) -> Dict[str, Any]:
+    def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
         retdict: Dict[str, Any] = {}
         column_names = self.owner.meta.field_to_column_names[name]
         assert len(column_names) >= 1

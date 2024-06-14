@@ -85,8 +85,8 @@ class RelatedField:
         func = self.wrap_args(attr)
         return func
 
-    def clean(self, name: str, value: Any) -> Dict[str, Any]:
-        return self.related_to.meta.pk.clean("pk", value)  # type: ignore
+    def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
+        return self.related_to.meta.pk.clean("pk", value, for_query=for_query)  # type: ignore
 
     def wrap_args(self, func: Any) -> Any:
         @functools.wraps(func)
