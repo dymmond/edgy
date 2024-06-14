@@ -27,7 +27,6 @@ from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.base import BaseField, PKField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
-from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
@@ -215,7 +214,7 @@ class MetaInfo:
                 excluded_fields.add(key)
             if hasattr(field, "modify_input"):
                 input_modifying_fields.add(key)
-            if isinstance(field, (BaseForeignKeyField, BaseOneToOneKeyField)):
+            if isinstance(field, BaseForeignKeyField):
                 foreign_key_fields[key] = field
         self.special_getter_fields: FrozenSet[str] = frozenset(special_getter_fields)
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)

@@ -132,6 +132,20 @@ class BaseForeignKeyField(BaseForeignKey):
             return fk_name
         return fk_name[:FK_CHAR_LIMIT]
 
+    def get_fkindex_name(self, name: str) -> str:
+        """
+        Builds the fk name for the engine.
+
+        Engines have a limitation of the foreign key being bigger than 63
+        characters.
+
+        if that happens, we need to assure it is small.
+        """
+        fk_name = f"fkindex_{self.owner.meta.tablename}_{self.target.meta.tablename}_{name}"
+        if not len(fk_name) > FK_CHAR_LIMIT:
+            return fk_name
+        return fk_name[:FK_CHAR_LIMIT]
+
     def get_fk_field_name(self, name: str, fieldname: str) -> str:
         if len(self.related_columns) == 1:
             return name
@@ -174,10 +188,11 @@ class BaseForeignKeyField(BaseForeignKey):
                     name=self.get_fk_name(name),
                 ),
             )
-        if self.index and not self.add_constraint:
+        # set for unique, or if no_constraint was set and index is True
+        if self.unique or (self.index and self.no_constraint):
             constraints.append(
                 sqlalchemy.Index(
-                    columns,
+                    self.get_fkindex_name(name), *columns, unique=self.unique
                 ),
             )
 
