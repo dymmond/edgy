@@ -1,17 +1,16 @@
 import typing
 from inspect import isclass
-from typing import TYPE_CHECKING, Sequence, TypeVar
+from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import get_origin
 
 import edgy
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
-from edgy.core.db.fields.core import ForeignKeyFieldFactory
+from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.terminal import Print
 from edgy.exceptions import ModelReferenceError
 
 if TYPE_CHECKING:
-    from sqlalchemy import Column
 
     from edgy import Model
     from edgy.core.db.models.model_reference import ModelRef
@@ -23,8 +22,7 @@ terminal = Print()
 
 
 class BaseRefForeignKeyField(BaseForeignKey):
-    def get_columns(self, name: str) -> Sequence["Column"]:
-        return []
+    pass
 
 
 class RefForeignKey(ForeignKeyFieldFactory, list):

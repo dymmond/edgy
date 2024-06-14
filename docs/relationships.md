@@ -164,3 +164,15 @@ Now creating another `Profile` with the same user will fail and raise an excepti
 ```
 await Profile.query.create(user=user)
 ```
+
+
+## Limitations
+
+We cannot cross the database with a query, yet.
+This means you can not join a MySQL table with a PostgreSQL table.
+
+How can this be implemented?
+
+Of course joins are not possible. The idea is to execute a query on the child database and then check which foreign key values match.
+
+Of course the ForeignKey has no constraint and if the data vanish it points to nowhere

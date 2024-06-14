@@ -9,16 +9,35 @@ hide:
 
 ### Added
 
-- allow multiple ForeignKeys with the same related_name in one model
-- add ExcludeField for masking fields in submodels
-- add R
+- Allow multiple ForeignKeys with the same related_name in one model
+- Support ForeignKeys on multiple columns
+- Allow selecting columns for ForeignKeys
+- Allow skipping creating a ForeignKeyConstraint
+  - Allow creating an Index instead
+- Add ExcludeField for masking fields in submodels
+- ConditionalRedirect constant for CompositeField
+- Embeddables via CompositeField
+- Add ForeignKeyFactory
+- Multiple primary keys and names different from "id" are possible now
+- Add inherit flag for Manager, BaseFields and Models (when used as an embeddable)
+
+- Some new methods on BaseField:
+  - embed_field: for controlling embedding a field in an CompositeField
+  - get_column_names: helper function for retrieving the column names of a field
+
 
 ### Changed
 
 - Breaking: Prefetch traversal of foreign keys uses now the foreign key name. For the traversal of RelatedFields everything stays the same.
-- ForeignKeys use now global constraints
-- pk is now a CompositeField (work for multiple primary keys in one model is on the way)
-- ConditionalRedirect constant for CompositeField
+- ForeignKeys use now global constraints and indexes
+- Breaking: clean has now the argument to_query
+- pk is now a PKField (a variant of the BaseCompositeField)
+- clean and to_columns of BaseField do return empty objects instead of raising NotImplementedError
+- Major refactory of ForeignKeys, move logic for single ForeignKeys to subclass
+- Move FieldFactory to own file
+- Make MetaInfo lazy
+- Remove superfluous BaseOneToOneKeyField. Merged into BaseForeignKeyField.
+- remove unused attributes of MetaInfo and added some lazy evaluations for fields
 
 ## 0.11.1
 

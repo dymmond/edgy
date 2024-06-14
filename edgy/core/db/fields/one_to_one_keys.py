@@ -1,44 +1,32 @@
-from typing import TYPE_CHECKING, Any, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
-import sqlalchemy
-
-from edgy.core.db.fields.base import BaseField, BaseForeignKey
-from edgy.core.db.fields.core import ForeignKeyFieldFactory
+from edgy.core.db.fields.foreign_keys import ForeignKey
 from edgy.core.terminal import Print
 
 if TYPE_CHECKING:
     from edgy import Model
+    from edgy.core.db.fields.base import BaseField
 
 T = TypeVar("T", bound="Model")
 
 terminal = Print()
 
-
-class BaseOneToOneKeyField(BaseForeignKey):
-    def get_global_constraints(
-        self, name: str, columns: Sequence[sqlalchemy.Column]
-    ) -> Sequence[sqlalchemy.Constraint]:
-        return [
-            *super().get_global_constraints(name, columns),
-            sqlalchemy.UniqueConstraint(*columns),
-        ]
-
-
-class OneToOneField(ForeignKeyFieldFactory):
+class OneToOneField(ForeignKey):
     """
     Representation of a one to one field.
     """
 
-    _bases = (BaseOneToOneKeyField,)
-
-    _type: Any = Any
-
     def __new__(  # type: ignore
         cls,
-        to: "Model",
+        to: Union["Model", str],
         **kwargs: Any,
-    ) -> BaseField:
-        return super().__new__(cls, to=to, **kwargs)
+    ) -> "BaseField":
+        for argument in ["index", "unique"]:
+            if argument in kwargs:
+                terminal.write_warning(f"Declaring {argument} on a OneToOneField has no effect.")
+        kwargs["index"] = False
+        kwargs["unique"] = True
 
+        return super().__new__(cls, to=to, **kwargs)
 
 OneToOne = OneToOneField

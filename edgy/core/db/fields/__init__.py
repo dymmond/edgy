@@ -1,3 +1,4 @@
+from .composite_field import CompositeField
 from .core import (
     AutoNowMixin,
     BaseField,
@@ -6,12 +7,10 @@ from .core import (
     BooleanField,
     CharField,
     ChoiceField,
-    CompositeField,
     DateField,
     DateTimeField,
     DecimalField,
     EmailField,
-    ExcludeField,
     FloatField,
     IntegerField,
     IPAddressField,
@@ -23,6 +22,7 @@ from .core import (
     URLField,
     UUIDField,
 )
+from .exclude_field import ExcludeField
 from .foreign_keys import ForeignKey
 from .many_to_many import ManyToMany, ManyToManyField
 from .one_to_one_keys import OneToOne, OneToOneField

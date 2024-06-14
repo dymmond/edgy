@@ -27,7 +27,6 @@ from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.base import BaseField, PKField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
-from edgy.core.db.fields.one_to_one_keys import BaseOneToOneKeyField
 from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
@@ -41,7 +40,7 @@ if TYPE_CHECKING:
 _empty_dict: Dict[str, Any] = {}
 _empty_set: FrozenSet[Any] = frozenset()
 
-class FieldToColumns(UserDict):
+class FieldToColumns(UserDict, Dict[str, Sequence["sqlalchemy.Column"]]):
     def __init__(self, meta: "MetaInfo"):
         self.meta = meta
         super().__init__()
@@ -53,6 +52,13 @@ class FieldToColumns(UserDict):
         result = self.data[name] = field.get_columns(name)
         return result
 
+    def __setitem__(self, name: str, value: Any) -> None:
+        raise Exception("Cannot set item here")
+
+    def __iter__(self) -> Any:
+        self.meta.columns_to_field.init()
+        return super().__iter__()
+
     def __contains__(self, key: str) -> bool:
         try:
             self[key]
@@ -61,19 +67,60 @@ class FieldToColumns(UserDict):
             return False
 
 
+class FieldToColumnNames(FieldToColumns, Dict[str, FrozenSet[str]]):
+    def __getitem__(self, name: str) -> FrozenSet[str]:
+        if name in self.data:
+            return cast(FrozenSet[str], self.data[name])
+        column_names = frozenset(column.name for column in self.meta.field_to_columns[name])
+        result = self.data[name] = column_names
+        return result
+
+
+class ColumnsToField(UserDict, Dict[str, str]):
+    def __init__(self, meta: "MetaInfo"):
+        self.meta = meta
+        self._init = False
+        super().__init__()
+
+    def init(self) -> None:
+        if not self._init:
+            self._init = True
+            _columns_to_field: Dict[str, str] = {}
+            for field_name in self.meta.fields_mapping.keys():
+                # init structure
+                column_names = self.meta.field_to_column_names[field_name]
+                for column_name in column_names:
+                    if column_name in _columns_to_field:
+                        raise ValueError(f"column collision: {column_name} between field {field_name} and {_columns_to_field[column_name]}")
+                    _columns_to_field[column_name] = field_name
+            self.data.update(_columns_to_field)
+
+    def __getitem__(self, name: str) -> str:
+        self.init()
+        return cast(str, super().__getitem__(name))
+
+    def __setitem__(self, name: str, value: Any) -> None:
+        raise Exception("Cannot set item here")
+
+    def __contains__(self, name: str) -> bool:
+        self.init()
+        return super().__contains__(name)
+
+
 _trigger_attributes_MetaInfo = {
     "field_to_columns",
+    "field_to_column_names",
     "foreign_key_fields",
+    "columns_to_field",
     "special_getter_fields",
     "input_modifying_fields",
     "excluded_fields",
-    "_columns_to_field",
-    "columns_to_field",
 }
 
 class MetaInfo:
     __slots__ = (
         "abstract",
+        "inherit",
         "fields_mapping",
         "registry",
         "tablename",
@@ -89,23 +136,28 @@ class MetaInfo:
         "input_modifying_fields",
         "foreign_key_fields",
         "field_to_columns",
-        "_columns_to_field",
+        "field_to_column_names",
+        "columns_to_field",
         "special_getter_fields",
         "excluded_fields",
         "_is_init"
     )
     _include_dump = (*filter(lambda x: x not in {
         "field_to_columns",
-        "_columns_to_field",
+        "field_to_column_names",
+        "columns_to_field",
         "_is_init"
     }, __slots__), "pk", "is_multi")
 
     field_to_columns: FieldToColumns
-    _columns_to_field: Optional[Dict[str, str]]
+    field_to_column_names: FieldToColumnNames
+    columns_to_field: Dict[str, str]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self._is_init = False
         self.abstract: bool = getattr(meta, "abstract", False)
+        # for embedding
+        self.inherit: bool = getattr(meta, "inherit", True)
         self.registry: Optional[Registry] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.unique_together: Any = getattr(meta, "unique_together", None)
@@ -119,7 +171,6 @@ class MetaInfo:
         self.multi_related: List[str] =  [*getattr(meta, "multi_related", _empty_set)]
         self.related_fields: Dict[str, RelatedField] = {**getattr(meta, "related_fields", _empty_dict)}
         self.model: Optional[Type["Model"]] = None
-        self.delete_fields_columns_mappings()
         self.load_dict(kwargs)
 
     @property
@@ -143,7 +194,7 @@ class MetaInfo:
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
         if name == "fields_mapping":
-            self._is_init = False
+            self.invalidate()
 
     def __getattribute__(self, name: str) -> Any:
         # lazy execute
@@ -152,7 +203,6 @@ class MetaInfo:
         return super().__getattribute__(name)
 
     def init_fields_mapping(self) -> None:
-        self.delete_fields_columns_mappings()
         special_getter_fields = set()
         excluded_fields = set()
         input_modifying_fields = set()
@@ -164,35 +214,19 @@ class MetaInfo:
                 excluded_fields.add(key)
             if hasattr(field, "modify_input"):
                 input_modifying_fields.add(key)
-            if isinstance(field, (BaseForeignKeyField, BaseOneToOneKeyField)):
+            if isinstance(field, BaseForeignKeyField):
                 foreign_key_fields[key] = field
         self.special_getter_fields: FrozenSet[str] = frozenset(special_getter_fields)
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
         self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
         self.foreign_key_fields: Dict[str, BaseField] = foreign_key_fields
-
-    def build_columns_field_mappings(self) -> None:
-        _columns_to_field: Dict[str, str] = {}
-        for field_name in self.fields_mapping.keys():
-            # init structure
-            columns = self.field_to_columns[field_name]
-            for column in columns:
-                if column.key in _columns_to_field:
-                    raise ValueError(f"column collision: {column.key} between field {field_name} and {_columns_to_field[column.key]}")
-                _columns_to_field[column.key] = field_name
-        self._columns_to_field = _columns_to_field
-
-    def delete_fields_columns_mappings(self) -> None:
         self.field_to_columns = FieldToColumns(self)
-        self._columns_to_field = None
+        self.field_to_column_names = FieldToColumnNames(self)
+        self.columns_to_field = ColumnsToField(self)
+        self._is_init = True
 
-    @property
-    def columns_to_field(self) -> Dict[str, str]:
-        if self._columns_to_field is None:
-            self.build_fields_columns_mappings()
-        return cast(Dict[str, str], self._columns_to_field)
-
-    columns_to_field.deleter(delete_fields_columns_mappings)
+    def invalidate(self) -> None:
+        self._is_init = False
 
     def get_columns_for_name(self, name: str) -> Sequence["sqlalchemy.Column"]:
         if name in self.field_to_columns:
@@ -294,6 +328,7 @@ def handle_annotations(
 _occluded_sentinel = object()
 
 def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
+    from edgy.core.db.fields.composite_field import CompositeField
     meta: Union[MetaInfo, None] = getattr(base, "meta", None)
     if not meta:
         # Mixins and other classes
@@ -306,12 +341,17 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
                     attrs[key] = value
                 elif isinstance(value, Manager):
                     attrs[key] = value.__class__()
+                elif isinstance(value, BaseModelMeta):
+                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit, name=key, owner=value)
             elif attrs[key] is _occluded_sentinel:
                 # when occluded only include if inherit is True
                 if isinstance(value, BaseField) and value.inherit:
                     attrs[key] = value
                 elif isinstance(value, Manager) and value.inherit:
                     attrs[key] = value.__class__()
+                elif isinstance(value, BaseModelMeta) and value.meta.inherit:
+                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit, name=key, owner=value)
+
     else:
         # abstract classes
         for key, value in meta.fields_mapping.items():
@@ -350,11 +390,21 @@ def extract_fields_and_managers(bases: Sequence[Type], attrs: Optional[Dict[str,
 
     Note: managers and fields with inherit=False are still extracted from mixins as long there is no intermediate model
     """
+
+    from edgy.core.db.fields.composite_field import CompositeField
     attrs = {} if attrs is None else {**attrs}
+    # order is important
+    for key in list(attrs.keys()):
+        value = attrs[key]
+        if isinstance(value, BaseModelMeta):
+            value = attrs[key]
+            attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit, owner=value)
     for base in bases:
         _extract_fields_and_managers(base, attrs)
+    # now remove sentinels
     for key in list(attrs.keys()):
-        if attrs[key] is _occluded_sentinel:
+        value = attrs[key]
+        if value is _occluded_sentinel:
             attrs.pop(key)
     return attrs
 
@@ -429,7 +479,7 @@ class BaseModelMeta(ModelMetaclass):
                         if sub_field_name in fields and fields[sub_field_name].owner is None:
                             raise ValueError(f"sub field name collision: {sub_field_name}")
                         # set as soon as possible the field_name
-                        sub_field.name = key
+                        sub_field.name = sub_field_name
                         if registry:
                             sub_field.registry = registry
                         if sub_field.primary_key:
@@ -447,7 +497,7 @@ class BaseModelMeta(ModelMetaclass):
                         )
                     else:
                         fields["id"] = edgy_fields.BigIntegerField(
-                            primary_key=True, autoincrement=True, inherit=False
+                            primary_key=True, autoincrement=True, inherit=False, name="id"
                         )  # type: ignore
                 if not isinstance(fields["id"], BaseField) or not fields["id"].primary_key:
                     raise ImproperlyConfigured(
@@ -495,6 +545,7 @@ class BaseModelMeta(ModelMetaclass):
             return model_class(cls, name, bases, attrs)
 
         new_class = cast("Type[Model]", model_class(cls, name, bases, attrs))
+        new_class.fields = fields
 
         # Update the model_fields are updated to the latest
         new_class.model_fields = {**new_class.model_fields, **model_fields}
@@ -575,7 +626,6 @@ class BaseModelMeta(ModelMetaclass):
                 registry.models[name] = new_class
 
         new_class.__db_model__ = True
-        new_class.fields = fields
         meta.model = new_class
 
         # Sets the foreign key fields

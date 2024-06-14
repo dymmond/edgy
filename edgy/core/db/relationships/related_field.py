@@ -44,6 +44,10 @@ class RelatedField:
     def foreign_key(self) -> BaseForeignKeyField:
         return cast(BaseForeignKeyField, self.related_from.meta.fields_mapping[self.foreign_key_name])
 
+    @property
+    def is_cross_db(self) -> bool:
+        return self.foreign_key.is_cross_db
+
     def m2m_related(self) -> Any:
         """
         Guarantees the the m2m filter is done by the owner of the call
@@ -81,8 +85,8 @@ class RelatedField:
         func = self.wrap_args(attr)
         return func
 
-    def clean(self, name: str, value: Any) -> Dict[str, Any]:
-        return self.related_to.meta.pk.clean(name, value)  # type: ignore
+    def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
+        return self.related_to.meta.pk.clean("pk", value, for_query=for_query)  # type: ignore
 
     def wrap_args(self, func: Any) -> Any:
         @functools.wraps(func)

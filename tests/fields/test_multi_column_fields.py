@@ -45,7 +45,7 @@ class MultiColumnFieldInner(BaseField):
             ),
         ]
 
-    def clean(self, field_name: str, value: Any) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
