@@ -559,7 +559,7 @@ class BaseModelMeta(ModelMetaclass):
             value.owner = new_class
         # set the model_class of managers
         for value in meta.managers.values():
-            value.model_class = new_class
+            value.owner = new_class
 
 
         # Validate meta for uniques and indexes
