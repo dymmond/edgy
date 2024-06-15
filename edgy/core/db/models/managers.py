@@ -30,10 +30,11 @@ class Manager:
     ```
     """
 
-    def __init__(self, model_class: Any = None, inherit: bool=True, name: str = ""):
+    def __init__(self, model_class: Any = None, inherit: bool=True, name: str = "", instance: Any=None):
         self.model_class = model_class
         self.inherit = inherit
         self.name = name
+        self.instance = instance
 
     def get_queryset(self) -> "QuerySet":
         """

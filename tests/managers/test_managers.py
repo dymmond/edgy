@@ -57,9 +57,12 @@ async def rollback_connections():
 
 async def test_model_crud():
     users = await User.query.all()
+    assert User.query.instance is None
     assert users == []
 
     user = await User.query.create(name="Test")
+    assert User.query.instance is None
+    assert user.query.instance is user
     users = await User.query.all()
     assert user.name == "Test"
     assert user.pk is not None
