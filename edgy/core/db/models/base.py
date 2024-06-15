@@ -387,7 +387,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         manager = self.meta.managers.get(name)
         if manager is not None:
             if name not in self.__dict__:
-                self.__dict__[name] = copy.copy(manager)
+                manager = copy.copy(manager)
+                manager.instance = self
+                self.__dict__[name] = manager
             return self.__dict__[name]
 
         field = self.meta.fields_mapping.get(name)
