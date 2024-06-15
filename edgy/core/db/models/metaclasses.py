@@ -28,7 +28,7 @@ from edgy.core.db.fields.base import BaseField, PKField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
-from edgy.core.db.models.managers import Manager
+from edgy.core.db.models.managers import BaseManager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_and_defaults
@@ -167,7 +167,7 @@ class MetaInfo:
         self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
         self.fields_mapping: Dict[str, BaseField] = {**getattr(meta, "fields_mapping", _empty_dict)}
         self.model_references: Dict[str, "ModelRef"] = {**getattr(meta, "model_references", _empty_dict)}
-        self.managers: Dict[str, Manager] = {**getattr(meta, "managers", _empty_dict)}
+        self.managers: Dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
         self.multi_related: List[str] =  [*getattr(meta, "multi_related", _empty_set)]
         self.related_fields: Dict[str, RelatedField] = {**getattr(meta, "related_fields", _empty_dict)}
         self.model: Optional[Type["Model"]] = None
@@ -332,14 +332,14 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
     meta: Union[MetaInfo, None] = getattr(base, "meta", None)
     if not meta:
         # Mixins and other classes
-        # Note: from mixins BaseFields and Managers are imported despite inherit=False until a model in the
+        # Note: from mixins BaseFields and BaseManagers are imported despite inherit=False until a model in the
         # hierarchy uses them
         # Here is _occluded_sentinel not overwritten
         for key, value in inspect.getmembers(base):
             if key not in attrs:
                 if isinstance(value, BaseField):
                     attrs[key] = value
-                elif isinstance(value, Manager):
+                elif isinstance(value, BaseManager):
                     attrs[key] = value.__class__()
                 elif isinstance(value, BaseModelMeta):
                     attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit, name=key, owner=value)
@@ -347,7 +347,7 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
                 # when occluded only include if inherit is True
                 if isinstance(value, BaseField) and value.inherit:
                     attrs[key] = value
-                elif isinstance(value, Manager) and value.inherit:
+                elif isinstance(value, BaseManager) and value.inherit:
                     attrs[key] = value.__class__()
                 elif isinstance(value, BaseModelMeta) and value.meta.inherit:
                     attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit, name=key, owner=value)
@@ -415,7 +415,7 @@ class BaseModelMeta(ModelMetaclass):
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any]) -> Any:
         fields: Dict[str, BaseField] = {}
         model_references: Dict[str, "ModelRef"] = {}
-        managers: Dict[str, Manager] = {}
+        managers: Dict[str, BaseManager] = {}
         meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
         base_annotations: Dict[str, Any] = {}
         has_explicit_primary_key = False
@@ -458,7 +458,7 @@ class BaseModelMeta(ModelMetaclass):
                     model_references[key] = value.to
                 else:
                     fields[key] = value
-            elif isinstance(value, Manager):
+            elif isinstance(value, BaseManager):
                 value = copy.copy(value)
                 value.name = key
                 managers[key] = value

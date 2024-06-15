@@ -4,7 +4,15 @@ from edgy.core.db.context_vars import get_tenant, set_tenant
 from edgy.core.db.querysets.base import QuerySet
 
 
-class Manager:
+class BaseManager:
+    def __init__(self, model_class: Any = None, inherit: bool=True, name: str = "", instance: Any=None):
+        self.model_class = model_class
+        self.inherit = inherit
+        self.name = name
+        self.instance = instance
+
+
+class Manager(BaseManager):
     """
     Base Manager for the Edgy Models.
     To create a custom manager, the best approach is to inherit from the ModelManager.
@@ -29,12 +37,6 @@ class Manager:
         ...
     ```
     """
-
-    def __init__(self, model_class: Any = None, inherit: bool=True, name: str = "", instance: Any=None):
-        self.model_class = model_class
-        self.inherit = inherit
-        self.name = name
-        self.instance = instance
 
     def get_queryset(self) -> "QuerySet":
         """
