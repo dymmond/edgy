@@ -73,7 +73,19 @@ class BaseForeignKeyField(BaseForeignKey):
 
         if isinstance(value, (target, target.proxy_model)):
             return value
-        return target.proxy_model(pk=value)
+        if len(self.related_columns) == 1 and not isinstance(value, (dict, BaseModel)):
+            value = {next(iter(self.related_columns.keys())): value}
+        if isinstance(value, dict):
+            for key in self.related_columns.keys():
+                if value.get(key) is None:
+                    return None
+        else:
+            for key in self.related_columns.keys():
+                if getattr(value, key, None) is None:
+                    return None
+        instance = target.proxy_model(**value)
+        instance.identifying_columns = self.related_columns.keys()
+        return instance
 
     def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
         retdict: Dict[str, Any] = {}

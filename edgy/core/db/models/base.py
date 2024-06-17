@@ -5,6 +5,7 @@ from typing import (
     Any,
     ClassVar,
     Dict,
+    Iterable,
     List,
     Literal,
     Optional,
@@ -23,7 +24,7 @@ from typing_extensions import Self
 
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models._internal import DescriptiveMeta
-from edgy.core.db.models.managers import Manager
+from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
 from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
@@ -50,7 +51,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     is_proxy_model: ClassVar[bool] = False
 
     query: ClassVar[Manager] = Manager()
-    query_related: ClassVar[Optional[Manager]] = None
+    query_related: ClassVar[RedirectManager] = RedirectManager(redirect_name="query")
     meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True)
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
@@ -61,10 +62,11 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     __show_pk__: ClassVar[bool] = False
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.__show_pk__ = kwargs.pop("__show_pk__", False)
+        __show_pk__ = kwargs.pop("__show_pk__", False)
         kwargs = self.transform_input(kwargs, phase="creation")
         super().__init__(**kwargs)
         self.__dict__ = self.setup_model_from_kwargs(kwargs)
+        self.__show_pk__ = __show_pk__
 
     @classmethod
     def transform_input(cls, kwargs: Any, phase: str) -> Any:
@@ -118,6 +120,18 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return self.__class__.proxy_model
 
     @cached_property
+    def identifying_columns(self) -> Any:
+        """The columns used for loading, can be set per instance defaults to pknames"""
+        return self.pkcolumns
+
+    @property
+    def can_load(self) -> bool:
+        for column in self.identifying_columns:
+            if self.__dict__.get(column) is None:
+                return False
+        return True
+
+    @cached_property
     def signals(self) -> "Broadcaster":
         return self.__class__.signals  # type: ignore
 
@@ -166,6 +180,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             return (table.columns[name],)
         else:
             return cast(Sequence["sqlalchemy.Column"], _empty)
+
+    def identifying_clauses(self) -> Iterable[Any]:
+        for column in self.identifying_columns:
+            yield getattr(self.table.columns, column) == self.__dict__[column]
 
     @classmethod
     def generate_proxy_model(cls) -> Type["Model"]:
@@ -396,23 +414,21 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         if field is not None and hasattr(field, "__get__"):
             # no need to set an descriptor object
             return field.__get__(self, self.__class__)
-        if name not in self.__dict__ and field is not None and name not in self.pkcolumns:
+        if name not in self.__dict__ and field is not None and name not in self.identifying_columns and self.can_load:
             run_sync(self.load())
             return self.__dict__[name]
         return super().__getattr__(name)
 
-    def __get_instance_values(self, instance: Any) -> Set[Any]:
-        fields = self.meta.fields_mapping
-        return {v for k, v in instance.__dict__.items() if k in fields and v is not None}
-
     def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:
             return False
-
-        original = self.__get_instance_values(instance=self)
-        other_values = self.__get_instance_values(instance=other)
-        if original != other_values:
+        if self.meta != other.meta:
             return False
+        for field in self.meta.fields_mapping.values():
+            # this fixes issues with meta fields, without columns
+            for column_name in field.get_column_names():
+                if self.__dict__.get(column_name, None) != other.__dict__.get(column_name, None):
+                    return False
         return True
 
 

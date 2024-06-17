@@ -345,6 +345,14 @@ class PKField(BaseCompositeField):
             d[translated_name] = getattr(instance, key, None)
         return d
 
+    def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
+        if name not in kwargs:
+            return
+        # check for collisions
+        for pkname in self.owner.pknames:
+            if pkname in kwargs:
+                raise ValueError("Cannot specify a primary key field and the primary key itself")
+
     def embed_field(self, prefix: str, new_fieldname:str, owner: Optional[Union[Type["Model"], Type["ReflectModel"]]]=None, parent: Optional["BaseField"]=None) -> Optional[BaseField]:
         return None
 

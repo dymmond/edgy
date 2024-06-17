@@ -3,7 +3,6 @@ from typing import Any, Dict, Set, Type, Union
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
-from edgy.core.db.models.utils import pk_from_model_to_clauses, pk_to_dict
 from edgy.exceptions import ObjectNotFound, RelationshipNotFound
 
 
@@ -50,7 +49,7 @@ class Model(ModelRow, DeclarativeMixin):
         # empty updates shouldn't cause an error
         if kwargs:
             kwargs = self._update_auto_now_fields(kwargs, self.fields)
-            expression = self.table.update().values(**kwargs).where(*pk_from_model_to_clauses(self))
+            expression = self.table.update().values(**kwargs).where(*self.identifying_clauses())
             await self.database.execute(expression)
         await self.signals.post_update.send_async(self.__class__, instance=self)
 
@@ -63,7 +62,7 @@ class Model(ModelRow, DeclarativeMixin):
         """Delete operation from the database"""
         await self.signals.pre_delete.send_async(self.__class__, instance=self)
 
-        expression = self.table.delete().where(*pk_from_model_to_clauses(self))
+        expression = self.table.delete().where(*self.identifying_clauses())
         await self.database.execute(expression)
 
         await self.signals.post_delete.send_async(self.__class__, instance=self)
@@ -71,7 +70,7 @@ class Model(ModelRow, DeclarativeMixin):
     async def load(self) -> None:
         # Build the select expression.
 
-        expression = self.table.select().where(*pk_from_model_to_clauses(self))
+        expression = self.table.select().where(*self.identifying_clauses())
 
         # Perform the fetch.
         row = await self.database.fetch_one(expression)
@@ -87,8 +86,6 @@ class Model(ModelRow, DeclarativeMixin):
         """
         expression = self.table.insert().values(**kwargs)
         autoincrement_value = await self.database.execute(expression)
-        pk_dict = pk_to_dict(self, kwargs, is_partial=True)
-        self.__dict__.update(pk_dict)
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
             column = self.table.autoincrement_column

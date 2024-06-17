@@ -2,10 +2,10 @@ import functools
 from typing import TYPE_CHECKING, Any, Dict, Optional, Type, Union, cast
 
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
-from edgy.core.db.models.utils import pk_from_model
 
 if TYPE_CHECKING:
-    from edgy import Manager, Model, QuerySet, ReflectModel
+    from edgy import Model, QuerySet, ReflectModel
+    from edgy.core.db.models.managers import BaseManager
 
 
 class RelatedField:
@@ -29,12 +29,9 @@ class RelatedField:
         self.instance = instance
 
     @functools.cached_property
-    def manager(self) -> "Manager":
+    def manager(self) -> "BaseManager":
         """Returns the manager class"""
-        manager: Optional["Manager"] = getattr(self.related_from, "query_related", None)
-        if manager is None:
-            manager = self.related_from.query
-        return manager
+        return self.related_from.meta.managers["query_related"]
 
     @functools.cached_property
     def queryset(self) -> "QuerySet":
@@ -93,7 +90,11 @@ class RelatedField:
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             # invert, so use the foreign_key_name
             # will be parsed later
-            kwargs[self.foreign_key_name] = pk_from_model(self.instance, always_dict=True)
+            query: Dict[str, Any] = {}
+            for column_name in self.foreign_key.get_column_names():
+                related_name = self.foreign_key.from_fk_field_name(self.foreign_key_name, column_name)
+                query[related_name] = getattr(self.instance, related_name)
+            kwargs[self.foreign_key_name] =  query
 
             related = self.m2m_related()
             if related:

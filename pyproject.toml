@@ -191,7 +191,7 @@ module = "docs_src.*"
 ignore_errors = true
 
 [tool.pytest.ini_options]
-addopts = ["--strict-config", "--strict-markers"]
+addopts = ["--strict-config", "--strict-markers", "--pdbcls=IPython.terminal.debugger:Pdb"]
 xfail_strict = true
 junit_family = "xunit2"
 
