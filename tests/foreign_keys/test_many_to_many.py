@@ -148,7 +148,7 @@ async def test_raises_RelationshipIncompatible():
     with pytest.raises(RelationshipIncompatible) as raised:
         await album.tracks.add(user)
 
-    assert raised.value.args[0] == "The child is not from the type 'Track'."
+    assert raised.value.args[0] == "The child is not from the types 'Track', 'AlbumTrack'."
 
 
 async def test_raises_RelationshipNotFound():

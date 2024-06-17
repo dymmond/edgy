@@ -278,7 +278,7 @@ def _set_related_name_for_foreign_keys(
         if not default_related_name:
             default_related_name = f"{model_class.__name__.lower()}s_set"
 
-        elif hasattr(foreign_key.target, default_related_name):
+        elif default_related_name in foreign_key.target.meta.fields_mapping:
             raise ForeignKeyBadConfigured(
                 f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
             )
@@ -286,14 +286,15 @@ def _set_related_name_for_foreign_keys(
 
         related_field = RelatedField(
             foreign_key_name=name,
-            related_name=default_related_name,
-            related_to=foreign_key.target,
+            name=default_related_name,
+            owner=foreign_key.target,
             related_from=model_class,
+            embed_parent=foreign_key.embed_parent,
         )
 
         # Set the related name
         target = foreign_key.target
-        setattr(target, default_related_name, related_field)
+        target.meta.fields_mapping[default_related_name] = related_field
         target.meta.related_fields[default_related_name] = related_field
 
 
@@ -617,7 +618,7 @@ class BaseModelMeta(ModelMetaclass):
                     if not isinstance(value, Index):
                         raise ValueError("Meta.indexes must be a list of Index types.")
 
-        for value in fields.values():
+        for value in list(fields.values()):
             if isinstance(value, BaseManyToManyForeignKeyField):
                 value.create_through_model()
 

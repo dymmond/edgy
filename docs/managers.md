@@ -47,7 +47,7 @@ an explicit `query_related` manager.
 {!> ../docs_src/models/managers/override.py !}
 ```
 
-Now with only overwritting the related manager:
+Now with only overwriting the related manager:
 
 ```python hl_lines="26 39 42 45 48"
 {!> ../docs_src/models/managers/override_related.py !}

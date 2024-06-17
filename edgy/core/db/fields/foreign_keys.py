@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, TypeVar
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Tuple, TypeVar
 
 import sqlalchemy
 from pydantic import BaseModel
@@ -36,12 +36,14 @@ class BaseForeignKeyField(BaseForeignKey):
         on_delete: str,
         related_fields: Sequence[str] = (),
         no_constraint: bool = False,
+        embed_parent: Optional[Tuple[str, str]]=None,
         **kwargs: Any,
     ) -> None:
         self.related_fields = related_fields
         self.on_update = on_update
         self.on_delete = on_delete
         self.no_constraint = no_constraint
+        self.embed_parent = embed_parent
         super().__init__(**kwargs)
 
     @cached_property
@@ -73,18 +75,17 @@ class BaseForeignKeyField(BaseForeignKey):
 
         if isinstance(value, (target, target.proxy_model)):
             return value
-        if len(self.related_columns) == 1 and not isinstance(value, (dict, BaseModel)):
-            value = {next(iter(self.related_columns.keys())): value}
-        if isinstance(value, dict):
-            for key in self.related_columns.keys():
-                if value.get(key) is None:
-                    return None
-        else:
-            for key in self.related_columns.keys():
-                if getattr(value, key, None) is None:
-                    return None
+        related_columns = self.related_columns.keys()
+        if len(related_columns) == 1 and not isinstance(value, (dict, BaseModel)):
+            value = {next(iter(related_columns)): value}
+        elif isinstance(value, BaseModel):
+            return self.expand_relationship({col: getattr(value, col) for col in related_columns})
+        elif value is None:
+            return None
         instance = target.proxy_model(**value)
-        instance.identifying_columns = self.related_columns.keys()
+        instance.identifying_db_fields = related_columns
+        if not instance.can_load:
+            return None
         return instance
 
     def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:

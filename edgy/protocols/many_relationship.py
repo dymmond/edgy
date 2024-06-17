@@ -1,10 +1,4 @@
-from typing import TYPE_CHECKING, runtime_checkable
-
-try:
-    from typing import Protocol
-except ImportError:  # pragma: nocover
-    from typing_extensions import Protocol  # type: ignore
-
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:  # pragma: nocover
     from edgy import Model
@@ -13,6 +7,7 @@ if TYPE_CHECKING:  # pragma: nocover
 @runtime_checkable
 class ManyRelationProtocol(Protocol):
     """Defines the what needs to be implemented when using the ManyRelationProtocol"""
+    async def save_related(self) -> None: ...
 
     async def add(self, child: "Model") -> None: ...
 

@@ -4,6 +4,7 @@ from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
 from edgy.exceptions import ObjectNotFound, RelationshipNotFound
+from edgy.protocols.many_relationship import ManyRelationProtocol
 
 
 class Model(ModelRow, DeclarativeMixin):
@@ -56,6 +57,11 @@ class Model(ModelRow, DeclarativeMixin):
         # Update the model instance.
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+        for field in self.meta.fields_mapping.keys():
+            _val = self.__dict__.get(field)
+            if isinstance(_val, ManyRelationProtocol):
+                await _val.save_related()
         return self
 
     async def delete(self) -> None:
@@ -91,6 +97,10 @@ class Model(ModelRow, DeclarativeMixin):
             column = self.table.autoincrement_column
             if column is not None:
                 setattr(self, column.key, autoincrement_value)
+        for field in self.meta.fields_mapping.keys():
+            _val = self.__dict__.get(field)
+            if isinstance(_val, ManyRelationProtocol):
+                await _val.save_related()
         return self
 
     async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
@@ -157,6 +167,7 @@ class Model(ModelRow, DeclarativeMixin):
         extracted_fields = self.extract_db_fields()
 
         for pkcolumn in self.__class__.pkcolumns:
+            # should trigger load in case of identifying_db_fields
             if getattr(self, pkcolumn, None) is None and self.table.columns[pkcolumn].autoincrement:
                 extracted_fields.pop(pkcolumn, None)
                 force_save = True

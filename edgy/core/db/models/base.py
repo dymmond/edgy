@@ -120,14 +120,14 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return self.__class__.proxy_model
 
     @cached_property
-    def identifying_columns(self) -> Any:
+    def identifying_db_fields(self) -> Any:
         """The columns used for loading, can be set per instance defaults to pknames"""
         return self.pkcolumns
 
     @property
     def can_load(self) -> bool:
-        for column in self.identifying_columns:
-            if self.__dict__.get(column) is None:
+        for field in self.identifying_db_fields:
+            if self.__dict__.get(field) is None:
                 return False
         return True
 
@@ -182,8 +182,13 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             return cast(Sequence["sqlalchemy.Column"], _empty)
 
     def identifying_clauses(self) -> Iterable[Any]:
-        for column in self.identifying_columns:
-            yield getattr(self.table.columns, column) == self.__dict__[column]
+        for field_name in self.identifying_db_fields:
+            field = self.meta.fields_mapping.get(field_name)
+            if field is not None:
+                for column, value in field.clean(field_name, self.__dict__[field_name]).items():
+                    yield getattr(self.table.columns, column) == value
+            else:
+                yield getattr(self.table.columns, field_name) == self.__dict__[field_name]
 
     @classmethod
     def generate_proxy_model(cls) -> Type["Model"]:
@@ -287,6 +292,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             elif getattr(field, "alias", None):
                 alias = field.alias
             model[alias] = retval
+        # tenants cause excluded fields to reappear
+        # TODO: find a better bugfix
+        for excluded_field in self.meta.excluded_fields:
+            model.pop(excluded_field, None)
         return model
 
     @classmethod
@@ -414,7 +423,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         if field is not None and hasattr(field, "__get__"):
             # no need to set an descriptor object
             return field.__get__(self, self.__class__)
-        if name not in self.__dict__ and field is not None and name not in self.identifying_columns and self.can_load:
+        if name not in self.__dict__ and field is not None and name not in self.identifying_db_fields and self.can_load:
             run_sync(self.load())
             return self.__dict__[name]
         return super().__getattr__(name)

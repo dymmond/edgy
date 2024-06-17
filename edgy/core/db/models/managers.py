@@ -18,7 +18,7 @@ class BaseManager:
         # legacy name
         return self.owner
 
-    def get_queryset(self) -> "QuerySet":
+    def get_queryset(self) -> QuerySet:
         """
         Returns the queryset object.
         """
@@ -74,6 +74,7 @@ class Manager(BaseManager):
         if name.startswith("_") or name == self.name:
             return super().__getattr__(name)
         try:
+            # we need to check tenant every request
             return getattr(self.get_queryset(), name)
         except AttributeError:
             return getattr(self.owner, name)
