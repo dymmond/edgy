@@ -239,8 +239,7 @@ class SingleRelation(ManyRelationProtocol):
         if not isinstance(child, (self.to, self.to.proxy_model)):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
 
-        setattr(child, self.to_foreign_key, self.instance)
-        await child.save()
+        await child.save(values={self.to_foreign_key: self.instance})
 
     async def remove(self, child: "Model") -> None:
         """Removes a child from the list of one to many.
@@ -251,8 +250,7 @@ class SingleRelation(ManyRelationProtocol):
         if not isinstance(child, self.to):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
 
-        setattr(child, self.to_foreign_key, None)
-        await child.save()
+        await child.save(values={self.to_foreign_key: None})
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"

@@ -179,9 +179,11 @@ class Model(ModelRow, DeclarativeMixin):
                 force_save = True
 
         if force_save:
+            if values:
+                extracted_fields.update(values)
             # force save must ensure a complete mapping
             validated_values = self._extract_values_from_field(
-                extracted_values=extracted_fields if values is None else values, is_partial=False
+                extracted_values=extracted_fields, is_partial=False
             )
             kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
             kwargs, model_references = self.update_model_references(**kwargs)

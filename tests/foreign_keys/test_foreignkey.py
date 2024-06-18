@@ -108,8 +108,11 @@ async def test_new_create():
     await album.tracks_set.add(track1)
     await album.tracks_set.add(track2)
     tracks = await album.tracks_set.all()
-
     assert len(tracks) == 2
+
+    await album.tracks_set.remove(track2)
+    tracks = await album.tracks_set.all()
+    assert len(tracks) == 1
 
 
 async def test_new_create2():
