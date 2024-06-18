@@ -113,7 +113,6 @@ class ModelParser:
                 if not field.read_only and field_name not in validated:
                     if field.has_default():
                         validated.update(field.get_default_values(field_name, validated))
-
         # Update with any ModelRef
         validated.update(self._extract_model_references(extracted_values, model_cls))
         return validated

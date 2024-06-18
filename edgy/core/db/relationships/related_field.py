@@ -49,6 +49,8 @@ class RelatedField(BaseField):
         """
         Meta field
         """
+        if isinstance(value, SingleRelation):
+            return {field_name: value}
         return {field_name: SingleRelation(to=self.related_from, to_foreign_key=self.foreign_key_name, embed_parent=self.embed_parent, refs=value)}
 
     def __get__(self, instance: "Model", owner: Any = None) -> SingleRelation:

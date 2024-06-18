@@ -364,12 +364,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
-    def update_from_dict(self, dict_values: Dict[str, Any]) -> Self:
-        """Updates the current model object with the new fields and possible model_references"""
-        for key, value in dict_values.items():
-            setattr(self, key, value)
-        return self
-
     def extract_db_fields(self) -> Dict[str, Any]:
         """
         Extracts all the db fields, model references and fields.
@@ -433,11 +427,12 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             return False
         if self.meta != other.meta:
             return False
-        for field in self.meta.fields_mapping.values():
-            # this fixes issues with meta fields, without columns
-            for column_name in field.get_column_names():
-                if self.__dict__.get(column_name, None) != other.__dict__.get(column_name, None):
-                    return False
+        self_dict = self._extract_values_from_field(self.extract_db_fields(), is_partial=True)
+        other_dict = self._extract_values_from_field(other.extract_db_fields(), is_partial=True)
+        key_set = {*self_dict.keys(), *other_dict.keys()}
+        for field_name in key_set:
+            if self_dict.get(field_name) != other_dict.get(field_name):
+                return False
         return True
 
 

@@ -141,6 +141,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         Meta field
         """
+        if isinstance(value, ManyRelation):
+            return {field_name: value}
         return {field_name: ManyRelation(through=self.through, to=self.to, from_foreign_key=self.from_foreign_key, to_foreign_key=self.to_foreign_key, embed_through=self.embed_through, refs=value)}
 
     def has_default(self) -> bool:

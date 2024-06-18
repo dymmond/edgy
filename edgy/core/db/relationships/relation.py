@@ -74,6 +74,7 @@ class ManyRelation(ManyRelationProtocol):
     def wrap_args(self, func: Any) -> Any:
         @functools.wraps(func)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
+            assert self.instance, "instance not initialized"
             fk = self.through.meta.fields_mapping[self.from_foreign_key]
             query = {}
             for related_name in fk.related_columns.keys():
@@ -103,7 +104,7 @@ class ManyRelation(ManyRelationProtocol):
         if the type is wrong.
         . Checks if the middle table already contains the record being added. Raises error if yes.
         """
-        if not isinstance(child, (self.to, self.through)):
+        if not isinstance(child, (self.to, self.to.proxy_model, self.through, self.through.proxy_model)):
             raise RelationshipIncompatible(f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'.")
         child = self.expand_relationship(child)
 
@@ -119,7 +120,7 @@ class ManyRelation(ManyRelationProtocol):
         . Validates if there is a relationship between the entities.
         . Removes the field if there is
         """
-        if not isinstance(child, (self.to, self.through)):
+        if not isinstance(child, (self.to, self.to.proxy_model, self.through, self.through.proxy_model)):
             raise RelationshipIncompatible(f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'.")
         child = self.expand_relationship(child)
         count = await child.query.filter(sqlalchemy.and_(*child.identifying_clauses())).count()
@@ -212,6 +213,7 @@ class SingleRelation(ManyRelationProtocol):
     def wrap_args(self, func: Any) -> Any:
         @functools.wraps(func)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
+            assert self.instance, "instance not initialized"
             fk = self.to.meta.fields_mapping[self.to_foreign_key]
             query = {}
             for column_name in fk.get_column_names():
@@ -234,7 +236,7 @@ class SingleRelation(ManyRelationProtocol):
         if the type is wrong.
         . Checks if the middle table already contains the record being added. Raises error if yes.
         """
-        if not isinstance(child, self.to):
+        if not isinstance(child, (self.to, self.to.proxy_model)):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
 
         setattr(child, self.to_foreign_key, self)

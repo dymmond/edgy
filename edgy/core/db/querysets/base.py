@@ -934,10 +934,10 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Creates a record in a specific table.
         """
         queryset: "QuerySet" = self._clone()
-        kwargs = queryset._validate_kwargs(**kwargs)
+        # kwargs = queryset._validate_kwargs(**kwargs)
         instance = queryset.model_class(**kwargs)
         instance.table = queryset.table
-        instance = await instance.save(force_save=True, values=kwargs)
+        instance = await instance.save(force_save=True)
         return instance
 
     async def bulk_create(self, objs: List[Dict]) -> None:

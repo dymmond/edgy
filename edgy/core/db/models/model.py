@@ -61,6 +61,7 @@ class Model(ModelRow, DeclarativeMixin):
         for field in self.meta.fields_mapping.keys():
             _val = self.__dict__.get(field)
             if isinstance(_val, ManyRelationProtocol):
+                _val.instance = self
                 await _val.save_related()
         return self
 
@@ -92,6 +93,10 @@ class Model(ModelRow, DeclarativeMixin):
         """
         expression = self.table.insert().values(**kwargs)
         autoincrement_value = await self.database.execute(expression)
+        transformed_kwargs = self.transform_input(kwargs, phase="post_insert")
+        for k, v in transformed_kwargs.items():
+            setattr(self, k, v)
+
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
             column = self.table.autoincrement_column
@@ -100,6 +105,7 @@ class Model(ModelRow, DeclarativeMixin):
         for field in self.meta.fields_mapping.keys():
             _val = self.__dict__.get(field)
             if isinstance(_val, ManyRelationProtocol):
+                _val.instance = self
                 await _val.save_related()
         return self
 
@@ -171,10 +177,6 @@ class Model(ModelRow, DeclarativeMixin):
             if getattr(self, pkcolumn, None) is None and self.table.columns[pkcolumn].autoincrement:
                 extracted_fields.pop(pkcolumn, None)
                 force_save = True
-
-        self.update_from_dict(dict_values=dict(extracted_fields.items()))
-
-        # Performs the update or the create based on a possible existing primary key
 
         if force_save:
             # force save must ensure a complete mapping
