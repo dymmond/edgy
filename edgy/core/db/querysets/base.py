@@ -934,7 +934,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Creates a record in a specific table.
         """
         queryset: "QuerySet" = self._clone()
-        # kwargs = queryset._validate_kwargs(**kwargs)
         instance = queryset.model_class(**kwargs)
         instance.table = queryset.table
         instance = await instance.save(force_save=True)

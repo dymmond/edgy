@@ -239,7 +239,7 @@ class SingleRelation(ManyRelationProtocol):
         if not isinstance(child, (self.to, self.to.proxy_model)):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
 
-        setattr(child, self.to_foreign_key, self)
+        setattr(child, self.to_foreign_key, self.instance)
         await child.save()
 
     async def remove(self, child: "Model") -> None:
