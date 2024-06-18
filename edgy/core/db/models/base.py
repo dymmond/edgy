@@ -5,6 +5,7 @@ from typing import (
     Any,
     ClassVar,
     Dict,
+    Iterable,
     List,
     Literal,
     Optional,
@@ -23,7 +24,7 @@ from typing_extensions import Self
 
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models._internal import DescriptiveMeta
-from edgy.core.db.models.managers import Manager
+from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
 from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
@@ -50,7 +51,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     is_proxy_model: ClassVar[bool] = False
 
     query: ClassVar[Manager] = Manager()
-    query_related: ClassVar[Optional[Manager]] = None
+    query_related: ClassVar[RedirectManager] = RedirectManager(redirect_name="query")
     meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True)
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
@@ -61,10 +62,11 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
     __show_pk__: ClassVar[bool] = False
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self.__show_pk__ = kwargs.pop("__show_pk__", False)
+        __show_pk__ = kwargs.pop("__show_pk__", False)
         kwargs = self.transform_input(kwargs, phase="creation")
         super().__init__(**kwargs)
         self.__dict__ = self.setup_model_from_kwargs(kwargs)
+        self.__show_pk__ = __show_pk__
 
     @classmethod
     def transform_input(cls, kwargs: Any, phase: str) -> Any:
@@ -118,6 +120,18 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return self.__class__.proxy_model
 
     @cached_property
+    def identifying_db_fields(self) -> Any:
+        """The columns used for loading, can be set per instance defaults to pknames"""
+        return self.pkcolumns
+
+    @property
+    def can_load(self) -> bool:
+        for field in self.identifying_db_fields:
+            if self.__dict__.get(field) is None:
+                return False
+        return True
+
+    @cached_property
     def signals(self) -> "Broadcaster":
         return self.__class__.signals  # type: ignore
 
@@ -166,6 +180,15 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             return (table.columns[name],)
         else:
             return cast(Sequence["sqlalchemy.Column"], _empty)
+
+    def identifying_clauses(self) -> Iterable[Any]:
+        for field_name in self.identifying_db_fields:
+            field = self.meta.fields_mapping.get(field_name)
+            if field is not None:
+                for column, value in field.clean(field_name, self.__dict__[field_name]).items():
+                    yield getattr(self.table.columns, column) == value
+            else:
+                yield getattr(self.table.columns, field_name) == self.__dict__[field_name]
 
     @classmethod
     def generate_proxy_model(cls) -> Type["Model"]:
@@ -269,6 +292,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             elif getattr(field, "alias", None):
                 alias = field.alias
             model[alias] = retval
+        # tenants cause excluded fields to reappear
+        # TODO: find a better bugfix
+        for excluded_field in self.meta.excluded_fields:
+            model.pop(excluded_field, None)
         return model
 
     @classmethod
@@ -337,12 +364,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
-    def update_from_dict(self, dict_values: Dict[str, Any]) -> Self:
-        """Updates the current model object with the new fields and possible model_references"""
-        for key, value in dict_values.items():
-            setattr(self, key, value)
-        return self
-
     def extract_db_fields(self) -> Dict[str, Any]:
         """
         Extracts all the db fields, model references and fields.
@@ -396,23 +417,22 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         if field is not None and hasattr(field, "__get__"):
             # no need to set an descriptor object
             return field.__get__(self, self.__class__)
-        if name not in self.__dict__ and field is not None and name not in self.pkcolumns:
+        if name not in self.__dict__ and field is not None and name not in self.identifying_db_fields and self.can_load:
             run_sync(self.load())
             return self.__dict__[name]
         return super().__getattr__(name)
 
-    def __get_instance_values(self, instance: Any) -> Set[Any]:
-        fields = self.meta.fields_mapping
-        return {v for k, v in instance.__dict__.items() if k in fields and v is not None}
-
     def __eq__(self, other: Any) -> bool:
         if self.__class__ != other.__class__:
             return False
-
-        original = self.__get_instance_values(instance=self)
-        other_values = self.__get_instance_values(instance=other)
-        if original != other_values:
+        if self.meta != other.meta:
             return False
+        self_dict = self._extract_values_from_field(self.extract_db_fields(), is_partial=True)
+        other_dict = self._extract_values_from_field(other.extract_db_fields(), is_partial=True)
+        key_set = {*self_dict.keys(), *other_dict.keys()}
+        for field_name in key_set:
+            if self_dict.get(field_name) != other_dict.get(field_name):
+                return False
         return True
 
 

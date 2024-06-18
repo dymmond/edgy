@@ -1,4 +1,5 @@
 import copy
+from collections import deque
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -6,6 +7,7 @@ from typing import (
     Dict,
     Generator,
     List,
+    NamedTuple,
     Optional,
     Sequence,
     Set,
@@ -24,6 +26,7 @@ from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import PrefetchMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
+from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.protocols.queryset import QuerySetProtocol
@@ -35,36 +38,88 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.models import Model
 
 
+class RelationshipCrawlResult(NamedTuple):
+    model_class: Type["Model"]
+    field_name: str
+    operator: str
+    forward_path: str
+    reverse_path: str
+
+def crawl_relationship(model_class: Type["Model"], name: str, callback_fn: Any=None) -> RelationshipCrawlResult:
+    splitted = deque(name.split("__"))
+    field_name = splitted.popleft()
+    field = None
+    forward_path = ""
+    reverse_path = ""
+    operator: str = "exact"
+    while splitted:
+        field = model_class.meta.fields_mapping.get(field_name)
+        if field is None:
+            if len(splitted) == 1 and splitted[0] in settings.filter_operators:
+                operator = splitted[0]
+                break
+            else:
+                raise ValueError(f"Field: {field_name} of {name} not found")
+        if isinstance(field, BaseForeignKey):
+            model_class = field.target
+            if reverse_path:
+                reverse_path = f"{field.related_name}__{reverse_path}"
+            else:
+                reverse_path = field.related_name
+            if callback_fn:
+                callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_path, inverse=False, operator=None)
+            if forward_path:
+                forward_path =  f"{forward_path}__{field_name}"
+            else:
+                forward_path = field_name
+            field_name = splitted.popleft()
+        elif isinstance(field, RelatedField):
+            model_class = field.related_from
+            if reverse_path:
+                reverse_path = f"{field.related_name}__{reverse_path}"
+            else:
+                reverse_path = field.foreign_key_name
+            if callback_fn:
+                callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_path, inverse=True, operator=None)
+            if forward_path:
+                forward_path =  f"{forward_path}__{field_name}"
+            else:
+                forward_path = field_name
+            field_name = splitted.popleft()
+        elif splitted:
+            # Determine if we should treat the final part as a
+            # filter operator or as a related field.
+            if len(splitted) == 1 and splitted[0] in settings.filter_operators:
+                operator = splitted[0]
+                break
+            else:
+                raise ValueError(f"Tried to cross field: {field_name} of type {field!r}")
+        else:
+            break
+    if reverse_path:
+        reverse_path = f"{field_name}__{reverse_path}"
+    else:
+        reverse_path = field_name
+    if callback_fn and field is not None:
+        callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_path, inverse=False, operator=operator)
+    return RelationshipCrawlResult(
+        model_class=model_class,
+        field_name=field_name,
+        operator=operator,
+        forward_path=forward_path,
+        reverse_path=reverse_path,
+    )
+
 def clean_query_kwargs(model: Type["Model"], kwargs: Dict[str, Any]) -> Dict[str, Any]:
     new_kwargs: Dict[str, Any] = {}
     for key, val in kwargs.items():
-        model_class = model
-        field_name = key
-        if "__" in key:
-            parts = key.split("__")
-
-            # Determine if we should treat the final part as a
-            # filter operator or as a related field.
-            if parts[-1] in settings.filter_operators:
-                field_name = parts[-2]
-                related_parts = parts[:-2]
-            else:
-                field_name = parts[-1]
-                related_parts = parts[:-1]
-            if related_parts:
-                # Walk the relationships to the actual model class
-                # against which the comparison is being made.
-                for part in related_parts:
-                    try:
-                        model_class = model_class.meta.fields_mapping[part].target
-                    except KeyError:
-                        model_class = model_class.meta.related_fields[part].related_from
-        if field_name in model_class.meta.fields_mapping:
-            new_kwargs.update(model_class.meta.fields_mapping[field_name].clean(key, val, for_query=True))
-        elif field_name in model_class.meta.related_fields:
-            new_kwargs.update(model_class.meta.related_fields[field_name].clean(key, val, for_query=True))
+        model_class, field_name, _, _, _ = crawl_relationship(model, key)
+        field = model_class.meta.fields_mapping.get(field_name)
+        if field is not None:
+            new_kwargs.update(field.clean(key, val, for_query=True))
         else:
             new_kwargs[key] = val
+            assert not isinstance(field, (BaseForeignKey, RelatedField))
     assert "pk" not in new_kwargs, "pk should be already parsed"
     return new_kwargs
 
@@ -94,7 +149,7 @@ class BaseQuerySet(
         distinct_on: Any = None,
         only_fields: Any = None,
         defer_fields: Any = None,
-        m2m_related: Any = None,
+        embed_parent: Any = None,
         using_schema: Any = None,
         table: Any = None,
         exclude_secrets: Any = False,
@@ -114,14 +169,12 @@ class BaseQuerySet(
         self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
         self._cache = None
-        self._m2m_related = m2m_related  # type: ignore
+        self.embed_parent = embed_parent
         self.using_schema = using_schema
         self._exclude_secrets = exclude_secrets or False
         self.extra: Dict[str, Any] = {}
 
         # Making sure the queryset always starts without any schema associated unless specified
-        if self.is_m2m and not self._m2m_related:
-            self._m2m_related = self.model_class.meta.multi_related[0]
 
         if table is not None:
             self.table = table
@@ -183,16 +236,17 @@ class BaseQuerySet(
             select_from = queryset.table
             former_table = None
             for part in item.split("__"):
-                try:
-                    foreign_key = model_class.fields[part]
-                    model_class = foreign_key.target
+                field = model_class.fields[part]
+                if isinstance(field, BaseForeignKey):
+                    model_class = field.target
                     inverse = False
-                except KeyError:
-                    # Check related fields
-                    related_field = model_class.meta.related_fields[part]
-                    model_class = related_field.related_from
-                    foreign_key = related_field.foreign_key
+                    foreign_key = field
+                elif isinstance(field, RelatedField):
+                    model_class = field.related_from
+                    foreign_key = field.foreign_key
                     inverse = True
+                else:
+                    raise ValueError(f"{part}: invalid field type: {field!r}")
                 if foreign_key.is_cross_db:
                     raise NotImplementedError("We cannot cross databases yet, this feature is planned")
                 table = model_class.table
@@ -202,7 +256,7 @@ class BaseQuerySet(
                     *self._select_from_relationship_clause_generator(select_from, foreign_key, table, inverse, former_table)
                 )
                 former_table = table
-                tables[table.name] = table
+                tables[table.name] = table  # type: ignore
 
         return tables.values(), select_from
 
@@ -316,39 +370,11 @@ class BaseQuerySet(
         kwargs = clean_query_kwargs(self.model_class, kwargs)
 
         for key, value in kwargs.items():
-            if "__" in key:
-                parts = key.split("__")
-
-                # Determine if we should treat the final part as a
-                # filter operator or as a related field.
-                if parts[-1] in settings.filter_operators:
-                    op = parts[-1]
-                    field_name = parts[-2]
-                    related_parts = parts[:-2]
-                else:
-                    op = "exact"
-                    field_name = parts[-1]
-                    related_parts = parts[:-1]
-
-                model_class = self.model_class
-                if related_parts:
-                    # Add any implied select_related
-                    related_str = "__".join(related_parts)
-                    if related_str not in select_related:
-                        select_related.append(related_str)
-
-                    # Walk the relationships to the actual model class
-                    # against which the comparison is being made.
-                    for part in related_parts:
-                        try:
-                            model_class = model_class.meta.fields_mapping[part].target
-                        except KeyError:
-                            model_class = model_class.meta.related_fields[part].related_from
-                column = model_class.table.columns[field_name]
-
-            else:
-                op = "exact"
-                column = self.table.columns[key]
+            model_class, field_name, op, related_str, _ = crawl_relationship(self.model_class, key)
+            assert not isinstance(value, Model)
+            if related_str and related_str not in select_related:
+                select_related.append(related_str)
+            column = model_class.table.columns[field_name]
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
@@ -362,9 +388,6 @@ class BaseQuerySet(
                     for char in self.ESCAPE_CHARACTERS:
                         value = value.replace(char, f"\\{char}")
                 value = f"%{value}%"
-
-            if isinstance(value, Model):
-                value = value.pk
 
             clause = getattr(column, op_attr)(value)
             clause.modifiers["escape"] = "\\" if has_escaped_character else None
@@ -395,7 +418,7 @@ class BaseQuerySet(
                 order_by=self._order_by,
                 only_fields=self._only,
                 defer_fields=self._defer,
-                m2m_related=self.m2m_related,
+                embed_parent=self.embed_parent,
                 table=self.table,
                 exclude_secrets=self._exclude_secrets,
                 using_schema=self.using_schema,
@@ -446,7 +469,7 @@ class BaseQuerySet(
         queryset._group_by = copy.copy(self._group_by)
         queryset.distinct_on = copy.copy(self.distinct_on)
         queryset._expression = copy.copy(self._expression)
-        queryset._m2m_related = copy.copy(self._m2m_related)
+        queryset.embed_parent = self.embed_parent
         queryset._only = copy.copy(self._only)
         queryset._defer = copy.copy(self._defer)
         queryset._database = self.database
@@ -793,13 +816,21 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             using_schema=queryset.using_schema,
         )
 
+    def embed_parent_in_result(self, result: Any) -> Any:
+        if not self.embed_parent:
+            return result
+        new_result = getattr(result, self.embed_parent[0])
+        if self.embed_parent[1]:
+            setattr(new_result, self.embed_parent[1], result)
+        return new_result
+
     async def _all(self, **kwargs: Any) -> List[EdgyModel]:
         """
         Executes the query.
         """
         queryset: "QuerySet" = self._clone()
-        if queryset.is_m2m:
-            queryset.distinct_on = [queryset.m2m_related]
+        if queryset.embed_parent:
+            queryset.distinct_on = [queryset.embed_parent[0]]
 
         if kwargs:
             return await queryset.filter(**kwargs).all()
@@ -829,10 +860,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             for row in rows
         ]
 
-        if not queryset.is_m2m:
-            return results
-
-        all_results = [getattr(result, queryset.m2m_related) for result in results]
+        all_results = [self.embed_parent_in_result(result) for result in results]
         return all_results
 
     def all(self, **kwargs: Any) -> "QuerySet":
@@ -906,10 +934,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         Creates a record in a specific table.
         """
         queryset: "QuerySet" = self._clone()
-        kwargs = queryset._validate_kwargs(**kwargs)
         instance = queryset.model_class(**kwargs)
         instance.table = queryset.table
-        instance = await instance.save(force_save=True, values=kwargs)
+        instance = await instance.save(force_save=True)
         return instance
 
     async def bulk_create(self, objs: List[Dict]) -> None:

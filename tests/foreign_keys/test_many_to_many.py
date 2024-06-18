@@ -30,7 +30,7 @@ class Track(edgy.Model):
 class Album(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     name = edgy.CharField(max_length=100)
-    tracks = edgy.ManyToManyField(Track)
+    tracks = edgy.ManyToManyField(Track, embed_through="embedded")
 
     class Meta:
         registry = models
@@ -71,9 +71,21 @@ async def test_add_many_to_many():
     await album.tracks.add(track3)
 
     total_tracks = await album.tracks.all()
-
     assert len(total_tracks) == 3
+    for track in total_tracks:
+        assert track.embedded.track.pk == track.pk
 
+async def test_add_many_to_many_new():
+    track1 = await Track.query.create(title="The Bird", position=1)
+    track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
+    track3 = await Track.query.create(title="The Waters", position=3)
+
+    album = await Album.query.create(name="Malibu", tracks=[track1, track2, track3])
+
+    total_tracks = await album.tracks.all()
+    assert len(total_tracks) == 3
+    for track in total_tracks:
+        assert track.embedded.track.pk == track.pk
 
 async def test_add_many_to_many_with_repeated_field():
     track1 = await Track.query.create(title="The Bird", position=1)
@@ -148,7 +160,7 @@ async def test_raises_RelationshipIncompatible():
     with pytest.raises(RelationshipIncompatible) as raised:
         await album.tracks.add(user)
 
-    assert raised.value.args[0] == "The child is not from the type 'Track'."
+    assert raised.value.args[0] == "The child is not from the types 'Track', 'AlbumTrack'."
 
 
 async def test_raises_RelationshipNotFound():

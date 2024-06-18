@@ -4,6 +4,7 @@ import pytest
 
 import edgy
 from edgy.core.db.fields.base import BaseField
+from edgy.core.db.models.managers import BaseManager
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -91,11 +92,11 @@ def test_fields():
 )
 def test_field_types(model):
     for field in model.meta.fields_mapping.values():
-        assert not isinstance(field, edgy.Manager)
+        assert not isinstance(field, BaseManager)
     for field in model.meta.fields_mapping.values():
         assert isinstance(field, BaseField)
     for manager in model.meta.managers.values():
-        assert isinstance(manager, edgy.Manager)
+        assert isinstance(manager, BaseManager)
 
 
 @pytest.mark.parametrize(

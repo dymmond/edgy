@@ -372,6 +372,7 @@ class MyModel(edgy.Model):
 * **to** - A string [model](./models.md) name or a class object of that same model.
 * **related_name** - The name to use for the relation from the related object back to this one.
 * **related_fields** - The columns or fields to use for the foreign key. If unset or empty, the primary key(s) are used.
+* **embed_parent** (to_attr, as_attr) - When accessing the reverse relation part, return to_attr instead and embed the parent object in as_attr (when as_attr is not empty). Default None (which disables it).
 * **no_constraint** - Skip creating a constraint. Note: if set and index=True an index will be created instead.
 * **on_delete** - A string indicating the behaviour that should happen on delete of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
@@ -426,7 +427,8 @@ class MyModel(edgy.Model):
 * **to_fields** - Provide the **related_fields** for the implicitly generated ForeignKey to the child model.
 * **related_name** - The name to use for the relation from the related object back to this one.
 * **through** - The model to be used for the relationship. Edgy generates the model by default
-if None is provided or **through** is an abstract model.
+                if None is provided or **through** is an abstract model.
+* **embed_through** - When traversing, embed the through object in this attribute. Otherwise it is not accessable.
 
 !!! Note:
     If **through** is an abstract model it will be used as a template (a new model is generated with through as base).

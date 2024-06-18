@@ -10,6 +10,4 @@
         - "!^__class_getitem__"
         - "!^__get__"
         - "!^ESCAPE_CHARACTERS"
-        - "!^m2m_related"
         - "!^pknames"
-        - "!^_m2m_related"

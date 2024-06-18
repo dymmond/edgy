@@ -1,14 +1,15 @@
 import functools
-from typing import TYPE_CHECKING, Any, Dict, Optional, Type, Union, cast
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union, cast
 
+from edgy.core.db.fields.base import BaseField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
-from edgy.core.db.models.utils import pk_from_model
+from edgy.core.db.relationships.relation import SingleRelation
 
 if TYPE_CHECKING:
-    from edgy import Manager, Model, QuerySet, ReflectModel
+    from edgy import Model, ReflectModel
 
-
-class RelatedField:
+class RelatedField(BaseField):
     """
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
@@ -16,29 +17,57 @@ class RelatedField:
 
     def __init__(
         self,
+        *,
         foreign_key_name: str,
-        related_name: str,
-        related_to: Union[Type["Model"], Type["ReflectModel"]],
         related_from: Union[Type["Model"], Type["ReflectModel"]],
-        instance: Optional[Union["Model", "ReflectModel"]] = None,
+        embed_parent: Optional[Tuple[str, str]]=None,
+        **kwargs: Any
     ) -> None:
         self.foreign_key_name = foreign_key_name
-        self.related_name = related_name
-        self.related_to = related_to
         self.related_from = related_from
-        self.instance = instance
+        self.embed_parent = embed_parent
+        super().__init__(
+            inherit=False,
+            exclude=True,
+            deprecated=False,
+            __type__=Any,
+            annotation=Any,
+            column_type=None,
+            null=True,
+            **kwargs
+        )
 
-    @functools.cached_property
-    def manager(self) -> "Manager":
-        """Returns the manager class"""
-        manager: Optional["Manager"] = getattr(self.related_from, "query_related", None)
-        if manager is None:
-            manager = self.related_from.query
-        return manager
+    @property
+    def related_to(self) ->  Union[Type["Model"], Type["ReflectModel"]]:
+        return self.owner
 
-    @functools.cached_property
-    def queryset(self) -> "QuerySet":
-        return self.manager.get_queryset()
+    @property
+    def related_name(self) ->  str:
+        return self.name
+
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+        """
+        Meta field
+        """
+        if isinstance(value, SingleRelation):
+            return {field_name: value}
+        return {field_name: SingleRelation(to=self.related_from, to_foreign_key=self.foreign_key_name, embed_parent=self.embed_parent, refs=value)}
+
+    def __get__(self, instance: "Model", owner: Any = None) -> SingleRelation:
+        if instance:
+            if self.name not in instance.__dict__:
+                instance.__dict__[self.name] = SingleRelation(to=self.related_from, to_foreign_key=self.foreign_key_name, embed_parent=self.embed_parent, instance=instance)
+            if instance.__dict__[self.name].instance is None:
+                instance.__dict__[self.name].instance = instance
+            return instance.__dict__[self.name]  # type: ignore
+        raise ValueError("missing instance")
+
+    def __set__(self, instance: "Model", value: Any) -> None:
+        relation = self.__get__(instance)
+        if not isinstance(value, Sequence):
+            value = [value]
+        for v in value:
+            relation._add_object(v)
 
     @functools.cached_property
     def foreign_key(self) -> BaseForeignKeyField:
@@ -48,44 +77,9 @@ class RelatedField:
     def is_cross_db(self) -> bool:
         return self.foreign_key.is_cross_db
 
-    def m2m_related(self) -> Any:
-        """
-        Guarantees the the m2m filter is done by the owner of the call
-        and not by the children.
-        """
-        if not self.related_from.meta.is_multi:
-            return
-
-        related = [
-            key
-            for key, value in self.related_from.fields.items()
-            if key != self.related_to.__name__.lower() and isinstance(value, BaseForeignKeyField)
-        ]
-        return related
-
-    def __get__(self, instance: Any, owner: Any = None) -> Any:
-        return self.__class__(
-            foreign_key_name=self.foreign_key_name,
-            related_name=self.related_name,
-            related_to=self.related_to,
-            instance=instance,
-            related_from=self.related_from,
-        )
-
-    def __getattr__(self, item: str) -> Any:
-        """
-        Gets the attribute from the queryset and if it does not
-        exist, then lookup in the model.
-        """
-        try:
-            attr = getattr(self.queryset, item)
-        except AttributeError:
-            attr = getattr(self.related_from, item)
-
-        func = self.wrap_args(attr)
-        return func
-
     def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
+        if not for_query:
+            return {}
         return self.related_to.meta.pk.clean("pk", value, for_query=for_query)  # type: ignore
 
     def wrap_args(self, func: Any) -> Any:
@@ -93,11 +87,13 @@ class RelatedField:
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             # invert, so use the foreign_key_name
             # will be parsed later
-            kwargs[self.foreign_key_name] = pk_from_model(self.instance, always_dict=True)
+            query: Dict[str, Any] = {}
+            for column_name in self.foreign_key.get_column_names():
+                related_name = self.foreign_key.from_fk_field_name(self.foreign_key_name, column_name)
+                query[related_name] = getattr(self.instance, related_name)
+            kwargs[self.foreign_key_name] =  query
 
-            related = self.m2m_related()
-            if related:
-                self.queryset.m2m_related = related[0]
+            self.queryset.embed_parent = self.embed_parent
             return func(*args, **kwargs)
 
         return wrapped

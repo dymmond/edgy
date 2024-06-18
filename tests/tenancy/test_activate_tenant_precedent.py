@@ -6,7 +6,7 @@ from pydantic import __version__
 import edgy
 from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.models import TenantMixin
-from edgy.core.db.querysets.mixins import activate_schema, deativate_schema
+from edgy.core.db.querysets.mixins import activate_schema, deactivate_schema
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -90,7 +90,7 @@ async def test_activate_using_takes_precedence():
     assert query[0].pk == permission.pk
 
     # Deactivate the schema and set to None (default)
-    deativate_schema()
+    deactivate_schema()
 
     query = await Permission.query.all()
 

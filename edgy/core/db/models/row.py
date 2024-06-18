@@ -1,7 +1,9 @@
 import asyncio
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Union, cast
 
+from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.models.base import EdgyBaseModel
+from edgy.core.db.relationships.related_field import RelatedField
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -50,22 +52,28 @@ class ModelRow(EdgyBaseModel):
         secret_fields = [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
 
         for related in select_related:
+            # first check the fields
             try:
-                try:
-                    model_cls = cls.meta.fields_mapping[related].target
-                except KeyError:
-                    model_cls = cls.meta.related_fields[related].related_from
-                item[related] = model_cls.from_sqla_row(row, exclude_secrets=exclude_secrets, using_schema=using_schema)
+                field = cls.meta.fields_mapping[related]
+                if isinstance(field, BaseForeignKey):
+                    model_class = field.target
+                elif isinstance(field, RelatedField):
+                    model_class = field.related_from
+                else:
+                    raise Exception("invalid field")
+                item[related] = model_class.from_sqla_row(row, exclude_secrets=exclude_secrets, using_schema=using_schema)
             except KeyError:
-                # first check the fields
                 if "__" in related:
                     first_part, remainder = related.split("__", 1)
-                    try:
-                        model_cls = cls.meta.fields_mapping[first_part].target
-                    except KeyError:
-                        model_cls = cls.meta.related_fields[first_part].related_from
+                    field = cls.meta.fields_mapping[first_part]
+                    if isinstance(field, BaseForeignKey):
+                        model_class = field.target
+                    elif isinstance(field, RelatedField):
+                        model_class = field.related_from
+                    else:
+                        raise Exception("invalid field") from None
 
-                    item[first_part] = model_cls.from_sqla_row(
+                    item[first_part] = model_class.from_sqla_row(
                         row,
                         select_related=[remainder],
                         prefetch_related=prefetch_related,
@@ -205,12 +213,15 @@ class ModelRow(EdgyBaseModel):
             if "__" in related.related_name:
                 first_part, remainder = related.related_name.split("__", 1)
 
-                try:
-                    model_cls = cls.meta.related_fields[first_part].related_from
-                    reverse_part = cls.meta.related_fields[first_part].foreign_key_name
-                except KeyError:
-                    model_cls = cls.meta.foreign_key_fields[first_part].target
-                    reverse_part = cls.meta.foreign_key_fields[first_part].related_name
+                field = cls.meta.fields_mapping[first_part]
+                if isinstance(field, BaseForeignKey):
+                    model_class = field.target
+                    reverse_part = field.related_name
+                elif isinstance(field, RelatedField):
+                    model_class = field.related_from
+                    reverse_part = field.foreign_key_name
+                else:
+                    raise Exception("invalid field")
 
                 # Build the new nested Prefetch object
                 remainder_prefetch = related.__class__(
@@ -223,7 +234,7 @@ class ModelRow(EdgyBaseModel):
 
                 # Recursively continue the process of handling the
                 # new prefetch
-                model_cls.__handle_prefetch_related(
+                model_class.__handle_prefetch_related(
                     row,
                     model,
                     prefetch_related=[remainder_prefetch],
@@ -268,13 +279,13 @@ class ModelRow(EdgyBaseModel):
         Processes the nested prefetch related names.
         """
         # Get the related field
-        try:
-            related_field = cls.meta.related_fields[prefetch_related.related_name]
-            reverse_part = cls.meta.related_fields[prefetch_related.related_name].foreign_key_name
-        except KeyError:
-            fk_field = cls.meta.foreign_key_fields[prefetch_related.related_name]
-            reverse_part = fk_field.related_name
-            related_field = fk_field.target.meta.related_fields[fk_field.related_name]
+        field = cls.meta.fields_mapping[prefetch_related.related_name]
+        if isinstance(field, BaseForeignKey):
+            related_field = field.target.meta.fields_mapping[field.related_name]
+            reverse_part = field.related_name
+        else:
+            related_field = field
+            reverse_part = field.foreign_key_name
 
         if inverse_path:
             inverse_path = f"{reverse_part}__{inverse_path}"

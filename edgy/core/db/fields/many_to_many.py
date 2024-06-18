@@ -4,7 +4,7 @@ from edgy.core.db.constants import CASCADE
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.foreign_keys import ForeignKey
-from edgy.core.db.relationships.relation import Relation
+from edgy.core.db.relationships.relation import ManyRelation
 from edgy.core.terminal import Print
 from edgy.core.utils.models import create_edgy_model
 
@@ -24,15 +24,21 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self,
         *,
         to_fields: Sequence[str] = (),
+        to_foreign_key: str = "",
         from_fields: Sequence[str] = (),
+        from_foreign_key: str = "",
         through: Union[str, Type["Model"]] = "",
+        embed_through: str="",
         **kwargs: Any,
     ) -> None:
-        self.to_fields = to_fields
-        self.from_fields = from_fields
-        self.through = through
-
         super().__init__(**kwargs)
+        self.to_fields = to_fields
+        self.to_foreign_key = to_foreign_key
+        self.from_fields = from_fields
+        self.from_foreign_key = from_foreign_key
+        self.through = through
+        self.embed_through = embed_through
+
 
     def add_model_to_register(self, model: Any) -> None:
         """
@@ -59,14 +65,38 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             if through.meta.abstract:
                 __bases__ = (through,)
             else:
-                name = self.to.__name__.lower()
-                if name not in through.meta.multi_related:
-                    through.meta.multi_related.append(name)
+                if not self.from_foreign_key:
+                    candidate = None
+                    for field_name, field in through.meta.foreign_key_fields.items():
+                        if field.target == self.owner:
+                            if candidate:
+                                raise ValueError("multiple foreign keys to owner")
+                            else:
+                                candidate = field_name
+                    if not candidate:
+                        raise ValueError("no foreign key fo owner found")
+                    self.from_foreign_key = candidate
+                if not self.to_foreign_key:
+                    candidate = None
+                    for field_name, field in through.meta.foreign_key_fields.items():
+                        if field.target == self.to:
+                            if candidate:
+                                raise ValueError("multiple foreign keys to target")
+                            else:
+                                candidate = field_name
+                    if not candidate:
+                        raise ValueError("no foreign key fo target found")
+                    self.to_foreign_key = candidate
                 return
-
         owner_name = self.owner.__name__
         to_name = self.to.__name__
         class_name = f"{owner_name}{to_name}"
+        if not self.from_foreign_key:
+            self.from_foreign_key = owner_name.lower()
+
+        if not self.to_foreign_key:
+            self.to_foreign_key = to_name.lower()
+
         tablename = f"{owner_name.lower()}s_{to_name}s".lower()
 
         new_meta: MetaInfo = MetaInfo(None, tablename=tablename, registry=self.registry, multi_related=[to_name.lower()])
@@ -82,15 +112,18 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             f"{self.related_name}" if self.related_name else f"{to_name.lower()}_{class_name.lower()}s_set"
         )
         fields = {
-            f"{owner_name.lower()}": ForeignKey(
+            f"{self.from_foreign_key}": ForeignKey(
                 self.owner,
                 null=True,
                 on_delete=CASCADE,
                 related_name=owner_related_name,
-                related_fields=self.from_fields
+                related_fields=self.from_fields,
+                primary_key=True
             ),
-            f"{to_name.lower()}": ForeignKey(self.to, null=True, on_delete=CASCADE, related_name=to_related_name,
-                related_fields=self.to_fields),
+            f"{self.to_foreign_key}": ForeignKey(self.to, null=True, on_delete=CASCADE, related_name=to_related_name,
+                related_fields=self.to_fields,
+                embed_parent=(self.from_foreign_key, self.embed_through),
+                primary_key=True),
         }
 
         # Create the through model
@@ -108,7 +141,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         Meta field
         """
-        return {}
+        if isinstance(value, ManyRelation):
+            return {field_name: value}
+        return {field_name: ManyRelation(through=self.through, to=self.to, from_foreign_key=self.from_foreign_key, to_foreign_key=self.to_foreign_key, embed_through=self.embed_through, refs=value)}
 
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
@@ -120,11 +155,21 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         return {}
 
-    def __get__(self, instance: "Model", owner: Any = None) -> Relation:
-        relation = Relation(through=self.through, to=self.to, owner=self.owner, instance=instance)
+    def __get__(self, instance: "Model", owner: Any = None) -> ManyRelation:
         if instance:
-            instance.__dict__[self.name] = relation
-        return relation
+            if self.name not in instance.__dict__:
+                instance.__dict__[self.name] = ManyRelation(through=self.through, to=self.to, from_foreign_key=self.from_foreign_key, to_foreign_key=self.to_foreign_key, embed_through=self.embed_through, instance=instance)
+            if instance.__dict__[self.name].instance is None:
+                instance.__dict__[self.name].instance = instance
+            return instance.__dict__[self.name]  # type: ignore
+        raise ValueError("Missing instance")
+
+    def __set__(self, instance: "Model", value: Any) -> None:
+        relation = self.__get__(instance)
+        if not isinstance(value, Sequence):
+            value = [value]
+        for v in value:
+            relation._add_object(v)
 
 
 class ManyToManyField(ForeignKeyFieldFactory):
