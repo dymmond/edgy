@@ -286,6 +286,7 @@ def _set_related_name_for_foreign_keys(
                 f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
             )
         foreign_key.related_name = related_name
+        foreign_key.reverse_name = related_name
 
         related_field = RelatedField(
             foreign_key_name=name,
@@ -620,7 +621,7 @@ class BaseModelMeta(ModelMetaclass):
                     if not isinstance(value, Index):
                         raise ValueError("Meta.indexes must be a list of Index types.")
 
-        for value in list(fields.values()):
+        for value in fields.values():
             if isinstance(value, BaseManyToManyForeignKeyField):
                 value.create_through_model()
 

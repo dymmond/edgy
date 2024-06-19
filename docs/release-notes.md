@@ -22,6 +22,8 @@ hide:
 - Add inherit flag for Manager, BaseFields and Models (when used as an embeddable)
 - Manager are now instance aware. You can customize the instance and they can react. They are also shallow copied for every class and instance.
 - Improved Relations (reverse side of ForeignKeys and forward side of Many2Many). Have now add and remove methods and work like RefForeignKey (you can just specify an Array with assignment targets and they will be added).
+- Allow skipping reverse RelatedFields
+- `pkcolumns` attribute of models (contains all found primary key columns)
 
 - Some new methods on BaseField:
   - embed_field: for controlling embedding a field in an CompositeField
@@ -33,13 +35,14 @@ hide:
 - Breaking: Prefetch traversal of foreign keys uses now the foreign key name. For the traversal of RelatedFields everything stays the same.
 - ForeignKeys use now global constraints and indexes
 - Breaking: clean has now the argument to_query
-- pk is now a PKField (a variant of the BaseCompositeField)
-- clean and to_columns of BaseField do return empty objects instead of raising NotImplementedError
+- Breaking: Many2Many doesn't have a RelatedField on owner anymore
+- MetaInfo (meta) is now lazy
+- `pk` is now a PKField (a variant of the BaseCompositeField)
+- `clean` and `to_columns` of BaseField do return empty objects instead of raising NotImplementedError
 - Major refactory of ForeignKeys, move logic for single ForeignKeys to subclass
-- Move FieldFactory to own file
-- Make MetaInfo lazy
+- Move FieldFactory and ForeignKeyFieldFactory to factories
 - Remove superfluous BaseOneToOneKeyField. Merged into BaseForeignKeyField.
-- remove unused attributes of MetaInfo and added some lazy evaluations for fields
+- Remove unused attributes of MetaInfo and added some lazy evaluations for fields
 
 ## 0.11.1
 

@@ -216,9 +216,9 @@ class ModelRow(EdgyBaseModel):
                 field = cls.meta.fields_mapping[first_part]
                 if isinstance(field, BaseForeignKey):
                     model_class = field.target
-                    reverse_part = field.related_name
-                    if reverse_part is False:
-                        raise ValueError("Missing related_name on prefetch path")
+                    reverse_part = field.reverse_name
+                    if not reverse_part:
+                        raise Exception("No backward relation possible (missing related_name)")
                 elif isinstance(field, RelatedField):
                     model_class = field.related_from
                     reverse_part = field.foreign_key_name
@@ -284,9 +284,9 @@ class ModelRow(EdgyBaseModel):
         field = cls.meta.fields_mapping[prefetch_related.related_name]
         if isinstance(field, BaseForeignKey):
             related_field = field.target.meta.fields_mapping[field.related_name]
-            if related_field.related_name is False:
-                raise ValueError("Missing related_name on prefetch path")
-            reverse_part = cast(str, field.related_name)
+            reverse_part = related_field.reverse_name
+            if not reverse_part:
+                raise Exception("No backward relation possible (missing related_name)")
         else:
             related_field = field
             reverse_part = field.foreign_key_name

@@ -134,6 +134,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 null=True,
                 on_delete=CASCADE,
                 related_name=False,
+                reverse_name=self.name,
                 related_fields=self.from_fields,
                 primary_key=True
             ),

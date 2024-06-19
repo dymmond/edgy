@@ -387,7 +387,9 @@ from `edgy`.
     from edgy import CASCADE, SET_NULL, RESTRICT
     ```
 
-
+Note: there is a `reverse_name` argument which can be used when `related_name=False` to specify a field for backward relations.
+It is useless except if related_name is False because it is otherwise overwritten.
+The `reverse_name` argument is used for finding the backward relation.
 
 #### RefForeignKey
 

@@ -63,11 +63,11 @@ def crawl_relationship(model_class: Type["Model"], name: str, callback_fn: Any=N
                 raise ValueError(f"Field: {field_name} of {name} not found")
         if isinstance(field, BaseForeignKey):
             model_class = field.target
-            if field.related_name is not False and reverse_path is not False:
+            if field.reverse_name and reverse_path is not False:
                 if reverse_path:
-                    reverse_path = f"{field.related_name}__{reverse_path}"
+                    reverse_path = f"{field.reverse_name}__{reverse_path}"
                 else:
-                    reverse_path = field.related_name
+                    reverse_path = field.reverse_name
             else:
                 reverse_path = False
             if callback_fn:
@@ -79,10 +79,11 @@ def crawl_relationship(model_class: Type["Model"], name: str, callback_fn: Any=N
             field_name = splitted.popleft()
         elif isinstance(field, RelatedField):
             model_class = field.related_from
-            if reverse_path:
-                reverse_path = f"{field.related_name}__{reverse_path}"
-            else:
-                reverse_path = field.foreign_key_name
+            if reverse_path is not False:
+                if reverse_path:
+                    reverse_path = f"{field.related_name}__{reverse_path}"
+                else:
+                    reverse_path = field.foreign_key_name
             if callback_fn:
                 callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_path, inverse=True, operator=None)
             if forward_path:
