@@ -1,12 +1,14 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, TypeVar
 
 import sqlalchemy
 from pydantic import BaseModel
 
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
+from edgy.core.db.relationships.relation import SingleRelation
 from edgy.core.terminal import Print
+from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
     from edgy import Model
@@ -37,6 +39,7 @@ class BaseForeignKeyField(BaseForeignKey):
         related_fields: Sequence[str] = (),
         no_constraint: bool = False,
         embed_parent: Optional[Tuple[str, str]]=None,
+        relation_fn: Optional[Callable[..., ManyRelationProtocol]]=None,
         **kwargs: Any,
     ) -> None:
         self.related_fields = related_fields
@@ -44,7 +47,13 @@ class BaseForeignKeyField(BaseForeignKey):
         self.on_delete = on_delete
         self.no_constraint = no_constraint
         self.embed_parent = embed_parent
+        self.relation_fn =relation_fn
         super().__init__(**kwargs)
+
+    def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
+        if self.relation_fn is not None:
+            return self.relation_fn(**kwargs)
+        return SingleRelation(to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs)
 
     @cached_property
     def related_columns(self) -> Dict[str, Optional[sqlalchemy.Column]]:

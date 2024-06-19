@@ -7,6 +7,7 @@ from typing import (
     ClassVar,
     Dict,
     FrozenSet,
+    Literal,
     Optional,
     Pattern,
     Sequence,
@@ -429,7 +430,7 @@ class BaseForeignKey(BaseField):
     def __init__(
         self,
         *,
-        related_name: str = "",
+        related_name: Union[str, Literal[False]] = "",
         **kwargs: Any,
     ) -> None:
         self.related_name = related_name

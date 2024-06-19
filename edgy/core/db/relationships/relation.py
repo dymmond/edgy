@@ -28,7 +28,7 @@ class ManyRelation(ManyRelationProtocol):
         through: Union[Type["Model"], Type["ReflectModel"]],
         embed_through: str = "",
         refs: Any = (),
-        instance: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        instance: Optional[Union["Model", "ReflectModel"]] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -38,7 +38,7 @@ class ManyRelation(ManyRelationProtocol):
         self.from_foreign_key = from_foreign_key
         self.to_foreign_key = to_foreign_key
         self.embed_through = embed_through
-        self.refs: Sequence[Union[Type["Model"], Type["ReflectModel"]]] = []
+        self.refs: Sequence[Union["Model", "ReflectModel"]] = []
         if not isinstance(refs, Sequence):
             refs = [refs]
         for v in refs:
@@ -154,7 +154,7 @@ class SingleRelation(ManyRelationProtocol):
         to: Union[Type["Model"], Type["ReflectModel"]],
         embed_parent: Optional[Tuple[str, str]]=None,
         refs: Any = (),
-        instance: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        instance: Optional[Union["Model", "ReflectModel"]] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -162,7 +162,7 @@ class SingleRelation(ManyRelationProtocol):
         self.instance = instance
         self.to_foreign_key = to_foreign_key
         self.embed_parent = embed_parent
-        self.refs: Sequence[Union[Type["Model"], Type["ReflectModel"]]] = []
+        self.refs: Sequence[Union["Model","ReflectModel"]] = []
         if not isinstance(refs, Sequence):
             refs = [refs]
         for v in refs:

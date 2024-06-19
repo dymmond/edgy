@@ -70,7 +70,7 @@ class Profile(edgy.Model):
 class Person(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     email = edgy.CharField(max_length=100)
-    profile = edgy.OneToOneField(Profile, on_delete=edgy.CASCADE)
+    profile = edgy.OneToOneField(Profile, on_delete=edgy.CASCADE, related_name=False)
 
     class Meta:
         registry = models
@@ -97,6 +97,11 @@ async def rollback_connections():
     with database.force_rollback():
         async with database:
             yield
+
+
+async def test_no_relation():
+    for field in Profile.meta.fields_mapping:
+        assert not field.startswith("person")
 
 
 async def test_new_create():

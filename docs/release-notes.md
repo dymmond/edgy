@@ -20,6 +20,8 @@ hide:
 - Add ForeignKeyFactory
 - Multiple primary keys and names different from "id" are possible now
 - Add inherit flag for Manager, BaseFields and Models (when used as an embeddable)
+- Manager are now instance aware. You can customize the instance and they can react. They are also shallow copied for every class and instance.
+- Improved Relations (reverse side of ForeignKeys and forward side of Many2Many). Have now add and remove methods and work like RefForeignKey (you can just specify an Array with assignment targets and they will be added).
 
 - Some new methods on BaseField:
   - embed_field: for controlling embedding a field in an CompositeField

@@ -273,29 +273,31 @@ def _set_related_name_for_foreign_keys(
         return
 
     for name, foreign_key in foreign_keys.items():
-        default_related_name = getattr(foreign_key, "related_name", None)
+        related_name = getattr(foreign_key, "related_name", None)
+        if related_name is False:
+            # skip related_field
+            continue
 
-        if not default_related_name:
-            default_related_name = f"{model_class.__name__.lower()}s_set"
+        if not related_name:
+            related_name = f"{model_class.__name__.lower()}s_set"
 
-        elif default_related_name in foreign_key.target.meta.fields_mapping:
+        elif related_name in foreign_key.target.meta.fields_mapping:
             raise ForeignKeyBadConfigured(
-                f"Multiple related_name with the same value '{default_related_name}' found to the same target. Related names must be different."
+                f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
             )
-        foreign_key.related_name = default_related_name
+        foreign_key.related_name = related_name
 
         related_field = RelatedField(
             foreign_key_name=name,
-            name=default_related_name,
+            name=related_name,
             owner=foreign_key.target,
             related_from=model_class,
-            embed_parent=foreign_key.embed_parent,
         )
 
         # Set the related name
         target = foreign_key.target
-        target.meta.fields_mapping[default_related_name] = related_field
-        target.meta.related_fields[default_related_name] = related_field
+        target.meta.fields_mapping[related_name] = related_field
+        target.meta.related_fields[related_name] = related_field
 
 
 def _handle_annotations(base: Type, base_annotations: Dict[str, Any]) -> None:

@@ -7,6 +7,7 @@ from typing import (
     Dict,
     Generator,
     List,
+    Literal,
     NamedTuple,
     Optional,
     Sequence,
@@ -43,14 +44,14 @@ class RelationshipCrawlResult(NamedTuple):
     field_name: str
     operator: str
     forward_path: str
-    reverse_path: str
+    reverse_path: Union[str, Literal[False]]
 
 def crawl_relationship(model_class: Type["Model"], name: str, callback_fn: Any=None) -> RelationshipCrawlResult:
     splitted = deque(name.split("__"))
     field_name = splitted.popleft()
     field = None
     forward_path = ""
-    reverse_path = ""
+    reverse_path: Union[str, Literal[False]] = ""
     operator: str = "exact"
     while splitted:
         field = model_class.meta.fields_mapping.get(field_name)
@@ -62,10 +63,13 @@ def crawl_relationship(model_class: Type["Model"], name: str, callback_fn: Any=N
                 raise ValueError(f"Field: {field_name} of {name} not found")
         if isinstance(field, BaseForeignKey):
             model_class = field.target
-            if reverse_path:
-                reverse_path = f"{field.related_name}__{reverse_path}"
+            if field.related_name is not False and reverse_path is not False:
+                if reverse_path:
+                    reverse_path = f"{field.related_name}__{reverse_path}"
+                else:
+                    reverse_path = field.related_name
             else:
-                reverse_path = field.related_name
+                reverse_path = False
             if callback_fn:
                 callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_path, inverse=False, operator=None)
             if forward_path:
@@ -96,10 +100,12 @@ def crawl_relationship(model_class: Type["Model"], name: str, callback_fn: Any=N
                 raise ValueError(f"Tried to cross field: {field_name} of type {field!r}")
         else:
             break
-    if reverse_path:
-        reverse_path = f"{field_name}__{reverse_path}"
-    else:
-        reverse_path = field_name
+
+    if reverse_path is not False:
+        if reverse_path:
+            reverse_path = f"{field_name}__{reverse_path}"
+        else:
+            reverse_path = field_name
     if callback_fn and field is not None:
         callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_path, inverse=False, operator=operator)
     return RelationshipCrawlResult(
