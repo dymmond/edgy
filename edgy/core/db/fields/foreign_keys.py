@@ -48,6 +48,7 @@ class BaseForeignKeyField(BaseForeignKey):
         self.no_constraint = no_constraint
         self.embed_parent = embed_parent
         self.relation_fn =relation_fn
+        kwargs.setdefault("index", True)
         super().__init__(**kwargs)
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
@@ -199,7 +200,10 @@ class BaseForeignKeyField(BaseForeignKey):
 
     def get_global_constraints(self, name: str, columns: Sequence[sqlalchemy.Column]) -> Sequence[sqlalchemy.Constraint]:
         constraints = []
-        if not self.no_constraint:
+        no_constraint = self.no_constraint
+        if self.is_cross_db:
+            no_constraint = True
+        if not no_constraint:
             target = self.target
             constraints.append(
                 sqlalchemy.ForeignKeyConstraint(
@@ -211,7 +215,7 @@ class BaseForeignKeyField(BaseForeignKey):
                 ),
             )
         # set for unique, or if no_constraint was set and index is True
-        if self.unique or (self.index and self.no_constraint):
+        if self.unique or (self.index and no_constraint):
             constraints.append(
                 sqlalchemy.Index(
                     self.get_fkindex_name(name), *columns, unique=self.unique

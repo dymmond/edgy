@@ -279,9 +279,12 @@ def _set_related_name_for_foreign_keys(
             continue
 
         if not related_name:
-            related_name = f"{model_class.__name__.lower()}s_set"
+            if foreign_key.unique:
+                related_name = f"{model_class.__name__.lower()}"
+            else:
+                related_name = f"{model_class.__name__.lower()}s_set"
 
-        elif related_name in foreign_key.target.meta.fields_mapping:
+        if related_name in foreign_key.target.meta.fields_mapping:
             raise ForeignKeyBadConfigured(
                 f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
             )

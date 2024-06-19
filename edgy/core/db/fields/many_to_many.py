@@ -76,12 +76,13 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
         self.to = self.target
         __bases__: Tuple[Type["Model"], ...] = ()
-
+        pknames = set()
         if self.through:
             if isinstance(self.through, str):
                 self.through = self.registry.models[self.through]
             through = cast(Type["Model"], self.through)
             if through.meta.abstract:
+                pknames = set(cast(Sequence[str], through.pknames))
                 __bases__ = (through,)
             else:
                 if not self.from_foreign_key:
@@ -117,8 +118,16 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             self.to_foreign_key = to_name.lower()
 
         tablename = f"{owner_name.lower()}s_{to_name}s".lower()
+        meta_args = {
+            "tablename": tablename,
+            "registry": self.registry,
+            "multi_related": [to_name.lower()]
+        }
+        has_pknames = pknames and not pknames.issubset({self.from_foreign_key, self.to_foreign_key})
+        if has_pknames:
+            meta_args["unique_together"] = [(self.from_foreign_key, self.to_foreign_key)]
 
-        new_meta: MetaInfo = MetaInfo(None, tablename=tablename, registry=self.registry, multi_related=[to_name.lower()])
+        new_meta: MetaInfo = MetaInfo(None, **meta_args)
 
         to_related_name: Union[str, Literal[False]]
         if self.related_name is False:
@@ -127,7 +136,10 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             to_related_name = f"{self.related_name}"
             self.reverse_name = to_related_name
         else:
-            to_related_name = f"{to_name.lower()}_{class_name.lower()}s_set"
+            if self.unique:
+                to_related_name = f"{to_name.lower()}_{class_name.lower()}"
+            else:
+                to_related_name = f"{to_name.lower()}_{class_name.lower()}s_set"
             self.reverse_name = to_related_name
 
         fields = {
@@ -138,16 +150,17 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 related_name=False,
                 reverse_name=self.name,
                 related_fields=self.from_fields,
-                primary_key=True
+                primary_key=not has_pknames
             ),
             f"{self.to_foreign_key}": ForeignKey(
                 self.to,
                 null=True,
                 on_delete=CASCADE,
+                unique=self.unique,
                 related_name=to_related_name,
                 related_fields=self.to_fields,
                 embed_parent=(self.from_foreign_key, self.embed_through),
-                primary_key=True,
+                primary_key=not has_pknames,
                 relation_fn=self.get_inverse_relation
             ),
         }

@@ -15,6 +15,7 @@ hide:
 - Allow skipping creating a ForeignKeyConstraint
   - Allow creating an Index instead
 - Add ExcludeField for masking fields in submodels
+- M2M Pass unique through to target foreignkey
 - ConditionalRedirect constant for CompositeField
 - Embeddables via CompositeField
 - Add ForeignKeyFactory
@@ -36,6 +37,7 @@ hide:
 - ForeignKeys use now global constraints and indexes
 - Breaking: clean has now the argument to_query
 - Breaking: Many2Many doesn't have a RelatedField on owner anymore
+- Breaking: use singular related_name for unique ForeignKeys (or OneToOne)
 - MetaInfo (meta) is now lazy
 - `pk` is now a PKField (a variant of the BaseCompositeField)
 - `clean` and `to_columns` of BaseField do return empty objects instead of raising NotImplementedError
