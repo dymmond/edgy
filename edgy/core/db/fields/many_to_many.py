@@ -125,8 +125,10 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             to_related_name = False
         elif self.related_name:
             to_related_name = f"{self.related_name}"
+            self.reverse_name = to_related_name
         else:
             to_related_name = f"{to_name.lower()}_{class_name.lower()}s_set"
+            self.reverse_name = to_related_name
 
         fields = {
             f"{self.from_foreign_key}": ForeignKey(
