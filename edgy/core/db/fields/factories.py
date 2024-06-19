@@ -1,9 +1,5 @@
 from functools import lru_cache
-from typing import (
-    Any,
-    Sequence,
-    cast,
-)
+from typing import Any, Literal, Sequence, Union, cast
 
 from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL
 from edgy.core.db.fields.base import BaseField, Field
@@ -90,7 +86,7 @@ class ForeignKeyFieldFactory(FieldFactory):
         null: bool = False,
         on_update: str = CASCADE,
         on_delete: str = RESTRICT,
-        related_name: str = "",
+        related_name: Union[str, Literal[False]] = "",
         server_onupdate: Any = None,
         default: Any = None,
         server_default: Any = None,
@@ -124,6 +120,6 @@ class ForeignKeyFieldFactory(FieldFactory):
             raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
         related_name = kwargs.get("related_name", "")
 
-        # tolerate Nones
+        # tolerate None and False
         if related_name and not isinstance(related_name, str):
             raise FieldDefinitionError("related_name must be a string.")

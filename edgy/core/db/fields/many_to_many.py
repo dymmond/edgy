@@ -1,4 +1,16 @@
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Tuple, Type, TypeVar, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Dict,
+    Literal,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
@@ -7,6 +19,7 @@ from edgy.core.db.fields.foreign_keys import ForeignKey
 from edgy.core.db.relationships.relation import ManyRelation
 from edgy.core.terminal import Print
 from edgy.core.utils.models import create_edgy_model
+from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
 
@@ -39,6 +52,12 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.through = through
         self.embed_through = embed_through
 
+    def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
+        return ManyRelation(through=self.through, to=self.to, from_foreign_key=self.from_foreign_key, to_foreign_key=self.to_foreign_key, embed_through=self.embed_through, **kwargs)
+
+    def get_inverse_relation(self, **kwargs: Any) -> ManyRelationProtocol:
+        return ManyRelation(through=self.through, to=self.owner, from_foreign_key=self.to_foreign_key, to_foreign_key=self.from_foreign_key, embed_through=self.embed_through, **kwargs)
+
 
     def add_model_to_register(self, model: Any) -> None:
         """
@@ -57,12 +76,13 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
         self.to = self.target
         __bases__: Tuple[Type["Model"], ...] = ()
-
+        pknames = set()
         if self.through:
             if isinstance(self.through, str):
                 self.through = self.registry.models[self.through]
             through = cast(Type["Model"], self.through)
             if through.meta.abstract:
+                pknames = set(cast(Sequence[str], through.pknames))
                 __bases__ = (through,)
             else:
                 if not self.from_foreign_key:
@@ -98,32 +118,51 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             self.to_foreign_key = to_name.lower()
 
         tablename = f"{owner_name.lower()}s_{to_name}s".lower()
+        meta_args = {
+            "tablename": tablename,
+            "registry": self.registry,
+            "multi_related": [to_name.lower()]
+        }
+        has_pknames = pknames and not pknames.issubset({self.from_foreign_key, self.to_foreign_key})
+        if has_pknames:
+            meta_args["unique_together"] = [(self.from_foreign_key, self.to_foreign_key)]
 
-        new_meta: MetaInfo = MetaInfo(None, tablename=tablename, registry=self.registry, multi_related=[to_name.lower()])
+        new_meta: MetaInfo = MetaInfo(None, **meta_args)
 
-        # Define the related names
-        owner_related_name = (
-            f"{self.related_name}_{class_name.lower()}s_set"
-            if self.related_name
-            else f"{owner_name.lower()}_{class_name.lower()}s_set"
-        )
+        to_related_name: Union[str, Literal[False]]
+        if self.related_name is False:
+            to_related_name = False
+        elif self.related_name:
+            to_related_name = f"{self.related_name}"
+            self.reverse_name = to_related_name
+        else:
+            if self.unique:
+                to_related_name = f"{to_name.lower()}_{class_name.lower()}"
+            else:
+                to_related_name = f"{to_name.lower()}_{class_name.lower()}s_set"
+            self.reverse_name = to_related_name
 
-        to_related_name = (
-            f"{self.related_name}" if self.related_name else f"{to_name.lower()}_{class_name.lower()}s_set"
-        )
         fields = {
             f"{self.from_foreign_key}": ForeignKey(
                 self.owner,
                 null=True,
                 on_delete=CASCADE,
-                related_name=owner_related_name,
+                related_name=False,
+                reverse_name=self.name,
                 related_fields=self.from_fields,
-                primary_key=True
+                primary_key=not has_pknames
             ),
-            f"{self.to_foreign_key}": ForeignKey(self.to, null=True, on_delete=CASCADE, related_name=to_related_name,
+            f"{self.to_foreign_key}": ForeignKey(
+                self.to,
+                null=True,
+                on_delete=CASCADE,
+                unique=self.unique,
+                related_name=to_related_name,
                 related_fields=self.to_fields,
                 embed_parent=(self.from_foreign_key, self.embed_through),
-                primary_key=True),
+                primary_key=not has_pknames,
+                relation_fn=self.get_inverse_relation
+            ),
         }
 
         # Create the through model
@@ -141,9 +180,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         Meta field
         """
-        if isinstance(value, ManyRelation):
+        if isinstance(value, ManyRelationProtocol):
             return {field_name: value}
-        return {field_name: ManyRelation(through=self.through, to=self.to, from_foreign_key=self.from_foreign_key, to_foreign_key=self.to_foreign_key, embed_through=self.embed_through, refs=value)}
+        return {field_name: self.get_relation(refs=value)}
 
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
@@ -158,7 +197,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
     def __get__(self, instance: "Model", owner: Any = None) -> ManyRelation:
         if instance:
             if self.name not in instance.__dict__:
-                instance.__dict__[self.name] = ManyRelation(through=self.through, to=self.to, from_foreign_key=self.from_foreign_key, to_foreign_key=self.to_foreign_key, embed_through=self.embed_through, instance=instance)
+                instance.__dict__[self.name] = self.get_relation()
             if instance.__dict__[self.name].instance is None:
                 instance.__dict__[self.name].instance = instance
             return instance.__dict__[self.name]  # type: ignore

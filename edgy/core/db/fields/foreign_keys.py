@@ -1,12 +1,14 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, TypeVar
 
 import sqlalchemy
 from pydantic import BaseModel
 
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
+from edgy.core.db.relationships.relation import SingleRelation
 from edgy.core.terminal import Print
+from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
     from edgy import Model
@@ -37,6 +39,7 @@ class BaseForeignKeyField(BaseForeignKey):
         related_fields: Sequence[str] = (),
         no_constraint: bool = False,
         embed_parent: Optional[Tuple[str, str]]=None,
+        relation_fn: Optional[Callable[..., ManyRelationProtocol]]=None,
         **kwargs: Any,
     ) -> None:
         self.related_fields = related_fields
@@ -44,7 +47,14 @@ class BaseForeignKeyField(BaseForeignKey):
         self.on_delete = on_delete
         self.no_constraint = no_constraint
         self.embed_parent = embed_parent
+        self.relation_fn =relation_fn
+        kwargs.setdefault("index", True)
         super().__init__(**kwargs)
+
+    def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
+        if self.relation_fn is not None:
+            return self.relation_fn(**kwargs)
+        return SingleRelation(to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs)
 
     @cached_property
     def related_columns(self) -> Dict[str, Optional[sqlalchemy.Column]]:
@@ -190,7 +200,10 @@ class BaseForeignKeyField(BaseForeignKey):
 
     def get_global_constraints(self, name: str, columns: Sequence[sqlalchemy.Column]) -> Sequence[sqlalchemy.Constraint]:
         constraints = []
-        if not self.no_constraint:
+        no_constraint = self.no_constraint
+        if self.is_cross_db:
+            no_constraint = True
+        if not no_constraint:
             target = self.target
             constraints.append(
                 sqlalchemy.ForeignKeyConstraint(
@@ -202,7 +215,7 @@ class BaseForeignKeyField(BaseForeignKey):
                 ),
             )
         # set for unique, or if no_constraint was set and index is True
-        if self.unique or (self.index and self.no_constraint):
+        if self.unique or (self.index and no_constraint):
             constraints.append(
                 sqlalchemy.Index(
                     self.get_fkindex_name(name), *columns, unique=self.unique

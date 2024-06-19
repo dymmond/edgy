@@ -16,7 +16,7 @@ Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions
 * **exclude** - An bool indicating if the field is included in model_dump
 * **default** - A value or a callable (function).
 * **index** - A boolean. Determine if a database index should be created.
-* **inherit** - A boolean. Determine if a field can be inherited in submodels. Default is False.
+* **inherit** - A boolean. Determine if a field can be inherited in submodels. Default is True. It is used by PKField, RelatedField and the injected ID Field.
 * **skip_absorption_check** - A boolean. Default False. Dangerous option! By default when defining a CompositeField with embedded fields and the `absorb_existing_fields` option it is checked that the field type of the absorbed field is compatible with the field type of the embedded field. This option skips the check.
 * **unique** - A boolean. Determine if a unique constraint should be created for the field.
 Check the [unique_together](./models.md#unique-together) for more details.
@@ -370,7 +370,8 @@ class MyModel(edgy.Model):
 ##### Parameters
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
-* **related_name** - The name to use for the relation from the related object back to this one.
+* **related_name** - The name to use for the relation from the related object back to this one. Can be False to disable a reverse connection.
+                     Note: This will also prevent prefetching and reversing via `__`.
 * **related_fields** - The columns or fields to use for the foreign key. If unset or empty, the primary key(s) are used.
 * **embed_parent** (to_attr, as_attr) - When accessing the reverse relation part, return to_attr instead and embed the parent object in as_attr (when as_attr is not empty). Default None (which disables it).
 * **no_constraint** - Skip creating a constraint. Note: if set and index=True an index will be created instead.
@@ -380,12 +381,15 @@ from `edgy`.
 * **on_update** - A string indicating the behaviour that should happen on update of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `edgy`.
+* **relation_fn** - Optionally drop a function which returns a Relation for the reverse side. This will be used by the RelatedField (if it is created). Used by Many2Many.
 
     ```python
     from edgy import CASCADE, SET_NULL, RESTRICT
     ```
 
-
+Note: there is a `reverse_name` argument which can be used when `related_name=False` to specify a field for backward relations.
+It is useless except if related_name is False because it is otherwise overwritten.
+The `reverse_name` argument is used for finding the backward relation.
 
 #### RefForeignKey
 

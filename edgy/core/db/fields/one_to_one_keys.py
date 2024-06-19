@@ -24,7 +24,6 @@ class OneToOneField(ForeignKey):
         for argument in ["index", "unique"]:
             if argument in kwargs:
                 terminal.write_warning(f"Declaring {argument} on a OneToOneField has no effect.")
-        kwargs["index"] = False
         kwargs["unique"] = True
 
         return super().__new__(cls, to=to, **kwargs)

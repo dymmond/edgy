@@ -59,6 +59,7 @@ async def rollback_connections():
 
 
 async def test_related_name_query():
+    assert "album_tracks_albumtracks_set" not in Album.meta.fields_mapping
     album = await Album.query.create(name="Malibu")
     album2 = await Album.query.create(name="Santa Monica")
 

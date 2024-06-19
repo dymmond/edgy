@@ -168,6 +168,7 @@ async def test_raises_RelationshipNotFound():
 
 
 async def test_many_to_many_many_fields():
+    assert "album_albumtracks_set" not in Album.meta.fields_mapping
     track1 = await Track.query.create(title="The Bird", position=1)
     track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
     track3 = await Track.query.create(title="The Waters", position=3)

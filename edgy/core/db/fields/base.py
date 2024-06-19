@@ -7,6 +7,7 @@ from typing import (
     ClassVar,
     Dict,
     FrozenSet,
+    Literal,
     Optional,
     Pattern,
     Sequence,
@@ -429,10 +430,14 @@ class BaseForeignKey(BaseField):
     def __init__(
         self,
         *,
-        related_name: str = "",
+        related_name: Union[str, Literal[False]] = "",
+        reverse_name: str = "",
         **kwargs: Any,
     ) -> None:
         self.related_name = related_name
+        # name used for backward relations
+        # only useful if related_name = False because otherwise it gets overwritten
+        self.reverse_name = reverse_name
         super().__init__(**kwargs)
 
     @property
