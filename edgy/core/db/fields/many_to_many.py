@@ -56,7 +56,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         return ManyRelation(through=self.through, to=self.to, from_foreign_key=self.from_foreign_key, to_foreign_key=self.to_foreign_key, embed_through=self.embed_through, **kwargs)
 
     def get_inverse_relation(self, **kwargs: Any) -> ManyRelationProtocol:
-        return ManyRelation(through=self.through, to=self.owner, from_foreign_key=self.to_foreign_key, to_foreign_key=self.from_foreign_key, embed_through=self.embed_through, **kwargs)
+        return ManyRelation(through=self.through, to=self.owner, reverse=True, from_foreign_key=self.to_foreign_key, to_foreign_key=self.from_foreign_key, embed_through=self.embed_through, **kwargs)
 
 
     def add_model_to_register(self, model: Any) -> None:

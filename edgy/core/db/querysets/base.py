@@ -899,7 +899,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if len(rows) > 1:
             raise MultipleObjectsReturned()
 
-        return queryset.model_class.from_sqla_row(
+        return self.embed_parent_in_result(queryset.model_class.from_sqla_row(
             rows[0],
             select_related=queryset._select_related,
             is_only_fields=is_only_fields,
@@ -908,7 +908,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             prefetch_related=queryset._prefetch_related,
             exclude_secrets=queryset._exclude_secrets,
             using_schema=queryset.using_schema,
-        )
+        ))
 
     async def first(self, **kwargs: Any) -> Union[EdgyModel, None]:
         """
@@ -920,7 +920,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         rows = await queryset.limit(1).order_by("id").all()
         if rows:
-            return rows[0]
+            return self.embed_parent_in_result(rows[0])
         return None
 
     async def last(self, **kwargs: Any) -> Union[EdgyModel, None]:
@@ -933,7 +933,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         rows = await queryset.order_by("-id").all()
         if rows:
-            return rows[0]
+            return self.embed_parent_in_result(rows[0])
         return None
 
     async def create(self, **kwargs: Any) -> EdgyModel:
@@ -944,7 +944,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         instance = queryset.model_class(**kwargs)
         instance.table = queryset.table
         instance = await instance.save(force_save=True)
-        return instance
+        return self.embed_parent_in_result(instance)
 
     async def bulk_create(self, objs: List[Dict]) -> None:
         """
@@ -1064,6 +1064,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         if getattr(instance, "pk", None) is None:
             raise ValueError("'obj' must be a model or reflect model instance.")
+        # TODO: handle embed parent
         return await queryset.filter(pk=instance.pk).exists()
 
     async def _execute(self) -> Any:

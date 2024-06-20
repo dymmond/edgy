@@ -1,6 +1,7 @@
 import pytest
 
 import edgy
+from edgy.core.db.relationships.relation import ManyRelation
 from edgy.exceptions import RelationshipIncompatible, RelationshipNotFound
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
@@ -73,7 +74,8 @@ async def test_add_many_to_many():
     total_tracks = await album.tracks.all()
     assert len(total_tracks) == 3
     for track in total_tracks:
-        assert track.embedded.track.pk == track.pk
+        assert track.embedded.album.pk == album.pk
+    assert isinstance(track1.track_albumtracks_set, ManyRelation)
 
 async def test_add_many_to_many_new():
     track1 = await Track.query.create(title="The Bird", position=1)
@@ -85,7 +87,8 @@ async def test_add_many_to_many_new():
     total_tracks = await album.tracks.all()
     assert len(total_tracks) == 3
     for track in total_tracks:
-        assert track.embedded.track.pk == track.pk
+        assert track.embedded.album.pk == album.pk
+    assert isinstance(track1.track_albumtracks_set, ManyRelation)
 
 async def test_add_many_to_many_with_repeated_field():
     track1 = await Track.query.create(title="The Bird", position=1)

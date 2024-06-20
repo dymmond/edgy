@@ -423,9 +423,12 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         return super().__getattr__(name)
 
     def __eq__(self, other: Any) -> bool:
-        if self.__class__ != other.__class__:
+        # if self.__class__ != other.__class__:
+        #     return False
+        # somehow meta gets regenerated, so just compare tablename and registry.
+        if self.meta.registry is not other.meta.registry:
             return False
-        if self.meta != other.meta:
+        if self.meta.tablename != other.meta.tablename:
             return False
         self_dict = self._extract_values_from_field(self.extract_db_fields(), is_partial=True)
         other_dict = self._extract_values_from_field(other.extract_db_fields(), is_partial=True)
