@@ -254,6 +254,8 @@ async def test_one_to_one_field_crud():
 
     person = await Person.query.get(email="info@edgy.com")
     assert person.profile.pk == profile.pk
+    reverse_person = await profile.person.get()
+    assert reverse_person == person
 
     await person.profile.load()
     assert person.profile.website == "https://edgy.com"
@@ -274,6 +276,8 @@ async def test_one_to_one_crud():
 
     person = await AnotherPerson.query.get(email="info@edgy.com")
     assert person.profile.pk == profile.pk
+    reverse_person = await profile.anotherperson.get()
+    assert reverse_person == person
 
     await person.profile.load()
     assert person.profile.website == "https://edgy.com"

@@ -1,10 +1,10 @@
 import functools
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Tuple, Type, Union
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Tuple, Type, Union, cast
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 
-from edgy.exceptions import RelationshipIncompatible, RelationshipNotFound
+from edgy.exceptions import ObjectNotFound, RelationshipIncompatible, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
@@ -26,6 +26,7 @@ class ManyRelation(ManyRelationProtocol):
         to_foreign_key: str,
         to: Union[Type["Model"], Type["ReflectModel"]],
         through: Union[Type["Model"], Type["ReflectModel"]],
+        reverse: bool=False,
         embed_through: str = "",
         refs: Any = (),
         instance: Optional[Union["Model", "ReflectModel"]] = None,
@@ -35,6 +36,7 @@ class ManyRelation(ManyRelationProtocol):
         self.through = through
         self.to = to
         self.instance = instance
+        self.reverse = reverse
         self.from_foreign_key = from_foreign_key
         self.to_foreign_key = to_foreign_key
         self.embed_through = embed_through
@@ -96,7 +98,7 @@ class ManyRelation(ManyRelationProtocol):
     def _add_object(self, child: Type["Model"]) -> None:
         self.refs.append(self.expand_relationship(child))
 
-    async def add(self, child: "Model") -> None:
+    async def add(self, child: "Model") -> Optional["Model"]:
         """
         Adds a child to the model as a list
 
@@ -110,19 +112,32 @@ class ManyRelation(ManyRelationProtocol):
 
         try:
             async with child.database.transaction():
-                await child.save(force_save=True)
+                return await child.save(force_save=True)
         except Exception:
             pass
+        return None
 
-    async def remove(self, child: "Model") -> None:
+    async def remove(self, child: Optional["Model"]=None) -> None:
         """Removes a child from the list of many to many.
 
         . Validates if there is a relationship between the entities.
         . Removes the field if there is
         """
+        if self.reverse:
+            fk = self.through.meta.fields_mapping[self.from_foreign_key]
+        else:
+            fk = self.through.meta.fields_mapping[self.to_foreign_key]
+        if child is None:
+            if fk.unique:
+                try:
+                    child = await self.get()
+                except ObjectNotFound:
+                    raise RelationshipNotFound(detail="no child found") from None
+            else:
+                raise RelationshipNotFound(detail="no child specified")
         if not isinstance(child, (self.to, self.to.proxy_model, self.through, self.through.proxy_model)):
             raise RelationshipIncompatible(f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'.")
-        child = self.expand_relationship(child)
+        child = cast("Model", self.expand_relationship(child))
         count = await child.query.filter(sqlalchemy.and_(*child.identifying_clauses())).count()
         if count == 0:
             raise RelationshipNotFound(
@@ -228,7 +243,7 @@ class SingleRelation(ManyRelationProtocol):
         while self.refs:
             await self.add(self.refs.pop())
 
-    async def add(self, child: "Model") -> None:
+    async def add(self, child: "Model") -> Optional["Model"]:
         """
         Adds a child to the model as a list
 
@@ -240,13 +255,23 @@ class SingleRelation(ManyRelationProtocol):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
 
         await child.save(values={self.to_foreign_key: self.instance})
+        return child
 
-    async def remove(self, child: "Model") -> None:
+    async def remove(self, child: Optional["Model"]=None) -> None:
         """Removes a child from the list of one to many.
 
         . Validates if there is a relationship between the entities.
         . Removes the field if there is
         """
+        fk = self.to.meta.fields_mapping[self.to_foreign_key]
+        if child is None:
+            if fk.unique:
+                try:
+                    child = await self.get()
+                except ObjectNotFound:
+                    raise RelationshipNotFound(detail="no child found") from None
+            else:
+                raise RelationshipNotFound(detail="no child specified")
         if not isinstance(child, self.to):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
 
