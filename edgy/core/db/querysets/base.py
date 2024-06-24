@@ -133,7 +133,7 @@ class BaseQuerySet(
         limit_offset: Any = None,
         order_by: Any = None,
         group_by: Any = None,
-        distinct_on: Any = None,
+        distinct_on: Optional[Sequence[str]] = None,
         only_fields: Any = None,
         defer_fields: Any = None,
         embed_parent: Any = None,
@@ -151,7 +151,7 @@ class BaseQuerySet(
         self._offset = limit_offset
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
-        self.distinct_on = [] if distinct_on is None else distinct_on
+        self.distinct_on = distinct_on
         self._only = [] if only_fields is None else only_fields
         self._defer = [] if defer_fields is None else defer_fields
         self._expression = None
@@ -198,11 +198,13 @@ class BaseQuerySet(
         expression = expression.where(clause)
         return expression
 
-    def _build_select_distinct(self, distinct_on: Any, expression: Any) -> Any:
-        """Filters selects only specific fields"""
-        distinct_on = list(map(self._prepare_fields_for_distinct, distinct_on))
-        expression = expression.distinct(*distinct_on)
-        return expression
+    def _build_select_distinct(self, distinct_on: Optional[Sequence[str]], expression: Any) -> Any:
+        """Filters selects only specific fields. Leave empty to use simple distinct"""
+        # using with columns is not supported by all databases
+        if distinct_on:
+            return expression.distinct(*map(self._prepare_fields_for_distinct, distinct_on))
+        else:
+            return expression.distinct()
 
     def _build_tables_select_from_relationship(self) -> Any:
         """
@@ -330,7 +332,7 @@ class BaseQuerySet(
         if queryset._group_by:
             expression = queryset._build_group_by_expression(queryset._group_by, expression=expression)
 
-        if queryset.distinct_on:
+        if queryset.distinct_on is not None:
             expression = queryset._build_select_distinct(queryset.distinct_on, expression=expression)
 
         queryset._expression = expression  # type: ignore
@@ -427,9 +429,8 @@ class BaseQuerySet(
         group_col = self.table.columns[group_by]
         return group_col
 
-    def _prepare_fields_for_distinct(self, distinct_on: str) -> Any:
-        _distinct_on: sqlalchemy.Column = self.table.columns[distinct_on]
-        return _distinct_on
+    def _prepare_fields_for_distinct(self, distinct_on: str) -> sqlalchemy.Column:
+        return self.table.columns[distinct_on]
 
     def _clone(self) -> Any:
         """
@@ -638,7 +639,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._group_by = group_by
         return queryset
 
-    def distinct(self, *distinct_on: Sequence[str]) -> "QuerySet":
+    def distinct(self, *distinct_on: str) -> "QuerySet":
         """
         Returns a queryset with distinct results.
         """
@@ -818,7 +819,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self._clone()
         if queryset.embed_parent:
-            queryset.distinct_on = [queryset.embed_parent[0]]
+            # activates distinct, not distinct on
+            queryset.distinct_on = []
 
         if kwargs:
             return await queryset.filter(**kwargs).all()

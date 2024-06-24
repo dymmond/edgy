@@ -231,6 +231,8 @@ async def test_related_name_nested_query():
     assert teams[0].pk == blue_team.pk
 
 
+@pytest.mark.skipif(database.url.dialect == "mysql", reason="Not supported on MySQL")
+@pytest.mark.skipif(database.url.dialect == "sqlite", reason="Not supported on SQLite")
 async def test_related_name_nested_query_multiple_foreign_keys_and_nested():
     acme = await Organisation.query.create(ident="ACME Ltd")
     red_team = await Team.query.create(org=acme, name="Red Team")
