@@ -1,5 +1,5 @@
 import functools
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Tuple, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Tuple, Type, Union, cast
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
@@ -9,6 +9,21 @@ from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
     from edgy import Model, QuerySet, ReflectModel
+
+
+
+def _removeprefix(text: str, prefix: str) -> str:
+    # TODO: replace with removeprefix when python3.9 is minimum
+    if text.startswith(prefix):
+        return text[len(prefix) :]
+    else:
+        return text
+
+
+def _removeprefixes(text:str, *prefixes: Sequence[str]) -> str:
+    for prefix in prefixes:
+        text = _removeprefix(text, prefix)
+    return text
 
 
 class ManyRelation(ManyRelationProtocol):
@@ -27,7 +42,7 @@ class ManyRelation(ManyRelationProtocol):
         to: Union[Type["Model"], Type["ReflectModel"]],
         through: Union[Type["Model"], Type["ReflectModel"]],
         reverse: bool=False,
-        embed_through: str = "",
+        embed_through: Union[Literal[False], str] = "",
         refs: Any = (),
         instance: Optional[Union["Model", "ReflectModel"]] = None,
         **kwargs: Any,
@@ -79,10 +94,19 @@ class ManyRelation(ManyRelationProtocol):
             assert self.instance, "instance not initialized"
             fk = self.through.meta.fields_mapping[self.from_foreign_key]
             query = {}
+            if self.embed_through == "":
+                new_kwargs = kwargs
+            else:
+                new_kwargs = {}
+                for key, val in kwargs.items():
+                    if self.embed_through is False or not key.startswith(self.embed_through):
+                        new_kwargs[f"{self.to_foreign_key}__{key}"] = val
+                    else:
+                        new_kwargs[_removeprefixes(key, self.embed_through, "__")] = val
             for related_name in fk.related_columns.keys():
                 query[related_name] = getattr(self.instance, related_name)
-            kwargs[self.from_foreign_key] = query
-            return func(*args, **kwargs)
+            new_kwargs[self.from_foreign_key] = query
+            return func(*args, **new_kwargs)
 
         return wrapped
 
@@ -231,11 +255,20 @@ class SingleRelation(ManyRelationProtocol):
             assert self.instance, "instance not initialized"
             fk = self.to.meta.fields_mapping[self.to_foreign_key]
             query = {}
+            if not self.embed_parent:
+                new_kwargs = kwargs
+            else:
+                for key, val in kwargs.items():
+                    if not self.embed_parent[1] or not key.startswith(self.embed_parent[1]):
+                        new_kwargs[f"{self.embed_parent[0]}__{key}"] = val
+                    else:
+                        new_kwargs[_removeprefixes(key, self.embed_parent[1], "__")] = val
+
             for column_name in fk.get_column_names():
                 related_name = fk.from_fk_field_name(fk.name, column_name)
                 query[related_name] = getattr(self.instance, related_name)
-            kwargs[self.to_foreign_key] = query
-            return func(*args, **kwargs)
+            new_kwargs[self.to_foreign_key] = query
+            return func(*args, **new_kwargs)
 
         return wrapped
 

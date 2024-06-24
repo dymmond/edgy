@@ -1,15 +1,15 @@
 import functools
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Dict, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Tuple, Type, Union, cast
 
-from edgy.core.db.fields.base import BaseField
+from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
     from edgy import Model, ReflectModel
 
-class RelatedField(BaseField):
+class RelatedField(RelationshipField):
     """
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
@@ -71,12 +71,14 @@ class RelatedField(BaseField):
     def foreign_key(self) -> BaseForeignKeyField:
         return cast(BaseForeignKeyField, self.related_from.meta.fields_mapping[self.foreign_key_name])
 
+    def traverse_field(self, path: str) -> Tuple[Any, str, str]:
+        return self.foreign_key.reverse_traverse_field(path)
+
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         return self.foreign_key.get_relation(**kwargs)
 
-    @property
     def is_cross_db(self) -> bool:
-        return self.foreign_key.is_cross_db
+        return self.foreign_key.is_cross_db()
 
     def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
         if not for_query:

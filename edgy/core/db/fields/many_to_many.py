@@ -1,3 +1,4 @@
+from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -31,6 +32,27 @@ T = TypeVar("T", bound="Model")
 terminal = Print()
 
 
+def _removesuffix(text: str, suffix: str) -> str:
+    # TODO: replace with _removesuffix when python3.9 is minimum
+    if text.endswith(suffix):
+        return text[: -len(suffix)]
+    else:
+        return text
+
+
+def _removeprefix(text: str, prefix: str) -> str:
+    # TODO: replace with removeprefix when python3.9 is minimum
+    if text.startswith(prefix):
+        return text[len(prefix) :]
+    else:
+        return text
+
+
+def _removeprefixes(text:str, *prefixes: Sequence[str]) -> str:
+    for prefix in prefixes:
+        text = _removeprefix(text, prefix)
+    return text
+
 class BaseManyToManyForeignKeyField(BaseForeignKey):
     is_m2m: bool = True
     def __init__(
@@ -41,7 +63,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
         through: Union[str, Type["Model"]] = "",
-        embed_through: str="",
+        embed_through: Union[str, Literal[False]]="",
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -52,12 +74,42 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.through = through
         self.embed_through = embed_through
 
+    @cached_property
+    def embed_through_prefix(self) -> str:
+        if self.embed_through is False:
+            return ""
+        if not self.embed_through:
+            return self.name
+        return f"{self.name}__{self.embed_through}"
+
+    @cached_property
+    def reverse_embed_through_prefix(self) -> str:
+        if self.embed_through is False:
+            return ""
+        if not self.embed_through:
+            return self.reverse_name
+        return f"{self.reverse_name}__{self.embed_through}"
+
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         return ManyRelation(through=self.through, to=self.to, from_foreign_key=self.from_foreign_key, to_foreign_key=self.to_foreign_key, embed_through=self.embed_through, **kwargs)
 
-    def get_inverse_relation(self, **kwargs: Any) -> ManyRelationProtocol:
+    def get_reverse_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         return ManyRelation(through=self.through, to=self.owner, reverse=True, from_foreign_key=self.to_foreign_key, to_foreign_key=self.from_foreign_key, embed_through=self.embed_through, **kwargs)
 
+    def traverse_field(self, path: str) -> Tuple[Any, str, str]:
+        if self.embed_through_prefix and path.startswith(self.embed_through_prefix):
+            return self.through, self.from_foreign_key, _removeprefixes(path, self.embed_through_prefix, "__")
+        return self.to, self.reverse_name, _removeprefixes(path, self.name, "__")
+
+    def reverse_traverse_field(self, path: str) -> Tuple[Any, str, str]:
+        # called from inner fk
+        return self.owner, self.name,  _removeprefixes(path, self.from_foreign_key, "__")
+
+    def reverse_traverse_field_fk(self, path: str) -> Tuple[Any, str, str]:
+        # used for target fk
+        if self.reverse_embed_through_prefix and path.startswith(self.reverse_embed_through_prefix):
+            return self.through, self.to_foreign_key, _removeprefix(_removeprefix(path, self.reverse_embed_through_prefix), "__")
+        return self.owner, self.name, _removeprefixes(path, self.reverse_name, "__")
 
     def add_model_to_register(self, model: Any) -> None:
         """
@@ -159,9 +211,10 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 unique=self.unique,
                 related_name=to_related_name,
                 related_fields=self.to_fields,
-                embed_parent=(self.from_foreign_key, self.embed_through),
+                embed_parent=(self.from_foreign_key, self.embed_through or ""),
                 primary_key=not has_pknames,
-                relation_fn=self.get_inverse_relation
+                relation_fn=self.get_reverse_relation,
+                reverse_path_fn=self.reverse_traverse_field_fk
             ),
         }
 

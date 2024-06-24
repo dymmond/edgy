@@ -1,5 +1,4 @@
 import copy
-from collections import deque
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -23,11 +22,10 @@ import sqlalchemy
 from edgy.conf import settings
 from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields import CharField, TextField
-from edgy.core.db.fields.base import BaseForeignKey
+from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import PrefetchMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
-from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.protocols.queryset import QuerySetProtocol
@@ -46,60 +44,43 @@ class RelationshipCrawlResult(NamedTuple):
     forward_path: str
     reverse_path: Union[str, Literal[False]]
 
-def crawl_relationship(model_class: Type["Model"], name: str, callback_fn: Any=None) -> RelationshipCrawlResult:
-    splitted = deque(name.split("__"))
-    field_name = splitted.popleft()
+def crawl_relationship(model_class: Type["Model"], path: str, callback_fn: Any=None) -> RelationshipCrawlResult:
     field = None
-    forward_path = ""
+    forward_prefix_path = ""
     reverse_path: Union[str, Literal[False]] = ""
     operator: str = "exact"
-    while splitted:
+    field_name: str = path
+    while path:
+        splitted = path.split("__", 1)
+        field_name = splitted[0]
         field = model_class.meta.fields_mapping.get(field_name)
-        if field is None:
-            if len(splitted) == 1 and splitted[0] in settings.filter_operators:
-                operator = splitted[0]
-                break
-            else:
-                raise ValueError(f"Field: {field_name} of {name} not found")
-        if isinstance(field, BaseForeignKey):
-            model_class = field.target
-            if field.reverse_name and reverse_path is not False:
+        if isinstance(field, RelationshipField) and len(splitted) == 2:
+            model_class, reverse_part, path = field.traverse_field(path)
+            if field.is_cross_db():
+                raise NotImplementedError("We cannot cross databases yet, this feature is planned")
+            reverse = not isinstance(field, BaseForeignKey)
+            if reverse_part and reverse_path is not False:
                 if reverse_path:
-                    reverse_path = f"{field.reverse_name}__{reverse_path}"
+                    reverse_path = f"{reverse_part}__{reverse_path}"
                 else:
-                    reverse_path = field.reverse_name
+                    reverse_path = reverse_part
             else:
                 reverse_path = False
+
             if callback_fn:
-                callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_path, inverse=False, operator=None)
-            if forward_path:
-                forward_path =  f"{forward_path}__{field_name}"
+                callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_prefix_path, reverse=reverse, operator=None)
+            if forward_prefix_path:
+                forward_prefix_path =  f"{forward_prefix_path}__{field_name}"
             else:
-                forward_path = field_name
-            field_name = splitted.popleft()
-        elif isinstance(field, RelatedField):
-            model_class = field.related_from
-            if reverse_path is not False:
-                if reverse_path:
-                    reverse_path = f"{field.related_name}__{reverse_path}"
-                else:
-                    reverse_path = field.foreign_key_name
-            if callback_fn:
-                callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_path, inverse=True, operator=None)
-            if forward_path:
-                forward_path =  f"{forward_path}__{field_name}"
-            else:
-                forward_path = field_name
-            field_name = splitted.popleft()
-        elif splitted:
-            # Determine if we should treat the final part as a
-            # filter operator or as a related field.
-            if len(splitted) == 1 and splitted[0] in settings.filter_operators:
-                operator = splitted[0]
+                forward_prefix_path = field_name
+        elif len(splitted) == 2:
+            if "__" not in splitted[1] and splitted[1] in settings.filter_operators:
+                operator = splitted[1]
                 break
             else:
-                raise ValueError(f"Tried to cross field: {field_name} of type {field!r}")
+                raise ValueError(f"Tried to cross field: {field_name} of type {field!r}, remainder: {splitted[1]}")
         else:
+            operator = "exact"
             break
 
     if reverse_path is not False:
@@ -108,12 +89,12 @@ def crawl_relationship(model_class: Type["Model"], name: str, callback_fn: Any=N
         else:
             reverse_path = field_name
     if callback_fn and field is not None:
-        callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_path, inverse=False, operator=operator)
+        callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_prefix_path, reverse=False, operator=operator)
     return RelationshipCrawlResult(
         model_class=model_class,
         field_name=field_name,
         operator=operator,
-        forward_path=forward_path,
+        forward_path=forward_prefix_path,
         reverse_path=reverse_path,
     )
 
@@ -126,7 +107,6 @@ def clean_query_kwargs(model: Type["Model"], kwargs: Dict[str, Any]) -> Dict[str
             new_kwargs.update(field.clean(key, val, for_query=True))
         else:
             new_kwargs[key] = val
-            assert not isinstance(field, (BaseForeignKey, RelatedField))
     assert "pk" not in new_kwargs, "pk should be already parsed"
     return new_kwargs
 
@@ -237,47 +217,48 @@ class BaseQuerySet(
         tables = {select_from.name: select_from}
 
         # Select related
-        for item in queryset._select_related:
+        for select_path in queryset._select_related:
             # For m2m relationships
             model_class = queryset.model_class
             select_from = queryset.table
             former_table = None
-            for part in item.split("__"):
-                field = model_class.fields[part]
-                if isinstance(field, BaseForeignKey):
-                    model_class = field.target
-                    inverse = False
-                    foreign_key = field
-                elif isinstance(field, RelatedField):
-                    model_class = field.related_from
-                    foreign_key = field.foreign_key
-                    inverse = True
+            while select_path:
+                field_name = select_path.split("__", 1)[0]
+                field = model_class.fields[field_name]
+                if isinstance(field, RelationshipField):
+                    model_class, reverse_part, select_path = field.traverse_field(select_path)
                 else:
-                    raise ValueError(f"{part}: invalid field type: {field!r}")
-                if foreign_key.is_cross_db:
+                    raise ValueError(f"{field_name}: invalid field type: {field!r}")
+                if isinstance(field, BaseForeignKey):
+                    foreign_key = field
+                    reverse = False
+                else:
+                    foreign_key = model_class.meta.fields_mapping[reverse_part]
+                    reverse = True
+                if foreign_key.is_cross_db():
                     raise NotImplementedError("We cannot cross databases yet, this feature is planned")
                 table = model_class.table
                 select_from = sqlalchemy.sql.join(  # type: ignore
                     select_from,
                     table,
-                    *self._select_from_relationship_clause_generator(select_from, foreign_key, table, inverse, former_table)
+                    *self._select_from_relationship_clause_generator(select_from, foreign_key, table, reverse, former_table)
                 )
                 former_table = table
-                tables[table.name] = table  # type: ignore
+                tables[table.name] = table
 
         return tables.values(), select_from
 
     @staticmethod
-    def _select_from_relationship_clause_generator(select_from: Any, foreign_key: BaseForeignKey, table: Any, inverse: bool, former_table: Any=None) -> Any:
+    def _select_from_relationship_clause_generator(select_from: Any, foreign_key: BaseForeignKey, table: Any, reverse: bool, former_table: Any=None) -> Any:
         column_names = foreign_key.get_column_names(foreign_key.name)
         for col in column_names:
-            if inverse:
+            if reverse:
                 colname = foreign_key.from_fk_field_name(foreign_key.name, col)
             else:
                 colname = col
             if former_table is None:
                 former_table = select_from
-            if inverse:
+            if reverse:
                 yield getattr(former_table.c, colname) == getattr(table.c, col)
             else:
                 yield getattr(former_table.c, colname) == getattr(table.c, foreign_key.from_fk_field_name(foreign_key.name, col))
@@ -377,8 +358,8 @@ class BaseQuerySet(
         kwargs = clean_query_kwargs(self.model_class, kwargs)
 
         for key, value in kwargs.items():
+            assert not isinstance(value, Model), f"should be parsed in clean: {key}: {value}"
             model_class, field_name, op, related_str, _ = crawl_relationship(self.model_class, key)
-            assert not isinstance(value, Model)
             if related_str and related_str not in select_related:
                 select_related.append(related_str)
             column = model_class.table.columns[field_name]

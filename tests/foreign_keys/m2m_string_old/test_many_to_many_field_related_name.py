@@ -29,7 +29,7 @@ class Track(edgy.Model):
 class Album(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     name = edgy.CharField(max_length=100)
-    tracks = edgy.ManyToManyField("Track", related_name="album_tracks", embed_through="embedded")
+    tracks = edgy.ManyToManyField("Track", related_name="album_tracks")
 
     class Meta:
         registry = models
@@ -37,8 +37,8 @@ class Album(edgy.Model):
 
 class Studio(edgy.Model):
     name = edgy.CharField(max_length=255)
-    users = edgy.ManyToManyField("User", related_name="studio_users", embed_through="embedded")
-    albums = edgy.ManyToManyField("Album", related_name="studio_albums", embed_through="embedded")
+    users = edgy.ManyToManyField("User", related_name="studio_users")
+    albums = edgy.ManyToManyField("Album", related_name="studio_albums")
 
     class Meta:
         registry = models
@@ -105,22 +105,22 @@ async def test_related_name_query_nested():
     assert album_tracks[0].pk == track1.pk
     assert album_tracks[1].pk == track2.pk
 
-    tracks_album = await track1.album_tracks.filter(name=album.name)
+    tracks_album = await track1.album_tracks.filter(album__name=album.name)
 
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album.pk
 
-    tracks_album = await track3.album_tracks.filter(name=album2.name)
+    tracks_album = await track3.album_tracks.filter(album__name=album2.name)
 
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album2.pk
 
-    tracks_album = await track1.album_tracks.filter(embedded__track__title=track1.title)
+    tracks_album = await track1.album_tracks.filter(track__title=track1.title)
 
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album.pk
 
-    tracks_album = await track3.album_tracks.filter(embedded__track__title=track3.title)
+    tracks_album = await track3.album_tracks.filter(track__title=track3.title)
 
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album2.pk
@@ -149,15 +149,15 @@ async def test_related_name_query_returns_nothing():
     assert album_tracks[0].pk == track1.pk
     assert album_tracks[1].pk == track2.pk
 
-    tracks_album = await track1.album_tracks.filter(name=album2.name)
+    tracks_album = await track1.album_tracks.filter(album__name=album2.name)
 
     assert len(tracks_album) == 0
 
-    tracks_album = await track3.album_tracks.filter(name=album.name)
+    tracks_album = await track3.album_tracks.filter(album__name=album.name)
 
     assert len(tracks_album) == 0
 
-    studio_albums = await album.studio_albums.filter(pk=studio)
+    studio_albums = await album.studio_albums.filter(studio=studio)
 
     assert len(studio_albums) == 1
     assert studio_albums[0].pk == studio.pk
@@ -167,6 +167,6 @@ async def test_related_name_query_returns_nothing():
     assert len(studio_albums) == 1
     assert studio_albums[0].pk == studio.pk
 
-    studio_albums = await album2.studio_albums.filter(pk=studio2)
+    studio_albums = await album2.studio_albums.filter(studio=studio2)
 
     assert len(studio_albums) == 0

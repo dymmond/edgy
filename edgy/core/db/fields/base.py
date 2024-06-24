@@ -11,6 +11,7 @@ from typing import (
     Optional,
     Pattern,
     Sequence,
+    Tuple,
     Type,
     Union,
     cast,
@@ -34,6 +35,7 @@ def _removesuffix(text: str, suffix: str) -> str:
         return text[: -len(suffix)]
     else:
         return text
+
 
 class BaseField(FieldInfo):
     """
@@ -314,6 +316,13 @@ class BaseCompositeField(BaseField):
         return {}
 
 
+class RelationshipField(BaseField):
+    def traverse_field(self, path: str) -> Tuple[Any, str, str]:
+        raise NotImplementedError()
+
+    def is_cross_db(self) -> bool:
+        raise NotImplementedError()
+
 
 class PKField(BaseCompositeField):
     """
@@ -424,7 +433,7 @@ class PKField(BaseCompositeField):
         return False
 
 
-class BaseForeignKey(BaseField):
+class BaseForeignKey(RelationshipField):
     is_m2m: bool = False
 
     def __init__(
@@ -463,7 +472,9 @@ class BaseForeignKey(BaseField):
         except AttributeError:
             pass
 
-    @property
+    def reverse_traverse_field(self, path: str) -> Tuple[Any, str, str]:
+        raise NotImplementedError()
+
     def is_cross_db(self) -> bool:
         return self.owner.meta.registry is not self.target.meta.registry
 
