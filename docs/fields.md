@@ -392,8 +392,12 @@ It is useless except if related_name is False because it is otherwise overwritte
 The `reverse_name` argument is used for finding the backward relation.
 
 
-Note: when embed_parent is set, queries start to use the second parameter of embed_parent. If it is empty, queries cannot access the parent anymore.
+Note: when embed_parent is set, queries start to use the second parameter of embed_parent **if it is a relationshipfield**.
+If it is empty, queries cannot access the parent anymore.
 This is analogue to Many2Many fields.
+
+If it isn't a relationship field (e.g. embeddable, CompositeField) queries are fired against the model, without the prefix stripped.
+
 
 #### RefForeignKey
 

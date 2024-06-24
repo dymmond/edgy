@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Tuple, Type,
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 
+from edgy.core.db.fields.base import RelationshipField
 from edgy.exceptions import ObjectNotFound, RelationshipIncompatible, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
@@ -255,7 +256,7 @@ class SingleRelation(ManyRelationProtocol):
             assert self.instance, "instance not initialized"
             fk = self.to.meta.fields_mapping[self.to_foreign_key]
             query = {}
-            if not self.embed_parent:
+            if not self.embed_parent or not isinstance(fk.owner.meta.fields_mapping[self.embed_parent[0]], RelationshipField):
                 new_kwargs = kwargs
             else:
                 new_kwargs = {}
