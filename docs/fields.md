@@ -422,11 +422,10 @@ from `edgy`.
 * **reverse_path_fn** - Optionally drop a function which handles the traversal from the reverse side. Used by the ManyToMany field.
 
 !!! Note:
-    The index roughly works like this:
-    1. `no_constraint` not set, try to build a constraint and use it instead of index
-    2. `is_cross_db()` or `no_constraint` is True: check index parameter
-    3. index parameter unset or set to True or unique is True: build index
-    This means if you don't want to create an index as fallback you have to set the parameter explicit to False.
+    The index parameter can improve the performance and is strongly recommended especially with `no_constraint` but also
+    ForeignKeys with constraint will benefit. By default off because conflicts are easily to provoke when reinitializing models (tests with database fixture scope="function").
+    This is no concern for webservers where models are initialized once.
+    `unique` uses internally an index and `index=False` will be ignored.
 
 
 !!! Note:
@@ -438,7 +437,7 @@ from `edgy`.
 !!! Note:
     When `embed_parent` is set, queries start to use the second parameter of `embed_parent` **if it is a RelationshipField**.
     If it is empty, queries cannot access the parent anymore when the first parameter points to a `RelationshipField`.
-    This is mode is analogue to Many2Many fields.
+    This is mode is analogue to ManyToMany fields.
     Otherwise, the first parameter points not to a `RelationshipField` (e.g. embeddable, CompositeField), queries use still the model, without the prefix stripped.
 
 
@@ -491,6 +490,12 @@ class MyModel(edgy.Model):
 
 !!! Note:
     If **through** is an abstract model it will be used as a template (a new model is generated with through as base).
+
+
+!!! Note:
+    The index parameter is passed through to the ForeignKey fields but is not required. The intern ForeignKey fields
+    create with their primary key constraint and unique_together fallback their own index.
+    You should be warned that the same for ForeignKey fields applies here for index, so you most probably don't want to use an index here.
 
 #### IPAddressField
 

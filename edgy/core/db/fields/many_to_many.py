@@ -190,6 +190,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 to_related_name = f"{to_name.lower()}_{class_name.lower()}s_set"
             self.reverse_name = to_related_name
 
+        # in any way m2m fields will have an index (either by unique_together or by their primary key constraint)
+
         fields = {
             f"{self.from_foreign_key}": ForeignKey(
                 self.owner,
@@ -198,7 +200,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 related_name=False,
                 reverse_name=self.name,
                 related_fields=self.from_fields,
-                primary_key=not has_pknames
+                primary_key=not has_pknames,
+                index=self.index
             ),
             f"{self.to_foreign_key}": ForeignKey(
                 self.to,
@@ -209,6 +212,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 related_fields=self.to_fields,
                 embed_parent=(self.from_foreign_key, self.embed_through or ""),
                 primary_key=not has_pknames,
+                index=self.index,
                 relation_fn=self.get_reverse_relation,
                 reverse_path_fn=self.reverse_traverse_field_fk
             ),

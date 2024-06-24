@@ -50,7 +50,6 @@ class BaseForeignKeyField(BaseForeignKey):
         self.embed_parent = embed_parent
         self.relation_fn =relation_fn
         self.reverse_path_fn = reverse_path_fn
-        kwargs.setdefault("index", True)
         super().__init__(**kwargs)
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
@@ -224,8 +223,8 @@ class BaseForeignKeyField(BaseForeignKey):
                     name=self.get_fk_name(name),
                 ),
             )
-        # set for unique, or if no_constraint was set and index is True
-        if self.unique or (self.index and no_constraint):
+        # set for unique or if index is True
+        if self.unique or self.index:
             constraints.append(
                 sqlalchemy.Index(
                     self.get_fkindex_name(name), *columns, unique=self.unique

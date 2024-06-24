@@ -26,7 +26,7 @@ class Album(edgy.Model):
 
 class Track(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
-    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE, related_fields=("name",))
+    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE, related_fields=("name",), index=True)
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()
 
@@ -44,7 +44,7 @@ class Organisation(edgy.Model):
 
 class Team(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
-    org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT)
+    org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT, index=True)
     name = edgy.CharField(max_length=100, primary_key=True)
 
     class Meta:
@@ -71,7 +71,7 @@ class Profile(edgy.Model):
 class Person(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     email = edgy.CharField(max_length=100)
-    profile = edgy.OneToOneField(Profile, on_delete=edgy.CASCADE)
+    profile = edgy.OneToOneField(Profile, on_delete=edgy.CASCADE, index=True)
 
     class Meta:
         registry = models
@@ -80,7 +80,7 @@ class Person(edgy.Model):
 class AnotherPerson(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     email = edgy.CharField(max_length=100)
-    profile = edgy.OneToOne(Profile, on_delete=edgy.CASCADE)
+    profile = edgy.OneToOne(Profile, on_delete=edgy.CASCADE, index=True)
 
     class Meta:
         registry = models
