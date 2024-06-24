@@ -258,6 +258,7 @@ class SingleRelation(ManyRelationProtocol):
             if not self.embed_parent:
                 new_kwargs = kwargs
             else:
+                new_kwargs = {}
                 for key, val in kwargs.items():
                     if not self.embed_parent[1] or not key.startswith(self.embed_parent[1]):
                         new_kwargs[f"{self.embed_parent[0]}__{key}"] = val
