@@ -367,6 +367,40 @@ class MyModel(edgy.Model):
 
 ```
 
+Hint you can change the base for the reverse end with embed_parent:
+
+```python
+import edgy
+
+class Address(edgy.Model):
+    street = edgy.CharField(max_length=100)
+    city = edgy.CharField(max_length=100)
+
+    class Meta:
+        abstract = True
+
+class User(edgy.Model):
+    is_active: bool = edgy.BooleanField(default=True)
+
+
+class Profile(edgy.Model):
+    is_enabled: bool = edgy.BooleanField(default=True)
+    user: User = edgy.OneToOne("User", on_delete=edgy.CASCADE, embed_parent=("address", "parent"))
+    address: Address = Address
+
+
+class MyModel(edgy.Model):
+    profile: Profile = edgy.ForeignKey(Profile, on_delete=edgy.CASCADE, related_name="my_models")
+    ...
+
+```
+when on the user model the `profile` reverse link is queried, by default the address embeddable is returned.
+Queries continue to use the Profile Model as base because address isn't a RelationshipField.
+The Profile object can be accessed by the `parent` attribute we choosed as second parameter.
+
+When the second parameter is empty, the parent object is not included as attribute.
+
+
 ##### Parameters
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
@@ -381,22 +415,32 @@ from `edgy`.
 * **on_update** - A string indicating the behaviour that should happen on update of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `edgy`.
-* **relation_fn** - Optionally drop a function which returns a Relation for the reverse side. This will be used by the RelatedField (if it is created). Used by Many2Many.
-
     ```python
     from edgy import CASCADE, SET_NULL, RESTRICT
     ```
+* **relation_fn** - Optionally drop a function which returns a Relation for the reverse side. This will be used by the RelatedField (if it is created). Used by the ManyToMany field.
+* **reverse_path_fn** - Optionally drop a function which handles the traversal from the reverse side. Used by the ManyToMany field.
 
-Note: there is a `reverse_name` argument which can be used when `related_name=False` to specify a field for backward relations.
-It is useless except if related_name is False because it is otherwise overwritten.
-The `reverse_name` argument is used for finding the backward relation.
+!!! Note:
+    The index roughly works like this:
+    1. `no_constraint` not set, try to build a constraint and use it instead of index
+    2. `is_cross_db()` or `no_constraint` is True: check index parameter
+    3. index parameter unset or set to True or unique is True: build index
+    This means if you don't want to create an index as fallback you have to set the parameter explicit to False.
 
 
-Note: when embed_parent is set, queries start to use the second parameter of embed_parent **if it is a relationshipfield**.
-If it is empty, queries cannot access the parent anymore.
-This is analogue to Many2Many fields.
+!!! Note:
+    There is a `reverse_name` argument which can be used when `related_name=False` to specify a field for reverse relations.
+    It is useless except if related_name is `False` because it is otherwise overwritten.
+    The `reverse_name` argument is used for finding the reverse field of the relationship.
 
-If it isn't a relationship field (e.g. embeddable, CompositeField) queries are fired against the model, without the prefix stripped.
+
+!!! Note:
+    When `embed_parent` is set, queries start to use the second parameter of `embed_parent` **if it is a RelationshipField**.
+    If it is empty, queries cannot access the parent anymore when the first parameter points to a `RelationshipField`.
+    This is mode is analogue to Many2Many fields.
+    Otherwise, the first parameter points not to a `RelationshipField` (e.g. embeddable, CompositeField), queries use still the model, without the prefix stripped.
+
 
 
 #### RefForeignKey
@@ -441,8 +485,9 @@ class MyModel(edgy.Model):
 * **through** - The model to be used for the relationship. Edgy generates the model by default
                 if None is provided or **through** is an abstract model.
 * **embed_through** - When traversing, embed the through object in this attribute. Otherwise it is not accessable from the result.
-                      if empty, the old behaviour is used to query from the through model as base
-                      If not an empty string or False this is only possible from string as prefix or not accessable with False.
+                      if an empty string was provided, the old behaviour is used to query from the through model as base (default).
+                      if False, the base is transformed to the target and source model (full proxying). You cannot select the through model via path traversal anymore (except from the through model itself).
+                      If not an empty string, the same behaviour like with False applies except that you can select the through model fields via path traversal with the provided name.
 
 !!! Note:
     If **through** is an abstract model it will be used as a template (a new model is generated with through as base).
