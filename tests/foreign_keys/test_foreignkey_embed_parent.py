@@ -1,11 +1,7 @@
-import sqlite3
 
-import asyncpg
-import pymysql
 import pytest
 
 import edgy
-from edgy.exceptions import FieldDefinitionError
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -59,7 +55,7 @@ async def rollback_connections():
 async def test_embed_parent():
     profile = await Profile.query.create(website="https://edgy.com")
     person = await Person.query.create(email="info@edgy.com")
-    profile_holder = await ProfileHolder.query.create(name="edgy", profile=profile, person=person)
+    await ProfileHolder.query.create(name="edgy", profile=profile, person=person)
 
     person = await Person.query.get(email="info@edgy.com")
     profile_queried = await person.profile_holder.get()
@@ -68,4 +64,4 @@ async def test_embed_parent():
     await profile_queried.parent.load()
     assert profile_queried.parent.name == "edgy"
     # try querying the embed field
-    profile_queried == await person.profile_holder.filter(parent__name="edgy").get()
+    assert profile_queried.pk == (await person.profile_holder.filter(parent__name="edgy").get()).pk
