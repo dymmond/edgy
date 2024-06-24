@@ -40,6 +40,7 @@ class BaseForeignKeyField(BaseForeignKey):
         no_constraint: bool = False,
         embed_parent: Optional[Tuple[str, str]]=None,
         relation_fn: Optional[Callable[..., ManyRelationProtocol]]=None,
+        reverse_path_fn: Optional[Callable[[str], Tuple[Any, str, str]]]=None,
         **kwargs: Any,
     ) -> None:
         self.related_fields = related_fields
@@ -48,6 +49,7 @@ class BaseForeignKeyField(BaseForeignKey):
         self.no_constraint = no_constraint
         self.embed_parent = embed_parent
         self.relation_fn =relation_fn
+        self.reverse_path_fn = reverse_path_fn
         kwargs.setdefault("index", True)
         super().__init__(**kwargs)
 
@@ -55,6 +57,14 @@ class BaseForeignKeyField(BaseForeignKey):
         if self.relation_fn is not None:
             return self.relation_fn(**kwargs)
         return SingleRelation(to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs)
+
+    def traverse_field(self, path: str) -> Tuple[Any, str, str]:
+        return self.target, self.reverse_name, _removeprefix(_removeprefix(path, self.name), "__")
+
+    def reverse_traverse_field(self, path: str) -> Tuple[Any, str, str]:
+        if self.reverse_path_fn:
+            return self.reverse_path_fn(path)
+        return self.owner, self.name, _removeprefix(_removeprefix(path, self.reverse_name), "__")
 
     @cached_property
     def related_columns(self) -> Dict[str, Optional[sqlalchemy.Column]]:
@@ -201,7 +211,7 @@ class BaseForeignKeyField(BaseForeignKey):
     def get_global_constraints(self, name: str, columns: Sequence[sqlalchemy.Column]) -> Sequence[sqlalchemy.Constraint]:
         constraints = []
         no_constraint = self.no_constraint
-        if self.is_cross_db:
+        if self.is_cross_db():
             no_constraint = True
         if not no_constraint:
             target = self.target

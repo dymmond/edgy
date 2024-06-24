@@ -1,7 +1,6 @@
 import pytest
 
 import edgy
-from edgy.core.db.relationships.relation import ManyRelation
 from edgy.exceptions import RelationshipIncompatible, RelationshipNotFound
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
@@ -31,7 +30,7 @@ class Track(edgy.Model):
 class Album(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     name = edgy.CharField(max_length=100)
-    tracks = edgy.ManyToManyField(Track, embed_through="embedded")
+    tracks = edgy.ManyToManyField("Track")
 
     class Meta:
         registry = models
@@ -39,8 +38,8 @@ class Album(edgy.Model):
 
 class Studio(edgy.Model):
     name = edgy.CharField(max_length=255)
-    users = edgy.ManyToManyField(User)
-    albums = edgy.ManyToManyField(Album)
+    users = edgy.ManyToManyField("User")
+    albums = edgy.ManyToManyField("Album")
 
     class Meta:
         registry = models
@@ -72,10 +71,8 @@ async def test_add_many_to_many():
     await album.tracks.add(track3)
 
     total_tracks = await album.tracks.all()
+
     assert len(total_tracks) == 3
-    for track in total_tracks:
-        assert track.embedded.album.pk == album.pk
-    assert isinstance(track1.track_albumtracks_set, ManyRelation)
 
 async def test_add_many_to_many_new():
     track1 = await Track.query.create(title="The Bird", position=1)
@@ -86,9 +83,8 @@ async def test_add_many_to_many_new():
 
     total_tracks = await album.tracks.all()
     assert len(total_tracks) == 3
-    for track in total_tracks:
-        assert track.embedded.album.pk == album.pk
-    assert isinstance(track1.track_albumtracks_set, ManyRelation)
+
+
 
 async def test_add_many_to_many_with_repeated_field():
     track1 = await Track.query.create(title="The Bird", position=1)
@@ -180,13 +176,6 @@ async def test_raises_RelationshipNotFound():
         await album.tracks.remove(track3)
 
     assert raised.value.args[0] == f"There is no relationship between 'album' and 'track: {track3.pk}'."
-
-
-async def test_many_to_many_many_related_manager():
-    album1 = await Album.query.create(name="Malibu")
-    assert album1.tracks is not None
-    album1 = await Album.query.get(name="Malibu")
-    assert album1.tracks is not None
 
 
 async def test_many_to_many_many_fields():
@@ -289,22 +278,22 @@ async def test_related_name_query_nested():
     assert album_tracks[0].pk == track1.pk
     assert album_tracks[1].pk == track2.pk
 
-    tracks_album = await track1.track_albumtracks_set.filter(name=album.name)
+    tracks_album = await track1.track_albumtracks_set.filter(album__name=album.name)
 
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album.pk
 
-    tracks_album = await track3.track_albumtracks_set.filter(name=album2.name)
+    tracks_album = await track3.track_albumtracks_set.filter(album__name=album2.name)
 
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album2.pk
 
-    tracks_album = await track1.track_albumtracks_set.filter(embedded__track__title=track1.title)
+    tracks_album = await track1.track_albumtracks_set.filter(track__title=track1.title)
 
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album.pk
 
-    tracks_album = await track3.track_albumtracks_set.filter(embedded__track__title=track3.title)
+    tracks_album = await track3.track_albumtracks_set.filter(track__title=track3.title)
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album2.pk
 
@@ -327,10 +316,10 @@ async def test_related_name_query_returns_nothing():
     assert album_tracks[0].pk == track1.pk
     assert album_tracks[1].pk == track2.pk
 
-    tracks_album = await track1.track_albumtracks_set.filter(name=album2.name)
+    tracks_album = await track1.track_albumtracks_set.filter(album__name=album2.name)
 
     assert len(tracks_album) == 0
 
-    tracks_album = await track3.track_albumtracks_set.filter(name=album.name)
+    tracks_album = await track3.track_albumtracks_set.filter(album__name=album.name)
 
     assert len(tracks_album) == 0

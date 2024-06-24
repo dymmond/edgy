@@ -1,9 +1,8 @@
 import asyncio
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Union, cast
 
-from edgy.core.db.fields.base import BaseForeignKey
+from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.models.base import EdgyBaseModel
-from edgy.core.db.relationships.related_field import RelatedField
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -52,35 +51,22 @@ class ModelRow(EdgyBaseModel):
         secret_fields = [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
 
         for related in select_related:
-            # first check the fields
-            try:
-                field = cls.meta.fields_mapping[related]
-                if isinstance(field, BaseForeignKey):
-                    model_class = field.target
-                elif isinstance(field, RelatedField):
-                    model_class = field.related_from
-                else:
-                    raise Exception("invalid field")
-                item[related] = model_class.from_sqla_row(row, exclude_secrets=exclude_secrets, using_schema=using_schema)
-            except KeyError:
-                if "__" in related:
-                    first_part, remainder = related.split("__", 1)
-                    field = cls.meta.fields_mapping[first_part]
-                    if isinstance(field, BaseForeignKey):
-                        model_class = field.target
-                    elif isinstance(field, RelatedField):
-                        model_class = field.related_from
-                    else:
-                        raise Exception("invalid field") from None
-
-                    item[first_part] = model_class.from_sqla_row(
-                        row,
-                        select_related=[remainder],
-                        prefetch_related=prefetch_related,
-                        exclude_secrets=exclude_secrets,
-                        using_schema=using_schema,
-                    )
-
+            field_name = related.split("__", 1)[0]
+            field = cls.meta.fields_mapping[field_name]
+            if isinstance(field, RelationshipField):
+                model_class, _, remainder = field.traverse_field(related)
+            else:
+                raise Exception("invalid field")
+            if remainder:
+                item[field_name] = model_class.from_sqla_row(
+                    row,
+                    select_related=[remainder],
+                    prefetch_related=prefetch_related,
+                    exclude_secrets=exclude_secrets,
+                    using_schema=using_schema,
+                )
+            else:
+                item[field_name] = model_class.from_sqla_row(row, exclude_secrets=exclude_secrets, using_schema=using_schema)
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
         # This way it is not overritten by any value
@@ -185,7 +171,7 @@ class ModelRow(EdgyBaseModel):
         prefetch_related: Sequence["Prefetch"],
         parent_cls: Optional[Type["Model"]] = None,
         # for going back
-        inverse_path: str = "",
+        reverse_path: str = "",
         is_nested: bool = False,
     ) -> Type["Model"]:
         """
@@ -208,20 +194,16 @@ class ModelRow(EdgyBaseModel):
                     )
 
             if not is_nested:
-                inverse_path = ""
+                reverse_path = ""
 
             if "__" in related.related_name:
                 first_part, remainder = related.related_name.split("__", 1)
 
                 field = cls.meta.fields_mapping[first_part]
-                if isinstance(field, BaseForeignKey):
-                    model_class = field.target
-                    reverse_part = field.reverse_name
+                if isinstance(field, RelationshipField):
+                    model_class, reverse_part, remainder = field.traverse_field(related.related_name)
                     if not reverse_part:
-                        raise Exception("No backward relation possible (missing related_name)")
-                elif isinstance(field, RelatedField):
-                    model_class = field.related_from
-                    reverse_part = field.foreign_key_name
+                        raise Exception("No reverse relation possible (missing related_name)")
                 else:
                     raise Exception("invalid field")
 
@@ -229,10 +211,10 @@ class ModelRow(EdgyBaseModel):
                 remainder_prefetch = related.__class__(
                     related_name=remainder, to_attr=related.to_attr, queryset=related.queryset
                 )
-                if inverse_path:
-                    inverse_path = f"{reverse_part}__{inverse_path}"
+                if reverse_path:
+                    reverse_path = f"{reverse_part}__{reverse_path}"
                 else:
-                    inverse_path = reverse_part
+                    reverse_path = reverse_part
 
                 # Recursively continue the process of handling the
                 # new prefetch
@@ -240,7 +222,7 @@ class ModelRow(EdgyBaseModel):
                     row,
                     model,
                     prefetch_related=[remainder_prefetch],
-                    inverse_path=inverse_path,
+                    reverse_path=reverse_path,
                     parent_cls=model,
                     is_nested=True,
                 )
@@ -260,7 +242,7 @@ class ModelRow(EdgyBaseModel):
                 records = cls.process_nested_prefetch_related(
                     row,
                     prefetch_related=related,
-                    inverse_path=inverse_path,
+                    reverse_path=reverse_path,
                     parent_cls=model,
                     queryset=related.queryset,
                 )
@@ -274,7 +256,7 @@ class ModelRow(EdgyBaseModel):
         row: "Row",
         prefetch_related: "Prefetch",
         parent_cls: Type["Model"],
-        inverse_path: str,
+        reverse_path: str,
         queryset: "QuerySet",
     ) -> List[Type["Model"]]:
         """
@@ -282,22 +264,17 @@ class ModelRow(EdgyBaseModel):
         """
         # Get the related field
         field = cls.meta.fields_mapping[prefetch_related.related_name]
-        if isinstance(field, BaseForeignKey):
-            related_field = field.target.meta.fields_mapping[field.related_name]
-            reverse_part = related_field.reverse_name
+        if isinstance(field, RelationshipField):
+            model_class, reverse_part, remainder = field.traverse_field(prefetch_related.related_name)
             if not reverse_part:
                 raise Exception("No backward relation possible (missing related_name)")
         else:
-            related_field = field
-            reverse_part = field.foreign_key_name
+            raise Exception("invalid field")
 
-        if inverse_path:
-            inverse_path = f"{reverse_part}__{inverse_path}"
+        if reverse_path:
+            reverse_path = f"{reverse_part}__{reverse_path}"
         else:
-            inverse_path = reverse_part
-
-        # Get the model to query related
-        model_class = related_field.related_from
+            reverse_path = reverse_part
 
         # TODO: related_field.clean would be better
         # fix this later when allowing selecting fields for fireign keys
@@ -305,7 +282,7 @@ class ModelRow(EdgyBaseModel):
         extra = {}
         for pkcol in parent_cls.pkcolumns:
             filter_by_pk = row[pkcol]
-            extra[f"{inverse_path}__{pkcol}"] = filter_by_pk
+            extra[f"{reverse_path}__{pkcol}"] = filter_by_pk
 
         records = asyncio.get_event_loop().run_until_complete(cls.run_query(model_class, extra, queryset))
         return records

@@ -391,6 +391,14 @@ Note: there is a `reverse_name` argument which can be used when `related_name=Fa
 It is useless except if related_name is False because it is otherwise overwritten.
 The `reverse_name` argument is used for finding the backward relation.
 
+
+Note: when embed_parent is set, queries start to use the second parameter of embed_parent **if it is a relationshipfield**.
+If it is empty, queries cannot access the parent anymore.
+This is analogue to Many2Many fields.
+
+If it isn't a relationship field (e.g. embeddable, CompositeField) queries are fired against the model, without the prefix stripped.
+
+
 #### RefForeignKey
 
 ```python
@@ -432,7 +440,9 @@ class MyModel(edgy.Model):
 * **related_name** - The name to use for the relation from the related object back to this one.
 * **through** - The model to be used for the relationship. Edgy generates the model by default
                 if None is provided or **through** is an abstract model.
-* **embed_through** - When traversing, embed the through object in this attribute. Otherwise it is not accessable.
+* **embed_through** - When traversing, embed the through object in this attribute. Otherwise it is not accessable from the result.
+                      if empty, the old behaviour is used to query from the through model as base
+                      If not an empty string or False this is only possible from string as prefix or not accessable with False.
 
 !!! Note:
     If **through** is an abstract model it will be used as a template (a new model is generated with through as base).

@@ -282,22 +282,22 @@ async def test_related_name_query_nested():
     assert album_tracks[0].pk == track1.pk
     assert album_tracks[1].pk == track2.pk
 
-    tracks_album = await track1.track_albumtracks_set.filter(album__name=album.name)
+    tracks_album = await track1.track_albumtracks_set.filter(name=album.name)
 
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album.pk
 
-    tracks_album = await track3.track_albumtracks_set.filter(album__name=album2.name)
+    tracks_album = await track3.track_albumtracks_set.filter(name=album2.name)
 
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album2.pk
 
-    tracks_album = await track1.track_albumtracks_set.filter(track__title=track1.title)
+    tracks_album = await track1.track_albumtracks_set.filter(embedded__track__title=track1.title)
 
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album.pk
 
-    tracks_album = await track3.track_albumtracks_set.filter(track__title=track3.title)
+    tracks_album = await track3.track_albumtracks_set.filter(embedded__track__title=track3.title)
     assert len(tracks_album) == 1
     assert tracks_album[0].pk == album2.pk
 
@@ -320,10 +320,10 @@ async def test_related_name_query_returns_nothing():
     assert album_tracks[0].pk == track1.pk
     assert album_tracks[1].pk == track2.pk
 
-    tracks_album = await track1.track_albumtracks_set.filter(album__name=album2.name)
+    tracks_album = await track1.track_albumtracks_set.filter(name=album2.name)
 
     assert len(tracks_album) == 0
 
-    tracks_album = await track3.track_albumtracks_set.filter(album__name=album.name)
+    tracks_album = await track3.track_albumtracks_set.filter(name=album.name)
 
     assert len(tracks_album) == 0

@@ -32,12 +32,19 @@ class Profile(edgy.Model):
     users: List[User] = edgy.ManyToMany("User")
 ```
 
+### Queries
+
+Queries from a Many2Many field use the `through` model as base when embed_through is empty. This also applies for the reverse related field.
+If embed_through is False the virtual base changes to the `target` model.
+The same applies if embed_through is not-empty. In this case it is possible to target the embedded model via the embed_through path part.
+It is like a virtual path part which can be traversed via the `__` path building.
+
 ### Operations
 
 With the many to many you can perform all the normal operations of searching from normal queries
 to the [related name][related_name] as per normal search.
 
-ManyToMany allows two different methods when using it.
+ManyToMany allows two different methods when using it (the same applies for the reverse side).
 
 * `add()` - Adds a record to the ManyToMany.
 * `remove()` - Removes a record to the ManyToMany.
@@ -81,6 +88,8 @@ organisation.teams.add(red_team)
 organisation.teams.remove(red_team)
 organisation.teams.remove(blue_team)
 ```
+
+Hint: when unique, remove works also without argument.
 
 #### Related name
 
