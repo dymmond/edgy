@@ -472,9 +472,6 @@ class BaseForeignKey(RelationshipField):
         except AttributeError:
             pass
 
-    def reverse_traverse_field(self, path: str) -> Tuple[Any, str, str]:
-        raise NotImplementedError()
-
     def is_cross_db(self) -> bool:
         return self.owner.meta.registry is not self.target.meta.registry
 

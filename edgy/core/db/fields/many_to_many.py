@@ -101,10 +101,6 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             return self.through, self.from_foreign_key, _removeprefixes(path, self.embed_through_prefix, "__")
         return self.to, self.reverse_name, _removeprefixes(path, self.name, "__")
 
-    def reverse_traverse_field(self, path: str) -> Tuple[Any, str, str]:
-        # called from inner fk
-        return self.owner, self.name,  _removeprefixes(path, self.from_foreign_key, "__")
-
     def reverse_traverse_field_fk(self, path: str) -> Tuple[Any, str, str]:
         # used for target fk
         if self.reverse_embed_through_prefix and path.startswith(self.reverse_embed_through_prefix):
