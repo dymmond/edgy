@@ -34,10 +34,10 @@ hide:
 
 - Breaking: Prefetch traversal of foreign keys uses now the foreign key name. For the traversal of RelatedFields everything stays the same.
 - ForeignKeys use now global constraints and indexes.
-- Breaking: clean has now the argument to_query.
-- Breaking: Many2Many doesn't have a RelatedField on owner anymore.
-- Breaking: use singular related_name for unique ForeignKeys (or OneToOne).
-- MetaInfo (meta) is now lazy.
+- Breaking: clean has now the argument to_query. See [Custom Fields](./fields.md#Custom%20Fields)
+- Breaking: ManyToMany doesn't have a RelatedField on owner anymore and uses proxying. See [ManyToMany](./fields.md#ManyToMany)
+- Breaking: use singular related_name for unique ForeignKeys (or OneToOne). See [related_name](./queries/related-name.md)
+- MetaInfo (meta) is now partly lazy.
 - `pk` is now a PKField (a variant of the BaseCompositeField).
 - `clean` and `to_columns` of BaseField do return empty objects instead of raising NotImplementedError.
 - Major refactory of ForeignKeys, move logic for single ForeignKeys to subclass.

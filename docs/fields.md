@@ -369,34 +369,14 @@ class MyModel(edgy.Model):
 
 Hint you can change the base for the reverse end with embed_parent:
 
-```python
-import edgy
 
-class Address(edgy.Model):
-    street = edgy.CharField(max_length=100)
-    city = edgy.CharField(max_length=100)
-
-    class Meta:
-        abstract = True
-
-class User(edgy.Model):
-    is_active: bool = edgy.BooleanField(default=True)
-
-
-class Profile(edgy.Model):
-    is_enabled: bool = edgy.BooleanField(default=True)
-    user: User = edgy.OneToOne("User", on_delete=edgy.CASCADE, embed_parent=("address", "parent"))
-    address: Address = Address
-
-
-class MyModel(edgy.Model):
-    profile: Profile = edgy.ForeignKey(Profile, on_delete=edgy.CASCADE, related_name="my_models")
-    ...
-
+```python hl_lines="26"
+{!> ../docs_src/relationships/embed_parent_with_embedded.py !}
 ```
+
 when on the user model the `profile` reverse link is queried, by default the address embeddable is returned.
 Queries continue to use the Profile Model as base because address isn't a RelationshipField.
-The Profile object can be accessed by the `parent` attribute we choosed as second parameter.
+The Profile object can be accessed by the `profile` attribute we choosed as second parameter.
 
 When the second parameter is empty, the parent object is not included as attribute.
 
@@ -404,8 +384,9 @@ When the second parameter is empty, the parent object is not included as attribu
 ##### Parameters
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
-* **related_name** - The name to use for the relation from the related object back to this one. Can be False to disable a reverse connection.
-                     Note: This will also prevent prefetching and reversing via `__`.
+* **related_name** - The name to use for the relation from the related object back to this one. Can be set to `False` to disable a reverse connection.
+                     Note: Setting to `False` will also prevent prefetching and reversing via `__`.
+                     See also [related_name](./queries/related-name.md) for defaults
 * **related_fields** - The columns or fields to use for the foreign key. If unset or empty, the primary key(s) are used.
 * **embed_parent** (to_attr, as_attr) - When accessing the reverse relation part, return to_attr instead and embed the parent object in as_attr (when as_attr is not empty). Default None (which disables it).
 * **no_constraint** - Skip creating a constraint. Note: if set and index=True an index will be created instead.
@@ -647,7 +628,7 @@ If you want to customize the entire field (e.g. checks), you have to split the f
 Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide following methods to work:
 
 * **get_columns(self, field_name)** - returns the sqlalchemy columns which should be created by this field.
-* **clean(self, field_name, value)** - returns the cleaned column values.
+* **clean(self, field_name, value, to_query)** - returns the cleaned column values. to_query specifies if clean is used by the query sanitizer and must be more strict (no partial values).
 
 Additional they can provide following methods:
 * **`__get__(self, instance, owner=None)`** - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
