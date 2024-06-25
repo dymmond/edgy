@@ -14,15 +14,15 @@ hide:
 - Allow selecting columns for ForeignKeys.
 - Allow skipping creating a ForeignKeyConstraint.
 - Add ExcludeField for masking fields in submodels.
-- M2M Pass unique through to target foreignkey.
-- ConditionalRedirect constant for CompositeField.
-- Embeddables via CompositeField.
-- Add ForeignKeyFactory.
+- ManyToMany fields pass unique through to target foreignkey.
+- Add ConditionalRedirect constant for CompositeField.
+- Embeddables via CompositeField. See [Embedding](./embedding.md)
+- Add ForeignKeyFactory, a factory with presets for building foreign keys.
 - Multiple primary keys and names different from "id" are possible now.
-- Add inherit flag for Manager, BaseFields and Models (when used as an embeddable).
+- Add inherit flag for Manager, BaseFields and Models (when used as an embeddable). It is used for controlling the inheritance.
 - Managers are now instance aware. You can customize the instance and they can react. They are also shallow copied for every class and instance.
 - Improved Relations (reverse side of ForeignKeys and forward side of Many2Many). Have now add and remove methods and work like RefForeignKey (you can just specify an Array with assignment targets and they will be added).
-- Allow skipping reverse RelatedFields via `False`.
+- Allow skip building reverse RelatedFields for ForeignKeys with `related_name=False`.
 - `pkcolumns` attribute of models (contains all found primary key columns).
 - Some new methods on BaseField:
   - embed_field: for controlling embedding a field in an CompositeField.
