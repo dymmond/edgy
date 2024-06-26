@@ -242,7 +242,7 @@ users = await User.query.distinct("email")
     Not all the SQL databases support the `DISTINCT ON` fields equally, for example, `mysql` has
     has that limitation whereas `postgres` does not.
     Be careful to know and understand where this should be applied.
-    You can mitigate this by providing no argument (filter applies on all columns)
+    You can mitigate this by providing no argument (filter applies on all columns).
 
 
 ### Select related

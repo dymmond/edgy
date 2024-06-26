@@ -9,42 +9,41 @@ hide:
 
 ### Added
 
-- Allow multiple ForeignKeys with the same related_name in one model
-- Support ForeignKeys on multiple columns
-- Allow selecting columns for ForeignKeys
-- Allow skipping creating a ForeignKeyConstraint
-  - Allow creating an Index instead
-- Add ExcludeField for masking fields in submodels
-- M2M Pass unique through to target foreignkey
-- ConditionalRedirect constant for CompositeField
-- Embeddables via CompositeField
-- Add ForeignKeyFactory
-- Multiple primary keys and names different from "id" are possible now
-- Add inherit flag for Manager, BaseFields and Models (when used as an embeddable)
+- Allow multiple ForeignKeys with the same related_name in one model.
+- Support ForeignKeys on multiple columns.
+- Allow selecting columns for ForeignKeys.
+- Allow skipping creating a ForeignKeyConstraint.
+- Add ExcludeField for masking fields in submodels.
+- ManyToMany fields pass unique through to target foreignkey.
+- Add ConditionalRedirect constant for CompositeField.
+- Embeddables via CompositeField. See [Embedding](./embedding.md)
+- Add ForeignKeyFactory, a factory with presets for building foreign keys.
+- Multiple primary keys and names different from "id" are possible now.
+- Add inherit flag for Manager, BaseFields and Models (when used as an embeddable). It is used for controlling the inheritance.
 - Managers are now instance aware. You can customize the instance and they can react. They are also shallow copied for every class and instance.
 - Improved Relations (reverse side of ForeignKeys and forward side of Many2Many). Have now add and remove methods and work like RefForeignKey (you can just specify an Array with assignment targets and they will be added).
-- Allow skipping reverse RelatedFields
-- `pkcolumns` attribute of models (contains all found primary key columns)
-
+- Allow skip building reverse RelatedFields for ForeignKeys with `related_name=False`.
+- `pkcolumns` attribute of models (contains all found primary key columns).
 - Some new methods on BaseField:
-  - embed_field: for controlling embedding a field in an CompositeField
-  - get_column_names: helper function for retrieving the column names of a field
+  - embed_field: for controlling embedding a field in an CompositeField.
+  - get_column_names: helper function for retrieving the column names of a field.
+- Add RelationshipField for traversable fields.
 
 
 ### Changed
 
 - Breaking: Prefetch traversal of foreign keys uses now the foreign key name. For the traversal of RelatedFields everything stays the same.
-- ForeignKeys use now global constraints and indexes
-- Breaking: clean has now the argument to_query
-- Breaking: Many2Many doesn't have a RelatedField on owner anymore
-- Breaking: use singular related_name for unique ForeignKeys (or OneToOne)
-- MetaInfo (meta) is now lazy
-- `pk` is now a PKField (a variant of the BaseCompositeField)
-- `clean` and `to_columns` of BaseField do return empty objects instead of raising NotImplementedError
-- Major refactory of ForeignKeys, move logic for single ForeignKeys to subclass
-- Move FieldFactory and ForeignKeyFieldFactory to factories
+- ForeignKeys use now global constraints and indexes.
+- Breaking: clean has now the argument to_query. See [Custom Fields](./fields.md#Custom%20Fields)
+- Breaking: ManyToMany doesn't have a RelatedField on owner anymore and uses proxying. See [ManyToMany](./fields.md#ManyToMany)
+- Breaking: use singular related_name for unique ForeignKeys (or OneToOne). See [related_name](./queries/related-name.md)
+- MetaInfo (meta) is now partly lazy.
+- `pk` is now a PKField (a variant of the BaseCompositeField).
+- `clean` and `to_columns` of BaseField do return empty objects instead of raising NotImplementedError.
+- Major refactory of ForeignKeys, move logic for single ForeignKeys to subclass.
+- Move FieldFactory and ForeignKeyFieldFactory to factories.
 - Remove superfluous BaseOneToOneKeyField. Merged into BaseForeignKeyField.
-- Remove unused attributes of MetaInfo and added some lazy evaluations for fields
+- Remove unused attributes of MetaInfo and added some lazy evaluations for fields.
 
 ## 0.11.1
 

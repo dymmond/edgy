@@ -22,7 +22,7 @@ class Track(edgy.Model):
 class Album(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     name = edgy.CharField(max_length=100)
-    tracks = edgy.ManyToManyField(Track, embed_through="embedded", unique=True)
+    tracks = edgy.ManyToManyField(Track, embed_through="embedded", unique=True, index=True)
 
     class Meta:
         registry = models

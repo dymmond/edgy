@@ -367,11 +367,26 @@ class MyModel(edgy.Model):
 
 ```
 
+Hint you can change the base for the reverse end with embed_parent:
+
+
+```python hl_lines="26"
+{!> ../docs_src/relationships/embed_parent_with_embedded.py !}
+```
+
+when on the user model the `profile` reverse link is queried, by default the address embeddable is returned.
+Queries continue to use the Profile Model as base because address isn't a RelationshipField.
+The Profile object can be accessed by the `profile` attribute we choosed as second parameter.
+
+When the second parameter is empty, the parent object is not included as attribute.
+
+
 ##### Parameters
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
-* **related_name** - The name to use for the relation from the related object back to this one. Can be False to disable a reverse connection.
-                     Note: This will also prevent prefetching and reversing via `__`.
+* **related_name** - The name to use for the relation from the related object back to this one. Can be set to `False` to disable a reverse connection.
+                     Note: Setting to `False` will also prevent prefetching and reversing via `__`.
+                     See also [related_name](./queries/related-name.md) for defaults
 * **related_fields** - The columns or fields to use for the foreign key. If unset or empty, the primary key(s) are used.
 * **embed_parent** (to_attr, as_attr) - When accessing the reverse relation part, return to_attr instead and embed the parent object in as_attr (when as_attr is not empty). Default None (which disables it).
 * **no_constraint** - Skip creating a constraint. Note: if set and index=True an index will be created instead.
@@ -381,22 +396,31 @@ from `edgy`.
 * **on_update** - A string indicating the behaviour that should happen on update of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `edgy`.
-* **relation_fn** - Optionally drop a function which returns a Relation for the reverse side. This will be used by the RelatedField (if it is created). Used by Many2Many.
-
     ```python
     from edgy import CASCADE, SET_NULL, RESTRICT
     ```
+* **relation_fn** - Optionally drop a function which returns a Relation for the reverse side. This will be used by the RelatedField (if it is created). Used by the ManyToMany field.
+* **reverse_path_fn** - Optionally drop a function which handles the traversal from the reverse side. Used by the ManyToMany field.
 
-Note: there is a `reverse_name` argument which can be used when `related_name=False` to specify a field for backward relations.
-It is useless except if related_name is False because it is otherwise overwritten.
-The `reverse_name` argument is used for finding the backward relation.
+!!! Note:
+    The index parameter can improve the performance and is strongly recommended especially with `no_constraint` but also
+    ForeignKeys with constraint will benefit. By default off because conflicts are easily to provoke when reinitializing models (tests with database fixture scope="function").
+    This is no concern for webservers where models are initialized once.
+    `unique` uses internally an index and `index=False` will be ignored.
 
 
-Note: when embed_parent is set, queries start to use the second parameter of embed_parent **if it is a relationshipfield**.
-If it is empty, queries cannot access the parent anymore.
-This is analogue to Many2Many fields.
+!!! Note:
+    There is a `reverse_name` argument which can be used when `related_name=False` to specify a field for reverse relations.
+    It is useless except if related_name is `False` because it is otherwise overwritten.
+    The `reverse_name` argument is used for finding the reverse field of the relationship.
 
-If it isn't a relationship field (e.g. embeddable, CompositeField) queries are fired against the model, without the prefix stripped.
+
+!!! Note:
+    When `embed_parent` is set, queries start to use the second parameter of `embed_parent` **if it is a RelationshipField**.
+    If it is empty, queries cannot access the parent anymore when the first parameter points to a `RelationshipField`.
+    This is mode is analogue to ManyToMany fields.
+    Otherwise, the first parameter points not to a `RelationshipField` (e.g. embeddable, CompositeField), queries use still the model, without the prefix stripped.
+
 
 
 #### RefForeignKey
@@ -441,11 +465,18 @@ class MyModel(edgy.Model):
 * **through** - The model to be used for the relationship. Edgy generates the model by default
                 if None is provided or **through** is an abstract model.
 * **embed_through** - When traversing, embed the through object in this attribute. Otherwise it is not accessable from the result.
-                      if empty, the old behaviour is used to query from the through model as base
-                      If not an empty string or False this is only possible from string as prefix or not accessable with False.
+                      if an empty string was provided, the old behaviour is used to query from the through model as base (default).
+                      if False, the base is transformed to the target and source model (full proxying). You cannot select the through model via path traversal anymore (except from the through model itself).
+                      If not an empty string, the same behaviour like with False applies except that you can select the through model fields via path traversal with the provided name.
 
 !!! Note:
     If **through** is an abstract model it will be used as a template (a new model is generated with through as base).
+
+
+!!! Note:
+    The index parameter is passed through to the ForeignKey fields but is not required. The intern ForeignKey fields
+    create with their primary key constraint and unique_together fallback their own index.
+    You should be warned that the same for ForeignKey fields applies here for index, so you most probably don't want to use an index here.
 
 #### IPAddressField
 
@@ -597,7 +628,7 @@ If you want to customize the entire field (e.g. checks), you have to split the f
 Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide following methods to work:
 
 * **get_columns(self, field_name)** - returns the sqlalchemy columns which should be created by this field.
-* **clean(self, field_name, value)** - returns the cleaned column values.
+* **clean(self, field_name, value, to_query)** - returns the cleaned column values. to_query specifies if clean is used by the query sanitizer and must be more strict (no partial values).
 
 Additional they can provide following methods:
 * **`__get__(self, instance, owner=None)`** - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
