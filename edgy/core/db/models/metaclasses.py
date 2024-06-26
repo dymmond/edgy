@@ -31,7 +31,7 @@ from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.models.managers import BaseManager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.db.relationships.related_field import RelatedField
-from edgy.core.utils.functional import edgy_setattr, extract_field_annotations_and_defaults
+from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
@@ -130,7 +130,6 @@ class MetaInfo:
         "model",
         "managers",
         "multi_related",
-        "related_fields",
         "model_references",
         "signals",
         "input_modifying_fields",
@@ -154,7 +153,7 @@ class MetaInfo:
     columns_to_field: Dict[str, str]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
-        self._is_init = False
+        #  Difference between meta extraction and kwargs: meta attributes are copied
         self.abstract: bool = getattr(meta, "abstract", False)
         # for embedding
         self.inherit: bool = getattr(meta, "inherit", True)
@@ -169,7 +168,6 @@ class MetaInfo:
         self.model_references: Dict[str, "ModelRef"] = {**getattr(meta, "model_references", _empty_dict)}
         self.managers: Dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
         self.multi_related: List[str] =  [*getattr(meta, "multi_related", _empty_set)]
-        self.related_fields: Dict[str, RelatedField] = {**getattr(meta, "related_fields", _empty_dict)}
         self.model: Optional[Type["Model"]] = None
         self.load_dict(kwargs)
 
@@ -186,10 +184,11 @@ class MetaInfo:
 
     def load_dict(self, values: Dict[str, Any], _init: bool=False) -> None:
         """
-        Loads the metadata from a dictionary
+        Loads the metadata from a dictionary.
         """
         for key, value in values.items():
-            edgy_setattr(self, key, value)
+            # we want triggering invalidate in case it is fields_mapping
+            setattr(self, key, value)
 
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
@@ -225,8 +224,27 @@ class MetaInfo:
         self.columns_to_field = ColumnsToField(self)
         self._is_init = True
 
-    def invalidate(self) -> None:
+    def invalidate(self, clear_class_attrs: bool=True) -> None:
         self._is_init = False
+        # prevent cycles and mem-leaks
+        self.field_to_columns = FieldToColumns(self)
+        self.field_to_column_names = FieldToColumnNames(self)
+        self.columns_to_field = ColumnsToField(self)
+        if clear_class_attrs:
+            for attr in ("_table", "_pknames", "_pkcolumns"):
+                try:
+                    delattr(self.model, attr)
+                except AttributeError:
+                    pass
+
+    def full_init(self, init_column_mappers: bool=True, init_class_attrs: bool=True) -> None:
+        if not self._is_init:
+            self.init_fields_mapping()
+        if init_column_mappers:
+            self.columns_to_field.init()
+        if init_class_attrs:
+            for attr in ("table", "pknames", "pkcolumns"):
+                getattr(self.model, attr)
 
     def get_columns_for_name(self, name: str) -> Sequence["sqlalchemy.Column"]:
         if name in self.field_to_columns:
@@ -301,7 +319,6 @@ def _set_related_name_for_foreign_keys(
         # Set the related name
         target = foreign_key.target
         target.meta.fields_mapping[related_name] = related_field
-        target.meta.related_fields[related_name] = related_field
 
 
 def _handle_annotations(base: Type, base_annotations: Dict[str, Any]) -> None:
