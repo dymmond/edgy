@@ -42,7 +42,7 @@ def test_control_lazyness():
 
     # init pk stuff
     assert "id" not in Product.meta.columns_to_field.data
-    assert User.fields["pk"].fieldless_pkcolumns == {"id"}
+    assert not User.fields["pk"].fieldless_pkcolumns
     assert "id" in User.meta.columns_to_field.data
 
     # invalidate
