@@ -67,8 +67,8 @@ async def rollback_connections():
 async def test_model_fields_are_different():
     user = await User.query.create(name="John", language="PT", description="John")
 
-    assert user.model_fields["name"].annotation == str
-    assert User.model_fields["name"].annotation == str
+    assert user.model_fields["name"].annotation is str
+    assert User.model_fields["name"].annotation is str
 
-    assert user.proxy_model.model_fields["name"].annotation == Any
-    assert User.proxy_model.model_fields["name"].annotation == Any
+    assert user.proxy_model.model_fields["name"].annotation is Any
+    assert User.proxy_model.model_fields["name"].annotation is Any
