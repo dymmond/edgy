@@ -335,7 +335,7 @@ def show(
 ) -> None:
     """Show the revision denoted by the given symbol."""
     config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
-    command.show(config, revision)  # type: ignore
+    command.show(config, revision)
 
 
 @catch_errors
@@ -360,14 +360,14 @@ def heads(
 ) -> None:
     """Show current available heads in the script directory"""
     config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
-    command.heads(config, verbose=verbose, resolve_dependencies=resolve_dependencies)  # type: ignore
+    command.heads(config, verbose=verbose, resolve_dependencies=resolve_dependencies)
 
 
 @catch_errors
 def branches(app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False) -> None:
     """Show current branch points"""
     config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
-    command.branches(config, verbose=verbose)  # type: ignore
+    command.branches(config, verbose=verbose)
 
 
 @catch_errors
