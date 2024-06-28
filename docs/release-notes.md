@@ -5,7 +5,7 @@ hide:
 
 # Release Notes
 
-## Unreleased
+## 0.12.0
 
 ### Added
 
@@ -25,17 +25,15 @@ hide:
 - Allow skip building reverse RelatedFields for ForeignKeys with `related_name=False`.
 - `pkcolumns` attribute of models (contains all found primary key columns).
 - Some new methods on BaseField:
-  - embed_field: for controlling embedding a field in an CompositeField.
-  - get_column_names: helper function for retrieving the column names of a field.
+  - `embed_field`: for controlling embedding a field in an CompositeField.
+  - `get_column_names`: helper function for retrieving the column names of a field.
 - Add RelationshipField for traversable fields.
-
 
 ### Changed
 
-- Breaking: Prefetch traversal of foreign keys uses now the foreign key name. For the traversal of RelatedFields everything stays the same.
 - ForeignKeys use now global constraints and indexes.
-- Breaking: clean has now the argument to_query. See [Custom Fields](./fields.md#Custom%20Fields)
-- Breaking: ManyToMany doesn't have a RelatedField on owner anymore and uses proxying. See [ManyToMany](./fields.md#ManyToMany)
+- Breaking: clean has now the argument to_query. See [Custom Fields](./fields.md#custom-fields).
+- Breaking: ManyToMany doesn't have a RelatedField on owner anymore and uses proxying. See [ManyToMany](./fields.md#ManyToMany).
 - Breaking: use singular related_name for unique ForeignKeys (or OneToOne). See [related_name](./queries/related-name.md)
 - MetaInfo (meta) is now partly lazy.
 - `pk` is now a PKField (a variant of the BaseCompositeField).
@@ -44,6 +42,10 @@ hide:
 - Move FieldFactory and ForeignKeyFieldFactory to factories.
 - Remove superfluous BaseOneToOneKeyField. Merged into BaseForeignKeyField.
 - Remove unused attributes of MetaInfo and added some lazy evaluations for fields.
+
+#### Breaking
+
+- Prefetch traversal of foreign keys uses now the foreign key name. For the traversal of RelatedFields everything stays the same.
 
 ## 0.11.1
 

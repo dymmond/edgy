@@ -4,10 +4,10 @@ There are two ways of embedding models
 
 ## Embeddable
 
-Edgy models are capable of beeing used as an embeddable. This means just using a model like a field works
-and automagically fields are copied with the prefix of the attribute name used plus an `_`.
+Edgy models are capable of being used as an embeddable. This means just using a model like a field works
+and *automagically* fields are copied with the prefix of the attribute name used plus an `_`.
 
-Fields with inherit=False are not pulled in to prevent PKField or autoinjected id fields to be pulled in.
+Fields with `inherit=False` are not pulled in to prevent PKField or autoinjected id fields to be pulled in.
 
 
 ``` python
