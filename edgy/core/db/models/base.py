@@ -393,8 +393,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 field.__set__(self, value)
             else:
                 for k, v in field.to_model(key, value, phase="set").items():
+                    # bypass __settr__
                     edgy_setattr(self, k, v)
         else:
+            # bypass __settr__
             edgy_setattr(self, key, value)
 
     def __getattr__(self, name: str) -> Any:

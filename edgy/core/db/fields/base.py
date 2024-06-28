@@ -27,8 +27,6 @@ from edgy.types import Undefined
 if TYPE_CHECKING:
     from edgy import Model, ReflectModel
 
-edgy_setattr = object.__setattr__
-
 def _removesuffix(text: str, suffix: str) -> str:
     # TODO: replace with _removesuffix when python3.9 is minimum
     if text.endswith(suffix):
@@ -100,7 +98,7 @@ class BaseField(FieldInfo):
 
         # set remaining attributes
         for name, value in kwargs.items():
-            edgy_setattr(self, name, value)
+            setattr(self, name, value)
 
         if self.primary_key:
             self.field_type = Any
