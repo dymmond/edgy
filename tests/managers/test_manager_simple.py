@@ -54,14 +54,21 @@ async def rollback_connections():
 
 async def test_can_create_record():
     await User.mang.create(password="12345", username="user", email="test@test.com")
+    assert User.mang.instance is None
 
     users = await User.mang.all()
 
     assert len(users) == 0
 
     user = await User.mang.create(password="12345", username="user2", email="test1@test.com", is_admin=False)
+    assert user.mang.instance is user
+    User.mang._fooobar = True
+    assert hasattr(User.mang, "_fooobar")
+    assert not hasattr(user.mang, "_fooobar")
 
     users = await User.mang.all()
 
     assert len(users) == 1
     assert users[0].pk == user.pk
+    # new instances have now the attribute
+    assert hasattr(users[0].mang, "_fooobar")

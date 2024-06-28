@@ -1,10 +1,31 @@
-from typing import Any, Type, cast
+from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
 
 from edgy.core.db.context_vars import get_tenant, set_tenant
 from edgy.core.db.querysets.base import QuerySet
 
+if TYPE_CHECKING:
+    from edgy.core.db.models.base import EdgyBaseModel
 
-class Manager:
+class BaseManager:
+    def __init__(self, *, owner: Optional[Union[Type["EdgyBaseModel"]]] = None, inherit: bool=True, name: str = "", instance: Optional[Union["EdgyBaseModel"]]=None):
+        self.owner = owner
+        self.inherit = inherit
+        self.name = name
+        self.instance = instance
+
+    @property
+    def model_class(self) -> Any:
+        # legacy name
+        return self.owner
+
+    def get_queryset(self) -> QuerySet:
+        """
+        Returns the queryset object.
+        """
+        raise NotImplementedError(f"The {self!r} manager doesn't implement the get_queryset method.")
+
+
+class Manager(BaseManager):
     """
     Base Manager for the Edgy Models.
     To create a custom manager, the best approach is to inherit from the ModelManager.
@@ -30,13 +51,6 @@ class Manager:
     ```
     """
 
-    def __init__(self, model_class: Any = None):
-        self.model_class = model_class
-
-    def __get__(self, instance: Any, owner: Any = None) -> Type["QuerySet"]:
-        # TODO: cache in instance
-        return cast("Type[QuerySet]", self.__class__(model_class=owner if owner else instance.__class__))
-
     def get_queryset(self) -> "QuerySet":
         """
         Returns the queryset object.
@@ -47,17 +61,34 @@ class Manager:
         if tenant:
             set_tenant(None)
             return QuerySet(
-                self.model_class,
-                table=self.model_class.table_schema(tenant),  # type: ignore
+                self.owner,
+                table=self.owner.table_schema(tenant),  # type: ignore
             )
-        return QuerySet(self.model_class)
+        return QuerySet(self.owner)
 
-    def __getattr__(self, item: Any) -> Any:
+    def __getattr__(self, name: str) -> Any:
         """
         Gets the attribute from the queryset and if it does not
         exist, then lookup in the model.
         """
+        if name.startswith("_") or name == self.name:
+            return super().__getattr__(name)
         try:
-            return getattr(self.get_queryset(), item)
+            # we need to check tenant every request
+            return getattr(self.get_queryset(), name)
         except AttributeError:
-            return getattr(self.model_class, item)
+            return getattr(self.owner, name)
+
+
+class RedirectManager(BaseManager):
+    def __init__(self, *, redirect_name: str, **kwargs: Any):
+        self.redirect_name = redirect_name
+        super().__init__(**kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        if name.startswith("_") or name == self.name:
+            return super().__getattr__(name)
+        return getattr(self.owner.meta.managers[self.redirect_name], name)  # type: ignore
+
+    def get_queryset(self) -> "QuerySet":
+        return cast("QuerySet", self.__getattr__("get_queryset")())

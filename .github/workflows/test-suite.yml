@@ -5,12 +5,8 @@ on:
   push:
     branches:
       - "**"
-    paths-ignore:
-      - "docs/**"
   pull_request:
-    branches: ["main", "release"]
-    paths-ignore:
-      - "docs/**"
+    branches: ["main", "develop", "release"]
   schedule:
     - cron: "0 0 * * *"
 
@@ -52,6 +48,22 @@ jobs:
 
     steps:
       - uses: "actions/checkout@v4"
+      - uses: "dorny/paths-filter@v3"
+        id: filters
+        with:
+          base: develop
+          filters: |
+            docs_src:
+              - 'docs_src/**'
+              - 'pyproject.toml'
+            src:
+              - 'edgy/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'docker-compose.yml'
+              - 'pyproject.toml'
+            workflows:
+              - '.github/workflows/**'
       - uses: "actions/setup-python@v5"
         with:
           python-version: "${{ matrix.python-version }}"
@@ -65,10 +77,13 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: "pip install hatch"
       - name: "Run linting"
-        run: "hatch run lint"
+        if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true'
+        run: "hatch run lint_only"
       - name: "Run mypy"
         run: "hatch run test:check_types"
+        if: steps.filters.outputs.src == 'true' || steps.filters.outputs.docs_src == 'true' || steps.filters.outputs.workflows == 'true'
       - name: "Run tests"
+        if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true' || github.event.schedule != ''
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/edgy"
           TEST_DATABASE_ALTERNATIVE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5433/edgy_alt"

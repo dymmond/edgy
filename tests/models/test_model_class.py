@@ -1,7 +1,7 @@
 import pytest
 
 import edgy
-from edgy.core.db.fields.core import Field
+from edgy.core.db.fields.base import Field
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL

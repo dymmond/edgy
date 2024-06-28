@@ -249,9 +249,12 @@ def test_inheritance():
         composite: Dict[str, Any] = edgy.CompositeField(
             inner_fields=[
                 ("first_name", edgy.CharField(max_length=255)),
-                ("last_name", edgy.CharField(max_length=255)),
+                ("last_name", edgy.CharField(max_length=51)),
             ],
         )
+
+    assert "age" not in ConcreteModel1.meta.fields_mapping
+    assert ConcreteModel1.meta.fields_mapping["last_name"].max_length == 51
 
     class ConcreteModel2(AbstractModel):
         composite2: Dict[str, Any] = edgy.CompositeField(
@@ -261,18 +264,17 @@ def test_inheritance():
             ],
             absorb_existing_fields=True,
         )
+    assert "age" in ConcreteModel2.meta.fields_mapping
+    assert ConcreteModel2.meta.fields_mapping["last_name"].max_length == 255
 
     class ConcreteModel3(AbstractModel):
-        composite2: Dict[str, Any] = edgy.CompositeField(
+        composite3: Dict[str, Any] = edgy.CompositeField(
             inner_fields=[
                 ("first_name", edgy.CharField(max_length=255)),
                 ("last_name", edgy.CharField(max_length=50)),
             ],
         )
 
-    assert "age" not in ConcreteModel1.meta.fields_mapping
-    assert "age" in ConcreteModel2.meta.fields_mapping
-    assert ConcreteModel2.meta.fields_mapping["last_name"].max_length == 255
     assert ConcreteModel3.meta.fields_mapping["last_name"].max_length == 50
     assert "age" in ConcreteModel3.meta.fields_mapping
 

@@ -15,6 +15,12 @@ A model in Edgy is a python class with attributes that represents a database tab
 
 In other words, it is what represents your SQL table in your codebase.
 
+## Embedding
+
+Models also doubles as embeddable; they can be used as a field template with optional prefix.
+
+[Check the embedding section](./embedding.md).
+
 ## Declaring models
 
 When declaring models by simply inheriting from `edgy.Model` object and define the attributes

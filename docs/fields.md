@@ -16,6 +16,7 @@ Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions
 * **exclude** - An bool indicating if the field is included in model_dump
 * **default** - A value or a callable (function).
 * **index** - A boolean. Determine if a database index should be created.
+* **inherit** - A boolean. Determine if a field can be inherited in submodels. Default is True. It is used by PKField, RelatedField and the injected ID Field.
 * **skip_absorption_check** - A boolean. Default False. Dangerous option! By default when defining a CompositeField with embedded fields and the `absorb_existing_fields` option it is checked that the field type of the absorbed field is compatible with the field type of the embedded field. This option skips the check.
 * **unique** - A boolean. Determine if a unique constraint should be created for the field.
 Check the [unique_together](./models.md#unique-together) for more details.
@@ -194,17 +195,21 @@ ddict = obj.composite
 ```
 
 The contained fields are serialized like normal fields. So if this is not wanted,
-the fields need the exclude attribute/parameter set
+the fields need the exclude attribute/parameter set.
+
+!!! Note:
+    The inherit flag is set to False for all fields created by a composite. This is because of inheritance.
 
 ##### Parameters
 
 * **inner_fields** - Required. A sequence containing the external field names mixed with embedded field definitions (name, Field) tuples.
+                     As an alternative it is possible to provide an Edgy Model (abstract or non-abstract) or a dictionary in the format: key=name, value=Field
 * **unsafe_json_serialization** - Default False. Normally when serializing in json mode, CompositeFields are ignored when they don't have a pydantic model set. This option includes such CompositeFields in the dump.
 * **absorb_existing_fields** - Default False. Don't fail if fields speficied with (name, Field) tuples already exists. Treat them as internal fields. The existing fields are checked if they are a subclass of the Field or have the attribute `skip_absorption_check` set
-* **model** - Default None (not set).Return a pydantic model instead of a dict
+* **model** - Default None (not set).Return a pydantic model instead of a dict.
 * **prefix_embedded** - Default "". Prefix the field names of embedded fields (not references to external fields). Useful for implementing embeddables
 
-Note: embedded fields are deepcopied. This way it is safe to provide the same inner_fields object to multiple CompositeFields
+Note: embedded fields are shallow-copied. This way it is safe to provide the same inner_fields object to multiple CompositeFields.
 
 
 Note: there is a special parameter for model: `ConditionalRedirect`.
@@ -362,20 +367,61 @@ class MyModel(edgy.Model):
 
 ```
 
+Hint you can change the base for the reverse end with embed_parent:
+
+
+```python hl_lines="26"
+{!> ../docs_src/relationships/embed_parent_with_embedded.py !}
+```
+
+when on the user model the `profile` reverse link is queried, by default the address embeddable is returned.
+Queries continue to use the Profile Model as base because address isn't a RelationshipField.
+The Profile object can be accessed by the `profile` attribute we choosed as second parameter.
+
+When the second parameter is empty, the parent object is not included as attribute.
+
+
 ##### Parameters
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
-* **related_name** - The name to use for the relation from the related object back to this one.
+* **related_name** - The name to use for the relation from the related object back to this one. Can be set to `False` to disable a reverse connection.
+                     Note: Setting to `False` will also prevent prefetching and reversing via `__`.
+                     See also [related_name](./queries/related-name.md) for defaults
+* **related_fields** - The columns or fields to use for the foreign key. If unset or empty, the primary key(s) are used.
+* **embed_parent** (to_attr, as_attr) - When accessing the reverse relation part, return to_attr instead and embed the parent object in as_attr (when as_attr is not empty). Default None (which disables it).
+* **no_constraint** - Skip creating a constraint. Note: if set and index=True an index will be created instead.
 * **on_delete** - A string indicating the behaviour that should happen on delete of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `edgy`.
 * **on_update** - A string indicating the behaviour that should happen on update of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `edgy`.
-
     ```python
     from edgy import CASCADE, SET_NULL, RESTRICT
     ```
+* **relation_fn** - Optionally drop a function which returns a Relation for the reverse side. This will be used by the RelatedField (if it is created). Used by the ManyToMany field.
+* **reverse_path_fn** - Optionally drop a function which handles the traversal from the reverse side. Used by the ManyToMany field.
+
+!!! Note:
+    The index parameter can improve the performance and is strongly recommended especially with `no_constraint` but also
+    ForeignKeys with constraint will benefit. By default off because conflicts are easily to provoke when reinitializing models (tests with database fixture scope="function").
+    This is no concern for webservers where models are initialized once.
+    `unique` uses internally an index and `index=False` will be ignored.
+
+
+!!! Note:
+    There is a `reverse_name` argument which can be used when `related_name=False` to specify a field for reverse relations.
+    It is useless except if related_name is `False` because it is otherwise overwritten.
+    The `reverse_name` argument is used for finding the reverse field of the relationship.
+
+
+!!! Note:
+    When `embed_parent` is set, queries start to use the second parameter of `embed_parent` **if it is a RelationshipField**.
+    If it is empty, queries cannot access the parent anymore when the first parameter points to a `RelationshipField`.
+    This is mode is analogue to ManyToMany fields.
+    Otherwise, the first parameter points not to a `RelationshipField` (e.g. embeddable, CompositeField), queries use still the model, without the prefix stripped.
+
+
 
 #### RefForeignKey
 
@@ -413,9 +459,24 @@ class MyModel(edgy.Model):
 ##### Parameters
 
 * **to** - A string [model](./models.md) name or a class object of that same model.
+* **from_fields** - Provide the **related_fields** for the implicitly generated ForeignKey to the owner model.
+* **to_fields** - Provide the **related_fields** for the implicitly generated ForeignKey to the child model.
 * **related_name** - The name to use for the relation from the related object back to this one.
 * **through** - The model to be used for the relationship. Edgy generates the model by default
-if none is provided.
+                if None is provided or **through** is an abstract model.
+* **embed_through** - When traversing, embed the through object in this attribute. Otherwise it is not accessable from the result.
+                      if an empty string was provided, the old behaviour is used to query from the through model as base (default).
+                      if False, the base is transformed to the target and source model (full proxying). You cannot select the through model via path traversal anymore (except from the through model itself).
+                      If not an empty string, the same behaviour like with False applies except that you can select the through model fields via path traversal with the provided name.
+
+!!! Note:
+    If **through** is an abstract model it will be used as a template (a new model is generated with through as base).
+
+
+!!! Note:
+    The index parameter is passed through to the ForeignKey fields but is not required. The intern ForeignKey fields
+    create with their primary key constraint and unique_together fallback their own index.
+    You should be warned that the same for ForeignKey fields applies here for index, so you most probably don't want to use an index here.
 
 #### IPAddressField
 
@@ -466,7 +527,10 @@ class MyModel(edgy.Model):
 Derives from the same as [ForeignKey](#foreignkey) and applies a One to One direction.
 
 !!! Tip
-    You can use `edgy.OneToOneField` as alternative to `OneToOne` instead.
+    You can use `edgy.OneToOneField` as alternative to `OneToOne` instead. Or if you want the basic ForeignKey with unique=True.
+
+!!! Note
+    The index parameter is here ignored.
 
 #### TextField
 
@@ -559,12 +623,12 @@ For examples look in the mentioned path (replace dots with slashes).
 If you want to customize the entire field (e.g. checks), you have to split the field in 2 parts:
 
 - One inherits from `edgy.db.fields.base.BaseField` (or one of the derived classes) and provides the missing parts. It shall not be used for the Enduser (though possible).
-- One inherits from `edgy.db.fields.field.FieldFactory`. Here the _bases attribute is adjusted to point to the Field from the first step.
+- One inherits from `edgy.db.fields.factories.FieldFactory`. Here the _bases attribute is adjusted to point to the Field from the first step.
 
 Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide following methods to work:
 
 * **get_columns(self, field_name)** - returns the sqlalchemy columns which should be created by this field.
-* **clean(self, field_name, value)** - returns the cleaned column values.
+* **clean(self, field_name, value, to_query)** - returns the cleaned column values. to_query specifies if clean is used by the query sanitizer and must be more strict (no partial values).
 
 Additional they can provide following methods:
 * **`__get__(self, instance, owner=None)`** - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
@@ -586,3 +650,13 @@ The `annotation` parameter is for pydantic, the `__type___` parameter is transfo
 
 
 for examples have a look in `tests/fields/test_composite_fields.py` or in `edgy/core/db/fields/core.py`
+
+
+## Customizing fields
+
+When a model was created it is safe to update the fields or fields_mapping as long as `invalidate()` of meta is called.
+It is auto-called when a new fields_mapping is assigned to meta but with the unfortune side-effect that additionally the fields attribute of the model must be set again.
+
+You can for example set the inherit flag to False to disable inheriting a Field or set other field attributes.
+
+You shouldn't remove fields (use ExcludeField for this) and be carefull when adding fields (maybe the model must be updated, this is no magic, have a look in the metaclasses file)

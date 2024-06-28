@@ -13,8 +13,7 @@ if TYPE_CHECKING:
     from edgy import Model
     from edgy.core.db.models.metaclasses import MetaInfo
 
-edgy_setattr = object.__setattr__
-
+type_ignored_setattr = setattr
 
 def _has_auto_now(field: Type[BaseField]) -> bool:
     """
@@ -113,7 +112,6 @@ class ModelParser:
                 if not field.read_only and field_name not in validated:
                     if field.has_default():
                         validated.update(field.get_default_values(field_name, validated))
-
         # Update with any ModelRef
         validated.update(self._extract_model_references(extracted_values, model_cls))
         return validated
@@ -171,8 +169,8 @@ def generify_model_fields(model: Type["Model"]) -> Dict[Any, Any]:
 
     # handle the nested non existing results
     for name, field in model.model_fields.items():
-        edgy_setattr(field, "annotation", Any)
-        edgy_setattr(field, "null", True)
-        edgy_setattr(field, "metadata", [])
+        type_ignored_setattr(field, "annotation", Any)
+        type_ignored_setattr(field, "null", True)
+        type_ignored_setattr(field, "metadata", [])
         fields[name] = field
     return fields

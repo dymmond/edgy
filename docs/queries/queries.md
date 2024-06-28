@@ -153,10 +153,10 @@ For this there is an extension of edgy's `and_` and `or_` which takes a model or
 matches kwargs against:
 
 ```python
-users = await User.query.filter(_and.from_kwargs(User, name="foo", email="foo@example.com"))
+users = await User.query.filter(and_.from_kwargs(User, name="foo", email="foo@example.com"))
 # or
 
-users = await User.query.filter(_and.from_kwargs(User, **my_dict))
+users = await User.query.filter(and_.from_kwargs(User, **my_dict))
 ```
 
 #### SQLAlchemy style
@@ -232,7 +232,7 @@ users = await User.query.lookup(term="gmail")
 
 ### Distinct
 
-Applies the SQL `DISTINCT ON` on a table.
+Applies the SQL `DISTINCT ON` on a table if it has arguments otherwise a plain `DISTINCT`.
 
 ```python
 users = await User.query.distinct("email")
@@ -242,6 +242,8 @@ users = await User.query.distinct("email")
     Not all the SQL databases support the `DISTINCT ON` fields equally, for example, `mysql` has
     has that limitation whereas `postgres` does not.
     Be careful to know and understand where this should be applied.
+    You can mitigate this by providing no argument (filter applies on all columns).
+
 
 ### Select related
 

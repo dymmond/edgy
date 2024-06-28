@@ -84,6 +84,19 @@ class Registry:
     def sync_engine(self) -> Engine:
         return self._get_sync_engine
 
+    def init_models(self, *, init_column_mappers: bool=True, init_class_attrs: bool=True) -> None:
+        for model_class in self.models.values():
+            model_class.meta.full_init(init_column_mappers=init_column_mappers, init_class_attrs=init_class_attrs)
+
+        for model_class in self.reflected.values():
+            model_class.meta.full_init(init_column_mappers=init_column_mappers, init_class_attrs=init_class_attrs)
+
+    def invalidate_models(self, *, clear_class_attrs: bool=True) -> None:
+        for model_class in self.models.values():
+            model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
+        for model_class in self.reflected.values():
+            model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
+
     async def create_all(self) -> None:
         if self.db_schema:
             await self.schema.create_schema(self.db_schema, True)
@@ -98,4 +111,6 @@ class Registry:
         async with self.database:
             async with self.engine.begin() as conn:
                 await conn.run_sync(self.metadata.drop_all)
+                # let's invalidate everything and recalculate. We don't want references.
+                self.invalidate_models()
         await self.engine.dispose()

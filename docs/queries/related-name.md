@@ -38,6 +38,15 @@ the following format:
 ```text
 <table-name>s_set
 ```
+
+when non-unique. And
+
+```text
+<table-name>
+```
+
+when unique.
+
 Edgy will use the lowercased model name of the related model to create the reverse relation.
 
 Imagine you have a model `Team` that has a [ForeignKey][foreign_keys] to another model

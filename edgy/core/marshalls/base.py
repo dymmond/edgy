@@ -109,13 +109,13 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         data = self.model_dump(exclude=set(self.__custom_fields__.keys()))
 
         pk_attribute_in_data = False
-        for pk_attribute in instance.meta.pk_attributes:
+        for pk_attribute in instance.pknames:
             if pk_attribute in data:
                 pk_attribute_in_data = True
                 break
 
         if pk_attribute_in_data:
-            for pk_attribute in instance.meta.pk_attributes:
+            for pk_attribute in instance.pknames:
                 edgy_setattr(self, pk_attribute, getattr(instance, pk_attribute))
 
     def _get_fields(self) -> Dict[str, Any]:

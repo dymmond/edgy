@@ -25,7 +25,7 @@ class Album(edgy.Model):
 
 class Track(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
-    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE)
+    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE, null=True)
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()
 
@@ -70,7 +70,7 @@ class Profile(edgy.Model):
 class Person(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     email = edgy.CharField(max_length=100)
-    profile = edgy.OneToOneField(Profile, on_delete=edgy.CASCADE)
+    profile = edgy.OneToOneField(Profile, on_delete=edgy.CASCADE, related_name=False)
 
     class Meta:
         registry = models
@@ -98,6 +98,37 @@ async def rollback_connections():
         async with database:
             yield
 
+
+async def test_no_relation():
+    for field in Profile.meta.fields_mapping:
+        assert not field.startswith("person")
+
+
+async def test_new_create():
+    track1 = await Track.query.create(title="The Bird", position=1)
+    track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
+    await Track.query.create(title="The Waters", position=3)
+
+    album = await Album.query.create(name="Malibu")
+    await album.tracks_set.add(track1)
+    await album.tracks_set.add(track2)
+    tracks = await album.tracks_set.all()
+    assert len(tracks) == 2
+
+    await album.tracks_set.remove(track2)
+    tracks = await album.tracks_set.all()
+    assert len(tracks) == 1
+
+
+async def test_new_create2():
+    track1 = await Track.query.create(title="The Bird", position=1)
+    track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
+    await Track.query.create(title="The Waters", position=3)
+
+    album = await Album.query.create(name="Malibu", tracks_set=[track1, track2])
+    tracks = await album.tracks_set.all()
+
+    assert len(tracks) == 2
 
 async def test_select_related():
     album = await Album.query.create(name="Malibu")

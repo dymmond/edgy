@@ -144,7 +144,7 @@ write `using(...)`.
 Importing is as simple as this:
 
 ```python
-from edgy.core.db.querysets.mixins import activate_schema, deativate_schema
+from edgy.core.db.querysets.mixins import activate_schema, deactivate_schema
 ```
 
 Let us see an example:

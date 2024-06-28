@@ -3,9 +3,8 @@ from typing import Any, Dict, Set, Type, Union
 from edgy.core.db.models.base import EdgyBaseReflectModel
 from edgy.core.db.models.mixins import DeclarativeMixin
 from edgy.core.db.models.row import ModelRow
-from edgy.core.db.models.utils import pk_from_model_to_clauses, pk_to_dict
-from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ObjectNotFound, RelationshipNotFound
+from edgy.protocols.many_relationship import ManyRelationProtocol
 
 
 class Model(ModelRow, DeclarativeMixin):
@@ -51,20 +50,26 @@ class Model(ModelRow, DeclarativeMixin):
         # empty updates shouldn't cause an error
         if kwargs:
             kwargs = self._update_auto_now_fields(kwargs, self.fields)
-            expression = self.table.update().values(**kwargs).where(*pk_from_model_to_clauses(self))
+            expression = self.table.update().values(**kwargs).where(*self.identifying_clauses())
             await self.database.execute(expression)
         await self.signals.post_update.send_async(self.__class__, instance=self)
 
         # Update the model instance.
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+        for field in self.meta.fields_mapping.keys():
+            _val = self.__dict__.get(field)
+            if isinstance(_val, ManyRelationProtocol):
+                _val.instance = self
+                await _val.save_related()
         return self
 
     async def delete(self) -> None:
         """Delete operation from the database"""
         await self.signals.pre_delete.send_async(self.__class__, instance=self)
 
-        expression = self.table.delete().where(*pk_from_model_to_clauses(self))
+        expression = self.table.delete().where(*self.identifying_clauses())
         await self.database.execute(expression)
 
         await self.signals.post_delete.send_async(self.__class__, instance=self)
@@ -72,7 +77,7 @@ class Model(ModelRow, DeclarativeMixin):
     async def load(self) -> None:
         # Build the select expression.
 
-        expression = self.table.select().where(*pk_from_model_to_clauses(self))
+        expression = self.table.select().where(*self.identifying_clauses())
 
         # Perform the fetch.
         row = await self.database.fetch_one(expression)
@@ -87,16 +92,21 @@ class Model(ModelRow, DeclarativeMixin):
         Performs the save instruction.
         """
         expression = self.table.insert().values(**kwargs)
-        awaitable = await self.database.execute(expression)
-        pk_dict = pk_to_dict(self, kwargs, is_partial=True)
+        autoincrement_value = await self.database.execute(expression)
+        transformed_kwargs = self.transform_input(kwargs, phase="post_insert")
+        for k, v in transformed_kwargs.items():
+            setattr(self, k, v)
+
         # sqlalchemy supports only one autoincrement column
-        if awaitable:
-            # autoincrement. search autoincrement field
-            for pkname in self.pknames:
-                if self.fields[pkname].autoincrement:
-                    pk_dict[pkname] = awaitable
-                    break
-        self.__dict__.update(pk_dict)
+        if autoincrement_value:
+            column = self.table.autoincrement_column
+            if column is not None:
+                setattr(self, column.key, autoincrement_value)
+        for field in self.meta.fields_mapping.keys():
+            _val = self.__dict__.get(field)
+            if isinstance(_val, ManyRelationProtocol):
+                _val.instance = self
+                await _val.save_related()
         return self
 
     async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
@@ -162,19 +172,18 @@ class Model(ModelRow, DeclarativeMixin):
 
         extracted_fields = self.extract_db_fields()
 
-        for pkname in self.pknames:
-            if getattr(self, pkname, None) is None and self.fields[pkname].autoincrement:
-                extracted_fields.pop(pkname, None)
+        for pkcolumn in self.__class__.pkcolumns:
+            # should trigger load in case of identifying_db_fields
+            if getattr(self, pkcolumn, None) is None and self.table.columns[pkcolumn].autoincrement:
+                extracted_fields.pop(pkcolumn, None)
                 force_save = True
 
-        self.update_from_dict(dict_values=dict(extracted_fields.items()))
-
-        # Performs the update or the create based on a possible existing primary key
-
         if force_save:
+            if values:
+                extracted_fields.update(values)
             # force save must ensure a complete mapping
             validated_values = self._extract_values_from_field(
-                extracted_values=extracted_fields if values is None else values, is_partial=False
+                extracted_values=extracted_fields, is_partial=False
             )
             kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
             kwargs, model_references = self.update_model_references(**kwargs)
@@ -208,20 +217,6 @@ class Model(ModelRow, DeclarativeMixin):
 
         await self.signals.post_save.send_async(self.__class__, instance=self)
         return self
-
-    def __getattr__(self, name: str) -> Any:
-        """
-        Run an one off query to populate any foreign key making sure
-        it runs only once per foreign key avoiding multiple database calls.
-        """
-        field = self.meta.fields_mapping.get(name)
-        if field is not None and hasattr(field, "__get__"):
-            # no need to set an descriptor object
-            return field.__get__(self, self.__class__)
-        if name not in self.__dict__ and field is not None and name not in self.pknames:
-            run_sync(self.load())
-            return self.__dict__[name]
-        return super().__getattr__(name)
 
 
 class ReflectModel(Model, EdgyBaseReflectModel):

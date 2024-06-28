@@ -6,6 +6,7 @@ from typing import Any, Dict, Tuple, Type, Union
 
 from edgy.core.db.fields.base import BaseField
 
+# bypass __setattr__ method
 edgy_setattr = object.__setattr__
 
 

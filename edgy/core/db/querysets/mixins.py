@@ -47,16 +47,8 @@ class QuerySetPropsMixin:
         return self.model_class.pknames  # type: ignore
 
     @property
-    def is_m2m(self) -> bool:
-        return bool(self.model_class.meta.is_multi)
-
-    @property
-    def m2m_related(self) -> str:
-        return self._m2m_related
-
-    @m2m_related.setter
-    def m2m_related(self, value: str) -> None:
-        self._m2m_related = value
+    def pkcolumns(self) -> Sequence[str]:
+        return self.model_class.pkcolumns  # type: ignore
 
 
 class TenancyMixin:
@@ -99,7 +91,7 @@ def activate_schema(tenant_name: str) -> None:
     set_schema(tenant_name)
 
 
-def deativate_schema() -> None:
+def deactivate_schema() -> None:
     """
     Deactivates the tenant for the context of the query.
     """
