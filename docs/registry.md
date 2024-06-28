@@ -135,8 +135,8 @@ your application.
 
 ## Lazyness
 
-Note: this is something for really advanced users which want to control the lazyness of metas. Skip if you just want use the framework
-and don't want to microoptimize your code.
+Note: this is something for really advanced users who want to control the lazyness of `meta` objects. Skip if you just want use the framework
+and don't want to micro-optimize your code.
 
 Registry objects have two helper functions which can undo the lazyness (for optimizations or in case of an environment which requires everything being static after init.):
 
@@ -145,6 +145,8 @@ Registry objects have two helper functions which can undo the lazyness (for opti
 **invalidate_models(self, *, clear_class_attrs=True)** - Invalidates metas and removes cached class attributes. Single sub-components can be excluded.
 
 
-Model class attributes `class_attrs` which are cleared or set are `table`, `pknames`, `pkcolumns`-
+Model class attributes `class_attrs` which are cleared or set are `table`, `pknames`, `pkcolumns`.
 
-`db_schema` internally calls also `invalidate_models` to remove references.
+`init_column_mappers` initializes the `columns_to_field` via its `init()` method. This initializes the mappers `columns_to_field`, `field_to_columns` and `field_to_column_names`.
+
+`db_schema` internally calls also `invalidate_models()` to remove table references.
