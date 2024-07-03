@@ -159,7 +159,6 @@ class BaseQuerySet(
         self.embed_parent = embed_parent
         self.using_schema = using_schema
         self._exclude_secrets = exclude_secrets or False
-        self.extra: Dict[str, Any] = {}
 
         # Making sure the queryset always starts without any schema associated unless specified
 
@@ -340,9 +339,9 @@ class BaseQuerySet(
 
     def _filter_query(
         self,
+        kwargs: Any,
         exclude: bool = False,
         or_: bool = False,
-        **kwargs: Any,
     ) -> "QuerySet":
         from edgy.core.db.models import Model
 
@@ -432,7 +431,7 @@ class BaseQuerySet(
     def _prepare_fields_for_distinct(self, distinct_on: str) -> sqlalchemy.Column:
         return self.table.columns[distinct_on]
 
-    def _clone(self) -> Any:
+    def _clone(self) -> "QuerySet":
         """
         Return a copy of the current QuerySet that's ready for another
         operation.
@@ -463,11 +462,10 @@ class BaseQuerySet(
         queryset._defer = copy.copy(self._defer)
         queryset._database = self.database
         queryset.table = self.table
-        queryset.extra = self.extra
         queryset._exclude_secrets = self._exclude_secrets
         queryset.using_schema = self.using_schema
 
-        return queryset
+        return cast("QuerySet", queryset)
 
 
 class QuerySet(BaseQuerySet, QuerySetProtocol):
@@ -499,89 +497,91 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def _filter_or_exclude(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        kwargs: Any,
+        clauses: Sequence[sqlalchemy.sql.expression.BinaryExpression],
         exclude: bool = False,
-        **kwargs: Any,
+        or_: bool = False
     ) -> "QuerySet":
         """
         Filters or excludes a given clause for a specific QuerySet.
         """
         queryset: "QuerySet" = self._clone()
-        if clause is None:
-            return queryset._filter_query(exclude=exclude, **kwargs)
-
-        queryset.filter_clauses.append(clause)
+        if kwargs:
+            queryset = queryset._filter_query(kwargs, exclude=exclude, or_=or_)
+        else:
+            queryset = self._clone()
+        if not clauses:
+            return queryset
+        if or_:
+            op = clauses_mod.or_
+        else:
+            op = clauses_mod.and_
+        if exclude:
+            queryset.filter_clauses.append(clauses_mod.not_(op(*clauses)))
+        else:
+            queryset.filter_clauses.append(op(*clauses))
         return queryset
 
     def filter(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
-        Filters the QuerySet by the given kwargs and clause.
+        Filters the QuerySet by the given kwargs and clauses.
         """
-        return self._filter_or_exclude(clause=clause, **kwargs)
+        return self._filter_or_exclude(clauses=clauses, kwargs=kwargs)
 
     def or_(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
         Filters the QuerySet by the OR operand.
         """
-        queryset: "QuerySet" = self._clone()
-        queryset = self.filter(clause=clause, or_=True, **kwargs)
-        return queryset
+        return self._filter_or_exclude(clauses=clauses, or_=True, kwargs=kwargs)
 
     def and_(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
-        Filters the QuerySet by the AND operand.
+        Filters the QuerySet by the AND operand. Alias of filter.
         """
-        queryset: "QuerySet" = self._clone()
-        queryset = self.filter(clause=clause, **kwargs)
-        return queryset
+        return self.filter(*clauses, **kwargs)
 
     def not_(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
-        Filters the QuerySet by the NOT operand.
+        Filters the QuerySet by the NOT operand. Alias of exclude.
         """
-        queryset: "QuerySet" = self._clone()
-        queryset = queryset.exclude(clause=clause, **kwargs)
-        return queryset
+        return self.exclude(*clauses, **kwargs)
 
     def exclude(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
         Exactly the same as the filter but for the exclude.
         """
-        queryset: "QuerySet" = self._clone()
-        queryset = self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
-        return queryset
+        return self._filter_or_exclude(clauses=clauses, exclude=True, kwargs=kwargs)
 
     def exclude_secrets(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
         Excludes any field that contains the `secret=True` declared from being leaked.
         """
-        queryset: "QuerySet" = self._clone()
+        queryset = self.filter(*clauses, **kwargs)
         queryset._exclude_secrets = True
-        queryset = queryset.filter(clause=clause, **kwargs)
         return queryset
 
     def lookup(self, term: Any) -> "QuerySet":
@@ -813,7 +813,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             setattr(new_result, self.embed_parent[1], result)
         return new_result
 
-    async def _all(self, **kwargs: Any) -> List[EdgyModel]:
+    async def _all(self) -> List[EdgyModel]:
         """
         Executes the query.
         """
@@ -821,9 +821,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if queryset.embed_parent:
             # activates distinct, not distinct on
             queryset.distinct_on = []
-
-        if kwargs:
-            return await queryset.filter(**kwargs).all()
 
         expression = queryset._build_select()
         queryset._set_query_expression(expression)
@@ -857,9 +854,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns the queryset records based on specific filters
         """
-        queryset: "QuerySet" = self._clone()
-        queryset.extra = kwargs
-        return queryset
+        return self.filter(**kwargs) if kwargs else self._clone()
 
     async def get(self, **kwargs: Any) -> EdgyModel:
         """
@@ -1052,7 +1047,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     async def _execute(self) -> Any:
         queryset: "QuerySet" = self._clone()
-        records = await queryset._all(**queryset.extra)
+        records = await queryset._all()
         return records
 
     def __await__(
