@@ -51,7 +51,6 @@ jobs:
       - uses: "dorny/paths-filter@v3"
         id: filters
         with:
-          base: develop
           filters: |
             docs_src:
               - 'docs_src/**'
