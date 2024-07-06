@@ -349,3 +349,15 @@ def test_assertation_error_on_missing_on_delete():
             model = edgy.ForeignKey(MyModel, on_delete=None)
 
     assert raised.value.args[0] == "on_delete must not be null."
+
+
+def test_assertation_error_on_embed_parent_double_underscore_attr():
+    with pytest.raises(FieldDefinitionError) as raised:
+
+        class MyModel(edgy.Model):
+            is_active = edgy.BooleanField(default=True)
+
+        class MyOtherModel(edgy.Model):
+            model = edgy.ForeignKey(MyModel, embed_parent=("foo", "foo__attr"))
+
+    assert raised.value.args[0] == '"embed_parent" second argument (for embedding parent) cannot contain "__".'

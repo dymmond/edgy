@@ -256,7 +256,7 @@ class SingleRelation(ManyRelationProtocol):
             assert self.instance, "instance not initialized"
             fk = self.to.meta.fields_mapping[self.to_foreign_key]
             query = {}
-            if not self.embed_parent or not isinstance(fk.owner.meta.fields_mapping[self.embed_parent[0]], RelationshipField):
+            if not self.embed_parent or not isinstance(fk.owner.meta.fields_mapping[self.embed_parent[0].split("__", 1)[0]], RelationshipField):
                 new_kwargs = kwargs
             else:
                 new_kwargs = {}
