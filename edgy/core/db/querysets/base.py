@@ -6,8 +6,6 @@ from typing import (
     Dict,
     Generator,
     List,
-    Literal,
-    NamedTuple,
     Optional,
     Sequence,
     Set,
@@ -26,6 +24,7 @@ from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import PrefetchMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
+from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.protocols.queryset import QuerySetProtocol
@@ -36,67 +35,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy import Database
     from edgy.core.db.models import Model
 
-
-class RelationshipCrawlResult(NamedTuple):
-    model_class: Type["Model"]
-    field_name: str
-    operator: str
-    forward_path: str
-    reverse_path: Union[str, Literal[False]]
-
-def crawl_relationship(model_class: Type["Model"], path: str, callback_fn: Any=None) -> RelationshipCrawlResult:
-    field = None
-    forward_prefix_path = ""
-    reverse_path: Union[str, Literal[False]] = ""
-    operator: str = "exact"
-    field_name: str = path
-    while path:
-        splitted = path.split("__", 1)
-        field_name = splitted[0]
-        field = model_class.meta.fields_mapping.get(field_name)
-        if isinstance(field, RelationshipField) and len(splitted) == 2:
-            model_class, reverse_part, path = field.traverse_field(path)
-            if field.is_cross_db():
-                raise NotImplementedError("We cannot cross databases yet, this feature is planned")
-            reverse = not isinstance(field, BaseForeignKey)
-            if reverse_part and reverse_path is not False:
-                if reverse_path:
-                    reverse_path = f"{reverse_part}__{reverse_path}"
-                else:
-                    reverse_path = reverse_part
-            else:
-                reverse_path = False
-
-            if callback_fn:
-                callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_prefix_path, reverse=reverse, operator=None)
-            if forward_prefix_path:
-                forward_prefix_path =  f"{forward_prefix_path}__{field_name}"
-            else:
-                forward_prefix_path = field_name
-        elif len(splitted) == 2:
-            if "__" not in splitted[1] and splitted[1] in settings.filter_operators:
-                operator = splitted[1]
-                break
-            else:
-                raise ValueError(f"Tried to cross field: {field_name} of type {field!r}, remainder: {splitted[1]}")
-        else:
-            operator = "exact"
-            break
-
-    if reverse_path is not False:
-        if reverse_path:
-            reverse_path = f"{field_name}__{reverse_path}"
-        else:
-            reverse_path = field_name
-    if callback_fn and field is not None:
-        callback_fn(model_class=model_class, field=field, reverse_path=reverse_path, forward_path=forward_prefix_path, reverse=False, operator=operator)
-    return RelationshipCrawlResult(
-        model_class=model_class,
-        field_name=field_name,
-        operator=operator,
-        forward_path=forward_prefix_path,
-        reverse_path=reverse_path,
-    )
 
 def clean_query_kwargs(model: Type["Model"], kwargs: Dict[str, Any]) -> Dict[str, Any]:
     new_kwargs: Dict[str, Any] = {}
@@ -159,7 +97,6 @@ class BaseQuerySet(
         self.embed_parent = embed_parent
         self.using_schema = using_schema
         self._exclude_secrets = exclude_secrets or False
-        self.extra: Dict[str, Any] = {}
 
         # Making sure the queryset always starts without any schema associated unless specified
 
@@ -226,11 +163,19 @@ class BaseQuerySet(
             former_table = None
             while select_path:
                 field_name = select_path.split("__", 1)[0]
+                try:
+                    field = model_class.meta.fields_mapping[field_name]
+                except KeyError:
+                    raise QuerySetError(
+                        detail=f"Selected field \"{field_name}\" does not exist on {model_class}."
+                    ) from None
                 field = model_class.fields[field_name]
                 if isinstance(field, RelationshipField):
                     model_class, reverse_part, select_path = field.traverse_field(select_path)
                 else:
-                    raise ValueError(f"{field_name}: invalid field type: {field!r}")
+                    raise QuerySetError(
+                        detail=f"Selected field \"{field_name}\" is not a RelationshipField on {model_class}."
+                    )
                 if isinstance(field, BaseForeignKey):
                     foreign_key = field
                     reverse = False
@@ -340,9 +285,9 @@ class BaseQuerySet(
 
     def _filter_query(
         self,
+        kwargs: Any,
         exclude: bool = False,
         or_: bool = False,
-        **kwargs: Any,
     ) -> "QuerySet":
         from edgy.core.db.models import Model
 
@@ -432,7 +377,7 @@ class BaseQuerySet(
     def _prepare_fields_for_distinct(self, distinct_on: str) -> sqlalchemy.Column:
         return self.table.columns[distinct_on]
 
-    def _clone(self) -> Any:
+    def _clone(self) -> "QuerySet":
         """
         Return a copy of the current QuerySet that's ready for another
         operation.
@@ -463,11 +408,10 @@ class BaseQuerySet(
         queryset._defer = copy.copy(self._defer)
         queryset._database = self.database
         queryset.table = self.table
-        queryset.extra = self.extra
         queryset._exclude_secrets = self._exclude_secrets
         queryset.using_schema = self.using_schema
 
-        return queryset
+        return cast("QuerySet", queryset)
 
 
 class QuerySet(BaseQuerySet, QuerySetProtocol):
@@ -499,89 +443,91 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def _filter_or_exclude(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        kwargs: Any,
+        clauses: Sequence[sqlalchemy.sql.expression.BinaryExpression],
         exclude: bool = False,
-        **kwargs: Any,
+        or_: bool = False
     ) -> "QuerySet":
         """
         Filters or excludes a given clause for a specific QuerySet.
         """
         queryset: "QuerySet" = self._clone()
-        if clause is None:
-            return queryset._filter_query(exclude=exclude, **kwargs)
-
-        queryset.filter_clauses.append(clause)
+        if kwargs:
+            queryset = queryset._filter_query(kwargs, exclude=exclude, or_=or_)
+        else:
+            queryset = self._clone()
+        if not clauses:
+            return queryset
+        if or_:
+            op = clauses_mod.or_
+        else:
+            op = clauses_mod.and_
+        if exclude:
+            queryset.filter_clauses.append(clauses_mod.not_(op(*clauses)))
+        else:
+            queryset.filter_clauses.append(op(*clauses))
         return queryset
 
     def filter(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
-        Filters the QuerySet by the given kwargs and clause.
+        Filters the QuerySet by the given kwargs and clauses.
         """
-        return self._filter_or_exclude(clause=clause, **kwargs)
+        return self._filter_or_exclude(clauses=clauses, kwargs=kwargs)
 
     def or_(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
         Filters the QuerySet by the OR operand.
         """
-        queryset: "QuerySet" = self._clone()
-        queryset = self.filter(clause=clause, or_=True, **kwargs)
-        return queryset
+        return self._filter_or_exclude(clauses=clauses, or_=True, kwargs=kwargs)
 
     def and_(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
-        Filters the QuerySet by the AND operand.
+        Filters the QuerySet by the AND operand. Alias of filter.
         """
-        queryset: "QuerySet" = self._clone()
-        queryset = self.filter(clause=clause, **kwargs)
-        return queryset
+        return self.filter(*clauses, **kwargs)
 
     def not_(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
-        Filters the QuerySet by the NOT operand.
+        Filters the QuerySet by the NOT operand. Alias of exclude.
         """
-        queryset: "QuerySet" = self._clone()
-        queryset = queryset.exclude(clause=clause, **kwargs)
-        return queryset
+        return self.exclude(*clauses, **kwargs)
 
     def exclude(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
         Exactly the same as the filter but for the exclude.
         """
-        queryset: "QuerySet" = self._clone()
-        queryset = self._filter_or_exclude(clause=clause, exclude=True, **kwargs)
-        return queryset
+        return self._filter_or_exclude(clauses=clauses, exclude=True, kwargs=kwargs)
 
     def exclude_secrets(
         self,
-        clause: Optional[sqlalchemy.sql.expression.BinaryExpression] = None,
+        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
         **kwargs: Any,
     ) -> "QuerySet":
         """
         Excludes any field that contains the `secret=True` declared from being leaked.
         """
-        queryset: "QuerySet" = self._clone()
+        queryset = self.filter(*clauses, **kwargs)
         queryset._exclude_secrets = True
-        queryset = queryset.filter(clause=clause, **kwargs)
         return queryset
 
     def lookup(self, term: Any) -> "QuerySet":
@@ -808,12 +754,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     def embed_parent_in_result(self, result: Any) -> Any:
         if not self.embed_parent:
             return result
-        new_result = getattr(result, self.embed_parent[0])
+        new_result = result
+        for part in self.embed_parent[0].split("__"):
+            new_result = getattr(new_result, part)
         if self.embed_parent[1]:
             setattr(new_result, self.embed_parent[1], result)
         return new_result
 
-    async def _all(self, **kwargs: Any) -> List[EdgyModel]:
+    async def _all(self) -> List[EdgyModel]:
         """
         Executes the query.
         """
@@ -821,9 +769,6 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if queryset.embed_parent:
             # activates distinct, not distinct on
             queryset.distinct_on = []
-
-        if kwargs:
-            return await queryset.filter(**kwargs).all()
 
         expression = queryset._build_select()
         queryset._set_query_expression(expression)
@@ -857,9 +802,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns the queryset records based on specific filters
         """
-        queryset: "QuerySet" = self._clone()
-        queryset.extra = kwargs
-        return queryset
+        return self.filter(**kwargs) if kwargs else self._clone()
 
     async def get(self, **kwargs: Any) -> EdgyModel:
         """
@@ -1052,7 +995,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     async def _execute(self) -> Any:
         queryset: "QuerySet" = self._clone()
-        records = await queryset._all(**queryset.extra)
+        records = await queryset._all()
         return records
 
     def __await__(

@@ -388,7 +388,7 @@ When the second parameter is empty, the parent object is not included as attribu
                      Note: Setting to `False` will also prevent prefetching and reversing via `__`.
                      See also [related_name](./queries/related-name.md) for defaults
 * **related_fields** - The columns or fields to use for the foreign key. If unset or empty, the primary key(s) are used.
-* **embed_parent** (to_attr, as_attr) - When accessing the reverse relation part, return to_attr instead and embed the parent object in as_attr (when as_attr is not empty). Default None (which disables it).
+* **embed_parent** (to_attr, as_attr) - When accessing the reverse relation part, return to_attr instead and embed the parent object in as_attr (when as_attr is not empty). Default None (which disables it). For to_attr (first argument) deeply nested models can be selected via `__`.
 * **no_constraint** - Skip creating a constraint. Note: if set and index=True an index will be created instead.
 * **on_delete** - A string indicating the behaviour that should happen on delete of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
@@ -422,6 +422,8 @@ from `edgy`.
     Otherwise, the first parameter points not to a `RelationshipField` (e.g. embeddable, CompositeField), queries use still the model, without the prefix stripped.
 
 
+!!! Note:
+    `embed_parent` cannot traverse embeddables.
 
 #### RefForeignKey
 

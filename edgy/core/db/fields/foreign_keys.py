@@ -8,6 +8,7 @@ from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.relationships.relation import SingleRelation
 from edgy.core.terminal import Print
+from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
@@ -245,3 +246,11 @@ class ForeignKey(ForeignKeyFieldFactory):
         **kwargs: Any,
     ) -> BaseField:
         return super().__new__(cls, to=to, **kwargs)
+
+    @classmethod
+    def validate(cls, **kwargs: Any) -> None:
+        super().validate(**kwargs)
+        embed_parent = kwargs.get("embed_parent")
+        if embed_parent:
+            if "__" in embed_parent[1]:
+                raise FieldDefinitionError('"embed_parent" second argument (for embedding parent) cannot contain "__".')

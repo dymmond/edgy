@@ -20,6 +20,7 @@ from edgy.core.db.fields.foreign_keys import ForeignKey
 from edgy.core.db.relationships.relation import ManyRelation
 from edgy.core.terminal import Print
 from edgy.core.utils.models import create_edgy_model
+from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
@@ -285,5 +286,14 @@ class ManyToManyField(ForeignKeyFieldFactory):
         kwargs["on_update"] = CASCADE
 
         return super().__new__(cls, to=to, through=through, **kwargs)
+
+    @classmethod
+    def validate(cls, **kwargs: Any) -> None:
+        super().validate(**kwargs)
+        embed_through = kwargs.get("embed_through")
+        if embed_through:
+            if "__" in embed_through:
+                raise FieldDefinitionError('"embed_through" cannot contain "__".')
+
 
 ManyToMany = ManyToManyField
