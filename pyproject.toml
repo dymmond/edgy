@@ -49,6 +49,7 @@ dependencies = [
     "pydantic-settings>=2.0.0,<3.0.0",
     "rich>=13.3.1,<14.0.0",
     "blinker>=1.8,<2.0",
+    "backports.zoneinfo;python_version<'3.9'"
 ]
 keywords = [
     "api",

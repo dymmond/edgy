@@ -5,14 +5,7 @@ import ipaddress
 import re
 import uuid
 from enum import EnumMeta
-from typing import (
-    Any,
-    Optional,
-    Pattern,
-    Sequence,
-    Tuple,
-    Union,
-)
+from typing import Any, Dict, Optional, Pattern, Sequence, Tuple, Union
 
 import pydantic
 import sqlalchemy
@@ -23,6 +16,12 @@ from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
 from edgy.core.db.fields.base import BaseField, Field
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.exceptions import FieldDefinitionError
+
+try:
+    import zoneinfo
+except ImportError:
+    from backports import zoneinfo  # type: ignore
+
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
@@ -245,10 +244,67 @@ class AutoNowMixin(FieldFactory):
         return super().__new__(cls, **kwargs)
 
 
+class ConcreteDateTimeField(BaseField):
+
+    def __init__(self, *, default_timezone: Optional[zoneinfo.ZoneInfo]=None, force_timezone: Optional[zoneinfo.ZoneInfo]=None, remove_timezone: bool=False, **kwargs: Any) -> None:
+        self.force_timezone = force_timezone
+        self.default_timezone = default_timezone
+        self.remove_timezone = remove_timezone
+        super().__init__(**kwargs)
+
+    def _convert_datetime(self, value: datetime.datetime) -> datetime.datetime:
+        if value.tzinfo is None and self.default_timezone is not None:
+            value = value.replace(tzinfo=self.default_timezone)
+        if self.force_timezone is not None and value.tzinfo != self.force_timezone:
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=self.force_timezone)
+            else:
+                value = value.astimezone(self.force_timezone)
+        if self.remove_timezone:
+            value = value.replace(tzinfo=None)
+        return value
+
+    def convert(self, value: Any) -> Optional[datetime.datetime]:
+        if value is None:
+            return None
+        elif isinstance(value, datetime.datetime):
+            return self._convert_datetime(value)
+        elif isinstance(value, (int, float)):
+            return self._convert_datetime(
+                datetime.datetime.fromtimestamp(value, self.default_timezone)
+            )
+        elif isinstance(value, str):
+            return self._convert_datetime(datetime.datetime.fromisoformat(value))
+        elif isinstance(value, datetime.date):
+            # datetime is subclass, so check datetime first
+            return self._convert_datetime(
+                datetime.datetime(year=value.year, month=value.month, day=value.day)
+            )
+        else:
+            raise ValueError(f"Invalid type detected: {type(value)}")
+
+    def clean(
+        self, field_name: str, value: Any, for_query: bool = False
+    ) -> Dict[str, Optional[datetime.datetime]]:
+        """
+        Convert input object to datetime
+        """
+        return {field_name: self.convert(value)}
+
+    def to_model(
+        self, field_name: str, value: Any, phase: str = ""
+    ) -> Dict[str, Optional[datetime.datetime]]:
+        """
+        Convert input object to datetime
+        """
+        return {field_name: self.convert(value)}
+
+
 class DateTimeField(AutoNowMixin, datetime.datetime):
     """Representation of a datetime field"""
 
     _type = datetime.datetime
+    _bases = (ConcreteDateTimeField,)
 
     def __new__(  # type: ignore
         cls,
