@@ -5,7 +5,7 @@ import ipaddress
 import re
 import uuid
 from enum import EnumMeta
-from typing import Any, Dict, Optional, Pattern, Sequence, Tuple, Union, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, Optional, Pattern, Sequence, Tuple, Union
 
 import pydantic
 import sqlalchemy
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     try:
         import zoneinfo  # type: ignore[import-not-found, unused-ignore]
     except ImportError:
-        from backports import zoneinfo  # type: ignore[import-not-found, no-redef, unused-ignore]
+        zoneinfo = Any  # type: ignore[unused-ignore, no-redef, assignment]
 
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
