@@ -242,11 +242,27 @@ class MyModel(edgy.Model):
 
 ```
 
+!!! Note:
+    Internally the DateTimeField logic is used and only the date element returned.
+    This implies the field can handle the same types like DateTimeField.
+
+
 ##### Parameters
 
 * **auto_now** - A boolean indicating the `auto_now` enabled. Useful for auto updates.
 * **auto_now_add** - A boolean indicating the `auto_now_add` enabled. This will ensure that it is
 only added once.
+* **default_timezone** - ZoneInfo containing the timezone which is added to naive datetimes and used for `auto_now` and `auto_now_add`.
+                         Datetimes are converted to date and lose their timezone information.
+* **force_timezone** - ZoneInfo containing the timezone in which all datetimes are converted.
+                       For naive datetimes it behaves like `default_timezone`
+                       Datetimes are converted to date and lose their timezone information.
+
+!!! Note:
+    There is no `remove_timezone` (argument will be silently ignored)
+
+!!! Note:
+    `auto_now` and `auto_now_add` set the `read_only` flag by default. You can explicitly set `read_only` to `False` to be still able to update the field manually.
 
 #### DateTimeField
 
@@ -261,11 +277,21 @@ class MyModel(edgy.Model):
 
 ```
 
+DateTimeField supports int, float, string (isoformat), date object and of course datetime as input. They are automatically converted to datetime.
+
+
 ##### Parameters
 
 * **auto_now** - A boolean indicating the `auto_now` enabled. Useful for auto updates.
-* **auto_now_add** - A boolean indicating the `auto_now_add` enabled. This will ensure that it is
-only added once.
+* **auto_now_add** - A boolean indicating the `auto_now_add` enabled. Only set when creating the object
+* **default_timezone** - ZoneInfo containing the timezone which is added to naive datetimes
+* **force_timezone** - ZoneInfo containing the timezone in which all datetimes are converted.
+                         For naive datetimes it behaves like `default_timezone`
+* **remove_timezone** - Boolean. Default False. Remove timezone information from datetime. Useful if the db should only contain naive datetimes and not convert.
+
+!!! Note:
+    `auto_now` and `auto_now_add` set the `read_only` flag by default. You can explicitly set `read_only` to `False` to be still able to update the field manually.
+
 
 #### DecimalField
 
@@ -630,14 +656,14 @@ If you want to customize the entire field (e.g. checks), you have to split the f
 Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide following methods to work:
 
 * **get_columns(self, field_name)** - returns the sqlalchemy columns which should be created by this field.
-* **clean(self, field_name, value, to_query)** - returns the cleaned column values. to_query specifies if clean is used by the query sanitizer and must be more strict (no partial values).
+* **clean(self, field_name, value, to_query=False)** - returns the cleaned column values. to_query specifies if clean is used by the query sanitizer and must be more strict (no partial values).
 
 Additional they can provide following methods:
 * **`__get__(self, instance, owner=None)`** - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
 * **`__set__(self, instance, value)`** - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
 * **to_model(self, field_name, phase="")** - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`
 * **get_embedded_fields(self, field_name, fields_mapping)** - Define internal fields.
-* **get_default_values(self, field_name, cleaned_data)** - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
+* **get_default_values(self, field_name, cleaned_data, is_update=False)** - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
 * **get_default_value(self)** - return default value for one column fields.
 * **get_global_constraints(self, field_name, columns)** - takes as second parameter (self excluded) the columns defined by this field (by get_columns). Returns a global constraint, which can be multi-column.
 

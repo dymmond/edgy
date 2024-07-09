@@ -5,6 +5,19 @@ hide:
 
 # Release Notes
 
+## Unreleased
+
+### Added
+
+- `default_timezone`, `force_timezone`, `remove_timezone` for DateTimeField
+- `default_timezone`, `force_timezone` for DateField
+
+### Changed
+
+### Fixed
+
+- `auto_now` and `auto_now_add` now also work for date fields
+
 ## 0.12.0
 
 ### Added

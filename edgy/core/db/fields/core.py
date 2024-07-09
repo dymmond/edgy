@@ -224,10 +224,10 @@ class BooleanField(FieldFactory, int):
 
 
 class AutoNowField(Field):
-    auto_now: Optional[bool] = False,
-    auto_now_add: Optional[bool] = False,
+    auto_now: Optional[bool]
+    auto_now_add: Optional[bool]
 
-    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any], is_update=False) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool=False) -> Any:
         if self.auto_now_add and is_update:
             return {}
         return super().get_default_values(field_name, cleaned_data, is_update=is_update)
@@ -266,7 +266,7 @@ class ConcreteDateTimeField(AutoNowField):
         self.remove_timezone = remove_timezone
         super().__init__(**kwargs)
 
-    def _convert_datetime(self, value: datetime.datetime) -> datetime.datetime:
+    def _convert_datetime(self, value: datetime.datetime) -> Union[datetime.datetime, datetime.date]:
         if value.tzinfo is None and self.default_timezone is not None:
             value = value.replace(tzinfo=self.default_timezone)
         if self.force_timezone is not None and value.tzinfo != self.force_timezone:
@@ -276,9 +276,11 @@ class ConcreteDateTimeField(AutoNowField):
                 value = value.astimezone(self.force_timezone)
         if self.remove_timezone:
             value = value.replace(tzinfo=None)
+        if self.field_type is datetime.date:
+            return value.date()
         return value
 
-    def check(self, value: Any) -> Optional[datetime.datetime]:
+    def check(self, value: Any) -> Optional[Union[datetime.datetime, datetime.date]]:
         if value is None:
             return None
         elif isinstance(value, datetime.datetime):
@@ -299,7 +301,7 @@ class ConcreteDateTimeField(AutoNowField):
 
     def to_model(
         self, field_name: str, value: Any, phase: str = ""
-    ) -> Dict[str, Optional[datetime.datetime]]:
+    ) -> Dict[str, Optional[Union[datetime.datetime, datetime.date]]]:
         """
         Convert input object to datetime
         """
@@ -343,16 +345,21 @@ class DateField(AutoNowMixin, datetime.date):
     """Representation of a date field"""
 
     _type = datetime.date
+    _bases = (ConcreteDateTimeField,)
 
     def __new__(  # type: ignore
         cls,
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
+        default_timezone: Optional[zoneinfo.ZoneInfo]=None,
+        force_timezone: Optional[zoneinfo.ZoneInfo]=None,
         **kwargs: Any,
     ) -> BaseField:
         if auto_now_add or auto_now:
-            kwargs["default"] = datetime.date.today
+            kwargs["default"] = datetime.datetime.now
+        # the datetimes lose the information anyway
+        kwargs["remove_timezone"] = False
 
         kwargs = {
             **kwargs,
