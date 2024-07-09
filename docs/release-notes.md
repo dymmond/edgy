@@ -10,9 +10,12 @@ hide:
 ### Added
 
 - `default_timezone`, `force_timezone`, `remove_timezone` for DateTimeField
-- `default_timezone`, `force_timezone` for DateField
+- `default_timezone`, `force_timezone` for DateField.
+-  Add attribute `inject_default_on_partial_update`.
 
 ### Changed
+
+- `get_default_values` has now an extra keyword argument `is_update`
 
 ### Fixed
 

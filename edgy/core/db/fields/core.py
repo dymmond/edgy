@@ -249,7 +249,7 @@ class AutoNowMixin(FieldFactory):
 
         if auto_now_add or auto_now:
             kwargs.setdefault("read_only", True)
-            kwargs["inject_default_on_partial_update"] = True
+            kwargs["inject_default_on_partial_update"] = auto_now
 
         kwargs = {
             **kwargs,

@@ -670,6 +670,7 @@ Additional they can provide following methods:
 You should also provide an init method which sets following attributes:
 
 * **column_type** - either None (default) or the sqlalchemy column type
+* **inject_default_on_partial_update** - Add default value despite being a partial update. Useful for implementing `auto_now` or other fields which should change on every update.
 
 
 Note: instance checks can also be done against the `field_type` attribute in case you want to check the compatibility with other fields (composite style)
