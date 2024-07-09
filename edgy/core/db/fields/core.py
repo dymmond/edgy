@@ -5,7 +5,7 @@ import ipaddress
 import re
 import uuid
 from enum import EnumMeta
-from typing import Any, Dict, Optional, Pattern, Sequence, Tuple, Union
+from typing import Any, Dict, Optional, Pattern, Sequence, Tuple, Union, TYPE_CHECKING
 
 import pydantic
 import sqlalchemy
@@ -17,10 +17,11 @@ from edgy.core.db.fields.base import BaseField, Field
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.exceptions import FieldDefinitionError
 
-try:
-    import zoneinfo
-except ImportError:
-    from backports import zoneinfo  # type: ignore
+if TYPE_CHECKING:
+    try:
+        import zoneinfo  # type: ignore[import-not-found, unused-ignore]
+    except ImportError:
+        from backports import zoneinfo  # type: ignore[import-not-found, no-redef, unused-ignore]
 
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
@@ -260,7 +261,7 @@ class AutoNowMixin(FieldFactory):
 
 class ConcreteDateTimeField(AutoNowField):
 
-    def __init__(self, *, default_timezone: Optional[zoneinfo.ZoneInfo]=None, force_timezone: Optional[zoneinfo.ZoneInfo]=None, remove_timezone: bool=False, **kwargs: Any) -> None:
+    def __init__(self, *, default_timezone: Optional["zoneinfo.ZoneInfo"]=None, force_timezone: Optional["zoneinfo.ZoneInfo"]=None, remove_timezone: bool=False, **kwargs: Any) -> None:
         self.force_timezone = force_timezone
         self.default_timezone = default_timezone
         self.remove_timezone = remove_timezone
@@ -293,6 +294,10 @@ class ConcreteDateTimeField(AutoNowField):
             return self._convert_datetime(datetime.datetime.fromisoformat(value))
         elif isinstance(value, datetime.date):
             # datetime is subclass, so check datetime first
+
+            # don't touch dates when DateField
+            if self.field_type is datetime.date:
+                return value
             return self._convert_datetime(
                 datetime.datetime(year=value.year, month=value.month, day=value.day)
             )
@@ -322,8 +327,8 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
-        default_timezone: Optional[zoneinfo.ZoneInfo]=None,
-        force_timezone: Optional[zoneinfo.ZoneInfo]=None,
+        default_timezone: Optional["zoneinfo.ZoneInfo"]=None,
+        force_timezone: Optional["zoneinfo.ZoneInfo"]=None,
         remove_timezone: bool=False,
         **kwargs: Any,
     ) -> BaseField:
@@ -352,8 +357,8 @@ class DateField(AutoNowMixin, datetime.date):
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
-        default_timezone: Optional[zoneinfo.ZoneInfo]=None,
-        force_timezone: Optional[zoneinfo.ZoneInfo]=None,
+        default_timezone: Optional["zoneinfo.ZoneInfo"]=None,
+        force_timezone: Optional["zoneinfo.ZoneInfo"]=None,
         **kwargs: Any,
     ) -> BaseField:
         if auto_now_add or auto_now:
