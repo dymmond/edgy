@@ -808,10 +808,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a single record based on the given kwargs.
         """
-        queryset: "QuerySet" = self._clone()
 
         if kwargs:
-            return await queryset.filter(**kwargs).get()
+            return await self.filter(**kwargs).get()
+
+        queryset: "QuerySet" = self._clone()
 
         expression = queryset._build_select().limit(2)
         rows = await queryset.database.fetch_all(expression)
