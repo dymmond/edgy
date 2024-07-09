@@ -223,7 +223,20 @@ class BooleanField(FieldFactory, int):
         return sqlalchemy.Boolean()
 
 
+class AutoNowField(Field):
+    auto_now: Optional[bool] = False,
+    auto_now_add: Optional[bool] = False,
+
+    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any], is_update=False) -> Any:
+        if self.auto_now_add and is_update:
+            return {}
+        return super().get_default_values(field_name, cleaned_data, is_update=is_update)
+
+
 class AutoNowMixin(FieldFactory):
+    _bases = (AutoNowField,)
+
+
     def __new__(  # type: ignore
         cls,
         *,
@@ -235,7 +248,8 @@ class AutoNowMixin(FieldFactory):
             raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
 
         if auto_now_add or auto_now:
-            kwargs["read_only"] = True
+            kwargs.setdefault("read_only", True)
+            kwargs["inject_default_on_partial_update"] = True
 
         kwargs = {
             **kwargs,
@@ -244,7 +258,7 @@ class AutoNowMixin(FieldFactory):
         return super().__new__(cls, **kwargs)
 
 
-class ConcreteDateTimeField(BaseField):
+class ConcreteDateTimeField(AutoNowField):
 
     def __init__(self, *, default_timezone: Optional[zoneinfo.ZoneInfo]=None, force_timezone: Optional[zoneinfo.ZoneInfo]=None, remove_timezone: bool=False, **kwargs: Any) -> None:
         self.force_timezone = force_timezone
@@ -264,7 +278,7 @@ class ConcreteDateTimeField(BaseField):
             value = value.replace(tzinfo=None)
         return value
 
-    def convert(self, value: Any) -> Optional[datetime.datetime]:
+    def check(self, value: Any) -> Optional[datetime.datetime]:
         if value is None:
             return None
         elif isinstance(value, datetime.datetime):
@@ -283,21 +297,16 @@ class ConcreteDateTimeField(BaseField):
         else:
             raise ValueError(f"Invalid type detected: {type(value)}")
 
-    def clean(
-        self, field_name: str, value: Any, for_query: bool = False
-    ) -> Dict[str, Optional[datetime.datetime]]:
-        """
-        Convert input object to datetime
-        """
-        return {field_name: self.convert(value)}
-
     def to_model(
         self, field_name: str, value: Any, phase: str = ""
     ) -> Dict[str, Optional[datetime.datetime]]:
         """
         Convert input object to datetime
         """
-        return {field_name: self.convert(value)}
+        return {field_name: self.check(value)}
+
+    def get_default_value(self) -> Any:
+        return self.check(super().get_default_value())
 
 
 class DateTimeField(AutoNowMixin, datetime.datetime):
@@ -311,6 +320,9 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
+        default_timezone: Optional[zoneinfo.ZoneInfo]=None,
+        force_timezone: Optional[zoneinfo.ZoneInfo]=None,
+        remove_timezone: bool=False,
         **kwargs: Any,
     ) -> BaseField:
         if auto_now_add or auto_now:
@@ -474,6 +486,9 @@ class URLField(CharField):
 
 
 class _IPAddressField(Field):
+    def is_native_type(self, value: str) -> bool:
+        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
+
     def check(self, value: Any) -> Any:
         if self.is_native_type(value):
             return value
@@ -493,9 +508,6 @@ class _IPAddressField(Field):
 class IPAddressField(FieldFactory, str):
     _bases = (_IPAddressField,)
     _type = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
-
-    def is_native_type(self, value: str) -> bool:
-        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
 
     def __new__(  # type: ignore
         cls,

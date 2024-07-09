@@ -15,36 +15,8 @@ if TYPE_CHECKING:
 
 type_ignored_setattr = setattr
 
-def _has_auto_now(field: Type[BaseField]) -> bool:
-    """
-    Checks if the field is auto now
-    """
-    return True if hasattr(field, "auto_now") and field.auto_now else False
-
-
-def _has_auto_now_add(field: Type[BaseField]) -> bool:
-    """
-    Checks if the field is auto now add
-    """
-    return True if hasattr(field, "auto_now_add") and field.auto_now_add else False
-
-
-def _is_datetime(field: Type[BaseField]) -> bool:
-    """
-    Validates if the field type is a datetime type.
-    """
-    return bool(field.field_type == datetime)
-
 
 class DateParser:
-    def _update_auto_now_fields(self, values: Any, fields: Any) -> Any:
-        """
-        Updates the `auto_now` fields
-        """
-        for name, field in fields.items():
-            if isinstance(field, BaseField) and _has_auto_now(field) and _is_datetime(field):
-                values.update(field.get_default_values(name, values))
-        return values
 
     def _resolve_value(self, value: typing.Any) -> typing.Any:
         if isinstance(value, dict):
@@ -88,15 +60,11 @@ class ModelParser:
             for field_name in model_cls.meta.input_modifying_fields:
                 model_cls.fields[field_name].modify_input(field_name, extracted_values)
         # phase 2: validate fields and set defaults for readonly
-        for field_name, field in model_cls.fields.items():  # type: ignore
-            if not is_partial and field.read_only:
+        need_second_pass: List[BaseField] = []
+        for field_name, field in model_cls.meta.fields_mapping.items():
+            if (not is_partial or (field.inject_default_on_partial_update and is_update)) and field.read_only:
                 if field.has_default():
-                    if not is_update:
-                        validated.update(field.get_default_values(field_name, validated))
-                    else:
-                        # For datetimes with `auto_now` and `auto_now_add`
-                        if not _has_auto_now_add(field):
-                            validated.update(field.get_default_values(field_name, validated))
+                    validated.update(field.get_default_values(field_name, validated, is_update=is_update))
                 continue
             if field_name in extracted_values:
                 item = extracted_values[field_name]
@@ -104,14 +72,17 @@ class ModelParser:
                     if sub_name in validated:
                         raise ValueError(f"value set twice for key: {sub_name}")
                     validated[sub_name] = value
+            elif (not is_partial or (field.inject_default_on_partial_update and is_update)) and field.has_default():
+                # add field without a value to the second pass (in case no value appears)
+                # only include fields which have inject_default_on_partial_update set or if not is_partial
+                need_second_pass.append(field)
 
-        # phase 3: set defaults for the rest if not an update
-        if not is_partial:
-            for field_name, field in model_cls.fields.items():  # type: ignore
-                # we need a second run
-                if not field.read_only and field_name not in validated:
-                    if field.has_default():
-                        validated.update(field.get_default_values(field_name, validated))
+        # phase 3: set defaults for the rest if not partial or inject_default_on_partial_update
+        if need_second_pass:
+            for field in need_second_pass:
+                # check if field appeared e.g. by composite
+                if field.name not in validated:
+                    validated.update(field.get_default_values(field.name, validated, is_update=is_update))
         # Update with any ModelRef
         validated.update(self._extract_model_references(extracted_values, model_cls))
         return validated

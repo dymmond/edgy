@@ -242,7 +242,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """Checks if the field has a default value set"""
         return False
 
-    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any]) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool=False) -> Any:
         """
         Meta field
         """

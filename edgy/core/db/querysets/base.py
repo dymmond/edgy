@@ -938,8 +938,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self._clone()
 
-        extracted_fields = queryset._extract_values_from_field(kwargs, model_class=queryset.model_class)
-        kwargs = queryset._update_auto_now_fields(extracted_fields, queryset.model_class.fields)
+        kwargs = queryset._extract_values_from_field(kwargs, model_class=queryset.model_class)
 
         # Broadcast the initial update details
         await self.model_class.signals.pre_update.send_async(self.__class__, instance=self, kwargs=kwargs)
