@@ -183,7 +183,7 @@ def test_can_create_date_field():
     field = DateField(auto_now=True)
 
     assert isinstance(field, BaseField)
-    assert field.default == datetime.date.today
+    assert field.default == datetime.datetime.now
     assert field.read_only is True
 
 
