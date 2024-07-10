@@ -101,7 +101,7 @@ mssql = ["databasez[aioodbc]"]
 all = ["edgy[test,postgres,mysql,sqlite,mssql]", "ipython", "ptpython"]
 
 [tool.hatch.envs.default]
-dependencies = ["ruff", "pre-commit>=2.17.0,<3.0.0", "twine"]
+dependencies = ["ruff", "pre-commit>=2.17.0,<3.0.0", "twine", "backports.zoneinfo;python_version<'3.9'"]
 
 [tool.hatch.envs.default.scripts]
 clean_pyc = "find . -type f -name \"*.pyc\" -delete"

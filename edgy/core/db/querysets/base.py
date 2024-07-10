@@ -808,10 +808,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a single record based on the given kwargs.
         """
-        queryset: "QuerySet" = self._clone()
 
         if kwargs:
-            return await queryset.filter(**kwargs).get()
+            return await self.filter(**kwargs).get()
+
+        queryset: "QuerySet" = self._clone()
 
         expression = queryset._build_select().limit(2)
         rows = await queryset.database.fetch_all(expression)
@@ -937,8 +938,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: "QuerySet" = self._clone()
 
-        extracted_fields = queryset._extract_values_from_field(kwargs, model_class=queryset.model_class)
-        kwargs = queryset._update_auto_now_fields(extracted_fields, queryset.model_class.fields)
+        kwargs = queryset._extract_values_from_field(kwargs, model_class=queryset.model_class)
 
         # Broadcast the initial update details
         await self.model_class.signals.pre_update.send_async(self.__class__, instance=self, kwargs=kwargs)

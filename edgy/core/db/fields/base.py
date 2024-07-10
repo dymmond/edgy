@@ -56,6 +56,7 @@ class BaseField(FieldInfo):
         self.read_only: bool = kwargs.pop("read_only", False)
         self.primary_key: bool = kwargs.pop("primary_key", False)
         self.autoincrement: bool = kwargs.pop("autoincrement", False)
+        self.inject_default_on_partial_update: bool = kwargs.pop("inject_default_on_partial_update", False)
         self.inherit = inherit
 
         super().__init__(**kwargs)
@@ -198,7 +199,7 @@ class BaseField(FieldInfo):
             return default()
         return default
 
-    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any]) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool=False) -> Any:
         # for multidefaults overwrite in subclasses get_default_values to
         # parse default values differently
         # NOTE: multi value fields should always check here if defaults were already applied
@@ -309,7 +310,7 @@ class BaseCompositeField(BaseField):
 
         return result
 
-    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any]) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool=False) -> Any:
         # fields should provide their own default which is used as long as they are in the fields_mapping
         return {}
 

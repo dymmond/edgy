@@ -5,14 +5,7 @@ import ipaddress
 import re
 import uuid
 from enum import EnumMeta
-from typing import (
-    Any,
-    Optional,
-    Pattern,
-    Sequence,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Dict, Optional, Pattern, Sequence, Tuple, Union
 
 import pydantic
 import sqlalchemy
@@ -23,6 +16,13 @@ from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
 from edgy.core.db.fields.base import BaseField, Field
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.exceptions import FieldDefinitionError
+
+if TYPE_CHECKING:
+    try:
+        import zoneinfo  # type: ignore[import-not-found, unused-ignore]
+    except ImportError:
+        zoneinfo = Any  # type: ignore[unused-ignore, no-redef, assignment]
+
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
@@ -224,7 +224,20 @@ class BooleanField(FieldFactory, int):
         return sqlalchemy.Boolean()
 
 
+class AutoNowField(Field):
+    auto_now: Optional[bool]
+    auto_now_add: Optional[bool]
+
+    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool=False) -> Any:
+        if self.auto_now_add and is_update:
+            return {}
+        return super().get_default_values(field_name, cleaned_data, is_update=is_update)
+
+
 class AutoNowMixin(FieldFactory):
+    _bases = (AutoNowField,)
+
+
     def __new__(  # type: ignore
         cls,
         *,
@@ -236,7 +249,8 @@ class AutoNowMixin(FieldFactory):
             raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
 
         if auto_now_add or auto_now:
-            kwargs["read_only"] = True
+            kwargs.setdefault("read_only", True)
+            kwargs["inject_default_on_partial_update"] = auto_now
 
         kwargs = {
             **kwargs,
@@ -245,16 +259,77 @@ class AutoNowMixin(FieldFactory):
         return super().__new__(cls, **kwargs)
 
 
+class ConcreteDateTimeField(AutoNowField):
+
+    def __init__(self, *, default_timezone: Optional["zoneinfo.ZoneInfo"]=None, force_timezone: Optional["zoneinfo.ZoneInfo"]=None, remove_timezone: bool=False, **kwargs: Any) -> None:
+        self.force_timezone = force_timezone
+        self.default_timezone = default_timezone
+        self.remove_timezone = remove_timezone
+        super().__init__(**kwargs)
+
+    def _convert_datetime(self, value: datetime.datetime) -> Union[datetime.datetime, datetime.date]:
+        if value.tzinfo is None and self.default_timezone is not None:
+            value = value.replace(tzinfo=self.default_timezone)
+        if self.force_timezone is not None and value.tzinfo != self.force_timezone:
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=self.force_timezone)
+            else:
+                value = value.astimezone(self.force_timezone)
+        if self.remove_timezone:
+            value = value.replace(tzinfo=None)
+        if self.field_type is datetime.date:
+            return value.date()
+        return value
+
+    def check(self, value: Any) -> Optional[Union[datetime.datetime, datetime.date]]:
+        if value is None:
+            return None
+        elif isinstance(value, datetime.datetime):
+            return self._convert_datetime(value)
+        elif isinstance(value, (int, float)):
+            return self._convert_datetime(
+                datetime.datetime.fromtimestamp(value, self.default_timezone)
+            )
+        elif isinstance(value, str):
+            return self._convert_datetime(datetime.datetime.fromisoformat(value))
+        elif isinstance(value, datetime.date):
+            # datetime is subclass, so check datetime first
+
+            # don't touch dates when DateField
+            if self.field_type is datetime.date:
+                return value
+            return self._convert_datetime(
+                datetime.datetime(year=value.year, month=value.month, day=value.day)
+            )
+        else:
+            raise ValueError(f"Invalid type detected: {type(value)}")
+
+    def to_model(
+        self, field_name: str, value: Any, phase: str = ""
+    ) -> Dict[str, Optional[Union[datetime.datetime, datetime.date]]]:
+        """
+        Convert input object to datetime
+        """
+        return {field_name: self.check(value)}
+
+    def get_default_value(self) -> Any:
+        return self.check(super().get_default_value())
+
+
 class DateTimeField(AutoNowMixin, datetime.datetime):
     """Representation of a datetime field"""
 
     _type = datetime.datetime
+    _bases = (ConcreteDateTimeField,)
 
     def __new__(  # type: ignore
         cls,
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
+        default_timezone: Optional["zoneinfo.ZoneInfo"]=None,
+        force_timezone: Optional["zoneinfo.ZoneInfo"]=None,
+        remove_timezone: bool=False,
         **kwargs: Any,
     ) -> BaseField:
         if auto_now_add or auto_now:
@@ -275,16 +350,21 @@ class DateField(AutoNowMixin, datetime.date):
     """Representation of a date field"""
 
     _type = datetime.date
+    _bases = (ConcreteDateTimeField,)
 
     def __new__(  # type: ignore
         cls,
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
+        default_timezone: Optional["zoneinfo.ZoneInfo"]=None,
+        force_timezone: Optional["zoneinfo.ZoneInfo"]=None,
         **kwargs: Any,
     ) -> BaseField:
         if auto_now_add or auto_now:
-            kwargs["default"] = datetime.date.today
+            kwargs["default"] = datetime.datetime.now
+        # the datetimes lose the information anyway
+        kwargs["remove_timezone"] = False
 
         kwargs = {
             **kwargs,
@@ -418,6 +498,9 @@ class URLField(CharField):
 
 
 class _IPAddressField(Field):
+    def is_native_type(self, value: str) -> bool:
+        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
+
     def check(self, value: Any) -> Any:
         if self.is_native_type(value):
             return value
@@ -437,9 +520,6 @@ class _IPAddressField(Field):
 class IPAddressField(FieldFactory, str):
     _bases = (_IPAddressField,)
     _type = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
-
-    def is_native_type(self, value: str) -> bool:
-        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
 
     def __new__(  # type: ignore
         cls,

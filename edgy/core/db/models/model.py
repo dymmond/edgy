@@ -49,7 +49,9 @@ class Model(ModelRow, DeclarativeMixin):
 
         # empty updates shouldn't cause an error
         if kwargs:
-            kwargs = self._update_auto_now_fields(kwargs, self.fields)
+            kwargs = self._extract_values_from_field(
+                 extracted_values=kwargs, is_partial=True, is_update=True
+             )
             expression = self.table.update().values(**kwargs).where(*self.identifying_clauses())
             await self.database.execute(expression)
         await self.signals.post_update.send_async(self.__class__, instance=self)
@@ -183,10 +185,9 @@ class Model(ModelRow, DeclarativeMixin):
                 extracted_fields.update(values)
             # force save must ensure a complete mapping
             validated_values = self._extract_values_from_field(
-                extracted_values=extracted_fields, is_partial=False
+                extracted_values=extracted_fields, is_partial=False, is_update=False
             )
-            kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
-            kwargs, model_references = self.update_model_references(**kwargs)
+            kwargs, model_references = self.update_model_references(**validated_values)
             await self._save(**kwargs)
         else:
             # Broadcast the initial update details
