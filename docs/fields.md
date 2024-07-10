@@ -246,7 +246,6 @@ class MyModel(edgy.Model):
     Internally the DateTimeField logic is used and only the date element returned.
     This implies the field can handle the same types like DateTimeField.
 
-
 ##### Parameters
 
 * **auto_now** - A boolean indicating the `auto_now` enabled. Useful for auto updates.
@@ -291,7 +290,6 @@ DateTimeField supports int, float, string (isoformat), date object and of course
 
 !!! Note:
     `auto_now` and `auto_now_add` set the `read_only` flag by default. You can explicitly set `read_only` to `False` to be still able to update the field manually.
-
 
 #### DecimalField
 
@@ -434,19 +432,16 @@ from `edgy`.
     This is no concern for webservers where models are initialized once.
     `unique` uses internally an index and `index=False` will be ignored.
 
-
 !!! Note:
     There is a `reverse_name` argument which can be used when `related_name=False` to specify a field for reverse relations.
     It is useless except if related_name is `False` because it is otherwise overwritten.
     The `reverse_name` argument is used for finding the reverse field of the relationship.
-
 
 !!! Note:
     When `embed_parent` is set, queries start to use the second parameter of `embed_parent` **if it is a RelationshipField**.
     If it is empty, queries cannot access the parent anymore when the first parameter points to a `RelationshipField`.
     This is mode is analogue to ManyToMany fields.
     Otherwise, the first parameter points not to a `RelationshipField` (e.g. embeddable, CompositeField), queries use still the model, without the prefix stripped.
-
 
 !!! Note:
     `embed_parent` cannot traverse embeddables.
@@ -499,7 +494,6 @@ class MyModel(edgy.Model):
 
 !!! Note:
     If **through** is an abstract model it will be used as a template (a new model is generated with through as base).
-
 
 !!! Note:
     The index parameter is passed through to the ForeignKey fields but is not required. The intern ForeignKey fields
