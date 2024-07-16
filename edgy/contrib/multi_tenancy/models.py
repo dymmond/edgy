@@ -104,9 +104,9 @@ class DomainMixin(edgy.Model):
     All models that store the domains must use this class
     """
 
-    domain = edgy.CharField(max_length=253, unique=True, db_index=True)
-    tenant = edgy.ForeignKey(settings.tenant_model, index=True, related_name="domains")
-    is_primary = edgy.BooleanField(default=True, index=True)
+    domain: str = edgy.CharField(max_length=253, unique=True, db_index=True)
+    tenant: Any = edgy.ForeignKey(settings.tenant_model, index=True, related_name="domains")
+    is_primary: bool = edgy.BooleanField(default=True, index=True)  # type: ignore
 
     class Meta:
         abstract = True
@@ -148,20 +148,20 @@ class TenantUserMixin(edgy.Model):
     Mapping between user and a client (tenant).
     """
 
-    user = edgy.ForeignKey(
+    user: Any = edgy.ForeignKey(
         settings.auth_user_model,
         null=False,
         blank=False,
         related_name="tenant_user_users",
     )
-    tenant = edgy.ForeignKey(
+    tenant: Any = edgy.ForeignKey(
         settings.tenant_model,
         null=False,
         blank=False,
         related_name="tenant_users_tenant",
     )
-    is_active = edgy.BooleanField(default=False)
-    created_on = edgy.DateField(auto_now_add=True)
+    is_active: bool = edgy.BooleanField(default=False)  # type: ignore
+    created_on: date = edgy.DateField(auto_now_add=True)
 
     class Meta:
         abstract = True
