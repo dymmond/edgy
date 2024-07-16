@@ -42,7 +42,7 @@ def test_column_type():
     assert isinstance(DateField.get_column_type(), sqlalchemy.Date)
     assert isinstance(TimeField.get_column_type(), sqlalchemy.Time)
     assert isinstance(JSONField.get_column_type(), sqlalchemy.JSON)
-    assert isinstance(BinaryField.get_column_type(), sqlalchemy.JSON)
+    assert isinstance(BinaryField.get_column_type(), sqlalchemy.LargeBinary)
     assert isinstance(IntegerField.get_column_type(), sqlalchemy.Integer)
     assert isinstance(BigIntegerField.get_column_type(), sqlalchemy.BigInteger)
     assert isinstance(SmallIntegerField.get_column_type(), sqlalchemy.SmallInteger)
@@ -62,7 +62,7 @@ def test_column_type():
         (DateField(auto_now=True), datetime.date),
         (TimeField(), datetime.time),
         (JSONField(), Any),
-        (BinaryField(max_length=255), bytes),
+        (BinaryField(), bytes),
         (IntegerField(), int),
         (BigIntegerField(), int),
         (SmallIntegerField(), int),
@@ -84,7 +84,7 @@ def test_field_annotation(field, annotation):
         (DateField(null=False), True),
         (TimeField(null=False), True),
         (JSONField(null=False), True),
-        (BinaryField(max_length=255, null=False), True),
+        (BinaryField(null=False), True),
         (IntegerField(null=False), True),
         (BigIntegerField(null=False), True),
         (SmallIntegerField(null=False), True),
@@ -211,11 +211,6 @@ def test_can_create_binary_field():
 
     assert isinstance(field, BaseField)
     assert field.default is None
-
-
-def test_raises_field_definition_error_on_binary_creation():
-    with pytest.raises(FieldDefinitionError):
-        BinaryField(max_length=0)
 
 
 @pytest.mark.parametrize("klass", [FloatField, IntegerField, BigIntegerField, SmallIntegerField])

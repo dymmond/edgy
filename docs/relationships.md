@@ -4,7 +4,7 @@ Creating relationships in **Edgy** is as simple as importing the fields and appl
 the models.
 
 There are currently two types, the [ForeignKey](./fields.md#foreignkey)
-and the [OneToOneField](./fields.md#onetoonefield).
+and the [OneToOne](./fields.md#onetoone).
 
 When declaring a foreign key, you can pass the value in two ways, as a string or as a model
 object. Internally **Edgy** lookups up inside the [registry](./models.md#registry) and maps
@@ -140,7 +140,7 @@ also be removed.
 instances pointing to that object will set to null. When this `SET_NULL` is true, the `null=True`
 must be also provided or an `AssertationError` is raised.
 
-## OneToOneField
+## OneToOne
 
 Creating an `OneToOneField` relationship between models is basically the same as the
 [ForeignKey](#foreignkey) with the key difference that it uses `unique=True` on the foreign key

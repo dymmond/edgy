@@ -536,7 +536,7 @@ user = await User.query.defer("name")
 
 ### Get or none
 
-When querying a model and do not want to raise a [DoesNotFound](../exceptions.md#doesnotfound) and
+When querying a model and do not want to raise a [ObjectNotFound](../exceptions.md#objectnotfound) and
 instead returns a `None`.
 
 ```python
@@ -711,7 +711,7 @@ queries and all the great functionalities of Edgy while using the operands.
 !!! Tip
     The same way you apply the filters for the queries using the [related](./related-name.md), this
     can also be done with the **Edgy style** but the same cannot be said for the
-    [SQLAlchemy style](#sqlalchemy-style-1). So if you want to leverage the full power of Edgy,
+    [SQLAlchemy style](#sqlalchemy-style). So if you want to leverage the full power of Edgy,
     it is advised to go Edgy style.
 
 #### AND
@@ -737,7 +737,7 @@ And you can do nested `querysets` like multiple [filters](#filter).
 
 #### OR
 
-The same principle as the [and_](#and-1) but applied to the `OR`.
+The same principle as the [and_](#and) but applied to the `OR`.
 
 ```python
 {!> ../docs_src/queries/clauses/style/or.py !}
@@ -757,7 +757,7 @@ And you can do nested `querysets` like multiple [filters](#filter).
 
 #### NOT
 
-The `not_` as the same principle as the [exclude](#exclude) and like the [and](#and-1), for
+The `not_` as the same principle as the [exclude](#exclude) and like the [and](#and), for
 representation purposes, Edgy also has that function.
 
 ```python
