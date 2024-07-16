@@ -76,6 +76,7 @@ nav:
       - Models: "models.md"
       - Declarative Models: "declarative-models.md"
       - Reflection: "reflection.md"
+      - Embedding: "embedding.md"
       - Managers: "managers.md"
       - Fields: "fields.md"
       - Queries:

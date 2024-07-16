@@ -49,7 +49,7 @@ hide:
 
 - ForeignKeys use now global constraints and indexes.
 - Breaking: clean has now the argument to_query. See [Custom Fields](./fields.md#custom-fields).
-- Breaking: ManyToMany doesn't have a RelatedField on owner anymore and uses proxying. See [ManyToMany](./fields.md#ManyToMany).
+- Breaking: ManyToMany doesn't have a RelatedField on owner anymore and uses proxying. See [ManyToMany](./fields.md#manytomany).
 - Breaking: use singular related_name for unique ForeignKeys (or OneToOne). See [related_name](./queries/related-name.md)
 - MetaInfo (meta) is now partly lazy.
 - `pk` is now a PKField (a variant of the BaseCompositeField).

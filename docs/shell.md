@@ -15,7 +15,7 @@ Before reading this section, you should get familiar with the ways Edgy handles 
 of the applications.
 
 The following examples and explanations will be using the [auto discovery](./migrations/discovery.md#auto-discovery)
-but [--app and environment variables](./migrations/discovery.md##environment-variables) approach but the
+but [--app and environment variables](./migrations/discovery.md#environment-variables) approach but the
 is equally valid and works in the same way.
 
 !!! Tip
@@ -75,7 +75,7 @@ $ edgy shell
 $ edgy shell --kernel ptpython
 ```
 
-#### With [--app and environment variables](./migrations/discovery.md##environment-variables)
+#### With [--app and environment variables](./migrations/discovery.md#environment-variables)
 
 **--app**
 

@@ -41,7 +41,7 @@ What does this non-core multi-tenancy brings?
 
 The module works as an *independent* application inside Edgy but using the obvious core components.
 
-The module uses a [settings file](#settings) that inherits from the main [settings](../settings.md)
+The module uses a [settings file](#tenancysettings) that inherits from the main [settings](../settings.md)
 module of **Edgy** which means you would only needed to override the needed values and use it.
 
 Every model that required to be applied on a `tenant` (schema) level, you require to inherit from

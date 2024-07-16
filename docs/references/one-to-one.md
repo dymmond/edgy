@@ -1,7 +1,7 @@
 # **`OneToOne`** class
 
 
-::: edgy.OneToOneField
+::: edgy.OneToOne
     options:
         filters:
         - "!^_type"

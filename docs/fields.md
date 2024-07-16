@@ -11,26 +11,26 @@ supported in **all field types**.
 !!! Check
     The data types are also very familiar for those with experience with Django model fields.
 
-* **primary_key** - A boolean. Determine if a column is primary key.
+- `primary_key` - A boolean. Determine if a column is primary key.
 Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions with Edgy.
-* **exclude** - An bool indicating if the field is included in model_dump
-* **default** - A value or a callable (function).
-* **index** - A boolean. Determine if a database index should be created.
-* **inherit** - A boolean. Determine if a field can be inherited in submodels. Default is True. It is used by PKField, RelatedField and the injected ID Field.
-* **skip_absorption_check** - A boolean. Default False. Dangerous option! By default when defining a CompositeField with embedded fields and the `absorb_existing_fields` option it is checked that the field type of the absorbed field is compatible with the field type of the embedded field. This option skips the check.
-* **unique** - A boolean. Determine if a unique constraint should be created for the field.
+- `exclude` - An bool indicating if the field is included in model_dump
+- `default` - A value or a callable (function).
+- `index` - A boolean. Determine if a database index should be created.
+- `inherit` - A boolean. Determine if a field can be inherited in submodels. Default is True. It is used by PKField, RelatedField and the injected ID Field.
+- `skip_absorption_check` - A boolean. Default False. Dangerous option! By default when defining a CompositeField with embedded fields and the `absorb_existing_fields` option it is checked that the field type of the absorbed field is compatible with the field type of the embedded field. This option skips the check.
+- `unique` - A boolean. Determine if a unique constraint should be created for the field.
 Check the [unique_together](./models.md#unique-together) for more details.
 
 All the fields are required unless on the the following is set:
 
-* **null** - A boolean. Determine if a column allows null.
+- `null` - A boolean. Determine if a column allows null.
 
     <sup>Set default to `None`</sup>
 
-* **server_default** - instance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
+- `server_default` - instance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
 construct representing the DDL DEFAULT value for the column.
-* **comment** - A comment to be added with the field in the SQL database.
-* **secret** - A special attribute that allows to call the [exclude_secrets](./queries/secrets.md#exclude-secrets) and avoid
+- `comment` - A comment to be added with the field in the SQL database.
+- `secret` - A special attribute that allows to call the [exclude_secrets](./queries/secrets.md#exclude-secrets) and avoid
 accidental leakage of sensitive data.
 
 ## Available fields
@@ -79,11 +79,11 @@ This field is used as a default field for the `id` of a model.
 
 ##### Parameters:
 
-* **minimum** - An integer, float or decimal indicating the minimum.
-* **maximum** - An integer, float or decimal indicating the maximum.
-* **max_digits** - Maximum digits allowed.
-* **multiple_of** - An integer, float or decimal indicating the multiple of.
-* **decimal_places** - The total decimal places.
+* `minimum` - An integer, float or decimal indicating the minimum.
+* `maximum` - An integer, float or decimal indicating the maximum.
+* `max_digits` - Maximum digits allowed.
+* `multiple_of` - An integer, float or decimal indicating the multiple of.
+* `decimal_places` - The total decimal places.
 
 #### IntegerField
 
@@ -100,11 +100,11 @@ class MyModel(edgy.Model):
 
 ##### Parameters:
 
-* **minimum** - An integer, float or decimal indicating the minimum.
-* **maximum** - An integer, float or decimal indicating the maximum.
-* **max_digits** - Maximum digits allowed.
-* **multiple_of** - An integer, float or decimal indicating the multiple of.
-* **decimal_places** - The total decimal places.
+* `minimum` - An integer, float or decimal indicating the minimum.
+* `maximum` - An integer, float or decimal indicating the maximum.
+* `max_digits` - Maximum digits allowed.
+* `multiple_of` - An integer, float or decimal indicating the multiple of.
+* `decimal_places` - The total decimal places.
 
 #### BooleanField
 
@@ -134,8 +134,8 @@ class MyModel(edgy.Model):
 
 ##### Parameters:
 
-* **max_length** - An integer indicating the total length of string.
-* **min_length** - An integer indicating the minimum length of string.
+* `max_length` - An integer indicating the total length of string.
+* `min_length` - An integer indicating the minimum length of string.
 
 #### ChoiceField
 
@@ -156,7 +156,7 @@ class MyModel(edgy.Model):
 
 ##### Parameters
 
-* **choices** - An enum containing the choices for the field.
+* `choices` - An enum containing the choices for the field.
 
 #### CompositeField
 
@@ -202,12 +202,12 @@ the fields need the exclude attribute/parameter set.
 
 ##### Parameters
 
-* **inner_fields** - Required. A sequence containing the external field names mixed with embedded field definitions (name, Field) tuples.
+* `inner_fields` - Required. A sequence containing the external field names mixed with embedded field definitions (name, Field) tuples.
                      As an alternative it is possible to provide an Edgy Model (abstract or non-abstract) or a dictionary in the format: key=name, value=Field
-* **unsafe_json_serialization** - Default False. Normally when serializing in json mode, CompositeFields are ignored when they don't have a pydantic model set. This option includes such CompositeFields in the dump.
-* **absorb_existing_fields** - Default False. Don't fail if fields speficied with (name, Field) tuples already exists. Treat them as internal fields. The existing fields are checked if they are a subclass of the Field or have the attribute `skip_absorption_check` set
-* **model** - Default None (not set).Return a pydantic model instead of a dict.
-* **prefix_embedded** - Default "". Prefix the field names of embedded fields (not references to external fields). Useful for implementing embeddables
+* `unsafe_json_serialization` - Default False. Normally when serializing in json mode, CompositeFields are ignored when they don't have a pydantic model set. This option includes such CompositeFields in the dump.
+* `absorb_existing_fields` - Default False. Don't fail if fields speficied with (name, Field) tuples already exists. Treat them as internal fields. The existing fields are checked if they are a subclass of the Field or have the attribute `skip_absorption_check` set
+* `model` - Default None (not set).Return a pydantic model instead of a dict.
+* `prefix_embedded` - Default "". Prefix the field names of embedded fields (not references to external fields). Useful for implementing embeddables
 
 Note: embedded fields are shallow-copied. This way it is safe to provide the same inner_fields object to multiple CompositeFields.
 
@@ -281,12 +281,12 @@ DateTimeField supports int, float, string (isoformat), date object and of course
 
 ##### Parameters
 
-* **auto_now** - A boolean indicating the `auto_now` enabled. Useful for auto updates.
-* **auto_now_add** - A boolean indicating the `auto_now_add` enabled. Only set when creating the object
-* **default_timezone** - ZoneInfo containing the timezone which is added to naive datetimes
-* **force_timezone** - ZoneInfo containing the timezone in which all datetimes are converted.
+* `auto_now` - A boolean indicating the `auto_now` enabled. Useful for auto updates.
+* `auto_now_add` - A boolean indicating the `auto_now_add` enabled. Only set when creating the object
+* `default_timezone` - ZoneInfo containing the timezone which is added to naive datetimes
+* `force_timezone` - ZoneInfo containing the timezone in which all datetimes are converted.
                          For naive datetimes it behaves like `default_timezone`
-* **remove_timezone** - Boolean. Default False. Remove timezone information from datetime. Useful if the db should only contain naive datetimes and not convert.
+* `remove_timezone` - Boolean. Default False. Remove timezone information from datetime. Useful if the db should only contain naive datetimes and not convert.
 
 !!! Note:
     `auto_now` and `auto_now_add` set the `read_only` flag by default. You can explicitly set `read_only` to `False` to be still able to update the field manually.
@@ -305,11 +305,11 @@ class MyModel(edgy.Model):
 
 ##### Parameters
 
-* **minimum** - An integer indicating the minimum.
-* **maximum** - An integer indicating the maximum.
-* **max_digits** - An integer indicating the total maximum digits.
-* **decimal_places** - An integer indicating the total decimal places.
-* **multiple_of** - An integer, float or decimal indicating the multiple of.
+* `minimum` - An integer indicating the minimum.
+* `maximum` - An integer indicating the maximum.
+* `max_digits` - An integer indicating the total maximum digits.
+* `decimal_places` - An integer indicating the total decimal places.
+* `multiple_of` - An integer, float or decimal indicating the multiple of.
 
 #### EmailField
 
@@ -407,24 +407,24 @@ When the second parameter is empty, the parent object is not included as attribu
 
 ##### Parameters
 
-* **to** - A string [model](./models.md) name or a class object of that same model.
-* **related_name** - The name to use for the relation from the related object back to this one. Can be set to `False` to disable a reverse connection.
+* `to` - A string [model](./models.md) name or a class object of that same model.
+* `related_name` - The name to use for the relation from the related object back to this one. Can be set to `False` to disable a reverse connection.
                      Note: Setting to `False` will also prevent prefetching and reversing via `__`.
                      See also [related_name](./queries/related-name.md) for defaults
-* **related_fields** - The columns or fields to use for the foreign key. If unset or empty, the primary key(s) are used.
-* **embed_parent** (to_attr, as_attr) - When accessing the reverse relation part, return to_attr instead and embed the parent object in as_attr (when as_attr is not empty). Default None (which disables it). For to_attr (first argument) deeply nested models can be selected via `__`.
-* **no_constraint** - Skip creating a constraint. Note: if set and index=True an index will be created instead.
-* **on_delete** - A string indicating the behaviour that should happen on delete of a specific
+* `related_fields` - The columns or fields to use for the foreign key. If unset or empty, the primary key(s) are used.
+* `embed_parent` (to_attr, as_attr) - When accessing the reverse relation part, return to_attr instead and embed the parent object in as_attr (when as_attr is not empty). Default None (which disables it). For to_attr (first argument) deeply nested models can be selected via `__`.
+* `no_constraint` - Skip creating a constraint. Note: if set and index=True an index will be created instead.
+* `on_delete` - A string indicating the behaviour that should happen on delete of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `edgy`.
-* **on_update** - A string indicating the behaviour that should happen on update of a specific
+* `on_update` - A string indicating the behaviour that should happen on update of a specific
 model. The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
 from `edgy`.
     ```python
     from edgy import CASCADE, SET_NULL, RESTRICT
     ```
-* **relation_fn** - Optionally drop a function which returns a Relation for the reverse side. This will be used by the RelatedField (if it is created). Used by the ManyToMany field.
-* **reverse_path_fn** - Optionally drop a function which handles the traversal from the reverse side. Used by the ManyToMany field.
+* `relation_fn` - Optionally drop a function which returns a Relation for the reverse side. This will be used by the RelatedField (if it is created). Used by the ManyToMany field.
+* `reverse_path_fn` - Optionally drop a function which handles the traversal from the reverse side. Used by the ManyToMany field.
 
 !!! Note:
     The index parameter can improve the performance and is strongly recommended especially with `no_constraint` but also
@@ -481,19 +481,19 @@ class MyModel(edgy.Model):
 
 ##### Parameters
 
-* **to** - A string [model](./models.md) name or a class object of that same model.
-* **from_fields** - Provide the **related_fields** for the implicitly generated ForeignKey to the owner model.
-* **to_fields** - Provide the **related_fields** for the implicitly generated ForeignKey to the child model.
-* **related_name** - The name to use for the relation from the related object back to this one.
-* **through** - The model to be used for the relationship. Edgy generates the model by default
-                if None is provided or **through** is an abstract model.
-* **embed_through** - When traversing, embed the through object in this attribute. Otherwise it is not accessable from the result.
+* `to` - A string [model](./models.md) name or a class object of that same model.
+* `from_fields` - Provide the `related_fields` for the implicitly generated ForeignKey to the owner model.
+* `to_fields` - Provide the `related_fields` for the implicitly generated ForeignKey to the child model.
+* `related_name` - The name to use for the relation from the related object back to this one.
+* `through` - The model to be used for the relationship. Edgy generates the model by default
+                if None is provided or `through` is an abstract model.
+* `embed_through` - When traversing, embed the through object in this attribute. Otherwise it is not accessable from the result.
                       if an empty string was provided, the old behaviour is used to query from the through model as base (default).
                       if False, the base is transformed to the target and source model (full proxying). You cannot select the through model via path traversal anymore (except from the through model itself).
                       If not an empty string, the same behaviour like with False applies except that you can select the through model fields via path traversal with the provided name.
 
 !!! Note:
-    If **through** is an abstract model it will be used as a template (a new model is generated with through as base).
+    If `through` is an abstract model it will be used as a template (a new model is generated with through as base).
 
 !!! Note:
     The index parameter is passed through to the ForeignKey fields but is not required. The intern ForeignKey fields
@@ -668,22 +668,23 @@ If you want to customize the entire field (e.g. checks), you have to split the f
 
 Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide following methods to work:
 
-* **get_columns(self, field_name)** - returns the sqlalchemy columns which should be created by this field.
-* **clean(self, field_name, value, to_query=False)** - returns the cleaned column values. to_query specifies if clean is used by the query sanitizer and must be more strict (no partial values).
+- `get_columns(self, field_name)` - returns the sqlalchemy columns which should be created by this field.
+- `clean(self, field_name, value, to_query=False)` - returns the cleaned column values. to_query specifies if clean is used by the query sanitizer and must be more strict (no partial values).
 
 Additional they can provide following methods:
-* **`__get__(self, instance, owner=None)`** - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
-* **`__set__(self, instance, value)`** - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
-* **to_model(self, field_name, phase="")** - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`
-* **get_embedded_fields(self, field_name, fields_mapping)** - Define internal fields.
-* **get_default_values(self, field_name, cleaned_data, is_update=False)** - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
-* **get_default_value(self)** - return default value for one column fields.
-* **get_global_constraints(self, field_name, columns)** - takes as second parameter (self excluded) the columns defined by this field (by get_columns). Returns a global constraint, which can be multi-column.
+
+* `__get__(self, instance, owner=None)` - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
+* `__set__(self, instance, value)` - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
+* `to_model(self, field_name, phase="")` - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`
+* `get_embedded_fields(self, field_name, fields_mapping)` - Define internal fields.
+* `get_default_values(self, field_name, cleaned_data, is_update=False)` - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
+* `get_default_value(self)` - return default value for one column fields.
+* `get_global_constraints(self, field_name, columns)` - takes as second parameter (self excluded) the columns defined by this field (by get_columns). Returns a global constraint, which can be multi-column.
 
 You should also provide an init method which sets following attributes:
 
-* **column_type** - either None (default) or the sqlalchemy column type
-* **inject_default_on_partial_update** - Add default value despite being a partial update. Useful for implementing `auto_now` or other fields which should change on every update.
+* `column_type` - either None (default) or the sqlalchemy column type
+* `inject_default_on_partial_update` - Add default value despite being a partial update. Useful for implementing `auto_now` or other fields which should change on every update.
 
 
 Note: instance checks can also be done against the `field_type` attribute in case you want to check the compatibility with other fields (composite style)

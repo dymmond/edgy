@@ -134,5 +134,5 @@ You can now query normally, something like this.
 ```
 
 
-[many_to_many]: ../fields.md#manytomanyfield
+[many_to_many]: ../fields.md#manytomany
 [related_name]: ./related-name.md
