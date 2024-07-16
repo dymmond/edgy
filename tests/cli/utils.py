@@ -4,12 +4,13 @@ import subprocess
 
 
 def run_cmd(app, cmd, is_app=True):
+    env = dict(os.environ)
     if is_app:
-        os.environ["SAFFIER_DEFAULT_APP"] = app
+        env["EDGY_DEFAULT_APP"] = app
+    cmd = f"hatch --env test run {cmd}"
 
-    process = subprocess.Popen(shlex.split(cmd), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    (stdout, stderr) = process.communicate()
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, shell=True)
     print("\n$ " + cmd)
-    print(stdout.decode("utf-8"))
-    print(stderr.decode("utf-8"))
-    return stdout, stderr, process.wait()
+    print(result.stdout.decode("utf-8"))
+    print(result.stderr.decode("utf-8"))
+    return result.stdout, result.stderr, result.returncode

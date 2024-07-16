@@ -101,14 +101,12 @@ mssql = ["databasez[aioodbc]"]
 all = ["edgy[test,postgres,mysql,sqlite,mssql]", "ipython", "ptpython"]
 
 [tool.hatch.envs.default]
-dependencies = ["ruff", "pre-commit>=2.17.0,<3.0.0", "twine", "backports.zoneinfo;python_version<'3.9'"]
+dependencies = ["ruff", "pre-commit>=2.17.0,<3.0.0", "backports.zoneinfo;python_version<'3.9'"]
 
 [tool.hatch.envs.default.scripts]
 clean_pyc = "find . -type f -name \"*.pyc\" -delete"
 clean_pycache = "find . -type d -name \"*__pycache__*\" -delete"
-lint_only = "ruff check edgy tests docs_src {args}"
-lint = "hatch run lint_only {args}; hatch run test:check_types"
-build_with_check = "hatch build; twine check dist/*"
+lint = "hatch fmt {args}; hatch run test:check_types"
 
 
 [tool.hatch.envs.docs]
@@ -129,14 +127,16 @@ serve = "mkdocs serve --dev-addr localhost:8000"
 
 
 [tool.hatch.envs.test]
+# required for cli tests and check_types
 features = ["all", "testing"]
 
 [tool.hatch.envs.test.scripts]
-# needs docker services running
-test = "pytest {args}"
-test_man = "pytest {args} -s -vv"
-coverage = "pytest --cov=edgy --cov=tests --cov-report=term-missing:skip-covered --cov-report=html tests {args}"
 check_types = "mypy -p edgy"
+
+[tool.hatch.envs.hatch-test]
+# needs docker services running
+features = ["all", "testing"]
+
 
 [tool.hatch.version]
 path = "edgy/__init__.py"

@@ -18,13 +18,12 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: pip install hatch
       - name: "Build package"
-        run: "hatch run build_with_check"
+        run: "hatch build"
       - name: "Publish to PyPI"
         run: "scripts/publish"
         env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-          VERSION_FILE: "edgy/__init__.py"
+          HATCH_INDEX_USER: __token__
+          HATCH_INDEX_AUTH: ${{ secrets.PYPI_TOKEN }}
       - name: "Deploy docs"
         run: |
           curl -X POST '${{ secrets.DEPLOY_DOCS }}'
