@@ -530,6 +530,25 @@ class MyModel(edgy.Model):
 
 Simple JSON representation object.
 
+
+#### BinaryField
+
+Simple blob field. It supports on some dbs a `max_length` attribute.
+
+```python
+from typing import Dict, Any
+import edgy
+
+
+class MyModel(edgy.Model):
+    data: bytes = edgy.Binary()
+    ...
+
+```
+
+!!! Note:
+    Blobs (BinaryField) are like TextFields not size-restricted by default.
+
 #### OneToOne
 
 ```python

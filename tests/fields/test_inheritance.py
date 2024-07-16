@@ -32,6 +32,7 @@ from edgy.core.db.models import Model
         (TimeField(null=True), TimeField),
         (JSONField(null=True), JSONField),
         (BinaryField(max_length=255, null=True), BinaryField),
+        (BinaryField(null=True), BinaryField),
         (IntegerField(null=True), IntegerField),
         (BigIntegerField(null=True), BigIntegerField),
         (SmallIntegerField(null=True), SmallIntegerField),
