@@ -23,12 +23,14 @@ class Registry:
         self.models: Dict[str, Any] = {}
         self.reflected: Dict[str, Any] = {}
         self.db_schema = kwargs.get("schema", None)
-        self.extra: Mapping[str, Type["Database"]] = kwargs.pop("extra", {})
+        self.extra: Mapping[str, Type[Database]] = kwargs.pop("extra", {})
 
         self.schema = Schema(registry=self)
 
         self._metadata: sqlalchemy.MetaData = (
-            sqlalchemy.MetaData(schema=self.db_schema) if self.db_schema is not None else sqlalchemy.MetaData()
+            sqlalchemy.MetaData(schema=self.db_schema)
+            if self.db_schema is not None
+            else sqlalchemy.MetaData()
         )
 
     @property
@@ -84,14 +86,20 @@ class Registry:
     def sync_engine(self) -> Engine:
         return self._get_sync_engine
 
-    def init_models(self, *, init_column_mappers: bool=True, init_class_attrs: bool=True) -> None:
+    def init_models(
+        self, *, init_column_mappers: bool = True, init_class_attrs: bool = True
+    ) -> None:
         for model_class in self.models.values():
-            model_class.meta.full_init(init_column_mappers=init_column_mappers, init_class_attrs=init_class_attrs)
+            model_class.meta.full_init(
+                init_column_mappers=init_column_mappers, init_class_attrs=init_class_attrs
+            )
 
         for model_class in self.reflected.values():
-            model_class.meta.full_init(init_column_mappers=init_column_mappers, init_class_attrs=init_class_attrs)
+            model_class.meta.full_init(
+                init_column_mappers=init_column_mappers, init_class_attrs=init_class_attrs
+            )
 
-    def invalidate_models(self, *, clear_class_attrs: bool=True) -> None:
+    def invalidate_models(self, *, clear_class_attrs: bool = True) -> None:
         for model_class in self.models.values():
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
         for model_class in self.reflected.values():
@@ -100,17 +108,15 @@ class Registry:
     async def create_all(self) -> None:
         if self.db_schema:
             await self.schema.create_schema(self.db_schema, True)
-        async with self.database:
-            async with self.engine.begin() as connection:
-                await connection.run_sync(self.metadata.create_all)
+        async with self.database, self.engine.begin() as connection:
+            await connection.run_sync(self.metadata.create_all)
         await self.engine.dispose()
 
     async def drop_all(self) -> None:
         if self.db_schema:
             await self.schema.drop_schema(self.db_schema, True, True)
-        async with self.database:
-            async with self.engine.begin() as conn:
-                await conn.run_sync(self.metadata.drop_all)
-                # let's invalidate everything and recalculate. We don't want references.
-                self.invalidate_models()
+        async with self.database, self.engine.begin() as conn:
+            await conn.run_sync(self.metadata.drop_all)
+            # let's invalidate everything and recalculate. We don't want references.
+            self.invalidate_models()
         await self.engine.dispose()

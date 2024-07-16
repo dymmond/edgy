@@ -71,8 +71,7 @@ class TenantMixin(edgy.Model):
                 else self.meta.registry.db_schema
             )
             raise ModelSchemaError(
-                "Can't update tenant outside it's own schema or the public schema. Current schema is '%s'"
-                % current_schema
+                f"Can't update tenant outside it's own schema or the public schema. Current schema is '{current_schema}'"
             )
 
         tenant = await super().save(force_save, values, **kwargs)
@@ -122,7 +121,9 @@ class DomainMixin(edgy.Model):
         **kwargs: Any,
     ) -> Model:
         async with self.meta.registry.database.transaction():
-            domains = self.__class__.query.filter(tenant=self.tenant, is_primary=True).exclude(pk=self.pk)
+            domains = self.__class__.query.filter(tenant=self.tenant, is_primary=True).exclude(
+                pk=self.pk
+            )
 
             exists = await domains.exists()
 
@@ -134,7 +135,10 @@ class DomainMixin(edgy.Model):
 
     async def delete(self) -> None:
         tenant = await self.tenant.load()
-        if tenant.schema_name.lower() == settings.tenant_schema_default.lower() and self.domain == settings.domain_name:
+        if (
+            tenant.schema_name.lower() == settings.tenant_schema_default.lower()
+            and self.domain == settings.domain_name
+        ):
             raise ValueError("Cannot drop public domain.")
         return await super().delete()
 
@@ -184,9 +188,7 @@ class TenantUserMixin(edgy.Model):
         await super().save(*args, **kwargs)
         if self.is_active:
             await (
-                get_model(
-                    registry=self.meta.registry, model_name=self.__class__.__name__
-                )
+                get_model(registry=self.meta.registry, model_name=self.__class__.__name__)
                 .query.filter(is_active=True, user=self.user)
                 .exclude(pk=self.pk)
                 .update(is_active=False)

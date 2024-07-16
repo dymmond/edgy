@@ -24,7 +24,6 @@ from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
-
     from edgy import Model
 
 T = TypeVar("T", bound="Model")
@@ -49,13 +48,15 @@ def _removeprefix(text: str, prefix: str) -> str:
         return text
 
 
-def _removeprefixes(text:str, *prefixes: Sequence[str]) -> str:
+def _removeprefixes(text: str, *prefixes: Sequence[str]) -> str:
     for prefix in prefixes:
         text = _removeprefix(text, prefix)
     return text
 
+
 class BaseManyToManyForeignKeyField(BaseForeignKey):
     is_m2m: bool = True
+
     def __init__(
         self,
         *,
@@ -64,7 +65,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
         through: Union[str, Type["Model"]] = "",
-        embed_through: Union[str, Literal[False]]="",
+        embed_through: Union[str, Literal[False]] = "",
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -92,20 +93,45 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         return f"{self.reverse_name}__{self.embed_through}"
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
-        return ManyRelation(through=self.through, to=self.to, from_foreign_key=self.from_foreign_key, to_foreign_key=self.to_foreign_key, embed_through=self.embed_through, **kwargs)
+        return ManyRelation(
+            through=self.through,
+            to=self.to,
+            from_foreign_key=self.from_foreign_key,
+            to_foreign_key=self.to_foreign_key,
+            embed_through=self.embed_through,
+            **kwargs,
+        )
 
     def get_reverse_relation(self, **kwargs: Any) -> ManyRelationProtocol:
-        return ManyRelation(through=self.through, to=self.owner, reverse=True, from_foreign_key=self.to_foreign_key, to_foreign_key=self.from_foreign_key, embed_through=self.embed_through, **kwargs)
+        return ManyRelation(
+            through=self.through,
+            to=self.owner,
+            reverse=True,
+            from_foreign_key=self.to_foreign_key,
+            to_foreign_key=self.from_foreign_key,
+            embed_through=self.embed_through,
+            **kwargs,
+        )
 
     def traverse_field(self, path: str) -> Tuple[Any, str, str]:
         if self.embed_through_prefix and path.startswith(self.embed_through_prefix):
-            return self.through, self.from_foreign_key, _removeprefixes(path, self.embed_through_prefix, "__")
+            return (
+                self.through,
+                self.from_foreign_key,
+                _removeprefixes(path, self.embed_through_prefix, "__"),
+            )
         return self.to, self.reverse_name, _removeprefixes(path, self.name, "__")
 
     def reverse_traverse_field_fk(self, path: str) -> Tuple[Any, str, str]:
         # used for target fk
-        if self.reverse_embed_through_prefix and path.startswith(self.reverse_embed_through_prefix):
-            return self.through, self.to_foreign_key, _removeprefix(_removeprefix(path, self.reverse_embed_through_prefix), "__")
+        if self.reverse_embed_through_prefix and path.startswith(
+            self.reverse_embed_through_prefix
+        ):
+            return (
+                self.through,
+                self.to_foreign_key,
+                _removeprefix(_removeprefix(path, self.reverse_embed_through_prefix), "__"),
+            )
         return self.owner, self.name, _removeprefixes(path, self.reverse_name, "__")
 
     def add_model_to_register(self, model: Any) -> None:
@@ -124,7 +150,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         from edgy.core.db.models.metaclasses import MetaInfo
 
         self.to = self.target
-        __bases__: Tuple[Type["Model"], ...] = ()
+        __bases__: Tuple[Type[Model], ...] = ()
         pknames = set()
         if self.through:
             if isinstance(self.through, str):
@@ -170,9 +196,11 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         meta_args = {
             "tablename": tablename,
             "registry": self.registry,
-            "multi_related": [to_name.lower()]
+            "multi_related": [to_name.lower()],
         }
-        has_pknames = pknames and not pknames.issubset({self.from_foreign_key, self.to_foreign_key})
+        has_pknames = pknames and not pknames.issubset(
+            {self.from_foreign_key, self.to_foreign_key}
+        )
         if has_pknames:
             meta_args["unique_together"] = [(self.from_foreign_key, self.to_foreign_key)]
 
@@ -202,7 +230,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 reverse_name=self.name,
                 related_fields=self.from_fields,
                 primary_key=not has_pknames,
-                index=self.index
+                index=self.index,
             ),
             f"{self.to_foreign_key}": ForeignKey(
                 self.to,
@@ -215,7 +243,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 primary_key=not has_pknames,
                 index=self.index,
                 relation_fn=self.get_reverse_relation,
-                reverse_path_fn=self.reverse_traverse_field_fk
+                reverse_path_fn=self.reverse_traverse_field_fk,
             ),
         }
 
@@ -225,7 +253,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             __module__=self.__module__,
             __definitions__=fields,
             __metadata__=new_meta,
-            __bases__=__bases__
+            __bases__=__bases__,
         )
         self.through = through_model
         self.add_model_to_register(self.through)
@@ -242,7 +270,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """Checks if the field has a default value set"""
         return False
 
-    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool=False) -> Any:
+    def get_default_values(
+        self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool = False
+    ) -> Any:
         """
         Meta field
         """
@@ -280,7 +310,9 @@ class ManyToManyField(ForeignKeyFieldFactory):
     ) -> BaseField:
         for argument in ["null", "on_delete", "on_update"]:
             if kwargs.get(argument, None):
-                terminal.write_warning(f"Declaring `{argument}` on a ManyToMany relationship has no effect.")
+                terminal.write_warning(
+                    f"Declaring `{argument}` on a ManyToMany relationship has no effect."
+                )
         kwargs["null"] = True
         kwargs["on_delete"] = CASCADE
         kwargs["on_update"] = CASCADE
@@ -291,9 +323,8 @@ class ManyToManyField(ForeignKeyFieldFactory):
     def validate(cls, **kwargs: Any) -> None:
         super().validate(**kwargs)
         embed_through = kwargs.get("embed_through")
-        if embed_through:
-            if "__" in embed_through:
-                raise FieldDefinitionError('"embed_through" cannot contain "__".')
+        if embed_through and "__" in embed_through:
+            raise FieldDefinitionError('"embed_through" cannot contain "__".')
 
 
 ManyToMany = ManyToManyField

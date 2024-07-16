@@ -61,7 +61,10 @@ def test_raises_error_on_missing_marshall_config():
         class UserMarshall(Marshall):
             details: fields.MarshallField = fields.MarshallMethodField(field_type=str)
 
-    assert raised.value.args[0] == "The 'marshall_config' was not found. Make sure it is declared and set."
+    assert (
+        raised.value.args[0]
+        == "The 'marshall_config' was not found. Make sure it is declared and set."
+    )
 
 
 def test_raises_assertation_error_on_using_both_fields_and_exclude():
@@ -91,7 +94,10 @@ def test_raises_error_on_missing_declared_function_on_method_field():
             marshall_config = ConfigMarshall(model=User, fields=["email"])
             details: fields.MarshallField = fields.MarshallMethodField(field_type=str)
 
-    assert raised.value.args[0] == "Field 'details' declared but no 'get_details' found in 'UserMarshall'."
+    assert (
+        raised.value.args[0]
+        == "Field 'details' declared but no 'get_details' found in 'UserMarshall'."
+    )
 
 
 def test_raises_error_on_missing_required_fields():
@@ -100,4 +106,7 @@ def test_raises_error_on_missing_required_fields():
         class ProfileMarshall(Marshall):
             marshall_config = ConfigMarshall(model=Profile, fields=["email"])
 
-    assert raised.value.args[0] == "'Profile' model requires the following mandatory fields: ['email', 'name']."
+    assert (
+        raised.value.args[0]
+        == "'Profile' model requires the following mandatory fields: ['email', 'name']."
+    )

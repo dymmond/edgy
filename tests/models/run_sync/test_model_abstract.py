@@ -59,7 +59,9 @@ async def test_model_does_not_exist():
 
 async def test_model_abstract():
     profile = edgy.run_sync(Profile.query.create(name="Test2", language="PT", age=23))
-    contact = edgy.run_sync(Contact.query.create(name="Test2", language="PT", age="25", address="Westminster, London"))
+    contact = edgy.run_sync(
+        Contact.query.create(name="Test2", language="PT", age="25", address="Westminster, London")
+    )
 
     profiles = edgy.run_sync(Profile.query.all())
     contacts = edgy.run_sync(Contact.query.all())

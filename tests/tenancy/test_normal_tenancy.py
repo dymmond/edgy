@@ -38,7 +38,9 @@ async def rollback_connections():
 async def test_can_create_tenant_records():
     # Create the tenant
     # using the defaults from Edgy.
-    await create_schema(registry=models, schema_name="esmerald", if_not_exists=True, should_create_tables=True)
+    await create_schema(
+        registry=models, schema_name="esmerald", if_not_exists=True, should_create_tables=True
+    )
 
     for i in range(10):
         await Item.query.create(name=f"item-{i}")

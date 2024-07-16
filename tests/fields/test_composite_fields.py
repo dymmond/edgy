@@ -31,7 +31,9 @@ class MyModel2(edgy.Model):
         ],
         absorb_existing_fields=True,
     )
-    plain: PlainModel = edgy.CompositeField(inner_fields=["first_name", "last_name", "age"], model=PlainModel)
+    plain: PlainModel = edgy.CompositeField(
+        inner_fields=["first_name", "last_name", "age"], model=PlainModel
+    )
 
     class Meta:
         registry = models
@@ -95,9 +97,9 @@ def test_get_columns_external_fields():
 def test_get_columns_inner_fields_mixed():
     assert (
         len(
-            edgy.CompositeField(inner_fields=["foo", ("last_name", edgy.CharField(max_length=255))]).get_columns(
-                "composite"
-            )
+            edgy.CompositeField(
+                inner_fields=["foo", ("last_name", edgy.CharField(max_length=255))]
+            ).get_columns("composite")
         )
         == 0
     )
@@ -210,7 +212,9 @@ def test_dump_composite_dict_json():
     )
     assert "embedded" not in obj1.model_dump(mode="json")
     assert "embedded" in obj2.model_dump(mode="json")
-    assert obj1.model_dump(mode="json", exclude=("embedded",)) == obj2.model_dump(mode="json", exclude=("embedded",))
+    assert obj1.model_dump(mode="json", exclude=("embedded",)) == obj2.model_dump(
+        mode="json", exclude=("embedded",)
+    )
 
 
 def test_dump_composite_model():
@@ -220,7 +224,9 @@ def test_dump_composite_model():
             "first_name": "edgy",
         },
     }
-    assert obj.model_dump(exclude={"plain": {"first_name": True, "age": True}}, include=("plain",)) == {
+    assert obj.model_dump(
+        exclude={"plain": {"first_name": True, "age": True}}, include=("plain",)
+    ) == {
         "plain": {
             "last_name": "edgytoo",
         },
@@ -264,6 +270,7 @@ def test_inheritance():
             ],
             absorb_existing_fields=True,
         )
+
     assert "age" in ConcreteModel2.meta.fields_mapping
     assert ConcreteModel2.meta.fields_mapping["last_name"].max_length == 255
 

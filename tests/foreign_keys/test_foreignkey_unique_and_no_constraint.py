@@ -53,7 +53,9 @@ class Team(edgy.Model):
 
 class Member(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
-    team = edgy.ForeignKey(Team, on_delete=edgy.SET_NULL, null=True, no_constraint=True, index=True)
+    team = edgy.ForeignKey(
+        Team, on_delete=edgy.SET_NULL, null=True, no_constraint=True, index=True
+    )
     email = edgy.CharField(max_length=100)
 
     class Meta:
@@ -181,7 +183,9 @@ async def test_multiple_fk():
     team = await Team.query.create(org=other, name="Green Team")
     await Member.query.create(team=team, email="e@example.org")
 
-    members = await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
+    members = (
+        await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
+    )
     assert len(members) == 4
     for member in members:
         assert member.team.org.ident == "ACME Ltd"
@@ -298,7 +302,7 @@ async def test_nullable_foreign_key():
     member = await Member.query.get()
 
     assert member.email == "dev@edgy.com"
-    assert member.team.pk == {'id': None, 'name': None}
+    assert member.team.pk == {"id": None, "name": None}
 
 
 def test_assertation_error_on_set_null():

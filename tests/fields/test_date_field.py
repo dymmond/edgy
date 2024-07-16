@@ -16,9 +16,10 @@ def test_default_timezone():
     )
     field = DateField(name="dt", default_timezone=zoneinfo.ZoneInfo("Etc/UTC"))
     assert field.clean(field.name, _date)["dt"] == _date
-    assert field.to_model(field.name, _datetimen)["dt"] == _datetimen.replace(
-        tzinfo=zoneinfo.ZoneInfo("Etc/UTC")
-    ).date()
+    assert (
+        field.to_model(field.name, _datetimen)["dt"]
+        == _datetimen.replace(tzinfo=zoneinfo.ZoneInfo("Etc/UTC")).date()
+    )
     assert field.clean(field.name, _datetimel)["dt"] == _datetimel.date()
 
 
@@ -31,9 +32,10 @@ def test_force_timezone():
     field = DateField(name="dt", force_timezone=zoneinfo.ZoneInfo("Etc/UTC"))
     assert field.clean(field.name, _date)["dt"] == _date
     assert field.to_model(field.name, _datetimen)["dt"] == _datetimen.date()
-    assert field.clean(field.name, _datetimel)["dt"] == _datetimel.astimezone(
-        zoneinfo.ZoneInfo("Etc/UTC")
-    ).date()
+    assert (
+        field.clean(field.name, _datetimel)["dt"]
+        == _datetimel.astimezone(zoneinfo.ZoneInfo("Etc/UTC")).date()
+    )
 
 
 def test_default_force_timezone():
@@ -48,9 +50,11 @@ def test_default_force_timezone():
         force_timezone=zoneinfo.ZoneInfo("Etc/UTC"),
     )
     assert field.clean(field.name, _date)["dt"] == _date
-    assert field.to_model(field.name, _datetimen)["dt"] == _datetimel.astimezone(
-        zoneinfo.ZoneInfo("Etc/UTC")
-    ).date()
-    assert field.clean(field.name, _datetimel)["dt"] == _datetimel.astimezone(
-        zoneinfo.ZoneInfo("Etc/UTC")
-    ).date()
+    assert (
+        field.to_model(field.name, _datetimen)["dt"]
+        == _datetimel.astimezone(zoneinfo.ZoneInfo("Etc/UTC")).date()
+    )
+    assert (
+        field.clean(field.name, _datetimel)["dt"]
+        == _datetimel.astimezone(zoneinfo.ZoneInfo("Etc/UTC")).date()
+    )

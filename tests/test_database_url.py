@@ -36,7 +36,9 @@ def test_database_url_properties():
     assert url.hostname == "/var/run/edgedb/.s.PGSQL.5656"
     assert url.database == "mydatabase"
 
-    url = DatabaseURL("edgedb://username:password@/mydatabase?unix_sock=/var/run/edgedb/.s.PGSQL.5656")
+    url = DatabaseURL(
+        "edgedb://username:password@/mydatabase?unix_sock=/var/run/edgedb/.s.PGSQL.5656"
+    )
     assert url.hostname == "/var/run/edgedb/.s.PGSQL.5656"
 
 
@@ -44,7 +46,7 @@ def test_database_url_escape():
     url = DatabaseURL(f"edgedb://username:{quote('[password')}@localhost/mydatabase")
     assert url.username == "username"
     assert url.password == "[password"
-    assert url.userinfo == f"username:{quote('[password')}".encode("utf-8")
+    assert url.userinfo == f"username:{quote('[password')}".encode()
 
     url2 = DatabaseURL(url)
     assert url2.password == "[password"

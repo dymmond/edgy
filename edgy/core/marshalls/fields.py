@@ -33,7 +33,7 @@ class BaseMarshallField(FieldInfo, _repr.Representation):
         Returns:
             `True` if the argument is required, `False` otherwise.
         """
-        return False if self.null else True
+        return not self.null
 
 
 class MarshallMethodField(BaseMarshallField):

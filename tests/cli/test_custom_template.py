@@ -1,3 +1,4 @@
+import contextlib
 import os
 import shutil
 
@@ -12,33 +13,21 @@ app = Esmerald(routes=[])
 @pytest.fixture(scope="module")
 def create_folders():
     os.chdir(os.path.split(os.path.abspath(__file__))[0])
-    try:
+    with contextlib.suppress(OSError):
         os.remove("app.db")
-    except OSError:
-        pass
-    try:
+    with contextlib.suppress(OSError):
         shutil.rmtree("migrations")
-    except OSError:
-        pass
-    try:
+    with contextlib.suppress(OSError):
         shutil.rmtree("temp_folder")
-    except OSError:
-        pass
 
     yield
 
-    try:
+    with contextlib.suppress(OSError):
         os.remove("app.db")
-    except OSError:
-        pass
-    try:
+    with contextlib.suppress(OSError):
         shutil.rmtree("migrations")
-    except OSError:
-        pass
-    try:
+    with contextlib.suppress(OSError):
         shutil.rmtree("temp_folder")
-    except OSError:
-        pass
 
 
 def test_alembic_version():

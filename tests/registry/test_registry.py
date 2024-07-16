@@ -60,7 +60,8 @@ async def test_raises_schema_error_if_exists():
         await registry.schema.create_schema(schema=schema, if_not_exists=False)
 
     assert (
-        raised.value.args[0] == f"<class 'asyncpg.exceptions.DuplicateSchemaError'>: schema \"{schema}\" already exists"
+        raised.value.args[0]
+        == f"<class 'asyncpg.exceptions.DuplicateSchemaError'>: schema \"{schema}\" already exists"
     )
 
 

@@ -10,10 +10,14 @@ CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
 class FieldFactoryMeta(type):
     def __instancecheck__(self, instance: Any) -> bool:
-        return super().__instancecheck__(instance) or isinstance(instance, self._get_field_cls(self))
+        return super().__instancecheck__(instance) or isinstance(
+            instance, self._get_field_cls(self)
+        )
 
     def __subclasscheck__(self, subclass: Any) -> bool:
-        return super().__subclasscheck__(subclass) or issubclass(subclass, self._get_field_cls(self))
+        return super().__subclasscheck__(subclass) or issubclass(
+            subclass, self._get_field_cls(self)
+        )
 
 
 class FieldFactory(metaclass=FieldFactoryMeta):

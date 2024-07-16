@@ -35,8 +35,12 @@ async def rollback_connections():
 
 
 async def test_model_defer():
-    edgy.run_sync(User.query.create(name="John", language="PT", description="A simple description"))
-    edgy.run_sync(User.query.create(name="Jane", language="EN", description="Another simple description"))
+    edgy.run_sync(
+        User.query.create(name="John", language="PT", description="A simple description")
+    )
+    edgy.run_sync(
+        User.query.create(name="Jane", language="EN", description="Another simple description")
+    )
     users = edgy.run_sync(User.query.defer("description"))
 
     assert len(users) == 2
@@ -66,7 +70,9 @@ async def test_model_defer_attribute_error():
 
 async def test_model_defer_with_all():
     edgy.run_sync(User.query.create(name="John", language="PT"))
-    edgy.run_sync(User.query.create(name="Jane", language="EN", description="Another simple description"))
+    edgy.run_sync(
+        User.query.create(name="Jane", language="EN", description="Another simple description")
+    )
 
     users = edgy.run_sync(User.query.defer("name", "language").all())
 
@@ -75,7 +81,9 @@ async def test_model_defer_with_all():
 
 async def test_model_defer_with_filter():
     edgy.run_sync(User.query.create(name="John", language="PT"))
-    edgy.run_sync(User.query.create(name="Jane", language="EN", description="Another simple description"))
+    edgy.run_sync(
+        User.query.create(name="Jane", language="EN", description="Another simple description")
+    )
 
     users = edgy.run_sync(User.query.filter(pk=1).defer("name", "language"))
 
@@ -96,7 +104,9 @@ async def test_model_defer_with_filter():
 
 async def test_model_defer_with_exclude():
     edgy.run_sync(User.query.create(name="John", language="PT"))
-    edgy.run_sync(User.query.create(name="Jane", language="EN", description="Another simple description"))
+    edgy.run_sync(
+        User.query.create(name="Jane", language="EN", description="Another simple description")
+    )
 
     users = edgy.run_sync(User.query.filter(pk=1).defer("name", "language").exclude(id=2))
 

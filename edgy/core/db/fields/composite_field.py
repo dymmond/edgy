@@ -1,4 +1,3 @@
-
 import copy
 from typing import (
     TYPE_CHECKING,
@@ -38,7 +37,17 @@ class ConcreteCompositeField(BaseCompositeField):
     Conrete, internal implementation of the CompositeField
     """
 
-    def __init__(self, *, inner_fields:  Union[Sequence[Union[str, Tuple[str, BaseField]]], Type["Model"], Type["ReflectModel"], Dict[str, BaseField]] =(), **kwargs: Any):
+    def __init__(
+        self,
+        *,
+        inner_fields: Union[
+            Sequence[Union[str, Tuple[str, BaseField]]],
+            Type["Model"],
+            Type["ReflectModel"],
+            Dict[str, BaseField],
+        ] = (),
+        **kwargs: Any,
+    ):
         self.inner_field_names: List[str] = []
         self.embedded_field_defs: Dict[str, BaseField] = {}
         if hasattr(inner_fields, "meta"):
@@ -51,7 +60,9 @@ class ConcreteCompositeField(BaseCompositeField):
         self.prefix_embedded: str = kwargs.pop("prefix_embedded", "")
         self.unsafe_json_serialization: bool = kwargs.pop("unsafe_json_serialization", False)
         self.absorb_existing_fields: bool = kwargs.pop("absorb_existing_fields", False)
-        self.model: Optional[Union[Type[BaseModel], Type[ConditionalRedirect]]] = kwargs.pop("model", None)
+        self.model: Optional[Union[Type[BaseModel], Type[ConditionalRedirect]]] = kwargs.pop(
+            "model", None
+        )
         for field in inner_fields:
             if isinstance(field, str):
                 self.inner_field_names.append(field)
@@ -60,11 +71,15 @@ class ConcreteCompositeField(BaseCompositeField):
                 field_name = field[0]
                 # for preventing suddenly invalid field names
                 if self.prefix_embedded.endswith("_") and field_name.startswith("_"):
-                    raise FieldDefinitionError(f"_ prefixed fields are not supported: {field_name} with prefix ending with _")
+                    raise FieldDefinitionError(
+                        f"_ prefixed fields are not supported: {field_name} with prefix ending with _"
+                    )
                 field_name = f"{self.prefix_embedded}{field_name}"
                 # set field_name and owner
                 # parent is None because not fully initialized
-                field_def = field[1].embed_field(self.prefix_embedded, field_name, owner=owner, parent=None)
+                field_def = field[1].embed_field(
+                    self.prefix_embedded, field_name, owner=owner, parent=None
+                )
                 if field_def is not None:
                     field_def.exclude = True
                     self.inner_field_names.append(field_def.name)
@@ -80,17 +95,30 @@ class ConcreteCompositeField(BaseCompositeField):
             return _removeprefix(name, self.prefix_embedded)
         return name
 
-
-    def embed_field(self, prefix: str, new_fieldname:str, owner: Optional[Union[Type["Model"], Type["ReflectModel"]]]=None, parent: Optional[BaseField]=None) -> BaseField:
-        field_copy = cast(BaseField, super().embed_field(prefix, new_fieldname, owner=owner, parent=self))
+    def embed_field(
+        self,
+        prefix: str,
+        new_fieldname: str,
+        owner: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        parent: Optional[BaseField] = None,
+    ) -> BaseField:
+        field_copy = cast(
+            BaseField, super().embed_field(prefix, new_fieldname, owner=owner, parent=self)
+        )
         field_copy.prefix_embedded = f"{prefix}{field_copy.prefix_embedded}"
         embedded_field_defs = field_copy.embedded_field_defs
-        field_copy.inner_field_names = [f"{prefix}{field_name}" for field_name in field_copy.inner_field_names if field_name not in embedded_field_defs]
+        field_copy.inner_field_names = [
+            f"{prefix}{field_name}"
+            for field_name in field_copy.inner_field_names
+            if field_name not in embedded_field_defs
+        ]
         field_copy.embedded_field_defs = {}
         for field_name, field in embedded_field_defs.items():
             # for preventing suddenly invalid field names
             if self.prefix_embedded.endswith("_") and field_name.startswith("_"):
-                raise FieldDefinitionError(f"_ prefixed fields are not supported: {field_name} with prefix ending with _")
+                raise FieldDefinitionError(
+                    f"_ prefixed fields are not supported: {field_name} with prefix ending with _"
+                )
             field_name = f"{prefix}{field_name}"
             field_def = field.embed_field(prefix, field_name, owner)
             if field_def is not None:
@@ -118,7 +146,7 @@ class ConcreteCompositeField(BaseCompositeField):
             return self.model(**d)
         return d
 
-    def clean(self, field_name: str, value: Any, for_query: bool=False) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
         assert len(self.inner_field_names) >= 1
         if (
             self.model is ConditionalRedirect
@@ -142,7 +170,9 @@ class ConcreteCompositeField(BaseCompositeField):
             return field.to_model(self.inner_field_names[0], value, phase=phase)
         return super().to_model(field_name, value, phase=phase)
 
-    def get_embedded_fields(self, name: str, fields_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
+    def get_embedded_fields(
+        self, name: str, fields_mapping: Dict[str, "BaseField"]
+    ) -> Dict[str, "BaseField"]:
         retdict = {}
         # owner is set: further down in hierarchy, or uninitialized embeddable, where the owner = model
         # owner is not set: current class
@@ -155,8 +185,12 @@ class ConcreteCompositeField(BaseCompositeField):
                 if duplicate_fields:
                     raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
             for field_name, field in self.embedded_field_defs.items():
-                existing_field = fields_mapping.get(field_name, None)
-                if existing_field is not None and existing_field.owner is None and self.owner is not None:  # type: ignore
+                existing_field = fields_mapping.get(field_name)
+                if (
+                    existing_field is not None
+                    and existing_field.owner is None
+                    and self.owner is not None
+                ):  # type: ignore
                     continue  # type: ignore
                 # now there should be no collisions anymore
                 cloned_field = copy.copy(field)

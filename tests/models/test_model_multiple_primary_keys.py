@@ -1,4 +1,3 @@
-
 import pytest
 
 import edgy
@@ -11,6 +10,7 @@ models = Registry(database=database)
 nother = Registry(database=database)
 
 pytestmark = pytest.mark.anyio
+
 
 class User(edgy.Model):
     non_default_id = edgy.BigIntegerField(primary_key=True, autoincrement=True)
@@ -73,10 +73,11 @@ async def test_model_multiple_primary_key_explicit_id():
     assert len(users) == 2
 
 
-
 async def test_model_multiple_primary_key_idempotence():
     user = await User.query.create(language="EN", name="edgy")
     user2 = await User.query.create(language="EN", name="edgy2", parent=user)
     extracted_fields = user2.extract_db_fields()
     column_values = user2._extract_values_from_field(extracted_fields)
-    assert User(**column_values).model_dump() == user2.model_dump(exclude={"parent": {"language": True}})
+    assert User(**column_values).model_dump() == user2.model_dump(
+        exclude={"parent": {"language": True}}
+    )

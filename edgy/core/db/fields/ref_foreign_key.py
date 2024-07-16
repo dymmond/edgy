@@ -11,7 +11,6 @@ from edgy.core.terminal import Print
 from edgy.exceptions import ModelReferenceError
 
 if TYPE_CHECKING:
-
     from edgy import Model
     from edgy.core.db.models.model_reference import ModelRef
 
@@ -44,7 +43,9 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
 
     def __new__(cls, to: "ModelRef", null: bool = False) -> BaseField:  # type: ignore
         if not cls.is_class_and_subclass(to, edgy.ModelRef):
-            raise ModelReferenceError(detail="A model reference must be an object of type ModelRef")
+            raise ModelReferenceError(
+                detail="A model reference must be an object of type ModelRef"
+            )
         if not hasattr(to, "__model__") or getattr(to, "__model__", None) is None:
             raise ModelReferenceError("'__model__' must bre declared when subclassing ModelRef.")
 

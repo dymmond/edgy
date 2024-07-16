@@ -59,7 +59,9 @@ async def test_model_does_not_exist():
 
 async def test_model_abstract():
     profile = await Profile.query.create(name="Test2", language="PT", age=23)
-    contact = await Contact.query.create(name="Test2", language="PT", age="25", address="Westminster, London")
+    contact = await Contact.query.create(
+        name="Test2", language="PT", age="25", address="Westminster, London"
+    )
 
     profiles = await Profile.query.all()
     contacts = await Contact.query.all()

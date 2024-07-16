@@ -2,7 +2,9 @@ import os
 
 from edgy.contrib.multi_tenancy.settings import TenancySettings
 
-DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/edgy")
+DATABASE_URL = os.environ.get(
+    "TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/edgy"
+)
 
 DATABASE_ALTERNATIVE_URL = os.environ.get(
     "TEST_DATABASE_ALTERNATIVE_URL",

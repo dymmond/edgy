@@ -50,7 +50,9 @@ class ModelRow(EdgyBaseModel):
         item: Dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
-        secret_fields = [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
+        secret_fields = (
+            [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
+        )
 
         for related in select_related:
             field_name = related.split("__", 1)[0]
@@ -58,13 +60,13 @@ class ModelRow(EdgyBaseModel):
                 field = cls.meta.fields_mapping[field_name]
             except KeyError:
                 raise QuerySetError(
-                    detail=f"Selected field \"{field_name}\" does not exist on {cls}."
+                    detail=f'Selected field "{field_name}" does not exist on {cls}.'
                 ) from None
             if isinstance(field, RelationshipField):
                 model_class, _, remainder = field.traverse_field(related)
             else:
                 raise QuerySetError(
-                    detail=f"Selected field \"{field_name}\" is not a RelationshipField on {cls}."
+                    detail=f'Selected field "{field_name}" is not a RelationshipField on {cls}.'
                 ) from None
             if remainder:
                 item[field_name] = model_class.from_sqla_row(
@@ -75,7 +77,9 @@ class ModelRow(EdgyBaseModel):
                     using_schema=using_schema,
                 )
             else:
-                item[field_name] = model_class.from_sqla_row(row, exclude_secrets=exclude_secrets, using_schema=using_schema)
+                item[field_name] = model_class.from_sqla_row(
+                    row, exclude_secrets=exclude_secrets, using_schema=using_schema
+                )
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
         # This way it is not overritten by any value
@@ -98,7 +102,9 @@ class ModelRow(EdgyBaseModel):
                 if column_name not in row:
                     continue
                 elif row[column_name] is not None:  # type: ignore
-                    child_item[foreign_key.from_fk_field_name(related, column_name)] = row[column_name]  # type: ignore
+                    child_item[foreign_key.from_fk_field_name(related, column_name)] = row[
+                        column_name
+                    ]  # type: ignore
 
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
@@ -128,7 +134,9 @@ class ModelRow(EdgyBaseModel):
             # Apply the schema to the model
             model = cls.__apply_schema(model, using_schema)
 
-            model = cls.__handle_prefetch_related(row=row, model=model, prefetch_related=prefetch_related)
+            model = cls.__handle_prefetch_related(
+                row=row, model=model, prefetch_related=prefetch_related
+            )
             return model
         else:
             # Pull out the regular column values.
@@ -136,20 +144,24 @@ class ModelRow(EdgyBaseModel):
                 # Making sure when a table is reflected, maps the right fields of the ReflectModel
                 if column.name in secret_fields:
                     continue
-                if column.name not in cls.fields.keys():
+                if column.name not in cls.fields:
                     continue
                 elif column.name not in item:
                     item[column.name] = row[column]
 
         model = (
-            cast("Model", cls(**item)) if not exclude_secrets else cast("Model", cls.proxy_model(**item))
+            cast("Model", cls(**item))
+            if not exclude_secrets
+            else cast("Model", cls.proxy_model(**item))
         )
 
         # Apply the schema to the model
         model = cls.__apply_schema(model, using_schema)
 
         # Handle prefetch related fields.
-        model = cls.__handle_prefetch_related(row=row, model=model, prefetch_related=prefetch_related)
+        model = cls.__handle_prefetch_related(
+            row=row, model=model, prefetch_related=prefetch_related
+        )
         return model
 
     @classmethod
@@ -161,7 +173,9 @@ class ModelRow(EdgyBaseModel):
         return model
 
     @classmethod
-    def __should_ignore_related_name(cls, related_name: str, select_related: Sequence[str]) -> bool:
+    def __should_ignore_related_name(
+        cls, related_name: str, select_related: Sequence[str]
+    ) -> bool:
         """
         Validates if it should populate the related field if select related is not considered.
         """
@@ -171,10 +185,13 @@ class ModelRow(EdgyBaseModel):
                 return True
         return False
 
-
     @staticmethod
     def __check_prefetch_collision(model: "Model", related: "Prefetch") -> None:
-        if hasattr(model, related.to_attr) or related.to_attr in model.meta.fields_mapping or related.to_attr in model.meta.managers:
+        if (
+            hasattr(model, related.to_attr)
+            or related.to_attr in model.meta.fields_mapping
+            or related.to_attr in model.meta.managers
+        ):
             raise QuerySetError(
                 f"Conflicting attribute to_attr='{related.related_name}' with '{related.to_attr}' in {model.__class__.__name__}"
             )
@@ -186,7 +203,9 @@ class ModelRow(EdgyBaseModel):
         for pkcol in cls.pkcolumns:
             clauses.append(getattr(model.table.columns, pkcol) == row[pkcol])
         queryset = related.queryset
-        crawl_result = crawl_relationship(model.__class__, related.related_name, traverse_last=True)
+        crawl_result = crawl_relationship(
+            model.__class__, related.related_name, traverse_last=True
+        )
         if queryset is None:
             if crawl_result.reverse_path is False:
                 queryset = model.__class__.query.all()
@@ -228,7 +247,6 @@ class ModelRow(EdgyBaseModel):
         queries = []
 
         for related in prefetch_related:
-
             # Check for conflicting names
             # If to_attr has the same name of any
             cls.__check_prefetch_collision(model=model, related=related)

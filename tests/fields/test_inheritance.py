@@ -113,11 +113,13 @@ def test_mixins_non_inherited():
 
     class ConcreteModel1(AbstractModel):
         pass
+
     assert not ConcreteModel1.meta.abstract
     assert "field" in ConcreteModel1.meta.fields_mapping
 
     class ConcreteModel2(ConcreteModel1):
         field3 = CharField(max_length=255, inherit=False)
+
     assert not ConcreteModel2.meta.abstract
     assert "field" not in ConcreteModel2.meta.fields_mapping
 
@@ -125,7 +127,6 @@ def test_mixins_non_inherited():
         pass
 
     assert "field" in ConcreteModel3.meta.fields_mapping
-
 
 
 def test_mixins_mixed_inherited():
@@ -143,10 +144,12 @@ def test_mixins_mixed_inherited():
 
     class ConcreteModel1(AbstractModel):
         pass
+
     assert not ConcreteModel1.meta.abstract
     assert ConcreteModel1.meta.fields_mapping["field"].max_length == 255
 
     class ConcreteModel2(ConcreteModel1):
         pass
+
     assert not ConcreteModel2.meta.abstract
     assert ConcreteModel2.meta.fields_mapping["field"].max_length == 250

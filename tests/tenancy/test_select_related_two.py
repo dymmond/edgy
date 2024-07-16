@@ -77,7 +77,9 @@ async def test_select_related_tenant():
     designation = await Designation.query.using(tenant.schema_name).create(name="admin")
     module = await AppModule.query.using(tenant.schema_name).create(name="payroll")
 
-    permission = await Permission.query.using(tenant.schema_name).create(designation=designation, module=module)
+    permission = await Permission.query.using(tenant.schema_name).create(
+        designation=designation, module=module
+    )
 
     query = await Permission.query.all()
 

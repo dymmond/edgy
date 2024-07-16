@@ -34,7 +34,9 @@ async def rollback_connections():
 
 
 async def test_model_get_or_create():
-    user, created = await User.query.get_or_create(name="Test", defaults={"language": "Portuguese"})
+    user, created = await User.query.get_or_create(
+        name="Test", defaults={"language": "Portuguese"}
+    )
     assert created is True
     assert user.name == "Test"
     assert user.language == "Portuguese"

@@ -77,8 +77,10 @@ async def test_schema_with_using():
     assert user.email == "edgy@edgy.dev"
     assert len(total) == 1
 
-    await User.query.using(tenant.schema_name).filter(email="edgy@edgy.dev").update(
-        email="bar@foo.com"
+    await (
+        User.query.using(tenant.schema_name)
+        .filter(email="edgy@edgy.dev")
+        .update(email="bar@foo.com")
     )
 
     users = await User.query.using(tenant.schema_name).all()

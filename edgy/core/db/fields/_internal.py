@@ -38,7 +38,7 @@ class IPAddress(BaseFieldProtocol):
     cache_ok: bool = True
 
     def load_dialect_impl(self, dialect: Any) -> Any:
-        if dialect.name not in settings.dialects.keys():
+        if dialect.name not in settings.dialects:
             return dialect.type_descriptor(sqlalchemy.CHAR(45))
         return dialect.type_descriptor(sqlalchemy.dialects.postgresql.INET())
 

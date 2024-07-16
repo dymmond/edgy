@@ -48,7 +48,9 @@ class Team(edgy.Model):
 class Member(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     team = edgy.ForeignKey(Team, on_delete=edgy.SET_NULL, null=True, related_name="members")
-    second_team = edgy.ForeignKey(Team, on_delete=edgy.SET_NULL, null=True, related_name="team_members")
+    second_team = edgy.ForeignKey(
+        Team, on_delete=edgy.SET_NULL, null=True, related_name="team_members"
+    )
     email = edgy.CharField(max_length=100)
     name = edgy.CharField(max_length=255, null=True)
 
@@ -321,7 +323,9 @@ async def test_related_name_nested_query_multiple_foreign_keys_and_nested():
     assert len(teams) == 0
 
     # Using distinct
-    teams = await acme.teams_set.filter(team_members__id__in=[monica.pk, charlie.pk]).distinct("name")
+    teams = await acme.teams_set.filter(team_members__id__in=[monica.pk, charlie.pk]).distinct(
+        "name"
+    )
 
     assert len(teams) == 1
     assert teams[0].pk == green_team.pk
@@ -339,7 +343,9 @@ async def test_nested_related_query():
 
     user = await User.query.create(member=charlie, name="Saffier")
 
-    teams = await acme.teams_set.filter(members__email=charlie.email, members__users__name=user.name)
+    teams = await acme.teams_set.filter(
+        members__email=charlie.email, members__users__name=user.name
+    )
 
     assert len(teams) == 1
     assert teams[0].pk == red_team.pk
@@ -350,7 +356,9 @@ async def test_nested_related_query():
     )
     user = await User.query.create(member=monica, name="New Saffier")
 
-    teams = await acme.teams_set.filter(members__email=monica.email, members__users__name=user.name)
+    teams = await acme.teams_set.filter(
+        members__email=monica.email, members__users__name=user.name
+    )
 
     assert len(teams) == 1
     assert teams[0].pk == green_team.pk

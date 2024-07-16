@@ -11,6 +11,7 @@ T = TypeVar("T", bound="Model")
 
 terminal = Print()
 
+
 class OneToOneField(ForeignKey):
     """
     Representation of a one to one field.
@@ -27,5 +28,6 @@ class OneToOneField(ForeignKey):
         kwargs["unique"] = True
 
         return super().__new__(cls, to=to, **kwargs)
+
 
 OneToOne = OneToOneField

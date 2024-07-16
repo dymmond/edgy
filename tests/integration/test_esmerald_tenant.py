@@ -57,7 +57,9 @@ class TenantMiddleware(MiddlewareProtocol):
         super().__init__(app)
         self.app = app
 
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> Coroutine[Any, Any, None]:
+    async def __call__(
+        self, scope: Scope, receive: Receive, send: Send
+    ) -> Coroutine[Any, Any, None]:
         request = Request(scope=scope, receive=receive, send=send)
         tenant_header = request.headers.get("tenant", None)
 
@@ -121,7 +123,9 @@ def another_app():
 
 @pytest.fixture()
 async def async_cli(another_app) -> AsyncGenerator:
-    async with AsyncClient(transport=ASGITransport(app=another_app), base_url="http://test") as acli:
+    async with AsyncClient(
+        transport=ASGITransport(app=another_app), base_url="http://test"
+    ) as acli:
         await to_thread.run_sync(blocking_function)
         yield acli
 
