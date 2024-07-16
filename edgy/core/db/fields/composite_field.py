@@ -189,8 +189,8 @@ class ConcreteCompositeField(BaseCompositeField):
                 if (
                     existing_field is not None
                     and existing_field.owner is None
-                    and self.owner is not None
-                ):  # type: ignore
+                    and self.owner is not None  # type: ignore
+                ):
                     continue  # type: ignore
                 # now there should be no collisions anymore
                 cloned_field = copy.copy(field)
