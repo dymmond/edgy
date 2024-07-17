@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
+
 class CharField(FieldFactory, str):
     """String field representation that constructs the Field class and populates the values"""
 
@@ -71,7 +72,9 @@ class CharField(FieldFactory, str):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.String(length=kwargs.get("max_length"), collation=kwargs.get("collation", None))
+        return sqlalchemy.String(
+            length=kwargs.get("max_length"), collation=kwargs.get("collation", None)
+        )
 
 
 class TextField(FieldFactory, str):
@@ -190,7 +193,9 @@ class DecimalField(Number, decimal.Decimal):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Numeric(precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places"))
+        return sqlalchemy.Numeric(
+            precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places")
+        )
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:
@@ -199,7 +204,9 @@ class DecimalField(Number, decimal.Decimal):
         max_digits = kwargs.get("max_digits")
         decimal_places = kwargs.get("decimal_places")
         if max_digits is None or max_digits < 0 or decimal_places is None or decimal_places < 0:
-            raise FieldDefinitionError("max_digits and decimal_places are required for DecimalField")
+            raise FieldDefinitionError(
+                "max_digits and decimal_places are required for DecimalField"
+            )
 
 
 class BooleanField(FieldFactory, int):
@@ -228,7 +235,9 @@ class AutoNowField(Field):
     auto_now: Optional[bool]
     auto_now_add: Optional[bool]
 
-    def get_default_values(self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool=False) -> Any:
+    def get_default_values(
+        self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool = False
+    ) -> Any:
         if self.auto_now_add and is_update:
             return {}
         return super().get_default_values(field_name, cleaned_data, is_update=is_update)
@@ -236,7 +245,6 @@ class AutoNowField(Field):
 
 class AutoNowMixin(FieldFactory):
     _bases = (AutoNowField,)
-
 
     def __new__(  # type: ignore
         cls,
@@ -260,14 +268,22 @@ class AutoNowMixin(FieldFactory):
 
 
 class ConcreteDateTimeField(AutoNowField):
-
-    def __init__(self, *, default_timezone: Optional["zoneinfo.ZoneInfo"]=None, force_timezone: Optional["zoneinfo.ZoneInfo"]=None, remove_timezone: bool=False, **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *,
+        default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
+        force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
+        remove_timezone: bool = False,
+        **kwargs: Any,
+    ) -> None:
         self.force_timezone = force_timezone
         self.default_timezone = default_timezone
         self.remove_timezone = remove_timezone
         super().__init__(**kwargs)
 
-    def _convert_datetime(self, value: datetime.datetime) -> Union[datetime.datetime, datetime.date]:
+    def _convert_datetime(
+        self, value: datetime.datetime
+    ) -> Union[datetime.datetime, datetime.date]:
         if value.tzinfo is None and self.default_timezone is not None:
             value = value.replace(tzinfo=self.default_timezone)
         if self.force_timezone is not None and value.tzinfo != self.force_timezone:
@@ -327,9 +343,9 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
-        default_timezone: Optional["zoneinfo.ZoneInfo"]=None,
-        force_timezone: Optional["zoneinfo.ZoneInfo"]=None,
-        remove_timezone: bool=False,
+        default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
+        force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
+        remove_timezone: bool = False,
         **kwargs: Any,
     ) -> BaseField:
         if auto_now_add or auto_now:
@@ -357,8 +373,8 @@ class DateField(AutoNowMixin, datetime.date):
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
-        default_timezone: Optional["zoneinfo.ZoneInfo"]=None,
-        force_timezone: Optional["zoneinfo.ZoneInfo"]=None,
+        default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
+        force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         **kwargs: Any,
     ) -> BaseField:
         if auto_now_add or auto_now:

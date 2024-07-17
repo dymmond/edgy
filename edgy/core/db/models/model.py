@@ -38,6 +38,7 @@ class Model(ModelRow, DeclarativeMixin):
             registry = models
     ```
     """
+
     class Meta:
         abstract = True
 
@@ -50,8 +51,8 @@ class Model(ModelRow, DeclarativeMixin):
         # empty updates shouldn't cause an error
         if kwargs:
             kwargs = self._extract_values_from_field(
-                 extracted_values=kwargs, is_partial=True, is_update=True
-             )
+                extracted_values=kwargs, is_partial=True, is_update=True
+            )
             expression = self.table.update().values(**kwargs).where(*self.identifying_clauses())
             await self.database.execute(expression)
         await self.signals.post_update.send_async(self.__class__, instance=self)
@@ -60,7 +61,7 @@ class Model(ModelRow, DeclarativeMixin):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        for field in self.meta.fields_mapping.keys():
+        for field in self.meta.fields_mapping:
             _val = self.__dict__.get(field)
             if isinstance(_val, ManyRelationProtocol):
                 _val.instance = self
@@ -104,7 +105,7 @@ class Model(ModelRow, DeclarativeMixin):
             column = self.table.autoincrement_column
             if column is not None:
                 setattr(self, column.key, autoincrement_value)
-        for field in self.meta.fields_mapping.keys():
+        for field in self.meta.fields_mapping:
             _val = self.__dict__.get(field)
             if isinstance(_val, ManyRelationProtocol):
                 _val.instance = self
@@ -119,9 +120,9 @@ class Model(ModelRow, DeclarativeMixin):
 
         for reference in model_references:
             if isinstance(reference, dict):
-                model: Type["Model"] = self.meta.model_references[model_ref].__model__  # type: ignore
+                model: Type[Model] = self.meta.model_references[model_ref].__model__  # type: ignore
             else:
-                model: Type["Model"] = reference.__model__  # type: ignore
+                model: Type[Model] = reference.__model__  # type: ignore
 
             if isinstance(model, str):
                 model = self.meta.registry.models[model]  # type: ignore
@@ -176,7 +177,10 @@ class Model(ModelRow, DeclarativeMixin):
 
         for pkcolumn in self.__class__.pkcolumns:
             # should trigger load in case of identifying_db_fields
-            if getattr(self, pkcolumn, None) is None and self.table.columns[pkcolumn].autoincrement:
+            if (
+                getattr(self, pkcolumn, None) is None
+                and self.table.columns[pkcolumn].autoincrement
+            ):
                 extracted_fields.pop(pkcolumn, None)
                 force_save = True
 
@@ -201,7 +205,9 @@ class Model(ModelRow, DeclarativeMixin):
             kwargs, model_references = self.update_model_references(**validated_values)
             update_model = {k: v for k, v in validated_values.items() if k in kwargs}
 
-            await self.signals.pre_update.send_async(self.__class__, instance=self, kwargs=update_model)
+            await self.signals.pre_update.send_async(
+                self.__class__, instance=self, kwargs=update_model
+            )
             await self.update(**update_model)
 
             # Broadcast the update complete
@@ -213,7 +219,11 @@ class Model(ModelRow, DeclarativeMixin):
                 await self.save_model_references(references or [], model_ref=model_ref)
 
         # Refresh the results
-        if any(field.server_default is not None for name, field in self.fields.items() if name not in extracted_fields):
+        if any(
+            field.server_default is not None
+            for name, field in self.fields.items()
+            if name not in extracted_fields
+        ):
             await self.load()
 
         await self.signals.post_save.send_async(self.__class__, instance=self)

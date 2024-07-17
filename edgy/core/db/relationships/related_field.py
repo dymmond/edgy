@@ -9,6 +9,7 @@ from edgy.protocols.many_relationship import ManyRelationProtocol
 if TYPE_CHECKING:
     from edgy import Model, ReflectModel
 
+
 class RelatedField(RelationshipField):
     """
     When a `related_name` is generated, creates a RelatedField from the table pointed
@@ -20,7 +21,7 @@ class RelatedField(RelationshipField):
         *,
         foreign_key_name: str,
         related_from: Union[Type["Model"], Type["ReflectModel"]],
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         self.foreign_key_name = foreign_key_name
         self.related_from = related_from
@@ -32,15 +33,15 @@ class RelatedField(RelationshipField):
             annotation=Any,
             column_type=None,
             null=True,
-            **kwargs
+            **kwargs,
         )
 
     @property
-    def related_to(self) ->  Union[Type["Model"], Type["ReflectModel"]]:
+    def related_to(self) -> Union[Type["Model"], Type["ReflectModel"]]:
         return self.owner
 
     @property
-    def related_name(self) ->  str:
+    def related_name(self) -> str:
         return self.name
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
@@ -69,7 +70,9 @@ class RelatedField(RelationshipField):
 
     @functools.cached_property
     def foreign_key(self) -> BaseForeignKeyField:
-        return cast(BaseForeignKeyField, self.related_from.meta.fields_mapping[self.foreign_key_name])
+        return cast(
+            BaseForeignKeyField, self.related_from.meta.fields_mapping[self.foreign_key_name]
+        )
 
     def traverse_field(self, path: str) -> Tuple[Any, str, str]:
         return self.foreign_key.reverse_traverse_field(path)

@@ -1,4 +1,3 @@
-
 import pytest
 
 import edgy
@@ -19,6 +18,7 @@ class Address(edgy.Model):
 class Person(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     email = edgy.CharField(max_length=100)
+
     class Meta:
         registry = models
 
@@ -31,11 +31,17 @@ class Profile(edgy.Model):
         registry = models
 
 
-
 class ProfileHolder(edgy.Model):
     address = Address
-    profile = edgy.OneToOneField(Profile, on_delete=edgy.CASCADE, embed_parent=("address", "parent"))
-    person = edgy.OneToOneField(Person, on_delete=edgy.CASCADE, embed_parent=("profile", "parent"), related_name="profile_holder")
+    profile = edgy.OneToOneField(
+        Profile, on_delete=edgy.CASCADE, embed_parent=("address", "parent")
+    )
+    person = edgy.OneToOneField(
+        Person,
+        on_delete=edgy.CASCADE,
+        embed_parent=("profile", "parent"),
+        related_name="profile_holder",
+    )
     name = edgy.CharField(max_length=100)
 
     class Meta:
@@ -59,7 +65,12 @@ async def rollback_connections():
 async def test_embed_parent():
     profile = await Profile.query.create(website="https://edgy.com")
     person = await Person.query.create(email="info@edgy.com")
-    profile_holder = await ProfileHolder.query.create(name="edgy", profile=profile, person=person, address={"street": "Rainbowstreet 123", "city": "London"})
+    profile_holder = await ProfileHolder.query.create(
+        name="edgy",
+        profile=profile,
+        person=person,
+        address={"street": "Rainbowstreet 123", "city": "London"},
+    )
 
     person = await Person.query.get(email="info@edgy.com")
     profile_queried = await person.profile_holder.get()

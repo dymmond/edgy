@@ -1,3 +1,4 @@
+import contextlib
 import copy
 import inspect
 from collections import UserDict, deque
@@ -39,6 +40,7 @@ if TYPE_CHECKING:
 
 _empty_dict: Dict[str, Any] = {}
 _empty_set: FrozenSet[Any] = frozenset()
+
 
 class FieldToColumns(UserDict, Dict[str, Sequence["sqlalchemy.Column"]]):
     def __init__(self, meta: "MetaInfo"):
@@ -86,12 +88,14 @@ class ColumnsToField(UserDict, Dict[str, str]):
         if not self._init:
             self._init = True
             _columns_to_field: Dict[str, str] = {}
-            for field_name in self.meta.fields_mapping.keys():
+            for field_name in self.meta.fields_mapping:
                 # init structure
                 column_names = self.meta.field_to_column_names[field_name]
                 for column_name in column_names:
                     if column_name in _columns_to_field:
-                        raise ValueError(f"column collision: {column_name} between field {field_name} and {_columns_to_field[column_name]}")
+                        raise ValueError(
+                            f"column collision: {column_name} between field {field_name} and {_columns_to_field[column_name]}"
+                        )
                     _columns_to_field[column_name] = field_name
             self.data.update(_columns_to_field)
 
@@ -117,6 +121,7 @@ _trigger_attributes_MetaInfo = {
     "excluded_fields",
 }
 
+
 class MetaInfo:
     __slots__ = (
         "abstract",
@@ -139,14 +144,17 @@ class MetaInfo:
         "columns_to_field",
         "special_getter_fields",
         "excluded_fields",
-        "_is_init"
+        "_is_init",
     )
-    _include_dump = (*filter(lambda x: x not in {
-        "field_to_columns",
-        "field_to_column_names",
-        "columns_to_field",
-        "_is_init"
-    }, __slots__), "pk", "is_multi")
+    _include_dump = (
+        *filter(
+            lambda x: x
+            not in {"field_to_columns", "field_to_column_names", "columns_to_field", "_is_init"},
+            __slots__,
+        ),
+        "pk",
+        "is_multi",
+    )
 
     field_to_columns: FieldToColumns
     field_to_column_names: FieldToColumnNames
@@ -164,11 +172,15 @@ class MetaInfo:
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
         self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
-        self.fields_mapping: Dict[str, BaseField] = {**getattr(meta, "fields_mapping", _empty_dict)}
-        self.model_references: Dict[str, "ModelRef"] = {**getattr(meta, "model_references", _empty_dict)}
+        self.fields_mapping: Dict[str, BaseField] = {
+            **getattr(meta, "fields_mapping", _empty_dict)
+        }
+        self.model_references: Dict[str, ModelRef] = {
+            **getattr(meta, "model_references", _empty_dict)
+        }
         self.managers: Dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
-        self.multi_related: List[str] =  [*getattr(meta, "multi_related", _empty_set)]
-        self.model: Optional[Type["Model"]] = None
+        self.multi_related: List[str] = [*getattr(meta, "multi_related", _empty_set)]
+        self.model: Optional[Type[Model]] = None
         self.load_dict(kwargs)
 
     @property
@@ -182,7 +194,7 @@ class MetaInfo:
     def model_dump(self) -> Dict[Any, Any]:
         return {k: getattr(self, k, None) for k in self._include_dump}
 
-    def load_dict(self, values: Dict[str, Any], _init: bool=False) -> None:
+    def load_dict(self, values: Dict[str, Any], _init: bool = False) -> None:
         """
         Loads the metadata from a dictionary.
         """
@@ -224,7 +236,7 @@ class MetaInfo:
         self.columns_to_field = ColumnsToField(self)
         self._is_init = True
 
-    def invalidate(self, clear_class_attrs: bool=True) -> None:
+    def invalidate(self, clear_class_attrs: bool = True) -> None:
         self._is_init = False
         # prevent cycles and mem-leaks
         self.field_to_columns = FieldToColumns(self)
@@ -232,12 +244,10 @@ class MetaInfo:
         self.columns_to_field = ColumnsToField(self)
         if clear_class_attrs:
             for attr in ("_table", "_pknames", "_pkcolumns"):
-                try:
+                with contextlib.suppress(AttributeError):
                     delattr(self.model, attr)
-                except AttributeError:
-                    pass
 
-    def full_init(self, init_column_mappers: bool=True, init_class_attrs: bool=True) -> None:
+    def full_init(self, init_column_mappers: bool = True, init_class_attrs: bool = True) -> None:
         if not self._is_init:
             self.init_fields_mapping()
         if init_column_mappers:
@@ -351,8 +361,10 @@ def handle_annotations(
 
 _occluded_sentinel = object()
 
+
 def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
     from edgy.core.db.fields.composite_field import CompositeField
+
     meta: Union[MetaInfo, None] = getattr(base, "meta", None)
     if not meta:
         # Mixins and other classes
@@ -366,7 +378,13 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
                 elif isinstance(value, BaseManager):
                     attrs[key] = value.__class__()
                 elif isinstance(value, BaseModelMeta):
-                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit, name=key, owner=value)
+                    attrs[key] = CompositeField(
+                        inner_fields=value,
+                        prefix_embedded=f"{key}_",
+                        inherit=value.meta.inherit,
+                        name=key,
+                        owner=value,
+                    )
             elif attrs[key] is _occluded_sentinel:
                 # when occluded only include if inherit is True
                 if isinstance(value, BaseField) and value.inherit:
@@ -374,7 +392,13 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
                 elif isinstance(value, BaseManager) and value.inherit:
                     attrs[key] = value.__class__()
                 elif isinstance(value, BaseModelMeta) and value.meta.inherit:
-                    attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit, name=key, owner=value)
+                    attrs[key] = CompositeField(
+                        inner_fields=value,
+                        prefix_embedded=f"{key}_",
+                        inherit=value.meta.inherit,
+                        name=key,
+                        owner=value,
+                    )
 
     else:
         # abstract classes
@@ -406,7 +430,9 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
         _extract_fields_and_managers(parent, attrs)
 
 
-def extract_fields_and_managers(bases: Sequence[Type], attrs: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def extract_fields_and_managers(
+    bases: Sequence[Type], attrs: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
     """
     Search for fields and managers and return them.
 
@@ -416,13 +442,19 @@ def extract_fields_and_managers(bases: Sequence[Type], attrs: Optional[Dict[str,
     """
 
     from edgy.core.db.fields.composite_field import CompositeField
+
     attrs = {} if attrs is None else {**attrs}
     # order is important
     for key in list(attrs.keys()):
         value = attrs[key]
         if isinstance(value, BaseModelMeta):
             value = attrs[key]
-            attrs[key] = CompositeField(inner_fields=value, prefix_embedded=f"{key}_", inherit=value.meta.inherit, owner=value)
+            attrs[key] = CompositeField(
+                inner_fields=value,
+                prefix_embedded=f"{key}_",
+                inherit=value.meta.inherit,
+                owner=value,
+            )
     for base in bases:
         _extract_fields_and_managers(base, attrs)
     # now remove sentinels
@@ -438,9 +470,9 @@ class BaseModelMeta(ModelMetaclass):
 
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any]) -> Any:
         fields: Dict[str, BaseField] = {}
-        model_references: Dict[str, "ModelRef"] = {}
+        model_references: Dict[str, ModelRef] = {}
         managers: Dict[str, BaseManager] = {}
-        meta_class: "object" = attrs.get("Meta", type("Meta", (), {}))
+        meta_class: object = attrs.get("Meta", type("Meta", (), {}))
         base_annotations: Dict[str, Any] = {}
         has_explicit_primary_key = False
         registry: Optional[Registry] = get_model_registry(bases, meta_class)
@@ -535,7 +567,13 @@ class BaseModelMeta(ModelMetaclass):
         for manager_name in managers:
             attrs.pop(manager_name, None)
 
-        attrs["meta"] = meta = MetaInfo(meta_class, fields_mapping=fields, model_references=model_references, parents=parents, managers=managers)
+        attrs["meta"] = meta = MetaInfo(
+            meta_class,
+            fields_mapping=fields,
+            model_references=model_references,
+            parents=parents,
+            managers=managers,
+        )
         if is_abstract:
             meta.abstract = True
 
@@ -544,11 +582,7 @@ class BaseModelMeta(ModelMetaclass):
             meta.abstract = True
 
         if not meta.abstract:
-            fields["pk"] = PKField(
-                exclude=True,
-                name="pk",
-                inherit=False
-            )
+            fields["pk"] = PKField(exclude=True, name="pk", inherit=False)
 
         model_class = super().__new__
 
@@ -585,7 +619,6 @@ class BaseModelMeta(ModelMetaclass):
         for value in meta.managers.values():
             value.owner = new_class
 
-
         # Validate meta for uniques and indexes
         if meta.abstract:
             if getattr(meta, "unique_together", None) is not None:
@@ -605,7 +638,6 @@ class BaseModelMeta(ModelMetaclass):
             raise ImproperlyConfigured(
                 "Registry for the table not found in the Meta class or any of the superclasses. You must set the registry in the Meta."
             )
-
 
         new_class.database = registry.database
 
@@ -709,14 +741,10 @@ class BaseModelMeta(ModelMetaclass):
 
     @table.setter
     def table(cls, value: sqlalchemy.Table) -> None:
-        try:
+        with contextlib.suppress(AttributeError):
             del cls._pknames
-        except AttributeError:
-            pass
-        try:
+        with contextlib.suppress(AttributeError):
             del cls._pkcolumns
-        except AttributeError:
-            pass
         cls._table = value
 
     def __getattr__(cls, name: str) -> Any:
@@ -727,7 +755,6 @@ class BaseModelMeta(ModelMetaclass):
         if manager is not None:
             return manager
         return super().__getattr__(name)
-
 
     @property
     def pkcolumns(cls) -> Sequence[str]:

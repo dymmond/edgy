@@ -60,7 +60,10 @@ class MultiColumnFieldInner(BaseField):
         if isinstance(normal, dict):
             kwargs[field_name] = normal
         else:
-            kwargs[field_name] = {"normal": normal, "inner": kwargs.pop(field_name + "_inner", normal)}
+            kwargs[field_name] = {
+                "normal": normal,
+                "inner": kwargs.pop(field_name + "_inner", normal),
+            }
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         if isinstance(value, str):

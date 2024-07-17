@@ -30,7 +30,9 @@ def get_model_fields(attrs: Union[Dict, Any], base_type: Type[BaseField] = BaseF
     return {k: v for k, v in attrs.items() if isinstance(v, base_type)}
 
 
-def populate_pydantic_default_values(attrs: Dict, base_type: Type[BaseField] = BaseField) -> Tuple[Dict, Dict]:
+def populate_pydantic_default_values(
+    attrs: Dict, base_type: Type[BaseField] = BaseField
+) -> Tuple[Dict, Dict]:
     """
     Making sure the fields from Edgy are the ones being validated by Edgy models
     and delegates the validations from pydantic to that functionality.

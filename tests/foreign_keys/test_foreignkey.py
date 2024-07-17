@@ -130,6 +130,7 @@ async def test_new_create2():
 
     assert len(tracks) == 2
 
+
 async def test_select_related():
     album = await Album.query.create(name="Malibu")
     await Track.query.create(album=album, title="The Bird", position=1)
@@ -211,7 +212,9 @@ async def test_multiple_fk():
     team = await Team.query.create(org=other, name="Green Team")
     await Member.query.create(team=team, email="e@example.org")
 
-    members = await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
+    members = (
+        await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
+    )
     assert len(members) == 4
     for member in members:
         assert member.team.org.ident == "ACME Ltd"
@@ -360,4 +363,7 @@ def test_assertation_error_on_embed_parent_double_underscore_attr():
         class MyOtherModel(edgy.Model):
             model = edgy.ForeignKey(MyModel, embed_parent=("foo", "foo__attr"))
 
-    assert raised.value.args[0] == '"embed_parent" second argument (for embedding parent) cannot contain "__".'
+    assert (
+        raised.value.args[0]
+        == '"embed_parent" second argument (for embedding parent) cannot contain "__".'
+    )

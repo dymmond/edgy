@@ -1,3 +1,4 @@
+import contextlib
 import copy
 from functools import cached_property
 from typing import (
@@ -95,7 +96,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
 
         return {
-            k: v for k, v in kwargs.items() if k in self.meta.fields_mapping or k in self.meta.model_references
+            k: v
+            for k, v in kwargs.items()
+            if k in self.meta.fields_mapping or k in self.meta.model_references
         }
 
     @property
@@ -126,10 +129,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @property
     def can_load(self) -> bool:
-        for field in self.identifying_db_fields:
-            if self.__dict__.get(field) is None:
-                return False
-        return True
+        return all(self.__dict__.get(field) is not None for field in self.identifying_db_fields)
 
     @cached_property
     def signals(self) -> "Broadcaster":
@@ -143,14 +143,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @table.setter
     def table(self, value: sqlalchemy.Table) -> None:
-        try:
+        with contextlib.suppress(AttributeError):
             del self._pknames
-        except AttributeError:
-            pass
-        try:
+        with contextlib.suppress(AttributeError):
             del self._pkcolumns
-        except AttributeError:
-            pass
         self._table = value
 
     @property
@@ -274,7 +270,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 if sub_exclude is True:
                     sub_exclude = None
             if isinstance(retval, BaseModel):
-                retval = retval.model_dump(include=sub_include, exclude=sub_exclude, mode=mode, **kwargs)
+                retval = retval.model_dump(
+                    include=sub_include, exclude=sub_exclude, mode=mode, **kwargs
+                )
             else:
                 assert (
                     sub_include is None
@@ -312,7 +310,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
 
-        columns: List["sqlalchemy.Column"] = []
+        columns: List[sqlalchemy.Column] = []
         global_constraints: List[Any] = []
         for name, field in cls.meta.fields_mapping.items():
             current_columns = field.get_columns(name)
@@ -372,7 +370,11 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         fields_mapping = self.meta.fields_mapping
         model_references = self.meta.model_references
         columns = self.__class__.columns
-        return {k: v for k, v in self.__dict__.items() if k in fields_mapping or k in columns or k in model_references}
+        return {
+            k: v
+            for k, v in self.__dict__.items()
+            if k in fields_mapping or k in columns or k in model_references
+        }
 
     def get_instance_name(self) -> str:
         """
@@ -419,7 +421,12 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         if field is not None and hasattr(field, "__get__"):
             # no need to set an descriptor object
             return field.__get__(self, self.__class__)
-        if name not in self.__dict__ and field is not None and name not in self.identifying_db_fields and self.can_load:
+        if (
+            name not in self.__dict__
+            and field is not None
+            and name not in self.identifying_db_fields
+            and self.can_load
+        ):
             run_sync(self.load())
             return self.__dict__[name]
         return super().__getattr__(name)
@@ -497,7 +504,9 @@ class EdgyBaseReflectModel(EdgyBaseModel):
         def execute_reflection(connection: AsyncConnection) -> sqlalchemy.Table:
             """Helper function to create and reflect the table."""
             try:
-                return sqlalchemy.Table(tablename, metadata, schema=schema, autoload_with=connection)
+                return sqlalchemy.Table(
+                    tablename, metadata, schema=schema, autoload_with=connection
+                )
             except Exception as e:
                 raise e
 

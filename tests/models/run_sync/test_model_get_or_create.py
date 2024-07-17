@@ -34,12 +34,16 @@ async def rollback_connections():
 
 
 async def test_model_get_or_create():
-    user, created = edgy.run_sync(User.query.get_or_create(name="Test", defaults={"language": "Portuguese"}))
+    user, created = edgy.run_sync(
+        User.query.get_or_create(name="Test", defaults={"language": "Portuguese"})
+    )
     assert created is True
     assert user.name == "Test"
     assert user.language == "Portuguese"
 
-    user, created = edgy.run_sync(User.query.get_or_create(name="Test", defaults={"language": "English"}))
+    user, created = edgy.run_sync(
+        User.query.get_or_create(name="Test", defaults={"language": "English"})
+    )
     assert created is False
     assert user.name == "Test"
     assert user.language == "Portuguese"

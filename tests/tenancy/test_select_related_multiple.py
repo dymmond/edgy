@@ -77,13 +77,19 @@ async def test_select_related_tenant():
     designation = await Designation.query.using(tenant.schema_name).create(name="admin")
     module = await AppModule.query.using(tenant.schema_name).create(name="payroll")
 
-    permission = await Permission.query.using(tenant.schema_name).create(designation=designation, module=module)
+    permission = await Permission.query.using(tenant.schema_name).create(
+        designation=designation, module=module
+    )
 
     query = await Permission.query.all()
 
     assert len(query) == 0
 
-    query = await Permission.query.using(tenant.schema_name).select_related(["designation", "module"]).all()
+    query = (
+        await Permission.query.using(tenant.schema_name)
+        .select_related(["designation", "module"])
+        .all()
+    )
 
     assert len(query) == 1
     assert query[0].pk == permission.pk

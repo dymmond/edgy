@@ -1,4 +1,3 @@
-
 import edgy
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
@@ -15,8 +14,8 @@ class BaseUser(edgy.Model):
     class Meta:
         abstract = True
 
-class User(BaseUser):
 
+class User(BaseUser):
     class Meta:
         registry = models
 

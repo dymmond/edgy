@@ -82,7 +82,9 @@ async def test_raises_field_definition_error_missing_max_digits():
                 return f"Employee: {self.name}, Age: {self.date_of_birth}, Salary: {self.salary}"
 
 
-@pytest.mark.parametrize("max_digits,decimal_places", [(-1, None), (None, -2), (None, None), (-1, -2)])
+@pytest.mark.parametrize(
+    "max_digits,decimal_places", [(-1, None), (None, -2), (None, None), (-1, -2)]
+)
 async def test_raises_field_definition_error_on_values(max_digits, decimal_places):
     with pytest.raises(FieldDefinitionError):  # noqa
 

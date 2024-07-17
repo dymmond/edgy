@@ -10,7 +10,6 @@ database = Database(DATABASE_URL)
 models = edgy.Registry(database=database)
 
 
-
 class Track(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     title = edgy.CharField(max_length=100)
@@ -26,6 +25,7 @@ class Album(edgy.Model):
 
     class Meta:
         registry = models
+
 
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
