@@ -52,8 +52,6 @@ class BaseField(BaseFieldType, FieldInfo):
         server_default: Any = Undefined,
         **kwargs: Any,
     ) -> None:
-        self.max_digits: str = kwargs.pop("max_digits", None)
-        self.decimal_places: str = kwargs.pop("decimal_places", None)
         self.server_default = server_default
         if "__type__" in kwargs:
             kwargs["field_type"] = kwargs.pop("__type__")
@@ -157,13 +155,13 @@ class Field(BaseField):
         """
         Return a single column for the field declared. Return None for meta fields.
         """
-        model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
+        column_model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
         return sqlalchemy.Column(
-            model.column_name or name,
-            model.column_type,
-            *model.constraints,
+            column_model.column_name or name,
+            column_model.column_type,
+            *column_model.constraints,
             key=name,
-            **model.model_dump(by_alias=True, exclude_none=True),
+            **column_model.model_dump(by_alias=True, exclude_none=True),
         )
 
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:

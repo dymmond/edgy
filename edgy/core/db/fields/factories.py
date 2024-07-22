@@ -46,6 +46,7 @@ class FieldFactory(metaclass=FieldFactoryMeta):
             default=default,
             server_default=server_default,
             constraints=constraints,
+            factory=cls,
             **kwargs,
         )
 
