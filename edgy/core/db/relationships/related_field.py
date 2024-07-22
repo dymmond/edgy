@@ -29,7 +29,7 @@ class RelatedField(RelationshipField):
             inherit=False,
             exclude=True,
             deprecated=False,
-            __type__=Any,
+            field_type=Any,
             annotation=Any,
             column_type=None,
             null=True,

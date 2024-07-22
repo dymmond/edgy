@@ -1,16 +1,13 @@
 import contextlib
 import copy
-import decimal
-from functools import cached_property
+from functools import cached_property, partial
 from typing import (
     TYPE_CHECKING,
     Any,
-    ClassVar,
     Dict,
     FrozenSet,
     Literal,
     Optional,
-    Pattern,
     Sequence,
     Tuple,
     Type,
@@ -22,11 +19,12 @@ import sqlalchemy
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
-from edgy.core.connection.registry import Registry
 from edgy.types import Undefined
 
+from .types import BaseFieldType, ColumnDefinitionModel, methods_overwritable_by_factory
+
 if TYPE_CHECKING:
-    from edgy import Model, ReflectModel
+    from edgy import Model, ReflectModel, Registry
 
 
 def _removesuffix(text: str, suffix: str) -> str:
@@ -37,35 +35,35 @@ def _removesuffix(text: str, suffix: str) -> str:
         return text
 
 
-class BaseField(FieldInfo):
+class BaseField(BaseFieldType, FieldInfo):
     """
-    The base field for all Edgy data model fields.
+    The base field for Edgy data model fields. It provides some helpers additional to
+    BaseFieldType and inherits from FieldInfo for pydantic integration.
+
+    Allows factories to overwrite methods.
     """
 
-    __namespace__: ClassVar[Union[Dict[str, Any], None]] = None
+    # defs to simplify the life (can be None actually)
+    owner: Type["Model"]
+    registry: "Registry"
 
     def __init__(
         self,
         *,
         default: Any = Undefined,
         server_default: Any = Undefined,
-        inherit: bool = True,
         **kwargs: Any,
     ) -> None:
-        self.max_digits: str = kwargs.pop("max_digits", None)
-        self.decimal_places: str = kwargs.pop("decimal_places", None)
-        self.server_default: Any = server_default
-        self.read_only: bool = kwargs.pop("read_only", False)
-        self.primary_key: bool = kwargs.pop("primary_key", False)
-        self.autoincrement: bool = kwargs.pop("autoincrement", False)
-        self.inject_default_on_partial_update: bool = kwargs.pop(
-            "inject_default_on_partial_update", False
-        )
-        self.inherit = inherit
+        self.server_default = server_default
+        if "__type__" in kwargs:
+            kwargs["field_type"] = kwargs.pop("__type__")
 
         super().__init__(**kwargs)
 
-        self.null: bool = kwargs.pop("null", False)
+        # set remaining attributes
+        for name, value in kwargs.items():
+            setattr(self, name, value)
+
         if self.null and default is Undefined:
             default = None
         if default is not Undefined:
@@ -74,37 +72,6 @@ class BaseField(FieldInfo):
             self.server_default is not None and self.server_default != Undefined
         ):
             self.null = True
-        self.field_type: Any = kwargs.pop("__type__", None)
-        self.__original_type__: type = kwargs.pop("__original_type__", None)
-        self.column_type: Optional[Any] = kwargs.pop("column_type", None)
-        self.constraints: Sequence[sqlalchemy.Constraint] = kwargs.pop("constraints", [])
-        self.skip_absorption_check: bool = kwargs.pop("skip_absorption_check", False)
-        self.help_text: Optional[str] = kwargs.pop("help_text", None)
-        self.pattern: Pattern = kwargs.pop("pattern", None)
-        self.unique: bool = kwargs.pop("unique", False)
-        self.index: bool = kwargs.pop("index", False)
-        self.choices: Sequence = kwargs.pop("choices", [])
-        self.owner: Union[Type[Model], Type[ReflectModel]] = kwargs.pop("owner", None)
-        # field name, set when retrieving
-        self.name: str = kwargs.get("name", None)
-        self.alias: str = kwargs.pop("name", None)
-        self.regex: str = kwargs.pop("regex", None)
-        self.format: str = kwargs.pop("format", None)
-        self.min_length: Optional[int] = kwargs.pop("min_length", None)
-        self.max_length: Optional[int] = kwargs.pop("max_length", None)
-        self.minimum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("minimum", None)
-        self.maximum: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop("maximum", None)
-        self.multiple_of: Optional[Union[int, float, decimal.Decimal]] = kwargs.pop(
-            "multiple_of", None
-        )
-        self.server_onupdate: Any = kwargs.pop("server_onupdate", None)
-        self.registry: Registry = kwargs.pop("registry", None)
-        self.comment: str = kwargs.pop("comment", None)
-        self.secret: bool = kwargs.pop("secret", False)
-
-        # set remaining attributes
-        for name, value in kwargs.items():
-            setattr(self, name, value)
 
         if self.primary_key:
             self.field_type = Any
@@ -112,12 +79,6 @@ class BaseField(FieldInfo):
 
         if isinstance(self.default, bool):
             self.null = True
-        self.__namespace__ = {k: v for k, v in self.__dict__.items() if k != "__namespace__"}
-
-    @property
-    def namespace(self) -> Any:
-        """Returns the properties added to the fields in a dict format"""
-        return self.__namespace__
 
     def is_required(self) -> bool:
         """Check if the argument is required.
@@ -129,12 +90,6 @@ class BaseField(FieldInfo):
             return False
         return not (self.null or self.server_default)
 
-    def get_alias(self) -> str:
-        """
-        Used to translate the model column names into database column tables.
-        """
-        return self.name
-
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
         return bool(self.default is not None and self.default is not Undefined)
@@ -144,40 +99,6 @@ class BaseField(FieldInfo):
         Returns the columns of the field being declared.
         """
         return []
-
-    def get_column_names(self, name: str = "") -> FrozenSet[str]:
-        if name:
-            return self.owner.meta.field_to_column_names[name]
-        return self.owner.meta.field_to_column_names[self.name]
-
-    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
-        """
-        Validates a value and transform it into columns which can be used for querying and saving.
-        for_query: is used for querying. Should have all columns used for querying set.
-        """
-        return {}
-
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
-        """
-        Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
-        Validation happens later.
-        """
-        return {field_name: value}
-
-    def get_embedded_fields(
-        self, field_name: str, fields_mapping: Dict[str, "BaseField"]
-    ) -> Dict[str, "BaseField"]:
-        """
-        Define extra fields on the fly. Often no owner is available yet.
-
-        Arguments are:
-        name: the field name
-        fields_mapping: the existing fields
-
-        Note: the returned fields are changed after return, so you should
-              return new fields or copies. Also set the owner of the field to them before returning
-        """
-        return {}
 
     def embed_field(
         self,
@@ -198,14 +119,6 @@ class BaseField(FieldInfo):
     def get_constraints(self) -> Any:
         return self.constraints
 
-    def get_global_constraints(
-        self, name: str, columns: Sequence[sqlalchemy.Column]
-    ) -> Sequence[sqlalchemy.Constraint]:
-        """Return global constraints and indexes.
-        Useful for multicolumn fields
-        """
-        return []
-
     def get_default_value(self) -> Any:
         # single default
         default = getattr(self, "default", None)
@@ -224,9 +137,21 @@ class BaseField(FieldInfo):
             return {}
         return {field_name: self.get_default_value()}
 
+    def __getattribute__(self, key: str) -> Any:
+        if key in methods_overwritable_by_factory and hasattr(self.factory, key):
+            fn = getattr(self.factory, key)
+            original_fn = None
+            with contextlib.suppress(AttributeError):
+                original_fn = super().__getattribute__(key)
+            # fix classmethod
+            return partial(fn.__call__, self.factory, original_fn=original_fn)
+        return super().__getattribute__(key)
+
 
 class Field(BaseField):
-    # defines compatibility fallbacks check and get_column
+    """
+    Field with fallbacks and used for factories.
+    """
 
     def check(self, value: Any) -> Any:
         """
@@ -244,20 +169,15 @@ class Field(BaseField):
         """
         Return a single column for the field declared. Return None for meta fields.
         """
-        constraints = self.get_constraints()
+        column_model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
+        if column_model.column_type is None:
+            return None
         return sqlalchemy.Column(
-            name,
-            self.column_type,
-            *constraints,
-            primary_key=self.primary_key,
-            autoincrement=self.autoincrement,
-            nullable=self.null,
-            index=self.index,
-            unique=self.unique,
-            default=self.default,
-            comment=self.comment,
-            server_default=self.server_default,
-            server_onupdate=self.server_onupdate,
+            column_model.column_name or name,
+            column_model.column_type,
+            *column_model.constraints,
+            key=name,
+            **column_model.model_dump(by_alias=True, exclude_none=True),
         )
 
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
@@ -357,7 +277,7 @@ class PKField(BaseCompositeField):
 
     def __init__(self, **kwargs: Any):
         kwargs["default"] = kwargs["server_default"] = None
-        kwargs["__type__"] = kwargs["annotation"] = Any
+        kwargs["field_type"] = kwargs["annotation"] = Any
         return super().__init__(
             **kwargs,
         )
@@ -491,7 +411,7 @@ class BaseForeignKey(RelationshipField):
         """
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]  # type: ignore
+                self._target = self.registry.models[self.to]
             else:
                 self._target = self.to
         return self._target

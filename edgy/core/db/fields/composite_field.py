@@ -16,8 +16,9 @@ from typing import (
 from pydantic import BaseModel
 
 from edgy.core.db.constants import ConditionalRedirect
-from edgy.core.db.fields.base import BaseCompositeField, BaseField
+from edgy.core.db.fields.base import BaseCompositeField
 from edgy.core.db.fields.core import FieldFactory
+from edgy.core.db.fields.types import BaseFieldType
 from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
@@ -41,15 +42,15 @@ class ConcreteCompositeField(BaseCompositeField):
         self,
         *,
         inner_fields: Union[
-            Sequence[Union[str, Tuple[str, BaseField]]],
+            Sequence[Union[str, Tuple[str, BaseFieldType]]],
             Type["Model"],
             Type["ReflectModel"],
-            Dict[str, BaseField],
+            Dict[str, BaseFieldType],
         ] = (),
         **kwargs: Any,
     ):
         self.inner_field_names: List[str] = []
-        self.embedded_field_defs: Dict[str, BaseField] = {}
+        self.embedded_field_defs: Dict[str, BaseFieldType] = {}
         if hasattr(inner_fields, "meta"):
             kwargs.setdefault("model", inner_fields)
             kwargs.setdefault("inherit", inner_fields.meta.inherit)
@@ -100,10 +101,10 @@ class ConcreteCompositeField(BaseCompositeField):
         prefix: str,
         new_fieldname: str,
         owner: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
-        parent: Optional[BaseField] = None,
-    ) -> BaseField:
+        parent: Optional[BaseFieldType] = None,
+    ) -> BaseFieldType:
         field_copy = cast(
-            BaseField, super().embed_field(prefix, new_fieldname, owner=owner, parent=self)
+            BaseFieldType, super().embed_field(prefix, new_fieldname, owner=owner, parent=self)
         )
         field_copy.prefix_embedded = f"{prefix}{field_copy.prefix_embedded}"
         embedded_field_defs = field_copy.embedded_field_defs
@@ -171,8 +172,8 @@ class ConcreteCompositeField(BaseCompositeField):
         return super().to_model(field_name, value, phase=phase)
 
     def get_embedded_fields(
-        self, name: str, fields_mapping: Dict[str, "BaseField"]
-    ) -> Dict[str, "BaseField"]:
+        self, name: str, fields_mapping: Dict[str, "BaseFieldType"]
+    ) -> Dict[str, "BaseFieldType"]:
         retdict = {}
         # owner is set: further down in hierarchy, or uninitialized embeddable, where the owner = model
         # owner is not set: current class
@@ -189,9 +190,9 @@ class ConcreteCompositeField(BaseCompositeField):
                 if (
                     existing_field is not None
                     and existing_field.owner is None
-                    and self.owner is not None  # type: ignore
+                    and self.owner is not None
                 ):
-                    continue  # type: ignore
+                    continue
                 # now there should be no collisions anymore
                 cloned_field = copy.copy(field)
                 # set to the current owner of this field, required in collision checks
@@ -216,7 +217,7 @@ class ConcreteCompositeField(BaseCompositeField):
                     )
         return retdict
 
-    def get_composite_fields(self) -> Dict[str, BaseField]:
+    def get_composite_fields(self) -> Dict[str, BaseFieldType]:
         return {field: self.owner.meta.fields_mapping[field] for field in self.inner_field_names}
 
     def is_required(self) -> bool:

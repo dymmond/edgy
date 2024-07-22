@@ -36,7 +36,7 @@ from edgy.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
     from edgy import Model, Registry
-    from edgy.core.db.fields.base import BaseField
+    from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.signals import Broadcaster
 
 _empty = cast(Set[str], frozenset())
@@ -254,7 +254,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                     continue
                 if getattr(field_name, "exclude", False):
                     continue
-            field: BaseField = self.meta.fields_mapping[field_name]
+            field: BaseFieldType = self.meta.fields_mapping[field_name]
             try:
                 retval = field.__get__(self, self.__class__)
             except AttributeError:
@@ -282,7 +282,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 ), "sub exclude filters for CompositeField specified, but no Pydantic model is set"
                 if mode == "json" and not getattr(field, "unsafe_json_serialization", False):
                     # skip field if it isn't a BaseModel and the mode is json and unsafe_json_serialization is not set
-                    # currently unsafe_json_serialization exists only on ConcreteCompositeFields
+                    # currently unsafe_json_serialization exists only on CompositeFields
                     continue
             alias: str = field_name
             if getattr(field, "serialization_alias", None):

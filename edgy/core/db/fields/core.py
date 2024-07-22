@@ -2,7 +2,6 @@ import datetime
 import decimal
 import enum
 import ipaddress
-import re
 import uuid
 from enum import EnumMeta
 from typing import TYPE_CHECKING, Any, Dict, Optional, Pattern, Sequence, Tuple, Union
@@ -38,18 +37,12 @@ class CharField(FieldFactory, str):
         max_length: Optional[int] = 0,
         min_length: Optional[int] = None,
         regex: Union[str, Pattern] = None,
+        pattern: Union[str, Pattern] = None,
         **kwargs: Any,
     ) -> BaseField:
-        if regex is None:
-            regex = None
-            kwargs["pattern_regex"] = None
-        elif isinstance(regex, str):
-            regex = regex
-            kwargs["pattern_regex"] = re.compile(regex)
-        else:
-            regex = regex.pattern
-            kwargs["pattern_regex"] = regex
-
+        if pattern is None:
+            pattern = regex
+        del regex
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
@@ -82,7 +75,18 @@ class TextField(FieldFactory, str):
 
     _type = str
 
-    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
+    def __new__(
+        cls,
+        *,
+        min_length: int = 0,
+        max_length: Optional[int] = None,
+        regex: Union[str, Pattern] = None,
+        pattern: Union[str, Pattern] = None,
+        **kwargs: Any,
+    ) -> BaseField:
+        if pattern is None:
+            pattern = regex
+        del regex
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
@@ -140,9 +144,9 @@ class FloatField(Number, float):
     def __new__(  # type: ignore
         cls,
         *,
-        mininum: Optional[float] = None,
-        maximun: Optional[float] = None,
-        multiple_of: Optional[int] = None,
+        mininum: Union[int, float, None] = None,
+        maximun: Union[int, float, None] = None,
+        multiple_of: Union[int, float, None] = None,
         **kwargs: Any,
     ) -> BaseField:
         kwargs = {
@@ -153,7 +157,7 @@ class FloatField(Number, float):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Float()
+        return sqlalchemy.Float(asdecimal=False)
 
 
 class BigIntegerField(IntegerField):
@@ -178,9 +182,9 @@ class DecimalField(Number, decimal.Decimal):
     def __new__(  # type: ignore
         cls,
         *,
-        minimum: float = None,
-        maximum: float = None,
-        multiple_of: int = None,
+        minimum: Union[int, float, None] = None,
+        maximum: Union[int, float, None] = None,
+        multiple_of: Union[int, float, None] = None,
         max_digits: int = None,
         decimal_places: int = None,
         **kwargs: Any,
@@ -194,7 +198,7 @@ class DecimalField(Number, decimal.Decimal):
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.Numeric(
-            precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places")
+            precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places"), asdecimal=True
         )
 
     @classmethod
@@ -243,43 +247,10 @@ class AutoNowField(Field):
         return super().get_default_values(field_name, cleaned_data, is_update=is_update)
 
 
-class AutoNowMixin(FieldFactory):
-    _bases = (AutoNowField,)
-
-    def __new__(  # type: ignore
-        cls,
-        *,
-        auto_now: Optional[bool] = False,
-        auto_now_add: Optional[bool] = False,
-        **kwargs: Any,
-    ) -> BaseField:
-        if auto_now_add and auto_now:
-            raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
-
-        if auto_now_add or auto_now:
-            kwargs.setdefault("read_only", True)
-            kwargs["inject_default_on_partial_update"] = auto_now
-
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
-
-class ConcreteDateTimeField(AutoNowField):
-    def __init__(
-        self,
-        *,
-        default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
-        force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
-        remove_timezone: bool = False,
-        **kwargs: Any,
-    ) -> None:
-        self.force_timezone = force_timezone
-        self.default_timezone = default_timezone
-        self.remove_timezone = remove_timezone
-        super().__init__(**kwargs)
+class TimezonedField:
+    default_timezone: Optional["zoneinfo.ZoneInfo"]
+    force_timezone: Optional["zoneinfo.ZoneInfo"]
+    remove_timezone: bool
 
     def _convert_datetime(
         self, value: datetime.datetime
@@ -332,11 +303,40 @@ class ConcreteDateTimeField(AutoNowField):
         return self.check(super().get_default_value())
 
 
+class AutoNowMixin(FieldFactory):
+    _bases: Sequence[Any] = (AutoNowField,)
+
+    def __new__(  # type: ignore
+        cls,
+        *,
+        auto_now: Optional[bool] = False,
+        auto_now_add: Optional[bool] = False,
+        **kwargs: Any,
+    ) -> BaseField:
+        if auto_now_add and auto_now:
+            raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
+
+        if auto_now_add or auto_now:
+            kwargs.setdefault("read_only", True)
+            kwargs["inject_default_on_partial_update"] = auto_now
+
+        kwargs = {
+            **kwargs,
+            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
+        }
+        if auto_now_add or auto_now:
+            kwargs["default"] = datetime.datetime.now
+        return super().__new__(cls, **kwargs)
+
+
 class DateTimeField(AutoNowMixin, datetime.datetime):
     """Representation of a datetime field"""
 
     _type = datetime.datetime
-    _bases = (ConcreteDateTimeField,)
+    _bases = (
+        TimezonedField,
+        AutoNowField,
+    )
 
     def __new__(  # type: ignore
         cls,
@@ -348,9 +348,6 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         remove_timezone: bool = False,
         **kwargs: Any,
     ) -> BaseField:
-        if auto_now_add or auto_now:
-            kwargs["default"] = datetime.datetime.now
-
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -366,7 +363,10 @@ class DateField(AutoNowMixin, datetime.date):
     """Representation of a date field"""
 
     _type = datetime.date
-    _bases = (ConcreteDateTimeField,)
+    _bases = (
+        TimezonedField,
+        AutoNowField,
+    )
 
     def __new__(  # type: ignore
         cls,
@@ -377,8 +377,6 @@ class DateField(AutoNowMixin, datetime.date):
         force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         **kwargs: Any,
     ) -> BaseField:
-        if auto_now_add or auto_now:
-            kwargs["default"] = datetime.datetime.now
         # the datetimes lose the information anyway
         kwargs["remove_timezone"] = False
 
@@ -507,28 +505,7 @@ class URLField(CharField):
         return sqlalchemy.String(length=kwargs.get("max_length"))
 
 
-class _IPAddressField(Field):
-    def is_native_type(self, value: str) -> bool:
-        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
-
-    def check(self, value: Any) -> Any:
-        if self.is_native_type(value):
-            return value
-
-        match_ipv4 = IPV4_REGEX.match(value)
-        match_ipv6 = IPV6_REGEX.match(value)
-
-        if not match_ipv4 and not match_ipv6:
-            raise ValueError("Must be a valid IP format.")
-
-        try:
-            return ipaddress.ip_address(value)
-        except ValueError:
-            raise ValueError("Must be a real IP.")  # noqa
-
-
 class IPAddressField(FieldFactory, str):
-    _bases = (_IPAddressField,)
     _type = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 
     def __new__(  # type: ignore
@@ -545,3 +522,24 @@ class IPAddressField(FieldFactory, str):
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> IPAddress:
         return IPAddress()
+
+    @staticmethod
+    def is_native_type(value: str) -> bool:
+        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
+
+    # overwrite
+    @classmethod
+    def check(cls, field_obj: BaseField, value: Any, original_fn: Any = None) -> Any:
+        if cls.is_native_type(value):
+            return value
+
+        match_ipv4 = IPV4_REGEX.match(value)
+        match_ipv6 = IPV6_REGEX.match(value)
+
+        if not match_ipv4 and not match_ipv6:
+            raise ValueError("Must be a valid IP format.")
+
+        try:
+            return ipaddress.ip_address(value)
+        except ValueError:
+            raise ValueError("Must be a real IP.")  # noqa

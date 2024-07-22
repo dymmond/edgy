@@ -25,10 +25,11 @@ from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.fields.base import BaseField, PKField
+from edgy.core.db.fields.base import PKField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
+from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.models.managers import BaseManager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.db.relationships.related_field import RelatedField
@@ -172,7 +173,7 @@ class MetaInfo:
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
         self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
-        self.fields_mapping: Dict[str, BaseField] = {
+        self.fields_mapping: Dict[str, BaseFieldType] = {
             **getattr(meta, "fields_mapping", _empty_dict)
         }
         self.model_references: Dict[str, ModelRef] = {
@@ -217,7 +218,7 @@ class MetaInfo:
         special_getter_fields = set()
         excluded_fields = set()
         input_modifying_fields = set()
-        foreign_key_fields: Dict[str, BaseField] = {}
+        foreign_key_fields: Dict[str, BaseFieldType] = {}
         for key, field in self.fields_mapping.items():
             if hasattr(field, "__get__"):
                 special_getter_fields.add(key)
@@ -230,7 +231,7 @@ class MetaInfo:
         self.special_getter_fields: FrozenSet[str] = frozenset(special_getter_fields)
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
         self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
-        self.foreign_key_fields: Dict[str, BaseField] = foreign_key_fields
+        self.foreign_key_fields: Dict[str, BaseFieldType] = foreign_key_fields
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)
         self.columns_to_field = ColumnsToField(self)
@@ -373,7 +374,7 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
         # Here is _occluded_sentinel not overwritten
         for key, value in inspect.getmembers(base):
             if key not in attrs:
-                if isinstance(value, BaseField):
+                if isinstance(value, BaseFieldType):
                     attrs[key] = value
                 elif isinstance(value, BaseManager):
                     attrs[key] = value.__class__()
@@ -387,7 +388,7 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
                     )
             elif attrs[key] is _occluded_sentinel:
                 # when occluded only include if inherit is True
-                if isinstance(value, BaseField) and value.inherit:
+                if isinstance(value, BaseFieldType) and value.inherit:
                     attrs[key] = value
                 elif isinstance(value, BaseManager) and value.inherit:
                     attrs[key] = value.__class__()
@@ -469,7 +470,7 @@ class BaseModelMeta(ModelMetaclass):
     __slots__ = ()
 
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any]) -> Any:
-        fields: Dict[str, BaseField] = {}
+        fields: Dict[str, BaseFieldType] = {}
         model_references: Dict[str, ModelRef] = {}
         managers: Dict[str, BaseManager] = {}
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
@@ -486,7 +487,7 @@ class BaseModelMeta(ModelMetaclass):
         attrs = extract_fields_and_managers(bases, attrs)
 
         for key, value in attrs.items():
-            if isinstance(value, BaseField):
+            if isinstance(value, BaseFieldType):
                 if key == "pk" and not isinstance(value, PKField):
                     raise ImproperlyConfigured(
                         f"Cannot add a field named pk to model {name}. Protected name."
@@ -556,7 +557,7 @@ class BaseModelMeta(ModelMetaclass):
                         fields["id"] = edgy_fields.BigIntegerField(
                             primary_key=True, autoincrement=True, inherit=False, name="id"
                         )  # type: ignore
-                if not isinstance(fields["id"], BaseField) or not fields["id"].primary_key:
+                if not isinstance(fields["id"], BaseFieldType) or not fields["id"].primary_key:
                     raise ImproperlyConfigured(
                         f"Cannot create model {name} without explicit primary key if field 'id' is already present."
                     )

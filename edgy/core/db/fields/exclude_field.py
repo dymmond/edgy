@@ -13,33 +13,54 @@ if TYPE_CHECKING:
     from edgy import Model, ReflectModel
 
 
-class ConcreteExcludeField(BaseField):
-    def __init__(self, **kwargs: Any):
-        kwargs["exclude"] = True
-        kwargs["null"] = True
-        kwargs["primary_key"] = False
-        return super().__init__(
-            **kwargs,
-        )
-
-    def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
-        """remove any value from input"""
-        return {}
-
-    def to_model(self, name: str, value: Any, phase: str = "") -> Dict[str, Any]:
-        """remove any value from input and raise when setting an attribute"""
-        if phase == "set":
-            raise AttributeError("field is excluded")
-        return {}
-
-    def __get__(self, instance: Union["Model", "ReflectModel"], owner: Any = None) -> None:
-        raise AttributeError("field is excluded")
-
-
 class ExcludeField(FieldFactory, Type[None]):
     """
     Meta field that masks fields
     """
 
-    _bases = (ConcreteExcludeField,)
     _type: Any = Any
+
+    def __new__(  # type: ignore
+        cls,
+        **kwargs: Any,
+    ) -> BaseField:
+        kwargs["exclude"] = True
+        kwargs["null"] = True
+        kwargs["primary_key"] = False
+        return super().__new__(cls, **kwargs)
+
+    @classmethod
+    def clean(
+        cls,
+        obj: BaseField,
+        name: str,
+        value: Any,
+        for_query: bool = False,
+        original_fn: Any = None,
+    ) -> Dict[str, Any]:
+        """remove any value from input."""
+        return {}
+
+    @classmethod
+    def to_model(
+        cls,
+        obj: BaseField,
+        name: str,
+        value: Any,
+        phase: str = "",
+        original_fn: Any = None,
+    ) -> Dict[str, Any]:
+        """remove any value from input and raise when setting an attribute."""
+        if phase == "set":
+            raise AttributeError("field is excluded")
+        return {}
+
+    @classmethod
+    def __get__(
+        cls,
+        obj: BaseField,
+        instance: Union["Model", "ReflectModel"],
+        owner: Any = None,
+        original_fn: Any = None,
+    ) -> None:
+        raise AttributeError("field is excluded")
