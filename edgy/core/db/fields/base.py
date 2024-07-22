@@ -140,8 +140,11 @@ class BaseField(BaseFieldType, FieldInfo):
     def __getattribute__(self, key: str) -> Any:
         if key in methods_overwritable_by_factory and hasattr(self.factory, key):
             fn = getattr(self.factory, key)
+            original_fn = None
+            with contextlib.suppress(AttributeError):
+                original_fn = super().__getattribute__(key)
             # fix classmethod
-            return partial(fn.__call__, self.factory)
+            return partial(fn.__call__, self.factory, original_fn=original_fn)
         return super().__getattribute__(key)
 
 

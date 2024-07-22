@@ -31,13 +31,25 @@ class ExcludeField(FieldFactory, Type[None]):
 
     @classmethod
     def clean(
-        cls, obj: BaseField, name: str, value: Any, for_query: bool = False
+        cls,
+        obj: BaseField,
+        name: str,
+        value: Any,
+        for_query: bool = False,
+        original_fn: Any = None,
     ) -> Dict[str, Any]:
         """remove any value from input."""
         return {}
 
     @classmethod
-    def to_model(cls, obj: BaseField, name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        cls,
+        obj: BaseField,
+        name: str,
+        value: Any,
+        phase: str = "",
+        original_fn: Any = None,
+    ) -> Dict[str, Any]:
         """remove any value from input and raise when setting an attribute."""
         if phase == "set":
             raise AttributeError("field is excluded")
@@ -45,6 +57,10 @@ class ExcludeField(FieldFactory, Type[None]):
 
     @classmethod
     def __get__(
-        cls, obj: BaseField, instance: Union["Model", "ReflectModel"], owner: Any = None
+        cls,
+        obj: BaseField,
+        instance: Union["Model", "ReflectModel"],
+        owner: Any = None,
+        original_fn: Any = None,
     ) -> None:
         raise AttributeError("field is excluded")

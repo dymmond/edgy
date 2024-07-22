@@ -529,7 +529,7 @@ class IPAddressField(FieldFactory, str):
 
     # overwrite
     @classmethod
-    def check(cls, field_obj: BaseField, value: Any) -> Any:
+    def check(cls, field_obj: BaseField, value: Any, original_fn: Any = None) -> Any:
         if cls.is_native_type(value):
             return value
 
