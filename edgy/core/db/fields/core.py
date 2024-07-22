@@ -2,7 +2,6 @@ import datetime
 import decimal
 import enum
 import ipaddress
-import re
 import uuid
 from enum import EnumMeta
 from typing import TYPE_CHECKING, Any, Dict, Optional, Pattern, Sequence, Tuple, Union
@@ -38,18 +37,12 @@ class CharField(FieldFactory, str):
         max_length: Optional[int] = 0,
         min_length: Optional[int] = None,
         regex: Union[str, Pattern] = None,
+        pattern: Union[str, Pattern] = None,
         **kwargs: Any,
     ) -> BaseField:
-        if regex is None:
-            regex = None
-            kwargs["pattern_regex"] = None
-        elif isinstance(regex, str):
-            regex = regex
-            kwargs["pattern_regex"] = re.compile(regex)
-        else:
-            regex = regex.pattern
-            kwargs["pattern_regex"] = regex
-
+        if pattern is None:
+            pattern = regex
+        del regex
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
@@ -82,7 +75,18 @@ class TextField(FieldFactory, str):
 
     _type = str
 
-    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
+    def __new__(
+        cls,
+        *,
+        min_length: int = 0,
+        max_length: Optional[int] = None,
+        regex: Union[str, Pattern] = None,
+        pattern: Union[str, Pattern] = None,
+        **kwargs: Any,
+    ) -> BaseField:
+        if pattern is None:
+            pattern = regex
+        del regex
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
@@ -140,9 +144,9 @@ class FloatField(Number, float):
     def __new__(  # type: ignore
         cls,
         *,
-        mininum: Optional[float] = None,
-        maximun: Optional[float] = None,
-        multiple_of: Optional[int] = None,
+        mininum: Union[int, float, None] = None,
+        maximun: Union[int, float, None] = None,
+        multiple_of: Union[int, float, None] = None,
         **kwargs: Any,
     ) -> BaseField:
         kwargs = {
@@ -153,7 +157,7 @@ class FloatField(Number, float):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Float()
+        return sqlalchemy.Float(asdecimal=False)
 
 
 class BigIntegerField(IntegerField):
@@ -178,9 +182,9 @@ class DecimalField(Number, decimal.Decimal):
     def __new__(  # type: ignore
         cls,
         *,
-        minimum: float = None,
-        maximum: float = None,
-        multiple_of: int = None,
+        minimum: Union[int, float, None] = None,
+        maximum: Union[int, float, None] = None,
+        multiple_of: Union[int, float, None] = None,
         max_digits: int = None,
         decimal_places: int = None,
         **kwargs: Any,
@@ -194,7 +198,7 @@ class DecimalField(Number, decimal.Decimal):
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.Numeric(
-            precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places")
+            precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places"), asdecimal=True
         )
 
     @classmethod

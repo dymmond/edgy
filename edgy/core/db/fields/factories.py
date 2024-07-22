@@ -40,7 +40,7 @@ class FieldFactory(metaclass=FieldFactoryMeta):
 
         new_field = cls._get_field_cls(cls)
         return new_field(  # type: ignore
-            __type__=pydantic_type,
+            field_type=pydantic_type,
             annotation=pydantic_type,
             column_type=column_type,
             default=default,

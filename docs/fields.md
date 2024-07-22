@@ -689,7 +689,7 @@ You should also provide an init method which sets following attributes:
 
 Note: instance checks can also be done against the `field_type` attribute in case you want to check the compatibility with other fields (composite style)
 
-The `annotation` parameter is for pydantic, the `__type___` parameter is transformed into the `field_type` attribute
+The `annotation` parameter is for pydantic.
 
 
 for examples have a look in `tests/fields/test_composite_fields.py` or in `edgy/core/db/fields/core.py`

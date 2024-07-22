@@ -36,7 +36,7 @@ from edgy.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
     from edgy import Model, Registry
-    from edgy.core.db.fields.base import BaseField
+    from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.signals import Broadcaster
 
 _empty = cast(Set[str], frozenset())
@@ -254,7 +254,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                     continue
                 if getattr(field_name, "exclude", False):
                     continue
-            field: BaseField = self.meta.fields_mapping[field_name]
+            field: BaseFieldType = self.meta.fields_mapping[field_name]
             try:
                 retval = field.__get__(self, self.__class__)
             except AttributeError:
