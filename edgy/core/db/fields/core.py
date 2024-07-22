@@ -247,43 +247,10 @@ class AutoNowField(Field):
         return super().get_default_values(field_name, cleaned_data, is_update=is_update)
 
 
-class AutoNowMixin(FieldFactory):
-    _bases = (AutoNowField,)
-
-    def __new__(  # type: ignore
-        cls,
-        *,
-        auto_now: Optional[bool] = False,
-        auto_now_add: Optional[bool] = False,
-        **kwargs: Any,
-    ) -> BaseField:
-        if auto_now_add and auto_now:
-            raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
-
-        if auto_now_add or auto_now:
-            kwargs.setdefault("read_only", True)
-            kwargs["inject_default_on_partial_update"] = auto_now
-
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
-
-class ConcreteDateTimeField(AutoNowField):
-    def __init__(
-        self,
-        *,
-        default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
-        force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
-        remove_timezone: bool = False,
-        **kwargs: Any,
-    ) -> None:
-        self.force_timezone = force_timezone
-        self.default_timezone = default_timezone
-        self.remove_timezone = remove_timezone
-        super().__init__(**kwargs)
+class TimezonedField:
+    default_timezone: Optional["zoneinfo.ZoneInfo"]
+    force_timezone: Optional["zoneinfo.ZoneInfo"]
+    remove_timezone: bool
 
     def _convert_datetime(
         self, value: datetime.datetime
@@ -336,11 +303,40 @@ class ConcreteDateTimeField(AutoNowField):
         return self.check(super().get_default_value())
 
 
+class AutoNowMixin(FieldFactory):
+    _bases: Sequence[Any] = (AutoNowField,)
+
+    def __new__(  # type: ignore
+        cls,
+        *,
+        auto_now: Optional[bool] = False,
+        auto_now_add: Optional[bool] = False,
+        **kwargs: Any,
+    ) -> BaseField:
+        if auto_now_add and auto_now:
+            raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
+
+        if auto_now_add or auto_now:
+            kwargs.setdefault("read_only", True)
+            kwargs["inject_default_on_partial_update"] = auto_now
+
+        kwargs = {
+            **kwargs,
+            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
+        }
+        if auto_now_add or auto_now:
+            kwargs["default"] = datetime.datetime.now
+        return super().__new__(cls, **kwargs)
+
+
 class DateTimeField(AutoNowMixin, datetime.datetime):
     """Representation of a datetime field"""
 
     _type = datetime.datetime
-    _bases = (ConcreteDateTimeField,)
+    _bases = (
+        TimezonedField,
+        AutoNowField,
+    )
 
     def __new__(  # type: ignore
         cls,
@@ -352,9 +348,6 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         remove_timezone: bool = False,
         **kwargs: Any,
     ) -> BaseField:
-        if auto_now_add or auto_now:
-            kwargs["default"] = datetime.datetime.now
-
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -370,7 +363,10 @@ class DateField(AutoNowMixin, datetime.date):
     """Representation of a date field"""
 
     _type = datetime.date
-    _bases = (ConcreteDateTimeField,)
+    _bases = (
+        TimezonedField,
+        AutoNowField,
+    )
 
     def __new__(  # type: ignore
         cls,
@@ -381,8 +377,6 @@ class DateField(AutoNowMixin, datetime.date):
         force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         **kwargs: Any,
     ) -> BaseField:
-        if auto_now_add or auto_now:
-            kwargs["default"] = datetime.datetime.now
         # the datetimes lose the information anyway
         kwargs["remove_timezone"] = False
 
@@ -511,28 +505,7 @@ class URLField(CharField):
         return sqlalchemy.String(length=kwargs.get("max_length"))
 
 
-class _IPAddressField(Field):
-    def is_native_type(self, value: str) -> bool:
-        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
-
-    def check(self, value: Any) -> Any:
-        if self.is_native_type(value):
-            return value
-
-        match_ipv4 = IPV4_REGEX.match(value)
-        match_ipv6 = IPV6_REGEX.match(value)
-
-        if not match_ipv4 and not match_ipv6:
-            raise ValueError("Must be a valid IP format.")
-
-        try:
-            return ipaddress.ip_address(value)
-        except ValueError:
-            raise ValueError("Must be a real IP.")  # noqa
-
-
 class IPAddressField(FieldFactory, str):
-    _bases = (_IPAddressField,)
     _type = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 
     def __new__(  # type: ignore
@@ -549,3 +522,24 @@ class IPAddressField(FieldFactory, str):
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> IPAddress:
         return IPAddress()
+
+    @staticmethod
+    def is_native_type(value: str) -> bool:
+        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
+
+    # overwrite
+    @classmethod
+    def check(cls, field_obj: BaseField, value: Any) -> Any:
+        if cls.is_native_type(value):
+            return value
+
+        match_ipv4 = IPV4_REGEX.match(value)
+        match_ipv6 = IPV6_REGEX.match(value)
+
+        if not match_ipv4 and not match_ipv6:
+            raise ValueError("Must be a valid IP format.")
+
+        try:
+            return ipaddress.ip_address(value)
+        except ValueError:
+            raise ValueError("Must be a real IP.")  # noqa

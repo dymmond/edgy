@@ -653,8 +653,10 @@ Derives from the same as [CharField](#charfield) and validates the value of an U
 
 ### Simple fields
 
-If you merely want to customize an existing field in `edgy.db.fields.core` you can just inherit from it and provide the customization via the `FieldFactory` (or you can `FieldFactory` for handling a new sqlalchemy type).
-Valid methods to overwrite are `__new__`, `get_column_type`, `get_pydatic_type`, `get_constraints` and `validate`
+If you merely want to customize an existing field in `edgy.core.db.fields` you can just inherit from it and provide the customization via the `FieldFactory` (or you can use `FieldFactory` directly for handling a new sqlalchemy type).
+Valid methods to overwrite are `__new__`, `get_column_type`, `get_pydantic_type`, `get_constraints` and `validate` as well as you can overwrite many field methods
+by defining them on the factory (see `edgy.core.db.fields.types` for allowed methods). Field methods overwrites must be classmethods which take as first argument after
+the class itself the field object.
 
 For examples look in the mentioned path (replace dots with slashes).
 

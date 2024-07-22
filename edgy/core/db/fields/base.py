@@ -1,6 +1,6 @@
 import contextlib
 import copy
-from functools import cached_property
+from functools import cached_property, partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -21,7 +21,7 @@ from pydantic.fields import FieldInfo
 
 from edgy.types import Undefined
 
-from .types import BaseFieldType, ColumnDefinitionModel
+from .types import BaseFieldType, ColumnDefinitionModel, methods_overwritable_by_factory
 
 if TYPE_CHECKING:
     from edgy import Model, ReflectModel, Registry
@@ -39,6 +39,8 @@ class BaseField(BaseFieldType, FieldInfo):
     """
     The base field for Edgy data model fields. It provides some helpers additional to
     BaseFieldType and inherits from FieldInfo for pydantic integration.
+
+    Allows factories to overwrite methods.
     """
 
     # defs to simplify the life (can be None actually)
@@ -135,9 +137,18 @@ class BaseField(BaseFieldType, FieldInfo):
             return {}
         return {field_name: self.get_default_value()}
 
+    def __getattribute__(self, key: str) -> Any:
+        if key in methods_overwritable_by_factory and hasattr(self.factory, key):
+            fn = getattr(self.factory, key)
+            # fix classmethod
+            return partial(fn.__call__, self.factory)
+        return super().__getattribute__(key)
+
 
 class Field(BaseField):
-    # defines compatibility fallbacks check and get_column
+    """
+    Field with fallbacks and used for factories.
+    """
 
     def check(self, value: Any) -> Any:
         """
@@ -156,6 +167,8 @@ class Field(BaseField):
         Return a single column for the field declared. Return None for meta fields.
         """
         column_model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
+        if column_model.column_type is None:
+            return None
         return sqlalchemy.Column(
             column_model.column_name or name,
             column_model.column_type,
@@ -395,7 +408,7 @@ class BaseForeignKey(RelationshipField):
         """
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]  # type: ignore
+                self._target = self.registry.models[self.to]
             else:
                 self._target = self.to
         return self._target

@@ -282,7 +282,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 ), "sub exclude filters for CompositeField specified, but no Pydantic model is set"
                 if mode == "json" and not getattr(field, "unsafe_json_serialization", False):
                     # skip field if it isn't a BaseModel and the mode is json and unsafe_json_serialization is not set
-                    # currently unsafe_json_serialization exists only on ConcreteCompositeFields
+                    # currently unsafe_json_serialization exists only on CompositeFields
                     continue
             alias: str = field_name
             if getattr(field, "serialization_alias", None):
