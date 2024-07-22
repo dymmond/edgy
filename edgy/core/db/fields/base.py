@@ -1,6 +1,6 @@
 import contextlib
 import copy
-from functools import cached_property, partial
+from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -21,7 +21,7 @@ from pydantic.fields import FieldInfo
 
 from edgy.types import Undefined
 
-from .types import BaseFieldType, ColumnDefinitionModel, methods_overwritable_by_factory
+from .types import BaseFieldType, ColumnDefinitionModel
 
 if TYPE_CHECKING:
     from edgy import Model, ReflectModel, Registry
@@ -137,16 +137,6 @@ class BaseField(BaseFieldType, FieldInfo):
             return {}
         return {field_name: self.get_default_value()}
 
-    def __getattribute__(self, key: str) -> Any:
-        if key in methods_overwritable_by_factory and hasattr(self.factory, key):
-            fn = getattr(self.factory, key)
-            original_fn = None
-            with contextlib.suppress(AttributeError):
-                original_fn = super().__getattribute__(key)
-            # fix classmethod
-            return partial(fn.__call__, self.factory, original_fn=original_fn)
-        return super().__getattribute__(key)
-
 
 class Field(BaseField):
     """
@@ -192,12 +182,12 @@ class BaseCompositeField(BaseField):
         """translate name for inner objects and parsing values"""
         return name
 
-    def get_composite_fields(self) -> Dict[str, BaseField]:
+    def get_composite_fields(self) -> Dict[str, BaseFieldType]:
         """return dictionary of fields with untranslated names"""
         raise NotImplementedError()
 
     @cached_property
-    def composite_fields(self) -> Dict[str, BaseField]:
+    def composite_fields(self) -> Dict[str, BaseFieldType]:
         # return untranslated names
         return self.get_composite_fields()
 
@@ -314,8 +304,8 @@ class PKField(BaseCompositeField):
         prefix: str,
         new_fieldname: str,
         owner: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
-        parent: Optional["BaseField"] = None,
-    ) -> Optional[BaseField]:
+        parent: Optional[BaseFieldType] = None,
+    ) -> Optional[BaseFieldType]:
         return None
 
     def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
@@ -366,7 +356,7 @@ class PKField(BaseCompositeField):
             return field.to_model(pknames[0], value, phase=phase)
         return super().to_model(field_name, value, phase=phase)
 
-    def get_composite_fields(self) -> Dict[str, BaseField]:
+    def get_composite_fields(self) -> Dict[str, BaseFieldType]:
         return {
             field: self.owner.meta.fields_mapping[field]
             for field in cast(Sequence[str], self.owner.pknames)

@@ -174,29 +174,3 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         if name:
             return cast("MetaInfo", self.owner.meta).field_to_column_names[name]
         return cast("MetaInfo", self.owner.meta).field_to_column_names[self.name]
-
-
-methods_overwritable_by_factory = {
-    key
-    for key, attr in BaseFieldType.__dict__.items()
-    if callable(attr) and not key.startswith("_")
-}
-methods_overwritable_by_factory.discard("get_column_names")
-methods_overwritable_by_factory.discard("__init__")
-
-# extra methods
-methods_overwritable_by_factory.add("__set__")
-methods_overwritable_by_factory.add("__get__")
-methods_overwritable_by_factory.add("modify_input")
-
-# BaseCompositeField
-methods_overwritable_by_factory.add("translate_name")
-methods_overwritable_by_factory.add("get_composite_fields")
-
-# Field
-methods_overwritable_by_factory.add("check")
-methods_overwritable_by_factory.add("get_column")
-
-# RelationshipField
-methods_overwritable_by_factory.add("traverse_field")
-methods_overwritable_by_factory.add("is_cross_db")

@@ -6,8 +6,8 @@ from typing import (
     Union,
 )
 
-from edgy.core.db.fields.base import BaseField
 from edgy.core.db.fields.factories import FieldFactory
+from edgy.core.db.fields.types import BaseFieldType
 
 if TYPE_CHECKING:
     from edgy import Model, ReflectModel
@@ -23,7 +23,7 @@ class ExcludeField(FieldFactory, Type[None]):
     def __new__(  # type: ignore
         cls,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         kwargs["exclude"] = True
         kwargs["null"] = True
         kwargs["primary_key"] = False
@@ -32,7 +32,7 @@ class ExcludeField(FieldFactory, Type[None]):
     @classmethod
     def clean(
         cls,
-        obj: BaseField,
+        obj: BaseFieldType,
         name: str,
         value: Any,
         for_query: bool = False,
@@ -44,7 +44,7 @@ class ExcludeField(FieldFactory, Type[None]):
     @classmethod
     def to_model(
         cls,
-        obj: BaseField,
+        obj: BaseFieldType,
         name: str,
         value: Any,
         phase: str = "",
@@ -58,7 +58,7 @@ class ExcludeField(FieldFactory, Type[None]):
     @classmethod
     def __get__(
         cls,
-        obj: BaseField,
+        obj: BaseFieldType,
         instance: Union["Model", "ReflectModel"],
         owner: Any = None,
         original_fn: Any = None,
