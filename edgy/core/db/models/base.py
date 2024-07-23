@@ -45,7 +45,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
     Base of all Edgy models with the core setup.
     """
 
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     query: ClassVar[Manager] = Manager()
     query_related: ClassVar[RedirectManager] = RedirectManager(redirect_name="query")

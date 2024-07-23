@@ -3,11 +3,12 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
 from orjson import OPT_OMIT_MICROSECONDS, OPT_SERIALIZE_NUMPY, dumps
-from pydantic import ConfigDict
 
 import edgy
 
 if TYPE_CHECKING:
+    from pydantic import ConfigDict
+
     from edgy import Model
     from edgy.core.db.fields.base import BaseFieldType
     from edgy.core.db.models.metaclasses import MetaInfo
@@ -100,10 +101,10 @@ class ModelParser:
 def create_edgy_model(
     __name__: str,
     __module__: str,
-    __definitions__: Optional[Dict[Any, Any]] = None,
+    __definitions__: Optional[Dict[str, Any]] = None,
     __metadata__: Optional[Type["MetaInfo"]] = None,
     __qualname__: Optional[str] = None,
-    __config__: Optional[ConfigDict] = None,
+    __config__: Optional["ConfigDict"] = None,
     __bases__: Optional[Tuple[Type["Model"]]] = None,
     __proxy__: bool = False,
     __pydantic_extra__: Any = None,
