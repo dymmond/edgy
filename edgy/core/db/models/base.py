@@ -21,10 +21,8 @@ import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 from sqlalchemy.ext.asyncio import AsyncConnection
-from typing_extensions import Self
 
 from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.models._internal import DescriptiveMeta
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
 from edgy.core.db.models.model_proxy import ProxyModel
@@ -34,6 +32,8 @@ from edgy.core.utils.models import DateParser, ModelParser, generify_model_field
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ImproperlyConfigured
 
+from .types import BaseModelType
+
 if TYPE_CHECKING:
     from edgy import Model, Registry
     from edgy.core.db.fields.types import BaseFieldType
@@ -42,19 +42,16 @@ if TYPE_CHECKING:
 _empty = cast(Set[str], frozenset())
 
 
-class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta):
+class EdgyBaseModel(BaseModel, DateParser, ModelParser, BaseModelType, metaclass=BaseModelMeta):
     """
     Base of all Edgy models with the core setup.
     """
 
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
-    parent: ClassVar[Union[Type[Self], None]]
-    is_proxy_model: ClassVar[bool] = False
 
     query: ClassVar[Manager] = Manager()
     query_related: ClassVar[RedirectManager] = RedirectManager(redirect_name="query")
     meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True)
-    Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
     __db_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
@@ -362,29 +359,6 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
-    def extract_db_fields(self) -> Dict[str, Any]:
-        """
-        Extracts all the db fields, model references and fields.
-        Related fields are not included because they are disjoint.
-        """
-        fields_mapping = self.meta.fields_mapping
-        model_references = self.meta.model_references
-        columns = self.__class__.columns
-        return {
-            k: v
-            for k, v in self.__dict__.items()
-            if k in fields_mapping or k in columns or k in model_references
-        }
-
-    def get_instance_name(self) -> str:
-        """
-        Returns the name of the class in lowercase.
-        """
-        return self.__class__.__name__.lower()
-
-    async def load(self) -> None:
-        raise NotImplementedError()
-
     def __setattr__(self, key: str, value: Any) -> None:
         fields_mapping = self.meta.fields_mapping
         field = fields_mapping.get(key, None)
@@ -439,8 +413,12 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             return False
         if self.meta.tablename != other.meta.tablename:
             return False
-        self_dict = self._extract_values_from_field(self.extract_db_fields(), is_partial=True)
-        other_dict = self._extract_values_from_field(other.extract_db_fields(), is_partial=True)
+        self_dict = self.extract_column_values(
+            self.extract_db_fields(self.pkcolumns), is_partial=True
+        )
+        other_dict = self.extract_column_values(
+            other.extract_db_fields(self.pkcolumns), is_partial=True
+        )
         key_set = {*self_dict.keys(), *other_dict.keys()}
         for field_name in key_set:
             if self_dict.get(field_name) != other_dict.get(field_name):

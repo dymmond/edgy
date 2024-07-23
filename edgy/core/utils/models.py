@@ -28,7 +28,7 @@ class DateParser:
 
 
 class ModelParser:
-    def _extract_model_references(
+    def extract_model_references(
         self, extracted_values: Any, model_class: Optional[Type["Model"]]
     ) -> Any:
         """
@@ -41,16 +41,18 @@ class ModelParser:
         }
         return model_references
 
-    def _extract_values_from_field(
+    def extract_column_values(
         self,
         extracted_values: Any,
         model_class: Optional["Model"] = None,
         is_update: bool = False,
         is_partial: bool = False,
-    ) -> Any:
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         Extracts all the default values from the given fields and returns the raw
         value corresponding to each field.
+
+        Extract the model references.
         """
         model_cls = model_class or self
         validated: Dict[str, Any] = {}
@@ -91,8 +93,6 @@ class ModelParser:
                     validated.update(
                         field.get_default_values(field.name, validated, is_update=is_update)
                     )
-        # Update with any ModelRef
-        validated.update(self._extract_model_references(extracted_values, model_cls))
         return validated
 
 
