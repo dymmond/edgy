@@ -21,11 +21,11 @@ from edgy.conf import settings
 from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
+from edgy.core.db.models.mixins import DateParser, ModelParser
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import PrefetchMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
 from edgy.core.db.relationships.utils import crawl_relationship
-from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.protocols.queryset import QuerySetProtocol
 

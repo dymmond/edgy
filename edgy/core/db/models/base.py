@@ -24,10 +24,11 @@ from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
+from edgy.core.db.models.mixins import ModelParser
 from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.utils.functional import edgy_setattr
-from edgy.core.utils.models import ModelParser, generify_model_fields
+from edgy.core.utils.models import generify_model_fields
 from edgy.core.utils.sync import run_sync
 
 from .types import BaseModelType
