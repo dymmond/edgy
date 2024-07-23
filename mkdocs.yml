@@ -1,6 +1,6 @@
 site_name: Edgy
 site_description: 🔥 The perfect ORM to work with complex databases 🔥.
-site_url: https://edgyorm.tarsild.io
+site_url: https://edgy.dymmond.com
 
 theme:
   name: "material"
@@ -47,8 +47,7 @@ plugins:
       min_length: 50
       max_length: 160
       trim: false
-  - markdownextradata:
-      data: data
+  - macros
   - mkdocstrings:
       handlers:
         python:
