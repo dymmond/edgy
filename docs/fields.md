@@ -14,14 +14,17 @@ supported in **all field types**.
 - `primary_key` - A boolean. Determine if a column is primary key.
 Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions with Edgy.
 - `exclude` - An bool indicating if the field is included in model_dump
-- `default` - A value or a callable (function).
 - `index` - A boolean. Determine if a database index should be created.
 - `inherit` - A boolean. Determine if a field can be inherited in submodels. Default is True. It is used by PKField, RelatedField and the injected ID Field.
 - `skip_absorption_check` - A boolean. Default False. Dangerous option! By default when defining a CompositeField with embedded fields and the `absorb_existing_fields` option it is checked that the field type of the absorbed field is compatible with the field type of the embedded field. This option skips the check.
 - `unique` - A boolean. Determine if a unique constraint should be created for the field.
 Check the [unique_together](./models.md#unique-together) for more details.
+- `column_name` - A string. Database name of the column (by default the same as the name)
+- `comment` - A comment to be added with the field in the SQL database.
+- `secret` - A special attribute that allows to call the [exclude_secrets](./queries/secrets.md#exclude-secrets) and avoid
+accidental leakage of sensitive data.
 
-All the fields are required unless on the the following is set:
+All fields are required unless one of the following is set:
 
 - `null` - A boolean. Determine if a column allows null.
 
@@ -29,9 +32,9 @@ All the fields are required unless on the the following is set:
 
 - `server_default` - instance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
 construct representing the DDL DEFAULT value for the column.
-- `comment` - A comment to be added with the field in the SQL database.
-- `secret` - A special attribute that allows to call the [exclude_secrets](./queries/secrets.md#exclude-secrets) and avoid
-accidental leakage of sensitive data.
+- `default` - A value or a callable (function).
+- `auto_now` or `auto_now_add` -  Only for DateTimeField and DateField
+
 
 ## Available fields
 
@@ -79,11 +82,9 @@ This field is used as a default field for the `id` of a model.
 
 ##### Parameters:
 
-* `minimum` - An integer, float or decimal indicating the minimum.
-* `maximum` - An integer, float or decimal indicating the maximum.
-* `max_digits` - Maximum digits allowed.
-* `multiple_of` - An integer, float or decimal indicating the multiple of.
-* `decimal_places` - The total decimal places.
+* `minimum` - An integer indicating the minimum.
+* `maximum` - An integer indicating the maximum.
+* `multiple_of` - An integer indicating the multiple of.
 
 #### IntegerField
 
@@ -100,11 +101,9 @@ class MyModel(edgy.Model):
 
 ##### Parameters:
 
-* `minimum` - An integer, float or decimal indicating the minimum.
-* `maximum` - An integer, float or decimal indicating the maximum.
-* `max_digits` - Maximum digits allowed.
-* `multiple_of` - An integer, float or decimal indicating the multiple of.
-* `decimal_places` - The total decimal places.
+* `minimum` - An integer indicating the minimum.
+* `maximum` - An integer indicating the maximum.
+* `multiple_of` - An integer indicating the multiple of.
 
 #### BooleanField
 
@@ -248,12 +247,12 @@ class MyModel(edgy.Model):
 
 ##### Parameters
 
-* **auto_now** - A boolean indicating the `auto_now` enabled. Useful for auto updates.
-* **auto_now_add** - A boolean indicating the `auto_now_add` enabled. This will ensure that it is
+* `auto_now` - A boolean indicating the `auto_now` enabled. Useful for auto updates.
+* `auto_now_add` - A boolean indicating the `auto_now_add` enabled. This will ensure that it is
 only added once.
-* **default_timezone** - ZoneInfo containing the timezone which is added to naive datetimes and used for `auto_now` and `auto_now_add`.
+* `default_timezone` - ZoneInfo containing the timezone which is added to naive datetimes and used for `auto_now` and `auto_now_add`.
                          Datetimes are converted to date and lose their timezone information.
-* **force_timezone** - ZoneInfo containing the timezone in which all datetimes are converted.
+* `force_timezone` - ZoneInfo containing the timezone in which all datetimes are converted.
                        For naive datetimes it behaves like `default_timezone`
                        Datetimes are converted to date and lose their timezone information.
 
@@ -655,11 +654,13 @@ Derives from the same as [CharField](#charfield) and validates the value of an U
 
 If you merely want to customize an existing field in `edgy.core.db.fields` you can just inherit from it and provide the customization via the `FieldFactory` (or you can use `FieldFactory` directly for handling a new sqlalchemy type).
 Valid methods to overwrite are `__new__`, `get_column_type`, `get_pydantic_type`, `get_constraints` and `validate` as well as you can overwrite many field methods
-by defining them on the factory (see `edgy.core.db.fields.types` for allowed methods). Field methods overwrites must be classmethods which take as first argument after
+by defining them on the factory (see `edgy.core.db.fields.factories` for allowed methods). Field methods overwrites must be classmethods which take as first argument after
 the class itself the field object and a keyword arg original_fn which can be None in case none was defined.
 
 For examples look in the mentioned path (replace dots with slashes).
 
+!!! Note:
+    You can extend in the factory the overwritable methods. The overwritten methods are not permanently overwritten. After init it is possible to change them again.
 
 ### Extended, special fields
 
