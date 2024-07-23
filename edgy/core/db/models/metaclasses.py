@@ -470,7 +470,9 @@ def extract_fields_and_managers(
 class BaseModelMeta(ModelMetaclass, ABCMeta):
     __slots__ = ()
 
-    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any]) -> Any:
+    def __new__(
+        cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any], **kwargs: Any
+    ) -> Any:
         fields: Dict[str, BaseFieldType] = {}
         model_references: Dict[str, ModelRef] = {}
         managers: Dict[str, BaseManager] = {}
@@ -604,9 +606,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # Ensure initialization is only performed for subclasses of EdgyBaseModel
         # (excluding the EdgyBaseModel class itself).
         if not parents:
-            return model_class(cls, name, bases, attrs)
+            return model_class(cls, name, bases, attrs, **kwargs)
 
-        new_class = cast("Type[Model]", model_class(cls, name, bases, attrs))
+        new_class = cast("Type[Model]", model_class(cls, name, bases, attrs, **kwargs))
         new_class.fields = fields
 
         # Update the model_fields are updated to the latest
