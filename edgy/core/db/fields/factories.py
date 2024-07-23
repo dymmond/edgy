@@ -94,7 +94,10 @@ class FieldFactory(metaclass=FieldFactoryMeta):
                 setattr(
                     new_field_obj,
                     key,
-                    staticmethod(partial(fn, cls, new_field_obj, original_fn=original_fn)),
+                    # .__func__ is a workaround for python < 3.10, python >=3.10 works without
+                    staticmethod(
+                        partial(fn, cls, new_field_obj, original_fn=original_fn)
+                    ).__func__,
                 )
         return new_field_obj
 
