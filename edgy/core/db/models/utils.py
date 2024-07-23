@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Iterable, Set, cast
 from edgy.core.connection.registry import Registry
 
 if TYPE_CHECKING:
-    from edgy.core.db.models.base import EdgyBaseModel
+    from edgy.core.db.models.base import BaseModelType
     from edgy.core.db.models.model import Model
 
 
@@ -48,6 +48,6 @@ def build_pkcolumns(model_class: Any) -> None:
     model_class._pkcolumns = tuple(sorted(pkcolumns))
 
 
-def from_model_to_clauses(model: "EdgyBaseModel") -> Iterable[Any]:
+def from_model_to_clauses(model: "BaseModelType") -> Iterable[Any]:
     for column in model.columns_for_load:
         yield getattr(model.table.columns, column) == getattr(model, column)

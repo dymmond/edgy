@@ -29,14 +29,15 @@ class DateParser:
 
 class ModelParser:
     def extract_model_references(
-        self, extracted_values: Any, model_class: Optional[Type["Model"]]
+        self, extracted_values: Any, model_class: Optional[Type["BaseFieldType"]] = None
     ) -> Any:
         """
         Exracts any possible model references from the EdgyModel and returns a dictionary.
         """
+        model_cls = model_class or self
         model_references = {
             name: extracted_values.get(name, None)
-            for name in model_class.meta.model_references  # type: ignore
+            for name in model_cls.meta.model_references  # type: ignore
             if extracted_values.get(name)
         }
         return model_references
@@ -47,7 +48,7 @@ class ModelParser:
         model_class: Optional["Model"] = None,
         is_update: bool = False,
         is_partial: bool = False,
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
         Extracts all the default values from the given fields and returns the raw
         value corresponding to each field.

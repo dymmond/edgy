@@ -10,8 +10,8 @@ from edgy.core.connection.registry import Registry
 from edgy.types import Undefined
 
 if TYPE_CHECKING:
-    from edgy.core.db.models.base import EdgyBaseModel
     from edgy.core.db.models.metaclasses import MetaInfo
+    from edgy.core.db.models.types import BaseModelType
 
 
 class _ColumnDefinition:
@@ -155,7 +155,7 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[EdgyBaseModel] = None,
+        owner: Optional[BaseModelType] = None,
         parent: Optional[BaseFieldType] = None,
     ) -> Optional[BaseFieldType]:
         """

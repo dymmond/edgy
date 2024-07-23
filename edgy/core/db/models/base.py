@@ -20,7 +20,6 @@ from typing import (
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager, RedirectManager
@@ -28,21 +27,20 @@ from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
 from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.utils.functional import edgy_setattr
-from edgy.core.utils.models import DateParser, ModelParser, generify_model_fields
+from edgy.core.utils.models import ModelParser, generify_model_fields
 from edgy.core.utils.sync import run_sync
-from edgy.exceptions import ImproperlyConfigured
 
 from .types import BaseModelType
 
 if TYPE_CHECKING:
-    from edgy import Model, Registry
+    from edgy import Model
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.signals import Broadcaster
 
 _empty = cast(Set[str], frozenset())
 
 
-class EdgyBaseModel(BaseModel, DateParser, ModelParser, BaseModelType, metaclass=BaseModelMeta):
+class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMeta):
     """
     Base of all Edgy models with the core setup.
     """
@@ -424,74 +422,3 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, BaseModelType, metaclass
             if self_dict.get(field_name) != other_dict.get(field_name):
                 return False
         return True
-
-
-class EdgyBaseReflectModel(EdgyBaseModel):
-    """
-    Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
-    call.
-    """
-
-    __reflected__: ClassVar[bool] = True
-
-    class Meta:
-        abstract = True
-
-    @classmethod
-    def build(cls, schema: Optional[str] = None) -> Any:
-        """
-        The inspect is done in an async manner and reflects the objects from the database.
-        """
-        registry = cls.meta.registry
-        assert registry is not None, "registry is not set"
-        metadata: sqlalchemy.MetaData = registry._metadata
-        schema_name = schema or registry.db_schema
-        metadata.schema = schema_name
-
-        tablename: str = cast("str", cls.meta.tablename)
-        return run_sync(cls.reflect(registry, tablename, metadata, schema_name))
-
-    @classmethod
-    async def reflect(
-        cls,
-        registry: "Registry",
-        tablename: str,
-        metadata: sqlalchemy.MetaData,
-        schema: Union[str, None] = None,
-    ) -> sqlalchemy.Table:
-        """
-        Reflect a table from the database and return its SQLAlchemy Table object.
-
-        This method connects to the database using the provided registry, reflects
-        the table with the given name and metadata, and returns the SQLAlchemy
-        Table object.
-
-        Parameters:
-            registry (Registry): The registry object containing the database engine.
-            tablename (str): The name of the table to reflect.
-            metadata (sqlalchemy.MetaData): The SQLAlchemy MetaData object to associate with the reflected table.
-            schema (Union[str, None], optional): The schema name where the table is located. Defaults to None.
-
-        Returns:
-            sqlalchemy.Table: The reflected SQLAlchemy Table object.
-
-        Raises:
-            ImproperlyConfigured: If there is an error during the reflection process.
-        """
-
-        def execute_reflection(connection: AsyncConnection) -> sqlalchemy.Table:
-            """Helper function to create and reflect the table."""
-            try:
-                return sqlalchemy.Table(
-                    tablename, metadata, schema=schema, autoload_with=connection
-                )
-            except Exception as e:
-                raise e
-
-        try:
-            async with registry.engine.begin() as connection:
-                table = await connection.run_sync(execute_reflection)
-            await registry.engine.dispose()
-            return table
-        except Exception as e:
-            raise ImproperlyConfigured(detail=str(e)) from e

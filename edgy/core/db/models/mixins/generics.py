@@ -1,16 +1,13 @@
 import inspect
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Mapped, relationship
 
 
-class DeclarativeMixin(BaseModel):
+class DeclarativeMixin:
     """
     Mixin for declarative base models.
     """
-
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     @classmethod
     def declarative(cls) -> Any:

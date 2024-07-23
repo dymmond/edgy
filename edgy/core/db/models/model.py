@@ -1,13 +1,12 @@
 from typing import Any, Dict, Type, Union
 
-from edgy.core.db.models.base import EdgyBaseReflectModel
-from edgy.core.db.models.mixins import DeclarativeMixin
-from edgy.core.db.models.row import ModelRow
+from edgy.core.db.models.base import EdgyBaseModel
+from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
 from edgy.exceptions import ObjectNotFound, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 
-class Model(ModelRow, DeclarativeMixin):
+class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
     """
     Representation of an Edgy `Model`.
 
@@ -215,7 +214,7 @@ class Model(ModelRow, DeclarativeMixin):
         return self
 
 
-class ReflectModel(Model, EdgyBaseReflectModel):
+class ReflectModel(ReflectedModelMixin, Model):
     """
     Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
     call.
