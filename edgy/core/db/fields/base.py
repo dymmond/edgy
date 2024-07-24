@@ -245,7 +245,7 @@ class BaseCompositeField(BaseField):
     def get_default_values(
         self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool = False
     ) -> Any:
-        # fields should provide their own default which is used as long as they are in the fields_mapping
+        # fields should provide their own default which is used as long as they are in the fields mapping
         return {}
 
 
@@ -278,7 +278,7 @@ class PKField(BaseCompositeField):
         d = {}
         for key in pknames:
             translated_name = self.translate_name(key)
-            field = instance.meta.fields_mapping.get(key)
+            field = instance.meta.fields.get(key)
             if field and hasattr(field, "__get__"):
                 d[translated_name] = field.__get__(instance, owner)
             else:
@@ -316,7 +316,7 @@ class PKField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             pkname = pknames[0]
-            field = self.owner.meta.fields_mapping[pkname]
+            field = self.owner.meta.fields[pkname]
             return field.clean(f"{prefix}{pkname}", value, for_query=for_query)
         retdict = super().clean(field_name, value, for_query=for_query)
         if self.is_incomplete:
@@ -349,13 +349,13 @@ class PKField(BaseCompositeField):
             # we first only redirect both
             and not isinstance(value, (dict, BaseModel))
         ):
-            field = self.owner.meta.fields_mapping[pknames[0]]
+            field = self.owner.meta.fields[pknames[0]]
             return field.to_model(pknames[0], value, phase=phase)
         return super().to_model(field_name, value, phase=phase)
 
     def get_composite_fields(self) -> Dict[str, BaseFieldType]:
         return {
-            field: self.owner.meta.fields_mapping[field]
+            field: self.owner.meta.fields[field]
             for field in cast(Sequence[str], self.owner.pknames)
         }
 

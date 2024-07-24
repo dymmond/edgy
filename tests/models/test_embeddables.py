@@ -58,29 +58,29 @@ async def rollback_connections(create_test_database):
 
 
 def test_fields():
-    assert "id" in MyModel1.meta.fields_mapping
-    assert "id2" not in MyModel1.meta.fields_mapping
+    assert "id" in MyModel1.meta.fields
+    assert "id2" not in MyModel1.meta.fields
     assert "id" in MyModel1.pkcolumns
     assert "id2" not in MyModel1.pkcolumns
-    assert "model1" in MyModel1.meta.fields_mapping
-    assert "model1_first_name" in MyModel1.meta.fields_mapping
+    assert "model1" in MyModel1.meta.fields
+    assert "model1_first_name" in MyModel1.meta.fields
     # prefixed _ is removed
-    assert "model1_last_name" in MyModel1.meta.fields_mapping
-    assert "model2" in MyModel1.meta.fields_mapping
-    assert "model2_first_name" in MyModel1.meta.fields_mapping
+    assert "model1_last_name" in MyModel1.meta.fields
+    assert "model2" in MyModel1.meta.fields
+    assert "model2_first_name" in MyModel1.meta.fields
 
-    assert "id2" in MyModel2.meta.fields_mapping
-    assert "id" not in MyModel2.meta.fields_mapping
+    assert "id2" in MyModel2.meta.fields
+    assert "id" not in MyModel2.meta.fields
     assert "id2" in MyModel2.pkcolumns
     assert "id" not in MyModel2.pkcolumns
-    assert "model1" in MyModel2.meta.fields_mapping
-    assert "model2" not in MyModel2.meta.fields_mapping
-    assert "model3" in MyModel2.meta.fields_mapping
-    assert "model1_first_name" in MyModel2.meta.fields_mapping
-    assert "model2_first_name" not in MyModel2.meta.fields_mapping
-    assert "model3_first_name" not in MyModel2.meta.fields_mapping
-    assert "model3_model1_first_name" in MyModel2.meta.fields_mapping
-    assert isinstance(MyModel2.meta.fields_mapping["model3_model1_last_name"], edgy.ExcludeField)
+    assert "model1" in MyModel2.meta.fields
+    assert "model2" not in MyModel2.meta.fields
+    assert "model3" in MyModel2.meta.fields
+    assert "model1_first_name" in MyModel2.meta.fields
+    assert "model2_first_name" not in MyModel2.meta.fields
+    assert "model3_first_name" not in MyModel2.meta.fields
+    assert "model3_model1_first_name" in MyModel2.meta.fields
+    assert isinstance(MyModel2.meta.fields["model3_model1_last_name"], edgy.ExcludeField)
 
 
 @pytest.mark.parametrize(
@@ -88,9 +88,9 @@ def test_fields():
     [MyModel1, MyModel2],
 )
 def test_field_types(model):
-    for field in model.meta.fields_mapping.values():
+    for field in model.meta.fields.values():
         assert not isinstance(field, BaseManager)
-    for field in model.meta.fields_mapping.values():
+    for field in model.meta.fields.values():
         assert isinstance(field, BaseField)
     for manager in model.meta.managers.values():
         assert isinstance(manager, BaseManager)
@@ -101,7 +101,7 @@ def test_field_types(model):
     [MyModel1, MyModel2],
 )
 def test_field_names(model):
-    for field_name, field in model.meta.fields_mapping.items():
+    for field_name, field in model.meta.fields.items():
         assert field_name == field.name
 
 

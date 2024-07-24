@@ -134,7 +134,7 @@ class BaseModelType(ABC):
         Extracts all the db fields, model references and fields.
         Related fields are not included because they are disjoint.
         """
-        fields_mapping = self.meta.fields_mapping
+        fields = self.meta.fields
         model_references = self.meta.model_references
         columns = self.table.columns
 
@@ -144,7 +144,7 @@ class BaseModelType(ABC):
         return {
             k: v
             for k, v in self.__dict__.items()
-            if k in fields_mapping or hasattr(columns, k) or k in model_references
+            if k in fields or hasattr(columns, k) or k in model_references
         }
 
     def get_instance_name(self) -> str:

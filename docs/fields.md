@@ -695,7 +695,7 @@ Additional they can provide following methods:
 * `__get__(self, instance, owner=None)` - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
 * `__set__(self, instance, value)` - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
 * `to_model(self, field_name, phase="")` - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`
-* `get_embedded_fields(self, field_name, fields_mapping)` - Define internal fields.
+* `get_embedded_fields(self, field_name, fields)` - Define internal fields.
 * `get_default_values(self, field_name, cleaned_data, is_update=False)` - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
 * `get_default_value(self)` - return default value for one column fields.
 * `get_global_constraints(self, field_name, columns)` - takes as second parameter (self excluded) the columns defined by this field (by get_columns). Returns a global constraint, which can be multi-column.
@@ -723,7 +723,7 @@ Dangerous! There can be many side-effects.
 The only safe thing to do is to update or replace a field and call `meta.invalidate()` afterwards. The type should match.
 
 Adding or excluding fields, or replacing the fields mappings are dangerous and could require a pydantic model rebuild.
-Also replacing `fields` with a new dict requires replacing `meta.fields_mapping` with the same dict (in this case a `meta.invalidate()` is automatically issued).
+Also replacing `fields` with a new dict requires replacing `meta.fields` with the same dict (in this case a `meta.invalidate()` is automatically issued).
 
 If you just want to remove a field ExcludeField or the inherit flags are the ways to go.
 

@@ -27,7 +27,7 @@ def build_pknames(model_class: Any) -> None:
     """
     meta = model_class.meta
     pknames: Set[str] = set()
-    for field_name, field in meta.fields_mapping.items():
+    for field_name, field in meta.fields.items():
         if field.primary_key:
             pknames.add(field_name)
     model_class._pknames = tuple(sorted(pknames))

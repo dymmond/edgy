@@ -54,7 +54,7 @@ class ConcreteCompositeField(BaseCompositeField):
         if hasattr(inner_fields, "meta"):
             kwargs.setdefault("model", inner_fields)
             kwargs.setdefault("inherit", inner_fields.meta.inherit)
-            inner_fields = inner_fields.meta.fields_mapping
+            inner_fields = inner_fields.meta.fields
         if isinstance(inner_fields, dict):
             inner_fields = inner_fields.items()  # type: ignore
         owner = kwargs.pop("owner", None)
@@ -135,7 +135,7 @@ class ConcreteCompositeField(BaseCompositeField):
         d = {}
         for key in self.inner_field_names:
             translated_name = self.translate_name(key)
-            field = instance.meta.fields_mapping.get(key)
+            field = instance.meta.fields.get(key)
             try:
                 if field and hasattr(field, "__get__"):
                     d[translated_name] = field.__get__(instance, owner)
@@ -155,7 +155,7 @@ class ConcreteCompositeField(BaseCompositeField):
             # we first only redirect both
             and not isinstance(value, (dict, BaseModel))
         ):
-            field = self.owner.meta.fields_mapping[self.inner_field_names[0]]
+            field = self.owner.meta.fields[self.inner_field_names[0]]
             return field.clean(self.inner_field_names[0], value, for_query=for_query)
         return super().clean(field_name, value, for_query=for_query)
 
@@ -167,12 +167,12 @@ class ConcreteCompositeField(BaseCompositeField):
             # we first only redirect both
             and not isinstance(value, (dict, BaseModel))
         ):
-            field = self.owner.meta.fields_mapping[self.inner_field_names[0]]
+            field = self.owner.meta.fields[self.inner_field_names[0]]
             return field.to_model(self.inner_field_names[0], value, phase=phase)
         return super().to_model(field_name, value, phase=phase)
 
     def get_embedded_fields(
-        self, name: str, fields_mapping: Dict[str, "BaseFieldType"]
+        self, name: str, fields: Dict[str, "BaseFieldType"]
     ) -> Dict[str, "BaseFieldType"]:
         retdict = {}
         # owner is set: further down in hierarchy, or uninitialized embeddable, where the owner = model
@@ -181,12 +181,12 @@ class ConcreteCompositeField(BaseCompositeField):
         if not self.absorb_existing_fields:
             if self.owner is None:
                 duplicate_fields = set(self.embedded_field_defs.keys()).intersection(  # type: ignore
-                    {k for k, v in fields_mapping.items() if v.owner is None}
+                    {k for k, v in fields.items() if v.owner is None}
                 )
                 if duplicate_fields:
                     raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
             for field_name, field in self.embedded_field_defs.items():
-                existing_field = fields_mapping.get(field_name)
+                existing_field = fields.get(field_name)
                 if (
                     existing_field is not None
                     and existing_field.owner is None
@@ -201,14 +201,14 @@ class ConcreteCompositeField(BaseCompositeField):
                 retdict[field_name] = cloned_field
             return retdict
         for field_name, field in self.embedded_field_defs.items():
-            if field_name not in fields_mapping:
+            if field_name not in fields:
                 cloned_field = copy.copy(field)
                 # set to the current owner of this field, required in collision checks
                 cloned_field.owner = self.owner
                 cloned_field.inherit = False
                 retdict[field_name] = cloned_field
             else:
-                absorbed_field = fields_mapping[field_name]
+                absorbed_field = fields[field_name]
                 if not getattr(absorbed_field, "skip_absorption_check", False) and not issubclass(
                     absorbed_field.field_type, field.field_type
                 ):
@@ -218,7 +218,7 @@ class ConcreteCompositeField(BaseCompositeField):
         return retdict
 
     def get_composite_fields(self) -> Dict[str, BaseFieldType]:
-        return {field: self.owner.meta.fields_mapping[field] for field in self.inner_field_names}
+        return {field: self.owner.meta.fields[field] for field in self.inner_field_names}
 
     def is_required(self) -> bool:
         return False
@@ -247,7 +247,7 @@ class CompositeField(FieldFactory):
         if inner_fields is not None:
             if hasattr(inner_fields, "meta"):
                 kwargs.setdefault("model", inner_fields)
-                inner_fields = inner_fields.meta.fields_mapping
+                inner_fields = inner_fields.meta.fields
             if isinstance(inner_fields, dict):
                 inner_fields = inner_fields.items()
             elif not isinstance(inner_fields, Sequence):

@@ -53,7 +53,7 @@ class ModelRowMixin:
         for related in select_related:
             field_name = related.split("__", 1)[0]
             try:
-                field = cls.meta.fields_mapping[field_name]
+                field = cls.meta.fields[field_name]
             except KeyError:
                 raise QuerySetError(
                     detail=f'Selected field "{field_name}" does not exist on {cls}.'
@@ -185,7 +185,7 @@ class ModelRowMixin:
     def __check_prefetch_collision(model: "Model", related: "Prefetch") -> None:
         if (
             hasattr(model, related.to_attr)
-            or related.to_attr in model.meta.fields_mapping
+            or related.to_attr in model.meta.fields
             or related.to_attr in model.meta.managers
         ):
             raise QuerySetError(

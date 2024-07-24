@@ -40,7 +40,7 @@ def clean_query_kwargs(model: Type["Model"], kwargs: Dict[str, Any]) -> Dict[str
     new_kwargs: Dict[str, Any] = {}
     for key, val in kwargs.items():
         model_class, field_name, _, _, _ = crawl_relationship(model, key)
-        field = model_class.meta.fields_mapping.get(field_name)
+        field = model_class.meta.fields.get(field_name)
         if field is not None:
             new_kwargs.update(field.clean(key, val, for_query=True))
         else:
@@ -161,12 +161,12 @@ class BaseQuerySet(
             while select_path:
                 field_name = select_path.split("__", 1)[0]
                 try:
-                    field = model_class.meta.fields_mapping[field_name]
+                    field = model_class.meta.fields[field_name]
                 except KeyError:
                     raise QuerySetError(
                         detail=f'Selected field "{field_name}" does not exist on {model_class}.'
                     ) from None
-                field = model_class.meta.fields_mapping[field_name]
+                field = model_class.meta.fields[field_name]
                 if isinstance(field, RelationshipField):
                     model_class, reverse_part, select_path = field.traverse_field(select_path)
                 else:
@@ -177,7 +177,7 @@ class BaseQuerySet(
                     foreign_key = field
                     reverse = False
                 else:
-                    foreign_key = model_class.meta.fields_mapping[reverse_part]
+                    foreign_key = model_class.meta.fields[reverse_part]
                     reverse = True
                 if foreign_key.is_cross_db():
                     raise NotImplementedError(

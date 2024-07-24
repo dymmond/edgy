@@ -120,14 +120,14 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         return []
 
     def get_embedded_fields(
-        self, field_name: str, fields_mapping: Dict[str, BaseFieldType]
+        self, field_name: str, fields: Dict[str, BaseFieldType]
     ) -> Dict[str, BaseFieldType]:
         """
         Define extra fields on the fly. Often no owner is available yet.
 
         Args:
             field_name: the field name (can be different from name)
-            fields_mapping: the existing fields
+            fields: the existing fields
 
         Note: the returned fields are changed after return, so you should
               return new fields or copies. Also set the owner of the field to them before returning

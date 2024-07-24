@@ -75,7 +75,7 @@ class BaseForeignKeyField(BaseForeignKey):
         columns: Dict[str, Optional[sqlalchemy.Column]] = {}
         if self.related_fields:
             for field_name in self.related_fields:
-                if field_name in target.meta.fields_mapping:
+                if field_name in target.meta.fields:
                     for column in target.meta.field_to_columns[field_name]:
                         columns[column.key] = column
                 else:

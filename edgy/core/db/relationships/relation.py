@@ -69,7 +69,7 @@ class ManyRelation(ManyRelationProtocol):
 
     async def save_related(self) -> None:
         # TODO: improve performance
-        fk = self.through.meta.fields_mapping[self.from_foreign_key]
+        fk = self.through.meta.fields[self.from_foreign_key]
         while self.refs:
             ref = self.refs.pop()
             ref.__dict__.update(fk.clean(fk.name, self.instance))
@@ -92,7 +92,7 @@ class ManyRelation(ManyRelationProtocol):
         @functools.wraps(func)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             assert self.instance, "instance not initialized"
-            fk = self.through.meta.fields_mapping[self.from_foreign_key]
+            fk = self.through.meta.fields[self.from_foreign_key]
             query = {}
             if self.embed_through == "":
                 new_kwargs = kwargs
@@ -154,9 +154,9 @@ class ManyRelation(ManyRelationProtocol):
         . Removes the field if there is
         """
         if self.reverse:
-            fk = self.through.meta.fields_mapping[self.from_foreign_key]
+            fk = self.through.meta.fields[self.from_foreign_key]
         else:
-            fk = self.through.meta.fields_mapping[self.to_foreign_key]
+            fk = self.through.meta.fields[self.to_foreign_key]
         if child is None:
             if fk.unique:
                 try:
@@ -227,7 +227,7 @@ class SingleRelation(ManyRelationProtocol):
 
         if isinstance(value, (target, target.proxy_model)):
             return value
-        related_columns = self.to.meta.fields_mapping[self.to_foreign_key].related_columns.keys()
+        related_columns = self.to.meta.fields[self.to_foreign_key].related_columns.keys()
         if len(related_columns) == 1 and not isinstance(value, (dict, BaseModel)):
             value = {next(iter(related_columns)): value}
         if isinstance(value, dict):
@@ -262,10 +262,10 @@ class SingleRelation(ManyRelationProtocol):
         @functools.wraps(func)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             assert self.instance, "instance not initialized"
-            fk = self.to.meta.fields_mapping[self.to_foreign_key]
+            fk = self.to.meta.fields[self.to_foreign_key]
             query = {}
             if not self.embed_parent or not isinstance(
-                fk.owner.meta.fields_mapping[self.embed_parent[0].split("__", 1)[0]],
+                fk.owner.meta.fields[self.embed_parent[0].split("__", 1)[0]],
                 RelationshipField,
             ):
                 new_kwargs = kwargs
@@ -309,7 +309,7 @@ class SingleRelation(ManyRelationProtocol):
         . Validates if there is a relationship between the entities.
         . Removes the field if there is
         """
-        fk = self.to.meta.fields_mapping[self.to_foreign_key]
+        fk = self.to.meta.fields[self.to_foreign_key]
         if child is None:
             if fk.unique:
                 try:

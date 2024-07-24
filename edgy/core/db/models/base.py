@@ -73,7 +73,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         kwargs = {**kwargs}
         new_kwargs: Dict[str, Any] = {}
 
-        fields = cls.meta.fields_mapping
+        fields = cls.meta.fields
         # phase 1: transform
         for field_name in cls.meta.input_modifying_fields:
             fields[field_name].modify_input(field_name, kwargs)
@@ -94,7 +94,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         return {
             k: v
             for k, v in kwargs.items()
-            if k in self.meta.fields_mapping or k in self.meta.model_references
+            if k in self.meta.fields or k in self.meta.model_references
         }
 
     @property
@@ -175,7 +175,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
 
     def identifying_clauses(self) -> Iterable[Any]:
         for field_name in self.identifying_db_fields:
-            field = self.meta.fields_mapping.get(field_name)
+            field = self.meta.fields.get(field_name)
             if field is not None:
                 for column, value in field.clean(field_name, self.__dict__[field_name]).items():
                     yield getattr(self.table.columns, column) == value
@@ -191,7 +191,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         if cls.__proxy_model__:
             return cls.__proxy_model__
 
-        fields = {key: copy.copy(field) for key, field in cls.meta.fields_mapping.items()}
+        fields = {key: copy.copy(field) for key, field in cls.meta.fields.items()}
         proxy_model = ProxyModel(
             name=cls.__name__,
             module=cls.__module__,
@@ -250,7 +250,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
                     continue
                 if getattr(field_name, "exclude", False):
                     continue
-            field: BaseFieldType = self.meta.fields_mapping[field_name]
+            field: BaseFieldType = self.meta.fields[field_name]
             try:
                 retval = field.__get__(self, self.__class__)
             except AttributeError:
@@ -308,7 +308,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
 
         columns: List[sqlalchemy.Column] = []
         global_constraints: List[Any] = []
-        for name, field in cls.meta.fields_mapping.items():
+        for name, field in cls.meta.fields.items():
             current_columns = field.get_columns(name)
             columns.extend(current_columns)
             global_constraints.extend(field.get_global_constraints(name, current_columns))
@@ -359,8 +359,8 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
     def __setattr__(self, key: str, value: Any) -> None:
-        fields_mapping = self.meta.fields_mapping
-        field = fields_mapping.get(key, None)
+        fields = self.meta.fields
+        field = fields.get(key, None)
         if field is not None:
             if hasattr(field, "__set__"):
                 # not recommended, better to use to_model instead
@@ -390,7 +390,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
                 self.__dict__[name] = manager
             return self.__dict__[name]
 
-        field = self.meta.fields_mapping.get(name)
+        field = self.meta.fields.get(name)
         if field is not None and hasattr(field, "__get__"):
             # no need to set an descriptor object
             return field.__get__(self, self.__class__)

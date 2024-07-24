@@ -60,7 +60,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        for field in self.meta.fields_mapping:
+        for field in self.meta.fields:
             _val = self.__dict__.get(field)
             if isinstance(_val, ManyRelationProtocol):
                 _val.instance = self
@@ -104,7 +104,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             column = self.table.autoincrement_column
             if column is not None:
                 setattr(self, column.key, autoincrement_value)
-        for field in self.meta.fields_mapping:
+        for field in self.meta.fields:
             _val = self.__dict__.get(field)
             if isinstance(_val, ManyRelationProtocol):
                 _val.instance = self
@@ -207,7 +207,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         # Refresh the results
         if any(
             field.server_default is not None
-            for name, field in self.meta.fields_mapping.items()
+            for name, field in self.meta.fields.items()
             if name not in extracted_fields
         ):
             await self.load()

@@ -114,7 +114,7 @@ def test_get_columns_inner_fields_mixed():
 )
 async def test_assign(rollback_connections, assign_object):
     obj = await MyModel2.query.create(first_name="edgy", last_name="edgytoo")
-    assert obj.meta.fields_mapping["last_name"].skip_absorption_check is True
+    assert obj.meta.fields["last_name"].skip_absorption_check is True
     assert obj.composite["first_name"] == "edgy"
     assert obj.composite["last_name"] == "edgytoo"
     assert obj.composite2["age"] is None
@@ -168,7 +168,7 @@ def test_dump_composite_dict():
         embedded_first_name="edgy2embedded",
         embedded_last_name="edgytoo2embedded",
     )
-    assert obj.meta.fields_mapping["embedded_first_name"].exclude
+    assert obj.meta.fields["embedded_first_name"].exclude
     assert obj.model_dump() == {
         "first_name": "edgy",
         "last_name": "edgytoo",
@@ -259,8 +259,8 @@ def test_inheritance():
             ],
         )
 
-    assert "age" not in ConcreteModel1.meta.fields_mapping
-    assert ConcreteModel1.meta.fields_mapping["last_name"].max_length == 51
+    assert "age" not in ConcreteModel1.meta.fields
+    assert ConcreteModel1.meta.fields["last_name"].max_length == 51
 
     class ConcreteModel2(AbstractModel):
         composite2: Dict[str, Any] = edgy.CompositeField(
@@ -271,8 +271,8 @@ def test_inheritance():
             absorb_existing_fields=True,
         )
 
-    assert "age" in ConcreteModel2.meta.fields_mapping
-    assert ConcreteModel2.meta.fields_mapping["last_name"].max_length == 255
+    assert "age" in ConcreteModel2.meta.fields
+    assert ConcreteModel2.meta.fields["last_name"].max_length == 255
 
     class ConcreteModel3(AbstractModel):
         composite3: Dict[str, Any] = edgy.CompositeField(
@@ -282,8 +282,8 @@ def test_inheritance():
             ],
         )
 
-    assert ConcreteModel3.meta.fields_mapping["last_name"].max_length == 50
-    assert "age" in ConcreteModel3.meta.fields_mapping
+    assert ConcreteModel3.meta.fields["last_name"].max_length == 50
+    assert "age" in ConcreteModel3.meta.fields
 
 
 def test_copying():
