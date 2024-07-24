@@ -121,8 +121,8 @@ async def test_signals():
     assert logs[0].instance["name"] == "Saffier"
     assert logs[1].signal == "post_update"
 
-    user.signals.pre_update.disconnect(pre_updating)
-    user.signals.post_update.disconnect(post_updating)
+    user.meta.signals.pre_update.disconnect(pre_updating)
+    user.meta.signals.post_update.disconnect(post_updating)
 
     # Disconnect the signals
     user = await user.update(name="Saffier")
@@ -134,10 +134,10 @@ async def test_signals():
     logs = await Log.query.filter(signal__icontains="delete").all()
     assert len(logs) == 2
 
-    user.signals.pre_delete.disconnect(pre_deleting)
-    user.signals.post_delete.disconnect(post_deleting)
-    user.signals.pre_save.disconnect(pre_saving)
-    user.signals.post_save.disconnect(post_saving)
+    user.meta.signals.pre_delete.disconnect(pre_deleting)
+    user.meta.signals.post_delete.disconnect(post_deleting)
+    user.meta.signals.pre_save.disconnect(pre_saving)
+    user.meta.signals.post_save.disconnect(post_saving)
 
     users = await User.query.all()
     assert len(users) == 1
@@ -161,8 +161,8 @@ async def test_staticmethod_signals():
 
     assert len(logs) == 2
 
-    user.signals.pre_save.disconnect(Static.pre_save_one)
-    user.signals.pre_save.disconnect(Static.pre_save_two)
+    user.meta.signals.pre_save.disconnect(Static.pre_save_one)
+    user.meta.signals.pre_save.disconnect(Static.pre_save_two)
 
 
 async def test_custom_signal():
