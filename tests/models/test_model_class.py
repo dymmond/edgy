@@ -48,10 +48,10 @@ async def rollback_connections():
 
 def test_model_class():
     assert sorted(User.fields.keys()) == sorted(["pk", "id", "name", "language"])
-    assert isinstance(User.fields["id"], Field)
-    assert User.fields["id"].primary_key is True
-    assert isinstance(User.fields["name"], Field)
-    assert User.fields["name"].max_length == 100
+    assert isinstance(User.meta.fields_mapping["id"], Field)
+    assert User.meta.fields_mapping["id"].primary_key is True
+    assert isinstance(User.meta.fields_mapping["name"], Field)
+    assert User.meta.fields_mapping["name"].max_length == 100
 
     assert User(id=1) != Product(id=1)
     assert User(id=1) != User(id=2)
@@ -60,8 +60,8 @@ def test_model_class():
     assert str(User(id=1)) == "User(id=1)"
     assert repr(User(id=1)) == "<User: User(id=1)>"
 
-    assert isinstance(User.query.fields["id"], Field)
-    assert isinstance(User.query.fields["name"], Field)
+    assert isinstance(User.query.meta.fields_mapping["id"], Field)
+    assert isinstance(User.query.meta.fields_mapping["name"], Field)
 
 
 def test_model_pk():

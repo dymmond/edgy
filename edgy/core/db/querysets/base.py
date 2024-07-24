@@ -166,7 +166,7 @@ class BaseQuerySet(
                     raise QuerySetError(
                         detail=f'Selected field "{field_name}" does not exist on {model_class}.'
                     ) from None
-                field = model_class.fields[field_name]
+                field = model_class.meta.fields_mapping[field_name]
                 if isinstance(field, RelationshipField):
                     model_class, reverse_part, select_path = field.traverse_field(select_path)
                 else:

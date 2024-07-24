@@ -39,7 +39,9 @@ class ModelParser:
         if model_cls.meta.input_modifying_fields:
             extracted_values = {**extracted_values}
             for field_name in model_cls.meta.input_modifying_fields:
-                model_cls.fields[field_name].modify_input(field_name, extracted_values)
+                model_cls.meta.fields_mapping[field_name].modify_input(
+                    field_name, extracted_values
+                )
         # phase 2: validate fields and set defaults for readonly
         need_second_pass: List[BaseFieldType] = []
         for field_name, field in model_cls.meta.fields_mapping.items():

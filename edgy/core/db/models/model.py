@@ -207,7 +207,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         # Refresh the results
         if any(
             field.server_default is not None
-            for name, field in self.fields.items()
+            for name, field in self.meta.fields_mapping.items()
             if name not in extracted_fields
         ):
             await self.load()
