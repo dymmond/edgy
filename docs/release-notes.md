@@ -26,6 +26,7 @@ hide:
   - Renamed internals.
   - Splitted model_references and column values extraction.
 - Comparisons of models use now only primary keys.
+- Deprecate on model forwards signals, fields. Use now meta.signals, meta.fields.
 
 ### Fixed
 
