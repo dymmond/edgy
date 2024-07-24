@@ -23,7 +23,7 @@ hide:
 - Refactoring of fields and models
   - BaseModelType and BaseFieldType are now added and should be used for typings.
   - `get_column` works now via extractor.
-  - Renamed internals
+  - Renamed internals.
   - Splitted model_references and column values extraction.
 - Comparisons of models use now only primary keys.
 
