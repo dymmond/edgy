@@ -127,9 +127,13 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
     def can_load(self) -> bool:
         return all(self.__dict__.get(field) is not None for field in self.identifying_db_fields)
 
-    @cached_property
+    @property
     def signals(self) -> "Broadcaster":
-        return self.__class__.signals  # type: ignore
+        return self.meta.signals
+
+    @property
+    def fields(self) -> Dict[str, "BaseFieldType"]:
+        return self.meta.fields
 
     @property
     def table(self) -> sqlalchemy.Table:

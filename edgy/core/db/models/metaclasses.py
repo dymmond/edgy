@@ -611,7 +611,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             return model_class(cls, name, bases, attrs, **kwargs)
 
         new_class = cast("Type[Model]", model_class(cls, name, bases, attrs, **kwargs))
-        new_class.fields = fields
 
         # Update the model_fields are updated to the latest
         new_class.model_fields = {**new_class.model_fields, **model_fields}
@@ -801,3 +800,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:
         return cast("sqlalchemy.sql.ColumnCollection", cls.table.columns)
+
+    @property
+    def fields(cls) -> Dict[str, BaseFieldType]:
+        return cast(Dict[str, BaseFieldType], cls.meta.fields)

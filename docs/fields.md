@@ -723,7 +723,7 @@ Dangerous! There can be many side-effects.
 The only safe thing to do is to update or replace a field and call `meta.invalidate()` afterwards. The type should match.
 
 Adding or excluding fields, or replacing the fields mappings are dangerous and could require a pydantic model rebuild.
-Also replacing `fields` with a new dict requires replacing `meta.fields` with the same dict (in this case a `meta.invalidate()` is automatically issued).
+In case of an assignment of a new field mapping (dict) to `meta.fields` a `meta.invalidate()` is automatically issued.
 
 If you just want to remove a field ExcludeField or the inherit flags are the ways to go.
 
