@@ -18,7 +18,7 @@ hide:
 ### Changed
 
 - `get_default_values` has now an extra keyword argument `is_update`
-- `meta.fields_mapping` is now `meta.fields`.-
+- `meta.fields_mapping` was renamed to `meta.fields`.-
 - Factories have now different named configuration variables.
 - Refactoring of fields and models
   - BaseModelType and BaseFieldType are now added and should be used for typings.

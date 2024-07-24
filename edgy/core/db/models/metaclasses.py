@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import inspect
+import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
 from typing import (
@@ -189,6 +190,11 @@ class MetaInfo:
 
     @property
     def fields_mapping(self) -> Dict[str, BaseFieldType]:
+        warnings.warn(
+            "'fields_mapping' has been deprecated, use 'fields' instead",
+            DeprecationWarning,
+            stacklevel=1,
+        )
         return self.fields
 
     @property
