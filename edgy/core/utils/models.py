@@ -6,10 +6,10 @@ from orjson import OPT_OMIT_MICROSECONDS, OPT_SERIALIZE_NUMPY, dumps
 from pydantic import ConfigDict
 
 import edgy
-from edgy.core.db.fields.base import BaseField
 
 if TYPE_CHECKING:
     from edgy import Model
+    from edgy.core.db.fields.base import BaseFieldType
     from edgy.core.db.models.metaclasses import MetaInfo
 
 type_ignored_setattr = setattr
@@ -60,7 +60,7 @@ class ModelParser:
             for field_name in model_cls.meta.input_modifying_fields:
                 model_cls.fields[field_name].modify_input(field_name, extracted_values)
         # phase 2: validate fields and set defaults for readonly
-        need_second_pass: List[BaseField] = []
+        need_second_pass: List[BaseFieldType] = []
         for field_name, field in model_cls.meta.fields_mapping.items():
             if (
                 not is_partial or (field.inject_default_on_partial_update and is_update)

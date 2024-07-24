@@ -4,8 +4,9 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple
 import sqlalchemy
 from pydantic import BaseModel
 
-from edgy.core.db.fields.base import BaseField, BaseForeignKey
+from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
+from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.relationships.relation import SingleRelation
 from edgy.core.terminal import Print
 from edgy.exceptions import FieldDefinitionError
@@ -248,7 +249,7 @@ class ForeignKey(ForeignKeyFieldFactory):
         cls,
         to: "Model",
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         return super().__new__(cls, to=to, **kwargs)
 
     @classmethod

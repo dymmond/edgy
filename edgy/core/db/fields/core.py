@@ -12,8 +12,9 @@ from pydantic import EmailStr
 
 from edgy.core.db.fields._internal import IPAddress
 from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
-from edgy.core.db.fields.base import BaseField, Field
+from edgy.core.db.fields.base import Field
 from edgy.core.db.fields.factories import FieldFactory
+from edgy.core.db.fields.types import BaseFieldType
 from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
@@ -39,7 +40,7 @@ class CharField(FieldFactory, str):
         regex: Union[str, Pattern] = None,
         pattern: Union[str, Pattern] = None,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         if pattern is None:
             pattern = regex
         del regex
@@ -83,7 +84,7 @@ class TextField(FieldFactory, str):
         regex: Union[str, Pattern] = None,
         pattern: Union[str, Pattern] = None,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         if pattern is None:
             pattern = regex
         del regex
@@ -122,7 +123,7 @@ class IntegerField(Number, int):
         maximum: Optional[int] = None,
         multiple_of: Optional[int] = None,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         if kwargs.get("primary_key", False):
             kwargs.setdefault("autoincrement", True)
         kwargs = {
@@ -148,7 +149,7 @@ class FloatField(Number, float):
         maximun: Union[int, float, None] = None,
         multiple_of: Union[int, float, None] = None,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
@@ -188,7 +189,7 @@ class DecimalField(Number, decimal.Decimal):
         max_digits: int = None,
         decimal_places: int = None,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
@@ -223,7 +224,7 @@ class BooleanField(FieldFactory, int):
         *,
         default: Optional[bool] = False,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
@@ -233,18 +234,6 @@ class BooleanField(FieldFactory, int):
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.Boolean()
-
-
-class AutoNowField(Field):
-    auto_now: Optional[bool]
-    auto_now_add: Optional[bool]
-
-    def get_default_values(
-        self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool = False
-    ) -> Any:
-        if self.auto_now_add and is_update:
-            return {}
-        return super().get_default_values(field_name, cleaned_data, is_update=is_update)
 
 
 class TimezonedField:
@@ -304,15 +293,13 @@ class TimezonedField:
 
 
 class AutoNowMixin(FieldFactory):
-    _bases: Sequence[Any] = (AutoNowField,)
-
     def __new__(  # type: ignore
         cls,
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         if auto_now_add and auto_now:
             raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
 
@@ -333,10 +320,7 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
     """Representation of a datetime field"""
 
     _type = datetime.datetime
-    _bases = (
-        TimezonedField,
-        AutoNowField,
-    )
+    _bases = (TimezonedField, Field)
 
     def __new__(  # type: ignore
         cls,
@@ -347,7 +331,7 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         remove_timezone: bool = False,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -358,15 +342,25 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.DateTime()
 
+    @classmethod
+    def get_default_values(
+        cls,
+        field_obj: Field,
+        field_name: str,
+        cleaned_data: Dict[str, Any],
+        is_update: bool = False,
+        original_fn: Any = None,
+    ) -> Any:
+        if field_obj.auto_now_add and is_update:
+            return {}
+        return original_fn(field_name, cleaned_data, is_update=is_update)
+
 
 class DateField(AutoNowMixin, datetime.date):
     """Representation of a date field"""
 
     _type = datetime.date
-    _bases = (
-        TimezonedField,
-        AutoNowField,
-    )
+    _bases = (TimezonedField, Field)
 
     def __new__(  # type: ignore
         cls,
@@ -376,7 +370,7 @@ class DateField(AutoNowMixin, datetime.date):
         default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         # the datetimes lose the information anyway
         kwargs["remove_timezone"] = False
 
@@ -396,7 +390,7 @@ class TimeField(FieldFactory, datetime.time):
 
     _type = datetime.time
 
-    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
+    def __new__(cls, **kwargs: Any) -> BaseFieldType:  # type: ignore
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -423,7 +417,7 @@ class BinaryField(FieldFactory, bytes):
 
     _type = bytes
 
-    def __new__(cls, *, max_length: Optional[int] = None, **kwargs: Any) -> BaseField:  # type: ignore
+    def __new__(cls, *, max_length: Optional[int] = None, **kwargs: Any) -> BaseFieldType:  # type: ignore
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -440,7 +434,7 @@ class UUIDField(FieldFactory, uuid.UUID):
 
     _type = uuid.UUID
 
-    def __new__(cls, **kwargs: Any) -> BaseField:  # type: ignore
+    def __new__(cls, **kwargs: Any) -> BaseFieldType:  # type: ignore
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -462,7 +456,7 @@ class ChoiceField(FieldFactory):
         cls,
         choices: Optional[Sequence[Union[Tuple[str, str], Tuple[str, int]]]] = None,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -511,7 +505,7 @@ class IPAddressField(FieldFactory, str):
     def __new__(  # type: ignore
         cls,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
@@ -529,7 +523,7 @@ class IPAddressField(FieldFactory, str):
 
     # overwrite
     @classmethod
-    def check(cls, field_obj: BaseField, value: Any, original_fn: Any = None) -> Any:
+    def check(cls, field_obj: BaseFieldType, value: Any, original_fn: Any = None) -> Any:
         if cls.is_native_type(value):
             return value
 

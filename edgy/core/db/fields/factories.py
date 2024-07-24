@@ -1,11 +1,40 @@
-from functools import lru_cache
-from typing import Any, Literal, Sequence, Union, cast
+from functools import lru_cache, partial
+from typing import Any, FrozenSet, Literal, Sequence, Set, Union, cast
 
 from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL
-from edgy.core.db.fields.base import BaseField, Field
+from edgy.core.db.fields.base import Field
+from edgy.core.db.fields.types import BaseFieldType
 from edgy.exceptions import FieldDefinitionError
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
+
+default_methods_overwritable_by_factory: Set[str] = {
+    key
+    for key, attr in BaseFieldType.__dict__.items()
+    if callable(attr) and not key.startswith("_")
+}
+default_methods_overwritable_by_factory.discard("get_column_names")
+default_methods_overwritable_by_factory.discard("__init__")
+
+# extra methods
+default_methods_overwritable_by_factory.add("__set__")
+default_methods_overwritable_by_factory.add("__get__")
+default_methods_overwritable_by_factory.add("modify_input")
+
+# BaseCompositeField
+default_methods_overwritable_by_factory.add("translate_name")
+default_methods_overwritable_by_factory.add("get_composite_fields")
+
+# Field
+default_methods_overwritable_by_factory.add("check")
+default_methods_overwritable_by_factory.add("get_column")
+
+# RelationshipField
+default_methods_overwritable_by_factory.add("traverse_field")
+default_methods_overwritable_by_factory.add("is_cross_db")
+
+# ForeignKey
+default_methods_overwritable_by_factory.add("expand_relationship")
 
 
 class FieldFactoryMeta(type):
@@ -25,13 +54,16 @@ class FieldFactory(metaclass=FieldFactoryMeta):
 
     _bases: Sequence[Any] = (Field,)
     _type: Any = None
+    _methods_overwritable_by_factory: FrozenSet[str] = frozenset(
+        default_methods_overwritable_by_factory
+    )
 
-    def __new__(cls, **kwargs: Any) -> BaseField:
+    def __new__(cls, **kwargs: Any) -> BaseFieldType:
         cls.validate(**kwargs)
         return cls.build_field(**kwargs)
 
     @classmethod
-    def build_field(cls, **kwargs: Any) -> BaseField:
+    def build_field(cls, **kwargs: Any) -> BaseFieldType:
         column_type = cls.get_column_type(**kwargs)
         pydantic_type = cls.get_pydantic_type(**kwargs)
         constraints = cls.get_constraints(**kwargs)
@@ -39,7 +71,8 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         server_default: None = kwargs.pop("server_default", None)
 
         new_field = cls._get_field_cls(cls)
-        return new_field(  # type: ignore
+
+        new_field_obj: BaseFieldType = new_field(  # type: ignore
             field_type=pydantic_type,
             annotation=pydantic_type,
             column_type=column_type,
@@ -49,6 +82,24 @@ class FieldFactory(metaclass=FieldFactoryMeta):
             factory=cls,
             **kwargs,
         )
+
+        for key in dir(cls):
+            if key in cls._methods_overwritable_by_factory and hasattr(cls, key):
+                fn = getattr(cls, key)
+                original_fn = getattr(new_field_obj, key, None)
+                # use original func, not the wrapper
+                if hasattr(fn, "__func__"):
+                    fn = fn.__func__
+                # fix classmethod, prevent injection of self or class
+                setattr(
+                    new_field_obj,
+                    key,
+                    # .__func__ is a workaround for python < 3.10, python >=3.10 works without
+                    staticmethod(
+                        partial(fn, cls, new_field_obj, original_fn=original_fn)
+                    ).__func__,
+                )
+        return new_field_obj
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:  # pragma no cover
@@ -75,8 +126,8 @@ class FieldFactory(metaclass=FieldFactoryMeta):
 
     @staticmethod
     @lru_cache(None)
-    def _get_field_cls(cls: "FieldFactory") -> BaseField:
-        return cast(BaseField, type(cls.__name__, cast(Any, cls._bases), {}))
+    def _get_field_cls(cls: "FieldFactory") -> BaseFieldType:
+        return cast(BaseFieldType, type(cls.__name__, cast(Any, cls._bases), {}))
 
 
 class ForeignKeyFieldFactory(FieldFactory):
@@ -96,7 +147,7 @@ class ForeignKeyFieldFactory(FieldFactory):
         default: Any = None,
         server_default: Any = None,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},

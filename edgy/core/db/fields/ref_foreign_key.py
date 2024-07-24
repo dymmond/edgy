@@ -5,13 +5,14 @@ from typing import TYPE_CHECKING, TypeVar
 from typing_extensions import get_origin
 
 import edgy
-from edgy.core.db.fields.base import BaseField, BaseForeignKey
+from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.terminal import Print
 from edgy.exceptions import ModelReferenceError
 
 if TYPE_CHECKING:
     from edgy import Model
+    from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.model_reference import ModelRef
 
 T = TypeVar("T", bound="Model")
@@ -41,7 +42,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         except TypeError:
             return False
 
-    def __new__(cls, to: "ModelRef", null: bool = False) -> BaseField:  # type: ignore
+    def __new__(cls, to: "ModelRef", null: bool = False) -> "BaseFieldType":  # type: ignore
         if not cls.is_class_and_subclass(to, edgy.ModelRef):
             raise ModelReferenceError(
                 detail="A model reference must be an object of type ModelRef"

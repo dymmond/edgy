@@ -24,7 +24,7 @@ from edgy.core.db.fields import (
     TimeField,
     UUIDField,
 )
-from edgy.core.db.fields.base import BaseField
+from edgy.core.db.fields.base import BaseField, Field
 from edgy.exceptions import FieldDefinitionError
 
 
@@ -197,6 +197,29 @@ def test_can_create_time_field():
 
     assert isinstance(field, BaseField)
     assert field.read_only is False
+
+
+def test_autonow_field(mocker):
+    class Foo(Field):
+        pass
+
+    class Bar(DateTimeField):
+        _bases = (Foo,)
+
+    spy = mocker.spy(Foo, "get_default_values")
+
+    field = Bar(auto_now_add=True)
+    field.get_default_values("field_name", {}, is_update=True)
+    spy.assert_not_called()
+    field.get_default_values("field_name", {}, is_update=False)
+    spy.assert_called()
+
+
+def test_can_overwrite_method_autonow_field(mocker):
+    field = DateTimeField(auto_now_add=True)
+    spy = mocker.spy(field, "get_default_values")
+    field.get_default_values("field_name", {}, is_update=True)
+    spy.assert_called_with("field_name", {}, is_update=True)
 
 
 def test_can_create_json_field():

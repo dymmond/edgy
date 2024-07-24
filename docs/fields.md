@@ -14,14 +14,17 @@ supported in **all field types**.
 - `primary_key` - A boolean. Determine if a column is primary key.
 Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions with Edgy.
 - `exclude` - An bool indicating if the field is included in model_dump
-- `default` - A value or a callable (function).
 - `index` - A boolean. Determine if a database index should be created.
 - `inherit` - A boolean. Determine if a field can be inherited in submodels. Default is True. It is used by PKField, RelatedField and the injected ID Field.
 - `skip_absorption_check` - A boolean. Default False. Dangerous option! By default when defining a CompositeField with embedded fields and the `absorb_existing_fields` option it is checked that the field type of the absorbed field is compatible with the field type of the embedded field. This option skips the check.
 - `unique` - A boolean. Determine if a unique constraint should be created for the field.
 Check the [unique_together](./models.md#unique-together) for more details.
+- `column_name` - A string. Database name of the column (by default the same as the name)
+- `comment` - A comment to be added with the field in the SQL database.
+- `secret` - A special attribute that allows to call the [exclude_secrets](./queries/secrets.md#exclude-secrets) and avoid
+accidental leakage of sensitive data.
 
-All the fields are required unless on the the following is set:
+All fields are required unless one of the following is set:
 
 - `null` - A boolean. Determine if a column allows null.
 
@@ -29,9 +32,12 @@ All the fields are required unless on the the following is set:
 
 - `server_default` - instance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
 construct representing the DDL DEFAULT value for the column.
-- `comment` - A comment to be added with the field in the SQL database.
-- `secret` - A special attribute that allows to call the [exclude_secrets](./queries/secrets.md#exclude-secrets) and avoid
-accidental leakage of sensitive data.
+- `default` - A value or a callable (function).
+- `auto_now` or `auto_now_add` -  Only for DateTimeField and DateField
+
+
+!!! Tip
+    Despite not always advertised you can pass valid keyword arguments for pydantic FieldInfo (they are in most cases just passed through).
 
 ## Available fields
 
@@ -79,11 +85,9 @@ This field is used as a default field for the `id` of a model.
 
 ##### Parameters:
 
-* `minimum` - An integer, float or decimal indicating the minimum.
-* `maximum` - An integer, float or decimal indicating the maximum.
-* `max_digits` - Maximum digits allowed.
-* `multiple_of` - An integer, float or decimal indicating the multiple of.
-* `decimal_places` - The total decimal places.
+* `minimum` - An integer indicating the minimum.
+* `maximum` - An integer indicating the maximum.
+* `multiple_of` - An integer indicating the multiple of.
 
 #### IntegerField
 
@@ -100,11 +104,9 @@ class MyModel(edgy.Model):
 
 ##### Parameters:
 
-* `minimum` - An integer, float or decimal indicating the minimum.
-* `maximum` - An integer, float or decimal indicating the maximum.
-* `max_digits` - Maximum digits allowed.
-* `multiple_of` - An integer, float or decimal indicating the multiple of.
-* `decimal_places` - The total decimal places.
+* `minimum` - An integer indicating the minimum.
+* `maximum` - An integer indicating the maximum.
+* `multiple_of` - An integer indicating the multiple of.
 
 #### BooleanField
 
@@ -197,7 +199,7 @@ ddict = obj.composite
 The contained fields are serialized like normal fields. So if this is not wanted,
 the fields need the exclude attribute/parameter set.
 
-!!! Note:
+!!! Note
     The inherit flag is set to False for all fields created by a composite. This is because of inheritance.
 
 ##### Parameters
@@ -242,25 +244,27 @@ class MyModel(edgy.Model):
 
 ```
 
-!!! Note:
+!!! Note
     Internally the DateTimeField logic is used and only the date element returned.
     This implies the field can handle the same types like DateTimeField.
 
 ##### Parameters
 
-* **auto_now** - A boolean indicating the `auto_now` enabled. Useful for auto updates.
-* **auto_now_add** - A boolean indicating the `auto_now_add` enabled. This will ensure that it is
+* `auto_now` - A boolean indicating the `auto_now` enabled. Useful for auto updates.
+* `auto_now_add` - A boolean indicating the `auto_now_add` enabled. This will ensure that it is
 only added once.
-* **default_timezone** - ZoneInfo containing the timezone which is added to naive datetimes and used for `auto_now` and `auto_now_add`.
+* `default_timezone` - ZoneInfo containing the timezone which is added to naive datetimes and used for `auto_now` and `auto_now_add`.
                          Datetimes are converted to date and lose their timezone information.
-* **force_timezone** - ZoneInfo containing the timezone in which all datetimes are converted.
+* `force_timezone` - ZoneInfo containing the timezone in which all datetimes are converted.
                        For naive datetimes it behaves like `default_timezone`
                        Datetimes are converted to date and lose their timezone information.
 
-!!! Note:
-    There is no `remove_timezone` (argument will be silently ignored)
 
-!!! Note:
+!!! Note
+    There is no `remove_timezone` (argument will be silently ignored).
+
+
+!!! Note
     `auto_now` and `auto_now_add` set the `read_only` flag by default. You can explicitly set `read_only` to `False` to be still able to update the field manually.
 
 #### DateTimeField
@@ -288,7 +292,8 @@ DateTimeField supports int, float, string (isoformat), date object and of course
                          For naive datetimes it behaves like `default_timezone`
 * `remove_timezone` - Boolean. Default False. Remove timezone information from datetime. Useful if the db should only contain naive datetimes and not convert.
 
-!!! Note:
+
+!!! Note
     `auto_now` and `auto_now_add` set the `read_only` flag by default. You can explicitly set `read_only` to `False` to be still able to update the field manually.
 
 #### DecimalField
@@ -426,24 +431,28 @@ from `edgy`.
 * `relation_fn` - Optionally drop a function which returns a Relation for the reverse side. This will be used by the RelatedField (if it is created). Used by the ManyToMany field.
 * `reverse_path_fn` - Optionally drop a function which handles the traversal from the reverse side. Used by the ManyToMany field.
 
-!!! Note:
+
+!!! Note
     The index parameter can improve the performance and is strongly recommended especially with `no_constraint` but also
     ForeignKeys with constraint will benefit. By default off because conflicts are easily to provoke when reinitializing models (tests with database fixture scope="function").
     This is no concern for webservers where models are initialized once.
     `unique` uses internally an index and `index=False` will be ignored.
 
-!!! Note:
+
+!!! Note
     There is a `reverse_name` argument which can be used when `related_name=False` to specify a field for reverse relations.
     It is useless except if related_name is `False` because it is otherwise overwritten.
     The `reverse_name` argument is used for finding the reverse field of the relationship.
 
-!!! Note:
+
+!!! Note
     When `embed_parent` is set, queries start to use the second parameter of `embed_parent` **if it is a RelationshipField**.
     If it is empty, queries cannot access the parent anymore when the first parameter points to a `RelationshipField`.
     This is mode is analogue to ManyToMany fields.
     Otherwise, the first parameter points not to a `RelationshipField` (e.g. embeddable, CompositeField), queries use still the model, without the prefix stripped.
 
-!!! Note:
+
+!!! Note
     `embed_parent` cannot traverse embeddables.
 
 #### RefForeignKey
@@ -492,10 +501,12 @@ class MyModel(edgy.Model):
                       if False, the base is transformed to the target and source model (full proxying). You cannot select the through model via path traversal anymore (except from the through model itself).
                       If not an empty string, the same behaviour like with False applies except that you can select the through model fields via path traversal with the provided name.
 
-!!! Note:
+
+!!! Note
     If `through` is an abstract model it will be used as a template (a new model is generated with through as base).
 
-!!! Note:
+
+!!! Note
     The index parameter is passed through to the ForeignKey fields but is not required. The intern ForeignKey fields
     create with their primary key constraint and unique_together fallback their own index.
     You should be warned that the same for ForeignKey fields applies here for index, so you most probably don't want to use an index here.
@@ -546,7 +557,7 @@ class MyModel(edgy.Model):
 
 ```
 
-!!! Note:
+!!! Note
     Blobs (BinaryField) are like TextFields not size-restricted by default.
 
 #### OneToOne
@@ -648,18 +659,21 @@ class MyModel(edgy.Model):
 Derives from the same as [CharField](#charfield) and validates the value of an UUID.
 
 
-
 ## Custom Fields
 
 ### Simple fields
 
 If you merely want to customize an existing field in `edgy.core.db.fields` you can just inherit from it and provide the customization via the `FieldFactory` (or you can use `FieldFactory` directly for handling a new sqlalchemy type).
 Valid methods to overwrite are `__new__`, `get_column_type`, `get_pydantic_type`, `get_constraints` and `validate` as well as you can overwrite many field methods
-by defining them on the factory (see `edgy.core.db.fields.types` for allowed methods). Field methods overwrites must be classmethods which take as first argument after
+by defining them on the factory (see `edgy.core.db.fields.factories` for allowed methods). Field methods overwrites must be classmethods which take as first argument after
 the class itself the field object and a keyword arg original_fn which can be None in case none was defined.
 
 For examples look in the mentioned path (replace dots with slashes).
 
+
+!!! Note
+    You can extend in the factory the overwritable methods. The overwritten methods are not permanently overwritten. After init it is possible to change them again.
+    A simple example is in `edgy/core/db/fields/exclude_field.py`. The magic behind this is in  `edgy/core/db/fields/factories.py`.
 
 ### Extended, special fields
 
@@ -689,19 +703,25 @@ You should also provide an init method which sets following attributes:
 * `inject_default_on_partial_update` - Add default value despite being a partial update. Useful for implementing `auto_now` or other fields which should change on every update.
 
 
-Note: instance checks can also be done against the `field_type` attribute in case you want to check the compatibility with other fields (composite style)
+!!! Note
+    Instance checks can also be done against the `field_type` attribute in case you want to check the compatibility with other fields (composite style).
+    The `annotation` field parameter is for pydantic (automatically set by factories).
+    For examples have a look in `tests/fields/test_composite_fields.py` or in `edgy/core/db/fields/core.py`.
 
-The `annotation` parameter is for pydantic.
+### Tricks
 
+You can use the field as a store for your customizations. Unconsumed keywords are set as attributes on the BaseField object.
+But if the variables clash with the variables used for Columns or for pydantic internals, there are unintended side-effects possible.
 
-for examples have a look in `tests/fields/test_composite_fields.py` or in `edgy/core/db/fields/core.py`
+## Customizing fields after model initialization
 
+Dangerous! There can be many side-effects.
 
-## Customizing fields
+The only safe thing to do is to update or replace a field and call `meta.invalidate()` afterwards. The type should match.
 
-When a model was created it is safe to update the fields or fields_mapping as long as `invalidate()` of meta is called.
-It is auto-called when a new fields_mapping is assigned to meta but with the unfortune side-effect that additionally the fields attribute of the model must be set again.
+Adding or excluding fields, or replacing the fields mappings are dangerous and could require a pydantic model rebuild.
+Also replacing `fields` with a new dict requires replacing `meta.fields_mapping` with the same dict (in this case a `meta.invalidate()` is automatically issued).
 
-You can for example set the inherit flag to False to disable inheriting a Field or set other field attributes.
+If you just want to remove a field ExcludeField or the inherit flags are the ways to go.
 
-You shouldn't remove fields (use ExcludeField for this) and be carefull when adding fields (maybe the model must be updated, this is no magic, have a look in the metaclasses file)
+If you want to add a Field dynamically, check `edgy/core/db/models/metaclasses.py` first what is done and don't forget the annotations.

@@ -14,7 +14,7 @@ from typing import (
 )
 
 from edgy.core.db.constants import CASCADE
-from edgy.core.db.fields.base import BaseField, BaseForeignKey
+from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.foreign_keys import ForeignKey
 from edgy.core.db.relationships.relation import ManyRelation
@@ -25,6 +25,7 @@ from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
     from edgy import Model
+    from edgy.core.db.fields.types import BaseFieldType
 
 T = TypeVar("T", bound="Model")
 
@@ -307,7 +308,7 @@ class ManyToManyField(ForeignKeyFieldFactory):
         from_fields: Sequence[str] = (),
         to_fields: Sequence[str] = (),
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> "BaseFieldType":
         for argument in ["null", "on_delete", "on_update"]:
             if kwargs.get(argument, None):
                 terminal.write_warning(
