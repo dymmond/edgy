@@ -191,9 +191,9 @@ class MetaInfo:
     @property
     def fields_mapping(self) -> Dict[str, BaseFieldType]:
         warnings.warn(
-            "'fields_mapping' has been deprecated, use 'fields' instead",
+            "'fields_mapping' has been deprecated, use 'fields' instead.",
             DeprecationWarning,
-            stacklevel=1,
+            stacklevel=2,
         )
         return self.fields
 
@@ -783,6 +783,11 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         """
         Returns the signals of a class
         """
+        warnings.warn(
+            "'signals' has been deprecated, use 'meta.signals' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         meta: MetaInfo = cls.meta
         return meta.signals
 
@@ -809,4 +814,10 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
     @property
     def fields(cls) -> Dict[str, BaseFieldType]:
-        return cast(Dict[str, BaseFieldType], cls.meta.fields)
+        warnings.warn(
+            "'fields' has been deprecated, use 'meta.fields' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        meta: MetaInfo = cls.meta
+        return meta.fields

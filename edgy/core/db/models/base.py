@@ -1,5 +1,6 @@
 import contextlib
 import copy
+import warnings
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -129,10 +130,20 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
 
     @property
     def signals(self) -> "Broadcaster":
+        warnings.warn(
+            "'signals' has been deprecated, use 'meta.signals' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.meta.signals
 
     @property
     def fields(self) -> Dict[str, "BaseFieldType"]:
+        warnings.warn(
+            "'fields' has been deprecated, use 'meta.fields' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self.meta.fields
 
     @property
