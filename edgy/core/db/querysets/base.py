@@ -21,11 +21,11 @@ from edgy.conf import settings
 from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
+from edgy.core.db.models.mixins import DateParser, ModelParser
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import PrefetchMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
 from edgy.core.db.relationships.utils import crawl_relationship
-from edgy.core.utils.models import DateParser, ModelParser
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.protocols.queryset import QuerySetProtocol
 
@@ -320,7 +320,7 @@ class BaseQuerySet(
         # Making sure for queries we use the main class and not the proxy
         # And enable the parent
         if self.model_class.is_proxy_model:
-            self.model_class = self.model_class.parent
+            self.model_class = self.model_class.__parent__
 
         kwargs = clean_query_kwargs(self.model_class, kwargs)
 
@@ -381,7 +381,7 @@ class BaseQuerySet(
         )
 
     def _validate_kwargs(self, **kwargs: Any) -> Any:
-        return self._extract_values_from_field(kwargs, model_class=self.model_class)
+        return self.extract_column_values(kwargs, model_class=self.model_class)
 
     def _prepare_order_by(self, order_by: str) -> Any:
         reverse = order_by.startswith("-")
@@ -927,9 +927,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
                     new_obj[key] = self._resolve_value(value)
             new_objs.append(new_obj)
 
-        new_objs = [
-            queryset._extract_values_from_field(obj, queryset.model_class) for obj in new_objs
-        ]
+        new_objs = [queryset.extract_column_values(obj, queryset.model_class) for obj in new_objs]
 
         pks1 = (
             getattr(queryset.table.c, pkcol) == sqlalchemy.bindparam(pkcol)
@@ -969,7 +967,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: QuerySet = self._clone()
 
-        kwargs = queryset._extract_values_from_field(kwargs, model_class=queryset.model_class)
+        kwargs = queryset.extract_column_values(kwargs, model_class=queryset.model_class)
 
         # Broadcast the initial update details
         await self.model_class.signals.pre_update.send_async(

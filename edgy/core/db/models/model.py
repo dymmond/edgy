@@ -1,13 +1,12 @@
-from typing import Any, Dict, Set, Type, Union
+from typing import Any, Dict, Type, Union
 
-from edgy.core.db.models.base import EdgyBaseReflectModel
-from edgy.core.db.models.mixins import DeclarativeMixin
-from edgy.core.db.models.row import ModelRow
+from edgy.core.db.models.base import EdgyBaseModel
+from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
 from edgy.exceptions import ObjectNotFound, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 
-class Model(ModelRow, DeclarativeMixin):
+class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
     """
     Representation of an Edgy `Model`.
 
@@ -50,7 +49,7 @@ class Model(ModelRow, DeclarativeMixin):
 
         # empty updates shouldn't cause an error
         if kwargs:
-            kwargs = self._extract_values_from_field(
+            kwargs = self.extract_column_values(
                 extracted_values=kwargs, is_partial=True, is_update=True
             )
             expression = self.table.update().values(**kwargs).where(*self.identifying_clauses())
@@ -146,20 +145,6 @@ class Model(ModelRow, DeclarativeMixin):
             data[foreign_key_target_field] = self
             await model.query.create(**data)
 
-    def update_model_references(self, **kwargs: Any) -> Any:
-        model_refs_set: Set[str] = set()
-        model_references: Dict[str, Any] = {}
-
-        for name, value in kwargs.items():
-            if name in self.meta.model_references:
-                model_references[name] = value
-                model_refs_set.add(name)
-
-        for value in model_refs_set:
-            kwargs.pop(value)
-
-        return kwargs, model_references
-
     async def save(
         self,
         force_save: bool = False,
@@ -188,27 +173,26 @@ class Model(ModelRow, DeclarativeMixin):
             if values:
                 extracted_fields.update(values)
             # force save must ensure a complete mapping
-            validated_values = self._extract_values_from_field(
+            kwargs = self.extract_column_values(
                 extracted_values=extracted_fields, is_partial=False, is_update=False
             )
-            kwargs, model_references = self.update_model_references(**validated_values)
+            model_references = self.extract_model_references(extracted_fields)
             await self._save(**kwargs)
         else:
             # Broadcast the initial update details
             # Making sure it only updates the fields that should be updated
-            # and excludes the fields aith `auto_now` as true
-            validated_values = self._extract_values_from_field(
+            # and excludes the fields with `auto_now` as true
+            kwargs = self.extract_column_values(
                 extracted_values=extracted_fields if values is None else values,
                 is_update=True,
                 is_partial=values is not None,
             )
-            kwargs, model_references = self.update_model_references(**validated_values)
-            update_model = {k: v for k, v in validated_values.items() if k in kwargs}
-
-            await self.signals.pre_update.send_async(
-                self.__class__, instance=self, kwargs=update_model
+            model_references = self.extract_model_references(
+                extracted_fields if values is None else values
             )
-            await self.update(**update_model)
+
+            await self.signals.pre_update.send_async(self.__class__, instance=self, kwargs=kwargs)
+            await self.update(**kwargs)
 
             # Broadcast the update complete
             await self.signals.post_update.send_async(self.__class__, instance=self)
@@ -230,7 +214,7 @@ class Model(ModelRow, DeclarativeMixin):
         return self
 
 
-class ReflectModel(Model, EdgyBaseReflectModel):
+class ReflectModel(ReflectedModelMixin, Model):
     """
     Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
     call.

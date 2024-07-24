@@ -2,7 +2,6 @@ import asyncio
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Union, cast
 
 from edgy.core.db.fields.base import RelationshipField
-from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import QuerySetError
@@ -13,13 +12,10 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy import Model, Prefetch, QuerySet
 
 
-class ModelRow(EdgyBaseModel):
+class ModelRowMixin:
     """
     Builds a row for a specific model
     """
-
-    class Meta:
-        abstract = True
 
     @classmethod
     def from_sqla_row(
@@ -101,10 +97,10 @@ class ModelRow(EdgyBaseModel):
             for column_name in columns_to_check:
                 if column_name not in row:
                     continue
-                elif row[column_name] is not None:  # type: ignore
-                    child_item[foreign_key.from_fk_field_name(related, column_name)] = row[
-                        column_name
-                    ]  # type: ignore
+                elif getattr(row, column_name) is not None:
+                    child_item[foreign_key.from_fk_field_name(related, column_name)] = getattr(
+                        row, column_name
+                    )
 
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model

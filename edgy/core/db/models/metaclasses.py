@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import inspect
+from abc import ABCMeta
 from collections import UserDict, deque
 from typing import (
     TYPE_CHECKING,
@@ -466,10 +467,12 @@ def extract_fields_and_managers(
     return attrs
 
 
-class BaseModelMeta(ModelMetaclass):
+class BaseModelMeta(ModelMetaclass, ABCMeta):
     __slots__ = ()
 
-    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any]) -> Any:
+    def __new__(
+        cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any], **kwargs: Any
+    ) -> Any:
         fields: Dict[str, BaseFieldType] = {}
         model_references: Dict[str, ModelRef] = {}
         managers: Dict[str, BaseManager] = {}
@@ -507,7 +510,6 @@ class BaseModelMeta(ModelMetaclass):
                 # That is why is not stored as a normal FK but as a reference but
                 # stored also as a field to be able later or to access anywhere in the model
                 # and use the value for the creation of the records via RefForeignKey.
-                # This is then used in `save_model_references()` and `update_model_references
                 # saving a reference foreign key.
                 # We split the keys (store them) in different places to be able to easily maintain and
                 #  what is what.
@@ -604,9 +606,9 @@ class BaseModelMeta(ModelMetaclass):
         # Ensure initialization is only performed for subclasses of EdgyBaseModel
         # (excluding the EdgyBaseModel class itself).
         if not parents:
-            return model_class(cls, name, bases, attrs)
+            return model_class(cls, name, bases, attrs, **kwargs)
 
-        new_class = cast("Type[Model]", model_class(cls, name, bases, attrs))
+        new_class = cast("Type[Model]", model_class(cls, name, bases, attrs, **kwargs))
         new_class.fields = fields
 
         # Update the model_fields are updated to the latest
@@ -700,7 +702,7 @@ class BaseModelMeta(ModelMetaclass):
         if not new_class.is_proxy_model and not meta.abstract:
             proxy_model = new_class.generate_proxy_model()
             new_class.__proxy_model__ = proxy_model
-            new_class.__proxy_model__.parent = new_class
+            new_class.__proxy_model__.__parent__ = new_class
             new_class.__proxy_model__.model_rebuild(force=True)
             meta.registry.models[new_class.__name__] = new_class  # type: ignore
 
