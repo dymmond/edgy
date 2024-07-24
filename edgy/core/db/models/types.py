@@ -136,7 +136,7 @@ class BaseModelType(ABC):
         """
         fields_mapping = self.meta.fields_mapping
         model_references = self.meta.model_references
-        columns = self.__class__.columns
+        columns = self.table.columns
 
         if only is not None:
             return {k: v for k, v in self.__dict__.items() if k in only}

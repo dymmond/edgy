@@ -25,7 +25,7 @@ class _EnhancedClausesHelper:
         if not isinstance(columns_or_model, ColumnCollection) and hasattr(
             columns_or_model, "columns"
         ):
-            columns_or_model = columns_or_model.columns
+            columns_or_model = columns_or_model.table.columns
         return self.op(*(getattr(columns_or_model, item[0]) == item[1] for item in kwargs.items()))
 
 
