@@ -691,7 +691,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         meta.model = new_class
 
         # Sets the foreign key fields
-        if not new_class.is_proxy_model and meta.foreign_key_fields:
+        if not new_class.__is_proxy_model__ and meta.foreign_key_fields:
             _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
 
         # Update the model references with the validations of the model
@@ -699,7 +699,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # Generates a proxy model for each model created
         # Making sure the core model where the fields are inherited
         # And mapped contains the main proxy_model
-        if not new_class.is_proxy_model and not meta.abstract:
+        if not new_class.__is_proxy_model__ and not meta.abstract:
             proxy_model = new_class.generate_proxy_model()
             new_class.__proxy_model__ = proxy_model
             new_class.__proxy_model__.__parent__ = new_class

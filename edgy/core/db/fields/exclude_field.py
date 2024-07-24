@@ -18,7 +18,7 @@ class ExcludeField(FieldFactory, Type[None]):
     Meta field that masks fields
     """
 
-    _type: Any = Any
+    field_type: Any = Any
 
     def __new__(  # type: ignore
         cls,

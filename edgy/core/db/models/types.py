@@ -53,7 +53,7 @@ class BaseModelType(ABC):
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
 
     __parent__: ClassVar[Union[Type["BaseModelType"], None]] = None
-    is_proxy_model: ClassVar[bool] = False
+    __is_proxy_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
 
     @property

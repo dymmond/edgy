@@ -232,7 +232,7 @@ class CompositeField(FieldFactory):
     Meta field that aggregates multiple fields in a pseudo field
     """
 
-    _bases = (ConcreteCompositeField,)
+    field_bases = (ConcreteCompositeField,)
 
     @classmethod
     def get_pydantic_type(cls, **kwargs: Any) -> Any:

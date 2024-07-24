@@ -26,8 +26,8 @@ class BaseRefForeignKeyField(BaseForeignKey):
 
 
 class RefForeignKey(ForeignKeyFieldFactory, list):
-    _bases = (BaseRefForeignKeyField,)
-    _type = list
+    field_bases = (BaseRefForeignKeyField,)
+    field_type = list
 
     @classmethod
     def is_class_and_subclass(cls, value: typing.Any, _type: typing.Any) -> bool:

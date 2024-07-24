@@ -7,4 +7,4 @@
         - "!^model_config"
         - "!^__slots__"
         - "!^__getattr__"
-        - "!^_type"
+        - "!^field_type"

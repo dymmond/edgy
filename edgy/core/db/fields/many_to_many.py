@@ -297,8 +297,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
 
 class ManyToManyField(ForeignKeyFieldFactory):
-    _type: Any = Any
-    _bases = (BaseManyToManyForeignKeyField,)
+    field_type: Any = Any
+    field_bases = (BaseManyToManyForeignKeyField,)
 
     def __new__(  # type: ignore
         cls,

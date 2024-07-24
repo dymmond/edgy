@@ -661,26 +661,29 @@ Derives from the same as [CharField](#charfield) and validates the value of an U
 
 ## Custom Fields
 
-### Simple fields
+### Factory fields
 
 If you merely want to customize an existing field in `edgy.core.db.fields` you can just inherit from it and provide the customization via the `FieldFactory` (or you can use `FieldFactory` directly for handling a new sqlalchemy type).
-Valid methods to overwrite are `__new__`, `get_column_type`, `get_pydantic_type`, `get_constraints` and `validate` as well as you can overwrite many field methods
+Valid methods to overwrite are `__new__`, `get_column_type`, `get_pydantic_type`, `get_constraints`, `build_field` and `validate` as well as you can overwrite many field methods
 by defining them on the factory (see `edgy.core.db.fields.factories` for allowed methods). Field methods overwrites must be classmethods which take as first argument after
 the class itself the field object and a keyword arg original_fn which can be None in case none was defined.
 
-For examples look in the mentioned path (replace dots with slashes).
+For examples have a look in `edgy/core/db/fields/core.py`.
 
 
 !!! Note
     You can extend in the factory the overwritable methods. The overwritten methods are not permanently overwritten. After init it is possible to change them again.
     A simple example is in `edgy/core/db/fields/exclude_field.py`. The magic behind this is in  `edgy/core/db/fields/factories.py`.
 
+!!! Tip
+    For global constraints you can overwrite the `get_global_constraints` field method via the factory overwrite. This differs from `get_constraints` which is defined on factories.
+
 ### Extended, special fields
 
 If you want to customize the entire field (e.g. checks), you have to split the field in 2 parts:
 
 - One inherits from `edgy.db.fields.base.BaseField` (or one of the derived classes) and provides the missing parts. It shall not be used for the Enduser (though possible).
-- One inherits from `edgy.db.fields.factories.FieldFactory`. Here the _bases attribute is adjusted to point to the Field from the first step.
+- One inherits from `edgy.db.fields.factories.FieldFactory`. Here the field_bases attribute is adjusted to point to the Field from the first step.
 
 Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide following methods to work:
 

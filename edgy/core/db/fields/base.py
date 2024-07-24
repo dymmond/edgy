@@ -116,9 +116,6 @@ class BaseField(BaseFieldType, FieldInfo):
         field_copy.owner = owner  # type: ignore
         return field_copy
 
-    def get_constraints(self) -> Any:
-        return self.constraints
-
     def get_default_value(self) -> Any:
         # single default
         default = getattr(self, "default", None)

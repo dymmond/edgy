@@ -319,7 +319,7 @@ class BaseQuerySet(
 
         # Making sure for queries we use the main class and not the proxy
         # And enable the parent
-        if self.model_class.is_proxy_model:
+        if self.model_class.__is_proxy_model__:
             self.model_class = self.model_class.__parent__
 
         kwargs = clean_query_kwargs(self.model_class, kwargs)

@@ -34,7 +34,7 @@ def create_edgy_model(
     core_definitions = {
         "__module__": __module__,
         "__qualname__": qualname,
-        "is_proxy_model": __proxy__,
+        "__is_proxy_model__": __proxy__,
     }
     if not __definitions__:
         __definitions__ = {}

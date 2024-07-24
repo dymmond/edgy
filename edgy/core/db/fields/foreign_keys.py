@@ -242,8 +242,8 @@ class BaseForeignKeyField(BaseForeignKey):
 
 
 class ForeignKey(ForeignKeyFieldFactory):
-    _bases = (BaseForeignKeyField,)
-    _type: Any = Any
+    field_bases = (BaseForeignKeyField,)
+    field_type: Any = Any
 
     def __new__(  # type: ignore
         cls,
