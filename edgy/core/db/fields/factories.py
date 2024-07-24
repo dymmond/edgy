@@ -52,9 +52,9 @@ class FieldFactoryMeta(type):
 class FieldFactory(metaclass=FieldFactoryMeta):
     """The base for all model fields to be used with Edgy"""
 
-    _bases: Sequence[Any] = (Field,)
-    _type: Any = None
-    _methods_overwritable_by_factory: FrozenSet[str] = frozenset(
+    field_bases: Sequence[Any] = (Field,)
+    field_type: Any = None
+    methods_overwritable_by_factory: FrozenSet[str] = frozenset(
         default_methods_overwritable_by_factory
     )
 
@@ -84,7 +84,7 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         )
 
         for key in dir(cls):
-            if key in cls._methods_overwritable_by_factory and hasattr(cls, key):
+            if key in cls.methods_overwritable_by_factory and hasattr(cls, key):
                 fn = getattr(cls, key)
                 original_fn = getattr(new_field_obj, key, None)
                 # use original func, not the wrapper
@@ -122,18 +122,18 @@ class FieldFactory(metaclass=FieldFactoryMeta):
     @classmethod
     def get_pydantic_type(cls, **kwargs: Any) -> Any:
         """Returns the type for pydantic"""
-        return cls._type
+        return cls.field_type
 
     @staticmethod
     @lru_cache(None)
     def _get_field_cls(cls: "FieldFactory") -> BaseFieldType:
-        return cast(BaseFieldType, type(cls.__name__, cast(Any, cls._bases), {}))
+        return cast(BaseFieldType, type(cls.__name__, cast(Any, cls.field_bases), {}))
 
 
 class ForeignKeyFieldFactory(FieldFactory):
     """The base for all model fields to be used with Edgy"""
 
-    _type: Any = Any
+    field_type: Any = Any
 
     def __new__(
         cls,

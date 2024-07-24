@@ -45,7 +45,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         """
         Update operation of the database fields.
         """
-        await self.signals.pre_update.send_async(self.__class__, instance=self)
+        await self.meta.signals.pre_update.send_async(self.__class__, instance=self)
 
         # empty updates shouldn't cause an error
         if kwargs:
@@ -54,13 +54,13 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             )
             expression = self.table.update().values(**kwargs).where(*self.identifying_clauses())
             await self.database.execute(expression)
-        await self.signals.post_update.send_async(self.__class__, instance=self)
+        await self.meta.signals.post_update.send_async(self.__class__, instance=self)
 
         # Update the model instance.
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        for field in self.meta.fields_mapping:
+        for field in self.meta.fields:
             _val = self.__dict__.get(field)
             if isinstance(_val, ManyRelationProtocol):
                 _val.instance = self
@@ -69,12 +69,12 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
     async def delete(self) -> None:
         """Delete operation from the database"""
-        await self.signals.pre_delete.send_async(self.__class__, instance=self)
+        await self.meta.signals.pre_delete.send_async(self.__class__, instance=self)
 
         expression = self.table.delete().where(*self.identifying_clauses())
         await self.database.execute(expression)
 
-        await self.signals.post_delete.send_async(self.__class__, instance=self)
+        await self.meta.signals.post_delete.send_async(self.__class__, instance=self)
 
     async def load(self) -> None:
         # Build the select expression.
@@ -104,7 +104,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             column = self.table.autoincrement_column
             if column is not None:
                 setattr(self, column.key, autoincrement_value)
-        for field in self.meta.fields_mapping:
+        for field in self.meta.fields:
             _val = self.__dict__.get(field)
             if isinstance(_val, ManyRelationProtocol):
                 _val.instance = self
@@ -156,7 +156,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         When creating a user it will make sure it can update existing or
         create a new one.
         """
-        await self.signals.pre_save.send_async(self.__class__, instance=self)
+        await self.meta.signals.pre_save.send_async(self.__class__, instance=self)
 
         extracted_fields = self.extract_db_fields()
 
@@ -191,11 +191,13 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 extracted_fields if values is None else values
             )
 
-            await self.signals.pre_update.send_async(self.__class__, instance=self, kwargs=kwargs)
+            await self.meta.signals.pre_update.send_async(
+                self.__class__, instance=self, kwargs=kwargs
+            )
             await self.update(**kwargs)
 
             # Broadcast the update complete
-            await self.signals.post_update.send_async(self.__class__, instance=self)
+            await self.meta.signals.post_update.send_async(self.__class__, instance=self)
 
         # Save the model references
         if model_references:
@@ -205,12 +207,12 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         # Refresh the results
         if any(
             field.server_default is not None
-            for name, field in self.fields.items()
+            for name, field in self.meta.fields.items()
             if name not in extracted_fields
         ):
             await self.load()
 
-        await self.signals.post_save.send_async(self.__class__, instance=self)
+        await self.meta.signals.post_save.send_async(self.__class__, instance=self)
         return self
 
 

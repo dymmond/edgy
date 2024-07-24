@@ -18,6 +18,3 @@ async def after_creation(sender, instance, **kwargs):
 
 # Disconnect the given function
 User.meta.signals.post_save.disconnect(after_creation)
-
-# Signals are also exposed via instance
-user.signals.post_save.disconnect(after_creation)

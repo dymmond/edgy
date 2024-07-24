@@ -661,26 +661,29 @@ Derives from the same as [CharField](#charfield) and validates the value of an U
 
 ## Custom Fields
 
-### Simple fields
+### Factory fields
 
 If you merely want to customize an existing field in `edgy.core.db.fields` you can just inherit from it and provide the customization via the `FieldFactory` (or you can use `FieldFactory` directly for handling a new sqlalchemy type).
-Valid methods to overwrite are `__new__`, `get_column_type`, `get_pydantic_type`, `get_constraints` and `validate` as well as you can overwrite many field methods
+Valid methods to overwrite are `__new__`, `get_column_type`, `get_pydantic_type`, `get_constraints`, `build_field` and `validate` as well as you can overwrite many field methods
 by defining them on the factory (see `edgy.core.db.fields.factories` for allowed methods). Field methods overwrites must be classmethods which take as first argument after
 the class itself the field object and a keyword arg original_fn which can be None in case none was defined.
 
-For examples look in the mentioned path (replace dots with slashes).
+For examples have a look in `edgy/core/db/fields/core.py`.
 
 
 !!! Note
     You can extend in the factory the overwritable methods. The overwritten methods are not permanently overwritten. After init it is possible to change them again.
     A simple example is in `edgy/core/db/fields/exclude_field.py`. The magic behind this is in  `edgy/core/db/fields/factories.py`.
 
+!!! Tip
+    For global constraints you can overwrite the `get_global_constraints` field method via the factory overwrite. This differs from `get_constraints` which is defined on factories.
+
 ### Extended, special fields
 
 If you want to customize the entire field (e.g. checks), you have to split the field in 2 parts:
 
 - One inherits from `edgy.db.fields.base.BaseField` (or one of the derived classes) and provides the missing parts. It shall not be used for the Enduser (though possible).
-- One inherits from `edgy.db.fields.factories.FieldFactory`. Here the _bases attribute is adjusted to point to the Field from the first step.
+- One inherits from `edgy.db.fields.factories.FieldFactory`. Here the field_bases attribute is adjusted to point to the Field from the first step.
 
 Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide following methods to work:
 
@@ -692,7 +695,7 @@ Additional they can provide following methods:
 * `__get__(self, instance, owner=None)` - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
 * `__set__(self, instance, value)` - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
 * `to_model(self, field_name, phase="")` - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`
-* `get_embedded_fields(self, field_name, fields_mapping)` - Define internal fields.
+* `get_embedded_fields(self, field_name, fields)` - Define internal fields.
 * `get_default_values(self, field_name, cleaned_data, is_update=False)` - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
 * `get_default_value(self)` - return default value for one column fields.
 * `get_global_constraints(self, field_name, columns)` - takes as second parameter (self excluded) the columns defined by this field (by get_columns). Returns a global constraint, which can be multi-column.
@@ -720,7 +723,7 @@ Dangerous! There can be many side-effects.
 The only safe thing to do is to update or replace a field and call `meta.invalidate()` afterwards. The type should match.
 
 Adding or excluding fields, or replacing the fields mappings are dangerous and could require a pydantic model rebuild.
-Also replacing `fields` with a new dict requires replacing `meta.fields_mapping` with the same dict (in this case a `meta.invalidate()` is automatically issued).
+In case of an assignment of a new field mapping (dict) to `meta.fields` a `meta.invalidate()` is automatically issued.
 
 If you just want to remove a field ExcludeField or the inherit flags are the ways to go.
 

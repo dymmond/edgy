@@ -204,7 +204,7 @@ def test_autonow_field(mocker):
         pass
 
     class Bar(DateTimeField):
-        _bases = (Foo,)
+        field_bases = (Foo,)
 
     spy = mocker.spy(Foo, "get_default_values")
 

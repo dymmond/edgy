@@ -60,8 +60,8 @@ class MultiColumnFieldInner(BaseField):
 
 
 class MultiColumnField(FieldFactory):
-    _bases = (MultiColumnFieldInner,)
-    _type = Any
+    field_bases = (MultiColumnFieldInner,)
+    field_type = Any
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:

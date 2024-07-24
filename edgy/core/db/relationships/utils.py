@@ -33,7 +33,7 @@ def crawl_relationship(
     while path:
         splitted = path.split("__", 1)
         field_name = splitted[0]
-        field = model_class.meta.fields_mapping.get(field_name)
+        field = model_class.meta.fields.get(field_name)
         if isinstance(field, RelationshipField) and len(splitted) == 2:
             model_class, reverse_part, path = field.traverse_field(path)
             if field.is_cross_db():

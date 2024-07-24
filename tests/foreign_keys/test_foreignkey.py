@@ -100,7 +100,7 @@ async def rollback_connections():
 
 
 async def test_no_relation():
-    for field in Profile.meta.fields_mapping:
+    for field in Profile.meta.fields:
         assert not field.startswith("person")
 
 

@@ -40,7 +40,7 @@ def clean_query_kwargs(model: Type["Model"], kwargs: Dict[str, Any]) -> Dict[str
     new_kwargs: Dict[str, Any] = {}
     for key, val in kwargs.items():
         model_class, field_name, _, _, _ = crawl_relationship(model, key)
-        field = model_class.meta.fields_mapping.get(field_name)
+        field = model_class.meta.fields.get(field_name)
         if field is not None:
             new_kwargs.update(field.clean(key, val, for_query=True))
         else:
@@ -161,12 +161,12 @@ class BaseQuerySet(
             while select_path:
                 field_name = select_path.split("__", 1)[0]
                 try:
-                    field = model_class.meta.fields_mapping[field_name]
+                    field = model_class.meta.fields[field_name]
                 except KeyError:
                     raise QuerySetError(
                         detail=f'Selected field "{field_name}" does not exist on {model_class}.'
                     ) from None
-                field = model_class.fields[field_name]
+                field = model_class.meta.fields[field_name]
                 if isinstance(field, RelationshipField):
                     model_class, reverse_part, select_path = field.traverse_field(select_path)
                 else:
@@ -177,7 +177,7 @@ class BaseQuerySet(
                     foreign_key = field
                     reverse = False
                 else:
-                    foreign_key = model_class.meta.fields_mapping[reverse_part]
+                    foreign_key = model_class.meta.fields[reverse_part]
                     reverse = True
                 if foreign_key.is_cross_db():
                     raise NotImplementedError(
@@ -319,7 +319,7 @@ class BaseQuerySet(
 
         # Making sure for queries we use the main class and not the proxy
         # And enable the parent
-        if self.model_class.is_proxy_model:
+        if self.model_class.__is_proxy_model__:
             self.model_class = self.model_class.__parent__
 
         kwargs = clean_query_kwargs(self.model_class, kwargs)
@@ -950,7 +950,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
     async def delete(self) -> None:
         queryset: QuerySet = self._clone()
 
-        await self.model_class.signals.pre_delete.send_async(self.__class__, instance=self)
+        await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
 
         expression = queryset.table.delete()
         for filter_clause in queryset.filter_clauses:
@@ -959,7 +959,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         queryset._set_query_expression(expression)
         await queryset.database.execute(expression)
 
-        await self.model_class.signals.post_delete.send_async(self.__class__, instance=self)
+        await self.model_class.meta.signals.post_delete.send_async(self.__class__, instance=self)
 
     async def update(self, **kwargs: Any) -> None:
         """
@@ -970,7 +970,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         kwargs = queryset.extract_column_values(kwargs, model_class=queryset.model_class)
 
         # Broadcast the initial update details
-        await self.model_class.signals.pre_update.send_async(
+        await self.model_class.meta.signals.pre_update.send_async(
             self.__class__, instance=self, kwargs=kwargs
         )
 
@@ -983,7 +983,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         await queryset.database.execute(expression)
 
         # Broadcast the update executed
-        await self.model_class.signals.post_update.send_async(self.__class__, instance=self)
+        await self.model_class.meta.signals.post_update.send_async(self.__class__, instance=self)
 
     async def get_or_create(
         self, defaults: Dict[str, Any], **kwargs: Any

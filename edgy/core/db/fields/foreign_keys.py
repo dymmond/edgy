@@ -75,7 +75,7 @@ class BaseForeignKeyField(BaseForeignKey):
         columns: Dict[str, Optional[sqlalchemy.Column]] = {}
         if self.related_fields:
             for field_name in self.related_fields:
-                if field_name in target.meta.fields_mapping:
+                if field_name in target.meta.fields:
                     for column in target.meta.field_to_columns[field_name]:
                         columns[column.key] = column
                 else:
@@ -242,8 +242,8 @@ class BaseForeignKeyField(BaseForeignKey):
 
 
 class ForeignKey(ForeignKeyFieldFactory):
-    _bases = (BaseForeignKeyField,)
-    _type: Any = Any
+    field_bases = (BaseForeignKeyField,)
+    field_type: Any = Any
 
     def __new__(  # type: ignore
         cls,

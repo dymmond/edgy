@@ -1,6 +1,7 @@
 import contextlib
 import copy
 import inspect
+import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
 from typing import (
@@ -52,7 +53,7 @@ class FieldToColumns(UserDict, Dict[str, Sequence["sqlalchemy.Column"]]):
     def __getitem__(self, name: str) -> Sequence["sqlalchemy.Column"]:
         if name in self.data:
             return cast(Sequence["sqlalchemy.Column"], self.data[name])
-        field = self.meta.fields_mapping[name]
+        field = self.meta.fields[name]
         result = self.data[name] = field.get_columns(name)
         return result
 
@@ -90,7 +91,7 @@ class ColumnsToField(UserDict, Dict[str, str]):
         if not self._init:
             self._init = True
             _columns_to_field: Dict[str, str] = {}
-            for field_name in self.meta.fields_mapping:
+            for field_name in self.meta.fields:
                 # init structure
                 column_names = self.meta.field_to_column_names[field_name]
                 for column_name in column_names:
@@ -128,7 +129,7 @@ class MetaInfo:
     __slots__ = (
         "abstract",
         "inherit",
-        "fields_mapping",
+        "fields",
         "registry",
         "tablename",
         "unique_together",
@@ -174,9 +175,7 @@ class MetaInfo:
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
         self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
-        self.fields_mapping: Dict[str, BaseFieldType] = {
-            **getattr(meta, "fields_mapping", _empty_dict)
-        }
+        self.fields: Dict[str, BaseFieldType] = {**getattr(meta, "fields", _empty_dict)}
         self.model_references: Dict[str, ModelRef] = {
             **getattr(meta, "model_references", _empty_dict)
         }
@@ -187,7 +186,16 @@ class MetaInfo:
 
     @property
     def pk(self) -> Optional[PKField]:
-        return cast(Optional[PKField], self.fields_mapping.get("pk"))
+        return cast(Optional[PKField], self.fields.get("pk"))
+
+    @property
+    def fields_mapping(self) -> Dict[str, BaseFieldType]:
+        warnings.warn(
+            "'fields_mapping' has been deprecated, use 'fields' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.fields
 
     @property
     def is_multi(self) -> bool:
@@ -201,12 +209,12 @@ class MetaInfo:
         Loads the metadata from a dictionary.
         """
         for key, value in values.items():
-            # we want triggering invalidate in case it is fields_mapping
+            # we want triggering invalidate in case it is fields
             setattr(self, key, value)
 
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
-        if name == "fields_mapping":
+        if name == "fields":
             self.invalidate()
 
     def __getattribute__(self, name: str) -> Any:
@@ -220,7 +228,7 @@ class MetaInfo:
         excluded_fields = set()
         input_modifying_fields = set()
         foreign_key_fields: Dict[str, BaseFieldType] = {}
-        for key, field in self.fields_mapping.items():
+        for key, field in self.fields.items():
             if hasattr(field, "__get__"):
                 special_getter_fields.add(key)
             if getattr(field, "exclude", False):
@@ -314,7 +322,7 @@ def _set_related_name_for_foreign_keys(
             else:
                 related_name = f"{model_class.__name__.lower()}s_set"
 
-        if related_name in foreign_key.target.meta.fields_mapping:
+        if related_name in foreign_key.target.meta.fields:
             raise ForeignKeyBadConfigured(
                 f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
             )
@@ -330,7 +338,7 @@ def _set_related_name_for_foreign_keys(
 
         # Set the related name
         target = foreign_key.target
-        target.meta.fields_mapping[related_name] = related_field
+        target.meta.fields[related_name] = related_field
 
 
 def _handle_annotations(base: Type, base_annotations: Dict[str, Any]) -> None:
@@ -404,7 +412,7 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
 
     else:
         # abstract classes
-        for key, value in meta.fields_mapping.items():
+        for key, value in meta.fields.items():
             if key not in attrs:
                 # when abstract or inherit passthrough
                 if meta.abstract or value.inherit:
@@ -572,7 +580,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         attrs["meta"] = meta = MetaInfo(
             meta_class,
-            fields_mapping=fields,
+            fields=fields,
             model_references=model_references,
             parents=parents,
             managers=managers,
@@ -609,13 +617,12 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             return model_class(cls, name, bases, attrs, **kwargs)
 
         new_class = cast("Type[Model]", model_class(cls, name, bases, attrs, **kwargs))
-        new_class.fields = fields
 
         # Update the model_fields are updated to the latest
         new_class.model_fields = {**new_class.model_fields, **model_fields}
 
         # Set the owner of the field, must be done as early as possible
-        # don't use meta.fields_mapping to not trigger the lazy evaluation
+        # don't use meta.fields to not trigger the lazy evaluation
         for value in fields.values():
             value.owner = new_class
         # set the model_class of managers
@@ -691,7 +698,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         meta.model = new_class
 
         # Sets the foreign key fields
-        if not new_class.is_proxy_model and meta.foreign_key_fields:
+        if not new_class.__is_proxy_model__ and meta.foreign_key_fields:
             _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
 
         # Update the model references with the validations of the model
@@ -699,7 +706,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # Generates a proxy model for each model created
         # Making sure the core model where the fields are inherited
         # And mapped contains the main proxy_model
-        if not new_class.is_proxy_model and not meta.abstract:
+        if not new_class.__is_proxy_model__ and not meta.abstract:
             proxy_model = new_class.generate_proxy_model()
             new_class.__proxy_model__ = proxy_model
             new_class.__proxy_model__.__parent__ = new_class
@@ -776,6 +783,11 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         """
         Returns the signals of a class
         """
+        warnings.warn(
+            "'signals' has been deprecated, use 'meta.signals' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         meta: MetaInfo = cls.meta
         return meta.signals
 
@@ -799,3 +811,13 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:
         return cast("sqlalchemy.sql.ColumnCollection", cls.table.columns)
+
+    @property
+    def fields(cls) -> Dict[str, BaseFieldType]:
+        warnings.warn(
+            "'fields' has been deprecated, use 'meta.fields' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        meta: MetaInfo = cls.meta
+        return meta.fields

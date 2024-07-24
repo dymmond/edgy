@@ -42,7 +42,7 @@ async def rollback_connections():
 
 
 async def test_no_relation():
-    for field in Track.meta.fields_mapping:
+    for field in Track.meta.fields:
         assert not field.endswith("_set")
 
 

@@ -53,7 +53,7 @@ class BaseModelType(ABC):
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
 
     __parent__: ClassVar[Union[Type["BaseModelType"], None]] = None
-    is_proxy_model: ClassVar[bool] = False
+    __is_proxy_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
 
     @property
@@ -134,9 +134,9 @@ class BaseModelType(ABC):
         Extracts all the db fields, model references and fields.
         Related fields are not included because they are disjoint.
         """
-        fields_mapping = self.meta.fields_mapping
+        fields = self.meta.fields
         model_references = self.meta.model_references
-        columns = self.__class__.columns
+        columns = self.table.columns
 
         if only is not None:
             return {k: v for k, v in self.__dict__.items() if k in only}
@@ -144,7 +144,7 @@ class BaseModelType(ABC):
         return {
             k: v
             for k, v in self.__dict__.items()
-            if k in fields_mapping or hasattr(columns, k) or k in model_references
+            if k in fields or hasattr(columns, k) or k in model_references
         }
 
     def get_instance_name(self) -> str:

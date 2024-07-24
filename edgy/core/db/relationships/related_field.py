@@ -70,9 +70,7 @@ class RelatedField(RelationshipField):
 
     @functools.cached_property
     def foreign_key(self) -> BaseForeignKeyField:
-        return cast(
-            BaseForeignKeyField, self.related_from.meta.fields_mapping[self.foreign_key_name]
-        )
+        return cast(BaseForeignKeyField, self.related_from.meta.fields[self.foreign_key_name])
 
     def traverse_field(self, path: str) -> Tuple[Any, str, str]:
         return self.foreign_key.reverse_traverse_field(path)

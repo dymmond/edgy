@@ -69,7 +69,7 @@ class MarshallMeta(ModelMetaclass):
             }
         elif base_fields_include is not None and "__all__" in base_fields_include:
             base_model_fields = {
-                k: v for k, v in model.meta.fields_mapping.items() if k not in model_fields
+                k: v for k, v in model.meta.fields.items() if k not in model_fields
             }
             show_pk = True
         else:
@@ -88,7 +88,7 @@ class MarshallMeta(ModelMetaclass):
         for k, v in attrs.items():
             if isinstance(v, BaseMarshallField):  # noqa: SIM102
                 # Make sure the custom fields are flagged.
-                if k not in model.meta.fields_mapping:
+                if k not in model.meta.fields:
                     custom_fields[k] = v
 
         # Handle the check of the custom fields

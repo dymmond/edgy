@@ -30,7 +30,7 @@ CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 class CharField(FieldFactory, str):
     """String field representation that constructs the Field class and populates the values"""
 
-    _type = str
+    field_type = str
 
     def __new__(  # type: ignore
         cls,
@@ -74,7 +74,7 @@ class CharField(FieldFactory, str):
 class TextField(FieldFactory, str):
     """String representation of a text field which means no max_length required"""
 
-    _type = str
+    field_type = str
 
     def __new__(
         cls,
@@ -114,7 +114,7 @@ class IntegerField(Number, int):
     Integer field factory that construct Field classes and populated their values.
     """
 
-    _type = int
+    field_type = int
 
     def __new__(  # type: ignore
         cls,
@@ -140,7 +140,7 @@ class IntegerField(Number, int):
 class FloatField(Number, float):
     """Representation of a int32 and int64"""
 
-    _type = float
+    field_type = float
 
     def __new__(  # type: ignore
         cls,
@@ -178,7 +178,7 @@ class SmallIntegerField(IntegerField):
 
 
 class DecimalField(Number, decimal.Decimal):
-    _type = decimal.Decimal
+    field_type = decimal.Decimal
 
     def __new__(  # type: ignore
         cls,
@@ -217,7 +217,7 @@ class DecimalField(Number, decimal.Decimal):
 class BooleanField(FieldFactory, int):
     """Representation of a boolean"""
 
-    _type = bool
+    field_type = bool
 
     def __new__(  # type: ignore
         cls,
@@ -319,8 +319,8 @@ class AutoNowMixin(FieldFactory):
 class DateTimeField(AutoNowMixin, datetime.datetime):
     """Representation of a datetime field"""
 
-    _type = datetime.datetime
-    _bases = (TimezonedField, Field)
+    field_type = datetime.datetime
+    field_bases = (TimezonedField, Field)
 
     def __new__(  # type: ignore
         cls,
@@ -359,8 +359,8 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
 class DateField(AutoNowMixin, datetime.date):
     """Representation of a date field"""
 
-    _type = datetime.date
-    _bases = (TimezonedField, Field)
+    field_type = datetime.date
+    field_bases = (TimezonedField, Field)
 
     def __new__(  # type: ignore
         cls,
@@ -388,7 +388,7 @@ class DateField(AutoNowMixin, datetime.date):
 class TimeField(FieldFactory, datetime.time):
     """Representation of a time field"""
 
-    _type = datetime.time
+    field_type = datetime.time
 
     def __new__(cls, **kwargs: Any) -> BaseFieldType:  # type: ignore
         kwargs = {
@@ -405,7 +405,7 @@ class TimeField(FieldFactory, datetime.time):
 class JSONField(FieldFactory, pydantic.Json):  # type: ignore
     """Representation of a JSONField"""
 
-    _type = Any
+    field_type = Any
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
@@ -415,7 +415,7 @@ class JSONField(FieldFactory, pydantic.Json):  # type: ignore
 class BinaryField(FieldFactory, bytes):
     """Representation of a binary"""
 
-    _type = bytes
+    field_type = bytes
 
     def __new__(cls, *, max_length: Optional[int] = None, **kwargs: Any) -> BaseFieldType:  # type: ignore
         kwargs = {
@@ -432,7 +432,7 @@ class BinaryField(FieldFactory, bytes):
 class UUIDField(FieldFactory, uuid.UUID):
     """Representation of a uuid"""
 
-    _type = uuid.UUID
+    field_type = uuid.UUID
 
     def __new__(cls, **kwargs: Any) -> BaseFieldType:  # type: ignore
         kwargs = {
@@ -450,7 +450,7 @@ class UUIDField(FieldFactory, uuid.UUID):
 class ChoiceField(FieldFactory):
     """Representation of an Enum"""
 
-    _type = enum.Enum
+    field_type = enum.Enum
 
     def __new__(  # type: ignore
         cls,
@@ -486,7 +486,7 @@ class PasswordField(CharField):
 
 
 class EmailField(CharField):
-    _type = EmailStr
+    field_type = EmailStr
 
     @classmethod
     def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
@@ -500,7 +500,7 @@ class URLField(CharField):
 
 
 class IPAddressField(FieldFactory, str):
-    _type = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+    field_type = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
 
     def __new__(  # type: ignore
         cls,
