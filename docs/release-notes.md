@@ -9,17 +9,29 @@ hide:
 
 ### Added
 
-- `default_timezone`, `force_timezone`, `remove_timezone` for DateTimeField
+- `default_timezone`, `force_timezone`, `remove_timezone` for DateTimeField.
 - `default_timezone`, `force_timezone` for DateField.
--  Add attribute `inject_default_on_partial_update`.
+- Add attribute `inject_default_on_partial_update`.
+- Allow factories overwriting field methods.
+- Deep embedding via embed_parent possible.
 
 ### Changed
 
 - `get_default_values` has now an extra keyword argument `is_update`
+- Factories have now different named configuration variables.
+- Refactoring of fields and models
+  - BaseModelType and BaseFieldType are now added and should be used for typings.
+  - `get_column` works now via extractor.
+  - Renamed internals
+  - Splitted model_references and column values extraction.
+- Comparisons of models use now only primary keys.
 
 ### Fixed
 
-- `auto_now` and `auto_now_add` now also work for date fields
+- `auto_now` and `auto_now_add` now also work for date fields.
+- `BinaryField` had a wrong type.
+- Metaclasses with keyword arguments are now possible.
+- Relaxed Prefetching, tables can now appear multiple times.
 
 ## 0.12.0
 
