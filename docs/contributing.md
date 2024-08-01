@@ -74,22 +74,21 @@ $ hatch run  pre-commit install
 To run the tests, use:
 
 ```shell
-$ hatch run test:test
+$ hatch test
 ```
 
-Because Edgy uses pytest, any additional arguments will be passed. More info within the
-[pytest documentation](https://docs.pytest.org/en/latest/how-to/usage.html)
-
-For example, to run a single test_script:
+To run a single test_script:
 
 ```shell
-$ hatch run test:test tests/test_apiviews.py
+$ hatch test tests/test_apiviews.py
 ```
+
+Pytest native arguments can be passed after passing `--`.
 
 To run the linting, use:
 
 ```shell
-$ hatch run lint
+$ hatch fmt
 ```
 
 ### Documentation
