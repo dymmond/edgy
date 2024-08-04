@@ -46,9 +46,10 @@ class ModelRowMixin:
         item: Dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
-        secret_fields = (
-            [name for name, field in cls.fields.items() if field.secret] if exclude_secrets else []
-        )
+        secret_columns = set()
+        if exclude_secrets:
+            for name in cls.meta.secret_fields:
+                secret_columns.update(cls.meta.field_to_column_names[name])
 
         for related in select_related:
             field_name = related.split("__", 1)[0]
@@ -81,12 +82,14 @@ class ModelRowMixin:
         # This way it is not overritten by any value
         for related, foreign_key in cls.meta.foreign_key_fields.items():
             ignore_related: bool = cls.__should_ignore_related_name(related, select_related)
-            if ignore_related or related in secret_fields:
+            if ignore_related or related in cls.meta.secret_fields:
+                continue
+            if related in item:
                 continue
 
-            columns_to_check = foreign_key.get_column_names(related)
-            if secret_fields and not columns_to_check.isdisjoint(secret_fields):
+            if exclude_secrets and foreign_key.secret:
                 continue
+            columns_to_check = foreign_key.get_column_names(related)
 
             model_related = foreign_key.target
 
@@ -95,62 +98,43 @@ class ModelRowMixin:
 
             child_item = {}
             for column_name in columns_to_check:
-                if column_name not in row:
-                    continue
-                elif getattr(row, column_name) is not None:
-                    child_item[foreign_key.from_fk_field_name(related, column_name)] = getattr(
-                        row, column_name
+                column = getattr(cls.table.columns, column_name, None)
+                if column is not None and column in row._mapping:
+                    child_item[foreign_key.from_fk_field_name(related, column_name)] = (
+                        row._mapping[column]
                     )
-
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
             # and rebuild it with the new fields.
-            item[related] = model_related.proxy_model(**child_item)
+            proxy_model = model_related.proxy_model(**child_item)
+            proxy_model.identifying_db_fields = foreign_key.related_columns
+            item[related] = proxy_model
 
         # Check for the only_fields
-        if is_only_fields or is_defer_fields:
-            mapping_fields = (
-                [str(field) for field in only_fields] if is_only_fields else list(row.keys())  # type: ignore
-            )
-
-            for column, value in row._mapping.items():
-                if column in secret_fields:
-                    continue
-                # Making sure when a table is reflected, maps the right fields of the ReflectModel
-                if column not in mapping_fields:
-                    continue
-
-                if column not in item:
-                    item[column] = value
-
-            # We need to generify the model fields to make sure we can populate the
-            # model without mandatory fields
-            model = cast("Model", cls.proxy_model(**item))
-
-            # Apply the schema to the model
-            model = cls.__apply_schema(model, using_schema)
-
-            model = cls.__handle_prefetch_related(
-                row=row, model=model, prefetch_related=prefetch_related
-            )
-            return model
-        else:
-            # Pull out the regular column values.
-            for column in cls.table.columns:
-                # Making sure when a table is reflected, maps the right fields of the ReflectModel
-                if column.name in secret_fields:
-                    continue
-                if column.name not in cls.fields:
-                    continue
-                elif column.name not in item:
-                    item[column.name] = row[column]
-
+        _is_only = set()
+        if is_only_fields:
+            _is_only = {str(field) for field in (only_fields or row._mapping.keys())}
+        # Pull out the regular column values.
+        for column in cls.table.columns:
+            # Making sure when a table is reflected, maps the right fields of the ReflectModel
+            if _is_only and column.name not in _is_only:
+                continue
+            if column.name in secret_columns:
+                continue
+            if column.name not in cls.meta.columns_to_field:
+                continue
+            # set if not of an foreign key
+            elif cls.meta.columns_to_field[column.name] not in item:
+                if column in row._mapping:
+                    item[column.name] = row._mapping[column]
+                # fallback if first is not working
+                elif column.name in row._mapping:
+                    item[column.name] = row._mapping[column.name]
         model = (
             cast("Model", cls(**item))
-            if not exclude_secrets
+            if not exclude_secrets and not is_defer_fields and not _is_only
             else cast("Model", cls.proxy_model(**item))
         )
-
         # Apply the schema to the model
         model = cls.__apply_schema(model, using_schema)
 
@@ -158,6 +142,7 @@ class ModelRowMixin:
         model = cls.__handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
+        assert model.pk is not None
         return model
 
     @classmethod
@@ -197,7 +182,7 @@ class ModelRowMixin:
         cls.__check_prefetch_collision(model, related)
         clauses = []
         for pkcol in cls.pkcolumns:
-            clauses.append(getattr(model.table.columns, pkcol) == row[pkcol])
+            clauses.append(getattr(model.table.columns, pkcol) == getattr(row, pkcol))
         queryset = related.queryset
         crawl_result = crawl_relationship(
             model.__class__, related.related_name, traverse_last=True

@@ -1,8 +1,5 @@
-import sqlite3
-
-import asyncpg
-import pymysql
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 import edgy
 from edgy.exceptions import FieldDefinitionError
@@ -231,12 +228,7 @@ async def test_on_delete_restrict():
     organisation = await Organisation.query.create(ident="Encode")
     await Team.query.create(org=organisation, name="Maintainers")
 
-    exceptions = (
-        asyncpg.exceptions.ForeignKeyViolationError,
-        pymysql.err.IntegrityError,
-    )
-
-    with pytest.raises(exceptions):
+    with pytest.raises(IntegrityError):
         await organisation.delete()
 
 
@@ -264,13 +256,7 @@ async def test_one_to_one_field_crud():
     await person.profile.load()
     assert person.profile.website == "https://edgy.com"
 
-    exceptions = (
-        asyncpg.exceptions.UniqueViolationError,
-        pymysql.err.IntegrityError,
-        sqlite3.IntegrityError,
-    )
-
-    with pytest.raises(exceptions):
+    with pytest.raises(IntegrityError):
         await Person.query.create(email="contact@edgy.com", profile=profile)
 
 
@@ -286,13 +272,7 @@ async def test_one_to_one_crud():
     await person.profile.load()
     assert person.profile.website == "https://edgy.com"
 
-    exceptions = (
-        asyncpg.exceptions.UniqueViolationError,
-        pymysql.err.IntegrityError,
-        sqlite3.IntegrityError,
-    )
-
-    with pytest.raises(exceptions):
+    with pytest.raises(IntegrityError):
         await AnotherPerson.query.create(email="contact@edgy.com", profile=profile)
 
 

@@ -1,5 +1,7 @@
 from typing import Any, Dict, Type, Union
 
+from sqlalchemy.engine.result import Row
+
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
 from edgy.exceptions import ObjectNotFound, RelationshipNotFound
@@ -98,11 +100,14 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         transformed_kwargs = self.transform_input(kwargs, phase="post_insert")
         for k, v in transformed_kwargs.items():
             setattr(self, k, v)
-
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
+            if isinstance(autoincrement_value, Row):
+                assert len(autoincrement_value) == 1
+                autoincrement_value = autoincrement_value[0]
             column = self.table.autoincrement_column
-            if column is not None:
+            # can be explicit set, which causes an invalid value returned
+            if column is not None and column.name not in kwargs:
                 setattr(self, column.key, autoincrement_value)
         for field in self.meta.fields:
             _val = self.__dict__.get(field)

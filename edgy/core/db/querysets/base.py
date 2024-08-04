@@ -229,17 +229,15 @@ class BaseQuerySet(
         if columns is None:
             columns = []
 
-        for name, field in model_class.fields.items():
+        for name, field in model_class.meta.fields.items():
+            if field.secret:
+                continue
+            columns.extend(field.get_column_names(name))
             if isinstance(field, BaseForeignKey):
                 # Making sure the foreign key is always added unless is a secret
-                if not field.secret:
-                    columns.extend(field.get_column_names(name))
-                    columns.extend(
-                        self._secret_recursive_names(model_class=field.target, columns=columns)
-                    )
-                continue
-            if not field.secret:
-                columns.append(name)
+                columns.extend(
+                    self._secret_recursive_names(model_class=field.target, columns=columns)
+                )
 
         columns = list(set(columns))
         return columns
@@ -560,7 +558,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         search_fields = [
             name
-            for name, field in queryset.model_class.fields.items()
+            for name, field in queryset.model_class.meta.fields.items()
             if isinstance(field, (CharField, TextField))
         ]
         search_clauses = [queryset.table.columns[name].ilike(value) for name in search_fields]
@@ -918,34 +916,41 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         refactored to be compatible with Edgy.
         """
         queryset: QuerySet = self._clone()
+        fields = list(fields)
 
-        new_objs = []
-        for obj in objs:
-            new_obj = {}
-            for key, value in obj.__dict__.items():
-                if key in fields:
-                    new_obj[key] = self._resolve_value(value)
-            new_objs.append(new_obj)
-
-        new_objs = [queryset.extract_column_values(obj, queryset.model_class) for obj in new_objs]
-
-        pks1 = (
-            getattr(queryset.table.c, pkcol) == sqlalchemy.bindparam(pkcol)
+        pk_query_placeholder = (
+            getattr(queryset.table.c, pkcol)
+            == sqlalchemy.bindparam(
+                "__id" if pkcol == "id" else pkcol, type_=getattr(queryset.table.c, pkcol).type
+            )
             for pkcol in queryset.pkcolumns
         )
-        expression = queryset.table.update().where(*pks1)
-        kwargs: Dict[Any, Any] = {
-            field: sqlalchemy.bindparam(field) for obj in new_objs for field in obj
+        expression = queryset.table.update().where(*pk_query_placeholder)
+
+        update_list = []
+        fields_plus_pk = {*fields, *queryset.model_class.pkcolumns}
+        for obj in objs:
+            update = queryset.extract_column_values(
+                obj.extract_db_fields(fields_plus_pk),
+                queryset.model_class,
+                is_update=True,
+                is_partial=True,
+            )
+            if "id" in update:
+                update["__id"] = update.pop("id")
+            update_list.append(update)
+
+        values_placeholder: Any = {
+            pkcol: sqlalchemy.bindparam(pkcol, type_=getattr(queryset.table.c, pkcol).type)
+            for field in fields
+            for pkcol in queryset.model_class.meta.field_to_column_names[field]
         }
-        pks2 = [{pkcol: getattr(obj, pkcol) for pkcol in queryset.pkcolumns} for obj in objs]
-
-        query_list = []
-        for pk, value in zip(pks2, new_objs):  # noqa
-            query_list.append({**pk, **value})
-
-        expression = expression.values(kwargs)
+        expression = expression.values(values_placeholder)
         queryset._set_query_expression(expression)
-        await queryset.database.execute_many(str(expression), query_list)
+        # TODO: rewrite ASAP (when the new databasez is released)
+        async with queryset.database.connection() as con:  # noqa: SIM117
+            async with con._query_lock:
+                await con._connection.async_connection.execute(expression, update_list)  # type: ignore
 
     async def delete(self) -> None:
         queryset: QuerySet = self._clone()

@@ -113,6 +113,10 @@ class ColumnsToField(UserDict, Dict[str, str]):
         self.init()
         return super().__contains__(name)
 
+    def __iter__(self) -> Any:
+        self.init()
+        return super().__iter__()
+
 
 _trigger_attributes_MetaInfo = {
     "field_to_columns",
@@ -122,6 +126,7 @@ _trigger_attributes_MetaInfo = {
     "special_getter_fields",
     "input_modifying_fields",
     "excluded_fields",
+    "secret_fields",
 }
 
 
@@ -147,6 +152,7 @@ class MetaInfo:
         "columns_to_field",
         "special_getter_fields",
         "excluded_fields",
+        "secret_fields",
         "_is_init",
     )
     _include_dump = (
@@ -161,7 +167,7 @@ class MetaInfo:
 
     field_to_columns: FieldToColumns
     field_to_column_names: FieldToColumnNames
-    columns_to_field: Dict[str, str]
+    columns_to_field: ColumnsToField
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         #  Difference between meta extraction and kwargs: meta attributes are copied
@@ -226,6 +232,7 @@ class MetaInfo:
     def init_fields_mapping(self) -> None:
         special_getter_fields = set()
         excluded_fields = set()
+        secret_fields = set()
         input_modifying_fields = set()
         foreign_key_fields: Dict[str, BaseFieldType] = {}
         for key, field in self.fields.items():
@@ -233,12 +240,15 @@ class MetaInfo:
                 special_getter_fields.add(key)
             if getattr(field, "exclude", False):
                 excluded_fields.add(key)
+            if getattr(field, "secret", False):
+                secret_fields.add(key)
             if hasattr(field, "modify_input"):
                 input_modifying_fields.add(key)
             if isinstance(field, BaseForeignKeyField):
                 foreign_key_fields[key] = field
         self.special_getter_fields: FrozenSet[str] = frozenset(special_getter_fields)
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
+        self.secret_fields: FrozenSet[str] = frozenset(secret_fields)
         self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
         self.foreign_key_fields: Dict[str, BaseFieldType] = foreign_key_fields
         self.field_to_columns = FieldToColumns(self)
