@@ -2,7 +2,7 @@ import datetime
 from enum import Enum
 
 import pytest
-from asyncpg.exceptions import UniqueViolationError
+from sqlalchemy.exc import IntegrityError
 
 import edgy
 from edgy.core.db.datastructures import UniqueConstraint
@@ -84,7 +84,7 @@ async def test_unique_together():
     await User.query.create(name="Test", email="test@example.com")
     await User.query.create(name="Test", email="test2@example.come")
 
-    with pytest.raises(UniqueViolationError):
+    with pytest.raises(IntegrityError):
         await User.query.create(name="Test", email="test@example.com")
 
 
@@ -93,7 +93,7 @@ async def test_unique_together_multiple():
     await HubUser.query.create(name="Test", email="test@example.com")
     await HubUser.query.create(name="Test", email="test2@example.come")
 
-    with pytest.raises(UniqueViolationError):
+    with pytest.raises(IntegrityError):
         await HubUser.query.create(name="Test", email="test@example.com")
 
 
@@ -101,7 +101,7 @@ async def test_unique_together_multiple():
 async def test_unique_together_multiple_name_age():
     await HubUser.query.create(name="NewTest", email="test@example.com", age=18)
 
-    with pytest.raises(UniqueViolationError):
+    with pytest.raises(IntegrityError):
         await HubUser.query.create(name="Test", email="test@example.com", age=18)
 
 
@@ -109,7 +109,7 @@ async def test_unique_together_multiple_name_age():
 async def test_unique_together_multiple_single_string():
     await Product.query.create(name="android", sku="12345")
 
-    with pytest.raises(UniqueViolationError):
+    with pytest.raises(IntegrityError):
         await Product.query.create(name="android", sku="12345")
 
 
@@ -117,5 +117,5 @@ async def test_unique_together_multiple_single_string():
 async def test_unique_together_multiple_single_string_two():
     await Product.query.create(name="android", sku="12345")
 
-    with pytest.raises(UniqueViolationError):
+    with pytest.raises(IntegrityError):
         await Product.query.create(name="iphone", sku="12345")
