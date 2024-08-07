@@ -200,7 +200,7 @@ class BaseQuerySet(
         foreign_key: BaseForeignKey,
         table: Any,
         reverse: bool,
-        former_table: Any = None,
+        former_table: Any,
     ) -> Any:
         column_names = foreign_key.get_column_names(foreign_key.name)
         for col in column_names:

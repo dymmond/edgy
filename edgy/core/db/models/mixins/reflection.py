@@ -82,7 +82,6 @@ class ReflectedModelMixin:
             async with Database(
                 registry.database, force_rollback=False
             ) as database, database.transaction():
-                table = await database.run_sync(execute_reflection)
-            return table
+                return await database.run_sync(execute_reflection)  # type: ignore
         except Exception as e:
             raise ImproperlyConfigured(detail=str(e)) from e
