@@ -1,16 +1,13 @@
 from functools import cached_property
-from typing import Any, Dict, Mapping, Type
+from typing import Any, Dict, Mapping, Union
 
 import sqlalchemy
-from sqlalchemy import Engine, create_engine
-from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
 from sqlalchemy.orm import declarative_base as sa_declarative_base
 
-from edgy.conf import settings
-from edgy.core.connection.database import Database
+from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
-from edgy.exceptions import ImproperlyConfigured
 
 
 class Registry:
@@ -18,12 +15,17 @@ class Registry:
     The command center for the models of Edgy.
     """
 
-    def __init__(self, database: Database, **kwargs: Any) -> None:
-        self.database: Database = database
+    def __init__(self, database: Union[Database, str, DatabaseURL], **kwargs: Any) -> None:
+        self.database: Database = (
+            database if isinstance(database, Database) else Database(database)
+        )
         self.models: Dict[str, Any] = {}
         self.reflected: Dict[str, Any] = {}
         self.db_schema = kwargs.get("schema", None)
-        self.extra: Mapping[str, Type[Database]] = kwargs.pop("extra", {})
+        self.extra: Mapping[str, Database] = {
+            k: v if isinstance(v, Database) else Database(v)
+            for k, v in kwargs.pop("extra", {}).items()
+        }
 
         self.schema = Schema(registry=self)
 
@@ -43,27 +45,6 @@ class Registry:
     def metadata(self, value: sqlalchemy.MetaData) -> None:
         self._metadata = value
 
-    def _get_database_url(self) -> str:
-        url = self.database.url
-        if not url.driver:
-            if url.dialect in settings.postgres_dialects:
-                url = url.replace(driver="asyncpg")
-            elif url.dialect in settings.mysql_dialects:
-                url = url.replace(driver="aiomysql")
-            elif url.dialect in settings.sqlite_dialects:
-                url = url.replace(driver="aiosqlite")
-            elif url.dialect in settings.mssql_dialects:
-                raise ImproperlyConfigured("Edgy does not support MSSQL at the moment.")
-        elif url.driver in settings.mssql_drivers:
-            raise ImproperlyConfigured("Edgy does not support MSSQL at the moment.")
-        return str(url)
-
-    @cached_property
-    def _get_engine(self) -> AsyncEngine:
-        url = self._get_database_url()
-        engine = create_async_engine(url)
-        return engine
-
     @cached_property
     def declarative_base(self) -> Any:
         if self.db_schema:
@@ -74,17 +55,12 @@ class Registry:
 
     @property
     def engine(self) -> AsyncEngine:
-        return self._get_engine
-
-    @cached_property
-    def _get_sync_engine(self) -> Engine:
-        url = self._get_database_url()
-        engine = create_engine(url)
-        return engine
+        assert self.database.engine, "database not initialized"
+        return self.database.engine
 
     @property
     def sync_engine(self) -> Engine:
-        return self._get_sync_engine
+        return self.engine.sync_engine
 
     def init_models(
         self, *, init_column_mappers: bool = True, init_class_attrs: bool = True
@@ -108,15 +84,15 @@ class Registry:
     async def create_all(self) -> None:
         if self.db_schema:
             await self.schema.create_schema(self.db_schema, True)
-        async with self.database, self.engine.begin() as connection:
-            await connection.run_sync(self.metadata.create_all)
-        await self.engine.dispose()
+        async with Database(
+            self.database, force_rollback=False
+        ) as database, database.transaction():
+            await database.create_all(self.metadata)
 
     async def drop_all(self) -> None:
         if self.db_schema:
             await self.schema.drop_schema(self.db_schema, True, True)
-        async with self.database, self.engine.begin() as conn:
-            await conn.run_sync(self.metadata.drop_all)
-            # let's invalidate everything and recalculate. We don't want references.
-            self.invalidate_models()
-        await self.engine.dispose()
+        async with Database(
+            self.database, force_rollback=False
+        ) as database, database.transaction():
+            await database.drop_all(self.metadata)

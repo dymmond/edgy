@@ -14,13 +14,14 @@ hide:
 - Add attribute `inject_default_on_partial_update`.
 - Allow factories overwriting field methods.
 - Deep embedding via embed_parent possible.
+- Support for nearly all async sqlalchemy drivers plus more from databasez.
 
 ### Changed
 
 - `get_default_values` has now an extra keyword argument `is_update`
 - `meta.fields_mapping` was renamed to `meta.fields`.-
 - Factories have now different named configuration variables.
-- Refactoring of fields and models
+- Refactoring of fields and models:
   - BaseModelType and BaseFieldType are now added and should be used for typings.
   - `get_column` works now via extractor.
   - Renamed internals.
@@ -28,12 +29,18 @@ hide:
 - Comparisons of models use now only primary keys.
 - Deprecate on model forwards signals, fields. Use now meta.signals, meta.fields.
 
+### Removed
+
+- execsync (nearly no uses).
+- DateParser mixin (superseeded by sqlalchemy's logic).
+
 ### Fixed
 
 - `auto_now` and `auto_now_add` now also work for date fields.
 - `BinaryField` had a wrong type.
 - Metaclasses with keyword arguments are now possible.
 - Relaxed Prefetching, tables can now appear multiple times.
+- `select_related` now correctly filters columns.
 
 ## 0.12.0
 

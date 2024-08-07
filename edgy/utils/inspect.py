@@ -8,8 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.sql import schema, sqltypes
 
 import edgy
-from edgy import Database, Registry
-from edgy.core.sync import execsync
+from edgy import Database, Registry, run_sync
 from edgy.core.terminal import Print
 
 printer = Print()
@@ -73,6 +72,7 @@ class InspectDB:
         Starts the InspectDB and passes all the configurations.
         """
         registry = Registry(database=self.database)
+        run_sync(registry.database.connect())
 
         # Get the engine to connect
         engine: AsyncEngine = registry.engine
@@ -83,13 +83,15 @@ class InspectDB:
             if self.schema is not None
             else sqlalchemy.MetaData()
         )
-        metadata = execsync(self.reflect)(engine=engine, metadata=metadata)
+        metadata = run_sync(self.reflect(engine=engine, metadata=metadata))
 
         # Generate the tables
         tables, _ = self.generate_table_information(metadata)
 
-        for line in self.write_output(tables, self.database.url._url, schema=self.schema):
+        for line in self.write_output(tables, str(registry.database.url), schema=self.schema):
             sys.stdout.writelines(line)  # type: ignore
+
+        run_sync(registry.database.disconnect())
 
     def generate_table_information(
         self, metadata: sqlalchemy.MetaData

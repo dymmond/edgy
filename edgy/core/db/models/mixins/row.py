@@ -232,7 +232,8 @@ class ModelRowMixin:
             # If to_attr has the same name of any
             cls.__check_prefetch_collision(model=model, related=related)
             queries.append(cls.__set_prefetch(row=row, model=model, related=related))
-        run_sync(asyncio.gather(*queries))
+        if queries:
+            run_sync(asyncio.gather(*queries))
         return model
 
     @classmethod

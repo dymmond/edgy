@@ -9,7 +9,7 @@ from edgy import Registry
 from edgy.cli.env import MigrationEnv
 from edgy.cli.operations.shell.enums import ShellOption
 from edgy.core.events import AyncLifespanContextManager
-from edgy.core.sync import execsync
+from edgy.core.utils.sync import run_sync
 
 
 @click.option(
@@ -46,7 +46,7 @@ def shell(env: MigrationEnv, kernel: bool) -> None:
     lifespan = handle_lifespan_events(
         on_startup=on_startup, on_shutdown=on_shutdown, lifespan=lifespan
     )
-    execsync(run_shell)(env.app, lifespan, registry, kernel)
+    run_sync(run_shell(env.app, lifespan, registry, kernel))
     return None
 
 
