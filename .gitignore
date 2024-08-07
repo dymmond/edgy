@@ -17,6 +17,7 @@ node_modules/
 results/
 site/
 target/
+tests/cli/migrations
 
 # files
 **/*.so

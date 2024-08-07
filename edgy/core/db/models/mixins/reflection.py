@@ -11,6 +11,7 @@ import sqlalchemy
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 from sqlalchemy.ext.asyncio import AsyncConnection
 
+from edgy.core.connection.database import Database
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ImproperlyConfigured
 
@@ -78,9 +79,10 @@ class ReflectedModelMixin:
                 raise e
 
         try:
-            async with registry.engine.begin() as connection:
-                table = await connection.run_sync(execute_reflection)
-            await registry.engine.dispose()
+            async with Database(
+                registry.database, force_rollback=False
+            ) as database, database.transaction():
+                table = await database.run_sync(execute_reflection)
             return table
         except Exception as e:
             raise ImproperlyConfigured(detail=str(e)) from e

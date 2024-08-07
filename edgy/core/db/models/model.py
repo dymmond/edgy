@@ -107,7 +107,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 autoincrement_value = autoincrement_value[0]
             column = self.table.autoincrement_column
             # can be explicit set, which causes an invalid value returned
-            if column is not None and column.name not in kwargs:
+            if column is not None and column.key not in kwargs:
                 setattr(self, column.key, autoincrement_value)
         for field in self.meta.fields:
             _val = self.__dict__.get(field)

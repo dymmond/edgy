@@ -21,7 +21,7 @@ from edgy.conf import settings
 from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
-from edgy.core.db.models.mixins import DateParser, ModelParser
+from edgy.core.db.models.mixins import ModelParser
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import PrefetchMixin
 from edgy.core.db.querysets.protocols import AwaitableQuery
@@ -53,7 +53,6 @@ class BaseQuerySet(
     TenancyMixin,
     QuerySetPropsMixin,
     PrefetchMixin,
-    DateParser,
     ModelParser,
     AwaitableQuery[EdgyModel],
 ):
@@ -156,8 +155,7 @@ class BaseQuerySet(
         for select_path in queryset._select_related:
             # For m2m relationships
             model_class = queryset.model_class
-            select_from = queryset.table
-            former_table = None
+            former_table = queryset.table
             while select_path:
                 field_name = select_path.split("__", 1)[0]
                 try:
@@ -184,21 +182,21 @@ class BaseQuerySet(
                         "We cannot cross databases yet, this feature is planned"
                     )
                 table = model_class.table
-                select_from = sqlalchemy.sql.join(  # type: ignore
-                    select_from,
-                    table,
-                    *self._select_from_relationship_clause_generator(
-                        select_from, foreign_key, table, reverse, former_table
-                    ),
-                )
+                if table.name not in tables:
+                    select_from = sqlalchemy.sql.join(  # type: ignore
+                        select_from,
+                        table,
+                        *self._select_from_relationship_clause_generator(
+                            foreign_key, table, reverse, former_table
+                        ),
+                    )
+                    tables[table.name] = table
                 former_table = table
-                tables[table.name] = table
 
         return tables.values(), select_from
 
     @staticmethod
     def _select_from_relationship_clause_generator(
-        select_from: Any,
         foreign_key: BaseForeignKey,
         table: Any,
         reverse: bool,
@@ -207,8 +205,6 @@ class BaseQuerySet(
         column_names = foreign_key.get_column_names(foreign_key.name)
         for col in column_names:
             colname = foreign_key.from_fk_field_name(foreign_key.name, col) if reverse else col
-            if former_table is None:
-                former_table = select_from
             if reverse:
                 yield getattr(former_table.c, colname) == getattr(table.c, col)
             else:
@@ -441,8 +437,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         return self.__class__(model_class=owner if owner else instance.__class__)
 
     @property
-    def sql(self) -> str:
-        return str(self._expression)
+    def sql(self) -> Any:
+        return self._expression
 
     @sql.setter
     def sql(self, value: Any) -> None:
@@ -947,10 +943,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         }
         expression = expression.values(values_placeholder)
         queryset._set_query_expression(expression)
-        # TODO: rewrite ASAP (when the new databasez is released)
-        async with queryset.database.connection() as con:  # noqa: SIM117
-            async with con._query_lock:
-                await con._connection.async_connection.execute(expression, update_list)  # type: ignore
+        await queryset.database.execute(expression, update_list)
 
     async def delete(self) -> None:
         queryset: QuerySet = self._clone()
