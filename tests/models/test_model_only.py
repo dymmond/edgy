@@ -44,7 +44,9 @@ async def test_raise_QuerySetError_on_only_and_defer():
 
 async def test_model_only():
     john = await User.query.create(name="John", language="PT", description="A simple description")
-    jane = await User.query.create(name="Jane", language="EN", description="Another simple description")
+    jane = await User.query.create(
+        name="Jane", language="EN", description="Another simple description"
+    )
     users = await User.query.only("name", "language")
 
     assert len(users) == 2

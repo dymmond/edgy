@@ -76,6 +76,7 @@ async def test_add_many_to_many():
     for track in total_tracks:
         assert track.embedded.track.pk == track.pk
 
+
 async def test_add_many_to_many_new():
     track1 = await Track.query.create(title="The Bird", position=1)
     track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
@@ -87,7 +88,6 @@ async def test_add_many_to_many_new():
     assert len(total_tracks) == 3
     for track in total_tracks:
         assert track.embedded.track.pk == track.pk
-
 
 
 async def test_add_many_to_many_with_repeated_field():
@@ -179,7 +179,10 @@ async def test_raises_RelationshipNotFound():
     with pytest.raises(RelationshipNotFound) as raised:
         await album.tracks.remove(track3)
 
-    assert raised.value.args[0] == f"There is no relationship between 'album' and 'track: {track3.pk}'."
+    assert (
+        raised.value.args[0]
+        == f"There is no relationship between 'album' and 'track: {track3.pk}'."
+    )
 
 
 async def test_many_to_many_many_fields():

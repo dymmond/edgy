@@ -88,7 +88,9 @@ async def test_inherited_base_model_managers():
     assert len(users) == 2
 
 
-@pytest.mark.parametrize("manager,manager_class,total", [("query", ObjectsManager, 0), ("ratings", RatingManager, 3)])
+@pytest.mark.parametrize(
+    "manager,manager_class,total", [("query", ObjectsManager, 0), ("ratings", RatingManager, 3)]
+)
 async def test_inherited_base_model_managers_product(manager, manager_class, total):
     assert isinstance(getattr(Product, manager), manager_class)
     await Product.query.create(name="test", rating=5)

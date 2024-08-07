@@ -16,11 +16,13 @@ class EdgyLazySettings(LazyObject):
         is used the first time settings are needed, if the user hasn't
         configured settings manually.
         """
-        settings_module: str = os.environ.get(ENVIRONMENT_VARIABLE, "edgy.conf.global_settings.EdgySettings")
+        settings_module: str = os.environ.get(
+            ENVIRONMENT_VARIABLE, "edgy.conf.global_settings.EdgySettings"
+        )
         settings: Any = import_string(settings_module)
 
         for setting, _ in settings().model_dump().items():
-            assert setting.islower(), "%s should be in lowercase." % setting
+            assert setting.islower(), f"{setting} should be in lowercase."
 
         self._wrapped = settings()
 
@@ -28,7 +30,7 @@ class EdgyLazySettings(LazyObject):
         # Hardcode the class name as otherwise it yields 'Settings'.
         if self._wrapped is empty:
             return "<EdgyLazySettings [Unevaluated]>"
-        return '<EdgyLazySettings "{settings_module}">'.format(settings_module=self._wrapped.__class__.__name__)
+        return f'<EdgyLazySettings "{self._wrapped.__class__.__name__}">'
 
     @property
     def configured(self) -> Any:

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from edgy.core.db.fields.foreign_keys import ForeignKey
@@ -5,11 +7,12 @@ from edgy.core.terminal import Print
 
 if TYPE_CHECKING:
     from edgy import Model
-    from edgy.core.db.fields.base import BaseField
+    from edgy.core.db.fields.types import BaseFieldType
 
 T = TypeVar("T", bound="Model")
 
 terminal = Print()
+
 
 class OneToOneField(ForeignKey):
     """
@@ -18,14 +21,15 @@ class OneToOneField(ForeignKey):
 
     def __new__(  # type: ignore
         cls,
-        to: Union["Model", str],
+        to: Union[Model, str],
         **kwargs: Any,
-    ) -> "BaseField":
+    ) -> BaseFieldType:
         for argument in ["index", "unique"]:
             if argument in kwargs:
                 terminal.write_warning(f"Declaring {argument} on a OneToOneField has no effect.")
         kwargs["unique"] = True
 
         return super().__new__(cls, to=to, **kwargs)
+
 
 OneToOne = OneToOneField

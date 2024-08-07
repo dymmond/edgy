@@ -117,7 +117,9 @@ def test_raises_ForeignKeyBadConfigured():
 
         class Profile(edgy.Model):
             user = edgy.ForeignKey(User, null=False, on_delete=edgy.CASCADE, related_name=name)
-            another_user = edgy.ForeignKey(User, null=False, on_delete=edgy.CASCADE, related_name=name)
+            another_user = edgy.ForeignKey(
+                User, null=False, on_delete=edgy.CASCADE, related_name=name
+            )
 
             class Meta:
                 registry = models

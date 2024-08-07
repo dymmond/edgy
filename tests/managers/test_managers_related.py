@@ -67,11 +67,12 @@ async def test_managers_related():
     user1 = await User.query.create(name="Edgy", email="foo@bar.com", is_active=False, team=team)  # noqa
 
     # You can also create a user using the new manager
-    user2 = await User.query_related.create(name="Another Edgy", email="bar@foo.com", is_active=False, team=team)  # noqa
+    user2 = await User.query_related.create(
+        name="Another Edgy", email="bar@foo.com", is_active=False, team=team
+    )  # noqa
 
     # Create a user using the default manager
-    user3 =await User.query.create(name="Edgy", email="user@edgy.com", team=team)  # noqa
-
+    user3 = await User.query.create(name="Edgy", email="user@edgy.com", team=team)  # noqa
 
     # Querying them all
     users = await User.query.all()  # noqa

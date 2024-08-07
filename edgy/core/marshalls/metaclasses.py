@@ -33,25 +33,29 @@ class MarshallMeta(ModelMetaclass):
         if not parents:
             return model_class(cls, name, bases, attrs)
 
-        model_class: "Marshall" = model_class(cls, name, bases, attrs)  # type: ignore
+        model_class: Marshall = model_class(cls, name, bases, attrs)  # type: ignore
         if name in ("Marshall",):
             return model_class
 
         if marshall_config is None:
-            raise MarshallFieldDefinitionError("The 'marshall_config' was not found. Make sure it is declared and set.")
+            raise MarshallFieldDefinitionError(
+                "The 'marshall_config' was not found. Make sure it is declared and set."
+            )
 
         # The declared model
-        model: "Model" = marshall_config.get("model", None)  # type: ignore
+        model: Model = marshall_config.get("model", None)  # type: ignore
         assert model is not None, "'model' must be declared in the 'ConfigMarshall'."
 
         if isinstance(cast(str, model), str):
-            model: "Model" = import_string(model)  # type: ignore
+            model: Model = import_string(model)  # type: ignore
             marshall_config["model"] = model
 
         base_fields_include = marshall_config.get("fields", None)
         base_fields_exclude = marshall_config.get("exclude", None)
 
-        assert base_fields_include is None or base_fields_exclude is None, "Use either 'fields' or 'exclude', not both."
+        assert (
+            base_fields_include is None or base_fields_exclude is None
+        ), "Use either 'fields' or 'exclude', not both."
         assert (
             base_fields_include is not None or base_fields_exclude is not None
         ), "Either 'fields' or 'exclude' must be declared."
@@ -60,9 +64,13 @@ class MarshallMeta(ModelMetaclass):
 
         # Define the fields for the Marshall
         if base_fields_exclude is not None:
-            base_model_fields = {k: v for k, v in model.model_fields.items() if k not in base_fields_exclude}
+            base_model_fields = {
+                k: v for k, v in model.model_fields.items() if k not in base_fields_exclude
+            }
         elif base_fields_include is not None and "__all__" in base_fields_include:
-            base_model_fields = {k: v for k, v in model.meta.fields_mapping.items() if k not in model_fields}
+            base_model_fields = {
+                k: v for k, v in model.meta.fields.items() if k not in model_fields
+            }
             show_pk = True
         else:
             base_model_fields = {
@@ -78,18 +86,21 @@ class MarshallMeta(ModelMetaclass):
 
         # For custom model_fields
         for k, v in attrs.items():
-            if isinstance(v, BaseMarshallField):
+            if isinstance(v, BaseMarshallField):  # noqa: SIM102
                 # Make sure the custom fields are flagged.
-                if k not in model.meta.fields_mapping:
+                if k not in model.meta.fields:
                     custom_fields[k] = v
 
         # Handle the check of the custom fields
         for name, field in custom_fields.items():
-            if field.__is_method__ and not field.source:
-                if not hasattr(model_class, f"get_{name}"):
-                    raise MarshallFieldDefinitionError(
-                        f"Field '{name}' declared but no 'get_{name}' found in '{model_class.__name__}'."
-                    )
+            if (
+                field.__is_method__
+                and not field.source
+                and not hasattr(model_class, f"get_{name}")
+            ):
+                raise MarshallFieldDefinitionError(
+                    f"Field '{name}' declared but no 'get_{name}' found in '{model_class.__name__}'."
+                )
 
         model_class.model_fields = base_model_fields
 
@@ -104,7 +115,7 @@ class MarshallMeta(ModelMetaclass):
 
         # Raise for error if any of the required fields is not in the Marshall
         required_fields: Set[str] = {f"'{k}'" for k, v in model.model_fields.items() if not v.null}
-        if any(value not in model_class.model_fields.keys() for value in required_fields):
+        if any(value not in model_class.model_fields for value in required_fields):
             fields = ", ".join(sorted(required_fields))
             raise MarshallFieldDefinitionError(
                 f"'{model.__name__}' model requires the following mandatory fields: [{fields}]."

@@ -103,8 +103,10 @@ async def test_can_have_multiple_tenants_with_different_records_with_using():
 
     # Create products for user_edgy
     for i in range(5):
-        await Product.query.defer().using(edgy.schema_name).create(
-            name=f"product-{i}", user=user_edgy
+        await (
+            Product.query.defer()
+            .using(edgy.schema_name)
+            .create(name=f"product-{i}", user=user_edgy)
         )
 
     # Create a user for saffier
@@ -112,8 +114,10 @@ async def test_can_have_multiple_tenants_with_different_records_with_using():
 
     # Create products for user_saffier
     for i in range(25):
-        await Product.query.exclude().using(saffier.schema_name).create(
-            name=f"product-{i}", user=user_saffier
+        await (
+            Product.query.exclude()
+            .using(saffier.schema_name)
+            .create(name=f"product-{i}", user=user_saffier)
         )
 
     # Create top level users

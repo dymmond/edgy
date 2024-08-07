@@ -103,7 +103,9 @@ class Migrate(BaseExtra):
 
         self.set_edgy_extension(app)
 
-    def check_db_models(self, model_apps: Union[Dict[str, str], Tuple[str], List[str]]) -> Dict[str, Any]:
+    def check_db_models(
+        self, model_apps: Union[Dict[str, str], Tuple[str], List[str]]
+    ) -> Dict[str, Any]:
         """
         Goes through all the model applications declared in the migrate and
         adds them into the registry.
@@ -162,7 +164,7 @@ class Migrate(BaseExtra):
         if not hasattr(config.cmd_opts, "x"):
             if arg is not None:
                 config.cmd_opts.x = []
-                if isinstance(arg, list) or isinstance(arg, tuple):
+                if isinstance(arg, (list, tuple)):
                     for x in arg:
                         config.cmd_opts.x.append(x)
                 else:
@@ -274,7 +276,9 @@ def migrate(
 
 
 @catch_errors
-def edit(app: Optional[typing.Any], directory: Optional[str] = None, revision: str = "current") -> None:
+def edit(
+    app: Optional[typing.Any], directory: Optional[str] = None, revision: str = "current"
+) -> None:
     """Edit current revision."""
     if alembic_version >= (1, 9, 4):
         config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
@@ -294,7 +298,9 @@ def merge(
 ) -> None:
     """Merge two revisions together.  Creates a new migration file"""
     config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
-    command.merge(config, revisions, message=message, branch_label=branch_label, rev_id=revision_id)
+    command.merge(
+        config, revisions, message=message, branch_label=branch_label, rev_id=revision_id
+    )
 
 
 @catch_errors
@@ -364,14 +370,18 @@ def heads(
 
 
 @catch_errors
-def branches(app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False) -> None:
+def branches(
+    app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False
+) -> None:
     """Show current branch points"""
     config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
     command.branches(config, verbose=verbose)
 
 
 @catch_errors
-def current(app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False) -> None:
+def current(
+    app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False
+) -> None:
     """Display the current revision for each database."""
     config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
     command.current(config, verbose=verbose)

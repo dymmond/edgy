@@ -24,7 +24,7 @@ from edgy.core.db.fields import (
     TimeField,
     UUIDField,
 )
-from edgy.core.db.fields.base import BaseField
+from edgy.core.db.fields.base import BaseField, Field
 from edgy.exceptions import FieldDefinitionError
 
 
@@ -42,7 +42,7 @@ def test_column_type():
     assert isinstance(DateField.get_column_type(), sqlalchemy.Date)
     assert isinstance(TimeField.get_column_type(), sqlalchemy.Time)
     assert isinstance(JSONField.get_column_type(), sqlalchemy.JSON)
-    assert isinstance(BinaryField.get_column_type(), sqlalchemy.JSON)
+    assert isinstance(BinaryField.get_column_type(), sqlalchemy.LargeBinary)
     assert isinstance(IntegerField.get_column_type(), sqlalchemy.Integer)
     assert isinstance(BigIntegerField.get_column_type(), sqlalchemy.BigInteger)
     assert isinstance(SmallIntegerField.get_column_type(), sqlalchemy.SmallInteger)
@@ -62,7 +62,7 @@ def test_column_type():
         (DateField(auto_now=True), datetime.date),
         (TimeField(), datetime.time),
         (JSONField(), Any),
-        (BinaryField(max_length=255), bytes),
+        (BinaryField(), bytes),
         (IntegerField(), int),
         (BigIntegerField(), int),
         (SmallIntegerField(), int),
@@ -84,7 +84,7 @@ def test_field_annotation(field, annotation):
         (DateField(null=False), True),
         (TimeField(null=False), True),
         (JSONField(null=False), True),
-        (BinaryField(max_length=255, null=False), True),
+        (BinaryField(null=False), True),
         (IntegerField(null=False), True),
         (BigIntegerField(null=False), True),
         (SmallIntegerField(null=False), True),
@@ -183,7 +183,7 @@ def test_can_create_date_field():
     field = DateField(auto_now=True)
 
     assert isinstance(field, BaseField)
-    assert field.default == datetime.date.today
+    assert field.default == datetime.datetime.now
     assert field.read_only is True
 
 
@@ -199,6 +199,29 @@ def test_can_create_time_field():
     assert field.read_only is False
 
 
+def test_autonow_field(mocker):
+    class Foo(Field):
+        pass
+
+    class Bar(DateTimeField):
+        field_bases = (Foo,)
+
+    spy = mocker.spy(Foo, "get_default_values")
+
+    field = Bar(auto_now_add=True)
+    field.get_default_values("field_name", {}, is_update=True)
+    spy.assert_not_called()
+    field.get_default_values("field_name", {}, is_update=False)
+    spy.assert_called()
+
+
+def test_can_overwrite_method_autonow_field(mocker):
+    field = DateTimeField(auto_now_add=True)
+    spy = mocker.spy(field, "get_default_values")
+    field.get_default_values("field_name", {}, is_update=True)
+    spy.assert_called_with("field_name", {}, is_update=True)
+
+
 def test_can_create_json_field():
     field = JSONField(default={"json": "json"})
 
@@ -211,11 +234,6 @@ def test_can_create_binary_field():
 
     assert isinstance(field, BaseField)
     assert field.default is None
-
-
-def test_raises_field_definition_error_on_binary_creation():
-    with pytest.raises(FieldDefinitionError):
-        BinaryField(max_length=0)
 
 
 @pytest.mark.parametrize("klass", [FloatField, IntegerField, BigIntegerField, SmallIntegerField])

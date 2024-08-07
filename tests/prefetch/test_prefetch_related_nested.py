@@ -95,7 +95,9 @@ async def test_prefetch_related_nested():
 
     await Company.query.create(studio=stud)
 
-    company = await Company.query.prefetch_related(Prefetch(related_name="studio__album__tracks", to_attr="tracks"))
+    company = await Company.query.prefetch_related(
+        Prefetch(related_name="studio__album__tracks", to_attr="tracks")
+    )
 
     assert len(company[0].tracks) == 1
 

@@ -1,4 +1,3 @@
-
 import copy
 from typing import (
     TYPE_CHECKING,
@@ -17,8 +16,9 @@ from typing import (
 from pydantic import BaseModel
 
 from edgy.core.db.constants import ConditionalRedirect
-from edgy.core.db.fields.base import BaseCompositeField, BaseField
+from edgy.core.db.fields.base import BaseCompositeField
 from edgy.core.db.fields.core import FieldFactory
+from edgy.core.db.fields.types import BaseFieldType
 from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
@@ -38,20 +38,32 @@ class ConcreteCompositeField(BaseCompositeField):
     Conrete, internal implementation of the CompositeField
     """
 
-    def __init__(self, *, inner_fields:  Union[Sequence[Union[str, Tuple[str, BaseField]]], Type["Model"], Type["ReflectModel"], Dict[str, BaseField]] =(), **kwargs: Any):
+    def __init__(
+        self,
+        *,
+        inner_fields: Union[
+            Sequence[Union[str, Tuple[str, BaseFieldType]]],
+            Type["Model"],
+            Type["ReflectModel"],
+            Dict[str, BaseFieldType],
+        ] = (),
+        **kwargs: Any,
+    ):
         self.inner_field_names: List[str] = []
-        self.embedded_field_defs: Dict[str, BaseField] = {}
+        self.embedded_field_defs: Dict[str, BaseFieldType] = {}
         if hasattr(inner_fields, "meta"):
             kwargs.setdefault("model", inner_fields)
             kwargs.setdefault("inherit", inner_fields.meta.inherit)
-            inner_fields = inner_fields.meta.fields_mapping
+            inner_fields = inner_fields.meta.fields
         if isinstance(inner_fields, dict):
             inner_fields = inner_fields.items()  # type: ignore
         owner = kwargs.pop("owner", None)
         self.prefix_embedded: str = kwargs.pop("prefix_embedded", "")
         self.unsafe_json_serialization: bool = kwargs.pop("unsafe_json_serialization", False)
         self.absorb_existing_fields: bool = kwargs.pop("absorb_existing_fields", False)
-        self.model: Optional[Union[Type[BaseModel], Type[ConditionalRedirect]]] = kwargs.pop("model", None)
+        self.model: Optional[Union[Type[BaseModel], Type[ConditionalRedirect]]] = kwargs.pop(
+            "model", None
+        )
         for field in inner_fields:
             if isinstance(field, str):
                 self.inner_field_names.append(field)
@@ -60,11 +72,15 @@ class ConcreteCompositeField(BaseCompositeField):
                 field_name = field[0]
                 # for preventing suddenly invalid field names
                 if self.prefix_embedded.endswith("_") and field_name.startswith("_"):
-                    raise FieldDefinitionError(f"_ prefixed fields are not supported: {field_name} with prefix ending with _")
+                    raise FieldDefinitionError(
+                        f"_ prefixed fields are not supported: {field_name} with prefix ending with _"
+                    )
                 field_name = f"{self.prefix_embedded}{field_name}"
                 # set field_name and owner
                 # parent is None because not fully initialized
-                field_def = field[1].embed_field(self.prefix_embedded, field_name, owner=owner, parent=None)
+                field_def = field[1].embed_field(
+                    self.prefix_embedded, field_name, owner=owner, parent=None
+                )
                 if field_def is not None:
                     field_def.exclude = True
                     self.inner_field_names.append(field_def.name)
@@ -80,17 +96,30 @@ class ConcreteCompositeField(BaseCompositeField):
             return _removeprefix(name, self.prefix_embedded)
         return name
 
-
-    def embed_field(self, prefix: str, new_fieldname:str, owner: Optional[Union[Type["Model"], Type["ReflectModel"]]]=None, parent: Optional[BaseField]=None) -> BaseField:
-        field_copy = cast(BaseField, super().embed_field(prefix, new_fieldname, owner=owner, parent=self))
+    def embed_field(
+        self,
+        prefix: str,
+        new_fieldname: str,
+        owner: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        parent: Optional[BaseFieldType] = None,
+    ) -> BaseFieldType:
+        field_copy = cast(
+            BaseFieldType, super().embed_field(prefix, new_fieldname, owner=owner, parent=self)
+        )
         field_copy.prefix_embedded = f"{prefix}{field_copy.prefix_embedded}"
         embedded_field_defs = field_copy.embedded_field_defs
-        field_copy.inner_field_names = [f"{prefix}{field_name}" for field_name in field_copy.inner_field_names if field_name not in embedded_field_defs]
+        field_copy.inner_field_names = [
+            f"{prefix}{field_name}"
+            for field_name in field_copy.inner_field_names
+            if field_name not in embedded_field_defs
+        ]
         field_copy.embedded_field_defs = {}
         for field_name, field in embedded_field_defs.items():
             # for preventing suddenly invalid field names
             if self.prefix_embedded.endswith("_") and field_name.startswith("_"):
-                raise FieldDefinitionError(f"_ prefixed fields are not supported: {field_name} with prefix ending with _")
+                raise FieldDefinitionError(
+                    f"_ prefixed fields are not supported: {field_name} with prefix ending with _"
+                )
             field_name = f"{prefix}{field_name}"
             field_def = field.embed_field(prefix, field_name, owner)
             if field_def is not None:
@@ -106,7 +135,7 @@ class ConcreteCompositeField(BaseCompositeField):
         d = {}
         for key in self.inner_field_names:
             translated_name = self.translate_name(key)
-            field = instance.meta.fields_mapping.get(key)
+            field = instance.meta.fields.get(key)
             try:
                 if field and hasattr(field, "__get__"):
                     d[translated_name] = field.__get__(instance, owner)
@@ -118,7 +147,7 @@ class ConcreteCompositeField(BaseCompositeField):
             return self.model(**d)
         return d
 
-    def clean(self, field_name: str, value: Any, for_query: bool=False) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
         assert len(self.inner_field_names) >= 1
         if (
             self.model is ConditionalRedirect
@@ -126,7 +155,7 @@ class ConcreteCompositeField(BaseCompositeField):
             # we first only redirect both
             and not isinstance(value, (dict, BaseModel))
         ):
-            field = self.owner.meta.fields_mapping[self.inner_field_names[0]]
+            field = self.owner.meta.fields[self.inner_field_names[0]]
             return field.clean(self.inner_field_names[0], value, for_query=for_query)
         return super().clean(field_name, value, for_query=for_query)
 
@@ -138,11 +167,13 @@ class ConcreteCompositeField(BaseCompositeField):
             # we first only redirect both
             and not isinstance(value, (dict, BaseModel))
         ):
-            field = self.owner.meta.fields_mapping[self.inner_field_names[0]]
+            field = self.owner.meta.fields[self.inner_field_names[0]]
             return field.to_model(self.inner_field_names[0], value, phase=phase)
         return super().to_model(field_name, value, phase=phase)
 
-    def get_embedded_fields(self, name: str, fields_mapping: Dict[str, "BaseField"]) -> Dict[str, "BaseField"]:
+    def get_embedded_fields(
+        self, name: str, fields: Dict[str, "BaseFieldType"]
+    ) -> Dict[str, "BaseFieldType"]:
         retdict = {}
         # owner is set: further down in hierarchy, or uninitialized embeddable, where the owner = model
         # owner is not set: current class
@@ -150,14 +181,18 @@ class ConcreteCompositeField(BaseCompositeField):
         if not self.absorb_existing_fields:
             if self.owner is None:
                 duplicate_fields = set(self.embedded_field_defs.keys()).intersection(  # type: ignore
-                    {k for k, v in fields_mapping.items() if v.owner is None}
+                    {k for k, v in fields.items() if v.owner is None}
                 )
                 if duplicate_fields:
                     raise ValueError(f"duplicate fields: {', '.join(duplicate_fields)}")
             for field_name, field in self.embedded_field_defs.items():
-                existing_field = fields_mapping.get(field_name, None)
-                if existing_field is not None and existing_field.owner is None and self.owner is not None:  # type: ignore
-                    continue  # type: ignore
+                existing_field = fields.get(field_name)
+                if (
+                    existing_field is not None
+                    and existing_field.owner is None
+                    and self.owner is not None
+                ):
+                    continue
                 # now there should be no collisions anymore
                 cloned_field = copy.copy(field)
                 # set to the current owner of this field, required in collision checks
@@ -166,14 +201,14 @@ class ConcreteCompositeField(BaseCompositeField):
                 retdict[field_name] = cloned_field
             return retdict
         for field_name, field in self.embedded_field_defs.items():
-            if field_name not in fields_mapping:
+            if field_name not in fields:
                 cloned_field = copy.copy(field)
                 # set to the current owner of this field, required in collision checks
                 cloned_field.owner = self.owner
                 cloned_field.inherit = False
                 retdict[field_name] = cloned_field
             else:
-                absorbed_field = fields_mapping[field_name]
+                absorbed_field = fields[field_name]
                 if not getattr(absorbed_field, "skip_absorption_check", False) and not issubclass(
                     absorbed_field.field_type, field.field_type
                 ):
@@ -182,8 +217,8 @@ class ConcreteCompositeField(BaseCompositeField):
                     )
         return retdict
 
-    def get_composite_fields(self) -> Dict[str, BaseField]:
-        return {field: self.owner.meta.fields_mapping[field] for field in self.inner_field_names}
+    def get_composite_fields(self) -> Dict[str, BaseFieldType]:
+        return {field: self.owner.meta.fields[field] for field in self.inner_field_names}
 
     def is_required(self) -> bool:
         return False
@@ -197,7 +232,7 @@ class CompositeField(FieldFactory):
     Meta field that aggregates multiple fields in a pseudo field
     """
 
-    _bases = (ConcreteCompositeField,)
+    field_bases = (ConcreteCompositeField,)
 
     @classmethod
     def get_pydantic_type(cls, **kwargs: Any) -> Any:
@@ -212,7 +247,7 @@ class CompositeField(FieldFactory):
         if inner_fields is not None:
             if hasattr(inner_fields, "meta"):
                 kwargs.setdefault("model", inner_fields)
-                inner_fields = inner_fields.meta.fields_mapping
+                inner_fields = inner_fields.meta.fields
             if isinstance(inner_fields, dict):
                 inner_fields = inner_fields.items()
             elif not isinstance(inner_fields, Sequence):

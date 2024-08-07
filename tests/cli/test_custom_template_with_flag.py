@@ -1,3 +1,4 @@
+import contextlib
 import os
 import shutil
 
@@ -12,33 +13,21 @@ app = Esmerald(routes=[])
 @pytest.fixture(scope="module")
 def create_folders():
     os.chdir(os.path.split(os.path.abspath(__file__))[0])
-    try:
+    with contextlib.suppress(OSError):
         os.remove("app.db")
-    except OSError:
-        pass
-    try:
+    with contextlib.suppress(OSError):
         shutil.rmtree("migrations")
-    except OSError:
-        pass
-    try:
+    with contextlib.suppress(OSError):
         shutil.rmtree("temp_folder")
-    except OSError:
-        pass
 
     yield
 
-    try:
+    with contextlib.suppress(OSError):
         os.remove("app.db")
-    except OSError:
-        pass
-    try:
+    with contextlib.suppress(OSError):
         shutil.rmtree("migrations")
-    except OSError:
-        pass
-    try:
+    with contextlib.suppress(OSError):
         shutil.rmtree("temp_folder")
-    except OSError:
-        pass
 
 
 def test_alembic_version():
@@ -51,13 +40,19 @@ def test_alembic_version():
 
 
 def test_migrate_upgrade_with_app_flag(create_folders):
-    (o, e, ss) = run_cmd("tests.cli.main:app", "edgy --app tests.cli.main:app init -t ./custom", is_app=False)
+    (o, e, ss) = run_cmd(
+        "tests.cli.main:app", "edgy --app tests.cli.main:app init -t ./custom", is_app=False
+    )
     assert ss == 0
 
-    (o, e, ss) = run_cmd("tests.cli.main:app", "edgy --app tests.cli.main:app makemigrations", is_app=False)
+    (o, e, ss) = run_cmd(
+        "tests.cli.main:app", "edgy --app tests.cli.main:app makemigrations", is_app=False
+    )
     assert ss == 0
 
-    (o, e, ss) = run_cmd("tests.cli.main:app", "edgy --app tests.cli.main:app migrate", is_app=False)
+    (o, e, ss) = run_cmd(
+        "tests.cli.main:app", "edgy --app tests.cli.main:app migrate", is_app=False
+    )
     assert ss == 0
 
     with open("migrations/README") as f:

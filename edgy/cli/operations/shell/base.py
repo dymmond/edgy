@@ -9,7 +9,7 @@ from edgy import Registry
 from edgy.cli.env import MigrationEnv
 from edgy.cli.operations.shell.enums import ShellOption
 from edgy.core.events import AyncLifespanContextManager
-from edgy.core.sync import execsync
+from edgy.core.utils.sync import run_sync
 
 
 @click.option(
@@ -32,15 +32,21 @@ def shell(env: MigrationEnv, kernel: bool) -> None:
     except AttributeError:
         registry = env.app._edgy_extra["extra"].registry  # type: ignore
 
-    if sys.platform != "win32" and not sys.stdin.isatty() and select.select([sys.stdin], [], [], 0)[0]:
+    if (
+        sys.platform != "win32"
+        and not sys.stdin.isatty()
+        and select.select([sys.stdin], [], [], 0)[0]
+    ):
         exec(sys.stdin.read(), globals())
         return
 
     on_startup = getattr(env.app, "on_startup", [])
     on_shutdown = getattr(env.app, "on_shutdown", [])
     lifespan = getattr(env.app, "lifespan", None)
-    lifespan = handle_lifespan_events(on_startup=on_startup, on_shutdown=on_shutdown, lifespan=lifespan)
-    execsync(run_shell)(env.app, lifespan, registry, kernel)
+    lifespan = handle_lifespan_events(
+        on_startup=on_startup, on_shutdown=on_shutdown, lifespan=lifespan
+    )
+    run_sync(run_shell(env.app, lifespan, registry, kernel))
     return None
 
 

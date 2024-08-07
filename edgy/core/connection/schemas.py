@@ -26,8 +26,14 @@ class Schema:
         """
         return cast("str", self.registry.engine.dialect.default_schema_name)
 
-    async def activate_schema_path(self, database: Database, schema: str, is_shared: bool = True) -> None:
-        path = "SET search_path TO %s, shared;" % schema if is_shared else "SET search_path TO %s;" % schema
+    async def activate_schema_path(
+        self, database: Database, schema: str, is_shared: bool = True
+    ) -> None:
+        path = (
+            f"SET search_path TO {schema}, shared;"
+            if is_shared
+            else f"SET search_path TO {schema};"
+        )
         expression = sqlalchemy.text(path)
         await database.execute(expression)
 
@@ -44,11 +50,14 @@ class Schema:
             except ProgrammingError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
-        async with self.registry.engine.begin() as connection:
-            await connection.run_sync(execute_create)
-        await self.registry.engine.dispose()
+        async with Database(
+            self.registry.database, force_rollback=False
+        ) as database, database.transaction():
+            await database.run_sync(execute_create)
 
-    async def drop_schema(self, schema: str, cascade: bool = False, if_exists: bool = False) -> None:
+    async def drop_schema(
+        self, schema: str, cascade: bool = False, if_exists: bool = False
+    ) -> None:
         """
         Drops an existing model schema.
         """
@@ -61,6 +70,7 @@ class Schema:
             except DBAPIError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
-        async with self.registry.engine.begin() as connection:
-            await connection.run_sync(execute_drop)
-        await self.registry.engine.dispose()
+        async with Database(
+            self.registry.database, force_rollback=False
+        ) as database, database.transaction():
+            await database.run_sync(execute_drop)

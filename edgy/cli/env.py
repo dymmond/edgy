@@ -38,7 +38,9 @@ class MigrationEnv:
     app: typing.Optional[typing.Any] = None
     command_path: typing.Optional[str] = None
 
-    def load_from_env(self, path: typing.Optional[str] = None, enable_logging: bool = True) -> "MigrationEnv":
+    def load_from_env(
+        self, path: typing.Optional[str] = None, enable_logging: bool = True
+    ) -> "MigrationEnv":
         """
         Loads the environment variables into the scaffold.
         """
@@ -55,7 +57,7 @@ class MigrationEnv:
         except ImportError:
             ...
 
-        _path = os.getenv(EDGY_DISCOVER_APP) if not path else path
+        _path = path if path else os.getenv(EDGY_DISCOVER_APP)
         _app = self.find_app(path=_path, cwd=cwd)
 
         return MigrationEnv(path=_app.path, app=_app.app)
@@ -95,7 +97,9 @@ class MigrationEnv:
 
             # Iterates through the elements of the module.
             for attr, value in module.__dict__.items():
-                if (callable(value) and hasattr(value, EDGY_DB)) or (callable(value) and hasattr(value, EDGY_EXTRA)):
+                if (callable(value) and hasattr(value, EDGY_DB)) or (
+                    callable(value) and hasattr(value, EDGY_EXTRA)
+                ):
                     app_path = f"{dotted_path}:{attr}"
                     return Scaffold(app=value, path=app_path)
 

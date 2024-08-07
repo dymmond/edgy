@@ -1,10 +1,10 @@
 # **`OneToOne`** class
 
 
-::: edgy.OneToOneField
+::: edgy.OneToOne
     options:
         filters:
-        - "!^_type"
+        - "!^field_type"
         - "!^model_config"
         - "!^__slots__"
         - "!^__getattr__"

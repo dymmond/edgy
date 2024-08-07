@@ -5,6 +5,43 @@ hide:
 
 # Release Notes
 
+## Unreleased
+
+### Added
+
+- `default_timezone`, `force_timezone`, `remove_timezone` for DateTimeField.
+- `default_timezone`, `force_timezone` for DateField.
+- Add attribute `inject_default_on_partial_update`.
+- Allow factories overwriting field methods.
+- Deep embedding via embed_parent possible.
+- Support for nearly all async sqlalchemy drivers plus more from databasez.
+
+### Changed
+
+- `get_default_values` has now an extra keyword argument `is_update`
+- `meta.fields_mapping` was renamed to `meta.fields`.-
+- Factories have now different named configuration variables.
+- Refactoring of fields and models:
+  - BaseModelType and BaseFieldType are now added and should be used for typings.
+  - `get_column` works now via extractor.
+  - Renamed internals.
+  - Splitted model_references and column values extraction.
+- Comparisons of models use now only primary keys.
+- Deprecate on model forwards signals, fields. Use now meta.signals, meta.fields.
+
+### Removed
+
+- execsync (nearly no uses).
+- DateParser mixin (superseeded by sqlalchemy's logic).
+
+### Fixed
+
+- `auto_now` and `auto_now_add` now also work for date fields.
+- `BinaryField` had a wrong type.
+- Metaclasses with keyword arguments are now possible.
+- Relaxed Prefetching, tables can now appear multiple times.
+- `select_related` now correctly filters columns.
+
 ## 0.12.0
 
 ### Added
@@ -33,7 +70,7 @@ hide:
 
 - ForeignKeys use now global constraints and indexes.
 - Breaking: clean has now the argument to_query. See [Custom Fields](./fields.md#custom-fields).
-- Breaking: ManyToMany doesn't have a RelatedField on owner anymore and uses proxying. See [ManyToMany](./fields.md#ManyToMany).
+- Breaking: ManyToMany doesn't have a RelatedField on owner anymore and uses proxying. See [ManyToMany](./fields.md#manytomany).
 - Breaking: use singular related_name for unique ForeignKeys (or OneToOne). See [related_name](./queries/related-name.md)
 - MetaInfo (meta) is now partly lazy.
 - `pk` is now a PKField (a variant of the BaseCompositeField).

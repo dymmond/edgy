@@ -10,6 +10,7 @@ pytestmark = pytest.mark.anyio
 database = Database(DATABASE_URL)
 models = edgy.Registry(database=database)
 
+
 class Track(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     title = edgy.CharField(max_length=100)
@@ -26,7 +27,6 @@ class Album(edgy.Model):
 
     class Meta:
         registry = models
-
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -56,7 +56,6 @@ async def test_add_many_to_many_unique_succeed():
     assert retrieved_album == album
     # does nothing.
     await album.tracks.add(track3)
-
 
 
 async def test_add_many_to_many_unique_conflict():

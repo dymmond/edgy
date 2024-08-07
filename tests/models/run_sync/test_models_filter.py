@@ -118,6 +118,8 @@ async def test_model_nested_filter():
 
     assert len(users) == 1
 
-    users = edgy.run_sync(User.query.filter(name="Test").filter(language="EN").filter(language="PT"))
+    users = edgy.run_sync(
+        User.query.filter(name="Test").filter(language="EN").filter(language="PT")
+    )
 
     assert len(users) == 0

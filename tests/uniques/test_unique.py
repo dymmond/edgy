@@ -2,7 +2,7 @@ import datetime
 from enum import Enum
 
 import pytest
-from asyncpg.exceptions import UniqueViolationError
+from sqlalchemy.exc import IntegrityError
 
 import edgy
 from edgy.testclient import DatabaseTestClient as Database
@@ -51,5 +51,5 @@ async def rollback_transactions():
 async def test_unique():
     await User.query.create(name="Tiago", email="test@example.com")
 
-    with pytest.raises(UniqueViolationError):
+    with pytest.raises(IntegrityError):
         await User.query.create(name="Tiago", email="test2@example.come")

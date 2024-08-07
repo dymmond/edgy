@@ -9,7 +9,7 @@ declarative model type for you.
 ```
 
 Be mindful that when using a declarative model if you have a [ForeignKey](./relationships.md#foreignkey) or
-a [OneToOneField](./relationships.md#onetoonefield), Edgy will generate a [SQLAlchemy Relationship](https://docs.sqlalchemy.org/en/20/orm/relationships.html)
+a [OneToOneField](./relationships.md#onetoone), Edgy will generate a [SQLAlchemy Relationship](https://docs.sqlalchemy.org/en/20/orm/relationships.html)
 for you automatically and append `relation` at the end of the declared field.
 
 Let us see an example.

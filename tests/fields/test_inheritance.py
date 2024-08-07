@@ -32,6 +32,7 @@ from edgy.core.db.models import Model
         (TimeField(null=True), TimeField),
         (JSONField(null=True), JSONField),
         (BinaryField(max_length=255, null=True), BinaryField),
+        (BinaryField(null=True), BinaryField),
         (IntegerField(null=True), IntegerField),
         (BigIntegerField(null=True), BigIntegerField),
         (SmallIntegerField(null=True), SmallIntegerField),
@@ -59,9 +60,9 @@ def test_overwriting_fields_with_fields():
     class ConcreteModel2(ConcreteModel1):
         first_name: str = CharField(max_length=50)
 
-    assert ConcreteModel1.meta.fields_mapping["first_name"].max_length == 255
-    assert isinstance(ConcreteModel1.meta.fields_mapping["last_name"], IntegerField)
-    assert ConcreteModel2.meta.fields_mapping["first_name"].max_length == 50
+    assert ConcreteModel1.meta.fields["first_name"].max_length == 255
+    assert isinstance(ConcreteModel1.meta.fields["last_name"], IntegerField)
+    assert ConcreteModel2.meta.fields["first_name"].max_length == 50
 
 
 def test_deleting_fields():
@@ -78,7 +79,7 @@ def test_deleting_fields():
     class ConcreteModel2(ConcreteModel1):
         first_name: Type[None] = ExcludeField()
 
-    assert ConcreteModel1.meta.fields_mapping["first_name"].max_length == 255
+    assert ConcreteModel1.meta.fields["first_name"].max_length == 255
     model1 = ConcreteModel1(first_name="edgy", last_name="edgy")
     model2 = ConcreteModel2(first_name="edgy", last_name="edgy")
     assert model1.first_name == "edgy"
@@ -112,19 +113,20 @@ def test_mixins_non_inherited():
 
     class ConcreteModel1(AbstractModel):
         pass
+
     assert not ConcreteModel1.meta.abstract
-    assert "field" in ConcreteModel1.meta.fields_mapping
+    assert "field" in ConcreteModel1.meta.fields
 
     class ConcreteModel2(ConcreteModel1):
         field3 = CharField(max_length=255, inherit=False)
+
     assert not ConcreteModel2.meta.abstract
-    assert "field" not in ConcreteModel2.meta.fields_mapping
+    assert "field" not in ConcreteModel2.meta.fields
 
     class ConcreteModel3(Mixin2, ConcreteModel1):
         pass
 
-    assert "field" in ConcreteModel3.meta.fields_mapping
-
+    assert "field" in ConcreteModel3.meta.fields
 
 
 def test_mixins_mixed_inherited():
@@ -142,10 +144,12 @@ def test_mixins_mixed_inherited():
 
     class ConcreteModel1(AbstractModel):
         pass
+
     assert not ConcreteModel1.meta.abstract
-    assert ConcreteModel1.meta.fields_mapping["field"].max_length == 255
+    assert ConcreteModel1.meta.fields["field"].max_length == 255
 
     class ConcreteModel2(ConcreteModel1):
         pass
+
     assert not ConcreteModel2.meta.abstract
-    assert ConcreteModel2.meta.fields_mapping["field"].max_length == 250
+    assert ConcreteModel2.meta.fields["field"].max_length == 250

@@ -37,6 +37,7 @@ class User(edgy.Model):
         registry = models
         unique_together = [("name", "email")]
 
+
 # Using ipython that supports await
 # Don't use this in production! Use Alembic or any tool to manage
 # The migrations for you
@@ -49,10 +50,12 @@ team = await Team.query.create(name="Edgy team")  # noqa
 user1 = await User.query.create(name="Edgy", email="foo@bar.com", is_active=False, team=team)  # noqa
 
 # You can also create a user using the new manager
-user2 = await User.query_related.create(name="Another Edgy", email="bar@foo.com", is_active=False, team=team)  # noqa
+user2 = await User.query_related.create(
+    name="Another Edgy", email="bar@foo.com", is_active=False, team=team
+)  # noqa
 
 # Create a user using the default manager
-user3 =await User.query.create(name="Edgy", email="user@edgy.com", team=team)  # noqa
+user3 = await User.query.create(name="Edgy", email="user@edgy.com", team=team)  # noqa
 
 
 # Querying them all

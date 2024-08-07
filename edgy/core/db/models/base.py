@@ -1,4 +1,6 @@
+import contextlib
 import copy
+import warnings
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -19,41 +21,37 @@ from typing import (
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
-from sqlalchemy.ext.asyncio import AsyncConnection
-from typing_extensions import Self
 
 from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.models._internal import DescriptiveMeta
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
+from edgy.core.db.models.mixins import ModelParser
 from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.utils.functional import edgy_setattr
-from edgy.core.utils.models import DateParser, ModelParser, generify_model_fields
+from edgy.core.utils.models import generify_model_fields
 from edgy.core.utils.sync import run_sync
-from edgy.exceptions import ImproperlyConfigured
+
+from .types import BaseModelType
 
 if TYPE_CHECKING:
-    from edgy import Model, Registry
-    from edgy.core.db.fields.base import BaseField
+    from edgy import Model
+    from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.signals import Broadcaster
 
 _empty = cast(Set[str], frozenset())
 
 
-class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta):
+class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMeta):
     """
     Base of all Edgy models with the core setup.
     """
 
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
-    parent: ClassVar[Union[Type[Self], None]]
-    is_proxy_model: ClassVar[bool] = False
+    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     query: ClassVar[Manager] = Manager()
     query_related: ClassVar[RedirectManager] = RedirectManager(redirect_name="query")
     meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True)
-    Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
     __db_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
@@ -76,7 +74,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         kwargs = {**kwargs}
         new_kwargs: Dict[str, Any] = {}
 
-        fields = cls.meta.fields_mapping
+        fields = cls.meta.fields
         # phase 1: transform
         for field_name in cls.meta.input_modifying_fields:
             fields[field_name].modify_input(field_name, kwargs)
@@ -95,7 +93,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
 
         return {
-            k: v for k, v in kwargs.items() if k in self.meta.fields_mapping or k in self.meta.model_references
+            k: v
+            for k, v in kwargs.items()
+            if k in self.meta.fields or k in self.meta.model_references
         }
 
     @property
@@ -126,14 +126,25 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @property
     def can_load(self) -> bool:
-        for field in self.identifying_db_fields:
-            if self.__dict__.get(field) is None:
-                return False
-        return True
+        return all(self.__dict__.get(field) is not None for field in self.identifying_db_fields)
 
-    @cached_property
+    @property
     def signals(self) -> "Broadcaster":
-        return self.__class__.signals  # type: ignore
+        warnings.warn(
+            "'signals' has been deprecated, use 'meta.signals' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.meta.signals
+
+    @property
+    def fields(self) -> Dict[str, "BaseFieldType"]:
+        warnings.warn(
+            "'fields' has been deprecated, use 'meta.fields' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.meta.fields
 
     @property
     def table(self) -> sqlalchemy.Table:
@@ -143,14 +154,10 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     @table.setter
     def table(self, value: sqlalchemy.Table) -> None:
-        try:
+        with contextlib.suppress(AttributeError):
             del self._pknames
-        except AttributeError:
-            pass
-        try:
+        with contextlib.suppress(AttributeError):
             del self._pkcolumns
-        except AttributeError:
-            pass
         self._table = value
 
     @property
@@ -183,7 +190,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
 
     def identifying_clauses(self) -> Iterable[Any]:
         for field_name in self.identifying_db_fields:
-            field = self.meta.fields_mapping.get(field_name)
+            field = self.meta.fields.get(field_name)
             if field is not None:
                 for column, value in field.clean(field_name, self.__dict__[field_name]).items():
                     yield getattr(self.table.columns, column) == value
@@ -199,7 +206,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         if cls.__proxy_model__:
             return cls.__proxy_model__
 
-        fields = {key: copy.copy(field) for key, field in cls.meta.fields_mapping.items()}
+        fields = {key: copy.copy(field) for key, field in cls.meta.fields.items()}
         proxy_model = ProxyModel(
             name=cls.__name__,
             module=cls.__module__,
@@ -258,7 +265,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                     continue
                 if getattr(field_name, "exclude", False):
                     continue
-            field: BaseField = self.meta.fields_mapping[field_name]
+            field: BaseFieldType = self.meta.fields[field_name]
             try:
                 retval = field.__get__(self, self.__class__)
             except AttributeError:
@@ -274,7 +281,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 if sub_exclude is True:
                     sub_exclude = None
             if isinstance(retval, BaseModel):
-                retval = retval.model_dump(include=sub_include, exclude=sub_exclude, mode=mode, **kwargs)
+                retval = retval.model_dump(
+                    include=sub_include, exclude=sub_exclude, mode=mode, **kwargs
+                )
             else:
                 assert (
                     sub_include is None
@@ -284,7 +293,7 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 ), "sub exclude filters for CompositeField specified, but no Pydantic model is set"
                 if mode == "json" and not getattr(field, "unsafe_json_serialization", False):
                     # skip field if it isn't a BaseModel and the mode is json and unsafe_json_serialization is not set
-                    # currently unsafe_json_serialization exists only on ConcreteCompositeFields
+                    # currently unsafe_json_serialization exists only on CompositeFields
                     continue
             alias: str = field_name
             if getattr(field, "serialization_alias", None):
@@ -312,9 +321,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
 
-        columns: List["sqlalchemy.Column"] = []
+        columns: List[sqlalchemy.Column] = []
         global_constraints: List[Any] = []
-        for name, field in cls.meta.fields_mapping.items():
+        for name, field in cls.meta.fields.items():
             current_columns = field.get_columns(name)
             columns.extend(current_columns)
             global_constraints.extend(field.get_global_constraints(name, current_columns))
@@ -364,28 +373,9 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
         """
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
-    def extract_db_fields(self) -> Dict[str, Any]:
-        """
-        Extracts all the db fields, model references and fields.
-        Related fields are not included because they are disjoint.
-        """
-        fields_mapping = self.meta.fields_mapping
-        model_references = self.meta.model_references
-        columns = self.__class__.columns
-        return {k: v for k, v in self.__dict__.items() if k in fields_mapping or k in columns or k in model_references}
-
-    def get_instance_name(self) -> str:
-        """
-        Returns the name of the class in lowercase.
-        """
-        return self.__class__.__name__.lower()
-
-    async def load(self) -> None:
-        raise NotImplementedError()
-
     def __setattr__(self, key: str, value: Any) -> None:
-        fields_mapping = self.meta.fields_mapping
-        field = fields_mapping.get(key, None)
+        fields = self.meta.fields
+        field = fields.get(key, None)
         if field is not None:
             if hasattr(field, "__set__"):
                 # not recommended, better to use to_model instead
@@ -415,11 +405,16 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
                 self.__dict__[name] = manager
             return self.__dict__[name]
 
-        field = self.meta.fields_mapping.get(name)
+        field = self.meta.fields.get(name)
         if field is not None and hasattr(field, "__get__"):
             # no need to set an descriptor object
             return field.__get__(self, self.__class__)
-        if name not in self.__dict__ and field is not None and name not in self.identifying_db_fields and self.can_load:
+        if (
+            name not in self.__dict__
+            and field is not None
+            and name not in self.identifying_db_fields
+            and self.can_load
+        ):
             run_sync(self.load())
             return self.__dict__[name]
         return super().__getattr__(name)
@@ -432,79 +427,14 @@ class EdgyBaseModel(BaseModel, DateParser, ModelParser, metaclass=BaseModelMeta)
             return False
         if self.meta.tablename != other.meta.tablename:
             return False
-        self_dict = self._extract_values_from_field(self.extract_db_fields(), is_partial=True)
-        other_dict = self._extract_values_from_field(other.extract_db_fields(), is_partial=True)
+        self_dict = self.extract_column_values(
+            self.extract_db_fields(self.pkcolumns), is_partial=True
+        )
+        other_dict = self.extract_column_values(
+            other.extract_db_fields(self.pkcolumns), is_partial=True
+        )
         key_set = {*self_dict.keys(), *other_dict.keys()}
         for field_name in key_set:
             if self_dict.get(field_name) != other_dict.get(field_name):
                 return False
         return True
-
-
-class EdgyBaseReflectModel(EdgyBaseModel):
-    """
-    Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
-    call.
-    """
-
-    __reflected__: ClassVar[bool] = True
-
-    class Meta:
-        abstract = True
-
-    @classmethod
-    def build(cls, schema: Optional[str] = None) -> Any:
-        """
-        The inspect is done in an async manner and reflects the objects from the database.
-        """
-        registry = cls.meta.registry
-        assert registry is not None, "registry is not set"
-        metadata: sqlalchemy.MetaData = registry._metadata
-        schema_name = schema or registry.db_schema
-        metadata.schema = schema_name
-
-        tablename: str = cast("str", cls.meta.tablename)
-        return run_sync(cls.reflect(registry, tablename, metadata, schema_name))
-
-    @classmethod
-    async def reflect(
-        cls,
-        registry: "Registry",
-        tablename: str,
-        metadata: sqlalchemy.MetaData,
-        schema: Union[str, None] = None,
-    ) -> sqlalchemy.Table:
-        """
-        Reflect a table from the database and return its SQLAlchemy Table object.
-
-        This method connects to the database using the provided registry, reflects
-        the table with the given name and metadata, and returns the SQLAlchemy
-        Table object.
-
-        Parameters:
-            registry (Registry): The registry object containing the database engine.
-            tablename (str): The name of the table to reflect.
-            metadata (sqlalchemy.MetaData): The SQLAlchemy MetaData object to associate with the reflected table.
-            schema (Union[str, None], optional): The schema name where the table is located. Defaults to None.
-
-        Returns:
-            sqlalchemy.Table: The reflected SQLAlchemy Table object.
-
-        Raises:
-            ImproperlyConfigured: If there is an error during the reflection process.
-        """
-
-        def execute_reflection(connection: AsyncConnection) -> sqlalchemy.Table:
-            """Helper function to create and reflect the table."""
-            try:
-                return sqlalchemy.Table(tablename, metadata, schema=schema, autoload_with=connection)
-            except Exception as e:
-                raise e
-
-        try:
-            async with registry.engine.begin() as connection:
-                table = await connection.run_sync(execute_reflection)
-            await registry.engine.dispose()
-            return table
-        except Exception as e:
-            raise ImproperlyConfigured(detail=str(e)) from e

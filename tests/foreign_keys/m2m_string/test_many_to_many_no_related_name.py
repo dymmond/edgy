@@ -10,7 +10,6 @@ database = Database(DATABASE_URL)
 models = edgy.Registry(database=database)
 
 
-
 class Track(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     title = edgy.CharField(max_length=100)
@@ -27,6 +26,7 @@ class Album(edgy.Model):
     class Meta:
         registry = models
 
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     await models.create_all()
@@ -42,7 +42,7 @@ async def rollback_connections():
 
 
 async def test_no_relation():
-    for field in Track.meta.fields_mapping:
+    for field in Track.meta.fields:
         assert not field.endswith("_set")
 
 

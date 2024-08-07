@@ -1,7 +1,7 @@
 import pytest
 
 import edgy
-from edgy.exceptions import RelationshipIncompatible, RelationshipNotFound
+from edgy.exceptions import FieldDefinitionError, RelationshipIncompatible, RelationshipNotFound
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -164,7 +164,10 @@ async def test_raises_RelationshipNotFound():
     with pytest.raises(RelationshipNotFound) as raised:
         await album.tracks.remove(track3)
 
-    assert raised.value.args[0] == f"There is no relationship between 'album' and 'track: {track3.pk}'."
+    assert (
+        raised.value.args[0]
+        == f"There is no relationship between 'album' and 'track: {track3.pk}'."
+    )
 
 
 async def test_many_to_many_many_fields():
@@ -313,3 +316,15 @@ async def test_related_name_query_returns_nothing():
     tracks_album = await track3.track_albumtracks_set.filter(name=album.name)
 
     assert len(tracks_album) == 0
+
+
+def test_assertation_error_on_embed_through_double_underscore_attr():
+    with pytest.raises(FieldDefinitionError) as raised:
+
+        class MyModel(edgy.Model):
+            is_active = edgy.BooleanField(default=True)
+
+        class MyOtherModel(edgy.Model):
+            model = edgy.ManyToMany(MyModel, embed_through="foo__attr")
+
+    assert raised.value.args[0] == '"embed_through" cannot contain "__".'

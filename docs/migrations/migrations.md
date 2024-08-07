@@ -18,7 +18,7 @@ Before reading this section, you should get familiar with the ways Edgy handles 
 of the applications.
 
 The following examples and explanations will be using the
-[--app and environment variables](./discovery.md##environment-variables) approach but the
+[--app and environment variables](./discovery.md#environment-variables) approach but the
 [auto discovery](./discovery.md#auto-discovery) is equally valid and works in the same way.
 
 ## Structure being used for this document

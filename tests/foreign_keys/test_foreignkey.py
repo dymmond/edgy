@@ -1,8 +1,5 @@
-import sqlite3
-
-import asyncpg
-import pymysql
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 import edgy
 from edgy.exceptions import FieldDefinitionError
@@ -100,7 +97,7 @@ async def rollback_connections():
 
 
 async def test_no_relation():
-    for field in Profile.meta.fields_mapping:
+    for field in Profile.meta.fields:
         assert not field.startswith("person")
 
 
@@ -129,6 +126,7 @@ async def test_new_create2():
     tracks = await album.tracks_set.all()
 
     assert len(tracks) == 2
+
 
 async def test_select_related():
     album = await Album.query.create(name="Malibu")
@@ -211,7 +209,9 @@ async def test_multiple_fk():
     team = await Team.query.create(org=other, name="Green Team")
     await Member.query.create(team=team, email="e@example.org")
 
-    members = await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
+    members = (
+        await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
+    )
     assert len(members) == 4
     for member in members:
         assert member.team.org.ident == "ACME Ltd"
@@ -257,12 +257,7 @@ async def test_on_delete_restrict():
     organisation = await Organisation.query.create(ident="Encode")
     await Team.query.create(org=organisation, name="Maintainers")
 
-    exceptions = (
-        asyncpg.exceptions.ForeignKeyViolationError,
-        pymysql.err.IntegrityError,
-    )
-
-    with pytest.raises(exceptions):
+    with pytest.raises(IntegrityError):
         await organisation.delete()
 
 
@@ -288,13 +283,7 @@ async def test_one_to_one_field_crud():
     await person.profile.load()
     assert person.profile.website == "https://edgy.com"
 
-    exceptions = (
-        asyncpg.exceptions.UniqueViolationError,
-        pymysql.err.IntegrityError,
-        sqlite3.IntegrityError,
-    )
-
-    with pytest.raises(exceptions):
+    with pytest.raises(IntegrityError):
         await Person.query.create(email="contact@edgy.com", profile=profile)
 
 
@@ -308,13 +297,7 @@ async def test_one_to_one_crud():
     await person.profile.load()
     assert person.profile.website == "https://edgy.com"
 
-    exceptions = (
-        asyncpg.exceptions.UniqueViolationError,
-        pymysql.err.IntegrityError,
-        sqlite3.IntegrityError,
-    )
-
-    with pytest.raises(exceptions):
+    with pytest.raises(IntegrityError):
         await AnotherPerson.query.create(email="contact@edgy.com", profile=profile)
 
 
@@ -349,3 +332,18 @@ def test_assertation_error_on_missing_on_delete():
             model = edgy.ForeignKey(MyModel, on_delete=None)
 
     assert raised.value.args[0] == "on_delete must not be null."
+
+
+def test_assertation_error_on_embed_parent_double_underscore_attr():
+    with pytest.raises(FieldDefinitionError) as raised:
+
+        class MyModel(edgy.Model):
+            is_active = edgy.BooleanField(default=True)
+
+        class MyOtherModel(edgy.Model):
+            model = edgy.ForeignKey(MyModel, embed_parent=("foo", "foo__attr"))
+
+    assert (
+        raised.value.args[0]
+        == '"embed_parent" second argument (for embedding parent) cannot contain "__".'
+    )

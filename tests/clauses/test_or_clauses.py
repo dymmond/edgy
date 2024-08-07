@@ -52,7 +52,9 @@ async def test_filter_with_empty_or():
 async def test_filter_with_or():
     user = await User.query.create(name="Adam")
 
-    results = await User.query.filter(or_(User.columns.name == "Adam", User.columns.name == "Edgy"))
+    results = await User.query.filter(
+        or_(User.columns.name == "Adam", User.columns.name == "Edgy")
+    )
 
     assert len(results) == 1
     assert results[0].pk == user.pk
@@ -62,7 +64,9 @@ async def test_filter_with_or_two():
     await User.query.create(name="Adam")
     await User.query.create(name="Edgy")
 
-    results = await User.query.filter(or_(User.columns.name == "Adam", User.columns.name == "Edgy"))
+    results = await User.query.filter(
+        or_(User.columns.name == "Adam", User.columns.name == "Edgy")
+    )
 
     assert len(results) == 2
 
@@ -71,7 +75,9 @@ async def test_filter_with_or_two_kwargs():
     await User.query.create(name="Adam", email="edgy@edgy.dev")
     await User.query.create(name="Edgy", email="edgy2@edgy.dev")
 
-    results = await User.query.filter(or_.from_kwargs(User.columns, name="Adam", email="edgy2@edgy.dev"))
+    results = await User.query.filter(
+        or_.from_kwargs(User.columns, name="Adam", email="edgy2@edgy.dev")
+    )
 
     assert len(results) == 2
 
@@ -84,7 +90,9 @@ async def test_filter_with_or_three():
     await User.query.create(name="Adam")
     user = await User.query.create(name="Edgy", email="edgy@edgy.dev")
 
-    results = await User.query.filter(or_(User.columns.name == "Adam", User.columns.email == user.email))
+    results = await User.query.filter(
+        or_(User.columns.name == "Adam", User.columns.email == user.email)
+    )
 
     assert len(results) == 2
 
@@ -93,7 +101,9 @@ async def test_filter_with_or_four():
     await User.query.create(name="Adam")
     user = await User.query.create(name="Edgy", email="edgy@edgy.dev")
 
-    results = await User.query.filter(or_(User.columns.name == user.name)).filter(or_(User.columns.email == user.email))
+    results = await User.query.filter(or_(User.columns.name == user.name)).filter(
+        or_(User.columns.email == user.email)
+    )
     assert len(results) == 1
 
 

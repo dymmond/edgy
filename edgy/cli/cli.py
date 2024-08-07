@@ -68,7 +68,9 @@ class EdgyGroup(click.Group):
         path = ctx.params.get("path", None)
 
         # Process any settings
-        if HELP_PARAMETER not in sys.argv and not any(value in sys.argv for value in EXCLUDED_COMMANDS):
+        if HELP_PARAMETER not in sys.argv and not any(
+            value in sys.argv for value in EXCLUDED_COMMANDS
+        ):
             try:
                 migration = MigrationEnv()
                 app_env = migration.load_from_env(path=path)

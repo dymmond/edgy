@@ -46,7 +46,9 @@ async def test_filter_with_not_two():
     await User.query.create(name="Edgy")
     user = await User.query.create(name="Esmerald")
 
-    results = await User.query.filter(not_(User.columns.name == "Edgy")).filter(not_(User.columns.name == "Adam"))
+    results = await User.query.filter(not_(User.columns.name == "Edgy")).filter(
+        not_(User.columns.name == "Adam")
+    )
 
     assert len(results) == 1
     assert results[0].pk == user.pk

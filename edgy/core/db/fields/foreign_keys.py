@@ -4,10 +4,12 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple
 import sqlalchemy
 from pydantic import BaseModel
 
-from edgy.core.db.fields.base import BaseField, BaseForeignKey
+from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
+from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.relationships.relation import SingleRelation
 from edgy.core.terminal import Print
+from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
@@ -38,9 +40,9 @@ class BaseForeignKeyField(BaseForeignKey):
         on_delete: str,
         related_fields: Sequence[str] = (),
         no_constraint: bool = False,
-        embed_parent: Optional[Tuple[str, str]]=None,
-        relation_fn: Optional[Callable[..., ManyRelationProtocol]]=None,
-        reverse_path_fn: Optional[Callable[[str], Tuple[Any, str, str]]]=None,
+        embed_parent: Optional[Tuple[str, str]] = None,
+        relation_fn: Optional[Callable[..., ManyRelationProtocol]] = None,
+        reverse_path_fn: Optional[Callable[[str], Tuple[Any, str, str]]] = None,
         **kwargs: Any,
     ) -> None:
         self.related_fields = related_fields
@@ -48,14 +50,16 @@ class BaseForeignKeyField(BaseForeignKey):
         self.on_delete = on_delete
         self.no_constraint = no_constraint
         self.embed_parent = embed_parent
-        self.relation_fn =relation_fn
+        self.relation_fn = relation_fn
         self.reverse_path_fn = reverse_path_fn
         super().__init__(**kwargs)
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         if self.relation_fn is not None:
             return self.relation_fn(**kwargs)
-        return SingleRelation(to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs)
+        return SingleRelation(
+            to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs
+        )
 
     def traverse_field(self, path: str) -> Tuple[Any, str, str]:
         return self.target, self.reverse_name, _removeprefix(_removeprefix(path, self.name), "__")
@@ -71,7 +75,7 @@ class BaseForeignKeyField(BaseForeignKey):
         columns: Dict[str, Optional[sqlalchemy.Column]] = {}
         if self.related_fields:
             for field_name in self.related_fields:
-                if field_name in target.meta.fields_mapping:
+                if field_name in target.meta.fields:
                     for column in target.meta.field_to_columns[field_name]:
                         columns[column.key] = column
                 else:
@@ -207,7 +211,9 @@ class BaseForeignKeyField(BaseForeignKey):
             columns.append(fkcolumn)
         return columns
 
-    def get_global_constraints(self, name: str, columns: Sequence[sqlalchemy.Column]) -> Sequence[sqlalchemy.Constraint]:
+    def get_global_constraints(
+        self, name: str, columns: Sequence[sqlalchemy.Column]
+    ) -> Sequence[sqlalchemy.Constraint]:
         constraints = []
         no_constraint = self.no_constraint
         if self.is_cross_db():
@@ -217,7 +223,10 @@ class BaseForeignKeyField(BaseForeignKey):
             constraints.append(
                 sqlalchemy.ForeignKeyConstraint(
                     columns,
-                    [f"{target.meta.tablename}.{self.from_fk_field_name(name, column.key)}" for column in columns],
+                    [
+                        f"{target.meta.tablename}.{self.from_fk_field_name(name, column.key)}"
+                        for column in columns
+                    ],
                     ondelete=self.on_delete,
                     onupdate=self.on_update,
                     name=self.get_fk_name(name),
@@ -226,22 +235,28 @@ class BaseForeignKeyField(BaseForeignKey):
         # set for unique or if index is True
         if self.unique or self.index:
             constraints.append(
-                sqlalchemy.Index(
-                    self.get_fkindex_name(name), *columns, unique=self.unique
-                ),
+                sqlalchemy.Index(self.get_fkindex_name(name), *columns, unique=self.unique),
             )
 
         return constraints
 
 
-
 class ForeignKey(ForeignKeyFieldFactory):
-    _bases = (BaseForeignKeyField,)
-    _type: Any = Any
+    field_bases = (BaseForeignKeyField,)
+    field_type: Any = Any
 
     def __new__(  # type: ignore
         cls,
         to: "Model",
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> BaseFieldType:
         return super().__new__(cls, to=to, **kwargs)
+
+    @classmethod
+    def validate(cls, **kwargs: Any) -> None:
+        super().validate(**kwargs)
+        embed_parent = kwargs.get("embed_parent")
+        if embed_parent and "__" in embed_parent[1]:
+            raise FieldDefinitionError(
+                '"embed_parent" second argument (for embedding parent) cannot contain "__".'
+            )

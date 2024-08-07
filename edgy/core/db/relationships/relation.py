@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from edgy import Model, QuerySet, ReflectModel
 
 
-
 def _removeprefix(text: str, prefix: str) -> str:
     # TODO: replace with removeprefix when python3.9 is minimum
     if text.startswith(prefix):
@@ -21,7 +20,7 @@ def _removeprefix(text: str, prefix: str) -> str:
         return text
 
 
-def _removeprefixes(text:str, *prefixes: Sequence[str]) -> str:
+def _removeprefixes(text: str, *prefixes: Sequence[str]) -> str:
     for prefix in prefixes:
         text = _removeprefix(text, prefix)
     return text
@@ -42,7 +41,7 @@ class ManyRelation(ManyRelationProtocol):
         to_foreign_key: str,
         to: Union[Type["Model"], Type["ReflectModel"]],
         through: Union[Type["Model"], Type["ReflectModel"]],
-        reverse: bool=False,
+        reverse: bool = False,
         embed_through: Union[Literal[False], str] = "",
         refs: Any = (),
         instance: Optional[Union["Model", "ReflectModel"]] = None,
@@ -56,7 +55,7 @@ class ManyRelation(ManyRelationProtocol):
         self.from_foreign_key = from_foreign_key
         self.to_foreign_key = to_foreign_key
         self.embed_through = embed_through
-        self.refs: Sequence[Union["Model", "ReflectModel"]] = []
+        self.refs: Sequence[Union[Model, ReflectModel]] = []
         if not isinstance(refs, Sequence):
             refs = [refs]
         for v in refs:
@@ -70,7 +69,7 @@ class ManyRelation(ManyRelationProtocol):
 
     async def save_related(self) -> None:
         # TODO: improve performance
-        fk = self.through.meta.fields_mapping[self.from_foreign_key]
+        fk = self.through.meta.fields[self.from_foreign_key]
         while self.refs:
             ref = self.refs.pop()
             ref.__dict__.update(fk.clean(fk.name, self.instance))
@@ -80,7 +79,7 @@ class ManyRelation(ManyRelationProtocol):
         """
         Gets the attribute from the queryset and if it does not
         exist, then lookup in the model.
-        """#
+        """  #
         try:
             attr = getattr(self.get_queryset(), item)
         except AttributeError:
@@ -93,7 +92,7 @@ class ManyRelation(ManyRelationProtocol):
         @functools.wraps(func)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             assert self.instance, "instance not initialized"
-            fk = self.through.meta.fields_mapping[self.from_foreign_key]
+            fk = self.through.meta.fields[self.from_foreign_key]
             query = {}
             if self.embed_through == "":
                 new_kwargs = kwargs
@@ -104,7 +103,7 @@ class ManyRelation(ManyRelationProtocol):
                         new_kwargs[f"{self.to_foreign_key}__{key}"] = val
                     else:
                         new_kwargs[_removeprefixes(key, self.embed_through, "__")] = val
-            for related_name in fk.related_columns.keys():
+            for related_name in fk.related_columns:
                 query[related_name] = getattr(self.instance, related_name)
             new_kwargs[self.from_foreign_key] = query
             return func(*args, **new_kwargs)
@@ -116,7 +115,9 @@ class ManyRelation(ManyRelationProtocol):
 
         if isinstance(value, (through, through.proxy_model)):
             return value
-        instance = through.proxy_model(**{self.from_foreign_key: self.instance, self.to_foreign_key: value})
+        instance = through.proxy_model(
+            **{self.from_foreign_key: self.instance, self.to_foreign_key: value}
+        )
         instance.identifying_db_fields = [self.from_foreign_key, self.to_foreign_key]
         return instance
 
@@ -131,8 +132,12 @@ class ManyRelation(ManyRelationProtocol):
         if the type is wrong.
         . Checks if the middle table already contains the record being added. Raises error if yes.
         """
-        if not isinstance(child, (self.to, self.to.proxy_model, self.through, self.through.proxy_model)):
-            raise RelationshipIncompatible(f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'.")
+        if not isinstance(
+            child, (self.to, self.to.proxy_model, self.through, self.through.proxy_model)
+        ):
+            raise RelationshipIncompatible(
+                f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
+            )
         child = self.expand_relationship(child)
 
         try:
@@ -142,16 +147,16 @@ class ManyRelation(ManyRelationProtocol):
             pass
         return None
 
-    async def remove(self, child: Optional["Model"]=None) -> None:
+    async def remove(self, child: Optional["Model"] = None) -> None:
         """Removes a child from the list of many to many.
 
         . Validates if there is a relationship between the entities.
         . Removes the field if there is
         """
         if self.reverse:
-            fk = self.through.meta.fields_mapping[self.from_foreign_key]
+            fk = self.through.meta.fields[self.from_foreign_key]
         else:
-            fk = self.through.meta.fields_mapping[self.to_foreign_key]
+            fk = self.through.meta.fields[self.to_foreign_key]
         if child is None:
             if fk.unique:
                 try:
@@ -160,8 +165,12 @@ class ManyRelation(ManyRelationProtocol):
                     raise RelationshipNotFound(detail="no child found") from None
             else:
                 raise RelationshipNotFound(detail="no child specified")
-        if not isinstance(child, (self.to, self.to.proxy_model, self.through, self.through.proxy_model)):
-            raise RelationshipIncompatible(f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'.")
+        if not isinstance(
+            child, (self.to, self.to.proxy_model, self.through, self.through.proxy_model)
+        ):
+            raise RelationshipIncompatible(
+                f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
+            )
         child = cast("Model", self.expand_relationship(child))
         count = await child.query.filter(sqlalchemy.and_(*child.identifying_clauses())).count()
         if count == 0:
@@ -178,7 +187,6 @@ class ManyRelation(ManyRelationProtocol):
         return f"{self.through.__name__}"
 
 
-
 class SingleRelation(ManyRelationProtocol):
     """
     When a `related_name` is generated, creates a RelatedField from the table pointed
@@ -192,7 +200,7 @@ class SingleRelation(ManyRelationProtocol):
         *,
         to_foreign_key: str,
         to: Union[Type["Model"], Type["ReflectModel"]],
-        embed_parent: Optional[Tuple[str, str]]=None,
+        embed_parent: Optional[Tuple[str, str]] = None,
         refs: Any = (),
         instance: Optional[Union["Model", "ReflectModel"]] = None,
         **kwargs: Any,
@@ -202,7 +210,7 @@ class SingleRelation(ManyRelationProtocol):
         self.instance = instance
         self.to_foreign_key = to_foreign_key
         self.embed_parent = embed_parent
-        self.refs: Sequence[Union["Model","ReflectModel"]] = []
+        self.refs: Sequence[Union[Model, ReflectModel]] = []
         if not isinstance(refs, Sequence):
             refs = [refs]
         for v in refs:
@@ -219,7 +227,7 @@ class SingleRelation(ManyRelationProtocol):
 
         if isinstance(value, (target, target.proxy_model)):
             return value
-        related_columns = self.to.meta.fields_mapping[self.to_foreign_key].related_columns.keys()
+        related_columns = self.to.meta.fields[self.to_foreign_key].related_columns.keys()
         if len(related_columns) == 1 and not isinstance(value, (dict, BaseModel)):
             value = {next(iter(related_columns)): value}
         if isinstance(value, dict):
@@ -254,9 +262,12 @@ class SingleRelation(ManyRelationProtocol):
         @functools.wraps(func)
         def wrapped(*args: Any, **kwargs: Any) -> Any:
             assert self.instance, "instance not initialized"
-            fk = self.to.meta.fields_mapping[self.to_foreign_key]
+            fk = self.to.meta.fields[self.to_foreign_key]
             query = {}
-            if not self.embed_parent or not isinstance(fk.owner.meta.fields_mapping[self.embed_parent[0]], RelationshipField):
+            if not self.embed_parent or not isinstance(
+                fk.owner.meta.fields[self.embed_parent[0].split("__", 1)[0]],
+                RelationshipField,
+            ):
                 new_kwargs = kwargs
             else:
                 new_kwargs = {}
@@ -292,13 +303,13 @@ class SingleRelation(ManyRelationProtocol):
         await child.save(values={self.to_foreign_key: self.instance})
         return child
 
-    async def remove(self, child: Optional["Model"]=None) -> None:
+    async def remove(self, child: Optional["Model"] = None) -> None:
         """Removes a child from the list of one to many.
 
         . Validates if there is a relationship between the entities.
         . Removes the field if there is
         """
-        fk = self.to.meta.fields_mapping[self.to_foreign_key]
+        fk = self.to.meta.fields[self.to_foreign_key]
         if child is None:
             if fk.unique:
                 try:

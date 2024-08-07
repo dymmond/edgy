@@ -1,16 +1,13 @@
 import inspect
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
 from sqlalchemy.orm import Mapped, relationship
 
 
-class DeclarativeMixin(BaseModel):
+class DeclarativeMixin:
     """
     Mixin for declarative base models.
     """
-
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     @classmethod
     def declarative(cls) -> Any:
@@ -35,7 +32,7 @@ class DeclarativeMixin(BaseModel):
                 continue
 
             # Maps the relationships with the foreign keys and related names
-            field = cls.fields.get(column.name)
+            field = cls.meta.fields.get(column.name)
             to = field.to.__name__ if inspect.isclass(field.to) else field.to
             mapped_model: Mapped[to] = relationship(to)  # type: ignore
 

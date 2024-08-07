@@ -1,4 +1,3 @@
-
 import edgy
 from edgy import Database, Registry
 
@@ -13,6 +12,7 @@ class Address(edgy.Model):
     class Meta:
         # we don't want a table just a template
         abstract = True
+
 
 class User(edgy.Model):
     is_active: bool = edgy.BooleanField(default=True)
@@ -31,7 +31,11 @@ class Profile(edgy.Model):
 
 
 user = edgy.run_sync(User.query.create())
-edgy.run_sync(Profile.query.create(name="edgy", user=user, address={"street": "Rainbowstreet 123", "city": "London"}))
+edgy.run_sync(
+    Profile.query.create(
+        name="edgy", user=user, address={"street": "Rainbowstreet 123", "city": "London"}
+    )
+)
 # use the reverse link
 address = edgy.run_sync(user.profile.get())
 # access the profile

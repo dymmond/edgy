@@ -160,11 +160,8 @@ class SimpleLazyObject(LazyObject):  # pragma: no cover
     # Return a meaningful representation of the lazy object for debugging
     # without evaluating the wrapped object.
     def __repr__(self) -> str:
-        if self._wrapped is empty:
-            repr_attr = self._setupfunc
-        else:
-            repr_attr = self._wrapped
-        return "<{}: {!r}>".format(type(self).__name__, repr_attr)
+        repr_attr = self._setupfunc if self._wrapped is empty else self._wrapped
+        return f"<{type(self).__name__}: {repr_attr!r}>"
 
     def __copy__(self) -> Any:
         if self._wrapped is empty:

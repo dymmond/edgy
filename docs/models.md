@@ -29,7 +29,7 @@ using the edgy [Fields](./fields.md).
 For each model defined you also need to set **one** mandatory field, the `registry` which is also
 an instance of `Registry` from Edgy.
 
-There are more parameters you can use and pass into the model such as [tablename](#metaclass) and
+There are more parameters you can use and pass into the model such as [tablename](#the-meta-class) and
 a few more but more on this in this document.
 
 Since **Edgy** took inspiration from the interface of Django, that also means that a [Meta](#the-meta-class)

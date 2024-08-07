@@ -6,6 +6,7 @@ import sqlalchemy
 import edgy
 from edgy.core.db.fields.base import BaseField
 from edgy.core.db.fields.core import FieldFactory
+from edgy.core.db.fields.types import ColumnDefinitionModel
 from edgy.testclient import DatabaseTestClient as Database
 from tests.settings import DATABASE_URL
 
@@ -16,32 +17,19 @@ models = edgy.Registry(database=database)
 
 class MultiColumnFieldInner(BaseField):
     def get_columns(self, field_name: str) -> Sequence[sqlalchemy.Column]:
+        model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
         return [
             sqlalchemy.Column(
                 field_name,
-                self.column_type,
-                *self.constraints,
-                primary_key=self.primary_key,
-                nullable=self.null and not self.primary_key,
-                index=self.index,
-                unique=self.unique,
-                default=self.default,
-                comment=self.comment,
-                server_default=self.server_default,
-                server_onupdate=self.server_onupdate,
+                model.column_type,
+                *model.constraints,
+                **model.model_dump(by_alias=True, exclude_none=True),
             ),
             sqlalchemy.Column(
                 field_name + "_inner",
-                self.column_type,
-                *self.constraints,
-                primary_key=self.primary_key,
-                nullable=self.null and not self.primary_key,
-                index=self.index,
-                unique=self.unique,
-                default=self.default,
-                comment=self.comment,
-                server_default=self.server_default,
-                server_onupdate=self.server_onupdate,
+                model.column_type,
+                *model.constraints,
+                **model.model_dump(by_alias=True, exclude_none=True),
             ),
         ]
 
@@ -60,7 +48,10 @@ class MultiColumnFieldInner(BaseField):
         if isinstance(normal, dict):
             kwargs[field_name] = normal
         else:
-            kwargs[field_name] = {"normal": normal, "inner": kwargs.pop(field_name + "_inner", normal)}
+            kwargs[field_name] = {
+                "normal": normal,
+                "inner": kwargs.pop(field_name + "_inner", normal),
+            }
 
     def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         if isinstance(value, str):
@@ -69,8 +60,8 @@ class MultiColumnFieldInner(BaseField):
 
 
 class MultiColumnField(FieldFactory):
-    _bases = (MultiColumnFieldInner,)
-    _type = Any
+    field_bases = (MultiColumnFieldInner,)
+    field_type = Any
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:

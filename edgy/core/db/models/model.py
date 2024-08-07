@@ -1,13 +1,14 @@
-from typing import Any, Dict, Set, Type, Union
+from typing import Any, Dict, Type, Union
 
-from edgy.core.db.models.base import EdgyBaseReflectModel
-from edgy.core.db.models.mixins import DeclarativeMixin
-from edgy.core.db.models.row import ModelRow
+from sqlalchemy.engine.result import Row
+
+from edgy.core.db.models.base import EdgyBaseModel
+from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
 from edgy.exceptions import ObjectNotFound, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 
-class Model(ModelRow, DeclarativeMixin):
+class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
     """
     Representation of an Edgy `Model`.
 
@@ -38,6 +39,7 @@ class Model(ModelRow, DeclarativeMixin):
             registry = models
     ```
     """
+
     class Meta:
         abstract = True
 
@@ -45,20 +47,22 @@ class Model(ModelRow, DeclarativeMixin):
         """
         Update operation of the database fields.
         """
-        await self.signals.pre_update.send_async(self.__class__, instance=self)
+        await self.meta.signals.pre_update.send_async(self.__class__, instance=self)
 
         # empty updates shouldn't cause an error
         if kwargs:
-            kwargs = self._update_auto_now_fields(kwargs, self.fields)
+            kwargs = self.extract_column_values(
+                extracted_values=kwargs, is_partial=True, is_update=True
+            )
             expression = self.table.update().values(**kwargs).where(*self.identifying_clauses())
             await self.database.execute(expression)
-        await self.signals.post_update.send_async(self.__class__, instance=self)
+        await self.meta.signals.post_update.send_async(self.__class__, instance=self)
 
         # Update the model instance.
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        for field in self.meta.fields_mapping.keys():
+        for field in self.meta.fields:
             _val = self.__dict__.get(field)
             if isinstance(_val, ManyRelationProtocol):
                 _val.instance = self
@@ -67,12 +71,12 @@ class Model(ModelRow, DeclarativeMixin):
 
     async def delete(self) -> None:
         """Delete operation from the database"""
-        await self.signals.pre_delete.send_async(self.__class__, instance=self)
+        await self.meta.signals.pre_delete.send_async(self.__class__, instance=self)
 
         expression = self.table.delete().where(*self.identifying_clauses())
         await self.database.execute(expression)
 
-        await self.signals.post_delete.send_async(self.__class__, instance=self)
+        await self.meta.signals.post_delete.send_async(self.__class__, instance=self)
 
     async def load(self) -> None:
         # Build the select expression.
@@ -96,13 +100,16 @@ class Model(ModelRow, DeclarativeMixin):
         transformed_kwargs = self.transform_input(kwargs, phase="post_insert")
         for k, v in transformed_kwargs.items():
             setattr(self, k, v)
-
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
+            if isinstance(autoincrement_value, Row):
+                assert len(autoincrement_value) == 1
+                autoincrement_value = autoincrement_value[0]
             column = self.table.autoincrement_column
-            if column is not None:
+            # can be explicit set, which causes an invalid value returned
+            if column is not None and column.key not in kwargs:
                 setattr(self, column.key, autoincrement_value)
-        for field in self.meta.fields_mapping.keys():
+        for field in self.meta.fields:
             _val = self.__dict__.get(field)
             if isinstance(_val, ManyRelationProtocol):
                 _val.instance = self
@@ -117,9 +124,9 @@ class Model(ModelRow, DeclarativeMixin):
 
         for reference in model_references:
             if isinstance(reference, dict):
-                model: Type["Model"] = self.meta.model_references[model_ref].__model__  # type: ignore
+                model: Type[Model] = self.meta.model_references[model_ref].__model__  # type: ignore
             else:
-                model: Type["Model"] = reference.__model__  # type: ignore
+                model: Type[Model] = reference.__model__  # type: ignore
 
             if isinstance(model, str):
                 model = self.meta.registry.models[model]  # type: ignore
@@ -143,20 +150,6 @@ class Model(ModelRow, DeclarativeMixin):
             data[foreign_key_target_field] = self
             await model.query.create(**data)
 
-    def update_model_references(self, **kwargs: Any) -> Any:
-        model_refs_set: Set[str] = set()
-        model_references: Dict[str, Any] = {}
-
-        for name, value in kwargs.items():
-            if name in self.meta.model_references:
-                model_references[name] = value
-                model_refs_set.add(name)
-
-        for value in model_refs_set:
-            kwargs.pop(value)
-
-        return kwargs, model_references
-
     async def save(
         self,
         force_save: bool = False,
@@ -168,13 +161,16 @@ class Model(ModelRow, DeclarativeMixin):
         When creating a user it will make sure it can update existing or
         create a new one.
         """
-        await self.signals.pre_save.send_async(self.__class__, instance=self)
+        await self.meta.signals.pre_save.send_async(self.__class__, instance=self)
 
         extracted_fields = self.extract_db_fields()
 
         for pkcolumn in self.__class__.pkcolumns:
             # should trigger load in case of identifying_db_fields
-            if getattr(self, pkcolumn, None) is None and self.table.columns[pkcolumn].autoincrement:
+            if (
+                getattr(self, pkcolumn, None) is None
+                and self.table.columns[pkcolumn].autoincrement
+            ):
                 extracted_fields.pop(pkcolumn, None)
                 force_save = True
 
@@ -182,29 +178,31 @@ class Model(ModelRow, DeclarativeMixin):
             if values:
                 extracted_fields.update(values)
             # force save must ensure a complete mapping
-            validated_values = self._extract_values_from_field(
-                extracted_values=extracted_fields, is_partial=False
+            kwargs = self.extract_column_values(
+                extracted_values=extracted_fields, is_partial=False, is_update=False
             )
-            kwargs = self._update_auto_now_fields(values=validated_values, fields=self.fields)
-            kwargs, model_references = self.update_model_references(**kwargs)
+            model_references = self.extract_model_references(extracted_fields)
             await self._save(**kwargs)
         else:
             # Broadcast the initial update details
             # Making sure it only updates the fields that should be updated
-            # and excludes the fields aith `auto_now` as true
-            validated_values = self._extract_values_from_field(
+            # and excludes the fields with `auto_now` as true
+            kwargs = self.extract_column_values(
                 extracted_values=extracted_fields if values is None else values,
                 is_update=True,
                 is_partial=values is not None,
             )
-            kwargs, model_references = self.update_model_references(**validated_values)
-            update_model = {k: v for k, v in validated_values.items() if k in kwargs}
+            model_references = self.extract_model_references(
+                extracted_fields if values is None else values
+            )
 
-            await self.signals.pre_update.send_async(self.__class__, instance=self, kwargs=update_model)
-            await self.update(**update_model)
+            await self.meta.signals.pre_update.send_async(
+                self.__class__, instance=self, kwargs=kwargs
+            )
+            await self.update(**kwargs)
 
             # Broadcast the update complete
-            await self.signals.post_update.send_async(self.__class__, instance=self)
+            await self.meta.signals.post_update.send_async(self.__class__, instance=self)
 
         # Save the model references
         if model_references:
@@ -212,14 +210,18 @@ class Model(ModelRow, DeclarativeMixin):
                 await self.save_model_references(references or [], model_ref=model_ref)
 
         # Refresh the results
-        if any(field.server_default is not None for name, field in self.fields.items() if name not in extracted_fields):
+        if any(
+            field.server_default is not None
+            for name, field in self.meta.fields.items()
+            if name not in extracted_fields
+        ):
             await self.load()
 
-        await self.signals.post_save.send_async(self.__class__, instance=self)
+        await self.meta.signals.post_save.send_async(self.__class__, instance=self)
         return self
 
 
-class ReflectModel(Model, EdgyBaseReflectModel):
+class ReflectModel(ReflectedModelMixin, Model):
     """
     Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
     call.

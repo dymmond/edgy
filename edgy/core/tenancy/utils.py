@@ -23,7 +23,9 @@ def table_schema(model_class: Type["Model"], schema: str) -> sqlalchemy.Table:
     return model_class.build(schema)
 
 
-async def create_tables(registry: "Registry", models: Dict[str, Type["Model"]], schema: str) -> None:
+async def create_tables(
+    registry: "Registry", models: Dict[str, Type["Model"]], schema: str
+) -> None:
     """
     Creates the table models for a specific schema just generated.
 
@@ -61,9 +63,10 @@ async def create_schema(
         registry (Registry): The registry object where the schema will be created.
         schema_name (str): The name of the schema to be created.
         models (dict[str, Model], optional): When models is provided, it will use them to generate
-        those same models in a given schema or else it will default to the `registry.models`.
+                                             those same models in a given schema or else
+                                             it will default to the `registry.models`.
         if_not_exists (bool, optional): If True, the schema will be created only if it does not already exist.
-        Defaults to False.
+                                        Defaults to False.
         should_create_tables (bool, optional): If True, tables will be created within the new schema. Defaults to False.
 
     Raises:
@@ -71,7 +74,9 @@ async def create_schema(
     """
     default_schema_name = registry.schema.get_default_schema() or "public"
     if schema_name.lower() == default_schema_name.lower():
-        raise ModelSchemaError(f"Cannot create a schema with the same name as the default: '{schema_name}'.")
+        raise ModelSchemaError(
+            f"Cannot create a schema with the same name as the default: '{schema_name}'."
+        )
 
     # Create the new schema, optionally checking if it already exists
     await registry.schema.create_schema(schema_name, if_not_exists=if_not_exists)

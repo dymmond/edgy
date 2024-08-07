@@ -4,10 +4,18 @@ from edgy.core.db.context_vars import get_tenant, set_tenant
 from edgy.core.db.querysets.base import QuerySet
 
 if TYPE_CHECKING:
-    from edgy.core.db.models.base import EdgyBaseModel
+    from edgy.core.db.models.base import BaseModelType
+
 
 class BaseManager:
-    def __init__(self, *, owner: Optional[Union[Type["EdgyBaseModel"]]] = None, inherit: bool=True, name: str = "", instance: Optional[Union["EdgyBaseModel"]]=None):
+    def __init__(
+        self,
+        *,
+        owner: Optional[Union[Type["BaseModelType"]]] = None,
+        inherit: bool = True,
+        name: str = "",
+        instance: Optional[Union["BaseModelType"]] = None,
+    ):
         self.owner = owner
         self.inherit = inherit
         self.name = name
@@ -22,7 +30,9 @@ class BaseManager:
         """
         Returns the queryset object.
         """
-        raise NotImplementedError(f"The {self!r} manager doesn't implement the get_queryset method.")
+        raise NotImplementedError(
+            f"The {self!r} manager doesn't implement the get_queryset method."
+        )
 
 
 class Manager(BaseManager):
