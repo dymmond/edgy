@@ -4,7 +4,7 @@ name: Publish
 on:
   push:
     tags:
-      - '*'
+      - '[0-9]*'
 
 jobs:
   publish:
@@ -20,7 +20,7 @@ jobs:
       - name: "Build package"
         run: "hatch build"
       - name: "Publish to PyPI"
-        run: "scripts/publish"
+        run: "hatch publish -n"
         env:
           HATCH_INDEX_USER: __token__
           HATCH_INDEX_AUTH: ${{ secrets.PYPI_TOKEN }}
