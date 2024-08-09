@@ -50,6 +50,7 @@ class Schema:
             except ProgrammingError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
+        # database can be also a TestClient, so use the Database and copy to not have strange error
         async with Database(
             self.registry.database, force_rollback=False
         ) as database, database.transaction():
@@ -70,6 +71,7 @@ class Schema:
             except DBAPIError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
+        # database can be also a TestClient, so use the Database and copy to not have strange error
         async with Database(
             self.registry.database, force_rollback=False
         ) as database, database.transaction():

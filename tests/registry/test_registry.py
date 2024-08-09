@@ -4,7 +4,7 @@ import pytest
 
 import edgy
 from edgy.exceptions import SchemaError
-from edgy.testclient import DatabaseTestClient as Database
+from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 
@@ -20,7 +20,7 @@ def get_random_string(
     return "".join(random.choice(allowed_chars) for _ in range(length))
 
 
-database = Database(url=DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, test_prefix="")
 registry = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio

@@ -6,12 +6,12 @@ from sqlalchemy.exc import IntegrityError
 
 import edgy
 from edgy.core.db.datastructures import UniqueConstraint
-from edgy.testclient import DatabaseTestClient as Database
+from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = Database(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, test_prefix="")
 models = edgy.Registry(database=database)
 
 

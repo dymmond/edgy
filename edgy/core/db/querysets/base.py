@@ -900,7 +900,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         expression = queryset.table.insert().values(new_objs)
         queryset._set_query_expression(expression)
-        await queryset.database.execute(expression)
+        await queryset.database.execute_many(expression)
 
     async def bulk_update(self, objs: List[EdgyModel], fields: List[str]) -> None:
         """
@@ -943,7 +943,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         }
         expression = expression.values(values_placeholder)
         queryset._set_query_expression(expression)
-        await queryset.database.execute(expression, update_list)
+        return await queryset.database.execute_many(expression, update_list)
 
     async def delete(self) -> None:
         queryset: QuerySet = self._clone()

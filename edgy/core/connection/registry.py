@@ -84,6 +84,7 @@ class Registry:
     async def create_all(self) -> None:
         if self.db_schema:
             await self.schema.create_schema(self.db_schema, True)
+        # database can be also a TestClient, so use the Database and copy to not have strange error
         async with Database(
             self.database, force_rollback=False
         ) as database, database.transaction():
@@ -92,6 +93,7 @@ class Registry:
     async def drop_all(self) -> None:
         if self.db_schema:
             await self.schema.drop_schema(self.db_schema, True, True)
+        # database can be also a TestClient, so use the Database and copy to not have strange error
         async with Database(
             self.database, force_rollback=False
         ) as database, database.transaction():

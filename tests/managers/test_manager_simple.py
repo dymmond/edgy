@@ -6,10 +6,10 @@ import pytest
 import edgy
 from edgy import Manager
 from edgy.core.db.querysets import QuerySet
-from edgy.testclient import DatabaseTestClient as Database
+from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = Database(url=DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, test_prefix="")
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio

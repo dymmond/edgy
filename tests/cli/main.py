@@ -9,7 +9,7 @@ from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
-database = DatabaseTestClient(DATABASE_URL, drop_database=True)
+database = DatabaseTestClient(DATABASE_URL, test_prefix="", drop_database=True)
 models = edgy.Registry(database=database)
 
 basedir = os.path.abspath(os.path.dirname(__file__))

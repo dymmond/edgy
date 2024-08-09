@@ -4,10 +4,10 @@ import pytest
 
 import edgy
 from edgy import Registry
-from edgy.testclient import DatabaseTestClient as Database
+from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = Database(url=DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, test_prefix="")
 models = Registry(database=database)
 nother = Registry(database=database)
 

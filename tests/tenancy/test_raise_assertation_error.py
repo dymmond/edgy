@@ -9,13 +9,13 @@ import pytest
 
 import edgy
 from edgy.core.db import fields
-from edgy.testclient import DatabaseTestClient as Database
+from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_ALTERNATIVE_URL, DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = Database(DATABASE_URL)
-another_db = Database(DATABASE_ALTERNATIVE_URL)
+database = DatabaseTestClient(DATABASE_URL, test_prefix="")
+another_db = DatabaseTestClient(DATABASE_ALTERNATIVE_URL, test_prefix="")
 models = edgy.Registry(database=database, extra={"another": another_db})
 registry = copy.copy(models)
 registry.database = another_db

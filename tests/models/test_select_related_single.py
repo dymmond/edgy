@@ -5,10 +5,10 @@ from pydantic import __version__
 
 import edgy
 from edgy.contrib.multi_tenancy import TenantRegistry
-from edgy.testclient import DatabaseTestClient as Database
+from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = Database(url=DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, test_prefix="")
 models = TenantRegistry(database=database)
 
 
