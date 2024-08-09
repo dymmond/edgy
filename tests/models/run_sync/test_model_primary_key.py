@@ -7,7 +7,7 @@ from edgy import Registry
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL, test_prefix="")
+database = DatabaseTestClient(DATABASE_URL)
 models = Registry(database=database)
 nother = Registry(database=database)
 

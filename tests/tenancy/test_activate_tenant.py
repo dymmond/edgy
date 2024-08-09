@@ -10,7 +10,7 @@ from edgy.core.db.querysets.mixins import activate_schema, deactivate_schema
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL, test_prefix="")
+database = DatabaseTestClient(DATABASE_URL)
 models = TenantRegistry(database=database)
 
 

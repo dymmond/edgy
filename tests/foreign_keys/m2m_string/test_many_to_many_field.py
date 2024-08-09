@@ -7,7 +7,7 @@ from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = DatabaseTestClient(DATABASE_URL, test_prefix="")
+database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=database)
 
 
@@ -45,14 +45,14 @@ class Studio(edgy.Model):
         registry = models
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True)
 async def create_test_database():
     await models.create_all()
     yield
     await models.drop_all()
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 async def rollback_connections():
     with database.force_rollback():
         async with database:

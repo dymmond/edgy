@@ -11,7 +11,7 @@ from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
-database = DatabaseTestClient(DATABASE_URL, test_prefix="")
+database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=database)
 
 

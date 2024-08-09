@@ -12,7 +12,7 @@ from edgy.core.marshalls.config import ConfigMarshall
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL, test_prefix="")
+database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio

@@ -15,7 +15,7 @@ from edgy.exceptions import ObjectNotFound
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL, test_prefix="")
+database = DatabaseTestClient(DATABASE_URL)
 models = TenantRegistry(database=database)
 
 

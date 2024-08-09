@@ -20,7 +20,7 @@ def get_random_string(
     return "".join(random.choice(allowed_chars) for _ in range(length))
 
 
-database = DatabaseTestClient(DATABASE_URL, test_prefix="")
+database = DatabaseTestClient(DATABASE_URL)
 registry = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio

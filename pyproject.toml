@@ -126,12 +126,21 @@ serve = "mkdocs serve --dev-addr localhost:8000"
 # required for cli tests and check_types
 features = ["all", "testing"]
 
+
+[tool.hatch.envs.test.env-vars]
+EDGY_TESTCLIENT_TEST_PREFIX = ""
+
+
 [tool.hatch.envs.test.scripts]
 check_types = "mypy -p edgy"
 
 [tool.hatch.envs.hatch-test]
 # needs docker services running
 features = ["all", "testing"]
+
+
+[tool.hatch.envs.hatch-test.env-vars]
+EDGY_TESTCLIENT_TEST_PREFIX = ""
 
 
 [tool.hatch.version]
