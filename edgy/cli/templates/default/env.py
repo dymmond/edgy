@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 from logging.config import fileConfig
-from typing import Any
+from typing import Any, Optional
 
 from alembic import context
 from databasez import DatabaseURL
@@ -11,7 +11,6 @@ from rich.console import Console
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from edgy import settings
 from edgy.cli.constants import APP_PARAMETER
 from edgy.cli.env import MigrationEnv
 from edgy.exceptions import EdgyException
@@ -52,7 +51,9 @@ def get_app() -> Any:
 
 
 def get_engine_url() -> str:
-    return os.environ.get("EDGY_DATABASE_URL")  # type: ignore
+    url: Optional[str] = os.environ.get("EDGY_DATABASE_URL")
+    assert url, '"EDGY_DATABASE_URL" not specified or empty'
+    return url
 
 
 app: Any = get_app()
@@ -118,25 +119,6 @@ def do_run_migrations(connection: Any) -> Any:
         context.run_migrations()
 
 
-def is_async_connection(url: DatabaseURL) -> bool:
-    """
-    Verifies if is an async connection string.
-
-    Validates the type of driver against the ones supported by Edgy.
-    """
-    if not url.driver:
-        return False
-
-    if (
-        (url.driver in settings.postgres_drivers)
-        or (url.driver in settings.mysql_drivers)
-        or (url.driver in settings.sqlite_drivers)
-        or url.driver in settings.mssql_drivers
-    ):
-        return True
-    return False
-
-
 async def run_migrations_online() -> Any:
     """Run migrations in 'online' mode.
 
@@ -145,7 +127,7 @@ async def run_migrations_online() -> Any:
 
     """
     database_url = DatabaseURL(get_engine_url())
-    is_async = is_async_connection(database_url)
+    is_async = database_url.sqla_url.get_dialect(True).is_async
 
     if is_async:
         connectable = create_async_engine(database_url._url)
