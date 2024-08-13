@@ -5,6 +5,16 @@ hide:
 
 # Release Notes
 
+## Unreleased
+
+### 0.13.1
+
+- Testclient can be configured via environment variables.
+
+### Fixed
+
+- Compatibility with newer databasez releases (>0.9).
+
 ## 0.13.0
 
 ### Added

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Tuple, Type,
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
+from sqlalchemy.exc import IntegrityError
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.exceptions import ObjectNotFound, RelationshipIncompatible, RelationshipNotFound
@@ -143,7 +144,7 @@ class ManyRelation(ManyRelationProtocol):
         try:
             async with child.database.transaction():
                 return await child.save(force_save=True)
-        except Exception:
+        except IntegrityError:
             pass
         return None
 
@@ -299,7 +300,6 @@ class SingleRelation(ManyRelationProtocol):
         """
         if not isinstance(child, (self.to, self.to.proxy_model)):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
-
         await child.save(values={self.to_foreign_key: self.instance})
         return child
 

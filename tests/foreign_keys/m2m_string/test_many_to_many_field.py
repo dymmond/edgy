@@ -2,12 +2,12 @@ import pytest
 
 import edgy
 from edgy.exceptions import RelationshipIncompatible, RelationshipNotFound
-from edgy.testclient import DatabaseTestClient as Database
+from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = Database(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=database)
 
 
@@ -45,14 +45,14 @@ class Studio(edgy.Model):
         registry = models
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True)
 async def create_test_database():
     await models.create_all()
     yield
     await models.drop_all()
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 async def rollback_connections():
     with database.force_rollback():
         async with database:

@@ -102,10 +102,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             setattr(self, k, v)
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
-            if isinstance(autoincrement_value, Row):
-                assert len(autoincrement_value) == 1
-                autoincrement_value = autoincrement_value[0]
             column = self.table.autoincrement_column
+            if column is not None and isinstance(autoincrement_value, Row):
+                autoincrement_value = autoincrement_value._mapping[column.name]
             # can be explicit set, which causes an invalid value returned
             if column is not None and column.key not in kwargs:
                 setattr(self, column.key, autoincrement_value)

@@ -3,13 +3,12 @@ from uuid import uuid4
 import pytest
 
 import edgy
-from edgy import Database
 from edgy.core.tenancy.utils import create_schema
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = Database(DATABASE_URL)
+database = edgy.Database(DATABASE_URL)
 models = edgy.Registry(database=database)
 
 

@@ -2,10 +2,10 @@ import pytest
 
 import edgy
 from edgy.core.db.querysets.clauses import or_
-from edgy.testclient import DatabaseTestClient as Database
+from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = Database(url=DATABASE_URL)
+database = DatabaseTestClient(url=DATABASE_URL)
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio

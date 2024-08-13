@@ -52,33 +52,6 @@ has some which are used across the codebase and those can be overriden easily.
 
     <sup>Default: `"~/.config/ptpython/config.py"`</sup>
 
-* **postgres_dialects** - Set of available Postgres dialects supported by Edgy.
-
-    <sup>Default: `{"postgres", "postgresql"}`</sup>
-
-* **mysql_dialects** - Set of available MySQL dialects supported by Edgy.
-
-    <sup>Default: `{"mysql"}`</sup>
-
-* **sqlite_dialects** - Set of available SQLite dialects supported by Edgy.
-
-    <sup>Default: `{"sqlite"}`</sup>
-
-* **mssql_dialects** - Set of available MSSQL dialects supported by Edgy.
-
-    <sup>Default: `{"mssql"}`</sup>
-
-* **postgres_drivers** - Set of available Postgres drivers supported by Edgy.
-
-    <sup>Default: `{"aiopg", "asyncpg"}`</sup>
-
-* **mysql_drivers** - Set of available MySQL drivers supported by Edgy.
-
-    <sup>Default: `{"aiomysql", "asyncmy"}`</sup>
-
-* **sqlite_drivers** - Set of available SQLite drivers supported by Edgy.
-
-    <sup>Default: `{aiosqlite}`</sup>
 
 #### How to use it
 

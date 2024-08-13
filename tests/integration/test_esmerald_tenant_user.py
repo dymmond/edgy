@@ -12,10 +12,10 @@ from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
 from edgy.contrib.multi_tenancy.models import TenantMixin, TenantUserMixin
 from edgy.core.db import fields, set_tenant
 from edgy.exceptions import ObjectNotFound
-from edgy.testclient import DatabaseTestClient as Database
+from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = Database(url=DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL)
 models = TenantRegistry(database=database)
 
 

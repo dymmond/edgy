@@ -4,12 +4,12 @@ from pydantic import __version__
 import edgy
 from edgy import ModelRef
 from edgy.exceptions import ModelReferenceError
-from edgy.testclient import DatabaseTestClient as Database
+from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = Database(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=database)
 
 pydantic_version = __version__[:3]

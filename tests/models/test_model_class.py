@@ -3,10 +3,10 @@ import pytest
 import edgy
 from edgy.core.db.fields.base import Field
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound
-from edgy.testclient import DatabaseTestClient as Database
+from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = Database(url=DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
