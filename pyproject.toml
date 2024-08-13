@@ -97,7 +97,7 @@ mssql = ["databasez[aioodbc]"]
 all = ["edgy[test,postgres,mysql,sqlite,mssql]", "ipython", "ptpython"]
 
 [tool.hatch.envs.default]
-dependencies = ["pre-commit>=2.17.0,<3.0.0"]
+dependencies = ["pre-commit>=2.17.0,<4.0.0"]
 
 [tool.hatch.envs.default.scripts]
 clean_pyc = "find . -type f -name \"*.pyc\" -delete"
@@ -129,6 +129,7 @@ features = ["all", "testing"]
 
 [tool.hatch.envs.test.env-vars]
 EDGY_TESTCLIENT_TEST_PREFIX = ""
+EDGY_TESTCLIENT_USE_EXISTING = "true"
 
 
 [tool.hatch.envs.test.scripts]
@@ -141,6 +142,7 @@ features = ["all", "testing"]
 
 [tool.hatch.envs.hatch-test.env-vars]
 EDGY_TESTCLIENT_TEST_PREFIX = ""
+EDGY_TESTCLIENT_USE_EXISTING = "true"
 
 
 [tool.hatch.version]

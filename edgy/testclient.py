@@ -8,10 +8,11 @@ if TYPE_CHECKING:
     import sqlalchemy
     from databasez import Database, DatabaseURL
 
+# TODO: move this to the settings
 default_test_prefix: str = "test_"
 # for allowing empty
 if "EDGY_TESTCLIENT_TEST_PREFIX" in os.environ:
-    default_test_prefix: str = os.environ["EDGY_TESTCLIENT_TEST_PREFIX"]
+    default_test_prefix = os.environ["EDGY_TESTCLIENT_TEST_PREFIX"]
 
 default_use_existing: bool = (
     os.environ.get("EDGY_TESTCLIENT_USE_EXISTING") or ""
@@ -22,6 +23,19 @@ default_drop_database: bool = (
 
 
 class DatabaseTestClient(_DatabaseTestClient):
+    """
+    Adaption of DatabaseTestClient for edgy.
+
+    Note: the default of lazy_setup is True here. This enables the simple Registry syntax.
+    """
+    testclient_lazy_setup: bool = (
+        os.environ.get("EDGY_TESTCLIENT_LAZY_SETUP", "true") or ""
+    ).lower() == "true"
+    testclient_force_rollback: bool = (
+        os.environ.get("EDGY_TESTCLIENT_FORCE_ROLLBACK") or ""
+    ).lower() == "true"
+
+    # TODO: replace by testclient default overwrites
     def __init__(
         self,
         url: typing.Union[str, "DatabaseURL", "sqlalchemy.URL", "Database"],

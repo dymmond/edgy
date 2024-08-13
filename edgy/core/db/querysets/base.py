@@ -943,7 +943,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         }
         expression = expression.values(values_placeholder)
         queryset._set_query_expression(expression)
-        return await queryset.database.execute_many(expression, update_list)
+        await queryset.database.execute_many(expression, update_list)
 
     async def delete(self) -> None:
         queryset: QuerySet = self._clone()
