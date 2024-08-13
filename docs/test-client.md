@@ -37,6 +37,11 @@ that rollbacks once the database is disconnected.
 
     <sup>Default: `False`</sup>
 
+* **lazy_setup** - This sets up the db first up on connect not in init.
+
+    <sup>Default: `True`</sup>
+
+
 * **use_existing** - Uses the existing `test_` database if previously created and not dropped.
 
     <sup>Default: `False`</sup>
@@ -44,6 +49,18 @@ that rollbacks once the database is disconnected.
 * **drop_database** - Ensures that after the tests, the database is dropped.
 
     <sup>Default: `False`</sup>
+
+* **test_prefix** - Allow a custom test prefix or leave empty to use the url instead without changes.
+
+    <sup>Default: `testclient_default_test_prefix` (defaults to `test_`)</sup>
+
+### Configuration via Environment
+
+Most parameters defaults can be changed via capitalized environment names with `EDGY_TESTCLIENT_`.
+
+E.g. `EDGY_TESTCLIENT_DEFAULT_PREFIX=foobar` or `EDGY_TESTCLIENT_FORCE_ROLLBACK=true`.
+
+This is used for the tests.
 
 ### How to use it
 
