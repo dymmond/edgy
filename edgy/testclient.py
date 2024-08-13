@@ -28,6 +28,7 @@ class DatabaseTestClient(_DatabaseTestClient):
 
     Note: the default of lazy_setup is True here. This enables the simple Registry syntax.
     """
+
     testclient_lazy_setup: bool = (
         os.environ.get("EDGY_TESTCLIENT_LAZY_SETUP", "true") or ""
     ).lower() == "true"
