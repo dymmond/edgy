@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Uni
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.relationships.utils import crawl_relationship
-from edgy.core.utils.sync import run_sync
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -18,7 +17,7 @@ class ModelRowMixin:
     """
 
     @classmethod
-    def from_sqla_row(
+    async def from_sqla_row(
         cls,
         row: "Row",
         select_related: Optional[Sequence[Any]] = None,
@@ -66,7 +65,7 @@ class ModelRowMixin:
                     detail=f'Selected field "{field_name}" is not a RelationshipField on {cls}.'
                 ) from None
             if remainder:
-                item[field_name] = model_class.from_sqla_row(
+                item[field_name] = await model_class.from_sqla_row(
                     row,
                     select_related=[remainder],
                     prefetch_related=prefetch_related,
@@ -74,7 +73,7 @@ class ModelRowMixin:
                     using_schema=using_schema,
                 )
             else:
-                item[field_name] = model_class.from_sqla_row(
+                item[field_name] = await model_class.from_sqla_row(
                     row, exclude_secrets=exclude_secrets, using_schema=using_schema
                 )
         # Populate the related names
@@ -139,7 +138,7 @@ class ModelRowMixin:
         model = cls.__apply_schema(model, using_schema)
 
         # Handle prefetch related fields.
-        model = cls.__handle_prefetch_related(
+        model = await cls.__handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
         assert model.pk is not None
@@ -211,7 +210,7 @@ class ModelRowMixin:
         setattr(model, related.to_attr, await queryset.filter(*clauses))
 
     @classmethod
-    def __handle_prefetch_related(
+    async def __handle_prefetch_related(
         cls,
         row: "Row",
         model: "Model",
@@ -233,7 +232,7 @@ class ModelRowMixin:
             cls.__check_prefetch_collision(model=model, related=related)
             queries.append(cls.__set_prefetch(row=row, model=model, related=related))
         if queries:
-            run_sync(asyncio.gather(*queries))
+            await asyncio.gather(*queries)
         return model
 
     @classmethod
