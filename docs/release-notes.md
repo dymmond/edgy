@@ -7,10 +7,9 @@ hide:
 
 ## Unreleased
 
-### Added
+### 0.13.1
 
 - Testclient can be configured via environment variables.
-
 
 ### Fixed
 
