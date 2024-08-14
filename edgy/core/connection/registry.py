@@ -65,6 +65,9 @@ class Registry:
     def init_models(
         self, *, init_column_mappers: bool = True, init_class_attrs: bool = True
     ) -> None:
+        """
+        Initializes lazy parts of models meta. Normally not needed to call.
+        """
         for model_class in self.models.values():
             model_class.meta.full_init(
                 init_column_mappers=init_column_mappers, init_class_attrs=init_class_attrs
@@ -76,6 +79,9 @@ class Registry:
             )
 
     def invalidate_models(self, *, clear_class_attrs: bool = True) -> None:
+        """
+        Invalidate all lazy parts of meta. They will automatically re-initialized on access.
+        """
         for model_class in self.models.values():
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
         for model_class in self.reflected.values():
