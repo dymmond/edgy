@@ -5,9 +5,9 @@ hide:
 
 # Release Notes
 
-## Unreleased
+## 0.13.1
 
-### 0.13.1
+## Added
 
 - Testclient can be configured via environment variables.
 
