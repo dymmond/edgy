@@ -1,3 +1,4 @@
+import asyncio
 import copy
 from typing import (
     TYPE_CHECKING,
@@ -760,11 +761,13 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             return None
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        return queryset.model_class.from_sqla_row(
-            rows[0],
-            select_related=queryset._select_related,
-            exclude_secrets=queryset._exclude_secrets,
-            using_schema=queryset.using_schema,
+        return self.embed_parent_in_result(
+            await queryset.model_class.from_sqla_row(
+                rows[0],
+                select_related=queryset._select_related,
+                exclude_secrets=queryset._exclude_secrets,
+                using_schema=queryset.using_schema,
+            )
         )
 
     def embed_parent_in_result(self, result: Any) -> Any:
@@ -811,7 +814,9 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             for row in rows
         ]
 
-        all_results = [self.embed_parent_in_result(result) for result in results]
+        all_results = [
+            self.embed_parent_in_result(result) for result in await asyncio.gather(*results)
+        ]
         return all_results
 
     def all(self, **kwargs: Any) -> "QuerySet":
@@ -843,7 +848,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             raise MultipleObjectsReturned()
 
         return self.embed_parent_in_result(
-            queryset.model_class.from_sqla_row(
+            await queryset.model_class.from_sqla_row(
                 rows[0],
                 select_related=queryset._select_related,
                 is_only_fields=is_only_fields,
