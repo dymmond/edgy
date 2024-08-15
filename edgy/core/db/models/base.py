@@ -58,6 +58,9 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
     __raw_query__: ClassVar[Optional[str]] = None
     __using_schema__: ClassVar[Union[str, None]] = None
     __show_pk__: ClassVar[bool] = False
+    # private attribute
+    _loaded_or_deleted: bool = False
+    _return_load_coro_on_attr_access: bool = False
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         __show_pk__ = kwargs.pop("__show_pk__", False)
@@ -65,6 +68,9 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         super().__init__(**kwargs)
         self.__dict__ = self.setup_model_from_kwargs(kwargs)
         self.__show_pk__ = __show_pk__
+        # always set them in __dict__ to prevent __getattr__ loop
+        self._loaded_or_deleted = False
+        self._return_load_coro_on_attr_access: bool = False
 
     @classmethod
     def transform_input(cls, kwargs: Any, phase: str) -> Any:
@@ -389,6 +395,10 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
             # bypass __settr__
             edgy_setattr(self, key, value)
 
+    async def _agetattr_helper(self, name: str) -> Any:
+        await self.load()
+        return self.__dict__[name]
+
     def __getattr__(self, name: str) -> Any:
         """
         Does following things
@@ -397,6 +407,9 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         3. Run an one off query to populate any foreign key making sure
            it runs only once per foreign key avoiding multiple database calls.
         """
+        return_load_coro_on_attr_access = self._return_load_coro_on_attr_access
+        # unset flag
+        self._return_load_coro_on_attr_access = False
         manager = self.meta.managers.get(name)
         if manager is not None:
             if name not in self.__dict__:
@@ -411,12 +424,15 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
             return field.__get__(self, self.__class__)
         if (
             name not in self.__dict__
+            and not self._loaded_or_deleted
             and field is not None
             and name not in self.identifying_db_fields
             and self.can_load
         ):
-            run_sync(self.load())
-            return self.__dict__[name]
+            coro = self._agetattr_helper(name)
+            if return_load_coro_on_attr_access:
+                return coro
+            return run_sync(coro)
         return super().__getattr__(name)
 
     def __eq__(self, other: Any) -> bool:

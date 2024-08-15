@@ -5,6 +5,17 @@ hide:
 
 # Release Notes
 
+## Unreleased
+
+### Changed
+
+- Server defaults don't trigger load after saving.
+- Less nested run_sync calls.
+
+### Fixed
+
+- `get_or_none` was not abidding embed_parent.
+
 ## 0.13.1
 
 ## Added

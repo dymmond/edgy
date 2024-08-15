@@ -75,6 +75,8 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         expression = self.table.delete().where(*self.identifying_clauses())
         await self.database.execute(expression)
+        # we cannot load anymore
+        self._loaded_or_deleted = True
 
         await self.meta.signals.post_delete.send_async(self.__class__, instance=self)
 
@@ -90,6 +92,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             raise ObjectNotFound("row does not exist anymore")
         # Update the instance.
         self.__dict__.update(self.transform_input(dict(row._mapping), phase="load"))
+        self._loaded_or_deleted = True
 
     async def _save(self, **kwargs: Any) -> "Model":
         """
@@ -208,13 +211,8 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             for model_ref, references in model_references.items():
                 await self.save_model_references(references or [], model_ref=model_ref)
 
-        # Refresh the results
-        if any(
-            field.server_default is not None
-            for name, field in self.meta.fields.items()
-            if name not in extracted_fields
-        ):
-            await self.load()
+        # Ensure on access refresh the results is active
+        self._loaded_or_deleted = False
 
         await self.meta.signals.post_save.send_async(self.__class__, instance=self)
         return self

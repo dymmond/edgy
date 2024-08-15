@@ -1,5 +1,6 @@
 import asyncio
 import copy
+from inspect import isawaitable
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -761,7 +762,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             return None
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        return self.embed_parent_in_result(
+        return await self.embed_parent_in_result(
             await queryset.model_class.from_sqla_row(
                 rows[0],
                 select_related=queryset._select_related,
@@ -770,12 +771,18 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             )
         )
 
-    def embed_parent_in_result(self, result: Any) -> Any:
+    async def embed_parent_in_result(self, result: Any) -> Any:
+        if isawaitable(result):
+            result = await result
         if not self.embed_parent:
             return result
         new_result = result
         for part in self.embed_parent[0].split("__"):
+            if hasattr(new_result, "_return_load_coro_on_attr_access"):
+                new_result._return_load_coro_on_attr_access = True
             new_result = getattr(new_result, part)
+            if isawaitable(new_result):
+                new_result = await new_result
         if self.embed_parent[1]:
             setattr(new_result, self.embed_parent[1], result)
         return new_result
@@ -801,23 +808,21 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         is_defer_fields = bool(queryset._defer)
 
         results = [
-            queryset.model_class.from_sqla_row(
-                row,
-                select_related=queryset._select_related,
-                prefetch_related=queryset._prefetch_related,
-                is_only_fields=is_only_fields,
-                only_fields=queryset._only,
-                is_defer_fields=is_defer_fields,
-                exclude_secrets=queryset._exclude_secrets,
-                using_schema=queryset.using_schema,
+            self.embed_parent_in_result(
+                queryset.model_class.from_sqla_row(
+                    row,
+                    select_related=queryset._select_related,
+                    prefetch_related=queryset._prefetch_related,
+                    is_only_fields=is_only_fields,
+                    only_fields=queryset._only,
+                    is_defer_fields=is_defer_fields,
+                    exclude_secrets=queryset._exclude_secrets,
+                    using_schema=queryset.using_schema,
+                )
             )
             for row in rows
         ]
-
-        all_results = [
-            self.embed_parent_in_result(result) for result in await asyncio.gather(*results)
-        ]
-        return all_results
+        return await asyncio.gather(*results)
 
     def all(self, **kwargs: Any) -> "QuerySet":
         """
@@ -847,8 +852,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if len(rows) > 1:
             raise MultipleObjectsReturned()
 
-        return self.embed_parent_in_result(
-            await queryset.model_class.from_sqla_row(
+        return await self.embed_parent_in_result(
+            queryset.model_class.from_sqla_row(
                 rows[0],
                 select_related=queryset._select_related,
                 is_only_fields=is_only_fields,
@@ -870,7 +875,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         rows = await queryset.limit(1).order_by("id").all()
         if rows:
-            return self.embed_parent_in_result(rows[0])
+            return await self.embed_parent_in_result(rows[0])
         return None
 
     async def last(self, **kwargs: Any) -> Union[EdgyModel, None]:
@@ -883,7 +888,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
         rows = await queryset.order_by("-id").all()
         if rows:
-            return self.embed_parent_in_result(rows[0])
+            return await self.embed_parent_in_result(rows[0])
         return None
 
     async def create(self, **kwargs: Any) -> EdgyModel:
@@ -894,7 +899,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         instance = queryset.model_class(**kwargs)
         instance.table = queryset.table
         instance = await instance.save(force_save=True)
-        return self.embed_parent_in_result(instance)
+        return await self.embed_parent_in_result(instance)
 
     async def bulk_create(self, objs: List[Dict]) -> None:
         """
