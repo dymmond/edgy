@@ -1,7 +1,9 @@
 from typing import (
     TYPE_CHECKING,
     Any,
+    AsyncIterator,
     Dict,
+    Generator,
     List,
     Optional,
     Protocol,
@@ -14,6 +16,8 @@ from typing import (
 )
 
 if TYPE_CHECKING:  # pragma: nocover
+    import sqlalchemy
+
     from edgy import Model, QuerySet, ReflectModel
 
 
@@ -25,9 +29,13 @@ EdgyModel = Union[_EdgyModel, ReflectEdgyModel]
 
 @runtime_checkable
 class QuerySetProtocol(Protocol):
-    """Defines the what needs to be implemented when using the ManyRelationProtocol"""
+    """Defines the what needs to be implemented when using the QuerysetProtocol"""
 
-    def filter(self, **kwargs: Any) -> "QuerySet": ...
+    def filter(
+        self, *clauses: Tuple["sqlalchemy.sql.expression.BinaryExpression", ...], **kwargs: Any
+    ) -> "QuerySet": ...
+
+    def all(self, **kwargs: Any) -> "QuerySet": ...
 
     def exclude(self, **kwargs: "Model") -> "QuerySet": ...
 
@@ -54,8 +62,6 @@ class QuerySetProtocol(Protocol):
     async def count(self) -> int: ...
 
     async def get_or_none(self, **kwargs: Any) -> Union[EdgyModel, None]: ...
-
-    async def all(self, **kwargs: Any) -> Sequence[Optional[EdgyModel]]: ...
 
     async def get(self, **kwargs: Any) -> EdgyModel: ...
 
@@ -99,3 +105,7 @@ class QuerySetProtocol(Protocol):
     async def update_or_create(self, defaults: Any, **kwargs: Any) -> Tuple[EdgyModel, bool]: ...
 
     async def contains(self, instance: EdgyModel) -> bool: ...
+
+    def __await__(self) -> Generator[Any, None, List[EdgyModel]]: ...
+
+    async def __aiter__(self) -> AsyncIterator[EdgyModel]: ...
