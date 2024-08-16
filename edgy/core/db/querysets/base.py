@@ -1019,6 +1019,7 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         if not fetch_all_at_once and queryset.database.force_rollback:
             # force_rollback on db = we have only one connection
             # so every operation must be atomic
+            # Note: force_rollback is a bit magic, it evaluates its truthiness to the actual value
             warnings.warn(
                 'Using queryset iterations with "Database"-level force_rollback set is risky. '
                 "Deadlocks can occur because only one connection is used.",
