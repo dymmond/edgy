@@ -55,7 +55,6 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
     __db_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
-    __raw_query__: ClassVar[Optional[str]] = None
     __using_schema__: ClassVar[Union[str, None]] = None
     __show_pk__: ClassVar[bool] = False
     # private attribute
@@ -103,14 +102,6 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
             for k, v in kwargs.items()
             if k in self.meta.fields or k in self.meta.model_references
         }
-
-    @property
-    def raw_query(self) -> Any:
-        return getattr(self, self.__raw_query__)
-
-    @raw_query.setter
-    def raw_query(self, value: Any) -> Any:
-        edgy_setattr(self, self.raw_query, value)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"

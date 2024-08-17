@@ -5,8 +5,10 @@ from typing import (
     ClassVar,
     Dict,
     Iterable,
+    List,
     Optional,
     Sequence,
+    Tuple,
     Type,
     Union,
 )
@@ -55,10 +57,6 @@ class BaseModelType(ABC):
     __parent__: ClassVar[Union[Type["BaseModelType"], None]] = None
     __is_proxy_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
-
-    @property
-    @abstractmethod
-    def raw_query(self) -> Any: ...
 
     @property
     @abstractmethod
@@ -152,3 +150,21 @@ class BaseModelType(ABC):
         Returns the name of the class in lowercase.
         """
         return self.__class__.__name__.lower()
+
+    @classmethod
+    def create_cache_key(cls, instance: Any) -> Union[Tuple[str], Tuple[str, Any, ...]]:
+        """
+        Build a cache key for the model.
+        """
+        cache_key_list: List[Any] = [cls.__name__]
+        try:
+            pknames_or_columns = cls.pkcolumns
+        except AttributeError:
+            pknames_or_columns = cls.pknames
+        if isinstance(instance, dict):
+            for pkcol in pknames_or_columns:
+                cache_key_list.append(str(instance[pkcol]))
+        else:
+            for pkcol in pknames_or_columns:
+                cache_key_list.append(str(getattr(instance, pkcol)))
+        return tuple(cache_key_list)

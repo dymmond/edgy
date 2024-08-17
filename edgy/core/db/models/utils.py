@@ -21,9 +21,7 @@ def get_model(registry: Registry, model_name: str) -> "Model":
 
 def build_pknames(model_class: Any) -> None:
     """
-    Set explicit pknames
-
-    Raise error if primary key column has no field associated.
+    Set explicit pknames (field names with primary_key=True set)
     """
     meta = model_class.meta
     pknames: Set[str] = set()
@@ -35,9 +33,7 @@ def build_pknames(model_class: Any) -> None:
 
 def build_pkcolumns(model_class: Any) -> None:
     """
-    Set pkcolumns
-
-    Raise error if primary key column has no field associated.
+    Set pkcolumns (columns with primary_key set)
     """
     table = model_class.table
     pkcolumns: Set[str] = set()
