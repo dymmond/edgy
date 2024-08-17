@@ -130,6 +130,7 @@ features = ["all", "testing"]
 [tool.hatch.envs.test.env-vars]
 EDGY_TESTCLIENT_TEST_PREFIX = ""
 EDGY_TESTCLIENT_USE_EXISTING = "true"
+EDGY_TESTCLIENT_FORCE_ROLLBACK = "true"
 
 
 [tool.hatch.envs.test.scripts]
@@ -143,6 +144,7 @@ features = ["all", "testing"]
 [tool.hatch.envs.hatch-test.env-vars]
 EDGY_TESTCLIENT_TEST_PREFIX = ""
 EDGY_TESTCLIENT_USE_EXISTING = "true"
+EDGY_TESTCLIENT_FORCE_ROLLBACK = "true"
 
 
 [tool.hatch.version]
