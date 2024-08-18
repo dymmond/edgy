@@ -29,7 +29,7 @@ from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 from edgy.core.db.models.mixins import ModelParser
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import PrefetchMixin
-from edgy.core.db.querysets.protocols import AwaitableQuery
+from edgy.core.db.querysets.types import QueryType
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.protocols.queryset import QuerySetProtocol
@@ -59,7 +59,7 @@ class BaseQuerySet(
     QuerySetPropsMixin,
     PrefetchMixin,
     ModelParser,
-    AwaitableQuery[EdgyModel],
+    QueryType[EdgyModel],
 ):
     ESCAPE_CHARACTERS = ["%", "_"]
 
@@ -84,7 +84,6 @@ class BaseQuerySet(
         exclude_secrets: Any = False,
     ) -> None:
         super().__init__(model_class=model_class)
-        self.model_class = cast("Type[Model]", model_class)
         self.filter_clauses = [] if filter_clauses is None else filter_clauses
         self.or_clauses = [] if or_clauses is None else or_clauses
         self.limit_count = limit_count

@@ -7,7 +7,7 @@ if typing.TYPE_CHECKING:
 EdgyModel = typing.TypeVar("EdgyModel", bound="Model")
 
 
-class AwaitableQuery(typing.Generic[EdgyModel]):
+class QueryType(typing.Generic[EdgyModel]):
     __slots__ = ("model_class",)
 
     def __init__(self, model_class: typing.Type[EdgyModel]) -> None:
