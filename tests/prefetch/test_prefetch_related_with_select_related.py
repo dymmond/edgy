@@ -31,16 +31,10 @@ class Track(edgy.Model):
 
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
-    await models.create_all()
-    yield
+    async with database:
+        await models.create_all()
+        yield
     await models.drop_all()
-
-
-@pytest.fixture(autouse=True)
-async def rollback_connections():
-    with database.force_rollback():
-        async with database:
-            yield
 
 
 async def test_prefetch_related():
