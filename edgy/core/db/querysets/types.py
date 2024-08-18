@@ -13,5 +13,5 @@ class QueryType(typing.Generic[EdgyModel]):
     def __init__(self, model_class: typing.Type[EdgyModel]) -> None:
         self.model_class: typing.Type[EdgyModel] = model_class
 
-    async def execute(self) -> typing.Any:
-        raise NotImplementedError()
+    def __class_getitem__(cls, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+        return cls
