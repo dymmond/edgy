@@ -42,11 +42,28 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.models import Model
 
 
-def clean_query_kwargs(model: Type["Model"], kwargs: Dict[str, Any]) -> Dict[str, Any]:
+def _removeprefix(text: str, prefix: str) -> str:
+    # TODO: replace with removeprefix when python3.9 is minimum
+    if text.startswith(prefix):
+        return text[len(prefix) :]
+    else:
+        return text
+
+
+def clean_query_kwargs(
+    model_class: Type["Model"],
+    kwargs: Dict[str, Any],
+    embed_parent: Optional[Tuple[str, str]] = None,
+) -> Dict[str, Any]:
     new_kwargs: Dict[str, Any] = {}
     for key, val in kwargs.items():
-        model_class, field_name, _, _, _ = crawl_relationship(model, key)
-        field = model_class.meta.fields.get(field_name)
+        if embed_parent:
+            if embed_parent[1] and key.startswith(embed_parent[1]):
+                key = _removeprefix(_removeprefix(key, embed_parent[1]), "__")
+            else:
+                key = f"{embed_parent[0]}__{key}"
+        sub_model_class, field_name, _, _, _ = crawl_relationship(model_class, key)
+        field = sub_model_class.meta.fields.get(field_name)
         if field is not None:
             new_kwargs.update(field.clean(key, val, for_query=True))
         else:
@@ -82,6 +99,7 @@ class BaseQuerySet(
         only_fields: Any = None,
         defer_fields: Any = None,
         embed_parent: Any = None,
+        embed_parent_filters: Any = None,
         using_schema: Any = None,
         table: Any = None,
         exclude_secrets: Any = False,
@@ -99,6 +117,7 @@ class BaseQuerySet(
         self._only = [] if only_fields is None else only_fields
         self._defer = [] if defer_fields is None else defer_fields
         self.embed_parent = embed_parent
+        self.embed_parent_filters = embed_parent_filters
         self.using_schema = using_schema
         self._exclude_secrets = exclude_secrets or False
         # cache should not be cloned
@@ -324,7 +343,7 @@ class BaseQuerySet(
         if self.model_class.__is_proxy_model__:
             self.model_class = self.model_class.__parent__
 
-        kwargs = clean_query_kwargs(self.model_class, kwargs)
+        kwargs = clean_query_kwargs(self.model_class, kwargs, self.embed_parent_filters)
 
         for key, value in kwargs.items():
             assert not isinstance(value, Model), f"should be parsed in clean: {key}: {value}"
@@ -462,6 +481,7 @@ class BaseQuerySet(
         queryset._group_by = copy.copy(self._group_by)
         queryset.distinct_on = copy.copy(self.distinct_on)
         queryset.embed_parent = self.embed_parent
+        queryset.embed_parent_filters = self.embed_parent_filters
         queryset._only = copy.copy(self._only)
         queryset._defer = copy.copy(self._defer)
         queryset._database = self.database
@@ -1014,15 +1034,13 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         await queryset.database.execute_many(expression, update_list)
 
     async def delete(self) -> None:
-        queryset: QuerySet = self
-
         await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
 
-        expression = queryset.table.delete()
-        for filter_clause in queryset.filter_clauses:
+        expression = self.table.delete()
+        for filter_clause in self.filter_clauses:
             expression = expression.where(filter_clause)
 
-        await queryset.database.execute(expression)
+        await self.database.execute(expression)
 
         await self.model_class.meta.signals.post_delete.send_async(self.__class__, instance=self)
 

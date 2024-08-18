@@ -64,14 +64,16 @@ class ManyRelation(ManyRelationProtocol):
     def get_queryset(self) -> "QuerySet":
         # we need to check tenant every request
         queryset = self.through.meta.managers["query_related"].get_queryset()
+        assert self.instance, "instance not initialized"
+        fk = self.through.meta.fields[self.from_foreign_key]
+        query = {}
+        for related_name in fk.related_columns:
+            query[related_name] = getattr(self.instance, related_name)
+        queryset = queryset.filter(**{self.from_foreign_key: query})
+        # now set embed_parent
         queryset.embed_parent = (self.to_foreign_key, self.embed_through)
-        if self.embed_through != "":
-            assert self.instance, "instance not initialized"
-            fk = self.through.meta.fields[self.from_foreign_key]
-            query = {}
-            for related_name in fk.related_columns:
-                query[related_name] = getattr(self.instance, related_name)
-            queryset = queryset.filter(**{self.from_foreign_key: query})
+        if self.embed_through:
+            queryset.embed_parent_filters = queryset.embed_parent
         return queryset
 
     async def save_related(self) -> None:
@@ -203,18 +205,21 @@ class SingleRelation(ManyRelationProtocol):
     def get_queryset(self) -> "QuerySet":
         # we need to check tenant every request
         queryset = self.to.meta.managers["query_related"].get_queryset()
-        queryset.embed_parent = self.embed_parent
         fk = self.to.meta.fields[self.to_foreign_key]
+        assert self.instance, "instance not initialized"
+        query = {}
+        for column_name in fk.get_column_names():
+            related_name = fk.from_fk_field_name(fk.name, column_name)
+            query[related_name] = getattr(self.instance, related_name)
+        queryset = queryset.filter(**{self.to_foreign_key: query})
+        # now set embed_parent
+        queryset.embed_parent = self.embed_parent
+        # only apply if relationship field. Add fallback for empty embed_parent
         if self.embed_parent and isinstance(
             fk.owner.meta.fields[self.embed_parent[0].split("__", 1)[0]],
             RelationshipField,
         ):
-            assert self.instance, "instance not initialized"
-            query = {}
-            for column_name in fk.get_column_names():
-                related_name = fk.from_fk_field_name(fk.name, column_name)
-                query[related_name] = getattr(self.instance, related_name)
-            queryset = queryset.filter(**query)
+            queryset.embed_parent_filters = queryset.embed_parent
         return queryset
 
     def expand_relationship(self, value: Any) -> Any:
