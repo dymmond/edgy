@@ -300,7 +300,7 @@ profiles = await Profile.query.select_related("user").filter(email__icontains="f
 
 ### All
 
-Copy the query. When providing True, instead copying the cache is cleared and the same query returned.
+Copy the queryset except caches.
 
 ```python
 users = await User.query.all()
@@ -310,6 +310,8 @@ users = await User.query.all()
     The all as mentioned before it automatically executed by **Edgy** if not provided and it
     can also be aggregated with other [queryset operations](#returning-querysets).
 
+!!! Tip
+    For flushing the queryset caches instead provide True as argument. This mutates the queryset.
 
 ### Save
 
