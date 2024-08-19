@@ -5,7 +5,7 @@ hide:
 
 # Release Notes
 
-## 0.14
+## 0.14.0
 
 ## Added
 
