@@ -31,7 +31,9 @@ async def test_model_first():
     Test = await User.query.create(name="Test")
     jane = await User.query.create(name="Jane")
 
-    assert await User.query.first() == Test
-    assert await User.query.first(name="Jane") == jane
+    query = User.query.all()
+    assert query._cache_first is None
+    assert await query.first() == Test
+    assert query._cache_first is not None
     assert await User.query.filter(name="Jane").first() == jane
     assert await User.query.filter(name="Lucy").first() is None

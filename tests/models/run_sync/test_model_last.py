@@ -32,6 +32,6 @@ async def test_model_last():
     jane = edgy.run_sync(User.query.create(name="Jane"))
 
     assert edgy.run_sync(User.query.last()) == jane
-    assert edgy.run_sync(User.query.last(name="Jane")) == jane
+    assert edgy.run_sync(User.query.filter(name="Jane").last()) == jane
     assert edgy.run_sync(User.query.filter(name="Test").last()) == Test
     assert edgy.run_sync(User.query.filter(name="Lucy").last()) is None

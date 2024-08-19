@@ -96,6 +96,10 @@ class ManyRelation(ManyRelationProtocol):
 
         return attr
 
+    def all(self, clear_cache: bool = False) -> "QuerySet":
+        # get_queryset returns already a fresh queryset. Skip making a copy.
+        return self.get_queryset()
+
     def expand_relationship(self, value: Any) -> Any:
         through = self.through
 
@@ -221,6 +225,10 @@ class SingleRelation(ManyRelationProtocol):
         ):
             queryset.embed_parent_filters = queryset.embed_parent
         return queryset
+
+    def all(self, clear_cache: bool = False) -> "QuerySet":
+        # get_queryset returns already a fresh queryset. Skip making a copy.
+        return self.get_queryset()
 
     def expand_relationship(self, value: Any) -> Any:
         target = self.to

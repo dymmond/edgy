@@ -40,7 +40,7 @@ async def test_exclude_secrets():
     await User.query.create(name="Edgy", age=2, language="EN")
     await User.query.create(name="Saffier", age=2, language="EN")
 
-    results = await User.query.exclude_secrets(id=1)
+    results = await User.query.filter(id=1).exclude_secrets()
 
     assert len(results) == 1
 
@@ -48,7 +48,7 @@ async def test_exclude_secrets():
 
     assert user.model_dump() == {"id": 1, "name": "Edgy"}
 
-    results = await User.query.exclude_secrets(id=2).get()
+    results = await User.query.exclude_secrets().get(id=2)
 
     assert results.model_dump() == {"id": 2, "name": "Saffier"}
 
@@ -57,7 +57,7 @@ async def test_exclude_secrets_fk():
     main = await Main.query.create(name="main")
     await User.query.create(name="Edgy", age=2, language="EN", main=main)
 
-    results = await User.query.exclude_secrets(id=1)
+    results = await User.query.filter(id=1).exclude_secrets()
 
     assert len(results) == 1
 
@@ -90,3 +90,23 @@ async def test_exclude_secrets_various():
     user = results[0]
 
     assert user.model_dump() == {"id": 1}
+
+
+async def test_exclude_secrets_undo():
+    main = await Main.query.create(name="main")
+    await User.query.create(name="Edgy", age=2, language="EN", main=main)
+
+    results = await User.query.exclude_secrets().exclude_secrets(False)
+
+    assert len(results) == 1
+
+    user = results[0]
+    await user.load_recursive()
+
+    assert user.model_dump() == {
+        "age": 2,
+        "id": 1,
+        "language": "EN",
+        "main": {"id": 1, "name": "main"},
+        "name": "Edgy",
+    }

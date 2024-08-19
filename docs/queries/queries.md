@@ -87,6 +87,32 @@ The `exclude()` is used when you want to filter results by excluding instances.
 users = await User.query.exclude(is_active=False)
 ```
 
+### Exclude secrets
+
+The `exclude_secrets()` is used when you want to exclude (reinclude) fields with the secret attribute.
+
+```python
+users = await User.query.exclude_secrets()
+```
+
+Or to reinclude:
+
+```python
+users = await User.query.exclude_secrets().exclude_secrets(False)
+```
+
+### Batch size
+
+When iterating it is sometimes useful to set the batch size. By default (or when providing None) the default of databasez is used.
+
+Note: this is just for tweaking memory usage/performance when using iterations and has currently no user visible effect.
+
+```python
+async for user in User.query.batch_size(30):
+    pass
+```
+
+
 ### Filter
 
 #### Django-style
@@ -206,7 +232,7 @@ await User.query.filter(email__icontains="foo").limit(5).order_by("id")
 
 ### Order by
 
-Classic SQL operation and you need to order results.
+Classic SQL operation and you need to order results. Prefix with `-` to get a descending order.
 
 
 **Order by descending id and ascending email**
@@ -220,6 +246,10 @@ users = await User.query.order_by("email", "-id")
 ```python
 users = await User.query.order_by("email", "id")
 ```
+
+### Reverse
+
+Reverse the order. Flip `-` prefix of order components.
 
 ### Lookup
 
@@ -270,7 +300,7 @@ profiles = await Profile.query.select_related("user").filter(email__icontains="f
 
 ### All
 
-Returns all the instances.
+Copy the query. When providing True, instead copying the cache is cleared and the same query returned.
 
 ```python
 users = await User.query.all()
@@ -363,7 +393,7 @@ user = await User.query.update(email="bar@foo.com")
 
 ### Get
 
-Obtains a single record from the database.
+Obtains a single record from the database. When using keywords (or no args) the cache is used.
 
 ```python
 user = await User.query.get(email="foo@bar.com")
@@ -377,7 +407,7 @@ user = await User.query.filter(email="foo@bar.com").get()
 
 ### First
 
-When you need to return the very first result from a queryset.
+When you need to return the very first result from a queryset. Cached.
 
 ```python
 user = await User.query.first()
@@ -387,7 +417,7 @@ You can also apply filters when needed.
 
 ### Last
 
-When you need to return the very last result from a queryset.
+When you need to return the very last result from a queryset. Cached.
 
 ```python
 user = await User.query.last()
@@ -397,23 +427,15 @@ You can also apply filters when needed.
 
 ### Exists
 
-Returns a boolean confirming if a specific record exists.
+Returns a boolean confirming if a specific record exists. Use cache if possible.
 
 ```python
 exists = await User.query.filter(email="foo@bar.com").exists()
 ```
 
-### Count
-
-Returns an integer with the total of records.
-
-```python
-total = await User.query.count()
-```
-
 ### Contains
 
-Returns true if the QuerySet contains the provided object.
+Returns true if the QuerySet contains the provided object. Use cache if possible.
 
 ```python
 user = await User.query.create(email="foo@bar.com")
@@ -421,6 +443,14 @@ user = await User.query.create(email="foo@bar.com")
 exists = await User.query.contains(instance=user)
 ```
 
+
+### Count
+
+Returns an integer with the total of records. Cached.
+
+```python
+total = await User.query.count()
+```
 ### Values
 
 Returns the model results in a dictionary like format.

@@ -5,16 +5,30 @@ hide:
 
 # Release Notes
 
-## Unreleased
+## 0.14
+
+## Added
+
+- Cache per queryset.
+- Expose raw_query for getting a raw sqlalchemy query.
+- Expose control for used batch size.
+- Add load_recursive for initializing a nested model structure.
+
 
 ### Changed
 
 - Server defaults don't trigger load after saving.
 - Less nested run_sync calls.
+- Alter queryset methods to contain useful arguments, instead of ignoring kwargs.
 
 ### Fixed
 
 - `get_or_none` was not abidding embed_parent.
+- Correctly apply filters on relations.
+
+### Removed
+
+- Unused and broken debug arguments, like raw_query on model classes.
 
 ## 0.13.1
 

@@ -104,8 +104,14 @@ class BaseModelType(ABC):
         """
 
     @abstractmethod
-    async def load(self) -> None:
+    async def load(self, only_needed: bool = False) -> None:
         """Load model"""
+
+    @abstractmethod
+    async def load_recursive(
+        self, only_needed: bool = True, only_needed_nest: bool = False
+    ) -> None:
+        """Load model and all models referenced by foreign keys."""
 
     @abstractmethod
     def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:

@@ -80,9 +80,10 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         await self.meta.signals.post_delete.send_async(self.__class__, instance=self)
 
-    async def load(self) -> None:
+    async def load(self, only_needed: bool = False) -> None:
+        if only_needed and self._loaded_or_deleted:
+            return
         # Build the select expression.
-
         expression = self.table.select().where(*self.identifying_clauses())
 
         # Perform the fetch.

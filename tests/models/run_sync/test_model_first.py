@@ -32,6 +32,5 @@ async def test_model_first():
     jane = edgy.run_sync(User.query.create(name="Jane"))
 
     assert edgy.run_sync(User.query.first()) == Test
-    assert edgy.run_sync(User.query.first(name="Jane")) == jane
     assert edgy.run_sync(User.query.filter(name="Jane").first()) == jane
     assert edgy.run_sync(User.query.filter(name="Lucy").first()) is None

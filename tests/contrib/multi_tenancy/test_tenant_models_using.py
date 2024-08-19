@@ -28,15 +28,11 @@ async def create_test_database():
         pytest.skip(f"Error: {str(e)}")
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 async def rollback_connections():
     with database.force_rollback():
         async with database:
             yield
-
-
-async def drop_schemas(name):
-    await models.schema.drop_schema(name, if_exists=True)
 
 
 class Tenant(TenantMixin):
