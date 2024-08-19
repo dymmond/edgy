@@ -67,31 +67,31 @@ class InspectDB:
     def schema(self) -> Optional[str]:
         return self._schema
 
+    async def _inspect(self) -> None:
+        registry = Registry(database=self.database)
+        async with registry.database:
+            # Get the engine to connect
+            engine: AsyncEngine = registry.engine
+
+            # Connect to a schema
+            metadata: sqlalchemy.MetaData = (
+                sqlalchemy.MetaData(schema=self.schema)
+                if self.schema is not None
+                else sqlalchemy.MetaData()
+            )
+            metadata = await self.reflect(engine=engine, metadata=metadata)
+
+            # Generate the tables
+            tables, _ = self.generate_table_information(metadata)
+
+            for line in self.write_output(tables, str(registry.database.url), schema=self.schema):
+                sys.stdout.writelines(line)  # type: ignore
+
     def inspect(self) -> None:
         """
         Starts the InspectDB and passes all the configurations.
         """
-        registry = Registry(database=self.database)
-        run_sync(registry.database.connect())
-
-        # Get the engine to connect
-        engine: AsyncEngine = registry.engine
-
-        # Connect to a schema
-        metadata: sqlalchemy.MetaData = (
-            sqlalchemy.MetaData(schema=self.schema)
-            if self.schema is not None
-            else sqlalchemy.MetaData()
-        )
-        metadata = run_sync(self.reflect(engine=engine, metadata=metadata))
-
-        # Generate the tables
-        tables, _ = self.generate_table_information(metadata)
-
-        for line in self.write_output(tables, str(registry.database.url), schema=self.schema):
-            sys.stdout.writelines(line)  # type: ignore
-
-        run_sync(registry.database.disconnect())
+        run_sync(self._inspect())
 
     def generate_table_information(
         self, metadata: sqlalchemy.MetaData
