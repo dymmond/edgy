@@ -30,6 +30,7 @@ hide:
 ### Removed
 
 - Unused and broken debug arguments, like raw_query on model classes.
+- Remove run_query of models.
 
 ## 0.13.1
 

@@ -8,7 +8,6 @@ from typing import (
     List,
     Optional,
     Sequence,
-    Tuple,
     Type,
     Union,
 )
@@ -158,7 +157,7 @@ class BaseModelType(ABC):
         return self.__class__.__name__.lower()
 
     @classmethod
-    def create_cache_key(cls, instance: Any) -> Union[Tuple[str], Tuple[str, Any, ...]]:
+    def create_cache_key(cls, instance: Any) -> tuple:
         """
         Build a cache key for the model.
         """

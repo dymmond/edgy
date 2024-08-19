@@ -1,5 +1,5 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.relationships.utils import crawl_relationship
@@ -8,7 +8,7 @@ from edgy.exceptions import QuerySetError
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.engine.result import Row
 
-    from edgy import Model, Prefetch, QuerySet
+    from edgy import Model, Prefetch
 
 
 class ModelRowMixin:
@@ -234,22 +234,3 @@ class ModelRowMixin:
         if queries:
             await asyncio.gather(*queries)
         return model
-
-    @classmethod
-    async def run_query(
-        cls,
-        model: Optional[Type["Model"]] = None,
-        extra: Optional[Dict[str, Any]] = None,
-        queryset: Optional["QuerySet"] = None,
-    ) -> Union[List[Type["Model"]], Any]:
-        """
-        Runs a specific query against a given model with filters.
-        """
-
-        if not queryset:
-            return await model.query.filter(**extra)  # type: ignore
-
-        if extra:
-            queryset = queryset.filter(**extra)
-
-        return await queryset
