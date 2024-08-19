@@ -393,7 +393,7 @@ user = await User.query.update(email="bar@foo.com")
 
 ### Get
 
-Obtains a single record from the database. When using keywords (or no args) the cache is used.
+Obtains a single record from the database.
 
 ```python
 user = await User.query.get(email="foo@bar.com")
@@ -407,7 +407,7 @@ user = await User.query.filter(email="foo@bar.com").get()
 
 ### First
 
-When you need to return the very first result from a queryset. Cached.
+When you need to return the very first result from a queryset.
 
 ```python
 user = await User.query.first()
@@ -417,7 +417,7 @@ You can also apply filters when needed.
 
 ### Last
 
-When you need to return the very last result from a queryset. Cached.
+When you need to return the very last result from a queryset.
 
 ```python
 user = await User.query.last()
@@ -427,7 +427,7 @@ You can also apply filters when needed.
 
 ### Exists
 
-Returns a boolean confirming if a specific record exists. Use cache if possible.
+Returns a boolean confirming if a specific record exists.
 
 ```python
 exists = await User.query.filter(email="foo@bar.com").exists()
@@ -435,7 +435,7 @@ exists = await User.query.filter(email="foo@bar.com").exists()
 
 ### Contains
 
-Returns true if the QuerySet contains the provided object. Use cache if possible.
+Returns true if the QuerySet contains the provided object.
 
 ```python
 user = await User.query.create(email="foo@bar.com")
@@ -446,7 +446,7 @@ exists = await User.query.contains(instance=user)
 
 ### Count
 
-Returns an integer with the total of records. Cached.
+Returns an integer with the total of records.
 
 ```python
 total = await User.query.count()
@@ -572,6 +572,23 @@ instead returns a `None`.
 ```python
 user = await User.query.get_or_none(id=1)
 ```
+
+## Using the cache
+
+`first`, `last`, `count` are always cached and also initialized when iterating over the query or requesting all results.
+Other functions which take keywords to filter can use the cache
+by providing the filters as keywords or leave all arguments empty.
+Some functions like `contains` exploit this by rewriting its query.
+
+For clearing the cache, `all` can be used:
+
+```python
+users = User.query.all().filter(name="foobar")
+# clear the cache
+users.all(True)
+await users
+```
+
 
 ## Useful methods
 
