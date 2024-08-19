@@ -25,6 +25,7 @@ hide:
 
 - `get_or_none` was not abidding embed_parent.
 - Correctly apply filters on relations.
+- `last` and `first` don't fail without id column anymore.
 
 ### Removed
 
