@@ -90,29 +90,83 @@ class QueryModelResultCache:
     Class for caching query results.
     """
 
-    def __init__(self) -> None:
-        self._cache: Dict[str, Dict[Tuple[Any, ...], BaseModelType]] = {}
+    def __init__(
+        self,
+        attrs: Sequence[str],
+        prefix: str = "query",
+        cache: Optional[Dict[str, Dict[Tuple[Any, ...], Any]]] = None,
+    ) -> None:
+        if cache is None:
+            cache = {}
+        self.cache: Dict[str, Dict[Tuple[Any, ...], Any]] = cache
+        self.attrs = attrs
 
-    def update(self, results: Sequence[BaseModelType]) -> None:
-        for instance in results:
-            try:
-                cache_key = instance.create_cache_key(instance)
-            except (AttributeError, KeyError):
-                continue
+    def create_category(
+        self, model_class: Type[BaseModelType], prefix: Optional[str] = None
+    ) -> str:
+        return f"{prefix}_{model_class.__name__}"
+
+    def create_sub_cache(
+        self, attrs: Sequence[str], prefix: str = "query"
+    ) -> QueryModelResultCache:
+        return self.__class__(attrs, prefix=prefix, cache=self.cache)
+
+    def clear(
+        self, model_class: Optional[Type[BaseModelType]] = None, prefix: Optional[str] = None
+    ) -> None:
+        cache: Any = self.cache
+        if model_class is not None:
+            cache = cache.get(self.create_category(model_class, prefix=prefix))
+        if cache is not None:
+            cache.clear()
+
+    def create_cache_key(
+        self, instance: Any, prefix: Optional[str] = None, attrs: Optional[Sequence[str]] = None
+    ) -> tuple:
+        """
+        Build a cache key for the model.
+        """
+        cache_key_list: List[Any] = [self.create_category(type(instance), prefix=prefix)]
+        if attrs is None:
+            attrs = self.attrs
+        # there are no columns, only column results
+        if isinstance(instance, dict):
+            for attr in attrs:
+                cache_key_list.append(str(instance[attr]))
+        else:
+            for attr in self.attrs:
+                cache_key_list.append(str(getattr(instance, attr)))
+        return tuple(cache_key_list)
+
+    def get_category(self, model_class: Type[BaseModelType], prefix: Optional[str] = None) -> dict:
+        return self.cache.setdefault(self.create_category(model_class, prefix=prefix), {})
+
+    def update(self, values: Sequence[Any], cache_keys: Optional[Sequence[tuple]] = None) -> None:
+        if cache_keys is None:
+            cache_keys = []
+            for instance in values:
+                try:
+                    cache_key = self.create_cache_key(instance)
+                except (AttributeError, KeyError):
+                    cache_key = _empty_tuple
+                cache_keys.append(cache_key)
+
+        for cache_key, instance in zip(cache_keys, values):
             if len(cache_key) <= 1:
                 continue
-            _model_cache = self._cache.setdefault(instance.__class__.__name__, {})
-            _model_cache[cache_key] = instance
+            _category_cache = self.cache.setdefault(cache_key[0], {})
+            _cache_list = _category_cache.setdefault(cache_key, [])
+            _category_cache[cache_key] = instance
 
-    def get(self, model_class: Type[BaseModelType], row_or_model: Any) -> Optional[BaseModelType]:
+    def get(self, model_class: Type[BaseModelType], row_or_model: Any) -> Optional[Any]:
         try:
-            cache_key = model_class.create_cache_key(row_or_model)
+            cache_key = self.create_cache_key(row_or_model)
         except (AttributeError, KeyError):
             return None
-        _model_cache = self._cache.get(model_class.__name__)
-        if _model_cache is None:
+        _category_cache = self.cache.get(model_class.__name__)
+        if _category_cache is None:
             return None
-        entry = _model_cache.get(cache_key)
+        entry = _category_cache.get(cache_key)
         if entry is None:
             return None
         return entry
@@ -121,40 +175,44 @@ class QueryModelResultCache:
         self,
         model_class: Type[BaseModelType],
         row_or_models: Sequence[Any],
-        cache_fn: Callable[[Any], Optional[BaseModelType]],
-    ) -> Optional[BaseModelType]:
+        cache_fn: Optional[Callable[[Any], Optional[BaseModelType]]] = None,
+        transform_fn: Optional[Callable[[Optional[BaseModelType]], Any]] = None,
+    ) -> Sequence[Any]:
+        cache_update_keys: List[tuple] = []
         cache_update: List[BaseModelType] = []
-        results: List[Optional[BaseModelType]] = []
+        results: List[Optional[Any]] = []
         for row_or_model in row_or_models:
             result = self.get(model_class, row_or_model)
-            if result is None:
+            if result is None and cache_fn is not None:
                 result = cache_fn(row_or_model)
                 if result is not None:
+                    cache_update_keys.append(self.create_cache_key(result))
+                    if transform_fn is not None:
+                        result = transform_fn(result)
                     cache_update.append(result)
                 results.append(result)
-        self.update(cache_update)
-        return result
+        self.update(cache_update, cache_keys=cache_update_keys)
+        return results
 
     async def aget_or_cache_many(
         self,
         model_class: Type[BaseModelType],
         row_or_models: Sequence[Any],
-        cache_fn: Callable[[Any], Awaitable[Optional[BaseModelType]]],
-    ) -> Optional[BaseModelType]:
-        cache_update: List[BaseModelType] = []
+        cache_fn: Optional[Callable[[Any], Awaitable[Optional[BaseModelType]]]] = None,
+        transform_fn: Optional[Callable[[Optional[BaseModelType]], Awaitable[Any]]] = None,
+    ) -> Sequence[Any]:
+        cache_update_keys: List[tuple] = []
+        cache_update: List[Any] = []
         results: List[Optional[BaseModelType]] = []
         for row_or_model in row_or_models:
             result = self.get(model_class, row_or_model)
             if result is None:
                 result = await cache_fn(row_or_model)
                 if result is not None:
+                    cache_update_keys.append(self.create_cache_key(result))
+                    if transform_fn is not None:
+                        result = await transform_fn(result)
                     cache_update.append(result)
                 results.append(result)
-        self.update(cache_update)
-        return result
-
-    def all_for_model_class(self, model_class: Type[BaseModelType]) -> Sequence[BaseModelType]:
-        _model_cache = self._cache.get(model_class.__name__)
-        if _model_cache is None:
-            return _empty_tuple
-        return _model_cache.values()  # type: ignore
+        self.update(cache_update, cache_keys=cache_update_keys)
+        return results

@@ -136,8 +136,8 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         _seen: Optional[Set[Any]] = None,
     ) -> None:
         if _seen is None:
-            _seen = {self.create_cache_key(self)}
-        elif self.create_cache_key(self) in _seen:
+            _seen = {self.create_model_key()}
+        elif self.create_model_key() in _seen:
             return
         _loaded_or_deleted = self._loaded_or_deleted
         if self.can_load:

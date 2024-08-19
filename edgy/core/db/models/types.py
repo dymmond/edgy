@@ -156,20 +156,12 @@ class BaseModelType(ABC):
         """
         return self.__class__.__name__.lower()
 
-    @classmethod
-    def create_cache_key(cls, instance: Any) -> tuple:
+    def create_model_key(self) -> tuple:
         """
         Build a cache key for the model.
         """
-        cache_key_list: List[Any] = [cls.__name__]
-        try:
-            pknames_or_columns = cls.pkcolumns
-        except AttributeError:
-            pknames_or_columns = cls.pknames
-        if isinstance(instance, dict):
-            for pkcol in pknames_or_columns:
-                cache_key_list.append(str(instance[pkcol]))
-        else:
-            for pkcol in pknames_or_columns:
-                cache_key_list.append(str(getattr(instance, pkcol)))
-        return tuple(cache_key_list)
+        pk_key_list: List[Any] = [type(self).__name__]
+        # there are no columns, only column results
+        for attr in self.pkcolumns:
+            pk_key_list.append(str(getattr(self, attr)))
+        return tuple(pk_key_list)

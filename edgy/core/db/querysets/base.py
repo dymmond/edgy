@@ -1,4 +1,3 @@
-import asyncio
 import copy
 import warnings
 from functools import cached_property
@@ -29,7 +28,7 @@ from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 from edgy.core.db.models.mixins import ModelParser
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
-from edgy.core.db.querysets.prefetch import PrefetchMixin
+from edgy.core.db.querysets.prefetch import Prefetch, PrefetchMixin, check_prefetch_collision
 from edgy.core.db.querysets.types import QueryType
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
@@ -100,6 +99,7 @@ class BaseQuerySet(
         defer_fields: Any = None,
         embed_parent: Any = None,
         embed_parent_filters: Any = None,
+        embed_sqla_row: str = "",
         using_schema: Any = None,
         table: Any = None,
         exclude_secrets: bool = False,
@@ -122,7 +122,9 @@ class BaseQuerySet(
         self.using_schema = using_schema
         self._exclude_secrets = exclude_secrets
         # cache should not be cloned
-        self._clear_cache()
+        self._cache = QueryModelResultCache(attrs=self.model_class.pkcolumns)
+        # is empty
+        self._clear_cache(False)
 
         # Making sure the queryset always starts without any schema associated unless specified
 
@@ -438,11 +440,11 @@ class BaseQuerySet(
     async def _get_or_cache_row(self, row: Any, extra_attr: str = "") -> EdgyModel:
         is_only_fields = bool(self._only)
         is_defer_fields = bool(self._defer)
-        result = await self._cache.aget_or_cache_many(
-            self.model_class,
-            [row],
-            lambda row: self._embed_parent_in_result(
-                self.model_class.from_sqla_row(
+        result = (
+            await self._cache.aget_or_cache_many(
+                self.model_class,
+                [row],
+                cache_fn=lambda row: self.model_class.from_sqla_row(
                     row,
                     select_related=self._select_related,
                     is_only_fields=is_only_fields,
@@ -451,9 +453,10 @@ class BaseQuerySet(
                     prefetch_related=self._prefetch_related,
                     exclude_secrets=self._exclude_secrets,
                     using_schema=self.using_schema,
-                )
-            ),
-        )
+                ),
+                transform_fn=self._embed_parent_in_result,
+            )
+        )[0]
         if extra_attr:
             for attr in extra_attr.split(","):
                 setattr(self, attr, result)
@@ -466,6 +469,7 @@ class BaseQuerySet(
         """
         queryset = self.__class__.__new__(self.__class__)
         queryset.model_class = self.model_class
+        queryset._cache = QueryModelResultCache(attrs=queryset.model_class.pkcolumns)
         queryset._clear_cache()
 
         # Making sure the registry schema takes precendent with
@@ -494,40 +498,85 @@ class BaseQuerySet(
         queryset.table = self.table
         queryset._exclude_secrets = self._exclude_secrets
         queryset.using_schema = self.using_schema
-
         return cast("QuerySet", queryset)
 
     def _clear_cache(self, keep_result_cache: bool = False) -> None:
         if not keep_result_cache:
-            self._cache = QueryModelResultCache()
+            self._cache.clear()
         self._cache_count: Optional[int] = None
         self._cache_first: Optional[Model] = None
         self._cache_last: Optional[Model] = None
+        # fetch all is in cache
+        self._cache_fetch_all: bool = False
+        # get current row during iteration. Used for prefetching.
+        # Bad style but no other way currently possible
+        self._cache_current_row: Optional[sqlalchemy.Row] = None
 
     async def _handle_batch(
         self, batch: Sequence[sqlalchemy.Row], queryset: "QuerySet"
-    ) -> List["Model"]:
-        ops = []
+    ) -> Sequence["Model"]:
         is_only_fields = bool(queryset._only)
         is_defer_fields = bool(queryset._defer)
-        for row in batch:
-            ops.append(
-                self._embed_parent_in_result(
-                    queryset.model_class.from_sqla_row(
-                        row,
-                        select_related=queryset._select_related,
-                        prefetch_related=queryset._prefetch_related,
-                        is_only_fields=is_only_fields,
-                        only_fields=queryset._only,
-                        is_defer_fields=is_defer_fields,
-                        exclude_secrets=queryset._exclude_secrets,
-                        using_schema=queryset.using_schema,
+        del queryset
+        _prefetch_related: List[Prefetch] = []
+
+        clauses = []
+        for pkcol in self.model_class.pkcolumns:
+            clauses.append(
+                getattr(self.table.columns, pkcol).in_([getattr(row, pkcol) for row in batch])
+            )
+        for prefetch in self._prefetch_related:
+            check_prefetch_collision(self.model_class, prefetch)
+
+            crawl_result = crawl_relationship(
+                self.model_class, prefetch.related_name, traverse_last=True
+            )
+            prefetch_queryset: Optional[QuerySet] = prefetch.queryset
+            if prefetch_queryset is None:
+                if crawl_result.reverse_path is False:
+                    prefetch_queryset = self.model_class.query.filter(*clauses)
+                else:
+                    prefetch_queryset = crawl_result.model_class.query.filter(*clauses)
+            else:
+                prefetch_queryset = prefetch_queryset.filter(*clauses)
+
+            if prefetch_queryset.model_class == self.model_class:
+                # queryset is of this model
+                prefetch_queryset = prefetch_queryset.select_related(prefetch.related_name)
+                prefetch_queryset.embed_parent = (prefetch.related_name, "")
+            elif crawl_result.reverse_path is False:
+                QuerySetError(
+                    detail=(
+                        f"Creating a reverse path is not possible, unidirectional fields used."
+                        f"You may want to use as queryset a queryset of model class {self.model_class!r}."
                     )
                 )
+            else:
+                # queryset is of the target model
+                prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
+            new_prefetch = Prefetch(
+                related_name=prefetch.related_name,
+                to_attr=prefetch.to_attr,
+                queryset=prefetch_queryset,
             )
-        results = await asyncio.gather(*ops)
-        self._cache.update(results)
-        return results
+            new_prefetch._is_finished = True
+            _prefetch_related.append(new_prefetch)
+
+        return await self._cache.aget_or_cache_many(
+            self.model_class,
+            batch,
+            cache_fn=lambda row: self.model_class.from_sqla_row(
+                row,
+                select_related=self._select_related,
+                is_only_fields=is_only_fields,
+                only_fields=self._only,
+                is_defer_fields=is_defer_fields,
+                prefetch_related=_prefetch_related,
+                exclude_secrets=self._exclude_secrets,
+                using_schema=self.using_schema,
+            ),
+            transform_fn=self._embed_parent_in_result,
+        )
 
     async def _execute_iterate(
         self, fetch_all_at_once: bool = False
@@ -535,6 +584,9 @@ class BaseQuerySet(
         """
         Executes the query, iterate.
         """
+        if self._cache_fetch_all:
+            for result in self._cache.get_category(self.model_class).values():
+                yield result
         queryset = self
         if queryset.embed_parent:
             # activates distinct, not distinct on
@@ -560,22 +612,30 @@ class BaseQuerySet(
         last_element: Optional[Model] = None
         if fetch_all_at_once:
             batch = await queryset.database.fetch_all(expression)
-            for result in await self._handle_batch(batch, queryset):
+            for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
                 if counter == 0:
                     self._cache_first = result
                 last_element = result
                 counter += 1
+                self._cache_current_row = batch[row_num]  # type: ignore
                 yield result
+            self._cache_current_row = None
+            self._cache_fetch_all = True
         else:
             async for batch in queryset.database.batched_iterate(
                 expression, batch_size=self._batch_size
             ):
-                for result in await self._handle_batch(batch, queryset):
+                # clear only result cache
+                self._cache.clear()
+                self._cache_fetch_all = False
+                for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
                     if counter == 0:
                         self._cache_first = result
                     last_element = result
                     counter += 1
+                    self._cache_current_row = batch[row_num]  # type: ignore
                     yield result
+            self._cache_current_row = None
         # better update them once
         self._cache_count = counter
         self._cache_last = last_element
