@@ -20,6 +20,7 @@ hide:
 - Server defaults don't trigger load after saving.
 - Less nested run_sync calls.
 - Alter queryset methods to contain useful arguments, instead of ignoring kwargs.
+- Replace QuerysetProtocol by abstract base type.
 
 ### Fixed
 

@@ -33,7 +33,6 @@ from edgy.core.db.querysets.prefetch import PrefetchMixin
 from edgy.core.db.querysets.types import QueryType
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
-from edgy.protocols.queryset import QuerySetProtocol
 
 from . import clauses as clauses_mod
 
@@ -536,10 +535,10 @@ class BaseQuerySet(
         """
         Executes the query, iterate.
         """
-        queryset: BaseQuerySet = self
+        queryset = self
         if queryset.embed_parent:
             # activates distinct, not distinct on
-            queryset = queryset.distinct()
+            queryset = queryset.distinct()  # type: ignore
 
         expression = queryset._build_select()
 
@@ -607,7 +606,7 @@ class BaseQuerySet(
         return queryset
 
 
-class QuerySet(BaseQuerySet, QuerySetProtocol):
+class QuerySet(BaseQuerySet):
     """
     QuerySet object used for query retrieving. Public interface
     """
