@@ -42,6 +42,6 @@ async def test_exclude_secrets_query():
         profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
     )
 
-    user = await User.query.exclude_secrets(id=1).get()
+    user = await User.query.exclude_secrets().get(id=1)
 
     assert user.pk == 1

@@ -1,6 +1,6 @@
-import asyncio
 import copy
 import warnings
+from functools import cached_property
 from inspect import isawaitable
 from typing import (
     TYPE_CHECKING,
@@ -23,15 +23,15 @@ import sqlalchemy
 
 from edgy.conf import settings
 from edgy.core.db.context_vars import get_schema
+from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 from edgy.core.db.models.mixins import ModelParser
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
-from edgy.core.db.querysets.prefetch import PrefetchMixin
-from edgy.core.db.querysets.protocols import AwaitableQuery
+from edgy.core.db.querysets.prefetch import Prefetch, PrefetchMixin, check_prefetch_collision
+from edgy.core.db.querysets.types import QueryType
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
-from edgy.protocols.queryset import QuerySetProtocol
 
 from . import clauses as clauses_mod
 
@@ -40,11 +40,28 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.models import Model
 
 
-def clean_query_kwargs(model: Type["Model"], kwargs: Dict[str, Any]) -> Dict[str, Any]:
+def _removeprefix(text: str, prefix: str) -> str:
+    # TODO: replace with removeprefix when python3.9 is minimum
+    if text.startswith(prefix):
+        return text[len(prefix) :]
+    else:
+        return text
+
+
+def clean_query_kwargs(
+    model_class: Type["Model"],
+    kwargs: Dict[str, Any],
+    embed_parent: Optional[Tuple[str, str]] = None,
+) -> Dict[str, Any]:
     new_kwargs: Dict[str, Any] = {}
     for key, val in kwargs.items():
-        model_class, field_name, _, _, _ = crawl_relationship(model, key)
-        field = model_class.meta.fields.get(field_name)
+        if embed_parent:
+            if embed_parent[1] and key.startswith(embed_parent[1]):
+                key = _removeprefix(_removeprefix(key, embed_parent[1]), "__")
+            else:
+                key = f"{embed_parent[0]}__{key}"
+        sub_model_class, field_name, _, _, _ = crawl_relationship(model_class, key)
+        field = sub_model_class.meta.fields.get(field_name)
         if field is not None:
             new_kwargs.update(field.clean(key, val, for_query=True))
         else:
@@ -58,8 +75,10 @@ class BaseQuerySet(
     QuerySetPropsMixin,
     PrefetchMixin,
     ModelParser,
-    AwaitableQuery[EdgyModel],
+    QueryType,
 ):
+    """Internal definitions for queryset."""
+
     ESCAPE_CHARACTERS = ["%", "_"]
 
     def __init__(
@@ -72,34 +91,40 @@ class BaseQuerySet(
         prefetch_related: Any = None,
         limit_count: Any = None,
         limit_offset: Any = None,
+        batch_size: Optional[int] = None,
         order_by: Any = None,
         group_by: Any = None,
         distinct_on: Optional[Sequence[str]] = None,
         only_fields: Any = None,
         defer_fields: Any = None,
         embed_parent: Any = None,
+        embed_parent_filters: Any = None,
+        embed_sqla_row: str = "",
         using_schema: Any = None,
         table: Any = None,
-        exclude_secrets: Any = False,
+        exclude_secrets: bool = False,
     ) -> None:
         super().__init__(model_class=model_class)
-        self.model_class = cast("Type[Model]", model_class)
         self.filter_clauses = [] if filter_clauses is None else filter_clauses
         self.or_clauses = [] if or_clauses is None else or_clauses
         self.limit_count = limit_count
         self._select_related = [] if select_related is None else select_related
         self._prefetch_related = [] if prefetch_related is None else prefetch_related
         self._offset = limit_offset
+        self._batch_size = batch_size
         self._order_by = [] if order_by is None else order_by
         self._group_by = [] if group_by is None else group_by
         self.distinct_on = distinct_on
         self._only = [] if only_fields is None else only_fields
         self._defer = [] if defer_fields is None else defer_fields
-        self._expression = None
-        self._cache = None
         self.embed_parent = embed_parent
+        self.embed_parent_filters = embed_parent_filters
         self.using_schema = using_schema
-        self._exclude_secrets = exclude_secrets or False
+        self._exclude_secrets = exclude_secrets
+        # cache should not be cloned
+        self._cache = QueryModelResultCache(attrs=self.model_class.pkcolumns)
+        # is empty
+        self._clear_cache(False)
 
         # Making sure the queryset always starts without any schema associated unless specified
 
@@ -246,7 +271,7 @@ class BaseQuerySet(
         """
         Builds the query select based on the given parameters and filters.
         """
-        queryset: QuerySet = self._clone()
+        queryset: BaseQuerySet = self
 
         queryset._validate_only_and_defer()
         tables, select_from = queryset._build_tables_select_from_relationship()
@@ -298,7 +323,6 @@ class BaseQuerySet(
                 queryset.distinct_on, expression=expression
             )
 
-        queryset._expression = expression  # type: ignore
         return expression
 
     def _filter_query(
@@ -320,7 +344,7 @@ class BaseQuerySet(
         if self.model_class.__is_proxy_model__:
             self.model_class = self.model_class.__parent__
 
-        kwargs = clean_query_kwargs(self.model_class, kwargs)
+        kwargs = clean_query_kwargs(self.model_class, kwargs, self.embed_parent_filters)
 
         for key, value in kwargs.items():
             assert not isinstance(value, Model), f"should be parsed in clean: {key}: {value}"
@@ -368,10 +392,12 @@ class BaseQuerySet(
                 prefetch_related=prefetch_related,
                 limit_count=self.limit_count,
                 limit_offset=self._offset,
+                batch_size=self._batch_size,
                 order_by=self._order_by,
                 only_fields=self._only,
                 defer_fields=self._defer,
                 embed_parent=self.embed_parent,
+                embed_parent_filters=self.embed_parent_filters,
                 table=self.table,
                 exclude_secrets=self._exclude_secrets,
                 using_schema=self.using_schema,
@@ -395,6 +421,47 @@ class BaseQuerySet(
     def _prepare_fields_for_distinct(self, distinct_on: str) -> sqlalchemy.Column:
         return self.table.columns[distinct_on]
 
+    async def _embed_parent_in_result(self, result: Any) -> Any:
+        if isawaitable(result):
+            result = await result
+        if not self.embed_parent:
+            return result
+        new_result = result
+        for part in self.embed_parent[0].split("__"):
+            if hasattr(new_result, "_return_load_coro_on_attr_access"):
+                new_result._return_load_coro_on_attr_access = True
+            new_result = getattr(new_result, part)
+            if isawaitable(new_result):
+                new_result = await new_result
+        if self.embed_parent[1]:
+            setattr(new_result, self.embed_parent[1], result)
+        return new_result
+
+    async def _get_or_cache_row(self, row: Any, extra_attr: str = "") -> EdgyModel:
+        is_only_fields = bool(self._only)
+        is_defer_fields = bool(self._defer)
+        result = (
+            await self._cache.aget_or_cache_many(
+                self.model_class,
+                [row],
+                cache_fn=lambda row: self.model_class.from_sqla_row(
+                    row,
+                    select_related=self._select_related,
+                    is_only_fields=is_only_fields,
+                    only_fields=self._only,
+                    is_defer_fields=is_defer_fields,
+                    prefetch_related=self._prefetch_related,
+                    exclude_secrets=self._exclude_secrets,
+                    using_schema=self.using_schema,
+                ),
+                transform_fn=self._embed_parent_in_result,
+            )
+        )[0]
+        if extra_attr:
+            for attr in extra_attr.split(","):
+                setattr(self, attr, result)
+        return result
+
     def _clone(self) -> "QuerySet":
         """
         Return a copy of the current QuerySet that's ready for another
@@ -402,6 +469,8 @@ class BaseQuerySet(
         """
         queryset = self.__class__.__new__(self.__class__)
         queryset.model_class = self.model_class
+        queryset._cache = QueryModelResultCache(attrs=queryset.model_class.pkcolumns)
+        queryset._clear_cache()
 
         # Making sure the registry schema takes precendent with
         # Any provided using
@@ -420,40 +489,159 @@ class BaseQuerySet(
         queryset._order_by = copy.copy(self._order_by)
         queryset._group_by = copy.copy(self._group_by)
         queryset.distinct_on = copy.copy(self.distinct_on)
-        queryset._expression = copy.copy(self._expression)
         queryset.embed_parent = self.embed_parent
+        queryset.embed_parent_filters = self.embed_parent_filters
+        queryset._batch_size = self._batch_size
         queryset._only = copy.copy(self._only)
         queryset._defer = copy.copy(self._defer)
         queryset._database = self.database
         queryset.table = self.table
         queryset._exclude_secrets = self._exclude_secrets
         queryset.using_schema = self.using_schema
-
         return cast("QuerySet", queryset)
 
+    def _clear_cache(self, keep_result_cache: bool = False) -> None:
+        if not keep_result_cache:
+            self._cache.clear()
+        self._cache_count: Optional[int] = None
+        self._cache_first: Optional[Model] = None
+        self._cache_last: Optional[Model] = None
+        # fetch all is in cache
+        self._cache_fetch_all: bool = False
+        # get current row during iteration. Used for prefetching.
+        # Bad style but no other way currently possible
+        self._cache_current_row: Optional[sqlalchemy.Row] = None
 
-class QuerySet(BaseQuerySet, QuerySetProtocol):
-    """
-    QuerySet object used for query retrieving.
-    """
+    async def _handle_batch(
+        self, batch: Sequence[sqlalchemy.Row], queryset: "QuerySet"
+    ) -> Sequence["Model"]:
+        is_only_fields = bool(queryset._only)
+        is_defer_fields = bool(queryset._defer)
+        del queryset
+        _prefetch_related: List[Prefetch] = []
 
-    def __get__(self, instance: Any, owner: Any = None) -> "QuerySet":
-        return self.__class__(model_class=owner if owner else instance.__class__)
+        clauses = []
+        for pkcol in self.model_class.pkcolumns:
+            clauses.append(
+                getattr(self.table.columns, pkcol).in_([getattr(row, pkcol) for row in batch])
+            )
+        for prefetch in self._prefetch_related:
+            check_prefetch_collision(self.model_class, prefetch)
 
-    @property
-    def sql(self) -> Any:
-        return self._expression
+            crawl_result = crawl_relationship(
+                self.model_class, prefetch.related_name, traverse_last=True
+            )
+            prefetch_queryset: Optional[QuerySet] = prefetch.queryset
+            if prefetch_queryset is None:
+                if crawl_result.reverse_path is False:
+                    prefetch_queryset = self.model_class.query.filter(*clauses)
+                else:
+                    prefetch_queryset = crawl_result.model_class.query.filter(*clauses)
+            else:
+                prefetch_queryset = prefetch_queryset.filter(*clauses)
 
-    @sql.setter
-    def sql(self, value: Any) -> None:
-        self._expression = value
+            if prefetch_queryset.model_class == self.model_class:
+                # queryset is of this model
+                prefetch_queryset = prefetch_queryset.select_related(prefetch.related_name)
+                prefetch_queryset.embed_parent = (prefetch.related_name, "")
+            elif crawl_result.reverse_path is False:
+                QuerySetError(
+                    detail=(
+                        f"Creating a reverse path is not possible, unidirectional fields used."
+                        f"You may want to use as queryset a queryset of model class {self.model_class!r}."
+                    )
+                )
+            else:
+                # queryset is of the target model
+                prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
+            new_prefetch = Prefetch(
+                related_name=prefetch.related_name,
+                to_attr=prefetch.to_attr,
+                queryset=prefetch_queryset,
+            )
+            new_prefetch._is_finished = True
+            _prefetch_related.append(new_prefetch)
 
-    def _set_query_expression(self, expression: Any) -> None:
+        return await self._cache.aget_or_cache_many(
+            self.model_class,
+            batch,
+            cache_fn=lambda row: self.model_class.from_sqla_row(
+                row,
+                select_related=self._select_related,
+                is_only_fields=is_only_fields,
+                only_fields=self._only,
+                is_defer_fields=is_defer_fields,
+                prefetch_related=_prefetch_related,
+                exclude_secrets=self._exclude_secrets,
+                using_schema=self.using_schema,
+            ),
+            transform_fn=self._embed_parent_in_result,
+        )
+
+    async def _execute_iterate(
+        self, fetch_all_at_once: bool = False
+    ) -> AsyncIterator[Awaitable[EdgyModel]]:
         """
-        Sets the value of the sql property to the expression used.
+        Executes the query, iterate.
         """
-        self.sql = expression
-        self.model_class.raw_query = self.sql
+        if self._cache_fetch_all:
+            for result in self._cache.get_category(self.model_class).values():
+                yield result
+        queryset = self
+        if queryset.embed_parent:
+            # activates distinct, not distinct on
+            queryset = queryset.distinct()  # type: ignore
+
+        expression = queryset._build_select()
+
+        if not fetch_all_at_once and queryset.database.force_rollback:
+            # force_rollback on db = we have only one connection
+            # so every operation must be atomic
+            # Note: force_rollback is a bit magic, it evaluates its truthiness to the actual value
+            warnings.warn(
+                'Using queryset iterations with "Database"-level force_rollback set is risky. '
+                "Deadlocks can occur because only one connection is used.",
+                UserWarning,
+                stacklevel=3,
+            )
+            if queryset._prefetch_related:
+                # prefetching will certainly deadlock, let's mitigate
+                fetch_all_at_once = True
+
+        counter = 0
+        last_element: Optional[Model] = None
+        if fetch_all_at_once:
+            batch = await queryset.database.fetch_all(expression)
+            for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
+                if counter == 0:
+                    self._cache_first = result
+                last_element = result
+                counter += 1
+                self._cache_current_row = batch[row_num]  # type: ignore
+                yield result
+            self._cache_current_row = None
+            self._cache_fetch_all = True
+        else:
+            async for batch in queryset.database.batched_iterate(
+                expression, batch_size=self._batch_size
+            ):
+                # clear only result cache
+                self._cache.clear()
+                self._cache_fetch_all = False
+                for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
+                    if counter == 0:
+                        self._cache_first = result
+                    last_element = result
+                    counter += 1
+                    self._cache_current_row = batch[row_num]  # type: ignore
+                    yield result
+            self._cache_current_row = None
+        # better update them once
+        self._cache_count = counter
+        self._cache_last = last_element
+
+    async def _execute_all(self) -> List[EdgyModel]:
+        return [result async for result in self._execute_iterate(fetch_all_at_once=True)]
 
     def _filter_or_exclude(
         self,
@@ -477,6 +665,22 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             queryset.filter_clauses.append(op(*clauses))
         return queryset
 
+
+class QuerySet(BaseQuerySet):
+    """
+    QuerySet object used for query retrieving. Public interface
+    """
+
+    @property
+    def raw_query(self) -> Any:
+        """Get SQL query (sqlalchemy)."""
+        return self._build_select()
+
+    @cached_property
+    def sql(self) -> str:
+        """Get SQL query as string."""
+        return str(self.raw_query)
+
     def filter(
         self,
         *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
@@ -487,12 +691,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         return self._filter_or_exclude(clauses=clauses, kwargs=kwargs)
 
-    def all(self, **kwargs: Any) -> "QuerySet":
+    def all(self, clear_cache: bool = False) -> "QuerySet":
         """
-        Returns the queryset records based on specific filters
+        Returns a cloned query with empty cache. Optionally just clear the cache and return the same query.
         """
-        # filter with reduced functionality
-        return self.filter(**kwargs) if kwargs else self._clone()
+        if clear_cache:
+            self._clear_cache()
+            return self
+        return self._clone()
 
     def or_(
         self,
@@ -536,14 +742,24 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     def exclude_secrets(
         self,
-        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
-        **kwargs: Any,
+        exclude_secrets: bool = True,
     ) -> "QuerySet":
         """
         Excludes any field that contains the `secret=True` declared from being leaked.
         """
-        queryset = self.filter(*clauses, **kwargs)
-        queryset._exclude_secrets = True
+        queryset = self._clone()
+        queryset._exclude_secrets = exclude_secrets
+        return queryset
+
+    def batch_size(
+        self,
+        batch_size: Optional[int] = None,
+    ) -> "QuerySet":
+        """
+        Set batch/chunk size. Used for iterate
+        """
+        queryset = self._clone()
+        queryset._batch_size = batch_size
         return queryset
 
     def lookup(self, term: Any) -> "QuerySet":
@@ -577,6 +793,13 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         queryset: QuerySet = self._clone()
         queryset._order_by = order_by
+        return queryset
+
+    def reverse(self) -> "QuerySet":
+        queryset: QuerySet = self._clone()
+        queryset._order_by = [
+            el[1:] if el.startswith("-") else f"-{el}" for el in queryset._order_by
+        ]
         return queryset
 
     def limit(self, limit_count: int) -> "QuerySet":
@@ -734,61 +957,40 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Returns a boolean indicating if a record exists or not.
         """
-        queryset: QuerySet = self._clone()
+        if kwargs:
+            # check cache for existance
+            cached = self._cache.get(self.model_class, kwargs)
+            if cached is not None:
+                return True
+            filter_query = self.filter(**kwargs)
+            filter_query._cache = self._cache
+            return await filter_query.exists()
+        queryset: QuerySet = self
         expression = queryset._build_select()
         expression = sqlalchemy.exists(expression).select()
-        queryset._set_query_expression(expression)
         _exists = await queryset.database.fetch_val(expression)
         return cast("bool", _exists)
 
-    async def count(self, **kwargs: Any) -> int:
+    async def count(self) -> int:
         """
         Returns an indicating the total records.
         """
-        queryset: QuerySet = self._clone()
+        if self._cache_count is not None:
+            return self._cache_count
+        queryset: QuerySet = self
         expression = queryset._build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
-        queryset._set_query_expression(expression)
-        _count = await queryset.database.fetch_val(expression)
-        return cast("int", _count)
+        self._cache_count = count = cast("int", await queryset.database.fetch_val(expression))
+        return count
 
     async def get_or_none(self, **kwargs: Any) -> Union[EdgyModel, None]:
         """
         Fetch one object matching the parameters or returns None.
         """
-        queryset: QuerySet = self.filter(**kwargs)
-        expression = queryset._build_select().limit(2)
-        queryset._set_query_expression(expression)
-        rows = await queryset.database.fetch_all(expression)
-
-        if not rows:
+        try:
+            return await self.get(**kwargs)
+        except ObjectNotFound:
             return None
-        if len(rows) > 1:
-            raise MultipleObjectsReturned()
-        return await self.embed_parent_in_result(
-            await queryset.model_class.from_sqla_row(
-                rows[0],
-                select_related=queryset._select_related,
-                exclude_secrets=queryset._exclude_secrets,
-                using_schema=queryset.using_schema,
-            )
-        )
-
-    async def embed_parent_in_result(self, result: Any) -> Any:
-        if isawaitable(result):
-            result = await result
-        if not self.embed_parent:
-            return result
-        new_result = result
-        for part in self.embed_parent[0].split("__"):
-            if hasattr(new_result, "_return_load_coro_on_attr_access"):
-                new_result._return_load_coro_on_attr_access = True
-            new_result = getattr(new_result, part)
-            if isawaitable(new_result):
-                new_result = await new_result
-        if self.embed_parent[1]:
-            setattr(new_result, self.embed_parent[1], result)
-        return new_result
 
     async def get(self, **kwargs: Any) -> EdgyModel:
         """
@@ -796,70 +998,73 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
 
         if kwargs:
-            return await self.filter(**kwargs).get()
+            cached = self._cache.get(self.model_class, kwargs)
+            if cached is not None:
+                return cached
+            filter_query = self.filter(**kwargs)
+            # connect parent query cache
+            filter_query._cache = self._cache
+            return await filter_query.get()
 
-        queryset: QuerySet = self._clone()
+        queryset: QuerySet = self
 
         expression = queryset._build_select().limit(2)
         rows = await queryset.database.fetch_all(expression)
-        queryset._set_query_expression(expression)
-
-        is_only_fields = bool(queryset._only)
-        is_defer_fields = bool(queryset._defer)
 
         if not rows:
+            queryset._cache_count = 0
             raise ObjectNotFound()
         if len(rows) > 1:
             raise MultipleObjectsReturned()
+        queryset._cache_count = 1
 
-        return await self.embed_parent_in_result(
-            queryset.model_class.from_sqla_row(
-                rows[0],
-                select_related=queryset._select_related,
-                is_only_fields=is_only_fields,
-                only_fields=queryset._only,
-                is_defer_fields=is_defer_fields,
-                prefetch_related=queryset._prefetch_related,
-                exclude_secrets=queryset._exclude_secrets,
-                using_schema=queryset.using_schema,
-            )
-        )
+        return await queryset._get_or_cache_row(rows[0], "_cache_first,_cache_last")
 
-    async def first(self, **kwargs: Any) -> Union[EdgyModel, None]:
+    async def first(self) -> Union[EdgyModel, None]:
         """
         Returns the first record of a given queryset.
         """
-        queryset: QuerySet = self._clone()
-        if kwargs:
-            return await queryset.filter(**kwargs).order_by("id").get()
-
-        rows = await queryset.limit(1).order_by("id").all()
-        if rows:
-            return await self.embed_parent_in_result(rows[0])
+        if self._cache_count is not None and self._cache_count == 0:
+            return None
+        if self._cache_first is not None:
+            return self._cache_first
+        queryset = self
+        if not queryset._order_by:
+            queryset = queryset.order_by(*self.model_class.pkcolumns)
+        row = await queryset.database.fetch_one(queryset._build_select(), pos=0)
+        if row:
+            return await self._get_or_cache_row(row, extra_attr="_cache_first")
         return None
 
-    async def last(self, **kwargs: Any) -> Union[EdgyModel, None]:
+    async def last(self) -> Union[EdgyModel, None]:
         """
         Returns the last record of a given queryset.
         """
-        queryset: QuerySet = self._clone()
-        if kwargs:
-            return await queryset.filter(**kwargs).order_by("-id").get()
-
-        rows = await queryset.order_by("-id").all()
-        if rows:
-            return await self.embed_parent_in_result(rows[0])
+        if self._cache_count is not None and self._cache_count == 0:
+            return None
+        if self._cache_last is not None:
+            return self._cache_last
+        queryset = self
+        if not queryset._order_by:
+            queryset = queryset.order_by(*self.model_class.pkcolumns)
+        row = await queryset.database.fetch_one(queryset.reverse()._build_select(), pos=0)
+        if row:
+            return await self._get_or_cache_row(row, extra_attr="_cache_last")
         return None
 
     async def create(self, **kwargs: Any) -> EdgyModel:
         """
         Creates a record in a specific table.
         """
+        # for tenancy
         queryset: QuerySet = self._clone()
         instance = queryset.model_class(**kwargs)
         instance.table = queryset.table
         instance = await instance.save(force_save=True)
-        return await self.embed_parent_in_result(instance)
+        result = await self._embed_parent_in_result(instance)
+        self._clear_cache(True)
+        self._cache.update([result])
+        return result
 
     async def bulk_create(self, objs: List[Dict]) -> None:
         """
@@ -869,8 +1074,8 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         new_objs = [queryset._validate_kwargs(**obj) for obj in objs]
 
         expression = queryset.table.insert().values(new_objs)
-        queryset._set_query_expression(expression)
         await queryset.database.execute_many(expression)
+        self._clear_cache(True)
 
     async def bulk_update(self, objs: List[EdgyModel], fields: List[str]) -> None:
         """
@@ -912,28 +1117,26 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
             for pkcol in queryset.model_class.meta.field_to_column_names[field]
         }
         expression = expression.values(values_placeholder)
-        queryset._set_query_expression(expression)
         await queryset.database.execute_many(expression, update_list)
+        self._clear_cache()
 
     async def delete(self) -> None:
-        queryset: QuerySet = self._clone()
-
         await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
 
-        expression = queryset.table.delete()
-        for filter_clause in queryset.filter_clauses:
+        expression = self.table.delete()
+        for filter_clause in self.filter_clauses:
             expression = expression.where(filter_clause)
 
-        queryset._set_query_expression(expression)
-        await queryset.database.execute(expression)
+        await self.database.execute(expression)
 
         await self.model_class.meta.signals.post_delete.send_async(self.__class__, instance=self)
+        self._clear_cache()
 
     async def update(self, **kwargs: Any) -> None:
         """
         Updates a record in a specific table with the given kwargs.
         """
-        queryset: QuerySet = self._clone()
+        queryset: QuerySet = self
 
         kwargs = queryset.extract_column_values(kwargs, model_class=queryset.model_class)
 
@@ -947,11 +1150,11 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         for filter_clause in queryset.filter_clauses:
             expression = expression.where(filter_clause)
 
-        queryset._set_query_expression(expression)
         await queryset.database.execute(expression)
 
         # Broadcast the update executed
         await self.model_class.meta.signals.post_update.send_async(self.__class__, instance=self)
+        self._clear_cache()
 
     async def get_or_create(
         self, defaults: Dict[str, Any], **kwargs: Any
@@ -959,14 +1162,14 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Creates a record in a specific table or updates if already exists.
         """
-        queryset: QuerySet = self._clone()
 
         try:
-            instance = await queryset.get(**kwargs)
+            instance = await self.get(**kwargs)
+
             return instance, False
         except ObjectNotFound:
             kwargs.update(defaults)
-            instance = await queryset.create(**kwargs)
+            instance = await self.create(**kwargs)
             return instance, True
 
     async def update_or_create(
@@ -975,94 +1178,30 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
         """
         Updates a record in a specific table or creates a new one.
         """
-        queryset: QuerySet = self._clone()
         try:
-            instance = await queryset.get(**kwargs)
-            await instance.update(**defaults)
-            return instance, False
+            get_instance = await self.get(**kwargs)
         except ObjectNotFound:
             kwargs.update(defaults)
-            instance = await queryset.create(**kwargs)
+            instance = await self.create(**kwargs)
             return instance, True
+        await get_instance.update(**defaults)
+        self._clear_cache()
+        return get_instance, False
 
     async def contains(self, instance: EdgyModel) -> bool:
         """Returns true if the QuerySet contains the provided object.
         False if otherwise.
         """
-        queryset: QuerySet = self._clone()
-
-        if getattr(instance, "pk", None) is None:
-            raise ValueError("'obj' must be a model or reflect model instance.")
-        # TODO: handle embed parent
-        return await queryset.filter(pk=instance.pk).exists()
-
-    async def _execute_iterate(
-        self, fetch_all_at_once: bool = False
-    ) -> AsyncIterator[Awaitable[EdgyModel]]:
-        """
-        Executes the query, iterate.
-        """
-        queryset: QuerySet = self._clone()
-        if queryset.embed_parent:
-            # activates distinct, not distinct on
-            queryset.distinct_on = []
-
-        expression = queryset._build_select()
-        queryset._set_query_expression(expression)
-
-        # Attach the raw query to the object
-        queryset.model_class.raw_query = queryset.sql
-
-        is_only_fields = bool(queryset._only)
-        is_defer_fields = bool(queryset._defer)
-
-        if not fetch_all_at_once and queryset.database.force_rollback:
-            # force_rollback on db = we have only one connection
-            # so every operation must be atomic
-            # Note: force_rollback is a bit magic, it evaluates its truthiness to the actual value
-            warnings.warn(
-                'Using queryset iterations with "Database"-level force_rollback set is risky. '
-                "Deadlocks can occur because only one connection is used.",
-                UserWarning,
-                stacklevel=3,
-            )
-            if queryset._prefetch_related:
-                # prefetching will certainly deadlock, let's mitigate
-                fetch_all_at_once = True
-
-        if fetch_all_at_once:
-            for row in await queryset.database.fetch_all(expression):
-                yield self.embed_parent_in_result(
-                    queryset.model_class.from_sqla_row(
-                        row,
-                        select_related=queryset._select_related,
-                        prefetch_related=queryset._prefetch_related,
-                        is_only_fields=is_only_fields,
-                        only_fields=queryset._only,
-                        is_defer_fields=is_defer_fields,
-                        exclude_secrets=queryset._exclude_secrets,
-                        using_schema=queryset.using_schema,
-                    )
-                )
-        else:
-            async for row in queryset.database.iterate(expression):
-                yield self.embed_parent_in_result(
-                    queryset.model_class.from_sqla_row(
-                        row,
-                        select_related=queryset._select_related,
-                        prefetch_related=queryset._prefetch_related,
-                        is_only_fields=is_only_fields,
-                        only_fields=queryset._only,
-                        is_defer_fields=is_defer_fields,
-                        exclude_secrets=queryset._exclude_secrets,
-                        using_schema=queryset.using_schema,
-                    )
-                )
-
-    async def _execute_all(self) -> List[EdgyModel]:
-        return await asyncio.gather(
-            *[coro async for coro in self._execute_iterate(fetch_all_at_once=True)]
-        )
+        query: Any = {}
+        try:
+            pkcolumns = instance.pkcolumns
+            for pkcolumn in pkcolumns:
+                query[pkcolumn] = getattr(instance, pkcolumn)
+                if query[pkcolumn] is None:
+                    raise ValueError("'obj' has incomplete/missing primary key.") from None
+        except AttributeError:
+            raise ValueError("'obj' must be a model or reflect model instance.") from None
+        return await self.exists(**query)
 
     def __await__(
         self,
@@ -1071,7 +1210,4 @@ class QuerySet(BaseQuerySet, QuerySetProtocol):
 
     async def __aiter__(self) -> AsyncIterator[EdgyModel]:
         async for value in self._execute_iterate():
-            yield await value
-
-    def __class_getitem__(cls, *args: Any, **kwargs: Any) -> Any:
-        return cls
+            yield value

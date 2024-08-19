@@ -31,7 +31,10 @@ async def test_model_last():
     Test = await User.query.create(name="Test")
     jane = await User.query.create(name="Jane")
 
-    assert await User.query.last() == jane
-    assert await User.query.last(name="Jane") == jane
+    query = User.query.all()
+    assert query._cache_last is None
+    assert await query.last() == jane
+    assert query._cache_last is not None
+    assert await User.query.filter(name="Jane").last() == jane
     assert await User.query.filter(name="Test").last() == Test
     assert await User.query.filter(name="Lucy").last() is None

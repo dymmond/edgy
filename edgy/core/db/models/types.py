@@ -5,6 +5,7 @@ from typing import (
     ClassVar,
     Dict,
     Iterable,
+    List,
     Optional,
     Sequence,
     Type,
@@ -58,10 +59,6 @@ class BaseModelType(ABC):
 
     @property
     @abstractmethod
-    def raw_query(self) -> Any: ...
-
-    @property
-    @abstractmethod
     def proxy_model(self) -> Any: ...
 
     @property
@@ -106,8 +103,14 @@ class BaseModelType(ABC):
         """
 
     @abstractmethod
-    async def load(self) -> None:
+    async def load(self, only_needed: bool = False) -> None:
         """Load model"""
+
+    @abstractmethod
+    async def load_recursive(
+        self, only_needed: bool = True, only_needed_nest: bool = False
+    ) -> None:
+        """Load model and all models referenced by foreign keys."""
 
     @abstractmethod
     def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
@@ -152,3 +155,13 @@ class BaseModelType(ABC):
         Returns the name of the class in lowercase.
         """
         return self.__class__.__name__.lower()
+
+    def create_model_key(self) -> tuple:
+        """
+        Build a cache key for the model.
+        """
+        pk_key_list: List[Any] = [type(self).__name__]
+        # there are no columns, only column results
+        for attr in self.pkcolumns:
+            pk_key_list.append(str(getattr(self, attr)))
+        return tuple(pk_key_list)

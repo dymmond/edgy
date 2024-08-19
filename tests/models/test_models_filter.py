@@ -72,10 +72,10 @@ async def test_model_filter():
     assert product.name == "T-Shirt"
     assert product.rating == 5
 
-    products = await Product.query.all(rating__gte=2, in_stock=True)
+    products = await Product.query.filter(rating__gte=2, in_stock=True)
     assert len(products) == 2
 
-    products = await Product.query.all(name__icontains="T")
+    products = await Product.query.filter(name__icontains="T")
     assert len(products) == 2
 
     # Test escaping % character from icontains, contains, and iexact

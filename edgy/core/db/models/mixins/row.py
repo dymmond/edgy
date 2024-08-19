@@ -1,14 +1,15 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Union, cast
 
 from edgy.core.db.fields.base import RelationshipField
+from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.engine.result import Row
 
-    from edgy import Model, Prefetch, QuerySet
+    from edgy import Model
 
 
 class ModelRowMixin:
@@ -138,7 +139,7 @@ class ModelRowMixin:
         model = cls.__apply_schema(model, using_schema)
 
         # Handle prefetch related fields.
-        model = await cls.__handle_prefetch_related(
+        await cls.__handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
         assert model.pk is not None
@@ -165,49 +166,63 @@ class ModelRowMixin:
                 return True
         return False
 
-    @staticmethod
-    def __check_prefetch_collision(model: "Model", related: "Prefetch") -> None:
-        if (
-            hasattr(model, related.to_attr)
-            or related.to_attr in model.meta.fields
-            or related.to_attr in model.meta.managers
-        ):
-            raise QuerySetError(
-                f"Conflicting attribute to_attr='{related.related_name}' with '{related.to_attr}' in {model.__class__.__name__}"
-            )
+    @classmethod
+    def create_model_key_from_sqla_row(
+        cls,
+        row: "Row",
+    ) -> tuple:
+        """
+        Build a cache key for the model.
+        """
+        pk_key_list: List[Any] = [cls.__name__]
+        for attr in cls.pkcolumns:
+            try:
+                pk_key_list.append(str(row._mapping[getattr(cls.table.columns, attr)]))
+            except KeyError:
+                pk_key_list.append(str(row._mapping[attr]))
+        return tuple(pk_key_list)
 
     @classmethod
     async def __set_prefetch(cls, row: "Row", model: "Model", related: "Prefetch") -> None:
-        cls.__check_prefetch_collision(model, related)
-        clauses = []
-        for pkcol in cls.pkcolumns:
-            clauses.append(getattr(model.table.columns, pkcol) == getattr(row, pkcol))
-        queryset = related.queryset
-        crawl_result = crawl_relationship(
-            model.__class__, related.related_name, traverse_last=True
-        )
-        if queryset is None:
-            if crawl_result.reverse_path is False:
-                queryset = model.__class__.query.all()
-            else:
-                queryset = crawl_result.model_class.query.all()
-
-        if queryset.model_class == model.__class__:
-            # queryset is of this model
-            queryset = queryset.select_related(related.related_name)
-            queryset.embed_parent = (related.related_name, "")
-        elif crawl_result.reverse_path is False:
-            QuerySetError(
-                detail=(
-                    f"Creating a reverse path is not possible, unidirectional fields used."
-                    f"You may want to use as queryset a queryset of model class {model!r}."
-                )
-            )
+        model_key = ()
+        if related._is_finished:
+            await related.init_bake(type(model))
+            model_key = model.create_model_key()
+        if model_key in related._baked_results:
+            setattr(model, related.to_attr, related._baked_results[model_key])
         else:
-            # queryset is of the target model
-            queryset = queryset.select_related(crawl_result.reverse_path)
+            clauses = []
+            for pkcol in cls.pkcolumns:
+                clauses.append(getattr(model.table.columns, pkcol) == getattr(row, pkcol))
+            queryset = related.queryset
+            if related._is_finished:
+                assert queryset is not None, "Queryset is not set but _is_finished flag"
+            else:
+                check_prefetch_collision(model, related)
+                crawl_result = crawl_relationship(
+                    model.__class__, related.related_name, traverse_last=True
+                )
+                if queryset is None:
+                    if crawl_result.reverse_path is False:
+                        queryset = model.__class__.query.all()
+                    else:
+                        queryset = crawl_result.model_class.query.all()
 
-        setattr(model, related.to_attr, await queryset.filter(*clauses))
+                if queryset.model_class == model.__class__:
+                    # queryset is of this model
+                    queryset = queryset.select_related(related.related_name)
+                    queryset.embed_parent = (related.related_name, "")
+                elif crawl_result.reverse_path is False:
+                    QuerySetError(
+                        detail=(
+                            f"Creating a reverse path is not possible, unidirectional fields used."
+                            f"You may want to use as queryset a queryset of model class {model!r}."
+                        )
+                    )
+                else:
+                    # queryset is of the target model
+                    queryset = queryset.select_related(crawl_result.reverse_path)
+            setattr(model, related.to_attr, await queryset.filter(*clauses))
 
     @classmethod
     async def __handle_prefetch_related(
@@ -215,7 +230,7 @@ class ModelRowMixin:
         row: "Row",
         model: "Model",
         prefetch_related: Sequence["Prefetch"],
-    ) -> "Model":
+    ) -> None:
         """
         Handles any prefetch related scenario from the model.
         Loads in advance all the models needed for a specific record
@@ -228,28 +243,8 @@ class ModelRowMixin:
 
         for related in prefetch_related:
             # Check for conflicting names
-            # If to_attr has the same name of any
-            cls.__check_prefetch_collision(model=model, related=related)
+            # Check as early as possible
+            check_prefetch_collision(model=model, related=related)
             queries.append(cls.__set_prefetch(row=row, model=model, related=related))
         if queries:
             await asyncio.gather(*queries)
-        return model
-
-    @classmethod
-    async def run_query(
-        cls,
-        model: Optional[Type["Model"]] = None,
-        extra: Optional[Dict[str, Any]] = None,
-        queryset: Optional["QuerySet"] = None,
-    ) -> Union[List[Type["Model"]], Any]:
-        """
-        Runs a specific query against a given model with filters.
-        """
-
-        if not queryset:
-            return await model.query.filter(**extra)  # type: ignore
-
-        if extra:
-            queryset = queryset.filter(**extra)
-
-        return await queryset

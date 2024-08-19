@@ -87,6 +87,32 @@ The `exclude()` is used when you want to filter results by excluding instances.
 users = await User.query.exclude(is_active=False)
 ```
 
+### Exclude secrets
+
+The `exclude_secrets()` is used when you want to exclude (reinclude) fields with the secret attribute.
+
+```python
+users = await User.query.exclude_secrets()
+```
+
+Or to reinclude:
+
+```python
+users = await User.query.exclude_secrets().exclude_secrets(False)
+```
+
+### Batch size
+
+When iterating it is sometimes useful to set the batch size. By default (or when providing None) the default of databasez is used.
+
+Note: this is just for tweaking memory usage/performance when using iterations and has currently no user visible effect.
+
+```python
+async for user in User.query.batch_size(30):
+    pass
+```
+
+
 ### Filter
 
 #### Django-style
@@ -206,7 +232,7 @@ await User.query.filter(email__icontains="foo").limit(5).order_by("id")
 
 ### Order by
 
-Classic SQL operation and you need to order results.
+Classic SQL operation and you need to order results. Prefix with `-` to get a descending order.
 
 
 **Order by descending id and ascending email**
@@ -220,6 +246,10 @@ users = await User.query.order_by("email", "-id")
 ```python
 users = await User.query.order_by("email", "id")
 ```
+
+### Reverse
+
+Reverse the order. Flip `-` prefix of order components.
 
 ### Lookup
 
@@ -270,7 +300,7 @@ profiles = await Profile.query.select_related("user").filter(email__icontains="f
 
 ### All
 
-Returns all the instances.
+Copy the queryset except caches.
 
 ```python
 users = await User.query.all()
@@ -280,6 +310,8 @@ users = await User.query.all()
     The all as mentioned before it automatically executed by **Edgy** if not provided and it
     can also be aggregated with other [queryset operations](#returning-querysets).
 
+!!! Tip
+    For flushing the queryset caches instead provide True as argument. This mutates the queryset.
 
 ### Save
 
@@ -403,14 +435,6 @@ Returns a boolean confirming if a specific record exists.
 exists = await User.query.filter(email="foo@bar.com").exists()
 ```
 
-### Count
-
-Returns an integer with the total of records.
-
-```python
-total = await User.query.count()
-```
-
 ### Contains
 
 Returns true if the QuerySet contains the provided object.
@@ -421,6 +445,14 @@ user = await User.query.create(email="foo@bar.com")
 exists = await User.query.contains(instance=user)
 ```
 
+
+### Count
+
+Returns an integer with the total of records.
+
+```python
+total = await User.query.count()
+```
 ### Values
 
 Returns the model results in a dictionary like format.
@@ -542,6 +574,23 @@ instead returns a `None`.
 ```python
 user = await User.query.get_or_none(id=1)
 ```
+
+## Using the cache
+
+`first`, `last`, `count` are always cached and also initialized when iterating over the query or requesting all results.
+Other functions which take keywords to filter can use the cache
+by providing the filters as keywords or leave all arguments empty.
+Some functions like `contains` exploit this by rewriting its query.
+
+For clearing the cache, `all` can be used:
+
+```python
+users = User.query.all().filter(name="foobar")
+# clear the cache
+users.all(True)
+await users
+```
+
 
 ## Useful methods
 

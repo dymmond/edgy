@@ -1,9 +1,9 @@
-from typing import TYPE_CHECKING, List, Optional, cast
+from typing import TYPE_CHECKING, Optional, Type
 
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
-    from edgy import QuerySet
+    from edgy import Model, QuerySet
 
 
 class Prefetch:
@@ -20,7 +20,35 @@ class Prefetch:
     ) -> None:
         self.related_name = related_name
         self.to_attr = to_attr
-        self.queryset = queryset
+        self.queryset: Optional[QuerySet] = queryset
+        self._is_finished = False
+        self._baked_results: dict = {}
+        self._baked = False
+
+    async def init_bake(self, model_class: Type["Model"]) -> None:
+        if self._baked or not self._is_finished or self.queryset is None:
+            return
+        self._baked = True
+        # we want all at once and async iterate
+        async for result in self.queryset._execute_iterate(True):
+            # a bit hacky but we need the current row
+            model_key = model_class.create_model_key_from_sqla_row(
+                self.queryset._cache_current_row
+            )
+            bake_list = self._baked_results.setdefault(model_key, [])
+            bake_list.append(result)
+
+
+def check_prefetch_collision(model: "Model", related: Prefetch) -> Prefetch:
+    if (
+        hasattr(model, related.to_attr)
+        or related.to_attr in model.meta.fields
+        or related.to_attr in model.meta.managers
+    ):
+        raise QuerySetError(
+            f"Conflicting attribute to_attr='{related.related_name}' with '{related.to_attr}' in {model.__class__.__name__}"
+        )
+    return related
 
 
 class PrefetchMixin:
@@ -35,17 +63,11 @@ class PrefetchMixin:
         from the select_related. Select related performs a follows the SQL foreign relation
         whereas the prefetch_related follows the python relations.
         """
-        queryset: "QuerySet" = self._clone()
-
-        if not isinstance(prefetch, (list, tuple)):
-            prefetch = cast("List[Prefetch]", [prefetch])  # type: ignore
-
-        if isinstance(prefetch, tuple):
-            prefetch = list(prefetch)  # type: ignore
+        queryset: QuerySet = self._clone()
 
         if any(not isinstance(value, Prefetch) for value in prefetch):
             raise QuerySetError("The prefetch_related must have Prefetch type objects only.")
 
-        prefetch = list(self._prefetch_related) + prefetch  # type: ignore
+        prefetch = [*self._prefetch_related, *prefetch]  # type: ignore
         queryset._prefetch_related = prefetch
         return queryset

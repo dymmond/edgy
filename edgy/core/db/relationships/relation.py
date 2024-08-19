@@ -1,4 +1,3 @@
-import functools
 from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Tuple, Type, Union, cast
 
 import sqlalchemy
@@ -65,7 +64,16 @@ class ManyRelation(ManyRelationProtocol):
     def get_queryset(self) -> "QuerySet":
         # we need to check tenant every request
         queryset = self.through.meta.managers["query_related"].get_queryset()
+        assert self.instance, "instance not initialized"
+        fk = self.through.meta.fields[self.from_foreign_key]
+        query = {}
+        for related_name in fk.related_columns:
+            query[related_name] = getattr(self.instance, related_name)
+        queryset = queryset.filter(**{self.from_foreign_key: query})
+        # now set embed_parent
         queryset.embed_parent = (self.to_foreign_key, self.embed_through)
+        if self.embed_through:
+            queryset.embed_parent_filters = queryset.embed_parent
         return queryset
 
     async def save_related(self) -> None:
@@ -86,30 +94,11 @@ class ManyRelation(ManyRelationProtocol):
         except AttributeError:
             attr = getattr(self.through, item)
 
-        func = self.wrap_args(attr)
-        return func
+        return attr
 
-    def wrap_args(self, func: Any) -> Any:
-        @functools.wraps(func)
-        def wrapped(*args: Any, **kwargs: Any) -> Any:
-            assert self.instance, "instance not initialized"
-            fk = self.through.meta.fields[self.from_foreign_key]
-            query = {}
-            if self.embed_through == "":
-                new_kwargs = kwargs
-            else:
-                new_kwargs = {}
-                for key, val in kwargs.items():
-                    if self.embed_through is False or not key.startswith(self.embed_through):
-                        new_kwargs[f"{self.to_foreign_key}__{key}"] = val
-                    else:
-                        new_kwargs[_removeprefixes(key, self.embed_through, "__")] = val
-            for related_name in fk.related_columns:
-                query[related_name] = getattr(self.instance, related_name)
-            new_kwargs[self.from_foreign_key] = query
-            return func(*args, **new_kwargs)
-
-        return wrapped
+    def all(self, clear_cache: bool = False) -> "QuerySet":
+        # get_queryset returns already a fresh queryset. Skip making a copy.
+        return self.get_queryset()
 
     def expand_relationship(self, value: Any) -> Any:
         through = self.through
@@ -220,8 +209,26 @@ class SingleRelation(ManyRelationProtocol):
     def get_queryset(self) -> "QuerySet":
         # we need to check tenant every request
         queryset = self.to.meta.managers["query_related"].get_queryset()
+        fk = self.to.meta.fields[self.to_foreign_key]
+        assert self.instance, "instance not initialized"
+        query = {}
+        for column_name in fk.get_column_names():
+            related_name = fk.from_fk_field_name(fk.name, column_name)
+            query[related_name] = getattr(self.instance, related_name)
+        queryset = queryset.filter(**{self.to_foreign_key: query})
+        # now set embed_parent
         queryset.embed_parent = self.embed_parent
+        # only apply if relationship field. Add fallback for empty embed_parent
+        if self.embed_parent and isinstance(
+            fk.owner.meta.fields[self.embed_parent[0].split("__", 1)[0]],
+            RelationshipField,
+        ):
+            queryset.embed_parent_filters = queryset.embed_parent
         return queryset
+
+    def all(self, clear_cache: bool = False) -> "QuerySet":
+        # get_queryset returns already a fresh queryset. Skip making a copy.
+        return self.get_queryset()
 
     def expand_relationship(self, value: Any) -> Any:
         target = self.to
@@ -256,35 +263,7 @@ class SingleRelation(ManyRelationProtocol):
         except AttributeError:
             attr = getattr(self.to, item)
 
-        func = self.wrap_args(attr)
-        return func
-
-    def wrap_args(self, func: Any) -> Any:
-        @functools.wraps(func)
-        def wrapped(*args: Any, **kwargs: Any) -> Any:
-            assert self.instance, "instance not initialized"
-            fk = self.to.meta.fields[self.to_foreign_key]
-            query = {}
-            if not self.embed_parent or not isinstance(
-                fk.owner.meta.fields[self.embed_parent[0].split("__", 1)[0]],
-                RelationshipField,
-            ):
-                new_kwargs = kwargs
-            else:
-                new_kwargs = {}
-                for key, val in kwargs.items():
-                    if not self.embed_parent[1] or not key.startswith(self.embed_parent[1]):
-                        new_kwargs[f"{self.embed_parent[0]}__{key}"] = val
-                    else:
-                        new_kwargs[_removeprefixes(key, self.embed_parent[1], "__")] = val
-
-            for column_name in fk.get_column_names():
-                related_name = fk.from_fk_field_name(fk.name, column_name)
-                query[related_name] = getattr(self.instance, related_name)
-            new_kwargs[self.to_foreign_key] = query
-            return func(*args, **new_kwargs)
-
-        return wrapped
+        return attr
 
     async def save_related(self) -> None:
         while self.refs:

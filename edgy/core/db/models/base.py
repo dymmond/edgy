@@ -55,7 +55,6 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
     __db_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
-    __raw_query__: ClassVar[Optional[str]] = None
     __using_schema__: ClassVar[Union[str, None]] = None
     __show_pk__: ClassVar[bool] = False
     # private attribute
@@ -104,14 +103,6 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
             if k in self.meta.fields or k in self.meta.model_references
         }
 
-    @property
-    def raw_query(self) -> Any:
-        return getattr(self, self.__raw_query__)
-
-    @raw_query.setter
-    def raw_query(self, value: Any) -> Any:
-        edgy_setattr(self, self.raw_query, value)
-
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"
 
@@ -132,7 +123,34 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
 
     @property
     def can_load(self) -> bool:
-        return all(self.__dict__.get(field) is not None for field in self.identifying_db_fields)
+        return bool(
+            self.meta.registry
+            and not self.meta.abstract
+            and all(self.__dict__.get(field) is not None for field in self.identifying_db_fields)
+        )
+
+    async def load_recursive(
+        self,
+        only_needed: bool = False,
+        only_needed_nest: bool = False,
+        _seen: Optional[Set[Any]] = None,
+    ) -> None:
+        if _seen is None:
+            _seen = {self.create_model_key()}
+        elif self.create_model_key() in _seen:
+            return
+        _loaded_or_deleted = self._loaded_or_deleted
+        if self.can_load:
+            await self.load(only_needed)
+        if only_needed_nest and _loaded_or_deleted:
+            return
+        for field_name in self.meta.foreign_key_fields:
+            value = getattr(self, field_name, None)
+            if value is not None:
+                # if a subinstance is fully loaded stop
+                await value.load_recursive(
+                    only_needed=only_needed, only_needed_nest=True, _seen=_seen
+                )
 
     @property
     def signals(self) -> "Broadcaster":
