@@ -61,6 +61,7 @@ Now with only overwriting the related manager:
 
 ```python hl_lines="26 39 42 45 48"
 {!> ../docs_src/models/managers/override_related.py !}
+```
 
 !!! Warning
     Be careful when overriding the default manager as you might not get all the results from the
