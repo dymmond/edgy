@@ -137,8 +137,12 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
     ) -> None:
         if _seen is None:
             _seen = {self.create_model_key()}
-        elif self.create_model_key() in _seen:
-            return
+        else:
+            model_key = self.create_model_key()
+            if model_key in _seen:
+                return
+            else:
+                _seen.add(model_key)
         _loaded_or_deleted = self._loaded_or_deleted
         if self.can_load:
             await self.load(only_needed)
