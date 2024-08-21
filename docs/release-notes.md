@@ -5,6 +5,16 @@ hide:
 
 # Release Notes
 
+## 0.14.1
+
+### Changed
+
+- Bump dependency of databasez.
+
+### Fixed
+
+- Fix load_recursive.
+
 ## 0.14.0
 
 ## Added

@@ -60,6 +60,21 @@ print(profile.user.pk)    # 1
 print(profile.user.email)  # Raises AttributeError
 ```
 
+#### Load recursive
+
+Especcially in connection with model_dump it is helpful to populate all foreign keys.
+You can use `load_recursive` for that.
+
+```python
+profile = await Profile.query.get(id=1)
+await profile.load_recursive()
+
+# We have an album instance and all foreign key relations populated
+print(profile.user)       # User(id=1) [sparse]
+print(profile.user.pk)    # 1
+print(profile.user.email)  # ok
+```
+
 ### Load an instance with the foreign key relationship on it
 
 ```python
