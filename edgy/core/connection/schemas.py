@@ -7,7 +7,7 @@ from edgy.core.connection.database import Database
 from edgy.exceptions import SchemaError
 
 if TYPE_CHECKING:
-    from edgy import Registry
+    from edgy import Database, Registry
 
 
 class Schema:
@@ -19,6 +19,10 @@ class Schema:
 
     def __init__(self, registry: Type["Registry"]) -> None:
         self.registry = registry
+
+    @property
+    def database(self) -> "Database":
+        return self.registry.database
 
     def get_default_schema(self) -> str:
         """
@@ -50,11 +54,9 @@ class Schema:
             except ProgrammingError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
-        # database can be also a TestClient, so use the Database and copy to not have strange error
-        async with Database(
-            self.registry.database, force_rollback=False
-        ) as database, database.transaction():
-            await database.run_sync(execute_create)
+        async with self.database as database:
+            with database.force_rollback(False):
+                await database.run_sync(execute_create)
 
     async def drop_schema(
         self, schema: str, cascade: bool = False, if_exists: bool = False
@@ -71,8 +73,6 @@ class Schema:
             except DBAPIError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
-        # database can be also a TestClient, so use the Database and copy to not have strange error
-        async with Database(
-            self.registry.database, force_rollback=False
-        ) as database, database.transaction():
-            await database.run_sync(execute_drop)
+        async with self.database as database:
+            with database.force_rollback(False):
+                await database.run_sync(execute_drop)

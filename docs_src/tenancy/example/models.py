@@ -24,7 +24,7 @@ class Tenant(edgy.Model):
         model_class: Type["Model"],
         schema: str,
     ) -> sqlalchemy.Table:
-        return model_class.build(schema)
+        return model_class.table_schema(schema)
 
     async def create_tables(
         self,

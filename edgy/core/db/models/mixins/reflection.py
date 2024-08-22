@@ -11,12 +11,12 @@ import sqlalchemy
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 from sqlalchemy.ext.asyncio import AsyncConnection
 
-from edgy.core.connection.database import Database
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ImproperlyConfigured
 
 if TYPE_CHECKING:
     from edgy import Registry
+    from edgy.core.connection.database import Database
 
 
 class ReflectedModelMixin:
@@ -44,7 +44,7 @@ class ReflectedModelMixin:
     @classmethod
     async def reflect(
         cls,
-        registry: "Registry",
+        registry: Union["Registry", "Database"],
         tablename: str,
         metadata: sqlalchemy.MetaData,
         schema: Union[str, None] = None,
@@ -78,10 +78,11 @@ class ReflectedModelMixin:
             except Exception as e:
                 raise e
 
+        if hasattr(registry, "database"):
+            registry = registry.database
         try:
-            async with Database(
-                registry.database, force_rollback=False
-            ) as database, database.transaction():
-                return await database.run_sync(execute_reflection)  # type: ignore
+            async with registry as database:
+                with database.force_rollback(False):
+                    return await database.run_sync(execute_reflection)  # type: ignore
         except Exception as e:
             raise ImproperlyConfigured(detail=str(e)) from e

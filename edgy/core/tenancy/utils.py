@@ -1,3 +1,4 @@
+import warnings
 from typing import TYPE_CHECKING, Dict, Type, Union
 
 import sqlalchemy
@@ -13,14 +14,12 @@ if TYPE_CHECKING:
 
 
 def table_schema(model_class: Type["Model"], schema: str) -> sqlalchemy.Table:
-    """
-    Making sure the tables on inheritance state, creates the new
-    one properly.
-
-    The use of context vars instead of using the lru_cache comes from
-    a warning from `ruff` where lru can lead to memory leaks.
-    """
-    return model_class.build(schema)
+    warnings.warn(
+        "'table_schema' has been deprecated, use '<model>.table_schema' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return model_class.table_schema(schema)
 
 
 async def create_tables(
@@ -33,13 +32,12 @@ async def create_tables(
     """
 
     for name, model in models.items():
-        table = table_schema(model, schema)
+        table = model.table_schema(schema)
 
         logger.info(f"Creating table '{name}' for schema: '{schema}'")
         try:
-            async with registry.engine.begin() as connection:
-                await connection.run_sync(table.create)
-            await registry.engine.dispose()
+            async with registry.database as database:
+                await database.run_sync(table.create)
         except Exception as e:
             logger.error(str(e))
             ...

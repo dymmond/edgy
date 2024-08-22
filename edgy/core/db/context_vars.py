@@ -1,11 +1,13 @@
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Type, Union
+from typing import TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
-    from edgy import Database, Model, QuerySet
+    pass
 
 TENANT: ContextVar[str] = ContextVar("tenant", default=None)
-SHEMA: ContextVar[str] = ContextVar("SHEMA", default=None)
+SCHEMA: ContextVar[str] = ContextVar("SCHEMA", default=None)
+# for bw compatibility
+SHEMA = SCHEMA
 
 
 def get_tenant() -> Union[str, None]:
@@ -24,43 +26,8 @@ def set_tenant(value: Union[str, None]) -> None:
 
 
 def get_schema() -> Union[str, None]:
-    return SHEMA.get()
+    return SCHEMA.get()
 
 
 def set_schema(value: Union[str, None]) -> None:
-    SHEMA.set(value)
-
-
-def set_queryset_schema(
-    queryset: "QuerySet",
-    model_class: Type["Model"],
-    value: Union[str, None],
-) -> "QuerySet":
-    """
-    Returns a new queryset object pointing to the desired schema of the
-    using.
-    """
-    return queryset.__class__(
-        model_class=model_class,
-        using_schema=value,
-        table=model_class.table_schema(value),
-    )
-
-
-def set_queryset_database(
-    queryset: "QuerySet",
-    model_class: Type["Model"],
-    database: "Database",
-    schema: Union[str, None] = None,
-) -> "QuerySet":
-    """
-    Returns a new queryset object pointing to the desired schema of the
-    using.
-    """
-    if not schema:
-        return queryset.__class__(
-            model_class=model_class,
-            database=database,
-            table=model_class.table_schema(schema),
-        )
-    return queryset.__class__(model_class=model_class, database=database)
+    SCHEMA.set(value)
