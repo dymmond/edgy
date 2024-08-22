@@ -117,15 +117,19 @@ class ModelRowMixin:
         # Pull out the regular column values.
         for column in table_columns:
             # Making sure when a table is reflected, maps the right fields of the ReflectModel
-            if _is_only and column.name not in _is_only:
+            if _is_only and column.key not in _is_only:
                 continue
-            if column.name in secret_columns:
+            if column.key in secret_columns:
                 continue
-            if column.name not in cls.meta.columns_to_field:
+            if column.key not in cls.meta.columns_to_field:
                 continue
             # set if not of an foreign key
-            elif cls.meta.columns_to_field[column.name] not in item and column in row._mapping:
-                item[column.name] = row._mapping[column]
+            elif cls.meta.columns_to_field[column.key] not in item:
+                if column in row._mapping:
+                    item[column.key] = row._mapping[column]
+                elif column.name in row._mapping:
+                    # fallback, sometimes the column is not found
+                    item[column.key] = row._mapping[column.name]
         model = (
             cast("Model", cls(**item))
             if not exclude_secrets and not is_defer_fields and not _is_only
@@ -138,7 +142,7 @@ class ModelRowMixin:
         await cls.__handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
-        assert model.pk is not None
+        assert model.pk is not None, model
         return model
 
     @classmethod
