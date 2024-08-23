@@ -1,8 +1,5 @@
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Union
-
-if TYPE_CHECKING:
-    pass
+from typing import Union
 
 TENANT: ContextVar[str] = ContextVar("tenant", default=None)
 SCHEMA: ContextVar[str] = ContextVar("SCHEMA", default=None)
