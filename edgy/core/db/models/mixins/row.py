@@ -1,5 +1,5 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Union, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
@@ -77,6 +77,7 @@ class ModelRowMixin:
                 item[field_name] = await model_class.from_sqla_row(
                     row, exclude_secrets=exclude_secrets, using_schema=using_schema
                 )
+        table_columns = cls.table_schema(using_schema).columns
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
         # This way it is not overritten by any value
@@ -93,12 +94,9 @@ class ModelRowMixin:
 
             model_related = foreign_key.target
 
-            # Apply the schema to the model
-            model_related = cls.__apply_schema(model_related, using_schema)
-
             child_item = {}
             for column_name in columns_to_check:
-                column = getattr(cls.table.columns, column_name, None)
+                column = getattr(table_columns, column_name, None)
                 if column is not None and column in row._mapping:
                     child_item[foreign_key.from_fk_field_name(related, column_name)] = (
                         row._mapping[column]
@@ -107,7 +105,9 @@ class ModelRowMixin:
             # For the related fields. We simply chnage the structure of the model
             # and rebuild it with the new fields.
             proxy_model = model_related.proxy_model(**child_item)
+            proxy_model = cls.__apply_schema(proxy_model, model_related, using_schema)
             proxy_model.identifying_db_fields = foreign_key.related_columns
+
             item[related] = proxy_model
 
         # Check for the only_fields
@@ -115,42 +115,43 @@ class ModelRowMixin:
         if is_only_fields:
             _is_only = {str(field) for field in (only_fields or row._mapping.keys())}
         # Pull out the regular column values.
-        for column in cls.table.columns:
+        for column in table_columns:
             # Making sure when a table is reflected, maps the right fields of the ReflectModel
-            if _is_only and column.name not in _is_only:
+            if _is_only and column.key not in _is_only:
                 continue
-            if column.name in secret_columns:
+            if column.key in secret_columns:
                 continue
-            if column.name not in cls.meta.columns_to_field:
+            if column.key not in cls.meta.columns_to_field:
                 continue
             # set if not of an foreign key
-            elif cls.meta.columns_to_field[column.name] not in item:
+            elif cls.meta.columns_to_field[column.key] not in item:
                 if column in row._mapping:
-                    item[column.name] = row._mapping[column]
-                # fallback if first is not working
+                    item[column.key] = row._mapping[column]
                 elif column.name in row._mapping:
-                    item[column.name] = row._mapping[column.name]
+                    # fallback, sometimes the column is not found
+                    item[column.key] = row._mapping[column.name]
         model = (
             cast("Model", cls(**item))
             if not exclude_secrets and not is_defer_fields and not _is_only
             else cast("Model", cls.proxy_model(**item))
         )
         # Apply the schema to the model
-        model = cls.__apply_schema(model, using_schema)
+        model = cls.__apply_schema(model, cls, using_schema)
 
         # Handle prefetch related fields.
         await cls.__handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
-        assert model.pk is not None
+        assert model.pk is not None, model
         return model
 
     @classmethod
-    def __apply_schema(cls, model: "Model", schema: Optional[str] = None) -> "Model":
+    def __apply_schema(
+        cls, model: "Model", model_class: Type["Model"], schema: Optional[str] = None
+    ) -> "Model":
         # Apply the schema to the model
-        if schema is not None:
-            model.table = model.build(schema)
-            model.proxy_model.table = model.proxy_model.build(schema)
+        model.table = model_class.table_schema(schema)
+        model.__using_schema__ = schema
         return model
 
     @classmethod

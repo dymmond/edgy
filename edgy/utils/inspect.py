@@ -4,11 +4,10 @@ from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, Tuple, Un
 
 import sqlalchemy
 from loguru import logger
-from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.sql import schema, sqltypes
 
 import edgy
-from edgy import Database, Registry, run_sync
+from edgy import Database, run_sync
 from edgy.core.terminal import Print
 
 printer = Print()
@@ -68,23 +67,19 @@ class InspectDB:
         return self._schema
 
     async def _inspect(self) -> None:
-        registry = Registry(database=self.database)
-        async with registry.database:
-            # Get the engine to connect
-            engine: AsyncEngine = registry.engine
-
+        async with self.database as database:
             # Connect to a schema
             metadata: sqlalchemy.MetaData = (
                 sqlalchemy.MetaData(schema=self.schema)
                 if self.schema is not None
                 else sqlalchemy.MetaData()
             )
-            metadata = await self.reflect(engine=engine, metadata=metadata)
+            metadata = await self.reflect(database=database, metadata=metadata)
 
             # Generate the tables
             tables, _ = self.generate_table_information(metadata)
 
-            for line in self.write_output(tables, str(registry.database.url), schema=self.schema):
+            for line in self.write_output(tables, str(database.url), schema=self.schema):
                 sys.stdout.writelines(line)  # type: ignore
 
     def inspect(self) -> None:
@@ -234,16 +229,14 @@ class InspectDB:
         return meta
 
     async def reflect(
-        self, *, engine: sqlalchemy.Engine, metadata: sqlalchemy.MetaData
+        self, *, database: Database, metadata: sqlalchemy.MetaData
     ) -> sqlalchemy.MetaData:
         """
         Connects to the database and reflects all the information about the
         schema bringing all the data available.
         """
-
-        async with engine.connect() as connection:
-            logger.info("Collecting database tables information...")
-            await connection.run_sync(metadata.reflect)
+        logger.info("Collecting database tables information...")
+        await database.run_sync(metadata.reflect)
         return metadata
 
     def write_output(

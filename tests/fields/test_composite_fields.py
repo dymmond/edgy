@@ -72,10 +72,11 @@ class MyModelEmbedded2(edgy.Model):
         registry = models
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 async def create_test_database():
-    await models.create_all()
-    yield
+    async with database:
+        await models.create_all()
+        yield
     await models.drop_all()
 
 

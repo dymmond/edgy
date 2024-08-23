@@ -1,12 +1,13 @@
-from typing import TYPE_CHECKING, Optional, Sequence, Type, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar, Union, cast
 
 import sqlalchemy
 
 from edgy.core.connection.database import Database
-from edgy.core.db.context_vars import set_queryset_database, set_queryset_schema, set_schema
+from edgy.core.db.context_vars import set_schema
+from edgy.types import Undefined
 
 if TYPE_CHECKING:
-    from edgy import QuerySet, Registry
+    from edgy import QuerySet
     from edgy.core.db.models import Model, ReflectModel
 
 
@@ -22,9 +23,12 @@ class QuerySetPropsMixin:
     for clean access and maintainance.
     """
 
+    _table: Optional["sqlalchemy.Table"] = None
+    _database: Optional["Database"] = None
+
     @property
     def database(self) -> Database:
-        if getattr(self, "_database", None) is None:
+        if self._database is None:
             return cast("Database", self.model_class.meta.registry.database)
         return self._database
 
@@ -34,12 +38,12 @@ class QuerySetPropsMixin:
 
     @property
     def table(self) -> sqlalchemy.Table:
-        if getattr(self, "_table", None) is None:
-            return cast("sqlalchemy.Table", self.model_class.table)
+        if self._table is None:
+            return cast("sqlalchemy.Table", self.model_class.table_schema(self.active_schema))
         return self._table
 
     @table.setter
-    def table(self, value: sqlalchemy.Table) -> None:
+    def table(self, value: Optional[sqlalchemy.Table]) -> None:
         self._table = value
 
     @property
@@ -56,17 +60,22 @@ class TenancyMixin:
     Mixin used for querying a possible multi tenancy application
     """
 
-    def using(self, schema: str) -> "QuerySet":
+    def using(self, schema: Union[str, Any, None] = Undefined) -> "QuerySet":
         """
         Enables and switches the db schema.
 
         Generates the registry object pointing to the desired schema
         using the same connection.
         """
-        queryset = set_queryset_schema(self, self.model_class, value=schema)
+        queryset = cast("QuerySet", self._clone())
+        queryset.using_schema = schema
+        queryset.active_schema = queryset.get_schema()
+        queryset.table = None  # type: ignore
         return queryset
 
-    def using_with_db(self, connection_name: str, schema: Optional[str] = None) -> "QuerySet":
+    def using_with_db(
+        self, connection_name: str, schema: Union[str, Any] = Undefined
+    ) -> "QuerySet":
         """
         Enables and switches the database connection.
 
@@ -77,10 +86,12 @@ class TenancyMixin:
             connection_name in self.model_class.meta.registry.extra
         ), f"`{connection_name}` is not in the connections extra of the model`{self.model_class.__name__}` registry"
 
-        connection: Type["Registry"] = self.model_class.meta.registry.extra[connection_name]
-        if schema:
-            return set_queryset_database(self, self.model_class, connection, schema)
-        queryset = set_queryset_database(self, self.model_class, connection)
+        connection: Database = self.model_class.meta.registry.extra[connection_name]
+        queryset = cast("QuerySet", self._clone())
+        queryset.database = connection
+        queryset.using_schema = schema
+        queryset.active_schema = queryset.get_schema()
+        queryset.table = None  # type: ignore
         return queryset
 
 

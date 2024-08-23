@@ -31,6 +31,7 @@ from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.utils.functional import edgy_setattr
 from edgy.core.utils.models import generify_model_fields
 from edgy.core.utils.sync import run_sync
+from edgy.types import Undefined
 
 from .types import BaseModelType
 
@@ -55,11 +56,11 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
     __db_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
-    __using_schema__: ClassVar[Union[str, None]] = None
     __show_pk__: ClassVar[bool] = False
     # private attribute
     _loaded_or_deleted: bool = False
     _return_load_coro_on_attr_access: bool = False
+    __using_schema__: Union[str, None, Any] = Undefined
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         __show_pk__ = kwargs.pop("__show_pk__", False)

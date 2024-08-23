@@ -32,6 +32,7 @@ from edgy.core.db.querysets.prefetch import Prefetch, PrefetchMixin, check_prefe
 from edgy.core.db.querysets.types import QueryType
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
+from edgy.types import Undefined
 
 from . import clauses as clauses_mod
 
@@ -100,7 +101,7 @@ class BaseQuerySet(
         embed_parent: Any = None,
         embed_parent_filters: Any = None,
         embed_sqla_row: str = "",
-        using_schema: Any = None,
+        using_schema: Any = Undefined,
         table: Any = None,
         exclude_secrets: bool = False,
     ) -> None:
@@ -118,13 +119,15 @@ class BaseQuerySet(
         self._only = [] if only_fields is None else only_fields
         self._defer = [] if defer_fields is None else defer_fields
         self.embed_parent = embed_parent
-        self.embed_parent_filters = embed_parent_filters
         self.using_schema = using_schema
+        self.embed_parent_filters = embed_parent_filters
         self._exclude_secrets = exclude_secrets
         # cache should not be cloned
         self._cache = QueryModelResultCache(attrs=self.model_class.pkcolumns)
         # is empty
         self._clear_cache(False)
+        # initialize
+        self.active_schema = self.get_schema()
 
         # Making sure the queryset always starts without any schema associated unless specified
 
@@ -210,7 +213,7 @@ class BaseQuerySet(
                     raise NotImplementedError(
                         "We cannot cross databases yet, this feature is planned"
                     )
-                table = model_class.table
+                table = model_class.table_schema(self.active_schema)
                 if table.name not in tables:
                     select_from = sqlalchemy.sql.join(  # type: ignore
                         select_from,
@@ -351,7 +354,7 @@ class BaseQuerySet(
             model_class, field_name, op, related_str, _ = crawl_relationship(self.model_class, key)
             if related_str and related_str not in select_related:
                 select_related.append(related_str)
-            column = model_class.table.columns[field_name]
+            column = model_class.table_schema(self.active_schema).columns[field_name]
 
             # Map the operation code onto SQLAlchemy's ColumnElement
             # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
@@ -398,7 +401,7 @@ class BaseQuerySet(
                 defer_fields=self._defer,
                 embed_parent=self.embed_parent,
                 embed_parent_filters=self.embed_parent_filters,
-                table=self.table,
+                table=getattr(self, "_table", None),
                 exclude_secrets=self._exclude_secrets,
                 using_schema=self.using_schema,
             ),
@@ -452,7 +455,7 @@ class BaseQuerySet(
                     is_defer_fields=is_defer_fields,
                     prefetch_related=self._prefetch_related,
                     exclude_secrets=self._exclude_secrets,
-                    using_schema=self.using_schema,
+                    using_schema=self.active_schema,
                 ),
                 transform_fn=self._embed_parent_in_result,
             )
@@ -461,6 +464,15 @@ class BaseQuerySet(
             for attr in extra_attr.split(","):
                 setattr(self, attr, result)
         return result
+
+    def get_schema(self) -> Optional[str]:
+        # Differs from get_schema global
+        schema = self.using_schema
+        if schema is Undefined:
+            schema = get_schema()
+        if schema is None:
+            schema = self.model_class.get_db_schema()
+        return schema  # type: ignore
 
     def _clone(self) -> "QuerySet":
         """
@@ -471,15 +483,12 @@ class BaseQuerySet(
         queryset.model_class = self.model_class
         queryset._cache = QueryModelResultCache(attrs=queryset.model_class.pkcolumns)
         queryset._clear_cache()
+        queryset.using_schema = self.using_schema
 
-        # Making sure the registry schema takes precendent with
-        # Any provided using
-        if not self.model_class.meta.registry.db_schema:
-            schema = get_schema()
-            if self.using_schema is None and schema is not None:
-                self.using_schema = schema
-            queryset.model_class.table = self.model_class.build(self.using_schema)
+        # initialize
+        queryset.active_schema = self.get_schema()
 
+        queryset._table = getattr(self, "_table", None)
         queryset.filter_clauses = copy.copy(self.filter_clauses)
         queryset.or_clauses = copy.copy(self.or_clauses)
         queryset.limit_count = copy.copy(self.limit_count)
@@ -495,9 +504,7 @@ class BaseQuerySet(
         queryset._only = copy.copy(self._only)
         queryset._defer = copy.copy(self._defer)
         queryset._database = self.database
-        queryset.table = self.table
         queryset._exclude_secrets = self._exclude_secrets
-        queryset.using_schema = self.using_schema
         return cast("QuerySet", queryset)
 
     def _clear_cache(self, keep_result_cache: bool = False) -> None:
@@ -573,7 +580,7 @@ class BaseQuerySet(
                 is_defer_fields=is_defer_fields,
                 prefetch_related=_prefetch_related,
                 exclude_secrets=self._exclude_secrets,
-                using_schema=self.using_schema,
+                using_schema=self.active_schema,
             ),
             transform_fn=self._embed_parent_in_result,
         )
@@ -1058,7 +1065,7 @@ class QuerySet(BaseQuerySet):
         """
         # for tenancy
         queryset: QuerySet = self._clone()
-        instance = queryset.model_class(**kwargs)
+        instance = self.model_class(**kwargs)
         instance.table = queryset.table
         instance = await instance.save(force_save=True)
         result = await self._embed_parent_in_result(instance)

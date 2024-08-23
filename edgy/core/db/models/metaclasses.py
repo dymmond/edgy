@@ -263,7 +263,7 @@ class MetaInfo:
         self.field_to_column_names = FieldToColumnNames(self)
         self.columns_to_field = ColumnsToField(self)
         if clear_class_attrs:
-            for attr in ("_table", "_pknames", "_pkcolumns"):
+            for attr in ("_table", "_pknames", "_pkcolumns", "_db_schemas"):
                 with contextlib.suppress(AttributeError):
                     delattr(self.model, attr)
 
@@ -630,6 +630,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         # Update the model_fields are updated to the latest
         new_class.model_fields = {**new_class.model_fields, **model_fields}
+        new_class._db_schemas = {}
 
         # Set the owner of the field, must be done as early as possible
         # don't use meta.fields to not trigger the lazy evaluation
@@ -728,18 +729,24 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         return new_class
 
-    def get_db_shema(cls) -> Union[str, None]:
+    def get_db_schema(cls) -> Union[str, None]:
         """
         Returns a db_schema from registry if any is passed.
         """
         if hasattr(cls, "meta") and hasattr(cls.meta, "registry"):
-            return cast(str, cls.meta.registry.db_schema)
-        elif hasattr(cls, "__using_schema__") and cls.__using_schema__ is not None:
-            return cast(str, cls.__using_schema__)
+            return cls.meta.registry.db_schema  # type: ignore
         return None
 
+    def get_db_shema(cls) -> Union[str, None]:
+        warnings.warn(
+            "'get_db_shema' has been deprecated, use 'get_db_schema' instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return cls.get_db_schema()
+
     @property
-    def table(cls) -> Any:
+    def table(cls) -> "sqlalchemy.Table":
         """
         Making sure the tables on inheritance state, creates the new
         one properly.
@@ -752,20 +759,14 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         3. If none is passed, defaults to the shared schema of the database connected.
         """
         if not hasattr(cls, "_table"):
-            cls._table = cls.build(cls.get_db_shema())
+            cls._table = cls.build(cls.get_db_schema())
         elif hasattr(cls, "_table"):
             table = cls._table
+            # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} != {cls.meta.tablename}"
+            # fix assigned table
             if table.name.lower() != cls.meta.tablename:
-                cls._table = cls.build(cls.get_db_shema())
-        return cls._table
-
-    @table.setter
-    def table(cls, value: sqlalchemy.Table) -> None:
-        with contextlib.suppress(AttributeError):
-            del cls._pknames
-        with contextlib.suppress(AttributeError):
-            del cls._pkcolumns
-        cls._table = value
+                cls._table = cls.build(cls.get_db_schema())
+        return cast("sqlalchemy.Table", cls._table)
 
     def __getattr__(cls, name: str) -> Any:
         """
@@ -801,15 +802,24 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         meta: MetaInfo = cls.meta
         return meta.signals
 
-    def table_schema(cls, schema: str) -> Any:
+    def table_schema(cls, schema: Union[str, None] = None) -> "sqlalchemy.Table":
         """
-        Making sure the tables on inheritance state, creates the new
-        one properly.
+        Retrieve table for schema (nearly the same as build with scheme argument).
+        Cache per class via a primitive LRU cache.
+        """
+        if schema is None:
+            return cls.table
+        # remove cache element so the key is reordered
+        schema_obj = cls._db_schemas.pop(schema, None)
+        if schema_obj is None:
+            schema_obj = cls.build(schema=schema)
+        # set element to last
+        cls._db_schemas[schema] = schema_obj
+        # remove oldest element, when bigger 100
+        while len(cls._db_schemas) > 100:
+            cls._db_schemas.pop(next(iter(cls._db_schemas)), None)
 
-        The use of context vars instead of using the lru_cache comes from
-        a warning from `ruff` where lru can lead to memory leaks.
-        """
-        return cls.build(schema=schema)
+        return cast("sqlalchemy.Table", schema_obj)
 
     @property
     def proxy_model(cls) -> Any:

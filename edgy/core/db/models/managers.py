@@ -67,6 +67,7 @@ class Manager(BaseManager):
 
         Checks for a global possible tenant and returns the corresponding queryset.
         """
+        assert self.owner is not None
         tenant = get_tenant()
         if tenant:
             set_tenant(None)
@@ -74,7 +75,7 @@ class Manager(BaseManager):
                 self.owner,
                 table=self.owner.table_schema(tenant),  # type: ignore
             )
-        return QuerySet(self.owner)
+        return QuerySet(self.owner, using_schema=self.owner.__using_schema__)
 
     def __getattr__(self, name: str) -> Any:
         """

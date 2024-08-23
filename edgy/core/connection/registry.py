@@ -15,16 +15,18 @@ class Registry:
     The command center for the models of Edgy.
     """
 
+    db_schema: Union[str, None] = None
+
     def __init__(self, database: Union[Database, str, DatabaseURL], **kwargs: Any) -> None:
+        self.db_schema = kwargs.pop("schema", None)
+        extra = kwargs.pop("extra", {})
         self.database: Database = (
-            database if isinstance(database, Database) else Database(database)
+            database if isinstance(database, Database) else Database(database, **kwargs)
         )
         self.models: Dict[str, Any] = {}
         self.reflected: Dict[str, Any] = {}
-        self.db_schema = kwargs.get("schema", None)
         self.extra: Mapping[str, Database] = {
-            k: v if isinstance(v, Database) else Database(v)
-            for k, v in kwargs.pop("extra", {}).items()
+            k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
         }
 
         self.schema = Schema(registry=self)
@@ -38,7 +40,7 @@ class Registry:
     @property
     def metadata(self) -> Any:
         for model_class in self.models.values():
-            model_class.build(schema=self.db_schema)
+            model_class.table_schema(schema=self.db_schema)
         return self._metadata
 
     @metadata.setter
@@ -55,7 +57,7 @@ class Registry:
 
     @property
     def engine(self) -> AsyncEngine:
-        assert self.database.engine, "database not initialized"
+        assert self.database.is_connected and self.database.engine, "database not initialized"
         return self.database.engine
 
     @property
@@ -90,17 +92,13 @@ class Registry:
     async def create_all(self) -> None:
         if self.db_schema:
             await self.schema.create_schema(self.db_schema, True)
-        # database can be also a TestClient, so use the Database and copy to not have strange error
-        async with Database(
-            self.database, force_rollback=False
-        ) as database, database.transaction():
-            await database.create_all(self.metadata)
+        async with self.database as database:
+            with database.force_rollback(False):
+                await database.create_all(self.metadata)
 
     async def drop_all(self) -> None:
         if self.db_schema:
             await self.schema.drop_schema(self.db_schema, True, True)
-        # database can be also a TestClient, so use the Database and copy to not have strange error
-        async with Database(
-            self.database, force_rollback=False
-        ) as database, database.transaction():
-            await database.drop_all(self.metadata)
+        async with self.database as database:
+            with database.force_rollback(False):
+                await database.drop_all(self.metadata)

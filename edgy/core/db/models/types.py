@@ -51,6 +51,7 @@ class BaseModelType(ABC):
     query: ClassVar["BaseManager"]
     query_related: ClassVar["BaseManager"]
     meta: ClassVar["MetaInfo"]
+    _db_schemas: ClassVar[Dict[str, Type["BaseModelType"]]]
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
 
     __parent__: ClassVar[Union[Type["BaseModelType"], None]] = None
