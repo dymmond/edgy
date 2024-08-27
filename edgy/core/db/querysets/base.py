@@ -27,6 +27,7 @@ from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 from edgy.core.db.models.mixins import ModelParser
+from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import Prefetch, PrefetchMixin, check_prefetch_collision
 from edgy.core.db.querysets.types import QueryType
@@ -456,6 +457,8 @@ class BaseQuerySet(
                     prefetch_related=self._prefetch_related,
                     exclude_secrets=self._exclude_secrets,
                     using_schema=self.active_schema,
+                    database=self.database,
+                    table=self.table,
                 ),
                 transform_fn=self._embed_parent_in_result,
             )
@@ -581,6 +584,8 @@ class BaseQuerySet(
                 prefetch_related=_prefetch_related,
                 exclude_secrets=self._exclude_secrets,
                 using_schema=self.active_schema,
+                database=self.database,
+                table=self.table,
             ),
             transform_fn=self._embed_parent_in_result,
         )
@@ -1066,7 +1071,13 @@ class QuerySet(BaseQuerySet):
         # for tenancy
         queryset: QuerySet = self._clone()
         instance = self.model_class(**kwargs)
-        instance.table = queryset.table
+        apply_instance_extras(
+            instance,
+            self.model_class,
+            schema=self.using_schema,
+            table=queryset.table,
+            database=queryset.database,
+        )
         instance = await instance.save(force_save=True)
         result = await self._embed_parent_in_result(instance)
         self._clear_cache(True)
@@ -1141,23 +1152,22 @@ class QuerySet(BaseQuerySet):
 
     async def update(self, **kwargs: Any) -> None:
         """
-        Updates a record in a specific table with the given kwargs.
+        Updates records in a specific table with the given kwargs.
         """
-        queryset: QuerySet = self
 
-        kwargs = queryset.extract_column_values(kwargs, model_class=queryset.model_class)
+        kwargs = self.extract_column_values(kwargs, model_class=self.model_class)
 
         # Broadcast the initial update details
         await self.model_class.meta.signals.pre_update.send_async(
             self.__class__, instance=self, kwargs=kwargs
         )
 
-        expression = queryset.table.update().values(**kwargs)
+        expression = self.table.update().values(**kwargs)
 
-        for filter_clause in queryset.filter_clauses:
+        for filter_clause in self.filter_clauses:
             expression = expression.where(filter_clause)
 
-        await queryset.database.execute(expression)
+        await self.database.execute(expression)
 
         # Broadcast the update executed
         await self.model_class.meta.signals.post_update.send_async(self.__class__, instance=self)

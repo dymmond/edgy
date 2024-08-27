@@ -1,4 +1,4 @@
-from typing import Any, Dict, Type, Union
+from typing import Any, Dict, Optional, Type, Union, cast
 
 from sqlalchemy.engine.result import Row
 
@@ -100,7 +100,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         Performs the save instruction.
         """
         expression = self.table.insert().values(**kwargs)
-        autoincrement_value = await self.database.execute(expression)
+        autoincrement_value = cast(Optional["Row"], await self.database.execute(expression))
         transformed_kwargs = self.transform_input(kwargs, phase="post_insert")
         for k, v in transformed_kwargs.items():
             setattr(self, k, v)

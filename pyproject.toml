@@ -42,7 +42,7 @@ dependencies = [
     "nest_asyncio",
     "alembic>=1.11.3,<2.0.0",
     "click>=8.1.3,<9.0.0",
-    "databasez>=0.9.7",
+    "databasez>=0.10.0",
     "loguru>=0.7.0,<0.10.0",
     "pydantic>=2.5.3,<3.0.0",
     "pydantic-settings>=2.0.0,<3.0.0",
@@ -130,7 +130,6 @@ features = ["all", "testing"]
 [tool.hatch.envs.test.env-vars]
 EDGY_TESTCLIENT_TEST_PREFIX = ""
 EDGY_TESTCLIENT_USE_EXISTING = "true"
-EDGY_TESTCLIENT_FORCE_ROLLBACK = "true"
 
 
 [tool.hatch.envs.test.scripts]
@@ -144,7 +143,6 @@ features = ["all", "testing"]
 [tool.hatch.envs.hatch-test.env-vars]
 EDGY_TESTCLIENT_TEST_PREFIX = ""
 EDGY_TESTCLIENT_USE_EXISTING = "true"
-EDGY_TESTCLIENT_FORCE_ROLLBACK = "true"
 
 
 [tool.hatch.version]

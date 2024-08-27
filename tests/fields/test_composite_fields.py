@@ -8,7 +8,9 @@ from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
-database = DatabaseTestClient(DATABASE_URL)
+database = DatabaseTestClient(
+    DATABASE_URL, full_isolation=False, force_rollback=False, drop_database=True
+)
 models = edgy.Registry(database=database)
 
 
@@ -72,19 +74,11 @@ class MyModelEmbedded2(edgy.Model):
         registry = models
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
-
-
-@pytest.fixture()
-async def rollback_connections(create_test_database):
-    with database.force_rollback():
-        async with database:
-            yield
 
 
 def test_column_type():
@@ -113,7 +107,7 @@ def test_get_columns_inner_fields_mixed():
         MyModel2(first_name="Santa", last_name="Clause", age=300),
     ],
 )
-async def test_assign(rollback_connections, assign_object):
+async def test_assign(create_test_database, assign_object):
     obj = await MyModel2.query.create(first_name="edgy", last_name="edgytoo")
     assert obj.meta.fields["last_name"].skip_absorption_check is True
     assert obj.composite["first_name"] == "edgy"
@@ -141,7 +135,7 @@ async def test_assign(rollback_connections, assign_object):
         MyModel2(first_name="Santa", last_name="Clause", age=300),
     ],
 )
-async def test_assign_embedded(rollback_connections, assign_object):
+async def test_assign_embedded(create_test_database, assign_object):
     obj = await MyModelEmbedded.query.create(
         first_name="edgy",
         last_name="edgytoo",

@@ -15,7 +15,7 @@ from typing import (
 if TYPE_CHECKING:
     import sqlalchemy
 
-    from edgy import Model
+    from edgy import Database, Model
     from edgy.core.db.models.managers import BaseManager
     from edgy.core.db.models.metaclasses import MetaInfo
 
@@ -48,6 +48,7 @@ class BaseModelType(ABC):
     """
 
     columns: ClassVar["sqlalchemy.sql.ColumnCollection"]
+    database: ClassVar["Database"]
     query: ClassVar["BaseManager"]
     query_related: ClassVar["BaseManager"]
     meta: ClassVar["MetaInfo"]
