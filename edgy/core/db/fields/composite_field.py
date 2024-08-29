@@ -1,4 +1,5 @@
 import copy
+import inspect
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -131,14 +132,14 @@ class ConcreteCompositeField(BaseCompositeField):
 
     async def aget(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
         d = {}
-        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+        token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
             for key in self.inner_field_names:
                 translated_name = self.translate_name(key)
-                try:
-                    d[translated_name] = getattr(instance, key)
-                except AttributeError:
-                    await instance.load(only_needed=True)
+                value = getattr(instance, key)
+                if inspect.isawaitable(value):
+                    value = await value
+                d[translated_name] = value
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
         if self.model is not None and self.model is not ConditionalRedirect:

@@ -13,6 +13,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Type,
     Union,
@@ -255,7 +256,8 @@ class MetaInfo:
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
         self.secret_fields: FrozenSet[str] = frozenset(secret_fields)
         self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
-        self.post_save_fields: FrozenSet[str] = frozenset(post_save_fields)
+        # foreign_keys belong to it so make it updatable
+        self.post_save_fields: Set[str] = set(post_save_fields)
         self.foreign_key_fields: Dict[str, BaseForeignKey] = foreign_key_fields
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)
@@ -355,6 +357,9 @@ def _set_related_name_for_foreign_keys(
         # Set the related name
         target = foreign_key.target
         target.meta.fields[related_name] = related_field
+        # for updating post_save_callback
+        if target.meta._is_init:
+            target.meta.post_save_fields.add(related_name)
 
 
 def _handle_annotations(base: Type, base_annotations: Dict[str, Any]) -> None:
