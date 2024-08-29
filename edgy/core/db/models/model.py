@@ -163,7 +163,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 model_class = self.meta.registry.models[model_class]
             assert not isinstance(model_class, str)
 
-            foreign_key_target_field = None
+            foreign_key_target_field = model_ref_type.__foreign_key__
             if not foreign_key_target_field:
                 for name, foreign_key in model_class.meta.foreign_key_fields.items():
                     if foreign_key.target == self.__class__:
@@ -173,7 +173,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 raise RelationshipNotFound(
                     f"There was no relationship found between '{model_class.__name__}' and {self.__class__.__name__}"
                 )
-            data = reference.model_dump(exclude={"__model__"})
+            data = reference.model_dump(exclude={"__model__", "__foreign_key__"})
             data[foreign_key_target_field] = self
             await model_class.query.create(**data)
 
