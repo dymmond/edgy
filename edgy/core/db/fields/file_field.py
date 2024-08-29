@@ -130,6 +130,7 @@ class ConcreteFileField(BaseCompositeField):
         return retdict
 
     async def post_save_callback(self, value: FieldFile, instance: "Model") -> None:
+        value.instance = instance
         await value.execute_operation()
 
 

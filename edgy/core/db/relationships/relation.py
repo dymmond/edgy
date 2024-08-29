@@ -258,7 +258,7 @@ class SingleRelation(ManyRelationProtocol):
     def stage(self, *children: "Model") -> None:
         for child in children:
             if not isinstance(
-                child, (self.to, self.to.proxy_model, self.through, self.through.proxy_model, dict)
+                child, (self.to, self.to.proxy_model, dict)
             ):
                 raise RelationshipIncompatible(
                     f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
