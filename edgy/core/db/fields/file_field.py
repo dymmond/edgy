@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Dict, Sequence, Union
 
 import sqlalchemy
 
@@ -49,9 +49,7 @@ class ConcreteFileField(BaseCompositeField):
                 retdict[f"{field_name}_size"] = value.size if value else None
         return retdict
 
-    def to_model(
-        self, field_name: str, value: Any, phase: str = "", old_value: Optional[FieldFile] = None
-    ) -> Dict[str, FieldFile]:
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, FieldFile]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
         Validation happens later.
@@ -65,26 +63,23 @@ class ConcreteFileField(BaseCompositeField):
         """
         if isinstance(value, FieldFile):
             return {field_name: value}
-        if old_value is None:
-            if isinstance(value, dict):
-                old_value = FieldFile(
-                    self,
-                    name=value[field_name],
-                    storage=value[f"{field_name}_storage"],
-                    size=value.get(f"{field_name}_size"),
-                    generate_name_fn=self.generate_name_fn,
-                )
-            else:
-                # not initialized yet
-                old_value = FieldFile(
-                    self, generate_name_fn=self.generate_name_fn, storage=self.storage
-                )
-                # file creation
-                old_value.save(value)
+        # init and load
+        if isinstance(value, dict):
+            file_instance = FieldFile(
+                self,
+                name=value[field_name],
+                storage=value[f"{field_name}_storage"],
+                size=value.get(f"{field_name}_size"),
+                generate_name_fn=self.generate_name_fn,
+            )
         else:
-            # file creation or deletion
-            old_value.save(value)
-        return {field_name: old_value}
+            # not initialized yet
+            file_instance = FieldFile(
+                self, generate_name_fn=self.generate_name_fn, storage=self.storage
+            )
+            # file creation if value is not None
+            file_instance.save(value)
+        return {field_name: file_instance}
 
     def __get__(self, instance: "Model", owner: Any = None) -> FieldFile:
         if instance:
@@ -95,6 +90,10 @@ class ConcreteFileField(BaseCompositeField):
                 instance.__dict__[self.name].instance = instance
             return instance.__dict__[self.name]  # type: ignore
         raise ValueError("missing instance")
+
+    def __set__(self, instance: "Model", value: Any) -> None:
+        file_instance = self.__get__(instance)
+        file_instance.save(value)
 
     def get_columns(self, field_name: str) -> Sequence[sqlalchemy.Column]:
         model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
@@ -129,6 +128,9 @@ class ConcreteFileField(BaseCompositeField):
             size_name = f"{self.name}_size"
             retdict[size_name] = self.owner.meta.fields[size_name]
         return retdict
+
+    async def post_save_callback(self, value: FieldFile, instance: "Model") -> None:
+        await value.execute_operation()
 
 
 class FileField(FieldFactory):

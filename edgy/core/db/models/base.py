@@ -1,5 +1,6 @@
 import contextlib
 import copy
+import inspect
 import warnings
 from functools import cached_property
 from typing import (
@@ -22,7 +23,7 @@ import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
-from edgy.core.db.context_vars import GETATTR_RETURN_CORO
+from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
@@ -64,7 +65,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         __show_pk__ = kwargs.pop("__show_pk__", False)
-        kwargs = self.transform_input(kwargs, phase="creation")
+        kwargs = self.transform_input(kwargs, phase="init")
         super().__init__(**kwargs)
         self.__dict__ = self.setup_model_from_kwargs(kwargs)
         self.__show_pk__ = __show_pk__
@@ -72,14 +73,10 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         self._loaded_or_deleted = False
 
     @classmethod
-    def transform_input(
-        cls, kwargs: Any, phase: str, instance_dict: Optional[Dict[str, Any]] = None
-    ) -> Any:
+    def transform_input(cls, kwargs: Any, phase: str) -> Any:
         """
         Expand to_models and apply input modifications.
         """
-        if instance_dict is None:
-            instance_dict = {}
 
         kwargs = {**kwargs}
         new_kwargs: Dict[str, Any] = {}
@@ -93,9 +90,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         for key, value in kwargs.items():
             field = fields.get(key, None)
             if field is not None:
-                new_kwargs.update(
-                    **field.to_model(key, value, phase=phase, old_value=instance_dict.get(key))
-                )
+                new_kwargs.update(**field.to_model(key, value, phase=phase))
             else:
                 new_kwargs[key] = value
         return new_kwargs
@@ -414,13 +409,11 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         field = fields.get(key, None)
         if field is not None:
             if hasattr(field, "__set__"):
-                # not recommended, better to use to_model instead
+                # not recommended, better to use to_model instead except for kept objects
                 # used in related_fields to mask and not to implement to_model
                 field.__set__(self, value)
             else:
-                for k, v in field.to_model(
-                    key, value, phase="set", old_value=self.__dict__.get(key)
-                ).items():
+                for k, v in field.to_model(key, value, phase="set").items():
                     # bypass __settr__
                     edgy_setattr(self, k, v)
         else:
@@ -430,7 +423,14 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
     async def _agetattr_helper(self, name: str, getter: Any) -> Any:
         await self.load()
         if getter is not None:
-            return getter(self, self.__class__)
+            token = MODEL_GETATTR_BEHAVIOR.set("coro")
+            try:
+                result = getter(self, self.__class__)
+                if inspect.isawaitable(result):
+                    result = await result
+                return result
+            finally:
+                MODEL_GETATTR_BEHAVIOR.reset(token)
         return self.__dict__[name]
 
     def __getattr__(self, name: str) -> Any:
@@ -441,6 +441,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         3. Run an one off query to populate any foreign key making sure
            it runs only once per foreign key avoiding multiple database calls.
         """
+        behavior = MODEL_GETATTR_BEHAVIOR.get()
         manager = self.meta.managers.get(name)
         if manager is not None:
             if name not in self.__dict__:
@@ -453,21 +454,28 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         getter: Any = None
         if field is not None and hasattr(field, "__get__"):
             getter = field.__get__
-            # no need to set an descriptor object
-            try:
+            if behavior == "coro" or behavior == "passdown":
                 return field.__get__(self, self.__class__)
-            except AttributeError:
-                # forward to load routine
-                pass
+            else:
+                token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+                # no need to set an descriptor object
+                try:
+                    return field.__get__(self, self.__class__)
+                except AttributeError:
+                    # forward to load routine
+                    pass
+                finally:
+                    MODEL_GETATTR_BEHAVIOR.reset(token)
         if (
             name not in self.__dict__
+            and behavior != "passdown"
             and not self._loaded_or_deleted
             and field is not None
             and name not in self.identifying_db_fields
             and self.can_load
         ):
             coro = self._agetattr_helper(name, getter)
-            if GETATTR_RETURN_CORO.get():
+            if behavior == "coro":
                 return coro
             return run_sync(coro)
         return super().__getattr__(name)

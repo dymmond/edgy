@@ -125,6 +125,7 @@ _trigger_attributes_MetaInfo = {
     "columns_to_field",
     "special_getter_fields",
     "input_modifying_fields",
+    "post_save_fields",
     "excluded_fields",
     "secret_fields",
 }
@@ -146,6 +147,7 @@ class MetaInfo:
         "model_references",
         "signals",
         "input_modifying_fields",
+        "post_save_fields",
         "foreign_key_fields",
         "field_to_columns",
         "field_to_column_names",
@@ -234,6 +236,7 @@ class MetaInfo:
         excluded_fields = set()
         secret_fields = set()
         input_modifying_fields = set()
+        post_save_fields = set()
         foreign_key_fields: Dict[str, BaseForeignKey] = {}
         for key, field in self.fields.items():
             if hasattr(field, "__get__"):
@@ -244,12 +247,15 @@ class MetaInfo:
                 secret_fields.add(key)
             if hasattr(field, "modify_input"):
                 input_modifying_fields.add(key)
+            if hasattr(field, "post_save_callback"):
+                post_save_fields.add(key)
             if isinstance(field, BaseForeignKeyField):
                 foreign_key_fields[key] = field
         self.special_getter_fields: FrozenSet[str] = frozenset(special_getter_fields)
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
         self.secret_fields: FrozenSet[str] = frozenset(secret_fields)
         self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
+        self.post_save_fields: FrozenSet[str] = frozenset(post_save_fields)
         self.foreign_key_fields: Dict[str, BaseForeignKey] = foreign_key_fields
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)

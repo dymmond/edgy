@@ -16,6 +16,7 @@ from typing import (
 from pydantic import BaseModel
 
 from edgy.core.db.constants import ConditionalRedirect
+from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.fields.base import BaseCompositeField
 from edgy.core.db.fields.core import FieldFactory
 from edgy.core.db.fields.types import BaseFieldType
@@ -128,20 +129,41 @@ class ConcreteCompositeField(BaseCompositeField):
                 field_copy.embedded_field_defs[field_def.name] = field_def
         return field_copy
 
+    async def aget(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
+        d = {}
+        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+        try:
+            for key in self.inner_field_names:
+                translated_name = self.translate_name(key)
+                try:
+                    d[translated_name] = getattr(instance, key)
+                except AttributeError:
+                    await instance.load(only_needed=True)
+        finally:
+            MODEL_GETATTR_BEHAVIOR.reset(token)
+        if self.model is not None and self.model is not ConditionalRedirect:
+            return self.model(**d)
+        return d
+
     def __get__(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
         assert len(self.inner_field_names) >= 1
         if self.model is ConditionalRedirect and len(self.inner_field_names) == 1:
-            return getattr(instance, self.inner_field_names[0], None)
+            try:
+                return getattr(instance, self.inner_field_names[0])
+            except AttributeError:
+                if not instance._loaded_or_deleted:
+                    raise AttributeError("not loaded") from None
+                return None
+        if MODEL_GETATTR_BEHAVIOR.get() == "coro":
+            return self.aget(instance, owner=owner)
         d = {}
         for key in self.inner_field_names:
             translated_name = self.translate_name(key)
-            field = instance.meta.fields.get(key)
             try:
-                if field and hasattr(field, "__get__"):
-                    d[translated_name] = field.__get__(instance, owner)
-                else:
-                    d[translated_name] = getattr(instance, key)
-            except AttributeError:
+                d[translated_name] = getattr(instance, key)
+            except (AttributeError, KeyError):
+                if not instance._loaded_or_deleted:
+                    raise AttributeError("not loaded") from None
                 pass
         if self.model is not None and self.model is not ConditionalRedirect:
             return self.model(**d)
@@ -160,7 +182,10 @@ class ConcreteCompositeField(BaseCompositeField):
         return super().clean(field_name, value, for_query=for_query)
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = "", old_value: Optional[Any] = None
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
     ) -> Dict[str, Any]:
         assert len(self.inner_field_names) >= 1
         if (
@@ -174,9 +199,8 @@ class ConcreteCompositeField(BaseCompositeField):
                 self.inner_field_names[0],
                 value,
                 phase=phase,
-                old_value=None if old_value is None else old_value.get(self.inner_field_names[0]),
             )
-        return super().to_model(field_name, value, phase=phase, old_value=old_value)
+        return super().to_model(field_name, value, phase=phase)
 
     def get_embedded_fields(
         self, name: str, fields: Dict[str, "BaseFieldType"]

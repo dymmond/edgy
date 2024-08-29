@@ -276,7 +276,7 @@ class TimezonedField:
             raise ValueError(f"Invalid type detected: {type(value)}")
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = "", old_value: Optional[Any] = None
+        self, field_name: str, value: Any, phase: str = ""
     ) -> Dict[str, Optional[Union[datetime.datetime, datetime.date]]]:
         """
         Convert input object to datetime

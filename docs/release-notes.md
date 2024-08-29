@@ -5,6 +5,12 @@ hide:
 
 # Release Notes
 
+## 0.15
+
+### Added
+
+- FileField and File handling.
+
 ## 0.14.1
 
 ### Changed

@@ -98,9 +98,7 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         """
         return {}
 
-    def to_model(
-        self, field_name: str, value: Any, phase: str = "", old_value: Optional[Any] = None
-    ) -> Dict[str, Any]:
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
         Validation happens later.

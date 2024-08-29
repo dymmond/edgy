@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Tuple, Type, Union, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
@@ -49,7 +49,6 @@ class RelatedField(RelationshipField):
         field_name: str,
         value: Any,
         phase: str = "",
-        old_value: Optional[ManyRelationProtocol] = None,
     ) -> Dict[str, Any]:
         """
         Meta field
@@ -69,11 +68,11 @@ class RelatedField(RelationshipField):
         raise ValueError("missing instance")
 
     def __set__(self, instance: "Model", value: Any) -> None:
+        # lazy assign one or more objects
         relation = self.__get__(instance)
         if not isinstance(value, Sequence):
             value = [value]
-        for v in value:
-            relation._add_object(v)
+        relation.stage(*value)
 
     @functools.cached_property
     def foreign_key(self) -> BaseForeignKeyField:
@@ -98,3 +97,6 @@ class RelatedField(RelationshipField):
 
     def __str__(self) -> str:
         return f"({self.related_to.__name__}={self.related_name})"
+
+    async def post_save_callback(self, value: ManyRelationProtocol, instance: "Model") -> None:
+        await value.save_related()

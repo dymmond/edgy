@@ -1,7 +1,9 @@
 from contextvars import ContextVar
-from typing import Union
+from typing import Literal, Union
 
-GETATTR_RETURN_CORO = ContextVar("GETATTR_RETURN_CORO", default=False)
+MODEL_GETATTR_BEHAVIOR: ContextVar[Literal["passdown", "load", "coro"]] = ContextVar(
+    "MODEL_GETATTR_BEHAVIOR", default="load"
+)
 TENANT: ContextVar[str] = ContextVar("tenant", default=None)
 SCHEMA: ContextVar[str] = ContextVar("SCHEMA", default=None)
 # for bw compatibility

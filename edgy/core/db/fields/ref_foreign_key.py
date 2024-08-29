@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, TypeVar
 from typing_extensions import get_origin
 
 import edgy
-from edgy.core.db.fields.base import BaseForeignKey
+from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.terminal import Print
 from edgy.exceptions import ModelReferenceError
@@ -21,7 +21,7 @@ T = TypeVar("T", bound="Model")
 terminal = Print()
 
 
-class BaseRefForeignKeyField(BaseForeignKey):
+class BaseRefForeignKeyField(RelationshipField):
     pass
 
 

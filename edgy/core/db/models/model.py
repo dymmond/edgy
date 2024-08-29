@@ -1,10 +1,11 @@
+import inspect
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union, cast
 
 from sqlalchemy.engine.result import Row
 
+from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
-from edgy.core.files.base import FieldFile
 from edgy.exceptions import ObjectNotFound, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
@@ -70,7 +71,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             _val = self.__dict__.get(field)
             if isinstance(_val, ManyRelationProtocol):
                 _val.instance = self
-                await _val.save_related()
+                await _val.post_save()
         return self
 
     async def delete(self) -> None:
@@ -96,9 +97,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         if row is None:
             raise ObjectNotFound("row does not exist anymore")
         # Update the instance.
-        self.__dict__.update(
-            self.transform_input(dict(row._mapping), phase="load", instance_dict=self.__dict__)
-        )
+        self.__dict__.update(self.transform_input(dict(row._mapping), phase="load"))
         self._loaded_or_deleted = True
 
     async def _save(self, **kwargs: Any) -> "Model":
@@ -107,9 +106,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         """
         expression = self.table.insert().values(**kwargs)
         autoincrement_value = cast(Optional["Row"], await self.database.execute(expression))
-        transformed_kwargs = self.transform_input(
-            kwargs, phase="post_insert", instance_dict=self.__dict__
-        )
+        transformed_kwargs = self.transform_input(kwargs, phase="post_insert")
         for k, v in transformed_kwargs.items():
             setattr(self, k, v)
         # sqlalchemy supports only one autoincrement column
@@ -120,13 +117,20 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             # can be explicit set, which causes an invalid value returned
             if column is not None and column.key not in kwargs:
                 setattr(self, column.key, autoincrement_value)
-        for field in self.meta.fields:
-            _val = self.__dict__.get(field)
-            if isinstance(_val, ManyRelationProtocol):
-                _val.instance = self
-                await _val.save_related()
-            elif isinstance(_val, FieldFile):
-                await _val.execute_operation()
+
+        token = MODEL_GETATTR_BEHAVIOR.set("coro")
+        try:
+            for field_name in self.meta.post_save_fields:
+                field = self.meta.fields[field_name]
+                try:
+                    value = getattr(self, field_name)
+                except AttributeError:
+                    continue
+                if inspect.isawaitable(value):
+                    value = await value
+                await field.post_save_callback(value, instance=self)
+        finally:
+            MODEL_GETATTR_BEHAVIOR.reset(token)
         return self
 
     async def save_model_references(
@@ -152,7 +156,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 model_class = self.meta.registry.models[model_class]
             assert not isinstance(model_class, str)
 
-            foreign_key_target_field = model_ref_field.reverse_name
+            foreign_key_target_field = None
             if not foreign_key_target_field:
                 for name, foreign_key in model_class.meta.foreign_key_fields.items():
                     if foreign_key.target == self.__class__:

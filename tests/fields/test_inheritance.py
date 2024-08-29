@@ -83,18 +83,18 @@ def test_deleting_fields():
     model1 = ConcreteModel1(first_name="edgy", last_name="edgy")
     model2 = ConcreteModel2(first_name="edgy", last_name="edgy")
     assert model1.first_name == "edgy"
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         _ = model1.last_name
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         model1.last_name = "edgy"
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         _ = model2.first_name
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         model2.first_name = "edgy"
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         _ = model2.last_name
-    with pytest.raises(AttributeError):
+    with pytest.raises(ValueError):
         model2.last_name = "edgy"
 
 

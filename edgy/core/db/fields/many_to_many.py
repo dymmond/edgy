@@ -259,9 +259,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.through = through_model
         self.add_model_to_register(self.through)
 
-    def to_model(
-        self, field_name: str, value: Any, phase: str = "", old_value: Optional[Any] = None
-    ) -> Dict[str, Any]:
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         """
         Meta field
         """
@@ -291,6 +289,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         raise ValueError("Missing instance")
 
     def __set__(self, instance: "Model", value: Any) -> None:
+        # This allows lazy assigning multiple objects
         relation = self.__get__(instance)
         if not isinstance(value, Sequence):
             value = [value]
