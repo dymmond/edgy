@@ -46,7 +46,8 @@ class StorageHandler:
         if params is None:
             raise InvalidStorageError(f"Could not find config for '{alias}' in settings.STORAGES.")
 
-        storage = self._create_storage(params)
+        storage = self.create_storage(params)
+        storage.name = alias
         self._storages[alias] = storage
         return storage
 

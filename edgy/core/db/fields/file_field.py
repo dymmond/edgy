@@ -7,13 +7,29 @@ from edgy.core.db.fields.core import BigIntegerField
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.core.db.fields.types import ColumnDefinitionModel
 from edgy.core.files.base import FieldFile
+from edgy.core.files.storage import storages
 
 if TYPE_CHECKING:
     from edgy import Model
     from edgy.core.db.fields.types import BaseFieldType
+    from edgy.core.files.storage import Storage
 
 
 class ConcreteFileField(BaseCompositeField):
+    def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
+        # we are initialized already or empty
+        if name not in kwargs or not isinstance(kwargs[name], str):
+            return
+        to_add = {name: kwargs.pop(name)}
+        storage_name = f"{name}_storage"
+        if storage_name in kwargs:
+            to_add[storage_name] = kwargs.get(storage_name)
+        size_name = f"{name}_size"
+        if size_name in kwargs:
+            to_add[size_name] = kwargs.get(size_name)
+
+        kwargs[name] = to_add
+
     def clean(self, field_name: str, value: FieldFile, for_query: bool = False) -> Dict[str, Any]:
         """
         Validates a value and transform it into columns which can be used for querying and saving.
@@ -24,10 +40,17 @@ class ConcreteFileField(BaseCompositeField):
         Kwargs:
             for_query: is used for querying. Should have all columns used for querying set.
         """
-        return {}
+        retdict: Dict[str, Any] = {
+            field_name: value.name,
+        }
+        if not for_query:
+            retdict[f"{field_name}_storage"] = value.storage.name
+            if self.with_sizefield:
+                retdict[f"{field_name}_size"] = value.size if value else None
+        return retdict
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = "", old_value: Optional[Any] = None
+        self, field_name: str, value: Any, phase: str = "", old_value: Optional[FieldFile] = None
     ) -> Dict[str, FieldFile]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
@@ -43,14 +66,29 @@ class ConcreteFileField(BaseCompositeField):
         if isinstance(value, FieldFile):
             return {field_name: value}
         if old_value is None:
-            assert phase == "creation"
             if isinstance(value, dict):
-                old_value = FieldFile(self, name=value["name"], size=value.get("size"))
+                old_value = FieldFile(
+                    self,
+                    name=value[field_name],
+                    storage=value[f"{field_name}_storage"],
+                    size=value.get(f"{field_name}_size"),
+                    generate_name_fn=self.generate_name_fn,
+                )
+            else:
+                # not initialized yet
+                old_value = FieldFile(
+                    self, generate_name_fn=self.generate_name_fn, storage=self.storage
+                )
+                # file creation
+                old_value.save(value)
+        else:
+            # file creation or deletion
+            old_value.save(value)
         return {field_name: old_value}
 
     def __get__(self, instance: "Model", owner: Any = None) -> FieldFile:
         if instance:
-            # only or so, file is not loaded yet
+            # defer or other reason, file is not loaded yet. Trigger load.
             if self.name not in instance.__dict__:
                 raise AttributeError()
             if instance.__dict__[self.name].instance is None:
@@ -69,16 +107,16 @@ class ConcreteFileField(BaseCompositeField):
             sqlalchemy.Column(
                 f"{field_name}_storage",
                 sqlalchemy.String(length=20, collation=self.collation),
-                default=self.storage,
+                default=self.storage.name,
             ),
         ]
 
     def get_embedded_fields(
         self, name: str, fields: Dict[str, "BaseFieldType"]
-    ) -> Dict[str, "BaseField"]:
-        retdict = {}
+    ) -> Dict[str, "BaseFieldType"]:
+        retdict: Dict[str, Any] = {}
         if self.with_sizefield:
-            size_name = f"{self.name}_size"
+            size_name = f"{name}_size"
             if size_name not in fields:
                 retdict[size_name] = BigIntegerField(
                     ge=0, null=self.null, exclude=True, read_only=True
@@ -86,7 +124,7 @@ class ConcreteFileField(BaseCompositeField):
         return retdict
 
     def get_composite_fields(self) -> Dict[str, "BaseFieldType"]:
-        retdict = {self.name: self}
+        retdict: Dict[str, Any] = {self.name: self}
         if self.with_sizefield:
             size_name = f"{self.name}_size"
             retdict[size_name] = self.owner.meta.fields[size_name]
@@ -99,10 +137,15 @@ class FileField(FieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        storage: Union[str, None] = None,
+        storage: Union[str, "Storage", None] = None,
         with_sizefield: bool = True,
         **kwargs: Any,
     ) -> BaseField:
+        if not storage:
+            storage = storages["default"]
+        elif isinstance(storage, str):
+            storage = storages[storage]
+
         return super().__new__(cls, storage=storage, **kwargs)  # type: ignore
 
     @classmethod

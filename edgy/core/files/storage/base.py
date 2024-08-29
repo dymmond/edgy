@@ -19,9 +19,12 @@ class Storage(ABC):
     storage of Edgy.
     """
 
-    def value_or_setting(
-        self, value: _arg_val, setting: _arg_setting
-    ) -> Union[_arg_val, _arg_setting]:
+    # automatically set by handler
+    name: str = ""
+
+    # private helper
+    @staticmethod
+    def value_or_setting(value: _arg_val, setting: _arg_setting) -> Union[_arg_val, _arg_setting]:
         return setting if value is None else value
 
     @abstractmethod

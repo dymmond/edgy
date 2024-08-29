@@ -93,7 +93,8 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
             field_name: the field name (can be different from name)
             value: the field value
         Kwargs:
-            for_query: is used for querying. Should have all columns used for querying set.
+            for_query: Is used for querying. Should have all columns used for querying set.
+                       The columns used can differ especially for multi column fields.
         """
         return {}
 
