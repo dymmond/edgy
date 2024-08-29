@@ -20,6 +20,7 @@ default_methods_overwritable_by_factory.discard("__init__")
 default_methods_overwritable_by_factory.add("__set__")
 default_methods_overwritable_by_factory.add("__get__")
 default_methods_overwritable_by_factory.add("modify_input")
+default_methods_overwritable_by_factory.add("post_save_callback")
 
 # BaseCompositeField
 default_methods_overwritable_by_factory.add("translate_name")
