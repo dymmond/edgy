@@ -18,6 +18,8 @@ from edgy.core.db.fields.types import BaseFieldType
 from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
+    from edgy import Model
+
     try:
         import zoneinfo  # type: ignore[import-not-found, unused-ignore]
     except ImportError:
@@ -276,7 +278,7 @@ class TimezonedField:
             raise ValueError(f"Invalid type detected: {type(value)}")
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = ""
+        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
     ) -> Dict[str, Optional[Union[datetime.datetime, datetime.date]]]:
         """
         Convert input object to datetime

@@ -259,13 +259,22 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.through = through_model
         self.add_model_to_register(self.through)
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
+    ) -> Dict[str, Any]:
         """
         Meta field
         """
         if isinstance(value, ManyRelationProtocol):
             return {field_name: value}
-        return {field_name: self.get_relation(refs=value)}
+        if instance:
+            relation_instance = self.__get__(instance)
+            if not isinstance(value, Sequence):
+                value = [value]
+            relation_instance.stage(*value)
+        else:
+            relation_instance = self.get_relation(refs=value)
+        return {field_name: relation_instance}
 
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
@@ -279,7 +288,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         return {}
 
-    def __get__(self, instance: "Model", owner: Any = None) -> ManyRelation:
+    def __get__(self, instance: "Model", owner: Any = None) -> ManyRelationProtocol:
         if instance:
             if self.name not in instance.__dict__:
                 instance.__dict__[self.name] = self.get_relation()
@@ -288,13 +297,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             return instance.__dict__[self.name]  # type: ignore
         raise ValueError("Missing instance")
 
-    def __set__(self, instance: "Model", value: Any) -> None:
-        # This allows lazy assigning multiple objects
-        relation = self.__get__(instance)
-        if not isinstance(value, Sequence):
-            value = [value]
-        for v in value:
-            relation._add_object(v)
+    async def post_save_callback(self, value: ManyRelationProtocol, instance: "Model") -> None:
+        await value.save_related()
 
 
 class ManyToManyField(ForeignKeyFieldFactory):

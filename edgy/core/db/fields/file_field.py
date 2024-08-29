@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Sequence, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union, cast
 
 import sqlalchemy
 
@@ -49,7 +49,9 @@ class ConcreteFileField(BaseCompositeField):
                 retdict[f"{field_name}_size"] = value.size if value else None
         return retdict
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, FieldFile]:
+    def to_model(
+        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
+    ) -> Dict[str, FieldFile]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
         Validation happens later.
@@ -73,10 +75,15 @@ class ConcreteFileField(BaseCompositeField):
                 generate_name_fn=self.generate_name_fn,
             )
         else:
-            # not initialized yet
-            file_instance = FieldFile(
-                self, generate_name_fn=self.generate_name_fn, storage=self.storage
-            )
+            if instance is not None and self.name in instance.__dict__:
+                # use old one
+                file_instance = cast(FieldFile, instance.__dict__[self.name])
+            else:
+                # not initialized yet
+                file_instance = FieldFile(
+                    self, generate_name_fn=self.generate_name_fn, storage=self.storage
+                )
+                file_instance.instance = instance
             # file creation if value is not None
             file_instance.save(value)
         return {field_name: file_instance}
@@ -86,14 +93,8 @@ class ConcreteFileField(BaseCompositeField):
             # defer or other reason, file is not loaded yet. Trigger load.
             if self.name not in instance.__dict__:
                 raise AttributeError()
-            if instance.__dict__[self.name].instance is None:
-                instance.__dict__[self.name].instance = instance
             return instance.__dict__[self.name]  # type: ignore
         raise ValueError("missing instance")
-
-    def __set__(self, instance: "Model", value: Any) -> None:
-        file_instance = self.__get__(instance)
-        file_instance.save(value)
 
     def get_columns(self, field_name: str) -> Sequence[sqlalchemy.Column]:
         model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
@@ -130,7 +131,6 @@ class ConcreteFileField(BaseCompositeField):
         return retdict
 
     async def post_save_callback(self, value: FieldFile, instance: "Model") -> None:
-        value.instance = instance
         await value.execute_operation()
 
 

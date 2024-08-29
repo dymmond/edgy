@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Dict, Tuple, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
@@ -45,18 +45,21 @@ class RelatedField(RelationshipField):
         return self.name
 
     def to_model(
-        self,
-        field_name: str,
-        value: Any,
-        phase: str = "",
+        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
     ) -> Dict[str, Any]:
         """
         Meta field
         """
         if isinstance(value, ManyRelationProtocol):
             return {field_name: value}
-        # old values should be replaceable
-        return {field_name: self.get_relation(refs=value)}
+        if instance:
+            relation_instance = self.__get__(instance)
+            if not isinstance(value, Sequence):
+                value = [value]
+            relation_instance.stage(*value)
+        else:
+            relation_instance = self.get_relation(refs=value)
+        return {field_name: relation_instance}
 
     def __get__(self, instance: "Model", owner: Any = None) -> ManyRelationProtocol:
         if instance:
@@ -66,13 +69,6 @@ class RelatedField(RelationshipField):
                 instance.__dict__[self.name].instance = instance
             return instance.__dict__[self.name]  # type: ignore
         raise ValueError("missing instance")
-
-    def __set__(self, instance: "Model", value: Any) -> None:
-        # lazy assign one or more objects
-        relation = self.__get__(instance)
-        if not isinstance(value, Sequence):
-            value = [value]
-        relation.stage(*value)
 
     @functools.cached_property
     def foreign_key(self) -> BaseForeignKeyField:
@@ -99,5 +95,4 @@ class RelatedField(RelationshipField):
         return f"({self.related_to.__name__}={self.related_name})"
 
     async def post_save_callback(self, value: ManyRelationProtocol, instance: "Model") -> None:
-        value.instance = instance
         await value.save_related()

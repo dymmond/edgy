@@ -65,7 +65,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         __show_pk__ = kwargs.pop("__show_pk__", False)
-        kwargs = self.transform_input(kwargs, phase="init")
+        kwargs = self.transform_input(kwargs, phase="init", instance=self)
         super().__init__(**kwargs)
         self.__dict__ = self.setup_model_from_kwargs(kwargs)
         self.__show_pk__ = __show_pk__
@@ -73,7 +73,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         self._loaded_or_deleted = False
 
     @classmethod
-    def transform_input(cls, kwargs: Any, phase: str) -> Any:
+    def transform_input(cls, kwargs: Any, phase: str, instance: Optional["Model"] = None) -> Any:
         """
         Expand to_models and apply input modifications.
         """
@@ -90,7 +90,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         for key, value in kwargs.items():
             field = fields.get(key, None)
             if field is not None:
-                new_kwargs.update(**field.to_model(key, value, phase=phase))
+                new_kwargs.update(**field.to_model(key, value, phase=phase, instance=instance))
             else:
                 new_kwargs[key] = value
         return new_kwargs

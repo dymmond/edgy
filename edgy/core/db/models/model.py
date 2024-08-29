@@ -7,7 +7,6 @@ from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
 from edgy.exceptions import ObjectNotFound, RelationshipNotFound
-from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
     from edgy.core.db.models import ModelRef
@@ -67,11 +66,19 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        for field in self.meta.fields:
-            _val = self.__dict__.get(field)
-            if isinstance(_val, ManyRelationProtocol):
-                _val.instance = self
-                await _val.post_save()
+        token = MODEL_GETATTR_BEHAVIOR.set("coro")
+        try:
+            for field_name in self.meta.post_save_fields:
+                field = self.meta.fields[field_name]
+                try:
+                    value = getattr(self, field_name)
+                except AttributeError:
+                    continue
+                if inspect.isawaitable(value):
+                    value = await value
+                await field.post_save_callback(value, instance=self)
+        finally:
+            MODEL_GETATTR_BEHAVIOR.reset(token)
         return self
 
     async def delete(self) -> None:
@@ -97,7 +104,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         if row is None:
             raise ObjectNotFound("row does not exist anymore")
         # Update the instance.
-        self.__dict__.update(self.transform_input(dict(row._mapping), phase="load"))
+        self.__dict__.update(self.transform_input(dict(row._mapping), phase="load", instance=self))
         self._loaded_or_deleted = True
 
     async def _save(self, **kwargs: Any) -> "Model":
@@ -106,7 +113,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         """
         expression = self.table.insert().values(**kwargs)
         autoincrement_value = cast(Optional["Row"], await self.database.execute(expression))
-        transformed_kwargs = self.transform_input(kwargs, phase="post_insert")
+        transformed_kwargs = self.transform_input(kwargs, phase="post_insert", instance=self)
         for k, v in transformed_kwargs.items():
             setattr(self, k, v)
         # sqlalchemy supports only one autoincrement column

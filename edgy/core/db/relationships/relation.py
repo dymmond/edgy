@@ -182,6 +182,10 @@ class ManyRelation(ManyRelationProtocol):
     def __str__(self) -> str:
         return f"{self.through.__name__}"
 
+    def __get__(self, instance: "Model", owner: Any = None) -> ManyRelationProtocol:
+        self.instance = instance
+        return self
+
 
 class SingleRelation(ManyRelationProtocol):
     """
@@ -257,9 +261,7 @@ class SingleRelation(ManyRelationProtocol):
 
     def stage(self, *children: "Model") -> None:
         for child in children:
-            if not isinstance(
-                child, (self.to, self.to.proxy_model, dict)
-            ):
+            if not isinstance(child, (self.to, self.to.proxy_model, dict)):
                 raise RelationshipIncompatible(
                     f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
                 )
@@ -320,3 +322,7 @@ class SingleRelation(ManyRelationProtocol):
 
     def __str__(self) -> str:
         return f"{self.to.__name__}"
+
+    def __get__(self, instance: "Model", owner: Any = None) -> ManyRelationProtocol:
+        self.instance = instance
+        return self

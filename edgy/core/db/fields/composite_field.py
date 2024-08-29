@@ -182,10 +182,7 @@ class ConcreteCompositeField(BaseCompositeField):
         return super().clean(field_name, value, for_query=for_query)
 
     def to_model(
-        self,
-        field_name: str,
-        value: Any,
-        phase: str = "",
+        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
     ) -> Dict[str, Any]:
         assert len(self.inner_field_names) >= 1
         if (
@@ -195,11 +192,7 @@ class ConcreteCompositeField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.meta.fields[self.inner_field_names[0]]
-            return field.to_model(
-                self.inner_field_names[0],
-                value,
-                phase=phase,
-            )
+            return field.to_model(self.inner_field_names[0], value, phase=phase, instance=instance)
         return super().to_model(field_name, value, phase=phase)
 
     def get_embedded_fields(

@@ -214,10 +214,7 @@ class BaseCompositeField(BaseField):
         return result
 
     def to_model(
-        self,
-        field_name: str,
-        value: Any,
-        phase: str = "",
+        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
     ) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
@@ -237,9 +234,7 @@ class BaseCompositeField(BaseField):
                 raise ErrorType(f"Missing sub-field: {sub_name} for {field_name}")
             result.update(
                 field.to_model(
-                    sub_name,
-                    value.get(translated_name, None),
-                    phase=phase,
+                    sub_name, value.get(translated_name, None), phase=phase, instance=instance
                 )
             )
         return result
@@ -359,7 +354,9 @@ class PKField(BaseCompositeField):
 
         return retdict
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
+    ) -> Dict[str, Any]:
         pknames = cast(Sequence[str], self.owner.pknames)
         assert len(cast(Sequence[str], self.owner.pkcolumns)) >= 1
         if self.is_incomplete:
@@ -370,12 +367,8 @@ class PKField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.meta.fields[pknames[0]]
-            return field.to_model(
-                pknames[0],
-                value,
-                phase=phase,
-            )
-        return super().to_model(field_name, value, phase=phase)
+            return field.to_model(pknames[0], value, phase=phase, instance=instance)
+        return super().to_model(field_name, value, phase=phase, instance=instance)
 
     def get_composite_fields(self) -> Dict[str, BaseFieldType]:
         return {
@@ -445,5 +438,7 @@ class BaseForeignKey(RelationshipField):
         """
         return value
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
+    ) -> Dict[str, Any]:
         return {field_name: self.expand_relationship(value)}
