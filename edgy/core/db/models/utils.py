@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Set, Type, cast
+from typing import TYPE_CHECKING, Any, Iterable, Optional, Set, Type, TypeVar, cast
 
 if TYPE_CHECKING:
     from sqlalchemy import Table
@@ -51,13 +51,16 @@ def from_model_to_clauses(model: "BaseModelType") -> Iterable[Any]:
         yield getattr(model.table.columns, column) == getattr(model, column)
 
 
+_model_type = TypeVar("_model_type", bound="BaseModelType")
+
+
 def apply_instance_extras(
-    model: "BaseModelType",
+    model: _model_type,
     model_class: Type["BaseModelType"],
     schema: Optional[str] = None,
     database: Optional["Database"] = None,
     table: Optional["Table"] = None,
-) -> "Model":
+) -> _model_type:
     model.__using_schema__ = schema
     if table is None:
         # Apply the schema to the model instance

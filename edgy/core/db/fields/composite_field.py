@@ -159,7 +159,9 @@ class ConcreteCompositeField(BaseCompositeField):
             return field.clean(self.inner_field_names[0], value, for_query=for_query)
         return super().clean(field_name, value, for_query=for_query)
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self, field_name: str, value: Any, phase: str = "", old_value: Optional[Any] = None
+    ) -> Dict[str, Any]:
         assert len(self.inner_field_names) >= 1
         if (
             self.model is ConditionalRedirect
@@ -168,8 +170,13 @@ class ConcreteCompositeField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.meta.fields[self.inner_field_names[0]]
-            return field.to_model(self.inner_field_names[0], value, phase=phase)
-        return super().to_model(field_name, value, phase=phase)
+            return field.to_model(
+                self.inner_field_names[0],
+                value,
+                phase=phase,
+                old_value=None if old_value is None else old_value.get(self.inner_field_names[0]),
+            )
+        return super().to_model(field_name, value, phase=phase, old_value=old_value)
 
     def get_embedded_fields(
         self, name: str, fields: Dict[str, "BaseFieldType"]

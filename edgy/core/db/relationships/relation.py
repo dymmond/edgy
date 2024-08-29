@@ -114,7 +114,7 @@ class ManyRelation(ManyRelationProtocol):
     def _add_object(self, child: Type["Model"]) -> None:
         self.refs.append(self.expand_relationship(child))
 
-    async def add(self, child: "Model") -> Optional["Model"]:
+    async def add(self, child: "Model", instant: bool = True) -> Optional["Model"]:
         """
         Adds a child to the model as a list
 
@@ -129,12 +129,16 @@ class ManyRelation(ManyRelationProtocol):
                 f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
             )
         child = self.expand_relationship(child)
-
-        try:
-            async with child.database.transaction():
-                return await child.save(force_save=True)
-        except IntegrityError:
-            pass
+        if not instant:
+            self.refs.append(child)
+            return child
+        else:
+            # try saving intermediate model. If it fails another instance already exists and return None
+            try:
+                async with child.database.transaction():
+                    return await child.save(force_save=True)
+            except IntegrityError:
+                pass
         return None
 
     async def remove(self, child: Optional["Model"] = None) -> None:
@@ -269,7 +273,7 @@ class SingleRelation(ManyRelationProtocol):
         while self.refs:
             await self.add(self.refs.pop())
 
-    async def add(self, child: "Model") -> Optional["Model"]:
+    async def add(self, child: "Model", instant: bool = True) -> Optional["Model"]:
         """
         Adds a child to the model as a list
 
@@ -279,7 +283,10 @@ class SingleRelation(ManyRelationProtocol):
         """
         if not isinstance(child, (self.to, self.to.proxy_model)):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
-        await child.save(values={self.to_foreign_key: self.instance})
+        if not instant:
+            self.refs.append(child)
+        else:
+            await child.save(values={self.to_foreign_key: self.instance})
         return child
 
     async def remove(self, child: Optional["Model"] = None) -> None:

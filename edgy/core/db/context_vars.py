@@ -1,6 +1,7 @@
 from contextvars import ContextVar
 from typing import Union
 
+GETATTR_RETURN_CORO = ContextVar("GETATTR_RETURN_CORO", default=False)
 TENANT: ContextVar[str] = ContextVar("tenant", default=None)
 SCHEMA: ContextVar[str] = ContextVar("SCHEMA", default=None)
 # for bw compatibility

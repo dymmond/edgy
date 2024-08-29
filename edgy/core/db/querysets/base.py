@@ -22,7 +22,7 @@ from typing import (
 import sqlalchemy
 
 from edgy.conf import settings
-from edgy.core.db.context_vars import get_schema
+from edgy.core.db.context_vars import GETATTR_RETURN_CORO, get_schema
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
@@ -430,13 +430,15 @@ class BaseQuerySet(
             result = await result
         if not self.embed_parent:
             return result
-        new_result = result
-        for part in self.embed_parent[0].split("__"):
-            if hasattr(new_result, "_return_load_coro_on_attr_access"):
-                new_result._return_load_coro_on_attr_access = True
-            new_result = getattr(new_result, part)
-            if isawaitable(new_result):
-                new_result = await new_result
+        GETATTR_RETURN_CORO.set(True)
+        try:
+            new_result = result
+            for part in self.embed_parent[0].split("__"):
+                new_result = getattr(new_result, part)
+                if isawaitable(new_result):
+                    new_result = await new_result
+        finally:
+            GETATTR_RETURN_CORO.set(False)
         if self.embed_parent[1]:
             setattr(new_result, self.embed_parent[1], result)
         return new_result

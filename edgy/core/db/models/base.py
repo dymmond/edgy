@@ -22,6 +22,7 @@ import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
+from edgy.core.db.context_vars import GETATTR_RETURN_CORO
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
@@ -59,7 +60,6 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
     __show_pk__: ClassVar[bool] = False
     # private attribute
     _loaded_or_deleted: bool = False
-    _return_load_coro_on_attr_access: bool = False
     __using_schema__: Union[str, None, Any] = Undefined
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -70,25 +70,32 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         self.__show_pk__ = __show_pk__
         # always set them in __dict__ to prevent __getattr__ loop
         self._loaded_or_deleted = False
-        self._return_load_coro_on_attr_access: bool = False
 
     @classmethod
-    def transform_input(cls, kwargs: Any, phase: str) -> Any:
+    def transform_input(
+        cls, kwargs: Any, phase: str, instance_dict: Optional[Dict[str, Any]] = None
+    ) -> Any:
         """
-        Expand to_model.
+        Expand to_models and apply input modifications.
         """
+        if instance_dict is None:
+            instance_dict = {}
+
         kwargs = {**kwargs}
         new_kwargs: Dict[str, Any] = {}
 
         fields = cls.meta.fields
         # phase 1: transform
+        # Note: this is order dependend. There should be no overlap.
         for field_name in cls.meta.input_modifying_fields:
             fields[field_name].modify_input(field_name, kwargs)
         # phase 2: apply to_model
         for key, value in kwargs.items():
             field = fields.get(key, None)
             if field is not None:
-                new_kwargs.update(**field.to_model(key, value, phase=phase))
+                new_kwargs.update(
+                    **field.to_model(key, value, phase=phase, old_value=instance_dict.get(key))
+                )
             else:
                 new_kwargs[key] = value
         return new_kwargs
@@ -411,15 +418,19 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
                 # used in related_fields to mask and not to implement to_model
                 field.__set__(self, value)
             else:
-                for k, v in field.to_model(key, value, phase="set").items():
+                for k, v in field.to_model(
+                    key, value, phase="set", old_value=self.__dict__.get(key)
+                ).items():
                     # bypass __settr__
                     edgy_setattr(self, k, v)
         else:
             # bypass __settr__
             edgy_setattr(self, key, value)
 
-    async def _agetattr_helper(self, name: str) -> Any:
+    async def _agetattr_helper(self, name: str, getter: Any) -> Any:
         await self.load()
+        if getter is not None:
+            return getter(self, self.__class__)
         return self.__dict__[name]
 
     def __getattr__(self, name: str) -> Any:
@@ -430,9 +441,6 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         3. Run an one off query to populate any foreign key making sure
            it runs only once per foreign key avoiding multiple database calls.
         """
-        return_load_coro_on_attr_access = self._return_load_coro_on_attr_access
-        # unset flag
-        self._return_load_coro_on_attr_access = False
         manager = self.meta.managers.get(name)
         if manager is not None:
             if name not in self.__dict__:
@@ -442,9 +450,15 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
             return self.__dict__[name]
 
         field = self.meta.fields.get(name)
+        getter: Any = None
         if field is not None and hasattr(field, "__get__"):
+            getter = field.__get__
             # no need to set an descriptor object
-            return field.__get__(self, self.__class__)
+            try:
+                return field.__get__(self, self.__class__)
+            except AttributeError:
+                # forward to load routine
+                pass
         if (
             name not in self.__dict__
             and not self._loaded_or_deleted
@@ -452,8 +466,8 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
             and name not in self.identifying_db_fields
             and self.can_load
         ):
-            coro = self._agetattr_helper(name)
-            if return_load_coro_on_attr_access:
+            coro = self._agetattr_helper(name, getter)
+            if GETATTR_RETURN_CORO.get():
                 return coro
             return run_sync(coro)
         return super().__getattr__(name)

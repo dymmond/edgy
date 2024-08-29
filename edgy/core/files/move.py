@@ -27,7 +27,10 @@ def _samefile(src: str, dst: str) -> bool:
 
 
 def file_move_safe(
-    old_file_name: str, new_file_name: str, chunk_size=1024 * 64, allow_overwrite: bool = False
+    old_file_name: str,
+    new_file_name: str,
+    chunk_size: int = 1024 * 64,
+    allow_overwrite: bool = False,
 ) -> None:
     """
     Move a file from one location to another in the safest way possible.

@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 class ModelParser:
     def extract_model_references(
-        self, extracted_values: Any, model_class: Optional[Type["BaseFieldType"]] = None
+        self: "Model", extracted_values: Any, model_class: Optional[Type["Model"]] = None
     ) -> Any:
         """
         Exracts any possible model references from the EdgyModel and returns a dictionary.
@@ -15,7 +15,7 @@ class ModelParser:
         model_cls = model_class or self
         model_references = {
             name: extracted_values.get(name, None)
-            for name in model_cls.meta.model_references  # type: ignore
+            for name in model_cls.meta.model_references
             if extracted_values.get(name)
         }
         return model_references

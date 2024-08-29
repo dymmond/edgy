@@ -18,11 +18,12 @@ Example Usage::
 """
 
 import os
+from typing import IO, Any
 
 __all__ = ("LOCK_EX", "LOCK_SH", "LOCK_NB", "lock", "unlock")
 
 
-def _fd(f):
+def _fd(f: IO) -> Any:
     """Get a filedescriptor from something which could be a file or an fd."""
     return f.fileno() if hasattr(f, "fileno") else f
 
@@ -69,13 +70,13 @@ if os.name == "nt":
     UnlockFileEx.restype = BOOL
     UnlockFileEx.argtypes = [HANDLE, DWORD, DWORD, DWORD, LPOVERLAPPED]
 
-    def lock(f, flags):
+    def lock(f: IO, flags: int) -> bool:
         hfile = msvcrt.get_osfhandle(_fd(f))
         overlapped = OVERLAPPED()
         ret = LockFileEx(hfile, flags, 0, 0, 0xFFFF0000, byref(overlapped))
         return bool(ret)
 
-    def unlock(f):
+    def unlock(f: IO) -> bool:
         hfile = msvcrt.get_osfhandle(_fd(f))
         overlapped = OVERLAPPED()
         ret = UnlockFileEx(hfile, 0, 0, 0xFFFF0000, byref(overlapped))
@@ -93,23 +94,23 @@ else:
         LOCK_EX = LOCK_SH = LOCK_NB = 0
 
         # Dummy functions that don't do anything.
-        def lock(f, flags):
+        def lock(f: IO, flags: int) -> bool:
             # File is not locked
             return False
 
-        def unlock(f):
+        def unlock(f: IO) -> bool:
             # File is unlocked
             return True
 
     else:
 
-        def lock(f, flags):
+        def lock(f: IO, flags: int) -> bool:
             try:
                 fcntl.flock(_fd(f), flags)
                 return True
             except BlockingIOError:
                 return False
 
-        def unlock(f):
+        def unlock(f: IO) -> bool:
             fcntl.flock(_fd(f), fcntl.LOCK_UN)
             return True

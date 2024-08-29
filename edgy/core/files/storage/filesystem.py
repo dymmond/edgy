@@ -2,20 +2,19 @@ import contextlib
 import os
 from datetime import datetime, timezone
 from functools import cached_property
-from typing import Any, List, Tuple, Union
+from threading import Lock
+from typing import Any, Dict, List, Tuple, Union, cast
 from urllib.parse import urljoin
 
 from edgy.conf import settings
 from edgy.core.files.base import File
 from edgy.core.files.move import file_move_safe
-from edgy.utils.encoding import filepath_to_uri
-from edgy.utils.path import safe_join
+from edgy.utils.path import filepath_to_uri, safe_join
 
-from ..mixins import StorageMixin
 from .base import Storage
 
 
-class FileSystemStorage(Storage, StorageMixin):
+class FileSystemStorage(Storage):
     OS_OPEN_FLAGS = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
 
     def __init__(
@@ -29,10 +28,28 @@ class FileSystemStorage(Storage, StorageMixin):
         self._base_url = base_url
         self._file_permissions_mode = file_permissions_mode
         self._directory_permissions_mode = directory_permissions_mode
+        self._name_lock = Lock()
+        self._name_dict: Dict[str, datetime] = {}
+
+    def reserve_name(self, name: str) -> bool:
+        with self._name_lock:
+            # we may can have a timeout of a reservation
+            if not self.exists(name) and name not in self._name_dict:
+                self._name_dict[name] = datetime.now(timezone.utc)
+                return True
+        return False
+
+    def unreserve_name(self, name: str) -> bool:
+        try:
+            with self._name_lock:
+                del self._name_dict[name]
+                return True
+        except KeyError:
+            return False
 
     @cached_property
     def base_location(self) -> str:
-        return self.value_or_setting(self._location, settings.media_root)
+        return cast(str, self.value_or_setting(self._location, settings.media_root))
 
     @cached_property
     def location(self) -> str:
@@ -41,7 +58,7 @@ class FileSystemStorage(Storage, StorageMixin):
     @cached_property
     def base_url(self) -> str:
         if self._base_url is not None and not self._base_url.endswith("/"):
-            self._base_url += "/"
+            self._base_url = f"{self._base_url}/"
         return self.value_or_setting(self._base_url, settings.media_url)
 
     @cached_property
@@ -54,12 +71,10 @@ class FileSystemStorage(Storage, StorageMixin):
             self._directory_permissions_mode, settings.file_upload_directory_permissions
         )
 
-    def _open(self, name: str, mode: Union[str, None] = None) -> File:
-        if mode is None:
-            mode = "rb"
+    def _open(self, name: str, mode: str) -> File:
         return File(open(self.path(name), mode))  # noqa: SIM115
 
-    def _save(self, name: str, content: Any) -> str:
+    def _save(self, content: File, name: str) -> None:
         """
         Save the content to the given name.
 
@@ -74,7 +89,6 @@ class FileSystemStorage(Storage, StorageMixin):
         self._create_directory(full_path)
         full_path = self._save_content(full_path, name, content)
         self._set_permissions(full_path)
-        return self._get_relative_path(full_path)
 
     def _get_full_path(self, name: str) -> str:
         """
@@ -257,7 +271,8 @@ class FileSystemStorage(Storage, StorageMixin):
             url = url.lstrip("/")
         return urljoin(self.base_url, url)
 
-    def _datetime_from_timestamp(self, ts) -> datetime:
+    @staticmethod
+    def _datetime_from_timestamp(ts: float) -> datetime:
         """
         Convert a UNIX timestamp to a datetime object.
 

@@ -218,18 +218,28 @@ class BaseCompositeField(BaseField):
                 )
         return result
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self, field_name: str, value: Any, phase: str = "", old_value: Optional[Any] = None
+    ) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
         result = {}
         if isinstance(value, dict):
+            # dict has certina
             for sub_name, field in self.composite_fields.items():
                 translated_name = self.translate_name(sub_name)
                 if translated_name not in value:
                     continue
                 result.update(
-                    field.to_model(sub_name, value.get(translated_name, None), phase=phase)
+                    field.to_model(
+                        sub_name,
+                        value.get(translated_name, None),
+                        phase=phase,
+                        old_value=old_value.get(translated_name, None)
+                        if old_value is not None
+                        else None,
+                    )
                 )
         else:
             for sub_name, field in self.composite_fields.items():
@@ -237,7 +247,14 @@ class BaseCompositeField(BaseField):
                 if not hasattr(value, translated_name):
                     continue
                 result.update(
-                    field.to_model(sub_name, getattr(value, translated_name, None), phase=phase)
+                    field.to_model(
+                        sub_name,
+                        getattr(value, translated_name, None),
+                        phase=phase,
+                        old_value=old_value.get(translated_name, None)
+                        if old_value is not None
+                        else None,
+                    )
                 )
 
         return result
@@ -339,7 +356,9 @@ class PKField(BaseCompositeField):
 
         return retdict
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self, field_name: str, value: Any, phase: str = "", old_value: Optional[Any] = None
+    ) -> Dict[str, Any]:
         pknames = cast(Sequence[str], self.owner.pknames)
         assert len(cast(Sequence[str], self.owner.pkcolumns)) >= 1
         if self.is_incomplete:
@@ -350,8 +369,13 @@ class PKField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.meta.fields[pknames[0]]
-            return field.to_model(pknames[0], value, phase=phase)
-        return super().to_model(field_name, value, phase=phase)
+            return field.to_model(
+                pknames[0],
+                value,
+                phase=phase,
+                old_value=None if old_value is None else old_value.get(pknames[0]),
+            )
+        return super().to_model(field_name, value, phase=phase, old_value=old_value)
 
     def get_composite_fields(self) -> Dict[str, BaseFieldType]:
         return {
@@ -421,5 +445,7 @@ class BaseForeignKey(RelationshipField):
         """
         return value
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self, field_name: str, value: Any, phase: str = "", old_value: Optional[Any] = None
+    ) -> Dict[str, Any]:
         return {field_name: self.expand_relationship(value)}

@@ -40,7 +40,7 @@ class ColumnDefinitionModel(
     null: bool = Field(serialization_alias="nullable", default=False)
     column_name: Optional[str] = Field(exclude=True, default=None)
     column_type: Any = Field(exclude=True, default=None)
-    constraints: Sequence[sqlalchemy.Constraint] = Field(exclude=True, default=tuple)  # type: ignore
+    constraints: Sequence[sqlalchemy.Constraint] = Field(exclude=True, default=())
 
 
 class BaseFieldDefinitions:
@@ -97,7 +97,9 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         """
         return {}
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self, field_name: str, value: Any, phase: str = "", old_value: Optional[Any] = None
+    ) -> Dict[str, Any]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
         Validation happens later.

@@ -16,7 +16,7 @@ class MediaSettings(BaseSettings):
     media_url: str = ""
 
     # Storage defaults
-    storages = {
+    storages: Dict[str, dict] = {
         "default": {
             "backend": "edgy.core.files.storage.FileSystemStorage",
         },

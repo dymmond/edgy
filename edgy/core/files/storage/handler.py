@@ -17,7 +17,7 @@ class StorageHandler:
 
     def __init__(self, backends: Union[Dict[str, Any], None] = None) -> None:
         self._backends = backends
-        self._storages = {}
+        self._storages: Dict[str, Storage] = {}
 
     @cached_property
     def backends(self) -> Dict[str, Any]:
@@ -25,7 +25,7 @@ class StorageHandler:
             self._backends = settings.storages.copy()
         return self._backends
 
-    def __getitem__(self, alias: str) -> Type["Storage"]:
+    def __getitem__(self, alias: str) -> "Storage":
         """
         Get the storage instance associated with the given alias.
 
@@ -50,7 +50,7 @@ class StorageHandler:
         self._storages[alias] = storage
         return storage
 
-    def create_storage(self, params: Dict[str, Any]) -> Type["Storage"]:
+    def create_storage(self, params: Dict[str, Any]) -> "Storage":
         """
         Create a storage instance based on the provided parameters.
 
@@ -67,7 +67,7 @@ class StorageHandler:
         options = params.pop("options", {})
 
         try:
-            storage_cls = import_string(backend)
+            storage_cls: Type[Storage] = import_string(backend)
         except ImportError as e:
             raise InvalidStorageError(f"Could not find backend {backend!r}: {e}") from e
         return storage_cls(**options)

@@ -1,11 +1,15 @@
-from typing import Any, Dict, Optional, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union, cast
 
 from sqlalchemy.engine.result import Row
 
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
+from edgy.core.files.base import FieldFile
 from edgy.exceptions import ObjectNotFound, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
+
+if TYPE_CHECKING:
+    from edgy.core.db.models import ModelRef
 
 
 class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
@@ -18,7 +22,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
     **Example**
 
     ```python
-    import edgy
+    import edgyBaseFieldType
     from edgy import Database, Registry
 
     database = Database("sqlite:///db.sqlite")
@@ -92,7 +96,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         if row is None:
             raise ObjectNotFound("row does not exist anymore")
         # Update the instance.
-        self.__dict__.update(self.transform_input(dict(row._mapping), phase="load"))
+        self.__dict__.update(
+            self.transform_input(dict(row._mapping), phase="load", instance_dict=self.__dict__)
+        )
         self._loaded_or_deleted = True
 
     async def _save(self, **kwargs: Any) -> "Model":
@@ -101,7 +107,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         """
         expression = self.table.insert().values(**kwargs)
         autoincrement_value = cast(Optional["Row"], await self.database.execute(expression))
-        transformed_kwargs = self.transform_input(kwargs, phase="post_insert")
+        transformed_kwargs = self.transform_input(
+            kwargs, phase="post_insert", instance_dict=self.__dict__
+        )
         for k, v in transformed_kwargs.items():
             setattr(self, k, v)
         # sqlalchemy supports only one autoincrement column
@@ -117,41 +125,49 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             if isinstance(_val, ManyRelationProtocol):
                 _val.instance = self
                 await _val.save_related()
+            elif isinstance(_val, FieldFile):
+                await _val.execute_operation()
         return self
 
-    async def save_model_references(self, model_references: Any, model_ref: Any = None) -> None:
+    async def save_model_references(
+        self, model_references: Sequence[Union[dict, "ModelRef"]], model_ref: str
+    ) -> None:
         """
         If there is any ModelRef declared in the model, it will generate the subsquent model
         reference records for that same model created.
         """
 
         for reference in model_references:
+            model_ref_field = self.meta.model_references[model_ref]
             if isinstance(reference, dict):
-                model: Type[Model] = self.meta.model_references[model_ref].__model__  # type: ignore
+                model_class = model_ref_field.__model__
+
             else:
-                model: Type[Model] = reference.__model__  # type: ignore
+                model_class = reference.__model__
 
-            if isinstance(model, str):
-                model = self.meta.registry.models[model]  # type: ignore
+            if isinstance(model_class, str):
+                assert (
+                    self.meta.registry is not None
+                ), f"No registry found (ModelRef): {self.__class__.__name__}"
+                model_class = self.meta.registry.models[model_class]
+            assert not isinstance(model_class, str)
 
-            # If the reference did come in a dict format
-            # It is necessary to convert into the original ModelRef.
-            if isinstance(reference, dict):
-                reference = self.meta.model_references[model_ref](**reference)  # type: ignore
-
-            foreign_key_target_field = None
-            for name, foreign_key in model.meta.foreign_key_fields.items():
-                if foreign_key.target == self.__class__:
-                    foreign_key_target_field = name
+            foreign_key_target_field = model_ref_field.reverse_name
+            if not foreign_key_target_field:
+                for name, foreign_key in model_class.meta.foreign_key_fields.items():
+                    if foreign_key.target == self.__class__:
+                        foreign_key_target_field = name
 
             if not foreign_key_target_field:
                 raise RelationshipNotFound(
-                    f"There was no relationship found between '{model.__class__.__name__}' and {self.__class__.__name__}"
+                    f"There was no relationship found between '{model_class.__name__}' and {self.__class__.__name__}"
                 )
-
-            data = reference.model_dump(exclude={"__model__"})
+            if isinstance(reference, dict):
+                data: dict = reference.copy()
+            else:
+                data = reference.model_dump(exclude={"__model__"})
             data[foreign_key_target_field] = self
-            await model.query.create(**data)
+            await model_class.query.create(**data)
 
     async def save(
         self,

@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Dict, Tuple, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
@@ -44,12 +44,19 @@ class RelatedField(RelationshipField):
     def related_name(self) -> str:
         return self.name
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        old_value: Optional[ManyRelationProtocol] = None,
+    ) -> Dict[str, Any]:
         """
         Meta field
         """
         if isinstance(value, ManyRelationProtocol):
             return {field_name: value}
+        # old values should be replaceable
         return {field_name: self.get_relation(refs=value)}
 
     def __get__(self, instance: "Model", owner: Any = None) -> ManyRelationProtocol:

@@ -27,7 +27,7 @@ from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.fields.base import PKField
+from edgy.core.db.fields.base import BaseForeignKey, PKField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
@@ -234,7 +234,7 @@ class MetaInfo:
         excluded_fields = set()
         secret_fields = set()
         input_modifying_fields = set()
-        foreign_key_fields: Dict[str, BaseFieldType] = {}
+        foreign_key_fields: Dict[str, BaseForeignKey] = {}
         for key, field in self.fields.items():
             if hasattr(field, "__get__"):
                 special_getter_fields.add(key)
@@ -250,7 +250,7 @@ class MetaInfo:
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
         self.secret_fields: FrozenSet[str] = frozenset(secret_fields)
         self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
-        self.foreign_key_fields: Dict[str, BaseFieldType] = foreign_key_fields
+        self.foreign_key_fields: Dict[str, BaseForeignKey] = foreign_key_fields
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)
         self.columns_to_field = ColumnsToField(self)

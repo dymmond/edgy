@@ -694,7 +694,7 @@ Additional they can provide following methods:
 
 * `__get__(self, instance, owner=None)` - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
 * `__set__(self, instance, value)` - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
-* `to_model(self, field_name, phase="")` - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`
+* `to_model(self, field_name, phase="", old_value=None)` - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`
 * `get_embedded_fields(self, field_name, fields)` - Define internal fields.
 * `get_default_values(self, field_name, cleaned_data, is_update=False)` - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
 * `get_default_value(self)` - return default value for one column fields.
