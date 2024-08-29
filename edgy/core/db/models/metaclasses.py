@@ -185,7 +185,7 @@ class MetaInfo:
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
         self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
         self.fields: Dict[str, BaseFieldType] = {**getattr(meta, "fields", _empty_dict)}
-        self.model_references: Dict[str, ModelRef] = {
+        self.model_references: Dict[str, Type[ModelRef]] = {
             **getattr(meta, "model_references", _empty_dict)
         }
         self.managers: Dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}

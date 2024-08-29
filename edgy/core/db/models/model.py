@@ -149,10 +149,10 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         """
 
         for reference in model_references:
-            model_ref_field = self.meta.model_references[model_ref]
+            model_ref_type = self.meta.model_references[model_ref]
             if isinstance(reference, dict):
-                model_class = model_ref_field.__model__
-
+                model_class = model_ref_type.__model__
+                reference = model_ref_type(**reference)
             else:
                 model_class = reference.__model__
 
@@ -173,10 +173,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 raise RelationshipNotFound(
                     f"There was no relationship found between '{model_class.__name__}' and {self.__class__.__name__}"
                 )
-            if isinstance(reference, dict):
-                data: dict = reference.copy()
-            else:
-                data = reference.model_dump(exclude={"__model__"})
+            data = reference.model_dump(exclude={"__model__"})
             data[foreign_key_target_field] = self
             await model_class.query.create(**data)
 
