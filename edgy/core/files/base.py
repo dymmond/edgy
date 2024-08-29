@@ -15,7 +15,8 @@ from typing import (
     cast,
 )
 
-from .storage import Storage, storages
+if TYPE_CHECKING:
+    from .storage import Storage
 
 if sys.version_info >= (3, 10):  # pragma: no cover
     from typing import ParamSpec
@@ -30,22 +31,28 @@ if TYPE_CHECKING:
 P = ParamSpec("P")
 
 
+def _get_storage(storage: str) -> "Storage":
+    from .storage import storages
+
+    return storages[storage]
+
+
 class File:
     name: str
     file: Optional[BinaryIO]
-    storage: Storage
+    storage: "Storage"
 
     def __init__(
         self,
         file: Optional[BinaryIO] = None,
         name: str = "",
-        storage: Union[Storage, str, None] = None,
+        storage: Union["Storage", str, None] = None,
     ) -> None:
         self.file = file
         if not storage:
-            storage = storages["default"]
-        elif isinstance(storage, str):
-            storage = storages[storage]
+            storage = "default"
+        if isinstance(storage, str):
+            storage = _get_storage(storage)
 
         self.storage = storage
 
@@ -240,8 +247,8 @@ class ContentFile(File):
 
 class FieldFile(File):
     operation: Literal["none", "save", "save_delete", "delete"] = "none"
-    old: Optional[Tuple[Storage, str]] = None
-    instance: Optional[BaseModelType] = None
+    old: Optional[Tuple["Storage", str]] = None
+    instance: Optional["BaseModelType"] = None
 
     def __init__(
         self,
@@ -249,8 +256,8 @@ class FieldFile(File):
         content: Union[BinaryIO, bytes, None, File] = None,
         name: str = "",
         size: Optional[int] = None,
-        storage: Union[Storage, str, None] = None,
-        generate_name_fn: Optional[Callable[[BaseModelType, str], str]] = None,
+        storage: Union["Storage", str, None] = None,
+        generate_name_fn: Optional[Callable[["BaseModelType", str], str]] = None,
     ) -> None:
         if isinstance(content, File):
             content = content.open("rb").file

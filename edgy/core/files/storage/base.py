@@ -36,7 +36,7 @@ class Storage(ABC):
         return self._open(name, mode)
 
     @abstractmethod
-    def _save(self, content: File, name: str = "") -> None: ...
+    def _save(self, content: "File", name: str = "") -> None: ...
 
     def save(self, content: Any, name: str = "") -> None:
         """
