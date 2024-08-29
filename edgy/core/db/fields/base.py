@@ -197,9 +197,9 @@ class BaseCompositeField(BaseField):
         result = {}
         ErrorType: Type[Exception] = KeyError
         if not isinstance(value, dict):
-            # we don't want to trigger loads
+            # simpler
             value = value.__dict__
-            # but for missing attributes
+            # trigger load for missing attributes
             ErrorType = AttributeError
 
         for sub_name, field in self.composite_fields.items():
@@ -225,9 +225,9 @@ class BaseCompositeField(BaseField):
         result = {}
         ErrorType: Type[Exception] = KeyError
         if not isinstance(value, dict):
-            # we don't want to trigger loads
+            # simpler
             value = value.__dict__
-            # but for missing attributes
+            # trigger load for missing attributes
             ErrorType = AttributeError
         for sub_name, field in self.composite_fields.items():
             translated_name = self.translate_name(sub_name)
