@@ -31,7 +31,6 @@ from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.base import BaseForeignKey, PKField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
-from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.models.managers import BaseManager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
@@ -40,7 +39,7 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
 
 if TYPE_CHECKING:
-    from edgy.core.db.models import Model, ModelRef, ReflectModel
+    from edgy.core.db.models import Model, ReflectModel
 
 _empty_dict: Dict[str, Any] = {}
 _empty_set: FrozenSet[Any] = frozenset()
@@ -145,7 +144,6 @@ class MetaInfo:
         "model",
         "managers",
         "multi_related",
-        "model_references",
         "signals",
         "input_modifying_fields",
         "post_save_fields",
@@ -185,9 +183,6 @@ class MetaInfo:
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
         self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
         self.fields: Dict[str, BaseFieldType] = {**getattr(meta, "fields", _empty_dict)}
-        self.model_references: Dict[str, Type[ModelRef]] = {
-            **getattr(meta, "model_references", _empty_dict)
-        }
         self.managers: Dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
         self.multi_related: List[str] = [*getattr(meta, "multi_related", _empty_set)]
         self.model: Optional[Type[Model]] = None
@@ -503,7 +498,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any], **kwargs: Any
     ) -> Any:
         fields: Dict[str, BaseFieldType] = {}
-        model_references: Dict[str, ModelRef] = {}
         managers: Dict[str, BaseManager] = {}
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
         base_annotations: Dict[str, Any] = {}
@@ -542,10 +536,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                 # saving a reference foreign key.
                 # We split the keys (store them) in different places to be able to easily maintain and
                 #  what is what.
-                if isinstance(value, BaseRefForeignKeyField):
-                    model_references[key] = value.to
-                else:
-                    fields[key] = value
+                fields[key] = value
             elif isinstance(value, BaseManager):
                 value = copy.copy(value)
                 value.name = key
@@ -602,7 +593,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         attrs["meta"] = meta = MetaInfo(
             meta_class,
             fields=fields,
-            model_references=model_references,
             parents=parents,
             managers=managers,
         )

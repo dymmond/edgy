@@ -16,7 +16,7 @@ pydantic_version = __version__[:3]
 
 
 class TrackModelRef(ModelRef):
-    __model__ = "Track"
+    __related_name__ = "tracks_set"
     title: str
     position: int
 
@@ -41,7 +41,7 @@ class Track(edgy.Model):
 
 
 class PostRef(ModelRef):
-    __model__ = "Post"
+    __related_name__ = "post_set"
     comment: str
 
 

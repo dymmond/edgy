@@ -83,6 +83,10 @@ class RelatedField(RelationshipField):
     def is_cross_db(self) -> bool:
         return self.foreign_key.is_cross_db()
 
+    @property
+    def is_m2m(self) -> bool:
+        return self.foreign_key.is_m2m
+
     def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
         if not for_query:
             return {}

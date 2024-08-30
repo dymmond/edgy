@@ -100,11 +100,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         Loops and setup the kwargs of the model
         """
 
-        return {
-            k: v
-            for k, v in kwargs.items()
-            if k in self.meta.fields or k in self.meta.model_references
-        }
+        return {k: v for k, v in kwargs.items() if k in self.meta.fields}
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"

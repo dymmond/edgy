@@ -17,6 +17,6 @@ class Post(edgy.Model):
 
 
 class PostRef(ModelRef):
-    __model__ = Post
+    __related_name__ = "posts_set"
     comment: str
     created_at: datetime

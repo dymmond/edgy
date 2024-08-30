@@ -140,17 +140,12 @@ class BaseModelType(ABC):
         Related fields are not included because they are disjoint.
         """
         fields = self.meta.fields
-        model_references = self.meta.model_references
         columns = self.table.columns
 
         if only is not None:
             return {k: v for k, v in self.__dict__.items() if k in only}
 
-        return {
-            k: v
-            for k, v in self.__dict__.items()
-            if k in fields or hasattr(columns, k) or k in model_references
-        }
+        return {k: v for k, v in self.__dict__.items() if k in fields or hasattr(columns, k)}
 
     def get_instance_name(self) -> str:
         """

@@ -1,15 +1,15 @@
 import inspect
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Optional, Union, cast
 
 from sqlalchemy.engine.result import Row
 
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
-from edgy.exceptions import ObjectNotFound, RelationshipNotFound
+from edgy.exceptions import ObjectNotFound
 
 if TYPE_CHECKING:
-    from edgy.core.db.models import ModelRef
+    pass
 
 
 class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
@@ -140,43 +140,6 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             MODEL_GETATTR_BEHAVIOR.reset(token)
         return self
 
-    async def save_model_references(
-        self, model_references: Sequence[Union[dict, "ModelRef"]], model_ref: str
-    ) -> None:
-        """
-        If there is any ModelRef declared in the model, it will generate the subsquent model
-        reference records for that same model created.
-        """
-
-        for reference in model_references:
-            model_ref_type = self.meta.model_references[model_ref]
-            if isinstance(reference, dict):
-                model_class = model_ref_type.__model__
-                reference = model_ref_type(**reference)
-            else:
-                model_class = reference.__model__
-
-            if isinstance(model_class, str):
-                assert (
-                    self.meta.registry is not None
-                ), f"No registry found (ModelRef): {self.__class__.__name__}"
-                model_class = self.meta.registry.models[model_class]
-            assert not isinstance(model_class, str)
-
-            foreign_key_target_field = model_ref_type.__foreign_key__
-            if not foreign_key_target_field:
-                for name, foreign_key in model_class.meta.foreign_key_fields.items():
-                    if foreign_key.target == self.__class__:
-                        foreign_key_target_field = name
-
-            if not foreign_key_target_field:
-                raise RelationshipNotFound(
-                    f"There was no relationship found between '{model_class.__name__}' and {self.__class__.__name__}"
-                )
-            data = reference.model_dump(exclude={"__model__", "__foreign_key__"})
-            data[foreign_key_target_field] = self
-            await model_class.query.create(**data)
-
     async def save(
         self,
         force_save: bool = False,
@@ -208,7 +171,6 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             kwargs = self.extract_column_values(
                 extracted_values=extracted_fields, is_partial=False, is_update=False
             )
-            model_references = self.extract_model_references(extracted_fields)
             await self._save(**kwargs)
         else:
             # Broadcast the initial update details
@@ -219,9 +181,6 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 is_update=True,
                 is_partial=values is not None,
             )
-            model_references = self.extract_model_references(
-                extracted_fields if values is None else values
-            )
 
             await self.meta.signals.pre_update.send_async(
                 self.__class__, instance=self, kwargs=kwargs
@@ -230,11 +189,6 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
             # Broadcast the update complete
             await self.meta.signals.post_update.send_async(self.__class__, instance=self)
-
-        # Save the model references
-        if model_references:
-            for model_ref, references in model_references.items():
-                await self.save_model_references(references or [], model_ref=model_ref)
 
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False

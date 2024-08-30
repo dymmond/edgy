@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 if TYPE_CHECKING:
     from edgy import Model
@@ -6,20 +6,6 @@ if TYPE_CHECKING:
 
 
 class ModelParser:
-    def extract_model_references(
-        self: "Model", extracted_values: Any, model_class: Optional[Type["Model"]] = None
-    ) -> Any:
-        """
-        Exracts any possible model references from the EdgyModel and returns a dictionary.
-        """
-        model_cls = model_class or self
-        model_references = {
-            name: extracted_values.get(name, None)
-            for name in model_cls.meta.model_references
-            if extracted_values.get(name)
-        }
-        return model_references
-
     def extract_column_values(
         self,
         extracted_values: Any,

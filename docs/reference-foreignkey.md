@@ -94,11 +94,11 @@ Or
 from edgy.core.db.models import ModelRef
 ```
 
-The `ModelRef` when creating and declaring it makes it **mandatory** to populate the `__model__`
+The `ModelRef` when creating and declaring it makes it **mandatory** to populate the `__related_name__`
 attribute or else it won't know what to do and it will raise a `ModelReferenceError`. This is good and
 means you can't miss it even if you wanted to.
 
-The `__model__` attribute can be the [model][models] itself or a string model name.
+The `__related_name__` attribute should point to a Relation (reverse side of ForeignKey or ManyToMany relation).
 
 The `ModelRef` is a special type from the Pydantic `BaseModel` which means you can take advantage
 of everything that Pydantic can do for you, for example the `field_validator` or `model_validator`
@@ -107,15 +107,15 @@ or anything you could normally use with a normal Pydantic model.
 #### Attention
 
 You need to be careful when declaring the fields of the `ModelRef` because that will be used
-against the `__model__` declared. If the [model][models] has `constraints`, `uniques` and so on
+against the `__related_name__` declared. If the [model][models] has `constraints`, `uniques` and so on
 you will need to respect it when you are about to insert in the database.
 
 #### Declaring a ModelRef
 
-When creating a `ModelRef`, as mentioned before, you need to declare the `__model__` field pointing
-to the [models][models] you want that reference to be.
+When creating a `ModelRef`, as mentioned before, you need to declare the `__related_name__` field pointing
+to the Relation you want that reference to be.
 
-Let us be honest, would just creating the `__model__` be enough for what we want to achieve? No.
+Let us be honest, would just creating the `__related_name__` be enough for what we want to achieve? No.
 
 In the `ModelRef` you **must** also specify the fields you want to have upon the instantiation of
 that model.
@@ -138,9 +138,6 @@ Or if you want to have everything in one place.
 ```python title="The model reference" hl_lines="19-20"
 {!> ../docs_src/reffk/model_ref/model_ref2.py !}
 ```
-
-The reason why the `__model__` accepts both types as value it is because a lot of times you will
-**want to separate database models from model references** in different places of your codebase.
 
 Another way of thinking *what fields should I put in the ModelRef* is:
 

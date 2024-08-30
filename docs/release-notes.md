@@ -11,6 +11,12 @@ hide:
 
 - FileField and File handling.
 
+
+### Changed
+
+- Breaking: ModelReferences use now the related name instead of the model name.
+  This way it can be distinguished between multiple foreign keys to the same model and self-references are possible.
+
 ## 0.14.1
 
 ### Changed
