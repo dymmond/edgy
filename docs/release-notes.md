@@ -16,6 +16,7 @@ hide:
 
 - Breaking: ModelReferences use now the related name instead of the model name.
   This way it can be distinguished between multiple foreign keys to the same model and self-references are possible.
+- `model_references` are superseeded by `post_save_fields` in meta.
 
 ## 0.14.1
 
