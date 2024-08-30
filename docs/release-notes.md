@@ -11,6 +11,7 @@ hide:
 
 - FileField and File handling.
 - ImageField stub (more is comming soon)
+- `stage` method in relations.
 
 ### Changed
 

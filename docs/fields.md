@@ -361,6 +361,27 @@ variable = obj.email
 obj.email = "foo@example.com"
 ```
 
+#### FileField
+
+FileField stage the file operation and execute them after saving.
+
+First a file_name is reserverd. It is checked if the file name is available. If not a new one is automatically generated
+and thread-safe reserved for allocation.
+
+
+!!! Tip:
+    You may want to set null=True to allow the deletion of the file.
+
+
+!!! Tip:
+    When saving with the same name, the file is overwritten and no filename is generated.
+
+#### ImageField
+
+Extended FileField for image handling.
+
+Metadata contains dimensions (width and height).
+
 #### FloatField
 
 ```python
