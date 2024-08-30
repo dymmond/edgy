@@ -99,18 +99,18 @@ class ConcreteFileField(BaseCompositeField):
                     )
                 # file creation if value is not None otherwise deletion
                 file_instance.save(value)
-        retdict = {field_name: file_instance}
+        retdict: Any = {field_name: file_instance}
         if self.with_size:
             retdict[f"{field_name}_size"] = file_instance.size
         if self.with_approval:
             retdict[f"{field_name}_approved"] = file_instance.approved
         if self.with_metadata:
-            metadata_result = file_instance.metadata
+            metadata_result: Any = file_instance.metadata
             field = self.owner.meta.fields[f"{field_name}_metadata"]
             if field.field_type is str:
                 metadata_result = orjson.dumps(metadata_result).decode("utf8")
             retdict[field.name] = metadata_result
-        return retdict
+        return retdict  # type: ignore
 
     def get_columns(self, field_name: str) -> Sequence[sqlalchemy.Column]:
         model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
@@ -217,7 +217,7 @@ class FileField(FieldFactory):
         cls,
         field_obj: "BaseFieldType",
         field_name: str,
-        value: Union[FieldFile, str],
+        value: Union[FieldFile, str, dict],
         for_query: bool = False,
         original_fn: Any = None,
     ) -> Dict[str, Any]:

@@ -215,7 +215,7 @@ class File:
             FileOperationError: If the file cannot be reopened.
         """
         if not self.closed:
-            self.file.seek(0)
+            self.file.seek(0)  # type: ignore
         elif self.name and self.storage.exists(self.name):
             self.file = self.storage.open(self.name, mode or self.mode)  # noqa: SIM115
         else:
@@ -224,9 +224,11 @@ class File:
         return self
 
     def read(self, amount: Optional[int] = None) -> bytes:
+        assert self.file is not None
         return self.file.read(amount)
 
     def write(self, data: bytes) -> int:
+        assert self.file is not None
         self.__dict__.pop("size", None)
         return self.file.write(data)
 
