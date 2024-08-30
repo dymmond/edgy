@@ -149,7 +149,8 @@ class BaseForeignKeyField(BaseForeignKey):
         if not to_add:
             return
         if name in kwargs:
-            raise ValueError("Cannot specify a foreign key column and the foreign key itself")
+            # after removing the attributes return
+            return
         if len(column_names) != len(to_add):
             raise ValueError("Cannot update the foreign key partially")
         kwargs[name] = to_add

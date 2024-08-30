@@ -83,24 +83,42 @@ class FieldFactory(metaclass=FieldFactoryMeta):
             factory=cls,
             **kwargs,
         )
+        cls.overwrite_methods(new_field_obj)
+        return new_field_obj
 
+    @classmethod
+    def overwrite_methods(cls, field_obj: BaseFieldType) -> None:
+        """Called in metaclasses"""
         for key in dir(cls):
             if key in cls.methods_overwritable_by_factory and hasattr(cls, key):
                 fn = getattr(cls, key)
-                original_fn = getattr(new_field_obj, key, None)
+                original_fn = getattr(field_obj, key, None)
                 # use original func, not the wrapper
                 if hasattr(fn, "__func__"):
                     fn = fn.__func__
+
                 # fix classmethod, prevent injection of self or class
                 setattr(
-                    new_field_obj,
+                    field_obj,
                     key,
                     # .__func__ is a workaround for python < 3.10, python >=3.10 works without
-                    staticmethod(
-                        partial(fn, cls, new_field_obj, original_fn=original_fn)
-                    ).__func__,
+                    staticmethod(partial(fn, cls, field_obj, original_fn=original_fn)).__func__,
                 )
-        return new_field_obj
+
+    @classmethod
+    def repack(cls, field_obj: BaseFieldType) -> None:
+        for key in dir(cls):
+            if key in cls.methods_overwritable_by_factory and hasattr(cls, key):
+                packed_fn = getattr(field_obj, key, None)
+                if packed_fn is not None and hasattr(packed_fn, "func"):
+                    setattr(
+                        field_obj,
+                        key,
+                        # .__func__ is a workaround for python < 3.10, python >=3.10 works without
+                        staticmethod(
+                            partial(packed_fn.func, cls, field_obj, **packed_fn.keywords)
+                        ).__func__,
+                    )
 
     @classmethod
     def validate(cls, **kwargs: Any) -> None:  # pragma no cover

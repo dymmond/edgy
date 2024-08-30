@@ -26,6 +26,7 @@ from .types import BaseFieldType, ColumnDefinitionModel
 
 if TYPE_CHECKING:
     from edgy import Model, ReflectModel, Registry
+    from edgy.core.db.fields.factories import FieldFactory
 
 
 def _removesuffix(text: str, suffix: str) -> str:
@@ -47,6 +48,7 @@ class BaseField(BaseFieldType, FieldInfo):
     # defs to simplify the life (can be None actually)
     owner: Type["Model"]
     registry: "Registry"
+    factory: Optional["FieldFactory"] = None
 
     def __init__(
         self,

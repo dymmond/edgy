@@ -51,19 +51,19 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         Update operation of the database fields.
         """
         await self.meta.signals.pre_update.send_async(self.__class__, instance=self)
+        kwargs = self.extract_column_values(
+            extracted_values=kwargs, is_partial=True, is_update=True
+        )
 
-        # empty updates shouldn't cause an error
+        # empty updates shouldn't cause an error. E.g. only model references are updated
         if kwargs:
-            kwargs = self.extract_column_values(
-                extracted_values=kwargs, is_partial=True, is_update=True
-            )
             expression = self.table.update().values(**kwargs).where(*self.identifying_clauses())
             await self.database.execute(expression)
-        await self.meta.signals.post_update.send_async(self.__class__, instance=self)
 
-        # Update the model instance.
-        for key, value in kwargs.items():
-            setattr(self, key, value)
+            # Update the model instance.
+            transformed_kwargs = self.transform_input(kwargs, phase="post_update", instance=self)
+            for k, v in transformed_kwargs.items():
+                setattr(self, k, v)
 
         # don't trigger loads, AttributeErrors are used for skipping fields
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
@@ -77,6 +77,11 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 await field.post_save_callback(value, instance=self)
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
+        if kwargs:
+            # Ensure on access refresh the results is active
+            self._loaded_or_deleted = False
+        await self.meta.signals.post_update.send_async(self.__class__, instance=self)
+
         return self
 
     async def delete(self) -> None:
@@ -111,9 +116,6 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         """
         expression = self.table.insert().values(**kwargs)
         autoincrement_value = cast(Optional["Row"], await self.database.execute(expression))
-        transformed_kwargs = self.transform_input(kwargs, phase="post_insert", instance=self)
-        for k, v in transformed_kwargs.items():
-            setattr(self, k, v)
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
             column = self.table.autoincrement_column
@@ -122,6 +124,10 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             # can be explicit set, which causes an invalid value returned
             if column is not None and column.key not in kwargs:
                 setattr(self, column.key, autoincrement_value)
+
+        transformed_kwargs = self.transform_input(kwargs, phase="post_insert", instance=self)
+        for k, v in transformed_kwargs.items():
+            setattr(self, k, v)
 
         # don't trigger loads, AttributeErrors are used for skipping fields
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
@@ -135,6 +141,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 await field.post_save_callback(value, instance=self)
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
+        # Ensure on access refresh the results is active
+        self._loaded_or_deleted = False
+
         return self
 
     async def save(
@@ -170,25 +179,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             )
             await self._save(**kwargs)
         else:
-            # Broadcast the initial update details
-            # Making sure it only updates the fields that should be updated
-            # and excludes the fields with `auto_now` as true
-            kwargs = self.extract_column_values(
-                extracted_values=extracted_fields if values is None else values,
-                is_update=True,
-                is_partial=values is not None,
-            )
-
-            await self.meta.signals.pre_update.send_async(
-                self.__class__, instance=self, kwargs=kwargs
-            )
-            await self.update(**kwargs)
-
-            # Broadcast the update complete
-            await self.meta.signals.post_update.send_async(self.__class__, instance=self)
-
-        # Ensure on access refresh the results is active
-        self._loaded_or_deleted = False
+            await self.update(**(extracted_fields if values is None else values))
 
         await self.meta.signals.post_save.send_async(self.__class__, instance=self)
         return self

@@ -21,7 +21,7 @@ class DatabaseTestClient(_DatabaseTestClient):
 
     """
 
-    test_client_default_test_prefix = default_test_prefix
+    testclient_default_test_prefix = default_test_prefix
 
     testclient_default_lazy_setup: bool = (
         os.environ.get("EDGY_TESTCLIENT_LAZY_SETUP", "true") or ""

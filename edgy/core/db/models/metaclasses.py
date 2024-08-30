@@ -36,7 +36,7 @@ from edgy.core.db.models.managers import BaseManager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.functional import extract_field_annotations_and_defaults
-from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
+from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured, TableBuildError
 
 if TYPE_CHECKING:
     from edgy.core.db.models import Model, ReflectModel
@@ -76,7 +76,7 @@ class FieldToColumnNames(FieldToColumns, Dict[str, FrozenSet[str]]):
     def __getitem__(self, name: str) -> FrozenSet[str]:
         if name in self.data:
             return cast(FrozenSet[str], self.data[name])
-        column_names = frozenset(column.name for column in self.meta.field_to_columns[name])
+        column_names = frozenset(column.key for column in self.meta.field_to_columns[name])
         result = self.data[name] = column_names
         return result
 
@@ -508,6 +508,10 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
+        # ensure they are clean
+        attrs.pop("_pkcolumns", None)
+        attrs.pop("_pknames", None)
+        attrs.pop("_table", None)
 
         # Extract fields and managers and include them in attrs
         attrs = extract_fields_and_managers(bases, attrs)
@@ -518,8 +522,10 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                     raise ImproperlyConfigured(
                         f"Cannot add a field named pk to model {name}. Protected name."
                     )
-                # make sure we have a fresh copy where we can set the owner
+                # make sure we have a fresh copy where we can set the owner and overwrite methods
                 value = copy.copy(value)
+                if value.factory is not None:
+                    value.factory.repack(value)
                 if value.primary_key:
                     has_explicit_primary_key = True
                 # set as soon as possible the field_name
@@ -589,7 +595,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         for manager_name in managers:
             attrs.pop(manager_name, None)
-
         attrs["meta"] = meta = MetaInfo(
             meta_class,
             fields=fields,
@@ -627,7 +632,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         if not parents:
             return model_class(cls, name, bases, attrs, **kwargs)
 
-        new_class = cast("Type[Model]", model_class(cls, name, bases, attrs, **kwargs))
+        new_class = cast(Type["Model"], model_class(cls, name, bases, attrs, **kwargs))
 
         # Update the model_fields are updated to the latest
         new_class.model_fields = {**new_class.model_fields, **model_fields}
@@ -734,7 +739,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         """
         Returns a db_schema from registry if any is passed.
         """
-        if hasattr(cls, "meta") and hasattr(cls.meta, "registry"):
+        if hasattr(cls, "meta") and getattr(cls.meta, "registry", None):
             return cls.meta.registry.db_schema  # type: ignore
         return None
 
@@ -759,14 +764,19 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         2. If a db_schema in the `registry` is passed, then it will use that as a default.
         3. If none is passed, defaults to the shared schema of the database connected.
         """
-        if not hasattr(cls, "_table"):
-            cls._table = cls.build(cls.get_db_schema())
-        elif hasattr(cls, "_table"):
-            table = cls._table
-            # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} != {cls.meta.tablename}"
-            # fix assigned table
-            if table.name.lower() != cls.meta.tablename:
+        if not cls.meta.registry:
+            # we cannot set the table without a registry
+            # raising is required
+            raise AttributeError()
+        table = getattr(cls, "_table", None)
+        # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} != {cls.meta.tablename}"
+        # fix assigned table
+        if table is None or table.name.lower() != cls.meta.tablename:
+            try:
                 cls._table = cls.build(cls.get_db_schema())
+            except AttributeError as exc:
+                raise TableBuildError(exc) from exc
+
         return cast("sqlalchemy.Table", cls._table)
 
     def __getattr__(cls, name: str) -> Any:

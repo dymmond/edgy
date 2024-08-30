@@ -7,6 +7,8 @@ from typing import (
     Any,
     BinaryIO,
     Callable,
+    ClassVar,
+    Dict,
     Generator,
     Literal,
     Optional,
@@ -14,6 +16,8 @@ from typing import (
     Union,
     cast,
 )
+
+from edgy.exceptions import FileOperationError
 
 if TYPE_CHECKING:
     from .storage import Storage
@@ -41,6 +45,7 @@ class File:
     name: str
     file: Optional[BinaryIO]
     storage: "Storage"
+    DEFAULT_CHUNK_SIZE: ClassVar[int] = 64 * 2**10
 
     def __init__(
         self,
@@ -83,7 +88,8 @@ class File:
 
     @cached_property
     def size(self) -> int:
-        assert self.file is not None, "File is closed"
+        if self.file is None:
+            return 0
         if hasattr(self.file, "size"):
             return cast(int, self.file.size)
         if hasattr(self.file, "name"):
@@ -166,7 +172,7 @@ class File:
             ...
         else:
             while True:
-                data = self.read(chunk_size)
+                data = self.file.read(chunk_size)
                 if not data:
                     break
                 yield data
@@ -206,22 +212,30 @@ class File:
             File: The opened file.
 
         Raises:
-            ValueError: If the file cannot be reopened.
+            FileOperationError: If the file cannot be reopened.
         """
         if not self.closed:
-            self.seek(0)
+            self.file.seek(0)
         elif self.name and self.storage.exists(self.name):
             self.file = self.storage.open(self.name, mode or self.mode)  # noqa: SIM115
         else:
-            raise ValueError("The file cannot be reopened.")
+            raise FileOperationError("The file cannot be reopened.")
 
         return self
+
+    def read(self, amount: Optional[int] = None) -> bytes:
+        return self.file.read(amount)
+
+    def write(self, data: bytes) -> int:
+        self.__dict__.pop("size", None)
+        return self.file.write(data)
 
     def close(self) -> None:
         if self.file is None:
             return
         self.file.close()
         self.file = None
+        self.__dict__.pop("size", None)
 
 
 class ContentFile(File):
@@ -235,20 +249,19 @@ class ContentFile(File):
         return "Raw content"
 
     def open(self, mode: Union[str, Any] = None) -> "ContentFile":
-        self.seek(0)
+        self.file.seek(0)
         return self
 
     def close(self) -> None: ...
 
-    def write(self, data: bytes) -> int:
-        self.__dict__.pop("size", None)
-        return self.file.write(data)
-
 
 class FieldFile(File):
     operation: Literal["none", "save", "save_delete", "delete"] = "none"
-    old: Optional[Tuple["Storage", str]] = None
+    old: Optional[Tuple["Storage", str, bool]] = None
     instance: Optional["BaseModelType"] = None
+    # can extract metadata
+    approved: bool
+    metadata: Dict[str, Any]
 
     def __init__(
         self,
@@ -257,7 +270,9 @@ class FieldFile(File):
         name: str = "",
         size: Optional[int] = None,
         storage: Union["Storage", str, None] = None,
-        generate_name_fn: Optional[Callable[["BaseModelType", str], str]] = None,
+        generate_name_fn: Optional[Callable[[str], str]] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+        approved: bool = True,
     ) -> None:
         if isinstance(content, File):
             content = content.open("rb").file
@@ -266,6 +281,11 @@ class FieldFile(File):
         super().__init__(content, name=name, storage=storage)
         self.field = field
         self.generate_name_fn = generate_name_fn
+        self.metadata = metadata or {}
+        self.approved = approved
+        if size is not None:
+            # set value to cached_property
+            self.size = size
 
     def _require_file(self) -> None:
         if self.file is None or not self.name:
@@ -281,21 +301,28 @@ class FieldFile(File):
                 self.storage.save(self.file, self.name)
             finally:
                 self.storage.unreserve_name(self.name)
-            if self.operation == "save_delete" and self.old is not None:
+            if self.operation == "save_delete" and self.old is not None and self.old[1]:
                 self.old[0].delete(self.old[1])
         elif self.operation == "delete":
             if hasattr(self, "file"):
                 self.close()
-            self.storage.delete(self.name)
+            # old should not be None anyway but check that
+            # if name is empty or None skip deletion
+            if self.old is not None and self.old[1]:
+                self.old[0].delete(self.old[1])
+        # else approve operation or metadata update
         self.operation = "none"
         self.old = None
 
     def save(
         self,
         content: Union[BinaryIO, bytes, None, File],
+        *,
         name: str = "",
         delete_old: bool = True,
+        approved: Optional[bool] = None,
         storage: Optional["Storage"] = None,
+        force_new_file: bool = False,
     ) -> None:
         """
         Save the file to storage and update associated model fields.
@@ -307,47 +334,68 @@ class FieldFile(File):
         if content is None:
             self.delete()
             return
-        elif isinstance(content, File):
-            content = content.open("rb").file
-        elif isinstance(content, bytes):
-            content = BytesIO(content)
 
         if not name:
             name = getattr(content, "name", "")
 
-        # Generate filename based on instance and name
-        if self.generate_name_fn is not None:
-            name = self.generate_name_fn(self.instance, name)
+        if isinstance(content, File):
+            content = content.open("rb").file
+        elif isinstance(content, bytes):
+            content = BytesIO(content)
 
         if storage is None:
             storage = self.storage
 
-        name = storage.get_available_name(name, max_length=getattr(self.field, "max_length", None))
+        if self.name != name or force_new_file:
+            # Generate filename based on name
+            if self.generate_name_fn is not None:
+                name = self.generate_name_fn(name)
+
+            name = storage.get_available_name(
+                name, max_length=getattr(self.field, "max_length", None)
+            )
         if hasattr(self, "file"):
             self.close()
-        self.old = (self.storage, self.name)
+        self.file = content
+        self.old = (self.storage, self.name, self.approved)
         self.storage = storage
         self.name = name
         self.operation = "save_delete" if delete_old else "save"
+        if approved is not None:
+            self.approved = approved
+
+    def set_approved(self, approved: bool) -> None:
+        self.old = (self.storage, self.name, self.approved)
+        self.approved = approved
 
     def reset(self) -> None:
         """
         Reset staged file operation.
         """
         if self.operation == "save" or self.operation == "save_delete":
+            # delete new assigned file
             if hasattr(self, "file"):
                 self.close()
             self.storage.unreserve_name(self.name)
         if self.old is not None:
-            self.storage, self.name = self.old
+            self.storage, self.name, self.approved = self.old
             self.old = None
         self.operation = "none"
 
-    def delete(self) -> None:
+    def delete(
+        self,
+        approved: Optional[bool] = None,
+    ) -> None:
         """
         Mark the file associated with this object for deletion from storage.
         """
         if not self:
             return
+        if not self.field.null:
+            raise FileOperationError("Cannot delete file (only replacing is possible)")
         self.reset()
+        self.old = (self.storage, self.name, self.approved)
+        self.name = ""
         self.operation = "delete"
+        if approved is not None:
+            self.approved = approved

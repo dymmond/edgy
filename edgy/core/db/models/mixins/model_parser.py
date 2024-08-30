@@ -39,6 +39,7 @@ class ModelParser:
                 continue
             if field_name in extracted_values:
                 item = extracted_values[field_name]
+                assert field.owner
                 for sub_name, value in field.clean(field_name, item).items():
                     if sub_name in validated:
                         raise ValueError(f"value set twice for key: {sub_name}")

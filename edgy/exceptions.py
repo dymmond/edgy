@@ -19,6 +19,12 @@ class EdgyException(Exception):
         return "".join(self.args).strip()
 
 
+class TableBuildError(EdgyException): ...
+
+
+class FileOperationError(EdgyException): ...
+
+
 class FieldDefinitionError(EdgyException): ...
 
 

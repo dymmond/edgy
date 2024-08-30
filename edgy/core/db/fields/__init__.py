@@ -23,6 +23,7 @@ from .core import (
     UUIDField,
 )
 from .exclude_field import ExcludeField
+from .file_field import FileField, ImageField
 from .foreign_keys import ForeignKey
 from .many_to_many import ManyToMany, ManyToManyField
 from .one_to_one_keys import OneToOne, OneToOneField
@@ -45,8 +46,11 @@ __all__ = [
     "EmailField",
     "ExcludeField",
     "FloatField",
+    "FileField",
+    "ImageField",
     "ForeignKey",
     "IntegerField",
+    "ImageFile",
     "IPAddressField",
     "JSONField",
     "RefForeignKey",

@@ -18,6 +18,8 @@ results/
 site/
 target/
 tests/cli/migrations
+media/
+test_media/
 
 # files
 **/*.so

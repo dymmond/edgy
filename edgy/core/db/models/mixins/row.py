@@ -137,8 +137,8 @@ class ModelRowMixin:
                 continue
             if column.key not in cls.meta.columns_to_field:
                 continue
-            # set if not of an foreign key
-            elif cls.meta.columns_to_field[column.key] not in item:
+            # set if not of an foreign key with one column
+            elif column.key not in item:
                 if column in row._mapping:
                     item[column.key] = row._mapping[column]
                 elif column.name in row._mapping:

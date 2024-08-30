@@ -19,7 +19,7 @@ class FileSystemStorage(Storage):
 
     def __init__(
         self,
-        location: Union[str, None] = None,
+        location: Union[str, os.PathLike, None] = None,
         base_url: Union[str, None] = None,
         file_permissions_mode: Union[str, None] = None,
         directory_permissions_mode: Union[str, None] = None,
@@ -49,7 +49,9 @@ class FileSystemStorage(Storage):
 
     @cached_property
     def base_location(self) -> str:
-        return cast(str, self.value_or_setting(self._location, settings.media_root))
+        return cast(
+            str, os.path.normpath(self.value_or_setting(self._location, settings.media_root))
+        )
 
     @cached_property
     def location(self) -> str:

@@ -1,9 +1,11 @@
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union, cast
+from functools import partial
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Type, Union, cast
 
+import orjson
 import sqlalchemy
 
 from edgy.core.db.fields.base import BaseCompositeField, BaseField
-from edgy.core.db.fields.core import BigIntegerField
+from edgy.core.db.fields.core import BigIntegerField, BooleanField, JSONField
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.core.db.fields.types import ColumnDefinitionModel
 from edgy.core.files.base import FieldFile
@@ -14,40 +16,34 @@ if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.files.storage import Storage
 
+IGNORED = ["cls", "__class__", "kwargs", "generate_name_fn"]
+
 
 class ConcreteFileField(BaseCompositeField):
-    def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
-        # we are initialized already or empty
-        if name not in kwargs or not isinstance(kwargs[name], str):
-            return
-        to_add = {name: kwargs.pop(name)}
-        storage_name = f"{name}_storage"
-        if storage_name in kwargs:
-            to_add[storage_name] = kwargs.get(storage_name)
-        size_name = f"{name}_size"
-        if size_name in kwargs:
-            to_add[size_name] = kwargs.get(size_name)
+    field_file_class: Type[FieldFile]
+    _generate_name_fn: Optional[Callable[[Optional["Model"], str], str]] = None
 
+    def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
+        # we are empty
+        if name not in kwargs:
+            return
+        extracted_names: List[str] = [name, f"{name}_storage"]
+        if self.with_size:
+            extracted_names.append(f"{name}_size")
+        if self.with_approval:
+            extracted_names.append(f"{name}_approved")
+        if self.with_metadata:
+            extracted_names.append(f"{name}_metadata")
+        to_add = {}
+        for _name in extracted_names:
+            if _name in kwargs:
+                to_add[_name] = kwargs.pop(_name)
         kwargs[name] = to_add
 
-    def clean(self, field_name: str, value: FieldFile, for_query: bool = False) -> Dict[str, Any]:
-        """
-        Validates a value and transform it into columns which can be used for querying and saving.
-
-        Args:
-            field_name: the field name (can be different from name)
-            value: the field value
-        Kwargs:
-            for_query: is used for querying. Should have all columns used for querying set.
-        """
-        retdict: Dict[str, Any] = {
-            field_name: value.name,
-        }
-        if not for_query:
-            retdict[f"{field_name}_storage"] = value.storage.name
-            if self.with_sizefield:
-                retdict[f"{field_name}_size"] = value.size if value else None
-        return retdict
+    def generate_name_fn(self, instance: Optional["Model"], name: str) -> str:
+        if self._generate_name_fn is None:
+            return name
+        return self._generate_name_fn(instance, name)
 
     def to_model(
         self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
@@ -63,38 +59,58 @@ class ConcreteFileField(BaseCompositeField):
             phase: the phase (set, creation, ...)
 
         """
+        if (
+            phase in {"post_update", "post_insert"}
+            and instance is not None
+            and self.name in instance.__dict__
+        ):
+            # use old one
+            value = cast(FieldFile, instance.__dict__[self.name])
+        # unpack when not from db
+        if isinstance(value, dict) and not isinstance(value.get(field_name), str):
+            value = value[field_name]
         if isinstance(value, FieldFile):
-            return {field_name: value}
-        # init and load
-        if isinstance(value, dict):
-            file_instance = FieldFile(
-                self,
-                name=value[field_name],
-                storage=value[f"{field_name}_storage"],
-                size=value.get(f"{field_name}_size"),
-                generate_name_fn=self.generate_name_fn,
-            )
+            file_instance = value
         else:
-            if instance is not None and self.name in instance.__dict__:
-                # use old one
-                file_instance = cast(FieldFile, instance.__dict__[self.name])
-            else:
-                # not initialized yet
-                file_instance = FieldFile(
-                    self, generate_name_fn=self.generate_name_fn, storage=self.storage
+            # init, load, post_insert, post_update
+            if isinstance(value, dict):
+                if phase == "set":
+                    raise ValueError("Cannot set dict to FileField")
+                file_instance = self.field_file_class(
+                    self,
+                    name=value[field_name],
+                    storage=value.get(f"{field_name}_storage", self.storage),
+                    size=value.get(f"{field_name}_size"),
+                    metadata=value.get(f"{field_name}_metadata", {}),
+                    approved=value.get(f"{field_name}_approved", not self.with_approval),
+                    generate_name_fn=partial(self.generate_name_fn, instance),
                 )
-                file_instance.instance = instance
-            # file creation if value is not None
-            file_instance.save(value)
-        return {field_name: file_instance}
-
-    def __get__(self, instance: "Model", owner: Any = None) -> FieldFile:
-        if instance:
-            # defer or other reason, file is not loaded yet. Trigger load.
-            if self.name not in instance.__dict__:
-                raise AttributeError()
-            return instance.__dict__[self.name]  # type: ignore
-        raise ValueError("missing instance")
+            else:
+                if instance is not None and self.name in instance.__dict__:
+                    # use old one
+                    file_instance = cast(FieldFile, instance.__dict__[self.name])
+                else:
+                    # not initialized yet
+                    file_instance = self.field_file_class(
+                        self,
+                        generate_name_fn=partial(self.generate_name_fn, instance),
+                        storage=self.storage,
+                        approved=not self.with_approval,
+                    )
+                # file creation if value is not None otherwise deletion
+                file_instance.save(value)
+        retdict = {field_name: file_instance}
+        if self.with_size:
+            retdict[f"{field_name}_size"] = file_instance.size
+        if self.with_approval:
+            retdict[f"{field_name}_approved"] = file_instance.approved
+        if self.with_metadata:
+            metadata_result = file_instance.metadata
+            field = self.owner.meta.fields[f"{field_name}_metadata"]
+            if field.field_type is str:
+                metadata_result = orjson.dumps(metadata_result).decode("utf8")
+            retdict[field.name] = metadata_result
+        return retdict
 
     def get_columns(self, field_name: str) -> Sequence[sqlalchemy.Column]:
         model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
@@ -106,7 +122,7 @@ class ConcreteFileField(BaseCompositeField):
             ),
             sqlalchemy.Column(
                 f"{field_name}_storage",
-                sqlalchemy.String(length=20, collation=self.collation),
+                sqlalchemy.String(length=20, collation=self.column_type.collation),
                 default=self.storage.name,
             ),
         ]
@@ -115,33 +131,62 @@ class ConcreteFileField(BaseCompositeField):
         self, name: str, fields: Dict[str, "BaseFieldType"]
     ) -> Dict[str, "BaseFieldType"]:
         retdict: Dict[str, Any] = {}
-        if self.with_sizefield:
+        if self.with_size:
             size_name = f"{name}_size"
             if size_name not in fields:
                 retdict[size_name] = BigIntegerField(
-                    ge=0, null=self.null, exclude=True, read_only=True
+                    ge=0,
+                    null=self.null,
+                    exclude=True,
+                    read_only=True,
+                    name=size_name,
+                    owner=self.owner,
+                )
+        if self.with_approval:
+            approval_name = f"{name}_approved"
+            if approval_name not in fields:
+                retdict[approval_name] = BooleanField(
+                    null=False,
+                    default=False,
+                    exclude=True,
+                    column_name=f"{name}_ok",
+                    name=approval_name,
+                    owner=self.owner,
+                )
+        if self.with_metadata:
+            metadata_name = f"{name}_metadata"
+            if metadata_name not in fields:
+                retdict[metadata_name] = JSONField(
+                    null=False, column_name=f"{name}_mname", name=metadata_name, owner=self.owner
                 )
         return retdict
 
     def get_composite_fields(self) -> Dict[str, "BaseFieldType"]:
-        retdict: Dict[str, Any] = {self.name: self}
-        if self.with_sizefield:
-            size_name = f"{self.name}_size"
-            retdict[size_name] = self.owner.meta.fields[size_name]
-        return retdict
+        field_names: List[str] = [self.name]
+        if self.with_size:
+            field_names.append(f"{self.name}_size")
+        if self.with_approval:
+            field_names.append(f"{self.name}_approved")
+        if self.with_metadata:
+            field_names.append(f"{self.name}_metadata")
+        return {name: self.owner.meta.fields[name] for name in field_names}
 
     async def post_save_callback(self, value: FieldFile, instance: "Model") -> None:
         await value.execute_operation()
 
 
 class FileField(FieldFactory):
-    _type: Any
+    field_type = Any
     field_bases = (ConcreteFileField,)
 
     def __new__(  # type: ignore
         cls,
         storage: Union[str, "Storage", None] = None,
-        with_sizefield: bool = True,
+        with_size: bool = True,
+        with_metadata: bool = True,
+        with_approval: bool = False,
+        field_file_class: Type[FieldFile] = FieldFile,
+        generate_name_fn: Optional[Callable[[Optional["Model"], str], str]] = None,
         **kwargs: Any,
     ) -> BaseField:
         if not storage:
@@ -149,10 +194,88 @@ class FileField(FieldFactory):
         elif isinstance(storage, str):
             storage = storages[storage]
 
-        return super().__new__(cls, storage=storage, **kwargs)  # type: ignore
+        kwargs = {
+            **kwargs,
+            **{k: v for k, v in locals().items() if k not in IGNORED},
+        }
+        return super().__new__(cls, _generate_name_fn=generate_name_fn, **kwargs)  # type: ignore
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.String(
             length=kwargs.get("max_length", 255), collation=kwargs.get("collation", None)
         )
+
+    @classmethod
+    def extract_metadata(
+        cls, field_obj: "BaseFieldType", field_name: str, field_file: FieldFile, approved: bool
+    ) -> Dict[str, Any]:
+        return {}
+
+    @classmethod
+    def clean(
+        cls,
+        field_obj: "BaseFieldType",
+        field_name: str,
+        value: Union[FieldFile, str],
+        for_query: bool = False,
+        original_fn: Any = None,
+    ) -> Dict[str, Any]:
+        """
+        Validates a value and transform it into columns which can be used for querying and saving.
+
+        Args:
+            field_name: the field name (can be different from name)
+            value: the field value
+        Kwargs:
+            for_query: is used for querying. Should have all columns used for querying set.
+        """
+        assert field_obj.owner
+        # unpack
+        if isinstance(value, dict) and isinstance(value.get(field_name), FieldFile):
+            value = value[field_name]
+        assert for_query or isinstance(value, FieldFile), f"Not a FieldFile: {value!r}"
+        if for_query:
+            if isinstance(value, str):
+                return {field_name: value}
+            assert isinstance(value, FieldFile)
+            query_dict: Dict[str, Any] = {
+                field_name: value.name,
+            }
+            query_dict[f"{field_name}_storage"] = value.storage.name
+            return query_dict
+        else:
+            assert isinstance(value, FieldFile)
+            retdict: Dict[str, Any] = {
+                field_name: value.name,
+            }
+            retdict[f"{field_name}_storage"] = value.storage.name
+            # fallback when with_approval is False
+            approved = True
+            if field_obj.with_approval:
+                if value:
+                    retdict[f"{field_name}_approved"] = value.approved
+                    approved = value.approved
+                else:
+                    retdict[f"{field_name}_approved"] = False
+                    approved = False
+            if field_obj.with_size:
+                retdict[f"{field_name}_size"] = value.size if value else None
+            if field_obj.with_metadata:
+                metadata_result: Any = (
+                    cls.extract_metadata(
+                        field_obj, field_name=field_name, field_file=value, approved=approved
+                    )
+                    if value
+                    else {}
+                )
+                field = field_obj.owner.meta.fields[f"{field_name}_metadata"]
+                # in case the field was swapped out for a text field
+                if field.field_type is str:
+                    metadata_result = orjson.dumps(metadata_result).decode("utf8")
+                retdict[field.name] = metadata_result
+            return retdict
+
+
+class ImageField(FileField):
+    pass

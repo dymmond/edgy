@@ -5,18 +5,22 @@ hide:
 
 # Release Notes
 
-## 0.15
+## 0.15.0
 
 ### Added
 
 - FileField and File handling.
-
+- ImageField stub (more is comming soon)
 
 ### Changed
 
 - Breaking: ModelReferences use now the related name instead of the model name.
   This way it can be distinguished between multiple foreign keys to the same model and self-references are possible.
 - `model_references` are superseeded by `post_save_fields` in meta.
+
+### Fixed
+
+- Factory overwrites can now access owner.
 
 ## 0.14.1
 
