@@ -716,7 +716,7 @@ You should also provide an init method which sets following attributes:
 
 #### Using for_query
 
-`clean` is required to clean the values for the db. It has an extra paramert `for_query` which is set
+`clean` is required to clean the values for the db. It has an extra parameter `for_query` which is set
 in a querying context (searching something in the db).
 
 #### Using phases
@@ -738,7 +738,7 @@ But if the variables clash with the variables used for Columns or for pydantic i
 
 #### Field returning persistent, instance aware object
 
-For getting an immutable object attached to a Model instance, there are two ways
+For getting an immutable object attached to a Model instance, there are two ways:
 
 - Using Managers (by default they are instance aware)
 - Using fields with `__get__` and `to_model`.
