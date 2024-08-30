@@ -1,6 +1,6 @@
 import typing
 from inspect import isclass
-from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 from typing_extensions import get_origin
 
@@ -45,17 +45,6 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         return super().__new__(cls, to=to, exclude=True, null=null)
 
     @classmethod
-    async def __get__(
-        cls,
-        obj: "BaseFieldType",
-        instance: "Model",
-        owner: Optional[Type["Model"]] = None,
-        original_fn: Any = None,
-    ) -> Any:
-        # stub out access when unset
-        return instance.__dict__.get(obj.name, ())
-
-    @classmethod
     async def post_save_callback(
         cls,
         obj: "BaseFieldType",
@@ -86,5 +75,5 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
                 **cast("ModelRef", instance_or_dict).model_dump(exclude={"__related_name__"}),
                 **extra_params,
             )
-            # we are in a relation ship field
+            # we are in a relationship field
             await relation.add(model)

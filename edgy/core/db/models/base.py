@@ -427,7 +427,10 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
                 return result
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(token)
-        return self.__dict__[name]
+        try:
+            return self.__dict__[name]
+        except KeyError:
+            raise AttributeError(f"Attribute: {name} not found") from None
 
     def __getattr__(self, name: str) -> Any:
         """

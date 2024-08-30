@@ -1,4 +1,3 @@
-import inspect
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union, cast
 
 from sqlalchemy.engine.result import Row
@@ -66,7 +65,8 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        token = MODEL_GETATTR_BEHAVIOR.set("coro")
+        # don't trigger loads, AttributeErrors are used for skipping fields
+        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
         try:
             for field_name in self.meta.post_save_fields:
                 field = self.meta.fields[field_name]
@@ -74,8 +74,6 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                     value = getattr(self, field_name)
                 except AttributeError:
                     continue
-                if inspect.isawaitable(value):
-                    value = await value
                 await field.post_save_callback(value, instance=self)
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
@@ -125,7 +123,8 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             if column is not None and column.key not in kwargs:
                 setattr(self, column.key, autoincrement_value)
 
-        token = MODEL_GETATTR_BEHAVIOR.set("coro")
+        # don't trigger loads, AttributeErrors are used for skipping fields
+        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
         try:
             for field_name in self.meta.post_save_fields:
                 field = self.meta.fields[field_name]
@@ -133,8 +132,6 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                     value = getattr(self, field_name)
                 except AttributeError:
                     continue
-                if inspect.isawaitable(value):
-                    value = await value
                 await field.post_save_callback(value, instance=self)
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
