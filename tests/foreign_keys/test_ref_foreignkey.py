@@ -103,6 +103,13 @@ async def test_get_or_create():
     posts = await user2.posts_set.all()
     assert posts[1].comment == "second arg"
 
+    user3, created = await User.query.update_or_create(
+        PostRef(comment="third arg"), name="foo", posts=[]
+    )
+    posts = await user3.posts_set.all()
+    assert posts[1].comment == "second arg"
+    assert posts[2].comment == "third arg"
+
 
 async def test_model_crud():
     track1 = TrackModelRef(title="The Bird", position=1)

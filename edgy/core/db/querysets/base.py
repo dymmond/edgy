@@ -1207,45 +1207,68 @@ class QuerySet(BaseQuerySet):
             defaults = {}
 
         try:
-            instance = await self.get(**kwargs)
-            for arg in args:
-                if isinstance(arg, ModelRef):
-                    relation_field = self.model_class.meta.fields[arg.__related_name__]
-                    extra_params = {}
-                    try:
-                        # m2m or foreign key
-                        target_model_class = relation_field.target
-                    except AttributeError:
-                        # reverse m2m or foreign key
-                        target_model_class = relation_field.related_from
-                    if not relation_field.is_m2m:
-                        # sometimes the foreign key is required, so set it already
-                        extra_params[relation_field.foreign_key.name] = self
-                    model = target_model_class(
-                        **arg.model_dump(exclude={"__related_name__"}),
-                        **extra_params,
-                    )
-                    relation = getattr(instance, arg.__related_name__)
-                    await relation.add(model)
-            return instance, False
+            get_instance = await self.get(**kwargs)
         except ObjectNotFound:
             kwargs.update(defaults)
             instance = await self.create(*args, **kwargs)
             return instance, True
+        for arg in args:
+            if isinstance(arg, ModelRef):
+                relation_field = self.model_class.meta.fields[arg.__related_name__]
+                extra_params = {}
+                try:
+                    # m2m or foreign key
+                    target_model_class = relation_field.target
+                except AttributeError:
+                    # reverse m2m or foreign key
+                    target_model_class = relation_field.related_from
+                if not relation_field.is_m2m:
+                    # sometimes the foreign key is required, so set it already
+                    extra_params[relation_field.foreign_key.name] = get_instance
+                model = target_model_class(
+                    **arg.model_dump(exclude={"__related_name__"}),
+                    **extra_params,
+                )
+                relation = getattr(get_instance, arg.__related_name__)
+                await relation.add(model)
+        return get_instance, False
 
     async def update_or_create(
-        self, defaults: Dict[str, Any], **kwargs: Any
+        self, defaults: Union[Dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
     ) -> Tuple[EdgyModel, bool]:
         """
         Updates a record in a specific table or creates a new one.
         """
+        if not isinstance(defaults, dict):
+            # can be a ModelRef so pass it
+            args = [defaults, *args]
+            defaults = {}
         try:
             get_instance = await self.get(**kwargs)
         except ObjectNotFound:
             kwargs.update(defaults)
-            instance = await self.create(**kwargs)
+            instance = await self.create(*args, **kwargs)
             return instance, True
         await get_instance.update(**defaults)
+        for arg in args:
+            if isinstance(arg, ModelRef):
+                relation_field = self.model_class.meta.fields[arg.__related_name__]
+                extra_params = {}
+                try:
+                    # m2m or foreign key
+                    target_model_class = relation_field.target
+                except AttributeError:
+                    # reverse m2m or foreign key
+                    target_model_class = relation_field.related_from
+                if not relation_field.is_m2m:
+                    # sometimes the foreign key is required, so set it already
+                    extra_params[relation_field.foreign_key.name] = get_instance
+                model = target_model_class(
+                    **arg.model_dump(exclude={"__related_name__"}),
+                    **extra_params,
+                )
+                relation = getattr(get_instance, arg.__related_name__)
+                await relation.add(model)
         self._clear_cache()
         return get_instance, False
 

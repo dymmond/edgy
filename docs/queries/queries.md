@@ -622,6 +622,7 @@ will use that value with the `defaults` provided to create a new instance.
     Since the `get_or_create()` is doing a [get](#get) internally, it can also raise a
     [MultipleObjectsReturned](../exceptions.md#multipleobjectsreturned).
 
+You can pass positional ModelRefs to this method.
 
 ### Update or create
 
@@ -643,6 +644,7 @@ will use that value with the `defaults` provided to create a new instance.
     Since the `get_or_create()` is doing a [get](#get) internally, it can also raise a
     [MultipleObjectsReturned](../exceptions.md#multipleobjectsreturned).
 
+You can pass positional ModelRefs to this method.
 
 ### Bulk create
 
