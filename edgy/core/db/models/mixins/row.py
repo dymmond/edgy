@@ -145,7 +145,7 @@ class ModelRowMixin:
                     # fallback, sometimes the column is not found
                     item[column.key] = row._mapping[column.name]
         model = (
-            cast("Model", cls(**item))
+            cast("Model", cls(**item, __phase__="init_db"))
             if not exclude_secrets and not is_defer_fields and not _is_only
             else cast("Model", cls.proxy_model(**item))
         )

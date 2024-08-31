@@ -1,6 +1,6 @@
 import typing
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Dict, Generator, List, Optional, Sequence, Set, Tuple, Union
+from typing import Any, AsyncIterator, Dict, Generator, List, Sequence, Set, Tuple, Union
 
 if typing.TYPE_CHECKING:
     import sqlalchemy
@@ -82,7 +82,7 @@ class QueryType(ABC, typing.Generic[EdgyModel]):
     async def last(self) -> Union[EdgyModel, None]: ...
 
     @abstractmethod
-    async def create(self, **kwargs: Any) -> EdgyModel: ...
+    async def create(self, *args, **kwargs: Any) -> EdgyModel: ...
 
     @abstractmethod
     async def bulk_create(self, objs: Sequence[List[Dict[Any, Any]]]) -> None: ...
@@ -118,7 +118,8 @@ class QueryType(ABC, typing.Generic[EdgyModel]):
     @abstractmethod
     async def get_or_create(
         self,
-        _defaults: Optional[Dict[str, Any]] = None,
+        defaults: Union[Dict[str, Any], Any, None] = None,
+        *args: Any,
         **kwargs: Any,
     ) -> Tuple[EdgyModel, bool]: ...
 

@@ -8,13 +8,10 @@ from edgy.types import Undefined
 
 if TYPE_CHECKING:
     from edgy import QuerySet
-    from edgy.core.db.models import Model, ReflectModel
+    from edgy.core.db.models import Model
 
 
-_EdgyModel = TypeVar("_EdgyModel", bound="Model")
-ReflectEdgyModel = TypeVar("ReflectEdgyModel", bound="ReflectModel")
-
-EdgyModel = Union[_EdgyModel, ReflectEdgyModel]
+EdgyModel = TypeVar("EdgyModel", bound="Model")
 
 
 class QuerySetPropsMixin:

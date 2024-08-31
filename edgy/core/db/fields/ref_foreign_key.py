@@ -1,6 +1,6 @@
 import typing
 from inspect import isclass
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Optional, Type, Union, cast
 
 from typing_extensions import get_origin
 
@@ -18,6 +18,28 @@ if TYPE_CHECKING:
 class RefForeignKey(ForeignKeyFieldFactory, list):
     field_type = list
     field_bases = (BaseField,)
+
+    @classmethod
+    def modify_input(
+        cls,
+        field_obj: "BaseFieldType",
+        name: str,
+        kwargs: Dict[str, Any],
+        phase: str = "",
+        original_fn: Any = None,
+    ) -> None:
+        # we are empty
+        if name not in kwargs and phase == "init_db":
+            kwargs[name] = []
+
+    def embed_field(
+        self,
+        prefix: str,
+        new_fieldname: str,
+        owner: Optional[Type["BaseModelType"]] = None,
+        parent: Optional["BaseFieldType"] = None,
+    ) -> Optional["BaseFieldType"]:
+        return None
 
     @classmethod
     def is_class_and_subclass(cls, value: typing.Any, _type: typing.Any) -> bool:

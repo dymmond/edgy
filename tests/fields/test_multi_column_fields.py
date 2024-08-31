@@ -41,7 +41,7 @@ class MultiColumnFieldInner(BaseField):
             return {field_name: value, field_name + "_inner": value}
         return {field_name: value["normal"], field_name + "_inner": value["inner"]}
 
-    def modify_input(self, field_name: str, kwargs: Any) -> None:
+    def modify_input(self, field_name: str, kwargs: Any, phase: str = "") -> None:
         if field_name not in kwargs and field_name + "_inner" not in kwargs:
             return
         normal = kwargs.pop(field_name, None)

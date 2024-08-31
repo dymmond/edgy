@@ -1,7 +1,7 @@
 from typing import List
 
 import edgy
-from edgy import Database, ModelRef, Registry, run_sync
+from edgy import Database, Registry, run_sync
 
 database = Database("sqlite:///db.sqlite")
 models = Registry(database=database)
@@ -15,7 +15,6 @@ class PostRef(ModelRef):
 class User(edgy.Model):
     id: int = edgy.IntegerField(primary_key=True)
     name: str = edgy.CharField(max_length=255)
-    posts: List["Post"] = edgy.RefForeignKey(PostRef)
 
     class Meta:
         registry = models
@@ -30,13 +29,11 @@ class Post(edgy.Model):
         registry = models
 
 
-# now we do things like
+# This time completely without a RefForeignKey
 
 run_sync(
     User.query.create(
         PostRef(comment="foo"),
         PostRef(comment="bar"),
-    ),
-    name="edgy",
-    posts=[{"comment": "I am a dict"}],
+    )
 )

@@ -114,7 +114,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         # phase 1: transform
         # Note: this is order dependend. There should be no overlap.
         for field_name in cls.meta.input_modifying_fields:
-            fields[field_name].modify_input(field_name, kwargs)
+            fields[field_name].modify_input(field_name, kwargs, phase=phase)
         # phase 2: apply to_model
         for key, value in kwargs.items():
             field = fields.get(key, None)

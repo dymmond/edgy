@@ -236,7 +236,7 @@ class BaseCompositeField(BaseField):
         for sub_name, field in self.composite_fields.items():
             translated_name = self.translate_name(sub_name)
             if translated_name not in value:
-                if phase == "init":
+                if phase == "init" or phase == "init_db":
                     continue
                 raise ErrorType(f"Missing sub-field: {sub_name} for {field_name}")
             result.update(
@@ -312,7 +312,7 @@ class PKField(BaseCompositeField):
             d[translated_name] = getattr(instance, key, None)
         return d
 
-    def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
+    def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:
         if name not in kwargs:
             return
         # check for collisions
@@ -428,7 +428,10 @@ class BaseForeignKey(RelationshipField):
         """
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]
+                try:
+                    self._target = self.registry.models[self.to]
+                except KeyError:
+                    self._target = self.registry.reflected[self.to]
             else:
                 self._target = self.to
         return self._target

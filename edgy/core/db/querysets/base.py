@@ -26,6 +26,7 @@ from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR, get_schema
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
+from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import Prefetch, PrefetchMixin, check_prefetch_collision
@@ -1075,13 +1076,13 @@ class QuerySet(BaseQuerySet):
             return await self._get_or_cache_row(row, extra_attr="_cache_last")
         return None
 
-    async def create(self, **kwargs: Any) -> EdgyModel:
+    async def create(self, *args: Any, **kwargs: Any) -> EdgyModel:
         """
         Creates a record in a specific table.
         """
         # for tenancy
         queryset: QuerySet = self._clone()
-        instance = self.model_class(**kwargs)
+        instance = self.model_class(*args, **kwargs)
         apply_instance_extras(
             instance,
             self.model_class,
@@ -1195,19 +1196,41 @@ class QuerySet(BaseQuerySet):
         self._clear_cache()
 
     async def get_or_create(
-        self, defaults: Dict[str, Any], **kwargs: Any
+        self, defaults: Union[Dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
     ) -> Tuple[EdgyModel, bool]:
         """
         Creates a record in a specific table or updates if already exists.
         """
+        if not isinstance(defaults, dict):
+            # can be a ModelRef so pass it
+            args = [defaults, *args]
+            defaults = {}
 
         try:
             instance = await self.get(**kwargs)
-
+            for arg in args:
+                if isinstance(arg, ModelRef):
+                    relation_field = self.model_class.meta.fields[arg.__related_name__]
+                    extra_params = {}
+                    try:
+                        # m2m or foreign key
+                        target_model_class = relation_field.target
+                    except AttributeError:
+                        # reverse m2m or foreign key
+                        target_model_class = relation_field.related_from
+                    if not relation_field.is_m2m:
+                        # sometimes the foreign key is required, so set it already
+                        extra_params[relation_field.foreign_key.name] = self
+                    model = target_model_class(
+                        **arg.model_dump(exclude={"__related_name__"}),
+                        **extra_params,
+                    )
+                    relation = getattr(instance, arg.__related_name__)
+                    await relation.add(model)
             return instance, False
         except ObjectNotFound:
             kwargs.update(defaults)
-            instance = await self.create(**kwargs)
+            instance = await self.create(*args, **kwargs)
             return instance, True
 
     async def update_or_create(

@@ -354,6 +354,8 @@ await User.query.create(is_active=False, email="bar@foo.com")
 await User.query.create(is_active=True, email="foo@bar.com", first_name="Foo", last_name="Bar")
 ```
 
+Create takes `ModelRef`s as positional arguments to automatically evaluate and stage them.
+
 ### Delete
 
 Used to delete an instance.
@@ -369,6 +371,12 @@ user = await User.query.get(email="foo@bar.com")
 
 await user.delete()
 ```
+
+
+#### Parameters
+
+- `use_models`: Instead of deleting directly in db, models are queried and deleted one by one. It is automatically activated in case of
+                file fields (or other fields with a post_delete_callback method).
 
 ### Update
 
@@ -839,7 +847,7 @@ Well, Edgy also supports the `run_sync` functionality that allows you to run the
 
 ### How to use
 
-You simply need to use the `run_sync` functionality from Edgy and make it happen almost immediatly.
+You simply need to use the `run_sync` functionality from Edgy and make it happen almost immediately.
 
 ```python
 from edgy import run_sync

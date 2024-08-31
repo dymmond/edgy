@@ -4,6 +4,7 @@ import inspect
 import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -39,7 +40,7 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured, TableBuildError
 
 if TYPE_CHECKING:
-    from edgy.core.db.models import Model, ReflectModel
+    from edgy.core.db.models import Model
 
 _empty_dict: Dict[str, Any] = {}
 _empty_set: FrozenSet[Any] = frozenset()
@@ -317,9 +318,35 @@ def get_model_registry(
     return None
 
 
+def _set_related_field(
+    target: "Model",
+    *,
+    foreign_key_name: str,
+    related_name: str,
+    source: "Model",
+) -> None:
+    if related_name in target.meta.fields:
+        raise ForeignKeyBadConfigured(
+            f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
+        )
+
+    related_field = RelatedField(
+        foreign_key_name=foreign_key_name,
+        name=related_name,
+        owner=target,
+        related_from=source,
+    )
+
+    # Set the related name
+    target.meta.fields[related_name] = related_field
+    # for updating post_save_callback
+    if target.meta._is_init:
+        target.meta.post_save_fields.add(related_name)
+
+
 def _set_related_name_for_foreign_keys(
     foreign_keys: Dict[str, BaseForeignKeyField],
-    model_class: Union["Model", "ReflectModel"],
+    model_class: "Model",
 ) -> None:
     """
     Sets the related name for the foreign keys.
@@ -341,26 +368,25 @@ def _set_related_name_for_foreign_keys(
             else:
                 related_name = f"{model_class.__name__.lower()}s_set"
 
-        if related_name in foreign_key.target.meta.fields:
-            raise ForeignKeyBadConfigured(
-                f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
-            )
         foreign_key.related_name = related_name
         foreign_key.reverse_name = related_name
 
-        related_field = RelatedField(
+        # FIXME: by pushing in target we resolve the target. This can lead to crashes if the target is not in registry
+        related_field_fn = partial(
+            _set_related_field,
+            source=model_class,
             foreign_key_name=name,
-            name=related_name,
-            owner=foreign_key.target,
-            related_from=model_class,
+            related_name=related_name,
         )
-
-        # Set the related name
-        target = foreign_key.target
-        target.meta.fields[related_name] = related_field
-        # for updating post_save_callback
-        if target.meta._is_init:
-            target.meta.post_save_fields.add(related_name)
+        try:
+            related_field_fn(foreign_key.target)
+        except KeyError as exc:
+            if isinstance(foreign_key.to, str):
+                model_class.meta.registry._callbacks.setdefault(foreign_key.to, []).append(
+                    related_field_fn
+                )
+            else:
+                raise exc
 
 
 def _handle_annotations(base: Type, base_annotations: Dict[str, Any]) -> None:
@@ -721,8 +747,12 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         meta.model = new_class
 
         # Sets the foreign key fields
-        if not new_class.__is_proxy_model__ and meta.foreign_key_fields:
-            _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
+        if not new_class.__is_proxy_model__:
+            if meta.foreign_key_fields:
+                _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
+            callbacks = registry._callbacks.get(name)
+            while callbacks:
+                callbacks.pop()(new_class)
 
         # Update the model references with the validations of the model
         # Being done by the Edgy fields instead.

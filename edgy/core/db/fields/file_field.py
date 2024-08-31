@@ -23,7 +23,7 @@ class ConcreteFileField(BaseCompositeField):
     field_file_class: Type[FieldFile]
     _generate_name_fn: Optional[Callable[[Optional["BaseModelType"], str], str]] = None
 
-    def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
+    def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:
         # we are empty
         if name not in kwargs:
             return
@@ -135,6 +135,7 @@ class ConcreteFileField(BaseCompositeField):
         self, name: str, fields: Dict[str, "BaseFieldType"]
     ) -> Dict[str, "BaseFieldType"]:
         retdict: Dict[str, Any] = {}
+        # TODO: use embed_field
         if self.with_size:
             size_name = f"{name}_size"
             if size_name not in fields:

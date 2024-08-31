@@ -129,7 +129,7 @@ class BaseForeignKeyField(BaseForeignKey):
             raise ValueError(f"cannot handle: {value} of type {type(value)}")
         return retdict
 
-    def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
+    def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:
         column_names = self.get_column_names(name)
         assert len(column_names) >= 1
         if len(column_names) == 1:

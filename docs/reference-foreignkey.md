@@ -107,8 +107,10 @@ or anything you could normally use with a normal Pydantic model.
 #### Attention
 
 You need to be careful when declaring the fields of the `ModelRef` because that will be used
-against the `__related_name__` declared. If the [model][models] has `constraints`, `uniques` and so on
+against the `__related_name__` declared. If the [model][models] on the reverse end of the relationship has `constraints`, `uniques` and so on
 you will need to respect it when you are about to insert in the database.
+
+It is also not possible to cross multiple models (except the through model in ManyToMany).
 
 #### Declaring a ModelRef
 
@@ -161,8 +163,8 @@ the user but now it is time to use the [RefForeignKey][reffk] instead.
 
 **What do we needed**:
 
-1. The [RefForeignKey][reffk] field.
-2. The [ModelRef][model_ref] object.
+1. The [ModelRef][model_ref] object.
+2. The [RefForeignKey][reffk] field (Optionally, you can pass ModelRef instances also as positional argument).
 
 Now it is time to readapt the [scenario](#scenario-example) example to adopt the [RefForeignKey](#refforeignkey)
 instead.
@@ -199,6 +201,12 @@ And the models with the imports.
 {!> ../docs_src/reffk/complex_example.py !}
 ```
 
+Here an example using the ModelRefs without RefForeignKey:
+
+```python title="models.py"
+{!> ../docs_src/reffk/positional_example.py !}
+```
+
 ### Writing the results
 
 Now that we refactored the code to have the [ModelRef][model_ref] we will also readapt the way we
@@ -226,6 +234,9 @@ post3 = PostRef(comment="A third comment")
 
 # Create the usee with all the posts
 await User.query.create(name="Edgy", posts=[post1, post2, post3])
+# or positional (Note: because posts has not null=True, we need still to provide the argument)
+await User.query.create(post1, post2, post3, name="Edgy", posts=[])
+
 ```
 
 This will now will make sure that creates all the proper objects and associated IDs in the corresponding
@@ -244,6 +255,8 @@ As per almost everything in the documentation, **Edgy** will use [Esmerald][esme
 Let us see the advantage of using this new approach directly there and enjoy.
 
 You can see the [RefForeignKey][reffk] as some sort of ***nested*** object.
+
+The beauty of [RefForeignKey][reffk] is the automatic conversion of dicts, so it is interoperable with many APIs.
 
 ### Declare the models, views and ModelRef
 
