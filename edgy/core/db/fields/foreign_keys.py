@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple
 
 import sqlalchemy
 from pydantic import BaseModel
@@ -8,17 +8,11 @@ from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.relationships.relation import SingleRelation
-from edgy.core.terminal import Print
 from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
-    from edgy import Model
-
-
-T = TypeVar("T", bound="Model")
-
-terminal = Print()
+    from edgy.core.db.models.types import BaseModelType
 
 
 FK_CHAR_LIMIT = 63
@@ -248,7 +242,7 @@ class ForeignKey(ForeignKeyFieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        to: "Model",
+        to: "BaseModelType",
         **kwargs: Any,
     ) -> BaseFieldType:
         return super().__new__(cls, to=to, **kwargs)

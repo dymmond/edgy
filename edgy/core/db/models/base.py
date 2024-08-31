@@ -27,10 +27,9 @@ from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
-from edgy.core.db.models.mixins import ModelParser
 from edgy.core.db.models.model_proxy import ProxyModel
+from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
-from edgy.core.utils.functional import edgy_setattr
 from edgy.core.utils.models import generify_model_fields
 from edgy.core.utils.sync import run_sync
 from edgy.types import Undefined
@@ -45,7 +44,7 @@ if TYPE_CHECKING:
 _empty = cast(Set[str], frozenset())
 
 
-class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMeta):
+class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
     """
     Base of all Edgy models with the core setup.
     """
@@ -63,10 +62,40 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
     _loaded_or_deleted: bool = False
     __using_schema__: Union[str, None, Any] = Undefined
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        __show_pk__ = kwargs.pop("__show_pk__", False)
-        kwargs = self.transform_input(kwargs, phase="init", instance=self)
+    def __init__(
+        self, *args: Any, __show_pk__: bool = False, __phase__: str = "init", **kwargs: Any
+    ) -> None:
+        # inject in relation fields anonymous ModelRef (without a Field)
+        for arg in args:
+            if isinstance(arg, ModelRef):
+                relation_field = self.meta.fields[arg.__related_name__]
+                extra_params = {}
+                try:
+                    # m2m or foreign key
+                    target_model_class = relation_field.target
+                except AttributeError:
+                    # reverse m2m or foreign key
+                    target_model_class = relation_field.related_from
+                if not relation_field.is_m2m:
+                    # sometimes the foreign key is required, so set it already
+                    extra_params[relation_field.foreign_key.name] = self
+                model = target_model_class(
+                    **arg.model_dump(exclude={"__related_name__"}),
+                    **extra_params,
+                )
+                existing: Any = kwargs.get(arg.__related_name__)
+                if isinstance(existing, Sequence):
+                    existing = [*existing, model]
+                elif existing is None:
+                    existing = [model]
+                else:
+                    existing = [existing, model]
+                kwargs[arg.__related_name__] = existing
+
+        kwargs = self.transform_input(kwargs, phase=__phase__, instance=self)
         super().__init__(**kwargs)
+        # restrict to fields
+        # TODO: maybe replaceable by direct setting kwargs but doesn't work yet
         self.__dict__ = self.setup_model_from_kwargs(kwargs)
         self.__show_pk__ = __show_pk__
         # always set them in __dict__ to prevent __getattr__ loop
@@ -400,6 +429,68 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         """
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
+    async def execute_post_save_hooks(self) -> None:
+        # don't trigger loads, AttributeErrors are used for skipping fields
+        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+        try:
+            for field_name in self.meta.post_save_fields:
+                field = self.meta.fields[field_name]
+                try:
+                    value = getattr(self, field_name)
+                except AttributeError:
+                    continue
+                await field.post_save_callback(value, instance=self)
+        finally:
+            MODEL_GETATTR_BEHAVIOR.reset(token)
+
+    @classmethod
+    def extract_column_values(
+        cls,
+        extracted_values: Dict[str, Any],
+        is_update: bool = False,
+        is_partial: bool = False,
+    ) -> Dict[str, Any]:
+        validated: Dict[str, Any] = {}
+        # phase 1: transform when required
+        if cls.meta.input_modifying_fields:
+            extracted_values = {**extracted_values}
+            for field_name in cls.meta.input_modifying_fields:
+                cls.meta.fields[field_name].modify_input(field_name, extracted_values)
+        # phase 2: validate fields and set defaults for readonly
+        need_second_pass: List[BaseFieldType] = []
+        for field_name, field in cls.meta.fields.items():
+            if (
+                not is_partial or (field.inject_default_on_partial_update and is_update)
+            ) and field.read_only:
+                if field.has_default():
+                    validated.update(
+                        field.get_default_values(field_name, validated, is_update=is_update)
+                    )
+                continue
+            if field_name in extracted_values:
+                item = extracted_values[field_name]
+                assert field.owner
+                for sub_name, value in field.clean(field_name, item).items():
+                    if sub_name in validated:
+                        raise ValueError(f"value set twice for key: {sub_name}")
+                    validated[sub_name] = value
+            elif (
+                not is_partial or (field.inject_default_on_partial_update and is_update)
+            ) and field.has_default():
+                # add field without a value to the second pass (in case no value appears)
+                # only include fields which have inject_default_on_partial_update set or if not is_partial
+                need_second_pass.append(field)
+
+        # phase 3: set defaults for the rest if not partial or inject_default_on_partial_update
+        if need_second_pass:
+            for field in need_second_pass:
+                # check if field appeared e.g. by composite
+                if field.name not in validated:
+                    validated.update(
+                        field.get_default_values(field.name, validated, is_update=is_update)
+                    )
+        return validated
+
     def __setattr__(self, key: str, value: Any) -> None:
         fields = self.meta.fields
         field = fields.get(key, None)
@@ -410,11 +501,11 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
                 field.__set__(self, value)
             else:
                 for k, v in field.to_model(key, value, phase="set").items():
-                    # bypass __settr__
-                    edgy_setattr(self, k, v)
+                    # bypass __setattr__ method
+                    object.__setattr__(self, k, v)
         else:
-            # bypass __settr__
-            edgy_setattr(self, key, value)
+            # bypass __setattr__ method
+            object.__setattr__(self, key, value)
 
     async def _agetattr_helper(self, name: str, getter: Any) -> Any:
         await self.load()
@@ -490,7 +581,7 @@ class EdgyBaseModel(ModelParser, BaseModel, BaseModelType, metaclass=BaseModelMe
         self_dict = self.extract_column_values(
             self.extract_db_fields(self.pkcolumns), is_partial=True
         )
-        other_dict = self.extract_column_values(
+        other_dict = other.extract_column_values(
             other.extract_db_fields(self.pkcolumns), is_partial=True
         )
         key_set = {*self_dict.keys(), *other_dict.keys()}

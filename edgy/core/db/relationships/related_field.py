@@ -1,13 +1,13 @@
 import functools
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
-    from edgy import Model, ReflectModel
+    from edgy.core.db.models.types import BaseModelType
 
 
 class RelatedField(RelationshipField):
@@ -20,7 +20,7 @@ class RelatedField(RelationshipField):
         self,
         *,
         foreign_key_name: str,
-        related_from: Union[Type["Model"], Type["ReflectModel"]],
+        related_from: Type["BaseModelType"],
         **kwargs: Any,
     ) -> None:
         self.foreign_key_name = foreign_key_name
@@ -37,7 +37,7 @@ class RelatedField(RelationshipField):
         )
 
     @property
-    def related_to(self) -> Union[Type["Model"], Type["ReflectModel"]]:
+    def related_to(self) -> Type["BaseModelType"]:
         return self.owner
 
     @property
@@ -45,7 +45,11 @@ class RelatedField(RelationshipField):
         return self.name
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         """
         Meta field
@@ -61,7 +65,7 @@ class RelatedField(RelationshipField):
             relation_instance = self.get_relation(refs=value)
         return {field_name: relation_instance}
 
-    def __get__(self, instance: "Model", owner: Any = None) -> ManyRelationProtocol:
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> ManyRelationProtocol:
         if instance:
             if self.name not in instance.__dict__:
                 instance.__dict__[self.name] = self.get_relation()
@@ -98,5 +102,7 @@ class RelatedField(RelationshipField):
     def __str__(self) -> str:
         return f"({self.related_to.__name__}={self.related_name})"
 
-    async def post_save_callback(self, value: ManyRelationProtocol, instance: "Model") -> None:
+    async def post_save_callback(
+        self, value: ManyRelationProtocol, instance: "BaseModelType"
+    ) -> None:
         await value.save_related()

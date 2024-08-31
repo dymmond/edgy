@@ -24,7 +24,7 @@ from edgy.core.db.fields.types import BaseFieldType
 from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
-    from edgy.core.db.models.model import Model, ReflectModel
+    from edgy.core.db.models.types import BaseModelType
 
 
 def _removeprefix(text: str, prefix: str) -> str:
@@ -45,8 +45,7 @@ class ConcreteCompositeField(BaseCompositeField):
         *,
         inner_fields: Union[
             Sequence[Union[str, Tuple[str, BaseFieldType]]],
-            Type["Model"],
-            Type["ReflectModel"],
+            Type["BaseModelType"],
             Dict[str, BaseFieldType],
         ] = (),
         **kwargs: Any,
@@ -102,7 +101,7 @@ class ConcreteCompositeField(BaseCompositeField):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        owner: Optional[Type["BaseModelType"]] = None,
         parent: Optional[BaseFieldType] = None,
     ) -> BaseFieldType:
         field_copy = cast(
@@ -130,7 +129,9 @@ class ConcreteCompositeField(BaseCompositeField):
                 field_copy.embedded_field_defs[field_def.name] = field_def
         return field_copy
 
-    async def aget(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
+    async def aget(
+        self, instance: "BaseModelType", owner: Any = None
+    ) -> Union[Dict[str, Any], Any]:
         d = {}
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
@@ -146,7 +147,7 @@ class ConcreteCompositeField(BaseCompositeField):
             return self.model(**d)
         return d
 
-    def __get__(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[Dict[str, Any], Any]:
         assert len(self.inner_field_names) >= 1
         if self.model is ConditionalRedirect and len(self.inner_field_names) == 1:
             try:
@@ -183,7 +184,11 @@ class ConcreteCompositeField(BaseCompositeField):
         return super().clean(field_name, value, for_query=for_query)
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         assert len(self.inner_field_names) >= 1
         if (

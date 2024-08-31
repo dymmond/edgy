@@ -10,9 +10,9 @@ from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.exceptions import ModelReferenceError
 
 if TYPE_CHECKING:
-    from edgy import Model
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.model_reference import ModelRef
+    from edgy.core.db.models.types import BaseModelType
 
 
 class RefForeignKey(ForeignKeyFieldFactory, list):
@@ -49,7 +49,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         cls,
         obj: "BaseFieldType",
         value: Optional[list],
-        instance: "Model",
+        instance: "BaseModelType",
         original_fn: Any = None,
     ) -> None:
         if not value:

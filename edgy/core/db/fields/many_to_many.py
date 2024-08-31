@@ -8,7 +8,6 @@ from typing import (
     Sequence,
     Tuple,
     Type,
-    TypeVar,
     Union,
     cast,
 )
@@ -24,11 +23,8 @@ from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
-    from edgy import Model
     from edgy.core.db.fields.types import BaseFieldType
-
-T = TypeVar("T", bound="Model")
-
+    from edgy.core.db.models.types import BaseModelType
 
 terminal = Print()
 
@@ -65,7 +61,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         to_foreign_key: str = "",
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
-        through: Union[str, Type["Model"]] = "",
+        through: Union[str, Type["BaseModelType"]] = "",
         embed_through: Union[str, Literal[False]] = "",
         **kwargs: Any,
     ) -> None:
@@ -151,12 +147,12 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         from edgy.core.db.models.metaclasses import MetaInfo
 
         self.to = self.target
-        __bases__: Tuple[Type[Model], ...] = ()
+        __bases__: Tuple[Type[BaseModelType], ...] = ()
         pknames = set()
         if self.through:
             if isinstance(self.through, str):
                 self.through = self.registry.models[self.through]
-            through = cast(Type["Model"], self.through)
+            through = cast(Type["BaseModelType"], self.through)
             if through.meta.abstract:
                 pknames = set(cast(Sequence[str], through.pknames))
                 __bases__ = (through,)
@@ -260,7 +256,11 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.add_model_to_register(self.through)
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         """
         Meta field
@@ -288,7 +288,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         return {}
 
-    def __get__(self, instance: "Model", owner: Any = None) -> ManyRelationProtocol:
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> ManyRelationProtocol:
         if instance:
             if self.name not in instance.__dict__:
                 instance.__dict__[self.name] = self.get_relation()
@@ -297,7 +297,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             return instance.__dict__[self.name]  # type: ignore
         raise ValueError("Missing instance")
 
-    async def post_save_callback(self, value: ManyRelationProtocol, instance: "Model") -> None:
+    async def post_save_callback(
+        self, value: ManyRelationProtocol, instance: "BaseModelType"
+    ) -> None:
         await value.save_related()
 
 
@@ -307,9 +309,9 @@ class ManyToManyField(ForeignKeyFieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        to: Union["Model", str],
+        to: Union["BaseModelType", str],
         *,
-        through: Optional["Model"] = None,
+        through: Optional["BaseModelType"] = None,
         from_fields: Sequence[str] = (),
         to_fields: Sequence[str] = (),
         **kwargs: Any,

@@ -126,6 +126,7 @@ _trigger_attributes_MetaInfo = {
     "special_getter_fields",
     "input_modifying_fields",
     "post_save_fields",
+    "post_delete_fields",
     "excluded_fields",
     "secret_fields",
 }
@@ -147,6 +148,7 @@ class MetaInfo:
         "signals",
         "input_modifying_fields",
         "post_save_fields",
+        "post_delete_fields",
         "foreign_key_fields",
         "field_to_columns",
         "field_to_column_names",
@@ -233,6 +235,7 @@ class MetaInfo:
         secret_fields = set()
         input_modifying_fields = set()
         post_save_fields = set()
+        post_delete_fields = set()
         foreign_key_fields: Dict[str, BaseForeignKey] = {}
         for key, field in self.fields.items():
             if hasattr(field, "__get__"):
@@ -245,14 +248,17 @@ class MetaInfo:
                 input_modifying_fields.add(key)
             if hasattr(field, "post_save_callback"):
                 post_save_fields.add(key)
+            if hasattr(field, "post_delete_callback"):
+                post_delete_fields.add(key)
             if isinstance(field, BaseForeignKeyField):
                 foreign_key_fields[key] = field
         self.special_getter_fields: FrozenSet[str] = frozenset(special_getter_fields)
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
         self.secret_fields: FrozenSet[str] = frozenset(secret_fields)
         self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
-        # foreign_keys belong to it so make it updatable
+        # RelatedField belong to it so make it updatable
         self.post_save_fields: Set[str] = set(post_save_fields)
+        self.post_delete_fields: FrozenSet[str] = frozenset(post_delete_fields)
         self.foreign_key_fields: Dict[str, BaseForeignKey] = foreign_key_fields
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)

@@ -1,14 +1,12 @@
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
 
-import edgy
-
 if TYPE_CHECKING:
     from pydantic import ConfigDict
 
-    from edgy import Model
+    from edgy.core.db.models import Model
+    from edgy.core.db.models.base import EdgyBaseModel
     from edgy.core.db.models.metaclasses import MetaInfo
-
-type_ignored_setattr = setattr
+    from edgy.core.db.models.types import BaseModelType
 
 
 def create_edgy_model(
@@ -18,7 +16,7 @@ def create_edgy_model(
     __metadata__: Optional[Type["MetaInfo"]] = None,
     __qualname__: Optional[str] = None,
     __config__: Optional["ConfigDict"] = None,
-    __bases__: Optional[Tuple[Type["Model"]]] = None,
+    __bases__: Optional[Tuple[Type["BaseModelType"]]] = None,
     __proxy__: bool = False,
     __pydantic_extra__: Any = None,
 ) -> Type["Model"]:
@@ -26,9 +24,10 @@ def create_edgy_model(
     Generates an `edgy.Model` with all the required definitions to generate the pydantic
     like model.
     """
+    from edgy.core.db.models import Model
 
     if not __bases__:
-        __bases__ = (edgy.Model,)
+        __bases__ = (Model,)
 
     qualname = __qualname__ or __name__
     core_definitions = {
@@ -52,7 +51,7 @@ def create_edgy_model(
     return model
 
 
-def generify_model_fields(model: Type["Model"]) -> Dict[Any, Any]:
+def generify_model_fields(model: Type["EdgyBaseModel"]) -> Dict[Any, Any]:
     """
     Makes all fields generic when a partial model is generated or used.
     This also removes any metadata for the field such as validations making
@@ -63,8 +62,8 @@ def generify_model_fields(model: Type["Model"]) -> Dict[Any, Any]:
 
     # handle the nested non existing results
     for name, field in model.model_fields.items():
-        type_ignored_setattr(field, "annotation", Any)
-        type_ignored_setattr(field, "null", True)
-        type_ignored_setattr(field, "metadata", [])
+        field.annotation = Any  # type: ignore
+        field.null = True
+        field.metadata = []
         fields[name] = field
     return fields

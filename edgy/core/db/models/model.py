@@ -1,14 +1,10 @@
-from typing import TYPE_CHECKING, Any, Dict, Optional, Union, cast
-
-from sqlalchemy.engine.result import Row
+import inspect
+from typing import Any, Dict, Union
 
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
 from edgy.exceptions import ObjectNotFound
-
-if TYPE_CHECKING:
-    pass
 
 
 class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
@@ -65,18 +61,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             for k, v in transformed_kwargs.items():
                 setattr(self, k, v)
 
-        # don't trigger loads, AttributeErrors are used for skipping fields
-        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
-        try:
-            for field_name in self.meta.post_save_fields:
-                field = self.meta.fields[field_name]
-                try:
-                    value = getattr(self, field_name)
-                except AttributeError:
-                    continue
-                await field.post_save_callback(value, instance=self)
-        finally:
-            MODEL_GETATTR_BEHAVIOR.reset(token)
+        # updates aren't required to change the db, they can also just affect the meta fields
+        if self.meta.post_save_fields:
+            await self.execute_post_save_hooks()
         if kwargs:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
@@ -84,14 +71,35 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         return self
 
-    async def delete(self) -> None:
+    async def delete(self, skip_post_delete_hooks: bool = False) -> None:
         """Delete operation from the database"""
         await self.meta.signals.pre_delete.send_async(self.__class__, instance=self)
-
+        # get values before deleting
+        field_values: Dict[str, Any] = {}
+        if not skip_post_delete_hooks and self.meta.post_delete_fields:
+            token = MODEL_GETATTR_BEHAVIOR.set("coro")
+            try:
+                for field_name in self.meta.post_delete_fields:
+                    try:
+                        field_value = getattr(self, field_name)
+                    except AttributeError:
+                        continue
+                    if inspect.isawaitable(field_value):
+                        try:
+                            field_value = await field_value
+                        except AttributeError:
+                            continue
+                    field_values[field_name] = field_value
+            finally:
+                MODEL_GETATTR_BEHAVIOR.reset(token)
         expression = self.table.delete().where(*self.identifying_clauses())
         await self.database.execute(expression)
         # we cannot load anymore
         self._loaded_or_deleted = True
+        # now cleanup with the saved values
+        for field_name, value in field_values.items():
+            field = self.meta.fields[field_name]
+            await field.post_delete_callback(value)
 
         await self.meta.signals.post_delete.send_async(self.__class__, instance=self)
 
@@ -115,12 +123,12 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         Performs the save instruction.
         """
         expression = self.table.insert().values(**kwargs)
-        autoincrement_value = cast(Optional["Row"], await self.database.execute(expression))
+        autoincrement_value = await self.database.execute(expression)
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
             column = self.table.autoincrement_column
-            if column is not None and isinstance(autoincrement_value, Row):
-                autoincrement_value = autoincrement_value._mapping[column.name]
+            if column is not None and hasattr(autoincrement_value, "_mapping"):
+                autoincrement_value = autoincrement_value._mapping[column.key]
             # can be explicit set, which causes an invalid value returned
             if column is not None and column.key not in kwargs:
                 setattr(self, column.key, autoincrement_value)
@@ -129,18 +137,8 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         for k, v in transformed_kwargs.items():
             setattr(self, k, v)
 
-        # don't trigger loads, AttributeErrors are used for skipping fields
-        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
-        try:
-            for field_name in self.meta.post_save_fields:
-                field = self.meta.fields[field_name]
-                try:
-                    value = getattr(self, field_name)
-                except AttributeError:
-                    continue
-                await field.post_save_callback(value, instance=self)
-        finally:
-            MODEL_GETATTR_BEHAVIOR.reset(token)
+        if self.meta.post_save_fields:
+            await self.execute_post_save_hooks()
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False
 

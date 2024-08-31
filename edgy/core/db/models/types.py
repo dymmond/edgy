@@ -109,6 +109,25 @@ class BaseModelType(ABC):
         """Load model"""
 
     @abstractmethod
+    async def update(self, **kwargs: Any) -> Any:
+        """
+        Update operation of the database fields.
+        """
+
+    @abstractmethod
+    async def save(
+        self,
+        force_save: bool = False,
+        values: Dict[str, Any] = None,
+        **kwargs: Any,
+    ) -> Union["Model", Any]:
+        """Save model"""
+
+    @abstractmethod
+    async def delete(self, skip_post_delete_hooks: bool = False) -> None:
+        """Delete Model"""
+
+    @abstractmethod
     async def load_recursive(
         self, only_needed: bool = True, only_needed_nest: bool = False
     ) -> None:
@@ -130,6 +149,22 @@ class BaseModelType(ABC):
     def build(cls, schema: Optional[str] = None) -> "sqlalchemy.Table":
         """
         Builds the SQLAlchemy table representation from the loaded fields.
+        """
+
+    @abstractmethod
+    async def execute_post_save_hooks(self) -> None: ...
+
+    @classmethod
+    @abstractmethod
+    def extract_column_values(
+        cls,
+        extracted_values: Dict[str, Any],
+        is_update: bool = False,
+        is_partial: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Extracts all the default values from the given fields and returns the raw
+        value corresponding to each field.
         """
 
     # helpers

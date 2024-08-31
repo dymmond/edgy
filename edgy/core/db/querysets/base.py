@@ -26,7 +26,6 @@ from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR, get_schema
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
-from edgy.core.db.models.mixins import ModelParser
 from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.querysets.mixins import EdgyModel, QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import Prefetch, PrefetchMixin, check_prefetch_collision
@@ -76,7 +75,6 @@ class BaseQuerySet(
     TenancyMixin,
     QuerySetPropsMixin,
     PrefetchMixin,
-    ModelParser,
     QueryType,
 ):
     """Internal definitions for queryset."""
@@ -408,9 +406,6 @@ class BaseQuerySet(
             ),
         )
 
-    def _validate_kwargs(self, **kwargs: Any) -> Any:
-        return self.extract_column_values(kwargs, model_class=self.model_class)
-
     def _prepare_order_by(self, order_by: str) -> Any:
         reverse = order_by.startswith("-")
         order_by = order_by.lstrip("-")
@@ -678,6 +673,20 @@ class BaseQuerySet(
         else:
             queryset.filter_clauses.append(op(*clauses))
         return queryset
+
+    async def _model_based_delete(self) -> int:
+        queryset = self.limit(self._batch_size)
+        counter = 0
+        models = await queryset
+        while models:
+            for model in models:
+                counter += 1
+                # delete issues already signals
+                await model.delete()
+            # clear cache and fetch new batch
+            models = await queryset.all(True)
+        self._clear_cache()
+        return counter
 
 
 class QuerySet(BaseQuerySet):
@@ -1091,11 +1100,12 @@ class QuerySet(BaseQuerySet):
         Bulk creates records in a table
         """
         queryset: QuerySet = self._clone()
-        new_objs = [queryset._validate_kwargs(**obj) for obj in objs]
+        new_objs = [queryset.model_class.extract_column_values(obj) for obj in objs]
 
         expression = queryset.table.insert().values(new_objs)
         await queryset.database.execute_many(expression)
         self._clear_cache(True)
+        # TODO; handle post_save_fields
 
     async def bulk_update(self, objs: List[EdgyModel], fields: List[str]) -> None:
         """
@@ -1121,9 +1131,8 @@ class QuerySet(BaseQuerySet):
         update_list = []
         fields_plus_pk = {*fields, *queryset.model_class.pkcolumns}
         for obj in objs:
-            update = queryset.extract_column_values(
+            update = queryset.model_class.extract_column_values(
                 obj.extract_db_fields(fields_plus_pk),
-                queryset.model_class,
                 is_update=True,
                 is_partial=True,
             )
@@ -1139,25 +1148,35 @@ class QuerySet(BaseQuerySet):
         expression = expression.values(values_placeholder)
         await queryset.database.execute_many(expression, update_list)
         self._clear_cache()
+        # TODO; handle post_save_fields
 
-    async def delete(self) -> None:
+    async def delete(self, use_models: bool = False) -> int:
+        if self.model_class.meta.post_delete_fields:
+            use_models = True
+        if use_models:
+            return await self._model_based_delete()
+
+        # delete of model issues already signals, so don't integrate them
         await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
 
         expression = self.table.delete()
         for filter_clause in self.filter_clauses:
             expression = expression.where(filter_clause)
 
-        await self.database.execute(expression)
+        row_count = cast(int, await self.database.execute(expression))
+
+        # clear cache before executing post_delete. Fresh results can be retrieved in signals
+        self._clear_cache()
 
         await self.model_class.meta.signals.post_delete.send_async(self.__class__, instance=self)
-        self._clear_cache()
+        return row_count
 
     async def update(self, **kwargs: Any) -> None:
         """
         Updates records in a specific table with the given kwargs.
         """
 
-        kwargs = self.extract_column_values(kwargs, model_class=self.model_class)
+        kwargs = self.model_class.extract_column_values(kwargs, is_update=True, is_partial=True)
 
         # Broadcast the initial update details
         await self.model_class.meta.signals.pre_update.send_async(

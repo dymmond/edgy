@@ -28,9 +28,9 @@ class ProxyModel:
     ) -> None:
         self.__name__: str = name
         self.__module__: str = module
-        self.__bases__: Union[Tuple[Type["Model"]], None] = bases
+        self.__bases__: Union[Tuple[Type[Model]], None] = bases
         self.__definitions__: Union[Dict[Any, Any], None] = definitions
-        self.__metadata__: Union[Type["MetaInfo"], None] = metadata
+        self.__metadata__: Union[Type[MetaInfo], None] = metadata
         self.__qualname__: Union[str, None] = qualname
         self.__config__: Union[ConfigDict, None] = config
         self.__proxy__: bool = proxy
@@ -43,7 +43,7 @@ class ProxyModel:
         """
         from edgy.core.utils.models import create_edgy_model
 
-        model: Type["Model"] = create_edgy_model(
+        model: Type[Model] = create_edgy_model(
             __name__=self.__name__,
             __module__=self.__module__,
             __bases__=self.__bases__,
@@ -59,7 +59,7 @@ class ProxyModel:
 
     @property
     def model(self) -> Type["Model"]:
-        return cast("Type[Model]", self.__model__)
+        return cast(Type["Model"], self.__model__)
 
     @model.setter
     def model(self, value: Type["Model"]) -> None:

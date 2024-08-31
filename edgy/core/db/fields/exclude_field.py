@@ -1,10 +1,10 @@
-from typing import TYPE_CHECKING, Any, Dict, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Type
 
 from edgy.core.db.fields.factories import FieldFactory
-from edgy.core.db.fields.types import BaseFieldType
 
 if TYPE_CHECKING:
-    from edgy import Model, ReflectModel
+    from edgy.core.db.fields.types import BaseFieldType
+    from edgy.core.db.models.types import BaseModelType
 
 
 class ExcludeField(FieldFactory, Type[None]):
@@ -17,7 +17,7 @@ class ExcludeField(FieldFactory, Type[None]):
     def __new__(  # type: ignore
         cls,
         **kwargs: Any,
-    ) -> BaseFieldType:
+    ) -> "BaseFieldType":
         kwargs["exclude"] = True
         kwargs["null"] = True
         kwargs["primary_key"] = False
@@ -26,7 +26,7 @@ class ExcludeField(FieldFactory, Type[None]):
     @classmethod
     def clean(
         cls,
-        obj: BaseFieldType,
+        obj: "BaseFieldType",
         name: str,
         value: Any,
         for_query: bool = False,
@@ -38,11 +38,11 @@ class ExcludeField(FieldFactory, Type[None]):
     @classmethod
     def to_model(
         cls,
-        obj: BaseFieldType,
+        obj: "BaseFieldType",
         name: str,
         value: Any,
         phase: str = "",
-        instance: Optional["Model"] = None,
+        instance: Optional["BaseModelType"] = None,
         original_fn: Any = None,
     ) -> Dict[str, Any]:
         """remove any value from input and raise when setting an attribute."""
@@ -53,8 +53,8 @@ class ExcludeField(FieldFactory, Type[None]):
     @classmethod
     def __get__(
         cls,
-        obj: BaseFieldType,
-        instance: Union["Model", "ReflectModel"],
+        obj: "BaseFieldType",
+        instance: "BaseModelType",
         owner: Any = None,
         original_fn: Any = None,
     ) -> None:

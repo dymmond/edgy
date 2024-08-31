@@ -25,8 +25,9 @@ from edgy.types import Undefined
 from .types import BaseFieldType, ColumnDefinitionModel
 
 if TYPE_CHECKING:
-    from edgy import Model, ReflectModel, Registry
+    from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.factories import FieldFactory
+    from edgy.core.db.models.types import BaseModelType
 
 
 def _removesuffix(text: str, suffix: str) -> str:
@@ -46,7 +47,7 @@ class BaseField(BaseFieldType, FieldInfo):
     """
 
     # defs to simplify the life (can be None actually)
-    owner: Type["Model"]
+    owner: Type["BaseModelType"]
     registry: "Registry"
     factory: Optional["FieldFactory"] = None
 
@@ -107,7 +108,7 @@ class BaseField(BaseFieldType, FieldInfo):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        owner: Optional[Type["BaseModelType"]] = None,
         parent: Optional["BaseField"] = None,
     ) -> Optional["BaseField"]:
         """
@@ -216,7 +217,11 @@ class BaseCompositeField(BaseField):
         return result
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
@@ -268,7 +273,9 @@ class PKField(BaseCompositeField):
             **kwargs,
         )
 
-    async def aget(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
+    async def aget(
+        self, instance: "BaseModelType", owner: Any = None
+    ) -> Union[Dict[str, Any], Any]:
         pknames = cast(Sequence[str], self.owner.pknames)
         d = {}
         # we don't want to issue loads
@@ -284,7 +291,7 @@ class PKField(BaseCompositeField):
             MODEL_GETATTR_BEHAVIOR.reset(token)
         return d
 
-    def __get__(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[Dict[str, Any], Any]:
         pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
         pknames = cast(Sequence[str], self.owner.pknames)
         assert len(pkcolumns) >= 1
@@ -317,7 +324,7 @@ class PKField(BaseCompositeField):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        owner: Optional[Type["BaseModelType"]] = None,
         parent: Optional[BaseFieldType] = None,
     ) -> Optional[BaseFieldType]:
         return None
@@ -357,7 +364,11 @@ class PKField(BaseCompositeField):
         return retdict
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         pknames = cast(Sequence[str], self.owner.pknames)
         assert len(cast(Sequence[str], self.owner.pkcolumns)) >= 1
@@ -441,6 +452,10 @@ class BaseForeignKey(RelationshipField):
         return value
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         return {field_name: self.expand_relationship(value)}

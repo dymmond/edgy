@@ -12,8 +12,8 @@ from edgy.core.files.base import FieldFile
 from edgy.core.files.storage import storages
 
 if TYPE_CHECKING:
-    from edgy import Model
     from edgy.core.db.fields.types import BaseFieldType
+    from edgy.core.db.models.types import BaseModelType
     from edgy.core.files.storage import Storage
 
 IGNORED = ["cls", "__class__", "kwargs", "generate_name_fn"]
@@ -21,7 +21,7 @@ IGNORED = ["cls", "__class__", "kwargs", "generate_name_fn"]
 
 class ConcreteFileField(BaseCompositeField):
     field_file_class: Type[FieldFile]
-    _generate_name_fn: Optional[Callable[[Optional["Model"], str], str]] = None
+    _generate_name_fn: Optional[Callable[[Optional["BaseModelType"], str], str]] = None
 
     def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
         # we are empty
@@ -40,13 +40,17 @@ class ConcreteFileField(BaseCompositeField):
                 to_add[_name] = kwargs.pop(_name)
         kwargs[name] = to_add
 
-    def generate_name_fn(self, instance: Optional["Model"], name: str) -> str:
+    def generate_name_fn(self, instance: Optional["BaseModelType"], name: str) -> str:
         if self._generate_name_fn is None:
             return name
         return self._generate_name_fn(instance, name)
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = "", instance: Optional["Model"] = None
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, FieldFile]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
@@ -171,8 +175,11 @@ class ConcreteFileField(BaseCompositeField):
             field_names.append(f"{self.name}_metadata")
         return {name: self.owner.meta.fields[name] for name in field_names}
 
-    async def post_save_callback(self, value: FieldFile, instance: "Model") -> None:
+    async def post_save_callback(self, value: FieldFile, instance: "BaseModelType") -> None:
         await value.execute_operation()
+
+    async def post_delete_callback(self, value: FieldFile) -> None:
+        value.delete(instant=True)
 
 
 class FileField(FieldFactory):
@@ -186,7 +193,7 @@ class FileField(FieldFactory):
         with_metadata: bool = True,
         with_approval: bool = False,
         field_file_class: Type[FieldFile] = FieldFile,
-        generate_name_fn: Optional[Callable[[Optional["Model"], str], str]] = None,
+        generate_name_fn: Optional[Callable[[Optional["BaseModelType"], str], str]] = None,
         **kwargs: Any,
     ) -> BaseField:
         if not storage:

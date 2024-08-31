@@ -384,10 +384,7 @@ class FieldFile(File):
             self.old = None
         self.operation = "none"
 
-    def delete(
-        self,
-        approved: Optional[bool] = None,
-    ) -> None:
+    def delete(self, *, approved: Optional[bool] = None, instant: bool = False) -> None:
         """
         Mark the file associated with this object for deletion from storage.
         """
@@ -396,6 +393,14 @@ class FieldFile(File):
         if not self.field.null:
             raise FileOperationError("Cannot delete file (only replacing is possible)")
         self.reset()
+        if instant:
+            # close
+            if hasattr(self, "file"):
+                self.close()
+            self.storage.delete(self.name)
+            if self.field.null:
+                self.name = ""
+            return
         self.old = (self.storage, self.name, self.approved)
         self.name = ""
         self.operation = "delete"
