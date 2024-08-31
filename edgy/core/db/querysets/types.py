@@ -1,23 +1,38 @@
-import typing
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Dict, Generator, List, Sequence, Set, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    AsyncIterator,
+    Dict,
+    Generator,
+    Generic,
+    List,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     import sqlalchemy
 
-    from edgy.core.db.models import Model
+    from edgy.core.db.models import BaseModelType, Model
 
 # Create a var type for the Edgy Model
-EdgyModel = typing.TypeVar("EdgyModel", bound="Model")
+EdgyModel = TypeVar("EdgyModel", bound="Model")
+EdgyEmbedTarget = TypeVar("EdgyEmbedTarget")
 
 
-class QueryType(ABC, typing.Generic[EdgyModel]):
+class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     __slots__ = ("model_class",)
+    model_class: Type[EdgyModel]
 
-    def __init__(self, model_class: typing.Type[EdgyModel]) -> None:
-        self.model_class: typing.Type[EdgyModel] = model_class
+    def __init__(self, model_class: Type[EdgyModel]) -> None:
+        self.model_class = model_class
 
-    def __class_getitem__(cls, *args: typing.Any, **kwargs: typing.Any) -> typing.Any:
+    def __class_getitem__(cls, *args: Any, **kwargs: Any) -> Any:
         return cls
 
     @abstractmethod
@@ -30,7 +45,7 @@ class QueryType(ABC, typing.Generic[EdgyModel]):
 
     @abstractmethod
     def exclude(
-        self, clauses: Tuple["sqlalchemy.sql.expression.BinaryExpression", ...], **kwargs: "Model"
+        self, clauses: Tuple["sqlalchemy.sql.expression.BinaryExpression", ...], **kwargs: Any
     ) -> "QueryType": ...
 
     @abstractmethod
@@ -70,25 +85,25 @@ class QueryType(ABC, typing.Generic[EdgyModel]):
     async def count(self) -> int: ...
 
     @abstractmethod
-    async def get_or_none(self, **kwargs: Any) -> Union[EdgyModel, None]: ...
+    async def get_or_none(self, **kwargs: Any) -> Union[EdgyEmbedTarget, None]: ...
 
     @abstractmethod
-    async def get(self, **kwargs: Any) -> EdgyModel: ...
+    async def get(self, **kwargs: Any) -> EdgyEmbedTarget: ...
 
     @abstractmethod
-    async def first(self) -> Union[EdgyModel, None]: ...
+    async def first(self) -> Union[EdgyEmbedTarget, None]: ...
 
     @abstractmethod
-    async def last(self) -> Union[EdgyModel, None]: ...
+    async def last(self) -> Union[EdgyEmbedTarget, None]: ...
 
     @abstractmethod
-    async def create(self, *args, **kwargs: Any) -> EdgyModel: ...
+    async def create(self, *args: Any, **kwargs: Any) -> EdgyEmbedTarget: ...
 
     @abstractmethod
-    async def bulk_create(self, objs: Sequence[List[Dict[Any, Any]]]) -> None: ...
+    async def bulk_create(self, objs: Sequence[List[Dict[str, Any]]]) -> None: ...
 
     @abstractmethod
-    async def bulk_update(self, objs: Sequence[List[EdgyModel]], fields: List[str]) -> None: ...
+    async def bulk_update(self, objs: Sequence[List[Any]], fields: List[str]) -> None: ...
 
     @abstractmethod
     async def delete(self) -> None: ...
@@ -121,16 +136,18 @@ class QueryType(ABC, typing.Generic[EdgyModel]):
         defaults: Union[Dict[str, Any], Any, None] = None,
         *args: Any,
         **kwargs: Any,
-    ) -> Tuple[EdgyModel, bool]: ...
+    ) -> Tuple[EdgyEmbedTarget, bool]: ...
 
     @abstractmethod
-    async def update_or_create(self, defaults: Any, **kwargs: Any) -> Tuple[EdgyModel, bool]: ...
+    async def update_or_create(
+        self, defaults: Union[Dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
+    ) -> Tuple[EdgyEmbedTarget, bool]: ...
 
     @abstractmethod
-    async def contains(self, instance: EdgyModel) -> bool: ...
+    async def contains(self, instance: "BaseModelType") -> bool: ...
 
     @abstractmethod
-    def __await__(self) -> Generator[Any, None, List[EdgyModel]]: ...
+    def __await__(self) -> Generator[Any, None, List[EdgyEmbedTarget]]: ...
 
     @abstractmethod
-    async def __aiter__(self) -> AsyncIterator[EdgyModel]: ...
+    async def __aiter__(self) -> AsyncIterator[EdgyEmbedTarget]: ...

@@ -1,5 +1,5 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set, Type
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.models.utils import apply_instance_extras
@@ -21,7 +21,7 @@ class ModelRowMixin:
 
     @classmethod
     async def from_sqla_row(
-        cls,
+        cls: Type["Model"],
         row: "Row",
         select_related: Optional[Sequence[Any]] = None,
         prefetch_related: Optional[Sequence["Prefetch"]] = None,
@@ -51,7 +51,7 @@ class ModelRowMixin:
         item: Dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
-        secret_columns = set()
+        secret_columns: Set[str] = set()
         if exclude_secrets:
             for name in cls.meta.secret_fields:
                 secret_columns.update(cls.meta.field_to_column_names[name])
@@ -62,7 +62,7 @@ class ModelRowMixin:
                 field = cls.meta.fields[field_name]
             except KeyError:
                 raise QuerySetError(
-                    detail=f'Selected field "{field_name}" does not exist on {cls}.'
+                    detail=f'Selected field "{field_name}cast("Model", " does not exist on {cls}.'
                 ) from None
             if isinstance(field, RelationshipField):
                 model_class, _, remainder = field.traverse_field(related)
@@ -144,10 +144,10 @@ class ModelRowMixin:
                 elif column.name in row._mapping:
                     # fallback, sometimes the column is not found
                     item[column.key] = row._mapping[column.name]
-        model = (
-            cast("Model", cls(**item, __phase__="init_db"))
+        model: Model = (
+            cls(**item, __phase__="init_db")
             if not exclude_secrets and not is_defer_fields and not _is_only
-            else cast("Model", cls.proxy_model(**item))
+            else cls.proxy_model(**item)
         )
         # Apply the schema to the model
         model = apply_instance_extras(model, cls, using_schema, database=database, table=table)

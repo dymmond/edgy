@@ -381,6 +381,7 @@ def _set_related_name_for_foreign_keys(
         try:
             related_field_fn(foreign_key.target)
         except KeyError as exc:
+            assert model_class.meta.registry is not None, "Registry not set"
             if isinstance(foreign_key.to, str):
                 model_class.meta.registry._callbacks.setdefault(foreign_key.to, []).append(
                     related_field_fn

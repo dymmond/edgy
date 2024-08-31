@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Sequence, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Union, cast
 
 import sqlalchemy
 
@@ -8,10 +8,6 @@ from edgy.types import Undefined
 
 if TYPE_CHECKING:
     from edgy import QuerySet
-    from edgy.core.db.models import Model
-
-
-EdgyModel = TypeVar("EdgyModel", bound="Model")
 
 
 class QuerySetPropsMixin:
