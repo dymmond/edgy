@@ -32,9 +32,6 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     def __init__(self, model_class: Type[EdgyModel]) -> None:
         self.model_class = model_class
 
-    def __class_getitem__(cls, *args: Any, **kwargs: Any) -> Any:
-        return cls
-
     @abstractmethod
     def filter(
         self, *clauses: Tuple["sqlalchemy.sql.expression.BinaryExpression", ...], **kwargs: Any
