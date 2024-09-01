@@ -363,10 +363,15 @@ obj.email = "foo@example.com"
 
 #### FileField
 
-FileField stage the file operation and execute them after saving.
+FileField allow to save files next to the database. In contrast to Django, you don't have to worry about the file-handling.
+It is all done automatically.
 
-First a file_name is reserverd. It is checked if the file name is available. If not a new one is automatically generated
-and thread-safe reserved for allocation.
+The cleanups when a file gets unreferenced are done automatically (No old files laying around) but this is configurable too.
+Delete queries are using model based deletes to proper trigger file deletions.
+
+Also by default overwriting is not possible. Files even honor a failed save and doesn't overwrite blindly the old ones.
+
+Setting a file field to None, implicitly deletes the file.
 
 
 !!! Tip:
@@ -374,7 +379,7 @@ and thread-safe reserved for allocation.
 
 
 !!! Tip:
-    When saving with the same name, the file is overwritten and no filename is generated.
+    You can overwrite a file by providing overwrite=True and pass the old file name (by default without name mangling by a filename generator).
 
 #### ImageField
 

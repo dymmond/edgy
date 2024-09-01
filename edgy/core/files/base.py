@@ -271,7 +271,7 @@ class FieldFile(File):
         name: str = "",
         size: Optional[int] = None,
         storage: Union["Storage", str, None] = None,
-        generate_name_fn: Optional[Callable[[str], str]] = None,
+        generate_name_fn: Optional[Callable[[str, Union[BinaryIO, File], bool], str]] = None,
         metadata: Optional[Dict[str, Any]] = None,
         approved: bool = True,
     ) -> None:
@@ -328,7 +328,7 @@ class FieldFile(File):
         delete_old: bool = True,
         approved: Optional[bool] = None,
         storage: Optional["Storage"] = None,
-        overwrite: Optional[bool] = None,
+        overwrite: bool = False,
     ) -> None:
         """
         Save the file to storage and update associated model fields.
@@ -341,23 +341,24 @@ class FieldFile(File):
             self.delete()
             return
 
+        direct_name = True
         if not name:
+            direct_name = False
             name = getattr(content, "name", "")
-
-        # Generate filename based on name
-        if self.generate_name_fn is not None:
-            name = self.generate_name_fn(name)
-        if overwrite is None:
-            overwrite = name == self.name
 
         if isinstance(content, File):
             content = content.open("rb").file
         elif isinstance(content, bytes):
             content = BytesIO(content)
 
+        # Generate filename based on name
+        if self.generate_name_fn is not None:
+            name = self.generate_name_fn(name, content, direct_name)
+
         if storage is None:
             storage = self.storage
 
+        # filters invalid names
         name = storage.get_available_name(
             name, max_length=getattr(self.field, "max_length", None), overwrite=overwrite
         )

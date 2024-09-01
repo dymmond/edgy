@@ -123,7 +123,11 @@ async def test_save_file_available_overwrite(create_test_database):
     assert os.path.exists(model1.file_field.path)
     path = model1.file_field.path
     # overwrite1
-    model1.file_field.save(edgy.files.ContentFile(b"foo", name="foo.bytes"), name=model1.file_field.name)
+    model1.file_field.save(
+        edgy.files.ContentFile(b"foo", name="foo.bytes"),
+        name=model1.file_field.name,
+        overwrite=True,
+    )
     assert path == model1.file_field.path
     # overwrite2
     model1.file_field.save(edgy.files.ContentFile(b"foo", name="foo.bytes"), overwrite=True)

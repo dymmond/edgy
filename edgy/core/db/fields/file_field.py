@@ -1,5 +1,17 @@
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Type, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    BinaryIO,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Type,
+    Union,
+    cast,
+)
 
 import orjson
 import sqlalchemy
@@ -8,7 +20,7 @@ from edgy.core.db.fields.base import BaseCompositeField, BaseField
 from edgy.core.db.fields.core import BigIntegerField, BooleanField, JSONField
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.core.db.fields.types import ColumnDefinitionModel
-from edgy.core.files.base import FieldFile
+from edgy.core.files.base import FieldFile, File
 from edgy.core.files.storage import storages
 
 if TYPE_CHECKING:
@@ -21,7 +33,9 @@ IGNORED = ["cls", "__class__", "kwargs", "generate_name_fn"]
 
 class ConcreteFileField(BaseCompositeField):
     field_file_class: Type[FieldFile]
-    _generate_name_fn: Optional[Callable[[Optional["BaseModelType"], str], str]] = None
+    _generate_name_fn: Optional[
+        Callable[[Optional["BaseModelType"], str, Union[File, BinaryIO], bool], str]
+    ] = None
 
     def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:
         # we are empty
@@ -40,7 +54,13 @@ class ConcreteFileField(BaseCompositeField):
                 to_add[_name] = kwargs.pop(_name)
         kwargs[name] = to_add
 
-    def generate_name_fn(self, instance: Optional["BaseModelType"], name: str) -> str:
+    def generate_name_fn(
+        self,
+        instance: Optional["BaseModelType"],
+        name: str,
+        file: Union[File, BinaryIO],
+        direct_name: bool,
+    ) -> str:
         if self._generate_name_fn is None:
             return name
         return self._generate_name_fn(instance, name)
