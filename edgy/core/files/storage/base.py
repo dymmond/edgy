@@ -78,7 +78,9 @@ class Storage(ABC):
         """
         return f"{file_root}_{get_random_string(7)}{file_ext}"
 
-    def get_available_name(self, name: str, max_length: Union[int, None] = None) -> str:
+    def get_available_name(
+        self, name: str, max_length: Union[int, None] = None, overwrite: bool = False
+    ) -> str:
         """
         Return a filename that's free on the target storage system and
         available for new content to be written to.
@@ -86,6 +88,7 @@ class Storage(ABC):
         Args:
             name (str): The original filename.
             max_length (int, optional): The maximum length of the filename. Defaults to None.
+            overwrite (bool, optional): Don't generate alternative names.
 
         Returns:
             str: The available filename. Need to call unreserve_name afterwards.
@@ -102,8 +105,13 @@ class Storage(ABC):
         validate_file_name(file_name)
         file_root, file_ext = os.path.splitext(file_name)
 
-        while (max_length and len(name) > max_length) or not self.reserve_name(name):
-            name = os.path.join(dir_name, self.get_alternative_name(file_root, file_ext))
+        while (max_length and len(name) > max_length) or (
+            not self.reserve_name(name) and not overwrite
+        ):
+            if not overwrite:
+                name = os.path.join(dir_name, self.get_alternative_name(file_root, file_ext))
+            else:
+                name = os.path.join(dir_name, f"{file_root}{file_ext}")
 
             if max_length is not None:
                 truncation = len(name) - max_length
@@ -115,7 +123,12 @@ class Storage(ABC):
                             "Please make sure that the corresponding file field "
                             'allows sufficient "max_length".'
                         )
-                    name = os.path.join(dir_name, self.get_alternative_name(file_root, file_ext))
+                    if not overwrite:
+                        name = os.path.join(
+                            dir_name, self.get_alternative_name(file_root, file_ext)
+                        )
+                    else:
+                        name = os.path.join(dir_name, f"{file_root}{file_ext}")
 
         return name
 

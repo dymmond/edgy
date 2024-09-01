@@ -115,7 +115,6 @@ class File:
 
     @property
     def path(self) -> str:
-        assert self.file is not None, "File is closed"
         return self.storage.path(self.name)
 
     @property
@@ -303,7 +302,12 @@ class FieldFile(File):
                 self.storage.save(self.file, self.name)
             finally:
                 self.storage.unreserve_name(self.name)
-            if self.operation == "save_delete" and self.old is not None and self.old[1]:
+            if (
+                self.operation == "save_delete"
+                and self.old is not None
+                and self.old[1]
+                and self.old[1] != self.name
+            ):
                 self.old[0].delete(self.old[1])
         elif self.operation == "delete":
             if hasattr(self, "file"):
@@ -324,7 +328,7 @@ class FieldFile(File):
         delete_old: bool = True,
         approved: Optional[bool] = None,
         storage: Optional["Storage"] = None,
-        force_new_file: bool = False,
+        overwrite: Optional[bool] = None,
     ) -> None:
         """
         Save the file to storage and update associated model fields.
@@ -340,6 +344,12 @@ class FieldFile(File):
         if not name:
             name = getattr(content, "name", "")
 
+        # Generate filename based on name
+        if self.generate_name_fn is not None:
+            name = self.generate_name_fn(name)
+        if overwrite is None:
+            overwrite = name == self.name
+
         if isinstance(content, File):
             content = content.open("rb").file
         elif isinstance(content, bytes):
@@ -348,14 +358,9 @@ class FieldFile(File):
         if storage is None:
             storage = self.storage
 
-        if self.name != name or force_new_file:
-            # Generate filename based on name
-            if self.generate_name_fn is not None:
-                name = self.generate_name_fn(name)
-
-            name = storage.get_available_name(
-                name, max_length=getattr(self.field, "max_length", None)
-            )
+        name = storage.get_available_name(
+            name, max_length=getattr(self.field, "max_length", None), overwrite=overwrite
+        )
         if hasattr(self, "file"):
             self.close()
         self.file = content
@@ -390,7 +395,7 @@ class FieldFile(File):
         """
         if not self:
             return
-        if not self.field.null:
+        if not self.field.null and not instant:
             raise FileOperationError("Cannot delete file (only replacing is possible)")
         self.reset()
         if instant:

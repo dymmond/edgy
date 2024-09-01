@@ -101,13 +101,35 @@ async def test_save_file_create(create_test_database):
     assert model.file_field.approved
     with model.file_field.open() as rob:
         assert rob.read() == b"foo"
-        path = model.file_field.path
+    path = model.file_field.path
     assert os.path.exists(path)
     assert model.file_field.storage.exists(model.file_field.name)
     model.file_field.delete()
     assert os.path.exists(path)
     await model.save()
     assert not os.path.exists(path)
+
+
+async def test_save_file_available_overwrite(create_test_database):
+    model1 = await MyModel.query.create(
+        file_field=edgy.files.ContentFile(b"foo", name="foo.bytes")
+    )
+    model2 = await MyModel.query.create(
+        file_field=edgy.files.ContentFile(b"foo", name="foo.bytes")
+    )
+    assert model1.file_field.name != model2.file_field.name
+    await model2.delete()
+    # file of model1 was not deleted
+    assert os.path.exists(model1.file_field.path)
+    path = model1.file_field.path
+    # overwrite1
+    model1.file_field.save(edgy.files.ContentFile(b"foo", name="foo.bytes"), name=model1.file_field.name)
+    assert path == model1.file_field.path
+    # overwrite2
+    model1.file_field.save(edgy.files.ContentFile(b"foo", name="foo.bytes"), overwrite=True)
+    assert model1.file_field.name == "foo.bytes"
+    # reset
+    model1.file_field.reset()
 
 
 async def test_save_file_reject_replace(create_test_database):
@@ -121,6 +143,9 @@ async def test_save_file_reject_replace(create_test_database):
     await model.save()
     with model.file_field.open() as rob:
         assert rob.read() == b"bar"
+    path = model.file_field.path
+    model.file_field.delete(instant=True)
+    assert not os.path.exists(path)
 
 
 async def test_save_file_approved(create_test_database):
@@ -135,3 +160,23 @@ async def test_save_file_approved(create_test_database):
     await model.save()
     model = await MyModelApproval.query.first()
     assert model.file_field.approved
+    model.file_field.delete(instant=True)
+
+
+async def test_delete_queryset(create_test_database):
+    model1 = await MyModel.query.create(
+        file_field=edgy.files.ContentFile(b"foo", name="foo.bytes")
+    )
+    model2 = await MyModel.query.create(
+        file_field=edgy.files.ContentFile(b"foo", name="foobar.bytes")
+    )
+    model3 = await MyModel.query.create(
+        file_field=edgy.files.ContentFile(b"foo", name="test.bytes")
+    )
+    seen = set()
+    for obj in [model1, model2, model3]:
+        assert obj.file_field.path not in seen
+        seen.add(obj.file_field.path)
+    assert await MyModel.query.delete() == 3
+    for path in seen:
+        assert not os.path.exists(path)
