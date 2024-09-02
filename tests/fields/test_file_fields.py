@@ -103,7 +103,8 @@ async def test_save_file_create(create_test_database):
     # get cached
     assert model.__dict__["file_field"].__dict__["size"] == 10
     assert model.file_field.size == 10
-    assert model.file_field.metadata["mime"] == "application/x-sh"
+    # distro specific
+    assert model.file_field.metadata["mime"].endswith("x-sh")
 
     assert model.file_field.approved
     with model.file_field.open() as rob:
