@@ -18,6 +18,7 @@ class ImageField(FileField):
         field_file_class: Type[ImageFieldFile] = ImageFieldFile,
         **kwargs: Dict[str, Any],
     ) -> "BaseFieldType":
+        kwargs.setdefault("with_approval", True)
         return super().__new__(
             cls,
             field_file_class=field_file_class,

@@ -363,29 +363,11 @@ obj.email = "foo@example.com"
 
 #### FileField
 
-FileField allow to save files next to the database. In contrast to Django, you don't have to worry about the file-handling.
-It is all done automatically.
-
-The cleanups when a file gets unreferenced are done automatically (No old files laying around) but this is configurable too.
-Delete queries are using model based deletes to proper trigger file deletions.
-
-Also by default overwriting is not possible. Files even honor a failed save and doesn't overwrite blindly the old ones.
-
-Setting a file field to None, implicitly deletes the file.
-
-
-!!! Tip:
-    You may want to set null=True to allow the deletion of the file.
-
-
-!!! Tip:
-    You can overwrite a file by providing overwrite=True and pass the old file name (by default without name mangling by a filename generator).
+See [FileField](file_handling.md#filefield).
 
 #### ImageField
 
-Extended FileField for image handling.
-
-Metadata contains dimensions (width and height).
+See [ImageField](file_handling.md#ImageField).
 
 #### FloatField
 
@@ -399,7 +381,7 @@ class MyModel(edgy.Model):
 
 ```
 
-Derives from the same as [IntergerField](#integerfield) and validates the decimal float.
+Derives from the same as [IntegerField](#integerfield) and validates the decimal float.
 
 #### ForeignKey
 
