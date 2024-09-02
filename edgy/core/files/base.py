@@ -46,6 +46,7 @@ class File:
     file: Optional[BinaryIO]
     storage: "Storage"
     DEFAULT_CHUNK_SIZE: ClassVar[int] = 64 * 2**10
+    mode: str = "rb"
 
     def __init__(
         self,
