@@ -1,13 +1,15 @@
-from typing import TYPE_CHECKING, Any, Iterable, Set, cast
-
-from edgy.core.connection.registry import Registry
+from typing import TYPE_CHECKING, Any, Iterable, Optional, Set, Type, TypeVar, cast
 
 if TYPE_CHECKING:
+    from sqlalchemy import Table
+
+    from edgy.core.connection.database import Database
+    from edgy.core.connection.registry import Registry
     from edgy.core.db.models.base import BaseModelType
     from edgy.core.db.models.model import Model
 
 
-def get_model(registry: Registry, model_name: str) -> "Model":
+def get_model(registry: "Registry", model_name: str) -> "Model":
     """
     Return the model with capitalize model_name.
 
@@ -47,3 +49,25 @@ def build_pkcolumns(model_class: Any) -> None:
 def from_model_to_clauses(model: "BaseModelType") -> Iterable[Any]:
     for column in model.columns_for_load:
         yield getattr(model.table.columns, column) == getattr(model, column)
+
+
+_model_type = TypeVar("_model_type", bound="BaseModelType")
+
+
+def apply_instance_extras(
+    model: _model_type,
+    model_class: Type["BaseModelType"],
+    schema: Optional[str] = None,
+    database: Optional["Database"] = None,
+    table: Optional["Table"] = None,
+) -> _model_type:
+    model.__using_schema__ = schema
+    if table is None:
+        # Apply the schema to the model instance
+        model.table = model_class.table_schema(schema)
+    else:
+        model.table = table
+    if database is not None:
+        # Set the database to the model instance
+        model.database = database
+    return model

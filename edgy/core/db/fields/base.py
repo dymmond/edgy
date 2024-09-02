@@ -19,12 +19,15 @@ import sqlalchemy
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
+from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.types import Undefined
 
 from .types import BaseFieldType, ColumnDefinitionModel
 
 if TYPE_CHECKING:
-    from edgy import Model, ReflectModel, Registry
+    from edgy.core.connection.registry import Registry
+    from edgy.core.db.fields.factories import FieldFactory
+    from edgy.core.db.models.types import BaseModelType
 
 
 def _removesuffix(text: str, suffix: str) -> str:
@@ -44,8 +47,9 @@ class BaseField(BaseFieldType, FieldInfo):
     """
 
     # defs to simplify the life (can be None actually)
-    owner: Type["Model"]
+    owner: Type["BaseModelType"]
     registry: "Registry"
+    factory: Optional["FieldFactory"] = None
 
     def __init__(
         self,
@@ -104,7 +108,7 @@ class BaseField(BaseFieldType, FieldInfo):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        owner: Optional[Type["BaseModelType"]] = None,
         parent: Optional["BaseField"] = None,
     ) -> Optional["BaseField"]:
         """
@@ -194,52 +198,52 @@ class BaseCompositeField(BaseField):
         """
         prefix = _removesuffix(field_name, self.name)
         result = {}
-        if isinstance(value, dict):
-            for sub_name, field in self.composite_fields.items():
-                translated_name = self.translate_name(sub_name)
-                if translated_name not in value:
-                    if field.has_default() or not field.is_required():
-                        continue
-                    raise ValueError(f"Missing key: {sub_name} for {field_name}")
-                result.update(
-                    field.clean(f"{prefix}{sub_name}", value[translated_name], for_query=for_query)
-                )
-        else:
-            for sub_name, field in self.composite_fields.items():
-                translated_name = self.translate_name(sub_name)
-                if not hasattr(value, translated_name):
-                    if not for_query and (field.has_default() or not field.is_required()):
-                        continue
-                    raise ValueError(f"Missing attribute: {translated_name} for {field_name}")
-                result.update(
-                    field.clean(
-                        f"{prefix}{sub_name}", getattr(value, translated_name), for_query=for_query
-                    )
-                )
+        ErrorType: Type[Exception] = KeyError
+        if not isinstance(value, dict):
+            # simpler
+            value = value.__dict__
+            # trigger load for missing attributes
+            ErrorType = AttributeError
+
+        for sub_name, field in self.composite_fields.items():
+            translated_name = self.translate_name(sub_name)
+            if translated_name not in value:
+                if field.has_default() or not field.is_required():
+                    continue
+                raise ErrorType(f"Missing sub-field: {sub_name} for {field_name}")
+            result.update(
+                field.clean(f"{prefix}{sub_name}", value[translated_name], for_query=for_query)
+            )
         return result
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
+    ) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
         result = {}
-        if isinstance(value, dict):
-            for sub_name, field in self.composite_fields.items():
-                translated_name = self.translate_name(sub_name)
-                if translated_name not in value:
+        ErrorType: Type[Exception] = KeyError
+        if not isinstance(value, dict):
+            # simpler
+            value = value.__dict__
+            # trigger load for missing attributes
+            ErrorType = AttributeError
+        for sub_name, field in self.composite_fields.items():
+            translated_name = self.translate_name(sub_name)
+            if translated_name not in value:
+                if phase == "init" or phase == "init_db":
                     continue
-                result.update(
-                    field.to_model(sub_name, value.get(translated_name, None), phase=phase)
+                raise ErrorType(f"Missing sub-field: {sub_name} for {field_name}")
+            result.update(
+                field.to_model(
+                    sub_name, value.get(translated_name, None), phase=phase, instance=instance
                 )
-        else:
-            for sub_name, field in self.composite_fields.items():
-                translated_name = self.translate_name(sub_name)
-                if not hasattr(value, translated_name):
-                    continue
-                result.update(
-                    field.to_model(sub_name, getattr(value, translated_name, None), phase=phase)
-                )
-
+            )
         return result
 
     def get_default_values(
@@ -269,12 +273,32 @@ class PKField(BaseCompositeField):
             **kwargs,
         )
 
-    def __get__(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
+    async def aget(
+        self, instance: "BaseModelType", owner: Any = None
+    ) -> Union[Dict[str, Any], Any]:
+        pknames = cast(Sequence[str], self.owner.pknames)
+        d = {}
+        # we don't want to issue loads
+        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+        try:
+            for key in pknames:
+                translated_name = self.translate_name(key)
+                d[translated_name] = getattr(instance, key, None)
+            for key in self.fieldless_pkcolumns:
+                translated_name = self.translate_name(key)
+                d[translated_name] = getattr(instance, key, None)
+        finally:
+            MODEL_GETATTR_BEHAVIOR.reset(token)
+        return d
+
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[Dict[str, Any], Any]:
         pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
         pknames = cast(Sequence[str], self.owner.pknames)
         assert len(pkcolumns) >= 1
         if len(pknames) == 1:
             return getattr(instance, pknames[0], None)
+        if MODEL_GETATTR_BEHAVIOR.get() == "coro":
+            return self.aget(instance, owner=owner)
         d = {}
         for key in pknames:
             translated_name = self.translate_name(key)
@@ -288,7 +312,7 @@ class PKField(BaseCompositeField):
             d[translated_name] = getattr(instance, key, None)
         return d
 
-    def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
+    def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:
         if name not in kwargs:
             return
         # check for collisions
@@ -300,7 +324,7 @@ class PKField(BaseCompositeField):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        owner: Optional[Type["BaseModelType"]] = None,
         parent: Optional[BaseFieldType] = None,
     ) -> Optional[BaseFieldType]:
         return None
@@ -339,7 +363,13 @@ class PKField(BaseCompositeField):
 
         return retdict
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
+    ) -> Dict[str, Any]:
         pknames = cast(Sequence[str], self.owner.pknames)
         assert len(cast(Sequence[str], self.owner.pkcolumns)) >= 1
         if self.is_incomplete:
@@ -350,8 +380,8 @@ class PKField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.meta.fields[pknames[0]]
-            return field.to_model(pknames[0], value, phase=phase)
-        return super().to_model(field_name, value, phase=phase)
+            return field.to_model(pknames[0], value, phase=phase, instance=instance)
+        return super().to_model(field_name, value, phase=phase, instance=instance)
 
     def get_composite_fields(self) -> Dict[str, BaseFieldType]:
         return {
@@ -398,7 +428,10 @@ class BaseForeignKey(RelationshipField):
         """
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                self._target = self.registry.models[self.to]
+                try:
+                    self._target = self.registry.models[self.to]
+                except KeyError:
+                    self._target = self.registry.reflected[self.to]
             else:
                 self._target = self.to
         return self._target
@@ -421,5 +454,11 @@ class BaseForeignKey(RelationshipField):
         """
         return value
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
+    ) -> Dict[str, Any]:
         return {field_name: self.expand_relationship(value)}

@@ -58,8 +58,7 @@ class ManyRelation(ManyRelationProtocol):
         self.refs: Sequence[Union[Model, ReflectModel]] = []
         if not isinstance(refs, Sequence):
             refs = [refs]
-        for v in refs:
-            self._add_object(v)
+        self.stage(*refs)
 
     def get_queryset(self) -> "QuerySet":
         # we need to check tenant every request
@@ -111,8 +110,15 @@ class ManyRelation(ManyRelationProtocol):
         instance.identifying_db_fields = [self.from_foreign_key, self.to_foreign_key]
         return instance
 
-    def _add_object(self, child: Type["Model"]) -> None:
-        self.refs.append(self.expand_relationship(child))
+    def stage(self, *children: "Model") -> None:
+        for child in children:
+            if not isinstance(
+                child, (self.to, self.to.proxy_model, self.through, self.through.proxy_model, dict)
+            ):
+                raise RelationshipIncompatible(
+                    f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
+                )
+            self.refs.append(self.expand_relationship(child))
 
     async def add(self, child: "Model") -> Optional["Model"]:
         """
@@ -123,13 +129,13 @@ class ManyRelation(ManyRelationProtocol):
         . Checks if the middle table already contains the record being added. Raises error if yes.
         """
         if not isinstance(
-            child, (self.to, self.to.proxy_model, self.through, self.through.proxy_model)
+            child, (self.to, self.to.proxy_model, self.through, self.through.proxy_model, dict)
         ):
             raise RelationshipIncompatible(
                 f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
             )
         child = self.expand_relationship(child)
-
+        # try saving intermediate model. If it fails another instance already exists and return None
         try:
             async with child.database.transaction():
                 return await child.save(force_save=True)
@@ -176,6 +182,10 @@ class ManyRelation(ManyRelationProtocol):
     def __str__(self) -> str:
         return f"{self.through.__name__}"
 
+    def __get__(self, instance: "Model", owner: Any = None) -> ManyRelationProtocol:
+        self.instance = instance
+        return self
+
 
 class SingleRelation(ManyRelationProtocol):
     """
@@ -203,8 +213,7 @@ class SingleRelation(ManyRelationProtocol):
         self.refs: Sequence[Union[Model, ReflectModel]] = []
         if not isinstance(refs, Sequence):
             refs = [refs]
-        for v in refs:
-            self._add_object(v)
+        self.stage(*refs)
 
     def get_queryset(self) -> "QuerySet":
         # we need to check tenant every request
@@ -250,8 +259,13 @@ class SingleRelation(ManyRelationProtocol):
         instance.identifying_db_fields = related_columns
         return instance
 
-    def _add_object(self, child: Type["Model"]) -> None:
-        self.refs.append(self.expand_relationship(child))
+    def stage(self, *children: "Model") -> None:
+        for child in children:
+            if not isinstance(child, (self.to, self.to.proxy_model, dict)):
+                raise RelationshipIncompatible(
+                    f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
+                )
+            self.refs.append(self.expand_relationship(child))
 
     def __getattr__(self, item: Any) -> Any:
         """
@@ -277,8 +291,9 @@ class SingleRelation(ManyRelationProtocol):
         if the type is wrong.
         . Checks if the middle table already contains the record being added. Raises error if yes.
         """
-        if not isinstance(child, (self.to, self.to.proxy_model)):
+        if not isinstance(child, (self.to, self.to.proxy_model, dict)):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
+        child = self.expand_relationship(child)
         await child.save(values={self.to_foreign_key: self.instance})
         return child
 
@@ -307,3 +322,7 @@ class SingleRelation(ManyRelationProtocol):
 
     def __str__(self) -> str:
         return f"{self.to.__name__}"
+
+    def __get__(self, instance: "Model", owner: Any = None) -> ManyRelationProtocol:
+        self.instance = instance
+        return self

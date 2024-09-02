@@ -1,15 +1,17 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set, Type
 
 from edgy.core.db.fields.base import RelationshipField
+from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
+    from sqlalchemy import Table
     from sqlalchemy.engine.result import Row
 
-    from edgy import Model
+    from edgy import Database, Model
 
 
 class ModelRowMixin:
@@ -19,7 +21,7 @@ class ModelRowMixin:
 
     @classmethod
     async def from_sqla_row(
-        cls,
+        cls: Type["Model"],
         row: "Row",
         select_related: Optional[Sequence[Any]] = None,
         prefetch_related: Optional[Sequence["Prefetch"]] = None,
@@ -27,7 +29,10 @@ class ModelRowMixin:
         only_fields: Sequence[str] = None,
         is_defer_fields: bool = False,
         exclude_secrets: bool = False,
-        using_schema: Union[str, None] = None,
+        using_schema: Optional[str] = None,
+        database: Optional["Database"] = None,
+        # local only parameter
+        table: Optional["Table"] = None,
     ) -> Optional["Model"]:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
@@ -46,7 +51,7 @@ class ModelRowMixin:
         item: Dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
-        secret_columns = set()
+        secret_columns: Set[str] = set()
         if exclude_secrets:
             for name in cls.meta.secret_fields:
                 secret_columns.update(cls.meta.field_to_column_names[name])
@@ -57,7 +62,7 @@ class ModelRowMixin:
                 field = cls.meta.fields[field_name]
             except KeyError:
                 raise QuerySetError(
-                    detail=f'Selected field "{field_name}" does not exist on {cls}.'
+                    detail=f'Selected field "{field_name}cast("Model", " does not exist on {cls}.'
                 ) from None
             if isinstance(field, RelationshipField):
                 model_class, _, remainder = field.traverse_field(related)
@@ -66,16 +71,22 @@ class ModelRowMixin:
                     detail=f'Selected field "{field_name}" is not a RelationshipField on {cls}.'
                 ) from None
             if remainder:
+                # don't pass table, it is only for the main model_class
                 item[field_name] = await model_class.from_sqla_row(
                     row,
                     select_related=[remainder],
                     prefetch_related=prefetch_related,
                     exclude_secrets=exclude_secrets,
                     using_schema=using_schema,
+                    database=database,
                 )
             else:
+                # don't pass table, it is only for the main model_class
                 item[field_name] = await model_class.from_sqla_row(
-                    row, exclude_secrets=exclude_secrets, using_schema=using_schema
+                    row,
+                    exclude_secrets=exclude_secrets,
+                    using_schema=using_schema,
+                    database=database,
                 )
         table_columns = cls.table_schema(using_schema).columns
         # Populate the related names
@@ -105,7 +116,10 @@ class ModelRowMixin:
             # For the related fields. We simply chnage the structure of the model
             # and rebuild it with the new fields.
             proxy_model = model_related.proxy_model(**child_item)
-            proxy_model = cls.__apply_schema(proxy_model, model_related, using_schema)
+            # don't pass table, it is only for the main model_class
+            proxy_model = apply_instance_extras(
+                proxy_model, model_related, using_schema, database=database
+            )
             proxy_model.identifying_db_fields = foreign_key.related_columns
 
             item[related] = proxy_model
@@ -123,35 +137,26 @@ class ModelRowMixin:
                 continue
             if column.key not in cls.meta.columns_to_field:
                 continue
-            # set if not of an foreign key
-            elif cls.meta.columns_to_field[column.key] not in item:
+            # set if not of an foreign key with one column
+            elif column.key not in item:
                 if column in row._mapping:
                     item[column.key] = row._mapping[column]
                 elif column.name in row._mapping:
                     # fallback, sometimes the column is not found
                     item[column.key] = row._mapping[column.name]
-        model = (
-            cast("Model", cls(**item))
+        model: Model = (
+            cls(**item, __phase__="init_db")
             if not exclude_secrets and not is_defer_fields and not _is_only
-            else cast("Model", cls.proxy_model(**item))
+            else cls.proxy_model(**item)
         )
         # Apply the schema to the model
-        model = cls.__apply_schema(model, cls, using_schema)
+        model = apply_instance_extras(model, cls, using_schema, database=database, table=table)
 
         # Handle prefetch related fields.
         await cls.__handle_prefetch_related(
             row=row, model=model, prefetch_related=prefetch_related
         )
         assert model.pk is not None, model
-        return model
-
-    @classmethod
-    def __apply_schema(
-        cls, model: "Model", model_class: Type["Model"], schema: Optional[str] = None
-    ) -> "Model":
-        # Apply the schema to the model
-        model.table = model_class.table_schema(schema)
-        model.__using_schema__ = schema
         return model
 
     @classmethod

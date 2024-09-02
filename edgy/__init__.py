@@ -3,6 +3,7 @@ __version__ = "0.14.1"
 from .cli.base import Migrate
 from .conf import settings
 from .conf.global_settings import EdgySettings
+from .core import files
 from .core.connection.database import Database, DatabaseURL
 from .core.connection.registry import Registry
 from .core.db import fields
@@ -65,7 +66,9 @@ __all__ = [
     "EmailField",
     "ExcludeField",
     "fields",
+    "files",
     "FloatField",
+    "FileField",
     "ForeignKey",
     "Index",
     "IntegerField",

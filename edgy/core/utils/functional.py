@@ -6,6 +6,7 @@ from typing import Any, Dict, Tuple, Type, Union
 
 from edgy.core.db.fields.types import BaseFieldType
 
+# deprecate, it can lead to circular imports and is an one-liner anyway
 # bypass __setattr__ method
 edgy_setattr = object.__setattr__
 

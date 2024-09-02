@@ -1,4 +1,5 @@
 import copy
+import inspect
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -16,13 +17,14 @@ from typing import (
 from pydantic import BaseModel
 
 from edgy.core.db.constants import ConditionalRedirect
+from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.fields.base import BaseCompositeField
 from edgy.core.db.fields.core import FieldFactory
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
-    from edgy.core.db.models.model import Model, ReflectModel
+    from edgy.core.db.models.types import BaseModelType
 
 
 def _removeprefix(text: str, prefix: str) -> str:
@@ -43,8 +45,7 @@ class ConcreteCompositeField(BaseCompositeField):
         *,
         inner_fields: Union[
             Sequence[Union[str, Tuple[str, BaseFieldType]]],
-            Type["Model"],
-            Type["ReflectModel"],
+            Type["BaseModelType"],
             Dict[str, BaseFieldType],
         ] = (),
         **kwargs: Any,
@@ -100,7 +101,7 @@ class ConcreteCompositeField(BaseCompositeField):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[Union[Type["Model"], Type["ReflectModel"]]] = None,
+        owner: Optional[Type["BaseModelType"]] = None,
         parent: Optional[BaseFieldType] = None,
     ) -> BaseFieldType:
         field_copy = cast(
@@ -128,20 +129,43 @@ class ConcreteCompositeField(BaseCompositeField):
                 field_copy.embedded_field_defs[field_def.name] = field_def
         return field_copy
 
-    def __get__(self, instance: "Model", owner: Any = None) -> Union[Dict[str, Any], Any]:
+    async def aget(
+        self, instance: "BaseModelType", owner: Any = None
+    ) -> Union[Dict[str, Any], Any]:
+        d = {}
+        token = MODEL_GETATTR_BEHAVIOR.set("coro")
+        try:
+            for key in self.inner_field_names:
+                translated_name = self.translate_name(key)
+                value = getattr(instance, key)
+                if inspect.isawaitable(value):
+                    value = await value
+                d[translated_name] = value
+        finally:
+            MODEL_GETATTR_BEHAVIOR.reset(token)
+        if self.model is not None and self.model is not ConditionalRedirect:
+            return self.model(**d)
+        return d
+
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[Dict[str, Any], Any]:
         assert len(self.inner_field_names) >= 1
         if self.model is ConditionalRedirect and len(self.inner_field_names) == 1:
-            return getattr(instance, self.inner_field_names[0], None)
+            try:
+                return getattr(instance, self.inner_field_names[0])
+            except AttributeError:
+                if not instance._loaded_or_deleted:
+                    raise AttributeError("not loaded") from None
+                return None
+        if MODEL_GETATTR_BEHAVIOR.get() == "coro":
+            return self.aget(instance, owner=owner)
         d = {}
         for key in self.inner_field_names:
             translated_name = self.translate_name(key)
-            field = instance.meta.fields.get(key)
             try:
-                if field and hasattr(field, "__get__"):
-                    d[translated_name] = field.__get__(instance, owner)
-                else:
-                    d[translated_name] = getattr(instance, key)
-            except AttributeError:
+                d[translated_name] = getattr(instance, key)
+            except (AttributeError, KeyError):
+                if not instance._loaded_or_deleted:
+                    raise AttributeError("not loaded") from None
                 pass
         if self.model is not None and self.model is not ConditionalRedirect:
             return self.model(**d)
@@ -159,7 +183,13 @@ class ConcreteCompositeField(BaseCompositeField):
             return field.clean(self.inner_field_names[0], value, for_query=for_query)
         return super().clean(field_name, value, for_query=for_query)
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
+    ) -> Dict[str, Any]:
         assert len(self.inner_field_names) >= 1
         if (
             self.model is ConditionalRedirect
@@ -168,7 +198,7 @@ class ConcreteCompositeField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.meta.fields[self.inner_field_names[0]]
-            return field.to_model(self.inner_field_names[0], value, phase=phase)
+            return field.to_model(self.inner_field_names[0], value, phase=phase, instance=instance)
         return super().to_model(field_name, value, phase=phase)
 
     def get_embedded_fields(
@@ -242,7 +272,7 @@ class CompositeField(FieldFactory):
         return Dict[str, Any]
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
         inner_fields = kwargs.get("inner_fields")
         if inner_fields is not None:
             if hasattr(inner_fields, "meta"):
@@ -262,6 +292,6 @@ class CompositeField(FieldFactory):
                 else:
                     if field[0] in inner_field_names:
                         raise FieldDefinitionError(f"duplicate inner field {field}")
-        model = kwargs.get("model", None)
+        model = kwargs.get("model")
         if model is not None and not isinstance(model, type):
             raise FieldDefinitionError(f"model must be type {model}")

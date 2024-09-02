@@ -15,7 +15,7 @@ from typing import (
 if TYPE_CHECKING:
     import sqlalchemy
 
-    from edgy import Model
+    from edgy import Database, Model
     from edgy.core.db.models.managers import BaseManager
     from edgy.core.db.models.metaclasses import MetaInfo
 
@@ -48,6 +48,7 @@ class BaseModelType(ABC):
     """
 
     columns: ClassVar["sqlalchemy.sql.ColumnCollection"]
+    database: ClassVar["Database"]
     query: ClassVar["BaseManager"]
     query_related: ClassVar["BaseManager"]
     meta: ClassVar["MetaInfo"]
@@ -108,6 +109,25 @@ class BaseModelType(ABC):
         """Load model"""
 
     @abstractmethod
+    async def update(self, **kwargs: Any) -> Any:
+        """
+        Update operation of the database fields.
+        """
+
+    @abstractmethod
+    async def save(
+        self,
+        force_save: bool = False,
+        values: Dict[str, Any] = None,
+        **kwargs: Any,
+    ) -> Union["Model", Any]:
+        """Save model"""
+
+    @abstractmethod
+    async def delete(self, skip_post_delete_hooks: bool = False) -> None:
+        """Delete Model"""
+
+    @abstractmethod
     async def load_recursive(
         self, only_needed: bool = True, only_needed_nest: bool = False
     ) -> None:
@@ -131,6 +151,22 @@ class BaseModelType(ABC):
         Builds the SQLAlchemy table representation from the loaded fields.
         """
 
+    @abstractmethod
+    async def execute_post_save_hooks(self) -> None: ...
+
+    @classmethod
+    @abstractmethod
+    def extract_column_values(
+        cls,
+        extracted_values: Dict[str, Any],
+        is_update: bool = False,
+        is_partial: bool = False,
+    ) -> Dict[str, Any]:
+        """
+        Extracts all the default values from the given fields and returns the raw
+        value corresponding to each field.
+        """
+
     # helpers
 
     def extract_db_fields(self, only: Optional[Sequence[str]] = None) -> Dict[str, Any]:
@@ -139,17 +175,12 @@ class BaseModelType(ABC):
         Related fields are not included because they are disjoint.
         """
         fields = self.meta.fields
-        model_references = self.meta.model_references
         columns = self.table.columns
 
         if only is not None:
             return {k: v for k, v in self.__dict__.items() if k in only}
 
-        return {
-            k: v
-            for k, v in self.__dict__.items()
-            if k in fields or hasattr(columns, k) or k in model_references
-        }
+        return {k: v for k, v in self.__dict__.items() if k in fields or hasattr(columns, k)}
 
     def get_instance_name(self) -> str:
         """

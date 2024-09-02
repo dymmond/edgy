@@ -361,6 +361,14 @@ variable = obj.email
 obj.email = "foo@example.com"
 ```
 
+#### FileField
+
+See [FileField](file_handling.md#filefield).
+
+#### ImageField
+
+See [ImageField](file_handling.md#ImageField).
+
 #### FloatField
 
 ```python
@@ -373,7 +381,7 @@ class MyModel(edgy.Model):
 
 ```
 
-Derives from the same as [IntergerField](#integerfield) and validates the decimal float.
+Derives from the same as [IntegerField](#integerfield) and validates the decimal float.
 
 #### ForeignKey
 
@@ -693,12 +701,16 @@ Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide follo
 Additional they can provide following methods:
 
 * `__get__(self, instance, owner=None)` - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
+  To prevent unwanted loads operate on the instance `__dict__`. You can throw an AttributeError to trigger a load.
 * `__set__(self, instance, value)` - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
-* `to_model(self, field_name, phase="")` - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`
+* `to_model(self, field_name, phase="", instance=None)` - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`.
 * `get_embedded_fields(self, field_name, fields)` - Define internal fields.
 * `get_default_values(self, field_name, cleaned_data, is_update=False)` - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
 * `get_default_value(self)` - return default value for one column fields.
 * `get_global_constraints(self, field_name, columns)` - takes as second parameter (self excluded) the columns defined by this field (by get_columns). Returns a global constraint, which can be multi-column.
+* `modify_input(name, kwargs, phase="")`: Modifying the input (kwargs is a dict). E.g. providing defaults only when loaded from db or collecting fields and columns for a
+  multi column, composite field (e.g. FileField). Note: this method is very powerful. You should only manipulate sub-fields and columns belonging to the field.
+* `embed_field(prefix, new_fieldname, owner=None, parent=None)`: Controlling the embedding of the field in other fields. Return None to disable embedding.
 
 You should also provide an init method which sets following attributes:
 
@@ -713,8 +725,51 @@ You should also provide an init method which sets following attributes:
 
 ### Tricks
 
+#### Using for_query
+
+`clean` is required to clean the values for the db. It has an extra parameter `for_query` which is set
+in a querying context (searching something in the db).
+
+#### Using phases
+
+`to_model` receives an argument named phase. If used outside of a model context it defaults to an empty string.
+
+Within a model context it contains the current phase it is called for:
+
+* `init`: Called in model `__init__`.
+* `set`: Called in model `__setattr__` (when setting an attribute).
+* `load`: Called after load. Contains db values.
+* `post_insert`: Called after insert. Arguments are the ones passed to save.
+
+#### Saving variables on Field
+
 You can use the field as a store for your customizations. Unconsumed keywords are set as attributes on the BaseField object.
 But if the variables clash with the variables used for Columns or for pydantic internals, there are unintended side-effects possible.
+
+
+#### Field returning persistent, instance aware object
+
+For getting an immutable object attached to a Model instance, there are two ways:
+
+- Using Managers (by default they are instance aware)
+- Using fields with `__get__` and `to_model`.
+
+The last way is a bit more complicated than managers. You need to consider 3 ways the field is affected:
+
+1. `__init__` and `load`: Some values are passed to the field. Use `to_model` for providing an initial object with instance.
+    Note: this doesn't gurantee the initialization. We still need the  `__get__`-
+2. `__getattr__` here the object can get an instance it can attach to. Use `__get__` for this.
+3. Set access. Either use `__set__` or `to_model` so it uses the old value.
+
+#### Nested loads with `__get__`
+
+Fields using `__get__` must consider the context_var `MODEL_GETATTR_BEHAVIOR`. There are two modes to consider:
+
+1. `passdown`: getattr access returns `AttributeError` on missing attributes. The first time an `AttributeError` is issued a load is issued when neccessary and the mode switches to `coro`. This can be overwritten in composite fields.
+2. `coro`: `__get__` needs to issue the load itself (in case this is wanted) and to handle returned coroutines. AttributeErrors are passed through.
+
+The third mode `load` is only relevant for models and querysets.
+
 
 ## Customizing fields after model initialization
 

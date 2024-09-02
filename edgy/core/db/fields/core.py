@@ -18,6 +18,8 @@ from edgy.core.db.fields.types import BaseFieldType
 from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
+    from edgy.core.db.models.types import BaseModelType
+
     try:
         import zoneinfo  # type: ignore[import-not-found, unused-ignore]
     except ImportError:
@@ -39,7 +41,7 @@ class CharField(FieldFactory, str):
         min_length: Optional[int] = None,
         regex: Union[str, Pattern] = None,
         pattern: Union[str, Pattern] = None,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> BaseFieldType:
         if pattern is None:
             pattern = regex
@@ -52,7 +54,7 @@ class CharField(FieldFactory, str):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
         max_length = kwargs.get("max_length", 0)
         if max_length <= 0:
             raise FieldDefinitionError(detail=f"'max_length' is required for {cls.__name__}")
@@ -99,17 +101,7 @@ class TextField(FieldFactory, str):
         return sqlalchemy.Text(collation=kwargs.get("collation", None))
 
 
-class Number(FieldFactory):
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        minimum = kwargs.get("minimum", None)
-        maximum = kwargs.get("maximum", None)
-
-        if (minimum is not None and maximum is not None) and minimum > maximum:
-            raise FieldDefinitionError(detail="'minimum' cannot be bigger than 'maximum'")
-
-
-class IntegerField(Number, int):
+class IntegerField(FieldFactory, int):
     """
     Integer field factory that construct Field classes and populated their values.
     """
@@ -119,8 +111,10 @@ class IntegerField(Number, int):
     def __new__(  # type: ignore
         cls,
         *,
-        minimum: Optional[int] = None,
-        maximum: Optional[int] = None,
+        ge: Union[int, float, decimal.Decimal, None] = None,
+        gt: Union[int, float, decimal.Decimal, None] = None,
+        le: Union[int, float, decimal.Decimal, None] = None,
+        lt: Union[int, float, decimal.Decimal, None] = None,
         multiple_of: Optional[int] = None,
         **kwargs: Any,
     ) -> BaseFieldType:
@@ -137,7 +131,7 @@ class IntegerField(Number, int):
         return sqlalchemy.Integer()
 
 
-class FloatField(Number, float):
+class FloatField(FieldFactory, float):
     """Representation of a int32 and int64"""
 
     field_type = float
@@ -145,9 +139,10 @@ class FloatField(Number, float):
     def __new__(  # type: ignore
         cls,
         *,
-        mininum: Union[int, float, None] = None,
-        maximun: Union[int, float, None] = None,
-        multiple_of: Union[int, float, None] = None,
+        ge: Union[int, float, decimal.Decimal, None] = None,
+        gt: Union[int, float, decimal.Decimal, None] = None,
+        le: Union[int, float, decimal.Decimal, None] = None,
+        lt: Union[int, float, decimal.Decimal, None] = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         kwargs = {
@@ -177,17 +172,19 @@ class SmallIntegerField(IntegerField):
         return sqlalchemy.SmallInteger()
 
 
-class DecimalField(Number, decimal.Decimal):
+class DecimalField(FieldFactory, decimal.Decimal):
     field_type = decimal.Decimal
 
     def __new__(  # type: ignore
         cls,
         *,
-        minimum: Union[int, float, None] = None,
-        maximum: Union[int, float, None] = None,
-        multiple_of: Union[int, float, None] = None,
-        max_digits: int = None,
-        decimal_places: int = None,
+        ge: Union[int, float, decimal.Decimal, None] = None,
+        gt: Union[int, float, decimal.Decimal, None] = None,
+        le: Union[int, float, decimal.Decimal, None] = None,
+        lt: Union[int, float, decimal.Decimal, None] = None,
+        multiple_of: Union[int, decimal.Decimal, None] = None,
+        max_digits: Optional[int] = None,
+        decimal_places: Optional[int] = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         kwargs = {
@@ -203,8 +200,8 @@ class DecimalField(Number, decimal.Decimal):
         )
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        super().validate(**kwargs)
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
+        super().validate(kwargs)
 
         max_digits = kwargs.get("max_digits")
         decimal_places = kwargs.get("decimal_places")
@@ -281,7 +278,11 @@ class TimezonedField:
             raise ValueError(f"Invalid type detected: {type(value)}")
 
     def to_model(
-        self, field_name: str, value: Any, phase: str = ""
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Optional[Union[datetime.datetime, datetime.date]]]:
         """
         Convert input object to datetime
@@ -455,7 +456,7 @@ class ChoiceField(FieldFactory):
     def __new__(  # type: ignore
         cls,
         choices: Optional[Sequence[Union[Tuple[str, str], Tuple[str, int]]]] = None,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> BaseFieldType:
         kwargs = {
             **kwargs,
@@ -464,7 +465,7 @@ class ChoiceField(FieldFactory):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
         choice_class = kwargs.get("choices")
         if choice_class is None or not isinstance(choice_class, EnumMeta):
             raise FieldDefinitionError("ChoiceField choices must be an Enum")

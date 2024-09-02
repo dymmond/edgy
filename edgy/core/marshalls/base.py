@@ -7,7 +7,6 @@ from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
 from edgy.core.marshalls.helpers import MarshallFieldMapping
 from edgy.core.marshalls.metaclasses import MarshallMeta
-from edgy.core.utils.functional import edgy_setattr
 from edgy.core.utils.sync import run_sync
 
 if TYPE_CHECKING:
@@ -27,7 +26,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
 
     def __init__(self, /, **data: Any) -> None:
         super().__init__(**data)
-        self._instance: "Model" = self._setup()
+        self._instance: Model = self._setup()
 
     def _setup(self) -> "Model":
         """
@@ -38,7 +37,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         """
         data = self.model_dump(exclude={"id"})
         data["__show_pk__"] = self.__show_pk__
-        instance: "Model" = self.marshall_config["model"](**data)  # type: ignore
+        instance: Model = self.marshall_config["model"](**data)  # type: ignore
         self._resolve_serializer(instance=instance)
         return instance
 
@@ -116,7 +115,8 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
 
         if pk_attribute_in_data:
             for pk_attribute in instance.pknames:
-                edgy_setattr(self, pk_attribute, getattr(instance, pk_attribute))
+                # bypass __setattr__ method
+                object.__setattr__(self, pk_attribute, getattr(instance, pk_attribute))
 
     def _get_fields(self) -> Dict[str, Any]:
         return self.model_fields.copy()

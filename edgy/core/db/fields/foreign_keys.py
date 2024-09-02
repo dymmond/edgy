@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple
 
 import sqlalchemy
 from pydantic import BaseModel
@@ -8,17 +8,11 @@ from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.relationships.relation import SingleRelation
-from edgy.core.terminal import Print
 from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
-    from edgy import Model
-
-
-T = TypeVar("T", bound="Model")
-
-terminal = Print()
+    from edgy.core.db.models.types import BaseModelType
 
 
 FK_CHAR_LIMIT = 63
@@ -135,7 +129,7 @@ class BaseForeignKeyField(BaseForeignKey):
             raise ValueError(f"cannot handle: {value} of type {type(value)}")
         return retdict
 
-    def modify_input(self, name: str, kwargs: Dict[str, Any]) -> None:
+    def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:
         column_names = self.get_column_names(name)
         assert len(column_names) >= 1
         if len(column_names) == 1:
@@ -149,7 +143,8 @@ class BaseForeignKeyField(BaseForeignKey):
         if not to_add:
             return
         if name in kwargs:
-            raise ValueError("Cannot specify a foreign key column and the foreign key itself")
+            # after removing the attributes return
+            return
         if len(column_names) != len(to_add):
             raise ValueError("Cannot update the foreign key partially")
         kwargs[name] = to_add
@@ -247,14 +242,14 @@ class ForeignKey(ForeignKeyFieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        to: "Model",
+        to: "BaseModelType",
         **kwargs: Any,
     ) -> BaseFieldType:
         return super().__new__(cls, to=to, **kwargs)
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        super().validate(**kwargs)
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
+        super().validate(kwargs)
         embed_parent = kwargs.get("embed_parent")
         if embed_parent and "__" in embed_parent[1]:
             raise FieldDefinitionError(

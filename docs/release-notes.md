@@ -5,6 +5,31 @@ hide:
 
 # Release Notes
 
+## 0.15.0
+
+### Added
+
+- FileField and File handling.
+- ImageField stub (more is comming soon)
+- `stage` method in relations.
+- ModelRefs passed as normal positional arguments are automatically staged.
+
+### Changed
+
+- Breaking: ModelReferences use now the related name instead of the model name.
+- Breaking: Field Factories pass now keyword arguments as positional dictionary. This way keyword arguments manipulations in validate are possible.
+  This way it can be distinguished between multiple foreign keys to the same model and self-references are possible.
+- `model_references` are superseeded by `post_save_fields` in meta.
+- ModelParser mixin is gone. Use the classmethod `extract_column_values` instead.
+- edgy_settr is not used internally anymore (circular imports).
+- `modify_input` receives now an argument phase
+
+### Fixed
+
+- Factory overwrites can now access owner.
+- Foreign keys to reflected models.
+- Handling to string references not in registry loaded yet.
+
 ## 0.14.1
 
 ### Changed

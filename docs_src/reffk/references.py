@@ -2,5 +2,5 @@ from edgy import ModelRef
 
 
 class PostRef(ModelRef):
-    __model__ = "Post"
+    __related_name__ = "posts_set"
     comment: str

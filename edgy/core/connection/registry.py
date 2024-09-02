@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import Any, Dict, Mapping, Union
+from typing import Any, Dict, List, Mapping, Union
 
 import sqlalchemy
 from sqlalchemy import Engine
@@ -28,6 +28,8 @@ class Registry:
         self.extra: Mapping[str, Database] = {
             k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
         }
+        # when setting a Model or Reflected Model execute the callbacks
+        self._callbacks: Dict[str, List[Any]] = {}
 
         self.schema = Schema(registry=self)
 

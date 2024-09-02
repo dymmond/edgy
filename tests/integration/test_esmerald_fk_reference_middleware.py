@@ -39,7 +39,7 @@ def blocking_function():
 
 
 class PostRef(edgy.ModelRef):
-    __model__ = "Post"
+    __related_name__ = "posts_set"
     comment: str
 
 

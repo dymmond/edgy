@@ -8,7 +8,6 @@ from typing import (
     Sequence,
     Tuple,
     Type,
-    TypeVar,
     Union,
     cast,
 )
@@ -24,11 +23,8 @@ from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
-    from edgy import Model
     from edgy.core.db.fields.types import BaseFieldType
-
-T = TypeVar("T", bound="Model")
-
+    from edgy.core.db.models.types import BaseModelType
 
 terminal = Print()
 
@@ -65,7 +61,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         to_foreign_key: str = "",
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
-        through: Union[str, Type["Model"]] = "",
+        through: Union[str, Type["BaseModelType"]] = "",
         embed_through: Union[str, Literal[False]] = "",
         **kwargs: Any,
     ) -> None:
@@ -151,12 +147,12 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         from edgy.core.db.models.metaclasses import MetaInfo
 
         self.to = self.target
-        __bases__: Tuple[Type[Model], ...] = ()
+        __bases__: Tuple[Type[BaseModelType], ...] = ()
         pknames = set()
         if self.through:
             if isinstance(self.through, str):
                 self.through = self.registry.models[self.through]
-            through = cast(Type["Model"], self.through)
+            through = cast(Type["BaseModelType"], self.through)
             if through.meta.abstract:
                 pknames = set(cast(Sequence[str], through.pknames))
                 __bases__ = (through,)
@@ -259,13 +255,26 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.through = through_model
         self.add_model_to_register(self.through)
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(
+        self,
+        field_name: str,
+        value: Any,
+        phase: str = "",
+        instance: Optional["BaseModelType"] = None,
+    ) -> Dict[str, Any]:
         """
         Meta field
         """
         if isinstance(value, ManyRelationProtocol):
             return {field_name: value}
-        return {field_name: self.get_relation(refs=value)}
+        if instance:
+            relation_instance = self.__get__(instance)
+            if not isinstance(value, Sequence):
+                value = [value]
+            relation_instance.stage(*value)
+        else:
+            relation_instance = self.get_relation(refs=value)
+        return {field_name: relation_instance}
 
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
@@ -279,7 +288,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         return {}
 
-    def __get__(self, instance: "Model", owner: Any = None) -> ManyRelation:
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> ManyRelationProtocol:
         if instance:
             if self.name not in instance.__dict__:
                 instance.__dict__[self.name] = self.get_relation()
@@ -288,12 +297,10 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             return instance.__dict__[self.name]  # type: ignore
         raise ValueError("Missing instance")
 
-    def __set__(self, instance: "Model", value: Any) -> None:
-        relation = self.__get__(instance)
-        if not isinstance(value, Sequence):
-            value = [value]
-        for v in value:
-            relation._add_object(v)
+    async def post_save_callback(
+        self, value: ManyRelationProtocol, instance: "BaseModelType"
+    ) -> None:
+        await value.save_related()
 
 
 class ManyToManyField(ForeignKeyFieldFactory):
@@ -302,30 +309,32 @@ class ManyToManyField(ForeignKeyFieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        to: Union["Model", str],
+        to: Union["BaseModelType", str],
         *,
-        through: Optional["Model"] = None,
+        through: Optional["BaseModelType"] = None,
         from_fields: Sequence[str] = (),
         to_fields: Sequence[str] = (),
         **kwargs: Any,
     ) -> "BaseFieldType":
+        return super().__new__(
+            cls, to=to, through=through, from_fields=from_fields, to_fields=to_fields, **kwargs
+        )
+
+    @classmethod
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
+        super().validate(kwargs)
+        embed_through = kwargs.get("embed_through")
+        if embed_through and "__" in embed_through:
+            raise FieldDefinitionError('"embed_through" cannot contain "__".')
+
         for argument in ["null", "on_delete", "on_update"]:
-            if kwargs.get(argument, None):
+            if kwargs.get(argument):
                 terminal.write_warning(
                     f"Declaring `{argument}` on a ManyToMany relationship has no effect."
                 )
         kwargs["null"] = True
         kwargs["on_delete"] = CASCADE
         kwargs["on_update"] = CASCADE
-
-        return super().__new__(cls, to=to, through=through, **kwargs)
-
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        super().validate(**kwargs)
-        embed_through = kwargs.get("embed_through")
-        if embed_through and "__" in embed_through:
-            raise FieldDefinitionError('"embed_through" cannot contain "__".')
 
 
 ManyToMany = ManyToManyField

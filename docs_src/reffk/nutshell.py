@@ -1,14 +1,14 @@
 from typing import List
 
 import edgy
-from edgy import Database, ModelRef, Registry
+from edgy import Database, ModelRef, Registry, run_sync
 
 database = Database("sqlite:///db.sqlite")
 models = Registry(database=database)
 
 
 class PostRef(ModelRef):
-    __model__ = "Post"
+    __related_name__ = "posts_set"
     comment: str
 
 
@@ -28,3 +28,15 @@ class Post(edgy.Model):
 
     class Meta:
         registry = models
+
+
+# now we do things like
+
+run_sync(
+    User.query.create(
+        PostRef(comment="foo"),
+        PostRef(comment="bar"),
+    ),
+    name="edgy",
+    posts=[{"comment": "I am a dict"}],
+)

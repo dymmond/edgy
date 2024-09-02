@@ -16,7 +16,7 @@ pydantic_version = __version__[:3]
 
 
 class TrackModelRef(ModelRef):
-    __model__ = "Track"
+    __related_name__ = "tracks_set"
     title: str
     position: int
 
@@ -41,13 +41,16 @@ class Track(edgy.Model):
 
 
 class PostRef(ModelRef):
-    __model__ = "Post"
+    __related_name__ = "posts_set"
     comment: str
 
 
 class Post(edgy.Model):
     user = edgy.ForeignKey("User")
     comment = edgy.CharField(max_length=255)
+
+    class Meta:
+        registry = models
 
 
 class User(edgy.Model):
@@ -70,6 +73,42 @@ async def rollback_connections():
     with database.force_rollback():
         async with database:
             yield
+
+
+async def test_conversion():
+    user = await User.query.create(name="foo", posts=[{"comment": "dict"}])
+    posts = await user.posts_set.all()
+    assert posts[0].comment == "dict"
+
+
+async def test_positional():
+    user = await User.query.create(PostRef(comment="positional"), name="foo", posts=[])
+    posts = await user.posts_set.all()
+    assert posts[0].comment == "positional"
+
+
+async def test_get_or_create():
+    # test get or create
+    user, created = await User.query.get_or_create(
+        PostRef(comment="default_arg"), name="foo", posts=[]
+    )
+    posts = await user.posts_set.all()
+    assert posts[0].comment == "default_arg"
+    assert created
+    user2, created = await User.query.get_or_create(
+        PostRef(comment="second arg"), name="foo", posts=[]
+    )
+    assert not created
+    assert user2 == user
+    posts = await user2.posts_set.all()
+    assert posts[1].comment == "second arg"
+
+    user3, created = await User.query.update_or_create(
+        PostRef(comment="third arg"), name="foo", posts=[]
+    )
+    posts = await user3.posts_set.all()
+    assert posts[1].comment == "second arg"
+    assert posts[2].comment == "third arg"
 
 
 async def test_model_crud():
@@ -233,7 +272,7 @@ async def test_raise_value_error_on_missing_model_fields():
     ]
 
 
-async def test_raises_model_reference_error_on_missing__model__():
+async def test_raises_model_reference_error_on_missing__related_name__():
     with pytest.raises(ModelReferenceError):
 
         class PostRef(ModelRef):

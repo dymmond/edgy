@@ -4,6 +4,7 @@ import inspect
 import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
+from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -13,6 +14,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Type,
     Union,
@@ -27,19 +29,18 @@ from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.fields.base import PKField
+from edgy.core.db.fields.base import BaseForeignKey, PKField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
-from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKeyField
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.models.managers import BaseManager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.functional import extract_field_annotations_and_defaults
-from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
+from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured, TableBuildError
 
 if TYPE_CHECKING:
-    from edgy.core.db.models import Model, ModelRef, ReflectModel
+    from edgy.core.db.models import Model
 
 _empty_dict: Dict[str, Any] = {}
 _empty_set: FrozenSet[Any] = frozenset()
@@ -76,7 +77,7 @@ class FieldToColumnNames(FieldToColumns, Dict[str, FrozenSet[str]]):
     def __getitem__(self, name: str) -> FrozenSet[str]:
         if name in self.data:
             return cast(FrozenSet[str], self.data[name])
-        column_names = frozenset(column.name for column in self.meta.field_to_columns[name])
+        column_names = frozenset(column.key for column in self.meta.field_to_columns[name])
         result = self.data[name] = column_names
         return result
 
@@ -125,6 +126,8 @@ _trigger_attributes_MetaInfo = {
     "columns_to_field",
     "special_getter_fields",
     "input_modifying_fields",
+    "post_save_fields",
+    "post_delete_fields",
     "excluded_fields",
     "secret_fields",
 }
@@ -143,9 +146,10 @@ class MetaInfo:
         "model",
         "managers",
         "multi_related",
-        "model_references",
         "signals",
         "input_modifying_fields",
+        "post_save_fields",
+        "post_delete_fields",
         "foreign_key_fields",
         "field_to_columns",
         "field_to_column_names",
@@ -182,9 +186,6 @@ class MetaInfo:
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
         self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
         self.fields: Dict[str, BaseFieldType] = {**getattr(meta, "fields", _empty_dict)}
-        self.model_references: Dict[str, ModelRef] = {
-            **getattr(meta, "model_references", _empty_dict)
-        }
         self.managers: Dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
         self.multi_related: List[str] = [*getattr(meta, "multi_related", _empty_set)]
         self.model: Optional[Type[Model]] = None
@@ -234,7 +235,9 @@ class MetaInfo:
         excluded_fields = set()
         secret_fields = set()
         input_modifying_fields = set()
-        foreign_key_fields: Dict[str, BaseFieldType] = {}
+        post_save_fields = set()
+        post_delete_fields = set()
+        foreign_key_fields: Dict[str, BaseForeignKey] = {}
         for key, field in self.fields.items():
             if hasattr(field, "__get__"):
                 special_getter_fields.add(key)
@@ -244,13 +247,20 @@ class MetaInfo:
                 secret_fields.add(key)
             if hasattr(field, "modify_input"):
                 input_modifying_fields.add(key)
+            if hasattr(field, "post_save_callback"):
+                post_save_fields.add(key)
+            if hasattr(field, "post_delete_callback"):
+                post_delete_fields.add(key)
             if isinstance(field, BaseForeignKeyField):
                 foreign_key_fields[key] = field
         self.special_getter_fields: FrozenSet[str] = frozenset(special_getter_fields)
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
         self.secret_fields: FrozenSet[str] = frozenset(secret_fields)
         self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
-        self.foreign_key_fields: Dict[str, BaseFieldType] = foreign_key_fields
+        # RelatedField belong to it so make it updatable
+        self.post_save_fields: Set[str] = set(post_save_fields)
+        self.post_delete_fields: FrozenSet[str] = frozenset(post_delete_fields)
+        self.foreign_key_fields: Dict[str, BaseForeignKey] = foreign_key_fields
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)
         self.columns_to_field = ColumnsToField(self)
@@ -308,9 +318,35 @@ def get_model_registry(
     return None
 
 
+def _set_related_field(
+    target: "Model",
+    *,
+    foreign_key_name: str,
+    related_name: str,
+    source: "Model",
+) -> None:
+    if related_name in target.meta.fields:
+        raise ForeignKeyBadConfigured(
+            f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
+        )
+
+    related_field = RelatedField(
+        foreign_key_name=foreign_key_name,
+        name=related_name,
+        owner=target,
+        related_from=source,
+    )
+
+    # Set the related name
+    target.meta.fields[related_name] = related_field
+    # for updating post_save_callback
+    if target.meta._is_init:
+        target.meta.post_save_fields.add(related_name)
+
+
 def _set_related_name_for_foreign_keys(
     foreign_keys: Dict[str, BaseForeignKeyField],
-    model_class: Union["Model", "ReflectModel"],
+    model_class: "Model",
 ) -> None:
     """
     Sets the related name for the foreign keys.
@@ -332,23 +368,26 @@ def _set_related_name_for_foreign_keys(
             else:
                 related_name = f"{model_class.__name__.lower()}s_set"
 
-        if related_name in foreign_key.target.meta.fields:
-            raise ForeignKeyBadConfigured(
-                f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
-            )
         foreign_key.related_name = related_name
         foreign_key.reverse_name = related_name
 
-        related_field = RelatedField(
+        # FIXME: by pushing in target we resolve the target. This can lead to crashes if the target is not in registry
+        related_field_fn = partial(
+            _set_related_field,
+            source=model_class,
             foreign_key_name=name,
-            name=related_name,
-            owner=foreign_key.target,
-            related_from=model_class,
+            related_name=related_name,
         )
-
-        # Set the related name
-        target = foreign_key.target
-        target.meta.fields[related_name] = related_field
+        try:
+            related_field_fn(foreign_key.target)
+        except KeyError as exc:
+            assert model_class.meta.registry is not None, "Registry not set"
+            if isinstance(foreign_key.to, str):
+                model_class.meta.registry._callbacks.setdefault(foreign_key.to, []).append(
+                    related_field_fn
+                )
+            else:
+                raise exc
 
 
 def _handle_annotations(base: Type, base_annotations: Dict[str, Any]) -> None:
@@ -492,7 +531,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any], **kwargs: Any
     ) -> Any:
         fields: Dict[str, BaseFieldType] = {}
-        model_references: Dict[str, ModelRef] = {}
         managers: Dict[str, BaseManager] = {}
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
         base_annotations: Dict[str, Any] = {}
@@ -503,6 +541,10 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
+        # ensure they are clean
+        attrs.pop("_pkcolumns", None)
+        attrs.pop("_pknames", None)
+        attrs.pop("_table", None)
 
         # Extract fields and managers and include them in attrs
         attrs = extract_fields_and_managers(bases, attrs)
@@ -513,8 +555,10 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                     raise ImproperlyConfigured(
                         f"Cannot add a field named pk to model {name}. Protected name."
                     )
-                # make sure we have a fresh copy where we can set the owner
+                # make sure we have a fresh copy where we can set the owner and overwrite methods
                 value = copy.copy(value)
+                if value.factory is not None:
+                    value.factory.repack(value)
                 if value.primary_key:
                     has_explicit_primary_key = True
                 # set as soon as possible the field_name
@@ -531,10 +575,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                 # saving a reference foreign key.
                 # We split the keys (store them) in different places to be able to easily maintain and
                 #  what is what.
-                if isinstance(value, BaseRefForeignKeyField):
-                    model_references[key] = value.to
-                else:
-                    fields[key] = value
+                fields[key] = value
             elif isinstance(value, BaseManager):
                 value = copy.copy(value)
                 value.name = key
@@ -587,11 +628,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         for manager_name in managers:
             attrs.pop(manager_name, None)
-
         attrs["meta"] = meta = MetaInfo(
             meta_class,
             fields=fields,
-            model_references=model_references,
             parents=parents,
             managers=managers,
         )
@@ -626,7 +665,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         if not parents:
             return model_class(cls, name, bases, attrs, **kwargs)
 
-        new_class = cast("Type[Model]", model_class(cls, name, bases, attrs, **kwargs))
+        new_class = cast(Type["Model"], model_class(cls, name, bases, attrs, **kwargs))
 
         # Update the model_fields are updated to the latest
         new_class.model_fields = {**new_class.model_fields, **model_fields}
@@ -709,8 +748,12 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         meta.model = new_class
 
         # Sets the foreign key fields
-        if not new_class.__is_proxy_model__ and meta.foreign_key_fields:
-            _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
+        if not new_class.__is_proxy_model__:
+            if meta.foreign_key_fields:
+                _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
+            callbacks = registry._callbacks.get(name)
+            while callbacks:
+                callbacks.pop()(new_class)
 
         # Update the model references with the validations of the model
         # Being done by the Edgy fields instead.
@@ -733,7 +776,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         """
         Returns a db_schema from registry if any is passed.
         """
-        if hasattr(cls, "meta") and hasattr(cls.meta, "registry"):
+        if hasattr(cls, "meta") and getattr(cls.meta, "registry", None):
             return cls.meta.registry.db_schema  # type: ignore
         return None
 
@@ -758,14 +801,19 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         2. If a db_schema in the `registry` is passed, then it will use that as a default.
         3. If none is passed, defaults to the shared schema of the database connected.
         """
-        if not hasattr(cls, "_table"):
-            cls._table = cls.build(cls.get_db_schema())
-        elif hasattr(cls, "_table"):
-            table = cls._table
-            # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} != {cls.meta.tablename}"
-            # fix assigned table
-            if table.name.lower() != cls.meta.tablename:
+        if not cls.meta.registry:
+            # we cannot set the table without a registry
+            # raising is required
+            raise AttributeError()
+        table = getattr(cls, "_table", None)
+        # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} != {cls.meta.tablename}"
+        # fix assigned table
+        if table is None or table.name.lower() != cls.meta.tablename:
+            try:
                 cls._table = cls.build(cls.get_db_schema())
+            except AttributeError as exc:
+                raise TableBuildError(exc) from exc
+
         return cast("sqlalchemy.Table", cls._table)
 
     def __getattr__(cls, name: str) -> Any:
