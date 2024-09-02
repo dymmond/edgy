@@ -74,7 +74,7 @@ class ConcreteFileField(BaseCompositeField):
         value: Any,
         phase: str = "",
         instance: Optional["BaseModelType"] = None,
-    ) -> Dict[str, FieldFile]:
+    ) -> Dict[str, Any]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
         Validation happens later.
@@ -281,8 +281,9 @@ class FileField(FieldFactory):
             field_file.approved or field_obj.extract_mime != "approved_only"
         ):
             if getattr(field_obj, "mime_use_magic", False):
-                import magic
+                from magic import Magic
 
+                magic = Magic(mime=True)
                 # only open, not close, done later
                 data["mime"] = magic.from_buffer(field_file.open("rb").read(2048))
             else:

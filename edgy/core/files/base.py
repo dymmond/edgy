@@ -267,7 +267,9 @@ class ContentFile(File):
         self.file.seek(0)
         return self
 
-    def close(self) -> None: ...
+    def close(self, keep_size: bool = False) -> None:
+        if not keep_size:
+            self.__dict__.pop("size", None)
 
 
 class FieldFile(File):
@@ -305,12 +307,10 @@ class FieldFile(File):
             # set value to cached_property
             self.size = size
 
-    def _require_file(self) -> None:
-        if self.file is None or not self.name:
-            raise ValueError(f"The '{self.field.name}' attribute has no file associated with it.")
-
     async def execute_operation(self) -> None:
-        if self.operation == "save" or self.operation == "save_delete":
+        operation = self.operation
+        self.operation = "none"
+        if operation == "save" or operation == "save_delete":
             if self.file is None or not self.name:
                 raise ValueError(
                     f"The '{self.field.name}' attribute has no file associated with it."
@@ -320,21 +320,20 @@ class FieldFile(File):
             finally:
                 self.storage.unreserve_name(self.name)
             if (
-                self.operation == "save_delete"
+                operation == "save_delete"
                 and self.old is not None
                 and self.old[1]
                 and self.old[1] != self.name
             ):
                 self.old[0].delete(self.old[1])
-        elif self.operation == "delete":
-            if hasattr(self, "file"):
+        elif operation == "delete":
+            if getattr(self, "file", None):
                 self.close()
             # old should not be None anyway but check that
             # if name is empty or None skip deletion
             if self.old is not None and self.old[1]:
                 self.old[0].delete(self.old[1])
         # else approve operation or metadata update
-        self.operation = "none"
         self.old = None
 
     def save(
@@ -379,7 +378,7 @@ class FieldFile(File):
         name = storage.get_available_name(
             name, max_length=getattr(self.field, "max_length", None), overwrite=overwrite
         )
-        if hasattr(self, "file"):
+        if getattr(self, "file", None):
             self.close()
         self.file = content
         self.old = (self.storage, self.name, self.approved)
@@ -401,7 +400,7 @@ class FieldFile(File):
         """
         if self.operation == "save" or self.operation == "save_delete":
             # delete new assigned file
-            if hasattr(self, "file"):
+            if getattr(self, "file", None):
                 self.close()
             self.storage.unreserve_name(self.name)
         if self.old is not None:
@@ -420,7 +419,7 @@ class FieldFile(File):
         self.reset()
         if instant:
             # close
-            if hasattr(self, "file"):
+            if getattr(self, "file", None):
                 self.close()
             self.storage.delete(self.name)
             # when allowed setting null, do so
@@ -439,6 +438,10 @@ class FieldFile(File):
             self.approved = approved
         elif self.change_removes_approval:
             self.approved = False
+
+    def close(self, keep_size: bool = False) -> None:
+        if self.operation == "none":
+            super().close(keep_size=keep_size)
 
 
 class ImageFieldFile(FieldFile):

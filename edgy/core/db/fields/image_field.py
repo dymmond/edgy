@@ -30,15 +30,20 @@ class ImageField(FileField):
     def extract_metadata(
         cls, field_obj: "BaseFieldType", field_name: str, field_file: "ImageFieldFile"
     ) -> Dict[str, Any]:
+        from PIL import UnidentifiedImageError
+
         data: Dict[str, Any] = super().extract_metadata(
             field_obj, field_name=field_name, field_file=field_file
         )
         assert isinstance(field_file, ImageFieldFile)
         # here the formats are checked
-        img = field_file.open_image()
-        data["height"] = img.height
-        data["width"] = img.width
-        img.close()
+        try:
+            img = field_file.open_image()
+            data["height"] = img.height
+            data["width"] = img.width
+            img.close()
+        except UnidentifiedImageError:
+            pass
 
         return data
 

@@ -50,7 +50,11 @@ async def test_save_file_create(create_test_database):
         model = await MyModel.query.create(
             ifield=edgy.files.File(open(image, mode="rb"), name=str(image.name))
         )
-        assert model.ifield.metadata["mime"] == ""
+        assert (
+            model.ifield.metadata["mime"] == "image/jpeg"
+            if str(image).endswith(".jpg")
+            else "image/png"
+        )
         assert model.ifield.metadata["height"] == 1
         assert model.ifield.metadata["width"] == 1
 
@@ -64,10 +68,13 @@ async def test_save_file_create_approved(create_test_database):
             ifield=edgy.files.File(open(image, mode="rb"), name=str(image.name))
         )
         if str(image).endswith(".png"):
+            assert model.ifield.metadata["mime"] == "image/png"
             assert "height" not in model.ifield.metadata
             assert "width" not in model.ifield.metadata
             model.ifield.set_approved(True)
             await model.save(ifield=model.ifield)
+        else:
+            assert model.ifield.metadata["mime"] == "image/jpeg"
 
         assert model.ifield.metadata["height"] == 1
         assert model.ifield.metadata["width"] == 1
