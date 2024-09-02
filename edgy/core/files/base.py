@@ -240,12 +240,13 @@ class File:
         self.__dict__.pop("size", None)
         return self.file.write(data)
 
-    def close(self) -> None:
+    def close(self, keep_size: bool = False) -> None:
         if self.file is None:
             return
         self.file.close()
         self.file = None
-        self.__dict__.pop("size", None)
+        if not keep_size:
+            self.__dict__.pop("size", None)
 
 
 class ContentFile(File):

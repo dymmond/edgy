@@ -207,7 +207,7 @@ class ConcreteFileField(BaseCompositeField):
     async def post_save_callback(self, value: FieldFile, instance: "BaseModelType") -> None:
         await value.execute_operation()
         # cleanup temp file
-        value.close()
+        value.close(keep_size=True)
 
     async def post_delete_callback(self, value: FieldFile) -> None:
         value.delete(instant=True)
