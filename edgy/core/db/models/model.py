@@ -47,23 +47,24 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         Update operation of the database fields.
         """
         await self.meta.signals.pre_update.send_async(self.__class__, instance=self)
-        kwargs = self.extract_column_values(
+        column_values = self.extract_column_values(
             extracted_values=kwargs, is_partial=True, is_update=True
         )
 
         # empty updates shouldn't cause an error. E.g. only model references are updated
-        if kwargs:
-            expression = self.table.update().values(**kwargs).where(*self.identifying_clauses())
+        if column_values:
+            expression = (
+                self.table.update().values(**column_values).where(*self.identifying_clauses())
+            )
             await self.database.execute(expression)
 
             # Update the model instance.
-            transformed_kwargs = self.transform_input(kwargs, phase="post_update", instance=self)
-            for k, v in transformed_kwargs.items():
+            new_kwargs = self.transform_input(column_values, phase="post_update", instance=self)
+            for k, v in new_kwargs.items():
                 setattr(self, k, v)
 
         # updates aren't required to change the db, they can also just affect the meta fields
-        if self.meta.post_save_fields:
-            await self.execute_post_save_hooks()
+        await self.execute_post_save_hooks(kwargs.keys())
         if kwargs:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
@@ -122,7 +123,11 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         """
         Performs the save instruction.
         """
-        expression = self.table.insert().values(**kwargs)
+        column_values = self.extract_column_values(
+            extracted_values=kwargs, is_partial=False, is_update=False
+        )
+
+        expression = self.table.insert().values(**column_values)
         autoincrement_value = await self.database.execute(expression)
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
@@ -130,15 +135,15 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             if column is not None and hasattr(autoincrement_value, "_mapping"):
                 autoincrement_value = autoincrement_value._mapping[column.key]
             # can be explicit set, which causes an invalid value returned
-            if column is not None and column.key not in kwargs:
-                setattr(self, column.key, autoincrement_value)
+            if column is not None and column.key not in column_values:
+                column_values[column.key] = autoincrement_value
 
-        transformed_kwargs = self.transform_input(kwargs, phase="post_insert", instance=self)
-        for k, v in transformed_kwargs.items():
+        new_kwargs = self.transform_input(column_values, phase="post_insert", instance=self)
+        for k, v in new_kwargs.items():
             setattr(self, k, v)
 
         if self.meta.post_save_fields:
-            await self.execute_post_save_hooks()
+            await self.execute_post_save_hooks(kwargs.keys())
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False
 
@@ -172,10 +177,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             if values:
                 extracted_fields.update(values)
             # force save must ensure a complete mapping
-            kwargs = self.extract_column_values(
-                extracted_values=extracted_fields, is_partial=False, is_update=False
-            )
-            await self._save(**kwargs)
+            await self._save(**extracted_fields)
         else:
             await self.update(**(extracted_fields if values is None else values))
 

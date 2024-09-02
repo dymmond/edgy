@@ -1,5 +1,6 @@
 import os
 from typing import Any
+from uuid import uuid4
 
 import pytest
 import sqlalchemy
@@ -96,11 +97,17 @@ def test_field_specs_approval():
 
 
 async def test_save_file_create(create_test_database):
-    model = await MyModel.query.create(file_field=edgy.files.ContentFile(b"foo", name="foo.bytes"))
-    assert model.__dict__["file_field"].__dict__["size"] == 3
+    model = await MyModel.query.create(
+        file_field=edgy.files.ContentFile(b"!# /bin/sh", name="foo.sh")
+    )
+    # get cached
+    assert model.__dict__["file_field"].__dict__["size"] == 10
+    assert model.file_field.size == 10
+    assert model.file_field.metadata["mime"] == "application/x-sh"
+
     assert model.file_field.approved
     with model.file_field.open() as rob:
-        assert rob.read() == b"foo"
+        assert rob.read() == b"!# /bin/sh"
     path = model.file_field.path
     assert os.path.exists(path)
     assert model.file_field.storage.exists(model.file_field.name)
@@ -164,7 +171,11 @@ async def test_save_file_approved(create_test_database):
     await model.save()
     model = await MyModelApproval.query.first()
     assert model.file_field.approved
+    path = model.file_field.path
     model.file_field.delete(instant=True)
+    assert not os.path.exists(path)
+    # remove approval after save is set
+    assert not model.file_field.approved
 
 
 async def test_delete_queryset(create_test_database):
@@ -182,5 +193,48 @@ async def test_delete_queryset(create_test_database):
         assert obj.file_field.path not in seen
         seen.add(obj.file_field.path)
     assert await MyModel.query.delete() == 3
+    for path in seen:
+        assert not os.path.exists(path)
+
+
+async def test_bulk_create(create_test_database):
+    obj_list = [
+        {"file_field": edgy.files.ContentFile(b"foo", name=f"{uuid4()}.bytes")},
+        {"file_field": edgy.files.ContentFile(b"foo", name=f"{uuid4()}.bytes")},
+        {"file_field": edgy.files.ContentFile(b"foo", name=f"{uuid4()}.bytes")},
+    ]
+    await MyModel.query.bulk_create(obj_list)
+    for num, obj in enumerate(await MyModel.query.all()):
+        assert obj_list[num]["file_field"].name in obj.file_field.name
+        assert os.path.exists(obj.file_field.path)
+
+
+async def test_bulk_create2(create_test_database, mocker):
+    obj_list = [
+        {},
+        {},
+        {},
+    ]
+    spy = mocker.spy(MyModel, "execute_post_save_hooks")
+    await MyModel.query.bulk_create(obj_list)
+    spy.assert_not_called()
+
+
+async def test_update_bulk(create_test_database):
+    model1 = await MyModel.query.create(
+        file_field=edgy.files.ContentFile(b"foo", name="foo.bytes")
+    )
+    model2 = await MyModel.query.create(
+        file_field=edgy.files.ContentFile(b"foo", name="foobar.bytes")
+    )
+    model3 = await MyModel.query.create(
+        file_field=edgy.files.ContentFile(b"foo", name="test.bytes")
+    )
+    seen = set()
+    for obj in [model1, model2, model3]:
+        assert obj.file_field.path not in seen
+        seen.add(obj.file_field.path)
+        obj.file_field = None
+    await MyModel.query.bulk_update([model1, model2, model3], fields=["file_field"])
     for path in seen:
         assert not os.path.exists(path)

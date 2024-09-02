@@ -419,8 +419,14 @@ class FieldFile(File):
             if hasattr(self, "file"):
                 self.close()
             self.storage.delete(self.name)
+            # when allowed setting null, do so
+            # this function must be callable by model deletions
             if self.field.null:
                 self.name = ""
+            if approved is not None:
+                self.approved = approved
+            elif self.change_removes_approval:
+                self.approved = False
             return
         self.old = (self.storage, self.name, self.approved)
         self.name = ""

@@ -429,19 +429,21 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         """
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
-    async def execute_post_save_hooks(self) -> None:
-        # don't trigger loads, AttributeErrors are used for skipping fields
-        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
-        try:
-            for field_name in self.meta.post_save_fields:
-                field = self.meta.fields[field_name]
-                try:
-                    value = getattr(self, field_name)
-                except AttributeError:
-                    continue
-                await field.post_save_callback(value, instance=self)
-        finally:
-            MODEL_GETATTR_BEHAVIOR.reset(token)
+    async def execute_post_save_hooks(self, fields: Sequence[str]) -> None:
+        affected_fields = self.meta.post_save_fields.intersection(fields)
+        if affected_fields:
+            # don't trigger loads, AttributeErrors are used for skipping fields
+            token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+            try:
+                for field_name in affected_fields:
+                    field = self.meta.fields[field_name]
+                    try:
+                        value = getattr(self, field_name)
+                    except AttributeError:
+                        continue
+                    await field.post_save_callback(value, instance=self)
+            finally:
+                MODEL_GETATTR_BEHAVIOR.reset(token)
 
     @classmethod
     def extract_column_values(
@@ -500,7 +502,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                 # used in related_fields to mask and not to implement to_model
                 field.__set__(self, value)
             else:
-                for k, v in field.to_model(key, value, phase="set").items():
+                for k, v in field.to_model(key, value, phase="set", instance=self).items():
                     # bypass __setattr__ method
                     object.__setattr__(self, k, v)
         else:

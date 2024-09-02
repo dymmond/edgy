@@ -41,7 +41,7 @@ class ImageField(FileField):
             image_formats=image_formats,
             approved_image_formats=approved_image_formats,
             **kwargs,
-        )  # type: ignore
+        )
 
     @classmethod
     def extract_metadata(

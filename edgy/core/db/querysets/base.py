@@ -9,6 +9,7 @@ from typing import (
     Awaitable,
     Dict,
     Generator,
+    Iterable,
     List,
     Optional,
     Sequence,
@@ -1116,17 +1117,34 @@ class QuerySet(BaseQuerySet):
         self._cache.update([result])
         return cast(EdgyEmbedTarget, result[1])
 
-    async def bulk_create(self, objs: List[Dict[str, Any]]) -> None:
+    async def bulk_create(self, objs: Iterable[Union[Dict[str, Any], EdgyModel]]) -> None:
         """
         Bulk creates records in a table
         """
         queryset: QuerySet = self._clone()
-        new_objs = [queryset.model_class.extract_column_values(obj) for obj in objs]
 
-        expression = queryset.table.insert().values(new_objs)
+        new_objs: List[EdgyModel] = []
+
+        def _iterate(obj_or_dict: Union[EdgyModel, Dict[str, Any]]) -> Dict[str, Any]:
+            if isinstance(obj_or_dict, dict):
+                obj: EdgyModel = queryset.model_class(**obj_or_dict)
+                if (
+                    self.model_class.meta.post_save_fields
+                    and not self.model_class.meta.post_save_fields.isdisjoint(obj_or_dict.keys())
+                ):
+                    new_objs.append(obj)
+            else:
+                obj = obj_or_dict
+                if self.model_class.meta.post_save_fields:
+                    new_objs.append(obj)
+            return obj.extract_column_values(obj.extract_db_fields())
+
+        expression = queryset.table.insert().values([_iterate(obj) for obj in objs])
         await queryset.database.execute_many(expression)
         self._clear_cache(True)
-        # TODO; handle post_save_fields
+        if new_objs:
+            for obj in new_objs:
+                await obj.execute_post_save_hooks(self.model_class.meta.fields.keys())
 
     async def bulk_update(self, objs: List[EdgyModel], fields: List[str]) -> None:
         """
@@ -1169,7 +1187,12 @@ class QuerySet(BaseQuerySet):
         expression = expression.values(values_placeholder)
         await queryset.database.execute_many(expression, update_list)
         self._clear_cache()
-        # TODO; handle post_save_fields
+        if (
+            self.model_class.meta.post_save_fields
+            and not self.model_class.meta.post_save_fields.isdisjoint(fields)
+        ):
+            for obj in objs:
+                await obj.execute_post_save_hooks(fields)
 
     async def delete(self, use_models: bool = False) -> int:
         if self.model_class.meta.post_delete_fields:

@@ -6,6 +6,7 @@ from typing import (
     Dict,
     Generator,
     Generic,
+    Iterable,
     List,
     Sequence,
     Set,
@@ -97,10 +98,10 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     async def create(self, *args: Any, **kwargs: Any) -> EdgyEmbedTarget: ...
 
     @abstractmethod
-    async def bulk_create(self, objs: Sequence[List[Dict[str, Any]]]) -> None: ...
+    async def bulk_create(self, objs: Iterable[Union[Dict[str, Any], EdgyModel]]) -> None: ...
 
     @abstractmethod
-    async def bulk_update(self, objs: Sequence[List[Any]], fields: List[str]) -> None: ...
+    async def bulk_update(self, objs: Sequence[EdgyModel], fields: List[str]) -> None: ...
 
     @abstractmethod
     async def delete(self) -> None: ...

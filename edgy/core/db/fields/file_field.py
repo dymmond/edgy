@@ -1,3 +1,4 @@
+import mimetypes
 from functools import partial
 from typing import (
     TYPE_CHECKING,
@@ -23,11 +24,7 @@ from edgy.core.db.fields.factories import FieldFactory
 from edgy.core.db.fields.types import ColumnDefinitionModel
 from edgy.core.files.base import FieldFile, File
 from edgy.core.files.storage import storages
-
-try:
-    import magic
-except ImportError:
-    magic = None  # type: ignore
+from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
@@ -95,24 +92,38 @@ class ConcreteFileField(BaseCompositeField):
             and self.name in instance.__dict__
         ):
             # use old one
-            value = cast(FieldFile, instance.__dict__[self.name])
+            field_instance_or_value: Any = cast(FieldFile, instance.__dict__[self.name])
+        else:
+            field_instance_or_value = value
         # unpack when not from db
-        if isinstance(value, dict) and not isinstance(value.get(field_name), str):
-            value = value[field_name]
-        if isinstance(value, FieldFile):
-            file_instance = value
+        if isinstance(field_instance_or_value, dict) and not isinstance(
+            field_instance_or_value.get(field_name), str
+        ):
+            field_instance_or_value = field_instance_or_value[field_name]
+        if isinstance(field_instance_or_value, FieldFile):
+            file_instance = field_instance_or_value
+            if isinstance(value, dict):
+                # update
+                if value.get(f"{field_name}_size") is not None:
+                    file_instance.size = value[f"{field_name}_size"]
+                if value.get(f"{field_name}_metadata") is not None:
+                    file_instance.metadata = value[f"{field_name}_metadata"]
+                if value.get(f"{field_name}_approved") is not None:
+                    file_instance.approved = value[f"{field_name}_approved"]
         else:
             # init, load, post_insert, post_update
-            if isinstance(value, dict):
+            if isinstance(field_instance_or_value, dict):
                 if phase == "set":
                     raise ValueError("Cannot set dict to FileField")
                 file_instance = self.field_file_class(
                     self,
-                    name=value[field_name],
-                    storage=value.get(f"{field_name}_storage", self.storage),
-                    size=value.get(f"{field_name}_size"),
-                    metadata=value.get(f"{field_name}_metadata", {}),
-                    approved=value.get(f"{field_name}_approved", not self.with_approval),
+                    name=field_instance_or_value[field_name],
+                    storage=field_instance_or_value.get(f"{field_name}_storage", self.storage),
+                    size=field_instance_or_value.get(f"{field_name}_size"),
+                    metadata=field_instance_or_value.get(f"{field_name}_metadata", {}),
+                    approved=field_instance_or_value.get(
+                        f"{field_name}_approved", not self.with_approval
+                    ),
                     change_removes_approval=self.with_approval,
                     generate_name_fn=partial(self.generate_name_fn, instance),
                 )
@@ -130,7 +141,7 @@ class ConcreteFileField(BaseCompositeField):
                         change_removes_approval=self.with_approval,
                     )
                 # file creation if value is not None otherwise deletion
-                file_instance.save(value)
+                file_instance.save(field_instance_or_value)
         retdict: Any = {field_name: file_instance}
         if self.with_size:
             retdict[f"{field_name}_size"] = file_instance.size
@@ -141,7 +152,7 @@ class ConcreteFileField(BaseCompositeField):
             field = self.owner.meta.fields[f"{field_name}_metadata"]
             if field.field_type is str:
                 metadata_result = orjson.dumps(metadata_result).decode("utf8")
-            retdict[field.name] = metadata_result
+            retdict[f"{field_name}_metadata"] = metadata_result
         return retdict  # type: ignore
 
     def get_columns(self, field_name: str) -> Sequence[sqlalchemy.Column]:
@@ -190,7 +201,11 @@ class ConcreteFileField(BaseCompositeField):
             metadata_name = f"{name}_metadata"
             if metadata_name not in fields:
                 retdict[metadata_name] = JSONField(
-                    null=False, column_name=f"{name}_mname", name=metadata_name, owner=self.owner
+                    null=False,
+                    column_name=f"{name}_mname",
+                    name=metadata_name,
+                    owner=self.owner,
+                    default=dict,
                 )
         return retdict
 
@@ -224,6 +239,7 @@ class FileField(FieldFactory):
         with_metadata: bool = True,
         with_approval: bool = False,
         extract_mime: Union[bool, Literal["approved_only"]] = True,
+        mime_use_magic: bool = False,
         field_file_class: Type[FieldFile] = FieldFile,
         generate_name_fn: Optional[Callable[[Optional["BaseModelType"], str], str]] = None,
         **kwargs: Any,
@@ -240,6 +256,17 @@ class FileField(FieldFactory):
         return super().__new__(cls, _generate_name_fn=generate_name_fn, **kwargs)  # type: ignore
 
     @classmethod
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
+        super().validate(kwargs)
+        if kwargs.get("mime_use_magic"):
+            try:
+                import magic  # noqa: F401
+            except ImportError:
+                raise FieldDefinitionError(
+                    "python-magic library is missing. Cannot use mime_use_magic parameter"
+                ) from None
+
+    @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.String(
             length=kwargs.get("max_length", 255), collation=kwargs.get("collation", None)
@@ -250,13 +277,16 @@ class FileField(FieldFactory):
         cls, field_obj: "BaseFieldType", field_name: str, field_file: FieldFile
     ) -> Dict[str, Any]:
         data: Dict[str, Any] = {}
-        if (
-            magic is not None
-            and field_obj.extract_mime
-            and (field_file.approved or field_obj.extract_mime != "approved_only")
+        if field_obj.extract_mime and (
+            field_file.approved or field_obj.extract_mime != "approved_only"
         ):
-            # only open, not close, done later
-            data["mime"] = magic.from_buffer(field_file.open("rb").read(2048))
+            if getattr(field_obj, "mime_use_magic", False):
+                import magic
+
+                # only open, not close, done later
+                data["mime"] = magic.from_buffer(field_file.open("rb").read(2048))
+            else:
+                data["mime"] = mimetypes.guess_type(field_file.name)[0]
         return data
 
     @classmethod
@@ -292,7 +322,8 @@ class FileField(FieldFactory):
             query_dict[f"{field_name}_storage"] = value.storage.name
             return query_dict
         else:
-            assert isinstance(value, FieldFile)
+            if not isinstance(value, FieldFile):
+                raise ValueError(f"invalid value: {value} ({value!r})")
             retdict: Dict[str, Any] = {
                 field_name: value.name,
             }
@@ -311,5 +342,5 @@ class FileField(FieldFactory):
                 # in case the field was swapped out for a text field
                 if field.field_type is str:
                     metadata_result = orjson.dumps(metadata_result).decode("utf8")
-                retdict[field.name] = metadata_result
+                retdict[f"{field_name}_metadata"] = metadata_result
             return retdict
