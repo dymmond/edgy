@@ -1,29 +1,11 @@
 from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Type
 
 from edgy.core.db.fields.file_field import FileField
-from edgy.core.files import FieldFile
+from edgy.core.files import ImageFieldFile
 from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
-    from PIL.ImageFile import ImageFile
-
     from edgy.core.db.fields.types import BaseFieldType
-
-
-class ImageFieldFile(FieldFile):
-    def open_image(self) -> "ImageFile":
-        from PIL import Image
-
-        allowed_formats: Optional[Sequence[str]] = getattr(self.field, "image_formats", ())
-        if self.approved and allowed_formats is not None:
-            approved_image_formats: Optional[Sequence[str]] = getattr(
-                self.field, "approved_image_formats", ()
-            )
-            if approved_image_formats is None:
-                allowed_formats = None
-            else:
-                allowed_formats = (*allowed_formats, *approved_image_formats)
-        return Image.open(self.open("rb"), formats=allowed_formats)
 
 
 class ImageField(FileField):
@@ -38,6 +20,7 @@ class ImageField(FileField):
     ) -> "BaseFieldType":
         return super().__new__(
             cls,
+            field_file_class=field_file_class,
             image_formats=image_formats,
             approved_image_formats=approved_image_formats,
             **kwargs,
@@ -45,12 +28,13 @@ class ImageField(FileField):
 
     @classmethod
     def extract_metadata(
-        cls, field_obj: "BaseFieldType", field_name: str, field_file: FieldFile
+        cls, field_obj: "BaseFieldType", field_name: str, field_file: "ImageFieldFile"
     ) -> Dict[str, Any]:
         data: Dict[str, Any] = super().extract_metadata(
             field_obj, field_name=field_name, field_file=field_file
         )
-
+        assert isinstance(field_file, ImageFieldFile)
+        # here the formats are checked
         img = field_file.open_image()
         data["height"] = img.height
         data["width"] = img.width

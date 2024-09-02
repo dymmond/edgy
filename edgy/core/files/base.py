@@ -12,12 +12,13 @@ from typing import (
     Generator,
     Literal,
     Optional,
+    Sequence,
     Tuple,
     Union,
     cast,
 )
 
-from edgy.exceptions import FileOperationError
+from edgy.exceptions import FileOperationError, SuspiciousFileOperation
 
 if TYPE_CHECKING:
     from .storage import Storage
@@ -28,6 +29,8 @@ else:  # pragma: no cover
     from typing_extensions import ParamSpec
 
 if TYPE_CHECKING:
+    from PIL.ImageFile import ImageFile
+
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
 
@@ -96,7 +99,8 @@ class File:
         if hasattr(self.file, "name"):
             try:
                 return self.storage.size(self.file.name)
-            except (OSError, TypeError):
+            except (OSError, TypeError, SuspiciousFileOperation):
+                # we can have a reference outside of media folder so ignore SuspiciousFileOperation
                 pass
         if hasattr(self.file, "tell") and hasattr(self.file, "seek"):
             pos = self.file.tell()
@@ -435,3 +439,19 @@ class FieldFile(File):
             self.approved = approved
         elif self.change_removes_approval:
             self.approved = False
+
+
+class ImageFieldFile(FieldFile):
+    def open_image(self) -> "ImageFile":
+        from PIL import Image
+
+        allowed_formats: Optional[Sequence[str]] = getattr(self.field, "image_formats", ())
+        if self.approved and allowed_formats is not None:
+            approved_image_formats: Optional[Sequence[str]] = getattr(
+                self.field, "approved_image_formats", ()
+            )
+            if approved_image_formats is None:
+                allowed_formats = None
+            else:
+                allowed_formats = (*allowed_formats, *approved_image_formats)
+        return Image.open(self.open("rb"), formats=allowed_formats)

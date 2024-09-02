@@ -323,7 +323,7 @@ class FileField(FieldFactory):
             return query_dict
         else:
             if not isinstance(value, FieldFile):
-                raise ValueError(f"invalid value: {value} ({value!r})")
+                raise ValueError(f"invalid value for for_query=False: {value} ({value!r})")
             retdict: Dict[str, Any] = {
                 field_name: value.name,
             }

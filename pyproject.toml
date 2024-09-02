@@ -179,7 +179,7 @@ fix = true
 
 [tool.ruff.lint]
 select = ["E", "W", "F", "C", "B", "I", "UP", "SIM"]
-ignore = ["E501", "B008", "C901", "B026"]
+ignore = ["E501", "B008", "C901", "B026", "SIM115"]
 exclude = ["docs_src/*"]
 
 [tool.ruff.lint.isort]
