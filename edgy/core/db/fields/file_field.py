@@ -63,7 +63,7 @@ class ConcreteFileField(BaseCompositeField):
     ) -> str:
         if self._generate_name_fn is None:
             return name
-        return self._generate_name_fn(instance, name)
+        return self._generate_name_fn(instance, name, direct_name)
 
     def to_model(
         self,
