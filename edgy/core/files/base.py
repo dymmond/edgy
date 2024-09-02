@@ -121,33 +121,6 @@ class File:
     def url(self) -> str:
         return self.storage.url(self.name)
 
-    def readable(self) -> bool:
-        """Return True if the file is readable."""
-        if self.closed:
-            return False
-        assert self.file is not None
-        if hasattr(self.file, "readable"):
-            return self.file.readable()
-        return True
-
-    def writable(self) -> bool:
-        """Return True if the file is writable."""
-        if self.closed:
-            return False
-        assert self.file is not None
-        if hasattr(self.file, "writable"):
-            return self.file.writable()
-        return "w" in getattr(self.file, "mode", "")
-
-    def seekable(self) -> bool:
-        """Return True if the file is seekable."""
-        if self.closed:
-            return False
-        assert self.file is not None
-        if hasattr(self.file, "seekable"):
-            return self.file.seekable()
-        return True
-
     def chunks(self, chunk_size: Union[int, None] = None) -> Generator[bytes, None, None]:
         """
         Read the file and yield chunks of ``chunk_size`` bytes (defaults to
@@ -222,6 +195,41 @@ class File:
 
         return self
 
+    def readable(self) -> bool:
+        """Return True if the file is readable."""
+        if self.closed:
+            return False
+        assert self.file is not None
+        if hasattr(self.file, "readable"):
+            return self.file.readable()
+        return True
+
+    def writable(self) -> bool:
+        """Return True if the file is writable."""
+        if self.closed:
+            return False
+        assert self.file is not None
+        if hasattr(self.file, "writable"):
+            return self.file.writable()
+        return "w" in getattr(self.file, "mode", "")
+
+    def seekable(self) -> bool:
+        """Return True if the file is seekable."""
+        if self.closed:
+            return False
+        assert self.file is not None
+        if hasattr(self.file, "seekable"):
+            return self.file.seekable()
+        return True
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        assert self.seekable()
+        return cast("BinaryIO", self.file).seek(offset, whence)
+
+    def tell(self) -> int:
+        assert self.file is not None
+        return self.file.tell()
+
     def read(self, amount: Optional[int] = None) -> bytes:
         assert self.file is not None
         return self.file.read(amount)
@@ -274,6 +282,8 @@ class FieldFile(File):
         generate_name_fn: Optional[Callable[[str, Union[BinaryIO, File], bool], str]] = None,
         metadata: Optional[Dict[str, Any]] = None,
         approved: bool = True,
+        # only usable with correct approval handling
+        change_removes_approval: bool = False,
     ) -> None:
         if isinstance(content, File):
             content = content.open("rb").file
@@ -284,6 +294,7 @@ class FieldFile(File):
         self.generate_name_fn = generate_name_fn
         self.metadata = metadata or {}
         self.approved = approved
+        self.change_removes_approval = change_removes_approval
         if size is not None:
             # set value to cached_property
             self.size = size
@@ -371,6 +382,8 @@ class FieldFile(File):
         self.operation = "save_delete" if delete_old else "save"
         if approved is not None:
             self.approved = approved
+        elif self.change_removes_approval:
+            self.approved = False
 
     def set_approved(self, approved: bool) -> None:
         self.old = (self.storage, self.name, self.approved)
@@ -412,3 +425,5 @@ class FieldFile(File):
         self.operation = "delete"
         if approved is not None:
             self.approved = approved
+        elif self.change_removes_approval:
+            self.approved = False

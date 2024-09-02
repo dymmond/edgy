@@ -248,8 +248,8 @@ class ForeignKey(ForeignKeyFieldFactory):
         return super().__new__(cls, to=to, **kwargs)
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        super().validate(**kwargs)
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
+        super().validate(kwargs)
         embed_parent = kwargs.get("embed_parent")
         if embed_parent and "__" in embed_parent[1]:
             raise FieldDefinitionError(

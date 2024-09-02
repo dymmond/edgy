@@ -6,6 +6,7 @@ from typing import (
     Callable,
     Dict,
     List,
+    Literal,
     Optional,
     Sequence,
     Type,
@@ -16,12 +17,17 @@ from typing import (
 import orjson
 import sqlalchemy
 
-from edgy.core.db.fields.base import BaseCompositeField, BaseField
+from edgy.core.db.fields.base import BaseCompositeField
 from edgy.core.db.fields.core import BigIntegerField, BooleanField, JSONField
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.core.db.fields.types import ColumnDefinitionModel
 from edgy.core.files.base import FieldFile, File
 from edgy.core.files.storage import storages
+
+try:
+    import magic
+except ImportError:
+    magic = None  # type: ignore
 
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
@@ -63,7 +69,7 @@ class ConcreteFileField(BaseCompositeField):
     ) -> str:
         if self._generate_name_fn is None:
             return name
-        return self._generate_name_fn(instance, name, direct_name)
+        return self._generate_name_fn(instance, file, name, direct_name)
 
     def to_model(
         self,
@@ -107,6 +113,7 @@ class ConcreteFileField(BaseCompositeField):
                     size=value.get(f"{field_name}_size"),
                     metadata=value.get(f"{field_name}_metadata", {}),
                     approved=value.get(f"{field_name}_approved", not self.with_approval),
+                    change_removes_approval=self.with_approval,
                     generate_name_fn=partial(self.generate_name_fn, instance),
                 )
             else:
@@ -120,6 +127,7 @@ class ConcreteFileField(BaseCompositeField):
                         generate_name_fn=partial(self.generate_name_fn, instance),
                         storage=self.storage,
                         approved=not self.with_approval,
+                        change_removes_approval=self.with_approval,
                     )
                 # file creation if value is not None otherwise deletion
                 file_instance.save(value)
@@ -198,6 +206,8 @@ class ConcreteFileField(BaseCompositeField):
 
     async def post_save_callback(self, value: FieldFile, instance: "BaseModelType") -> None:
         await value.execute_operation()
+        # cleanup temp file
+        value.close()
 
     async def post_delete_callback(self, value: FieldFile) -> None:
         value.delete(instant=True)
@@ -213,10 +223,11 @@ class FileField(FieldFactory):
         with_size: bool = True,
         with_metadata: bool = True,
         with_approval: bool = False,
+        extract_mime: Union[bool, Literal["approved_only"]] = True,
         field_file_class: Type[FieldFile] = FieldFile,
         generate_name_fn: Optional[Callable[[Optional["BaseModelType"], str], str]] = None,
         **kwargs: Any,
-    ) -> BaseField:
+    ) -> "BaseFieldType":
         if not storage:
             storage = storages["default"]
         elif isinstance(storage, str):
@@ -236,9 +247,17 @@ class FileField(FieldFactory):
 
     @classmethod
     def extract_metadata(
-        cls, field_obj: "BaseFieldType", field_name: str, field_file: FieldFile, approved: bool
+        cls, field_obj: "BaseFieldType", field_name: str, field_file: FieldFile
     ) -> Dict[str, Any]:
-        return {}
+        data: Dict[str, Any] = {}
+        if (
+            magic is not None
+            and field_obj.extract_mime
+            and (field_file.approved or field_obj.extract_mime != "approved_only")
+        ):
+            # only open, not close, done later
+            data["mime"] = magic.from_buffer(field_file.open("rb").read(2048))
+        return data
 
     @classmethod
     def clean(
@@ -278,22 +297,13 @@ class FileField(FieldFactory):
                 field_name: value.name,
             }
             retdict[f"{field_name}_storage"] = value.storage.name
-            # fallback when with_approval is False
-            approved = True
             if field_obj.with_approval:
-                if value:
-                    retdict[f"{field_name}_approved"] = value.approved
-                    approved = value.approved
-                else:
-                    retdict[f"{field_name}_approved"] = False
-                    approved = False
+                retdict[f"{field_name}_approved"] = value.approved
             if field_obj.with_size:
                 retdict[f"{field_name}_size"] = value.size if value else None
             if field_obj.with_metadata:
                 metadata_result: Any = (
-                    cls.extract_metadata(
-                        field_obj, field_name=field_name, field_file=value, approved=approved
-                    )
+                    cls.extract_metadata(field_obj, field_name=field_name, field_file=value)
                     if value
                     else {}
                 )
@@ -303,7 +313,3 @@ class FileField(FieldFactory):
                     metadata_result = orjson.dumps(metadata_result).decode("utf8")
                 retdict[field.name] = metadata_result
             return retdict
-
-
-class ImageField(FileField):
-    pass

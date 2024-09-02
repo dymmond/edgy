@@ -41,7 +41,7 @@ class CharField(FieldFactory, str):
         min_length: Optional[int] = None,
         regex: Union[str, Pattern] = None,
         pattern: Union[str, Pattern] = None,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> BaseFieldType:
         if pattern is None:
             pattern = regex
@@ -54,7 +54,7 @@ class CharField(FieldFactory, str):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
         max_length = kwargs.get("max_length", 0)
         if max_length <= 0:
             raise FieldDefinitionError(detail=f"'max_length' is required for {cls.__name__}")
@@ -200,8 +200,8 @@ class DecimalField(FieldFactory, decimal.Decimal):
         )
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        super().validate(**kwargs)
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
+        super().validate(kwargs)
 
         max_digits = kwargs.get("max_digits")
         decimal_places = kwargs.get("decimal_places")
@@ -456,7 +456,7 @@ class ChoiceField(FieldFactory):
     def __new__(  # type: ignore
         cls,
         choices: Optional[Sequence[Union[Tuple[str, str], Tuple[str, int]]]] = None,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> BaseFieldType:
         kwargs = {
             **kwargs,
@@ -465,7 +465,7 @@ class ChoiceField(FieldFactory):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
         choice_class = kwargs.get("choices")
         if choice_class is None or not isinstance(choice_class, EnumMeta):
             raise FieldDefinitionError("ChoiceField choices must be an Enum")

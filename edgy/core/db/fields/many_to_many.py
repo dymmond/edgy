@@ -316,23 +316,25 @@ class ManyToManyField(ForeignKeyFieldFactory):
         to_fields: Sequence[str] = (),
         **kwargs: Any,
     ) -> "BaseFieldType":
+        return super().__new__(
+            cls, to=to, through=through, from_fields=from_fields, to_fields=to_fields, **kwargs
+        )
+
+    @classmethod
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
+        super().validate(kwargs)
+        embed_through = kwargs.get("embed_through")
+        if embed_through and "__" in embed_through:
+            raise FieldDefinitionError('"embed_through" cannot contain "__".')
+
         for argument in ["null", "on_delete", "on_update"]:
-            if kwargs.get(argument, None):
+            if kwargs.get(argument):
                 terminal.write_warning(
                     f"Declaring `{argument}` on a ManyToMany relationship has no effect."
                 )
         kwargs["null"] = True
         kwargs["on_delete"] = CASCADE
         kwargs["on_update"] = CASCADE
-
-        return super().__new__(cls, to=to, through=through, **kwargs)
-
-    @classmethod
-    def validate(cls, **kwargs: Any) -> None:
-        super().validate(**kwargs)
-        embed_through = kwargs.get("embed_through")
-        if embed_through and "__" in embed_through:
-            raise FieldDefinitionError('"embed_through" cannot contain "__".')
 
 
 ManyToMany = ManyToManyField

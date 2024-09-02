@@ -23,8 +23,9 @@ from .core import (
     UUIDField,
 )
 from .exclude_field import ExcludeField
-from .file_field import FileField, ImageField
+from .file_field import FileField
 from .foreign_keys import ForeignKey
+from .image_field import ImageField
 from .many_to_many import ManyToMany, ManyToManyField
 from .one_to_one_keys import OneToOne, OneToOneField
 from .ref_foreign_key import RefForeignKey

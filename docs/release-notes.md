@@ -17,6 +17,7 @@ hide:
 ### Changed
 
 - Breaking: ModelReferences use now the related name instead of the model name.
+- Breaking: Field Factories pass now keyword arguments as positional dictionary. This way keyword arguments manipulations in validate are possible.
   This way it can be distinguished between multiple foreign keys to the same model and self-references are possible.
 - `model_references` are superseeded by `post_save_fields` in meta.
 - ModelParser mixin is gone. Use the classmethod `extract_column_values` instead.

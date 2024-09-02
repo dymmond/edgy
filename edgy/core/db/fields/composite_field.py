@@ -272,7 +272,7 @@ class CompositeField(FieldFactory):
         return Dict[str, Any]
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
         inner_fields = kwargs.get("inner_fields")
         if inner_fields is not None:
             if hasattr(inner_fields, "meta"):
@@ -292,6 +292,6 @@ class CompositeField(FieldFactory):
                 else:
                     if field[0] in inner_field_names:
                         raise FieldDefinitionError(f"duplicate inner field {field}")
-        model = kwargs.get("model", None)
+        model = kwargs.get("model")
         if model is not None and not isinstance(model, type):
             raise FieldDefinitionError(f"model must be type {model}")

@@ -1,5 +1,5 @@
 from functools import lru_cache, partial
-from typing import Any, FrozenSet, Literal, Sequence, Set, Union, cast
+from typing import Any, Dict, FrozenSet, Literal, Sequence, Set, Union, cast
 
 from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL
 from edgy.core.db.fields.base import Field
@@ -60,8 +60,8 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         default_methods_overwritable_by_factory
     )
 
-    def __new__(cls, **kwargs: Any) -> BaseFieldType:
-        cls.validate(**kwargs)
+    def __new__(cls, **kwargs: Dict[str, Any]) -> BaseFieldType:
+        cls.validate(kwargs)
         return cls.build_field(**kwargs)
 
     @classmethod
@@ -122,10 +122,10 @@ class FieldFactory(metaclass=FieldFactoryMeta):
                     )
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:  # pragma no cover
+    def validate(cls, kwargs: Dict[str, Any]) -> None:  # pragma no cover
         """
-        Used to validate if all required parameters on a given field type are set.
-        :param kwargs: all params passed during construction
+        Used to validate if all required parameters on a given field type are set and modify them if needed.
+        :param kwargs: dict with all params passed during construction
         :type kwargs: Any
         """
 
@@ -166,21 +166,18 @@ class ForeignKeyFieldFactory(FieldFactory):
         server_onupdate: Any = None,
         default: Any = None,
         server_default: Any = None,
-        **kwargs: Any,
+        **kwargs: Dict[str, Any],
     ) -> BaseFieldType:
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
         }
-
-        cls.validate(**kwargs)
+        cls.validate(kwargs)
         # update related name when available
-        if related_name:
-            kwargs["related_name"] = related_name.lower()
         return cls.build_field(**kwargs)
 
     @classmethod
-    def validate(cls, **kwargs: Any) -> None:
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
         """default validation useful for one_to_one and foreign_key"""
         on_delete = kwargs.get("on_delete", CASCADE)
         on_update = kwargs.get("on_update", RESTRICT)
@@ -199,3 +196,6 @@ class ForeignKeyFieldFactory(FieldFactory):
         # tolerate None and False
         if related_name and not isinstance(related_name, str):
             raise FieldDefinitionError("related_name must be a string.")
+
+        if related_name:
+            kwargs["related_name"] = related_name.lower()
