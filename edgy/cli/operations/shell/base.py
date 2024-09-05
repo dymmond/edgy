@@ -3,7 +3,6 @@ import sys
 from typing import Any, Callable, Optional, Sequence
 
 import click
-import nest_asyncio
 
 from edgy import Registry
 from edgy.cli.env import MigrationEnv
@@ -58,13 +57,11 @@ async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) ->
             from edgy.cli.operations.shell.ipython import get_ipython
 
             ipython_shell = get_ipython(app=app, registry=registry)
-            nest_asyncio.apply()
             ipython_shell()
         else:
             from edgy.cli.operations.shell.ptpython import get_ptpython
 
             ptpython = get_ptpython(app=app, registry=registry)
-            nest_asyncio.apply()
             ptpython()
 
 
