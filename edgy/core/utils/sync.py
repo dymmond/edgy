@@ -1,8 +1,8 @@
 import asyncio
+import weakref
 from contextvars import copy_context
 from threading import Event, Thread
-from typing import Any, Awaitable, Optional
-from weakref import WeakKeyDictionary, finalize
+from typing import Any, Awaitable, Optional, WeakKeyDictionary
 
 
 async def _coro_helper(awaitable: Awaitable, timeout: Optional[float]) -> Any:
@@ -12,13 +12,13 @@ async def _coro_helper(awaitable: Awaitable, timeout: Optional[float]) -> Any:
 
 
 weak_subloop_map: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.AbstractEventLoop] = (
-    WeakKeyDictionary()
+    weakref.WeakKeyDictionary()
 )
 
 
 async def _startup(old_loop: asyncio.AbstractEventLoop, is_initialized: Event) -> None:
     new_loop = asyncio.get_running_loop()
-    finalize(old_loop, new_loop.stop)
+    weakref.finalize(old_loop, new_loop.stop)
     weak_subloop_map[old_loop] = new_loop
     is_initialized.set()
 
