@@ -7,7 +7,7 @@ from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = edgy.Database(DATABASE_URL)
+database = edgy.Database(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 

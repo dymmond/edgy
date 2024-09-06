@@ -49,7 +49,8 @@ async def create_test_database():
     async with database:
         await models.create_all()
         yield
-        await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
 
 
 def test_invalid_signal():

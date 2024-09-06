@@ -8,7 +8,7 @@ from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = edgy.Database(DATABASE_URL)
+database = edgy.Database(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 
@@ -25,6 +25,7 @@ async def create_test_database():
     async with database:
         await models.create_all()
         yield
+        # we have a normal database object here
         await models.drop_all()
 
 
