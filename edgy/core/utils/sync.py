@@ -1,7 +1,8 @@
 import asyncio
 from contextvars import copy_context
-from threading import Thread
+from threading import Event, Thread
 from typing import Any, Awaitable, Optional
+from weakref import WeakKeyDictionary, finalize
 
 
 async def _coro_helper(awaitable: Awaitable, timeout: Optional[float]) -> Any:
@@ -10,11 +11,46 @@ async def _coro_helper(awaitable: Awaitable, timeout: Optional[float]) -> Any:
     return await awaitable
 
 
-def thread_run(awaitable: Awaitable, future: asyncio.Future) -> None:
+weak_subloop_map: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.AbstractEventLoop] = (
+    WeakKeyDictionary()
+)
+
+
+async def _startup(old_loop: asyncio.AbstractEventLoop, is_initialized: Event) -> None:
+    new_loop = asyncio.get_running_loop()
+    finalize(old_loop, new_loop.stop)
+    weak_subloop_map[old_loop] = new_loop
+    is_initialized.set()
+
+
+def _init_thread(old_loop: asyncio.AbstractEventLoop, is_initialized: Event) -> None:
+    loop = asyncio.new_event_loop()
+    # keep reference
+    task = loop.create_task(_startup(old_loop, is_initialized))
     try:
-        future.set_result(asyncio.run(awaitable))
-    except BaseException as exc:
-        future.set_exception(exc)
+        try:
+            loop.run_forever()
+        except RuntimeError:
+            pass
+        finally:
+            # now all inits wait
+            is_initialized.clear()
+        loop.run_until_complete(loop.shutdown_asyncgens())
+    finally:
+        del task
+        loop.close()
+
+
+def get_subloop(loop: asyncio.AbstractEventLoop) -> asyncio.AbstractEventLoop:
+    sub_loop = weak_subloop_map.get(loop, None)
+    if sub_loop is None:
+        is_initialized = Event()
+        thread = Thread(target=_init_thread, args=[loop, is_initialized], daemon=True)
+        thread.start()
+        is_initialized.wait()
+        return weak_subloop_map[loop]
+
+    return sub_loop
 
 
 def run_sync(awaitable: Awaitable, timeout: Optional[float] = None) -> Any:
@@ -30,12 +66,9 @@ def run_sync(awaitable: Awaitable, timeout: Optional[float] = None) -> Any:
     if loop is None:
         return asyncio.run(_coro_helper(awaitable, timeout))
     else:
-        future: asyncio.Future = loop.create_future()
-        context = copy_context()
-        thread = Thread(
-            target=context.run,
-            args=[thread_run, _coro_helper(awaitable, timeout), future],
-        )
-        thread.start()
-        thread.join()
-        return future.result()
+        ctx = copy_context()
+        # the context of the coro seems to be switched correctly
+        # in case of problems, we can switch to threadexecutors with asyncio.run but this is not as performant
+        return asyncio.run_coroutine_threadsafe(
+            ctx.run(_coro_helper, awaitable, timeout), get_subloop(loop)
+        ).result()
