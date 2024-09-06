@@ -10,7 +10,8 @@ import edgy
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
+# we don't want drop_database/use_existing here
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
@@ -18,19 +19,10 @@ pytestmark = pytest.mark.anyio
 
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
-    try:
+    async with database:
         await models.create_all()
         yield
-        await models.drop_all()
-    except Exception:
-        pytest.skip("No database available")
-
-
-@pytest.fixture(autouse=True)
-async def rollback_connections():
-    with database.force_rollback():
-        async with database:
-            yield
+    await models.drop_all()
 
 
 def blocking_function():

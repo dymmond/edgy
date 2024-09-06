@@ -5,8 +5,8 @@ from edgy.core.db.querysets.clauses import or_
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(url=DATABASE_URL)
-models = edgy.Registry(database=database)
+database = DatabaseTestClient(DATABASE_URL)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 pytestmark = pytest.mark.anyio
 
@@ -27,12 +27,18 @@ class Product(edgy.Model):
         registry = models
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
+        await models.drop_all()
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def rollback_transactions():
+    async with models.database:
+        yield
 
 
 async def test_filter_with_empty_or():
@@ -157,7 +163,7 @@ async def test_filter_or_clause_mixed():
     user = await User.query.create(name="Adam", email="adam@edgy.dev")
     await User.query.create(name="Edgy", email="adam@edgy.dev")
 
-    results = await User.query.or_(name="Adam", email=user.email).and_(id=1)
+    results = await User.query.or_(name="Adam", email=user.email).and_(id=user.id)
 
     assert len(results) == 1
     assert results[0].pk == user.pk

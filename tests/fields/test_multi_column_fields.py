@@ -79,25 +79,19 @@ class MyModel(edgy.Model):
 
 @pytest.fixture()
 async def create_test_database():
-    await models.create_all()
-    yield
+    async with database:
+        await models.create_all()
+        yield
     await models.drop_all()
 
 
-@pytest.fixture()
-async def rollback_connections(create_test_database):
-    with database.force_rollback():
-        async with database:
-            yield
-
-
-def test_basic_mdoel():
+def test_basic_model():
     obj = MyModel(multi="edgy")
     assert obj.multi["normal"] == "edgy"
     assert obj.multi["inner"] == "edgy"
 
 
-async def test_create_and_assign(rollback_connections):
+async def test_create_and_assign(create_test_database):
     obj = await MyModel.query.create(multi="edgy", multi_inner="edgytoo")
     assert obj.multi["normal"] == "edgy"
     assert obj.multi["inner"] == "edgytoo"

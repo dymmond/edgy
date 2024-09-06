@@ -2,7 +2,7 @@ import asyncio
 import weakref
 from contextvars import copy_context
 from threading import Event, Thread
-from typing import Any, Awaitable, Optional, WeakKeyDictionary
+from typing import Any, Awaitable, Dict, Optional, cast
 
 
 async def _coro_helper(awaitable: Awaitable, timeout: Optional[float]) -> Any:
@@ -11,8 +11,9 @@ async def _coro_helper(awaitable: Awaitable, timeout: Optional[float]) -> Any:
     return await awaitable
 
 
-weak_subloop_map: WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.AbstractEventLoop] = (
-    weakref.WeakKeyDictionary()
+# python <= 3.8 doesn't support WeakKeyDictionary as type
+weak_subloop_map: Dict[asyncio.AbstractEventLoop, asyncio.AbstractEventLoop] = cast(
+    Dict[asyncio.AbstractEventLoop, asyncio.AbstractEventLoop], weakref.WeakKeyDictionary()
 )
 
 
@@ -42,7 +43,7 @@ def _init_thread(old_loop: asyncio.AbstractEventLoop, is_initialized: Event) -> 
 
 
 def get_subloop(loop: asyncio.AbstractEventLoop) -> asyncio.AbstractEventLoop:
-    sub_loop = weak_subloop_map.get(loop, None)
+    sub_loop = weak_subloop_map.get(loop)
     if sub_loop is None:
         is_initialized = Event()
         thread = Thread(target=_init_thread, args=[loop, is_initialized], daemon=True)

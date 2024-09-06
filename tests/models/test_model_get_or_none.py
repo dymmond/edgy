@@ -24,7 +24,7 @@ async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
+        await models.drop_all()
 
 
 async def test_get_or_none():
