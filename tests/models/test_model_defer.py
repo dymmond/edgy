@@ -9,8 +9,6 @@ models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
 
-# TODO: disable implicit loading deferred and check for crashes
-
 class User(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     name = edgy.CharField(max_length=100)
@@ -40,6 +38,8 @@ async def test_model_defer():
 
     assert "description" not in users[0].model_dump()
     assert "description" not in users[1].model_dump()
+
+    # FIXME: hangs without full_isolation but shouldn't
 
     users[0].description  # noqa
     users[1].description  # noqa
