@@ -13,7 +13,7 @@ from tests.settings import DATABASE_URL
 pytestmark = pytest.mark.anyio
 
 database = DatabaseTestClient(DATABASE_URL)
-models = edgy.Registry(database=database)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 def get_random_string(length):
@@ -65,16 +65,17 @@ class NewReflectedUser(edgy.ReflectModel):
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    await models.create_all()
-    yield
-    await models.drop_all()
+    async with database:
+        await models.create_all()
+        yield
+        if not database.drop:
+            await models.drop_all()
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
-    with database.force_rollback():
-        async with database:
-            yield
+    async with models.database:
+        yield
 
 
 def async_adapter(wrapped_func):

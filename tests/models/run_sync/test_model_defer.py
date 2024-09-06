@@ -4,7 +4,7 @@ import edgy
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, full_isolation=True, force_rollback=False)
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
@@ -21,17 +21,12 @@ class User(edgy.Model):
 
 
 @pytest.fixture(autouse=True, scope="function")
-async def create_xtest_database():
-    await models.create_all()
-    yield
-    await models.drop_all()
-
-
-@pytest.fixture(autouse=True)
-async def rollback_connections():
-    with database.force_rollback():
-        async with database:
-            yield
+async def create_test_database():
+    async with database:
+        await models.create_all()
+        yield
+        if not database.drop:
+            await models.drop_all()
 
 
 async def test_model_defer():

@@ -5,7 +5,7 @@ from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL)
-models = edgy.Registry(database=database)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 pytestmark = pytest.mark.anyio
 
@@ -28,12 +28,19 @@ class User(Base):
     profile: Profile = edgy.ForeignKey(Profile, on_delete=edgy.CASCADE)
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def rollback_transactions():
+    async with models.database:
+        yield
 
 
 async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_not_secret():

@@ -58,12 +58,19 @@ class Permission(EdgyTenantBaseModel):
         tablename = "ut_permission"
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def rollback_transactions():
+    async with models.database:
+        yield
 
 
 async def test_select_related_tenant():

@@ -24,23 +24,24 @@ async def create_test_database():
     async with database:
         await models.create_all()
         yield
-        await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
 
 
-@pytest.fixture()
+@pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
     async with models.database:
         yield
 
 
-async def test_rollback1(rollback_transactions):
+async def test_rollback1():
     assert await MyModel.query.all() == []
     assert bool(database.force_rollback())
     model = await MyModel.query.create()
     assert await MyModel.query.all() == [model]
 
 
-async def test_rollback2(rollback_transactions):
+async def test_rollback2():
     assert await MyModel.query.all() == []
     assert bool(database.force_rollback())
     model = await MyModel.query.create()

@@ -9,7 +9,7 @@ from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL)
-models = edgy.Registry(database=database)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 pytestmark = pytest.mark.anyio
 
@@ -41,12 +41,19 @@ class Product(edgy.Model):
         name = "products"
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def rollback_transactions():
+    async with models.database:
+        yield
 
 
 async def test_contains():

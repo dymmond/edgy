@@ -4,7 +4,7 @@ import edgy
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, full_isolation=False, force_rollback=False)
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
@@ -33,7 +33,8 @@ async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
 
 
 async def test_exclude_secrets_query():
@@ -42,6 +43,4 @@ async def test_exclude_secrets_query():
         profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
     )
 
-    user = await User.query.exclude_secrets().get(id=1)
-
-    assert user.pk == 1
+    await User.query.exclude_secrets().get()

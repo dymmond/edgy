@@ -8,7 +8,7 @@ from tests.settings import DATABASE_URL
 pytestmark = pytest.mark.anyio
 
 database = DatabaseTestClient(DATABASE_URL)
-models = edgy.Registry(database=database)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 class User(edgy.Model):
@@ -34,12 +34,19 @@ class Article(edgy.Model):
         registry = models
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def rollback_transactions():
+    async with models.database:
+        yield
 
 
 class Test: ...

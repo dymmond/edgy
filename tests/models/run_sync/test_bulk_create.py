@@ -15,7 +15,7 @@ from tests.settings import DATABASE_URL
 pytestmark = pytest.mark.anyio
 
 database = DatabaseTestClient(DATABASE_URL)
-models = edgy.Registry(database=database)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 def time():
@@ -50,16 +50,17 @@ class Product(edgy.Model):
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    await models.create_all()
-    yield
-    await models.drop_all()
+    async with database:
+        await models.create_all()
+        yield
+        if not database.drop:
+            await models.drop_all()
 
 
 @pytest.fixture(autouse=True)
 async def rollback_transactions():
-    with database.force_rollback():
-        async with database:
-            yield
+    async with models.database:
+        yield
 
 
 async def test_bulk_create():

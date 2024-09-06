@@ -4,7 +4,7 @@ import edgy
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, full_isolation=True, force_rollback=False)
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
@@ -24,10 +24,11 @@ async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
 
 
-async def test_get_or_none():
+async def test_get_or_none_without_get():
     user = edgy.run_sync(User.query.create(name="Charles"))
     assert user == edgy.run_sync(User.query.filter(name="Charles").get())
 
@@ -38,7 +39,7 @@ async def test_get_or_none():
     assert user.pk == 1
 
 
-async def test_get_or_none_without_get():
+async def test_get_or_none():
     user = edgy.run_sync(User.query.create(name="Charles"))
     users = edgy.run_sync(User.query.filter(name="Charles"))
     assert user == users[0]

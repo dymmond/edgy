@@ -4,7 +4,7 @@ import edgy
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
@@ -24,7 +24,8 @@ async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
 
 
 async def test_get_or_none():

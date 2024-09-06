@@ -9,7 +9,7 @@ from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
-database = DatabaseTestClient(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 
@@ -45,16 +45,10 @@ class MyModel2(MyModel1):
 
 @pytest.fixture()
 async def create_test_database():
-    await models.create_all()
-    yield
+    async with database:
+        await models.create_all()
+        yield
     await models.drop_all()
-
-
-@pytest.fixture()
-async def rollback_connections(create_test_database):
-    with database.force_rollback():
-        async with database:
-            yield
 
 
 def test_fields():
@@ -105,7 +99,7 @@ def test_field_names(model):
         assert field_name == field.name
 
 
-async def test_fields_db(rollback_connections):
+async def test_fields_db(create_test_database):
     model1_def = {
         "model1_first_name": "edgy",
         "model1_last_name": "edgytoo",

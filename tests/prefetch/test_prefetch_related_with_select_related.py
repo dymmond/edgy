@@ -8,7 +8,7 @@ from tests.settings import DATABASE_URL
 pytestmark = pytest.mark.anyio
 
 database = DatabaseTestClient(DATABASE_URL)
-models = edgy.Registry(database=database)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 class Album(edgy.Model):
@@ -29,12 +29,19 @@ class Track(edgy.Model):
         registry = models
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def rollback_transactions():
+    async with models.database:
+        yield
 
 
 async def test_prefetch_related():
@@ -92,8 +99,8 @@ async def test_prefetch_related_with_select_related_return_multiple():
     )
 
     assert len(tracks) == 2
-    assert tracks[0].albums[0].pk == track1.pk
-    assert tracks[1].albums[0].pk == track2.pk
+    assert tracks[0].albums[0].pk == track1.album.pk
+    assert tracks[1].albums[0].pk == track2.album.pk
 
 
 async def test_prefetch_related_with_select_related_return_none():
