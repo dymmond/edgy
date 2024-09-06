@@ -5,8 +5,7 @@ from edgy.core.db.querysets.clauses import not_
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL, drop_database=True, use_existing=False)
-# we don't want drop_database/use_existing here
+database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 pytestmark = pytest.mark.anyio
