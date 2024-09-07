@@ -4,18 +4,18 @@ import pytest
 from pydantic import __version__
 
 import edgy
-from edgy.contrib.multi_tenancy import TenantRegistry
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL, full_isolation=True)
-models = TenantRegistry(database=database)
+models = edgy.Registry(database=database)
 
 
 pytestmark = pytest.mark.anyio
 pydantic_version = __version__[:3]
 
 # TODO: disallow loading and check the crashes
+
 
 class EdgyTenantBaseModel(edgy.Model):
     id: int = edgy.IntegerField(primary_key=True)

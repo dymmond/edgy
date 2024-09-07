@@ -57,7 +57,8 @@ More on this in the [example](#example) provided.
 All the needed imports are located inside the `multi_tenancy` module in `contrib`:
 
 ```python
-from edgy.contrib.multi_tenancy import TenantModel. TenantRegistry, TenancySettings
+from edgy import Registry
+from edgy.contrib.multi_tenancy import TenantModel, TenancySettings
 from edgy.contrib.multi_tenancy.models import TenantMixin, DomainMixin, TenantUserMixin
 ```
 
@@ -74,21 +75,6 @@ core functionalities but introduces a new internam `metaclass` required for the 
 
 This is how you **must** declare a model that you want it to be in your multi-tenant schemas using
 this particular module. **This is mandatory**.
-
-Did you notice that a `TenantRegistry` was used? Nothing to worry about, it is nothing completely
-new to you, it is just an inherited [registry](../registry.md) with extra properties specifically
-created for this purpose 😁.
-
-## TenantRegistry
-
-The `TenantRegistry` as mentioned above, it is just an inherited [registry](../registry.md) with extra properties specifically
-created for the purpose of useing the Edgy contrib module where it adds some extras to make this
-integration easier, such as the `tenant_models` object which is internally used to understand
-which models should be generated upon the creation of a `Tenant` automatically.
-
-```python hl_lines="2 5 8 19"
-{!> ../docs_src/tenancy/contrib/tenant_registry.py !}
-```
 
 ## TenancySettings
 

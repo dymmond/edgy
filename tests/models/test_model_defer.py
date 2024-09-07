@@ -9,6 +9,7 @@ models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
 
+
 class User(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
     name = edgy.CharField(max_length=100)

@@ -32,6 +32,7 @@ class Registry:
         self._callbacks: Dict[str, List[Any]] = {}
 
         self.schema = Schema(registry=self)
+        self.tenant_models: Dict[str, Any] = {}
 
         self._metadata: sqlalchemy.MetaData = (
             sqlalchemy.MetaData(schema=self.db_schema)
