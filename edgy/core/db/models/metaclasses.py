@@ -223,7 +223,7 @@ class MetaInfo:
 
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
-        if name == "fields" and self._is_init:
+        if name == "fields" and getattr(self, "_is_init", False):
             self.invalidate()
 
     def __getattribute__(self, name: str) -> Any:
@@ -285,7 +285,7 @@ class MetaInfo:
             for attr in ("_table", "_pknames", "_pkcolumns", "_db_schemas"):
                 with contextlib.suppress(AttributeError):
                     delattr(self.model, attr)
-            # FIXME: clumsy and imperformant, make proxy_model lazy
+            # FIXME: a lazy proxy_model would be better
             proxy_model = self.model.generate_proxy_model()
             self.model.__proxy_model__ = proxy_model
             self.model.__proxy_model__.__parent__ = self.model
@@ -746,8 +746,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             if isinstance(value, BaseManyToManyForeignKeyField):
                 value.create_through_model()
 
-        # Making sure it does not generate tables if abstract it set
-        if not meta.abstract:
+        # Making sure it does not generate models if abstract or a proxy
+        if not meta.abstract and not new_class.__is_proxy_model__:
             if getattr(cls, "__reflected__", False):
                 registry.reflected[name] = new_class
             else:
