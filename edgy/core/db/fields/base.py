@@ -446,7 +446,8 @@ class BaseForeignKey(RelationshipField):
             delattr(self, "_target")
 
     def is_cross_db(self) -> bool:
-        return self.owner.meta.registry is not self.target.meta.registry
+        # self.registry should be self.owner.meta.registry
+        return self.registry is not self.target.meta.registry
 
     def expand_relationship(self, value: Any) -> Any:
         """

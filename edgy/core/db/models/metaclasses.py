@@ -29,7 +29,7 @@ from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.fields.base import BaseForeignKey, PKField
+from edgy.core.db.fields.base import PKField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.types import BaseFieldType
@@ -237,7 +237,7 @@ class MetaInfo:
         input_modifying_fields = set()
         post_save_fields = set()
         post_delete_fields = set()
-        foreign_key_fields: Dict[str, BaseForeignKey] = {}
+        foreign_key_fields = set()
         for key, field in self.fields.items():
             if hasattr(field, "__get__"):
                 special_getter_fields.add(key)
@@ -252,7 +252,7 @@ class MetaInfo:
             if hasattr(field, "post_delete_callback"):
                 post_delete_fields.add(key)
             if isinstance(field, BaseForeignKeyField):
-                foreign_key_fields[key] = field
+                foreign_key_fields.add(key)
         self.special_getter_fields: FrozenSet[str] = frozenset(special_getter_fields)
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
         self.secret_fields: FrozenSet[str] = frozenset(secret_fields)
@@ -260,7 +260,7 @@ class MetaInfo:
         # RelatedField belong to it so make it updatable
         self.post_save_fields: Set[str] = set(post_save_fields)
         self.post_delete_fields: FrozenSet[str] = frozenset(post_delete_fields)
-        self.foreign_key_fields: Dict[str, BaseForeignKey] = foreign_key_fields
+        self.foreign_key_fields: FrozenSet[str] = frozenset(foreign_key_fields)
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)
         self.columns_to_field = ColumnsToField(self)
@@ -335,6 +335,7 @@ def _set_related_field(
         name=related_name,
         owner=target,
         related_from=source,
+        registry=target.meta.registry,
     )
 
     # Set the related name
@@ -345,7 +346,7 @@ def _set_related_field(
 
 
 def _set_related_name_for_foreign_keys(
-    foreign_keys: Dict[str, BaseForeignKeyField],
+    meta: "MetaInfo",
     model_class: "Model",
 ) -> None:
     """
@@ -353,10 +354,11 @@ def _set_related_name_for_foreign_keys(
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
-    if not foreign_keys:
+    if not meta.foreign_key_fields:
         return
 
-    for name, foreign_key in foreign_keys.items():
+    for name in meta.foreign_key_fields:
+        foreign_key = meta.fields[name]
         related_name = getattr(foreign_key, "related_name", None)
         if related_name is False:
             # skip related_field
@@ -371,23 +373,16 @@ def _set_related_name_for_foreign_keys(
         foreign_key.related_name = related_name
         foreign_key.reverse_name = related_name
 
-        # FIXME: by pushing in target we resolve the target. This can lead to crashes if the target is not in registry
         related_field_fn = partial(
             _set_related_field,
             source=model_class,
             foreign_key_name=name,
             related_name=related_name,
         )
-        try:
-            related_field_fn(foreign_key.target)
-        except KeyError as exc:
-            assert model_class.meta.registry is not None, "Registry not set"
-            if isinstance(foreign_key.to, str):
-                model_class.meta.registry._callbacks.setdefault(foreign_key.to, []).append(
-                    related_field_fn
-                )
-            else:
-                raise exc
+        registry: Registry = cast("Registry", model_class.meta.registry)
+        with contextlib.suppress(Exception):
+            registry = cast("Registry", foreign_key.target.registry)
+        registry.register_callback(foreign_key.to, related_field_fn, one_time=True)
 
 
 def _handle_annotations(base: Type, base_annotations: Dict[str, Any]) -> None:
@@ -750,10 +745,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # Sets the foreign key fields
         if not new_class.__is_proxy_model__:
             if meta.foreign_key_fields:
-                _set_related_name_for_foreign_keys(meta.foreign_key_fields, new_class)
-            callbacks = registry._callbacks.get(name)
-            while callbacks:
-                callbacks.pop()(new_class)
+                _set_related_name_for_foreign_keys(meta, new_class)
+            registry.execute_model_callbacks(new_class)
 
         # Update the model references with the validations of the model
         # Being done by the Edgy fields instead.

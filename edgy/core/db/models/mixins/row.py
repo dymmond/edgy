@@ -92,7 +92,8 @@ class ModelRowMixin:
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
         # This way it is not overritten by any value
-        for related, foreign_key in cls.meta.foreign_key_fields.items():
+        for related in cls.meta.foreign_key_fields:
+            foreign_key = cls.meta.fields[related]
             ignore_related: bool = cls.__should_ignore_related_name(related, select_related)
             if ignore_related or related in cls.meta.secret_fields:
                 continue

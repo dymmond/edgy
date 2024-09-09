@@ -152,14 +152,15 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         if self.through:
             if isinstance(self.through, str):
                 self.through = self.registry.models[self.through]
-            through = cast(Type["BaseModelType"], self.through)
+            through = self.through
             if through.meta.abstract:
                 pknames = set(cast(Sequence[str], through.pknames))
                 __bases__ = (through,)
             else:
                 if not self.from_foreign_key:
                     candidate = None
-                    for field_name, field in through.meta.foreign_key_fields.items():
+                    for field_name in through.meta.foreign_key_fields:
+                        field = through.meta.fields[field_name]
                         if field.target == self.owner:
                             if candidate:
                                 raise ValueError("multiple foreign keys to owner")
