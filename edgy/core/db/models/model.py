@@ -53,13 +53,13 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         # empty updates shouldn't cause an error. E.g. only model references are updated
         if column_values:
-            async with self.database.transaction():
+            async with self.database as database, database.transaction():
                 # can update column_values
-                await self.execute_pre_save_hooks(column_values)
+                column_values.update(await self.execute_pre_save_hooks(column_values, kwargs))
                 expression = (
                     self.table.update().values(**column_values).where(*self.identifying_clauses())
                 )
-                await self.database.execute(expression)
+                await database.execute(expression)
 
             # Update the model instance.
             new_kwargs = self.transform_input(column_values, phase="post_update", instance=self)
@@ -129,11 +129,11 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         column_values = self.extract_column_values(
             extracted_values=kwargs, is_partial=False, is_update=False
         )
-        async with self.database.transaction():
+        async with self.database as database, database.transaction():
             # can update column_values
-            await self.execute_pre_save_hooks(column_values)
+            column_values.update(await self.execute_pre_save_hooks(column_values, kwargs))
             expression = self.table.insert().values(**column_values)
-            autoincrement_value = await self.database.execute(expression)
+            autoincrement_value = await database.execute(expression)
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
             column = self.table.autoincrement_column

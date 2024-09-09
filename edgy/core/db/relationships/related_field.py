@@ -1,7 +1,8 @@
 import functools
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, cast
+from typing import TYPE_CHECKING, Any, Dict, Tuple, Type, cast
 
+from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.protocols.many_relationship import ManyRelationProtocol
@@ -49,11 +50,11 @@ class RelatedField(RelationshipField):
         field_name: str,
         value: Any,
         phase: str = "",
-        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         """
         Meta field
         """
+        instance = CURRENT_INSTANCE.get()
         if isinstance(value, ManyRelationProtocol):
             return {field_name: value}
         if instance:

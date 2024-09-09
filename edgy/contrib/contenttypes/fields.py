@@ -12,6 +12,17 @@ terminal = Print()
 
 
 class BaseContentTypeFieldField(BaseForeignKeyField):
+    async def pre_save_callback(
+        self, value: Any, original_value: Any, instance: "BaseModelType"
+    ) -> Any:
+        target = self.target
+        if value is None or (isinstance(value, dict) and not value):
+            value = original_value
+        # e.g. default was a Model
+        if isinstance(value, (target, target.proxy_model)):
+            value.name = self.owner.__name__
+        return await super().pre_save_callback(value, original_value, instance=instance)
+
     def get_default_value(self) -> Any:
         default = getattr(self, "default", None)
         if callable(default):

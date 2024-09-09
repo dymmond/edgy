@@ -155,7 +155,16 @@ class BaseModelType(ABC):
     async def execute_post_save_hooks(self, fields: Sequence[str]) -> None: ...
 
     @abstractmethod
-    async def execute_pre_save_hooks(self, values: Dict[str, Any]) -> Dict[str, Any]: ...
+    async def execute_pre_save_hooks(
+        self, values: Dict[str, Any], original: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        For async operations after clean. Can be used to reintroduce stripped values for save.
+        The async operations run in a transaction with save or update. This allows to intervene with the operation.
+        Has also access to the defaults and can transform them.
+
+        Returns: column values for saving.
+        """
 
     @classmethod
     @abstractmethod

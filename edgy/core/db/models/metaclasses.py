@@ -285,7 +285,7 @@ class MetaInfo:
             for attr in ("_table", "_pknames", "_pkcolumns", "_db_schemas"):
                 with contextlib.suppress(AttributeError):
                     delattr(self.model, attr)
-
+            # FIXME: clumsy and imperformant, make proxy_model lazy
             proxy_model = self.model.generate_proxy_model()
             self.model.__proxy_model__ = proxy_model
             self.model.__proxy_model__.__parent__ = self.model
@@ -668,11 +668,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         # Ensure the initialization is only performed for subclasses of EdgyBaseModel
         attrs["__init_annotations__"] = annotations
-
-        # Ensure initialization is only performed for subclasses of EdgyBaseModel
-        # (excluding the EdgyBaseModel class itself).
-        if not parents:
-            return model_class(cls, name, bases, attrs, **kwargs)
 
         new_class = cast(Type["Model"], model_class(cls, name, bases, attrs, **kwargs))
         meta.model = new_class

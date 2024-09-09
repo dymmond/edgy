@@ -142,8 +142,8 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         pkl = []
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
         try:
-            for pkname in self.pknames:
-                pkl.append(f"{pkname}={getattr(self, pkname, None)}")
+            for identifier in self.identifying_db_fields:
+                pkl.append(f"{identifier}={getattr(self, identifier, None)}")
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
         return f"{self.__class__.__name__}({', '.join(pkl)})"
@@ -434,21 +434,33 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         """
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
-    async def execute_pre_save_hooks(self, values: Dict[str, Any]) -> None:
-        affected_fields = self.meta.pre_save_fields.intersection(values.keys())
+    async def execute_pre_save_hooks(
+        self, column_values: Dict[str, Any], original: Dict[str, Any]
+    ) -> None:
+        # also handle defaults
+        keys = {*column_values.keys(), *original.keys()}
+        affected_fields = self.meta.pre_save_fields.intersection(keys)
+        retdict: Dict[str, Any] = {}
         if affected_fields:
             # don't trigger loads
             token = MODEL_GETATTR_BEHAVIOR.set("passdown")
             token2 = CURRENT_INSTANCE.set(self)
             try:
                 for field_name in affected_fields:
-                    if field_name not in values:
+                    if field_name not in column_values and field_name not in original:
                         continue
                     field = self.meta.fields[field_name]
-                    values.update(await field.pre_save_callback(values[field_name], instance=self))
+                    retdict.update(
+                        await field.pre_save_callback(
+                            column_values.get(field_name),
+                            original.get(field_name),
+                            instance=self,
+                        )
+                    )
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(token)
                 CURRENT_INSTANCE.reset(token2)
+        return retdict
 
     async def execute_post_save_hooks(self, fields: Sequence[str]) -> None:
         affected_fields = self.meta.post_save_fields.intersection(fields)

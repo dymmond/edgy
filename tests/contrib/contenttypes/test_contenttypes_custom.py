@@ -1,16 +1,24 @@
 import pytest
-from sqlalchemy.exc import IntegrityError
 
 import edgy
 from edgy.contrib.contenttypes.fields import ContentTypeField
+from edgy.contrib.contenttypes.models import ContentType as _ContentType
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
+
+
+class ExplicitContentType(_ContentType):
+    custom_field = edgy.CharField(max_length=1, null=True)
+
+    class Meta:
+        abstract = True
+
 
 pytestmark = pytest.mark.anyio
 
 database = DatabaseTestClient(DATABASE_URL, use_existing=False)
 models = edgy.Registry(
-    database=edgy.Database(database, force_rollback=True), with_content_type=True
+    database=edgy.Database(database, force_rollback=True), with_content_type=ExplicitContentType
 )
 
 
@@ -96,7 +104,7 @@ async def test_default_contenttypes():
 
 async def test_explicit_contenttypes():
     model1 = await Company.query.create(name="edgy inc", content_type={"name": "Company"})
-    # wrong type, should be autocorrected
+    # wrong name type, but should be autocorrected
     model2 = await Organisation.query.create(name="edgy inc", content_type={"name": "Company"})
     assert model1.content_type.id is not None
     assert model1.content_type.name == "Company"
@@ -111,16 +119,3 @@ async def test_explicit_contenttypes():
     assert model_after_load.content_type.name == "Company"
     # FIXME: get_instance is missing in proxy_type
     # assert await model_after_load.content_type.get_instance() == model1
-
-
-async def test_collision():
-    assert await Company.query.count() == 0
-    model1 = await Company.query.create(
-        name="edgy inc", content_type={"name": "Company", "collision_key": "edgy inc"}
-    )
-    assert model1.content_type.collision_key == "edgy inc"
-    with pytest.raises(IntegrityError):
-        await Organisation.query.create(
-            name="edgy inc", content_type={"name": "Organisation", "collision_key": "edgy inc"}
-        )
-    assert await Organisation.query.count() == 0

@@ -53,9 +53,7 @@ class MultiColumnFieldInner(BaseField):
                 "inner": kwargs.pop(field_name + "_inner", normal),
             }
 
-    def to_model(
-        self, field_name: str, value: Any, phase: str = "", instance=None
-    ) -> Dict[str, Any]:
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         if isinstance(value, str):
             return {field_name: {"normal": value, "inner": value}}
         return {field_name: value}

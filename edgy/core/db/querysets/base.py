@@ -1137,8 +1137,9 @@ class QuerySet(BaseQuerySet):
                 obj = obj_or_dict
                 if self.model_class.meta.post_save_fields:
                     new_objs.append(obj)
-            col_values = obj.extract_column_values(obj.extract_db_fields())
-            await obj.execute_pre_save_hooks(col_values)
+            original = obj.extract_db_fields()
+            col_values = obj.extract_column_values(original)
+            col_values.update(await obj.execute_pre_save_hooks(col_values, original))
             return col_values
 
         expression = queryset.table.insert().values([await _iterate(obj) for obj in objs])
@@ -1172,12 +1173,13 @@ class QuerySet(BaseQuerySet):
         update_list = []
         fields_plus_pk = {*fields, *queryset.model_class.pkcolumns}
         for obj in objs:
+            extracted = obj.extract_db_fields(fields_plus_pk)
             update = queryset.model_class.extract_column_values(
-                obj.extract_db_fields(fields_plus_pk),
+                extracted,
                 is_update=True,
                 is_partial=True,
             )
-            await obj.execute_pre_save_hooks(update)
+            update.update(await obj.execute_pre_save_hooks(update, extracted))
             if "id" in update:
                 update["__id"] = update.pop("id")
             update_list.append(update)

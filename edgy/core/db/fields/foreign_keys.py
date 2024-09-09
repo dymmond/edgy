@@ -48,13 +48,19 @@ class BaseForeignKeyField(BaseForeignKey):
         self.reverse_path_fn = reverse_path_fn
         super().__init__(**kwargs)
 
-    async def pre_save_callback(self, value: Any, instance: "BaseModelType") -> Any:
-        from edgy.core.db.models.types import BaseModelType
-
+    async def pre_save_callback(
+        self, value: Any, original_value: Any, instance: "BaseModelType"
+    ) -> Any:
+        target = self.target
+        if value is None or (isinstance(value, dict) and not value):
+            value = original_value
         # e.g. default was a Model
-        if isinstance(value, BaseModelType):
+        if isinstance(value, (target, target.proxy_model)):
             await value.save()
-        return self.clean(self.name, value, for_query=False)
+            return self.clean(self.name, value, for_query=False)
+        elif isinstance(value, dict):
+            return await self.pre_save_callback(target(**value))
+        return {self.name: value}
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         if self.relation_fn is not None:
@@ -97,7 +103,6 @@ class BaseForeignKeyField(BaseForeignKey):
 
     def expand_relationship(self, value: Any) -> Any:
         target = self.target
-
         if isinstance(value, (target, target.proxy_model)):
             return value
         related_columns = self.related_columns.keys()
