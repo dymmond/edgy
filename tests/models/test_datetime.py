@@ -1,5 +1,5 @@
+import asyncio
 import datetime
-import time
 
 import pytest
 
@@ -43,7 +43,7 @@ async def test_creates_and_updates_only_updated_at():
     last_created_datetime = user.created_at
     last_updated_datetime = user.updated_at
 
-    time.sleep(2)
+    await asyncio.sleep(0.5)
 
     await user.update(name="Test 2")
 
@@ -57,7 +57,7 @@ async def test_creates_and_updates_only_updated_at_on_save():
     last_created_datetime = user.created_at
     last_updated_datetime = user.updated_at
 
-    time.sleep(2)
+    await asyncio.sleep(0.5)
 
     user.name = "Test 2"
     await user.save()
