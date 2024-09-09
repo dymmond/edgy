@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import sqlalchemy
 from pydantic import BaseModel
@@ -47,6 +47,14 @@ class BaseForeignKeyField(BaseForeignKey):
         self.relation_fn = relation_fn
         self.reverse_path_fn = reverse_path_fn
         super().__init__(**kwargs)
+
+    async def pre_save_callback(self, value: Any, instance: "BaseModelType") -> Any:
+        from edgy.core.db.models.types import BaseModelType
+
+        # e.g. default was a Model
+        if isinstance(value, BaseModelType):
+            await value.save()
+        return self.clean(self.name, value, for_query=False)
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         if self.relation_fn is not None:
@@ -101,8 +109,6 @@ class BaseForeignKeyField(BaseForeignKey):
             return None
         instance = target.proxy_model(**value)
         instance.identifying_db_fields = related_columns
-        if not instance.can_load:
-            return None
         return instance
 
     def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
@@ -242,7 +248,7 @@ class ForeignKey(ForeignKeyFieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        to: "BaseModelType",
+        to: Union["BaseModelType", str],
         **kwargs: Any,
     ) -> BaseFieldType:
         return super().__new__(cls, to=to, **kwargs)

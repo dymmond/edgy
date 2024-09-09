@@ -1,6 +1,12 @@
 from contextvars import ContextVar
-from typing import Literal, Union
+from typing import TYPE_CHECKING, Literal, Optional, Union
 
+if TYPE_CHECKING:
+    from edgy.core.db.models.types import BaseModelType
+
+CURRENT_INSTANCE: ContextVar[Optional["BaseModelType"]] = ContextVar(
+    "CURRENT_INSTANCE", default=None
+)
 MODEL_GETATTR_BEHAVIOR: ContextVar[Literal["passdown", "load", "coro"]] = ContextVar(
     "MODEL_GETATTR_BEHAVIOR", default="load"
 )

@@ -103,7 +103,6 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         field_name: str,
         value: Any,
         phase: str = "",
-        instance: Optional[BaseModelType] = None,
     ) -> Dict[str, Any]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).

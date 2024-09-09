@@ -53,10 +53,13 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         # empty updates shouldn't cause an error. E.g. only model references are updated
         if column_values:
-            expression = (
-                self.table.update().values(**column_values).where(*self.identifying_clauses())
-            )
-            await self.database.execute(expression)
+            async with self.database.transaction():
+                # can update column_values
+                await self.execute_pre_save_hooks(column_values)
+                expression = (
+                    self.table.update().values(**column_values).where(*self.identifying_clauses())
+                )
+                await self.database.execute(expression)
 
             # Update the model instance.
             new_kwargs = self.transform_input(column_values, phase="post_update", instance=self)
@@ -126,9 +129,11 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         column_values = self.extract_column_values(
             extracted_values=kwargs, is_partial=False, is_update=False
         )
-
-        expression = self.table.insert().values(**column_values)
-        autoincrement_value = await self.database.execute(expression)
+        async with self.database.transaction():
+            # can update column_values
+            await self.execute_pre_save_hooks(column_values)
+            expression = self.table.insert().values(**column_values)
+            autoincrement_value = await self.database.execute(expression)
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
             column = self.table.autoincrement_column
@@ -164,14 +169,18 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         extracted_fields = self.extract_db_fields()
 
-        for pkcolumn in self.__class__.pkcolumns:
-            # should trigger load in case of identifying_db_fields
-            if (
-                getattr(self, pkcolumn, None) is None
-                and self.table.columns[pkcolumn].autoincrement
-            ):
-                extracted_fields.pop(pkcolumn, None)
-                force_save = True
+        token = MODEL_GETATTR_BEHAVIOR.set("coro")
+        try:
+            for pkcolumn in self.__class__.pkcolumns:
+                # should trigger load in case of identifying_db_fields
+                value = getattr(self, pkcolumn, None)
+                if inspect.isawaitable(value):
+                    value = await value
+                if value is None and self.table.columns[pkcolumn].autoincrement:
+                    extracted_fields.pop(pkcolumn, None)
+                    force_save = True
+        finally:
+            MODEL_GETATTR_BEHAVIOR.reset(token)
 
         if force_save:
             if values:

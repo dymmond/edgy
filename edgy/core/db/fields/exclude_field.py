@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Optional, Type
+from typing import TYPE_CHECKING, Any, Dict, Type
 
 from edgy.core.db.fields.factories import FieldFactory
 
@@ -42,7 +42,6 @@ class ExcludeField(FieldFactory, Type[None]):
         name: str,
         value: Any,
         phase: str = "",
-        instance: Optional["BaseModelType"] = None,
         original_fn: Any = None,
     ) -> Dict[str, Any]:
         """remove any value from input and raise when setting an attribute."""

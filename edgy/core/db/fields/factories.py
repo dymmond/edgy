@@ -159,13 +159,10 @@ class ForeignKeyFieldFactory(FieldFactory):
         cls,
         *,
         to: Any = None,
-        null: bool = False,
         on_update: str = CASCADE,
         on_delete: str = RESTRICT,
         related_name: Union[str, Literal[False]] = "",
         server_onupdate: Any = None,
-        default: Any = None,
-        server_default: Any = None,
         **kwargs: Dict[str, Any],
     ) -> BaseFieldType:
         kwargs = {
@@ -181,7 +178,8 @@ class ForeignKeyFieldFactory(FieldFactory):
         """default validation useful for one_to_one and foreign_key"""
         on_delete = kwargs.get("on_delete", CASCADE)
         on_update = kwargs.get("on_update", RESTRICT)
-        null = kwargs.get("null", False)
+        kwargs.setdefault("null", False)
+        null = kwargs["null"]
 
         if on_delete is None:
             raise FieldDefinitionError("on_delete must not be null.")
@@ -199,3 +197,4 @@ class ForeignKeyFieldFactory(FieldFactory):
 
         if related_name:
             kwargs["related_name"] = related_name.lower()
+        kwargs.setdefault("default", None)

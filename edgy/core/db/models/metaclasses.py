@@ -148,6 +148,7 @@ class MetaInfo:
         "multi_related",
         "signals",
         "input_modifying_fields",
+        "pre_save_fields",
         "post_save_fields",
         "post_delete_fields",
         "foreign_key_fields",
@@ -174,6 +175,8 @@ class MetaInfo:
     columns_to_field: ColumnsToField
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
+        self._is_init = False
+        self.model: Optional[Type[Model]] = None
         #  Difference between meta extraction and kwargs: meta attributes are copied
         self.abstract: bool = getattr(meta, "abstract", False)
         # for embedding
@@ -188,7 +191,6 @@ class MetaInfo:
         self.fields: Dict[str, BaseFieldType] = {**getattr(meta, "fields", _empty_dict)}
         self.managers: Dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
         self.multi_related: List[str] = [*getattr(meta, "multi_related", _empty_set)]
-        self.model: Optional[Type[Model]] = None
         self.load_dict(kwargs)
 
     @property
@@ -221,7 +223,7 @@ class MetaInfo:
 
     def __setattr__(self, name: str, value: Any) -> None:
         super().__setattr__(name, value)
-        if name == "fields":
+        if name == "fields" and self._is_init:
             self.invalidate()
 
     def __getattribute__(self, name: str) -> Any:
@@ -235,6 +237,7 @@ class MetaInfo:
         excluded_fields = set()
         secret_fields = set()
         input_modifying_fields = set()
+        pre_save_fields = set()
         post_save_fields = set()
         post_delete_fields = set()
         foreign_key_fields = set()
@@ -249,6 +252,8 @@ class MetaInfo:
                 input_modifying_fields.add(key)
             if hasattr(field, "post_save_callback"):
                 post_save_fields.add(key)
+            if hasattr(field, "pre_save_callback"):
+                pre_save_fields.add(key)
             if hasattr(field, "post_delete_callback"):
                 post_delete_fields.add(key)
             if isinstance(field, BaseForeignKeyField):
@@ -257,8 +262,10 @@ class MetaInfo:
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
         self.secret_fields: FrozenSet[str] = frozenset(secret_fields)
         self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
-        # RelatedField belong to it so make it updatable
+        # RelatedField belong to it, so make it updatable
         self.post_save_fields: Set[str] = set(post_save_fields)
+        # ContentTypeField belong to it, so make it updatable
+        self.pre_save_fields: Set[str] = set(pre_save_fields)
         self.post_delete_fields: FrozenSet[str] = frozenset(post_delete_fields)
         self.foreign_key_fields: FrozenSet[str] = frozenset(foreign_key_fields)
         self.field_to_columns = FieldToColumns(self)
@@ -272,10 +279,17 @@ class MetaInfo:
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)
         self.columns_to_field = ColumnsToField(self)
+        if self.model is None:
+            return
         if clear_class_attrs:
             for attr in ("_table", "_pknames", "_pkcolumns", "_db_schemas"):
                 with contextlib.suppress(AttributeError):
                     delattr(self.model, attr)
+
+            proxy_model = self.model.generate_proxy_model()
+            self.model.__proxy_model__ = proxy_model
+            self.model.__proxy_model__.__parent__ = self.model
+            self.model.__proxy_model__.model_rebuild(force=True)
 
     def full_init(self, init_column_mappers: bool = True, init_class_attrs: bool = True) -> None:
         if not self._is_init:
@@ -661,6 +675,11 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             return model_class(cls, name, bases, attrs, **kwargs)
 
         new_class = cast(Type["Model"], model_class(cls, name, bases, attrs, **kwargs))
+        meta.model = new_class
+        # Ensure initialization is only performed for subclasses of EdgyBaseModel
+        # (excluding the EdgyBaseModel class itself).
+        if not parents:
+            return new_class
 
         # Update the model_fields are updated to the latest
         new_class.model_fields = {**new_class.model_fields, **model_fields}

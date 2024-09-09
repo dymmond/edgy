@@ -24,7 +24,7 @@ def create_edgy_model(
     Generates an `edgy.Model` with all the required definitions to generate the pydantic
     like model.
     """
-    from edgy.core.db.models import Model
+    from edgy.core.db.models.model import Model
 
     if not __bases__:
         __bases__ = (Model,)

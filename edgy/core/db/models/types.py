@@ -152,7 +152,10 @@ class BaseModelType(ABC):
         """
 
     @abstractmethod
-    async def execute_post_save_hooks(self) -> None: ...
+    async def execute_post_save_hooks(self, fields: Sequence[str]) -> None: ...
+
+    @abstractmethod
+    async def execute_pre_save_hooks(self, values: Dict[str, Any]) -> Dict[str, Any]: ...
 
     @classmethod
     @abstractmethod

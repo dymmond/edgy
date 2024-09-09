@@ -221,7 +221,6 @@ class BaseCompositeField(BaseField):
         field_name: str,
         value: Any,
         phase: str = "",
-        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
@@ -239,11 +238,7 @@ class BaseCompositeField(BaseField):
                 if phase == "init" or phase == "init_db":
                     continue
                 raise ErrorType(f"Missing sub-field: {sub_name} for {field_name}")
-            result.update(
-                field.to_model(
-                    sub_name, value.get(translated_name, None), phase=phase, instance=instance
-                )
-            )
+            result.update(field.to_model(sub_name, value.get(translated_name, None), phase=phase))
         return result
 
     def get_default_values(
@@ -380,8 +375,8 @@ class PKField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.meta.fields[pknames[0]]
-            return field.to_model(pknames[0], value, phase=phase, instance=instance)
-        return super().to_model(field_name, value, phase=phase, instance=instance)
+            return field.to_model(pknames[0], value, phase=phase)
+        return super().to_model(field_name, value, phase=phase)
 
     def get_composite_fields(self) -> Dict[str, BaseFieldType]:
         return {
@@ -460,6 +455,5 @@ class BaseForeignKey(RelationshipField):
         field_name: str,
         value: Any,
         phase: str = "",
-        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         return {field_name: self.expand_relationship(value)}

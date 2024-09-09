@@ -13,6 +13,7 @@ from typing import (
 )
 
 from edgy.core.db.constants import CASCADE
+from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.foreign_keys import ForeignKey
@@ -171,7 +172,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                     self.from_foreign_key = candidate
                 if not self.to_foreign_key:
                     candidate = None
-                    for field_name, field in through.meta.foreign_key_fields.items():
+                    for field_name in through.meta.foreign_key_fields:
+                        field = through.meta.fields[field_name]
                         if field.target == self.to:
                             if candidate:
                                 raise ValueError("multiple foreign keys to target")
@@ -261,11 +263,11 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         field_name: str,
         value: Any,
         phase: str = "",
-        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         """
         Meta field
         """
+        instance = CURRENT_INSTANCE.get()
         if isinstance(value, ManyRelationProtocol):
             return {field_name: value}
         if instance:

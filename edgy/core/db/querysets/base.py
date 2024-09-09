@@ -1125,7 +1125,7 @@ class QuerySet(BaseQuerySet):
 
         new_objs: List[EdgyModel] = []
 
-        def _iterate(obj_or_dict: Union[EdgyModel, Dict[str, Any]]) -> Dict[str, Any]:
+        async def _iterate(obj_or_dict: Union[EdgyModel, Dict[str, Any]]) -> Dict[str, Any]:
             if isinstance(obj_or_dict, dict):
                 obj: EdgyModel = queryset.model_class(**obj_or_dict)
                 if (
@@ -1137,9 +1137,11 @@ class QuerySet(BaseQuerySet):
                 obj = obj_or_dict
                 if self.model_class.meta.post_save_fields:
                     new_objs.append(obj)
-            return obj.extract_column_values(obj.extract_db_fields())
+            col_values = obj.extract_column_values(obj.extract_db_fields())
+            await obj.execute_pre_save_hooks(col_values)
+            return col_values
 
-        expression = queryset.table.insert().values([_iterate(obj) for obj in objs])
+        expression = queryset.table.insert().values([await _iterate(obj) for obj in objs])
         await queryset.database.execute_many(expression)
         self._clear_cache(True)
         if new_objs:
@@ -1175,6 +1177,7 @@ class QuerySet(BaseQuerySet):
                 is_update=True,
                 is_partial=True,
             )
+            await obj.execute_pre_save_hooks(update)
             if "id" in update:
                 update["__id"] = update.pop("id")
             update_list.append(update)

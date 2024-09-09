@@ -8,7 +8,6 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
-from edgy.core.utils.models import create_edgy_model
 
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
@@ -62,10 +61,11 @@ class Registry:
     def _set_content_type(
         self, with_content_type: Union[Literal[True], Type["BaseModelType"]]
     ) -> None:
-        from edgy.contrib.contenttypes.fields import BaseGenericForeignKeyField, GenericForeignKey
+        from edgy.contrib.contenttypes.fields import BaseContentTypeFieldField, ContentTypeField
         from edgy.contrib.contenttypes.models import ContentType
         from edgy.core.db.models.metaclasses import MetaInfo
         from edgy.core.db.relationships.related_field import RelatedField
+        from edgy.core.utils.models import create_edgy_model
 
         if with_content_type is True:
             with_content_type = ContentType
@@ -85,6 +85,7 @@ class Registry:
                 __metadata__=new_meta,
                 __bases__=(with_content_type,),
             )
+            self.execute_model_callbacks(real_content_type)
             self.models["ContentType"] = real_content_type
         self.content_type = real_content_type
 
@@ -94,7 +95,7 @@ class Registry:
                 return
             # skip if is explicit set
             for field in model_class.meta.fields.values():
-                if isinstance(field, BaseGenericForeignKeyField):
+                if isinstance(field, BaseContentTypeFieldField):
                     return
             # e.g. exclude field
             if "content_type" not in model_class.meta.fields:
@@ -104,21 +105,30 @@ class Registry:
                 ), f"duplicate model name: {model_class.__name__}"
                 model_class.meta.fields["content_type"] = cast(
                     "BaseFieldType",
-                    GenericForeignKey(
+                    ContentTypeField(
                         name="content_type", owner=model_class, to=real_content_type, registry=self
                     ),
                 )
-                real_content_type.fields[related_name] = RelatedField(
+                if model_class.meta._is_init:
+                    model_class.meta.pre_save_fields.add("content_type")
+                real_content_type.meta.fields[related_name] = RelatedField(
                     name=related_name,
                     foreign_key_name="content_type",
                     related_from=model_class,
                     owner=real_content_type,
                     registry=real_content_type.meta.registry,
                 )
-                if real_content_type.meta._is_init:
-                    real_content_type.meta.post_save_fields.add(related_name)
+                real_content_type.meta.invalidate(True)
 
         self.register_callback(None, callback, one_time=False)
+
+    def get_model(self, model_name: str) -> Type["BaseModelType"]:
+        if model_name in self.models:
+            return self.models[model_name]
+        elif model_name in self.reflected:
+            return self.reflected[model_name]
+        else:
+            raise LookupError(f"Registry doesn't have a {model_name} model.") from None
 
     @property
     def metadata(self) -> Any:
@@ -136,8 +146,6 @@ class Registry:
         callback: Callable[[Type["BaseModelType"]], None],
         one_time: bool,
     ) -> None:
-        if name_or_class is not None and not isinstance(name_or_class, str):
-            name_or_class = name_or_class.__name__
         called: bool = False
         if name_or_class is None:
             for model in self.models.values():
@@ -146,6 +154,9 @@ class Registry:
             for model in self.reflected.values():
                 callback(model)
                 called = True
+        elif not isinstance(name_or_class, str):
+            callback(name_or_class)
+            called = True
         else:
             if name_or_class in self.models:
                 callback(self.models[name_or_class])
@@ -153,6 +164,8 @@ class Registry:
             elif name_or_class in self.reflected:
                 callback(self.reflected[name_or_class])
                 called = True
+        if name_or_class is not None and not isinstance(name_or_class, str):
+            name_or_class = name_or_class.__name__
         if called and one_time:
             return
         if one_time:

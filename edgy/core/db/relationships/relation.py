@@ -137,8 +137,7 @@ class ManyRelation(ManyRelationProtocol):
         child = self.expand_relationship(child)
         # try saving intermediate model. If it fails another instance already exists and return None
         try:
-            async with child.database.transaction():
-                return await child.save(force_save=True)
+            return await child.save(force_save=True)
         except IntegrityError:
             pass
         return None
@@ -247,14 +246,6 @@ class SingleRelation(ManyRelationProtocol):
         related_columns = self.to.meta.fields[self.to_foreign_key].related_columns.keys()
         if len(related_columns) == 1 and not isinstance(value, (dict, BaseModel)):
             value = {next(iter(related_columns)): value}
-        if isinstance(value, dict):
-            for key in related_columns:
-                if value.get(key) is None:
-                    return None
-        else:
-            for key in related_columns:
-                if getattr(value, key, None) is None:
-                    return None
         instance = target.proxy_model(**value)
         instance.identifying_db_fields = related_columns
         return instance
