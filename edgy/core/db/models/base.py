@@ -27,10 +27,8 @@ from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
-from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
-from edgy.core.utils.models import generify_model_fields
 from edgy.core.utils.sync import run_sync
 from edgy.types import Undefined
 
@@ -261,24 +259,6 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
             else:
                 yield getattr(self.table.columns, field_name) == self.__dict__[field_name]
 
-    @classmethod
-    def generate_proxy_model(cls) -> Type["Model"]:
-        """
-        Generates a proxy model for each model. This proxy model is a simple
-        shallow copy of the original model being generated.
-        """
-        fields = {key: copy.copy(field) for key, field in cls.meta.fields.items()}
-        proxy_model = ProxyModel(
-            name=cls.__name__,
-            module=cls.__module__,
-            metadata=cls.meta,
-            definitions=fields,
-        )
-
-        proxy_model.build()
-        generify_model_fields(proxy_model.model)
-        return proxy_model.model
-
     def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
         """
         An updated version of the model dump.
@@ -436,7 +416,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
 
     async def execute_pre_save_hooks(
         self, column_values: Dict[str, Any], original: Dict[str, Any]
-    ) -> None:
+    ) -> Dict[str, Any]:
         # also handle defaults
         keys = {*column_values.keys(), *original.keys()}
         affected_fields = self.meta.pre_save_fields.intersection(keys)

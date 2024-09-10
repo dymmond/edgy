@@ -1,4 +1,9 @@
+from typing import TYPE_CHECKING, cast
+
 import edgy
+
+if TYPE_CHECKING:
+    from edgy.core.db.querysets.base import QuerySet
 
 
 class ContentType(edgy.Model):
@@ -13,4 +18,4 @@ class ContentType(edgy.Model):
 
     async def get_instance(self) -> edgy.Model:
         reverse_name = f"reverse_{self.name.lower()}"
-        return await getattr(self, reverse_name).get()
+        return await cast("QuerySet", getattr(self, reverse_name)).get()

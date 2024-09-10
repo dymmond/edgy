@@ -59,7 +59,7 @@ class BaseForeignKeyField(BaseForeignKey):
             await value.save()
             return self.clean(self.name, value, for_query=False)
         elif isinstance(value, dict):
-            return await self.pre_save_callback(target(**value))
+            return await self.pre_save_callback(target(**value), None, instance=instance)
         return {self.name: value}
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:

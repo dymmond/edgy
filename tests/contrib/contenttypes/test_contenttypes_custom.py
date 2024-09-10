@@ -98,8 +98,7 @@ async def test_default_contenttypes():
     assert model_after_load.content_type.id is not None
     # defer
     assert model_after_load.content_type.name == "Company"
-    # FIXME: get_instance is missing in proxy_type
-    # assert await model_after_load.content_type.get_instance() == model1
+    assert await model_after_load.content_type.get_instance() == model1
 
 
 async def test_explicit_contenttypes():
@@ -117,5 +116,4 @@ async def test_explicit_contenttypes():
     assert model_after_load.content_type.id is not None
     # defer
     assert model_after_load.content_type.name == "Company"
-    # FIXME: get_instance is missing in proxy_type
-    # assert await model_after_load.content_type.get_instance() == model1
+    assert await model_after_load.content_type.get_instance() == model1

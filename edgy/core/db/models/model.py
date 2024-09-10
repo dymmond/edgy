@@ -1,9 +1,12 @@
+import copy
 import inspect
-from typing import Any, Dict, Union
+from typing import Any, Dict, Type, Union, cast
 
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
+from edgy.core.db.models.model_proxy import ProxyModel
+from edgy.core.utils.models import generify_model_fields
 from edgy.exceptions import ObjectNotFound
 
 
@@ -41,6 +44,38 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
     class Meta:
         abstract = True
+
+    @classmethod
+    def generate_proxy_model(cls) -> Type["Model"]:
+        """
+        Generates a proxy model for each model. This proxy model is a simple
+        shallow copy of the original model being generated.
+        """
+        fields = {key: copy.copy(field) for key, field in cls.meta.fields.items()}
+
+        class MethodHolder(Model):
+            pass
+
+        ignore = set(dir(MethodHolder))
+
+        for key in dir(cls):
+            if key in ignore or key.startswith("_"):
+                continue
+            val = inspect.getattr_static(cls, key)
+            if inspect.isfunction(val):
+                setattr(MethodHolder, key, val)
+
+        proxy_model = ProxyModel(
+            name=cls.__name__,
+            module=cls.__module__,
+            metadata=cls.meta,
+            definitions=fields,
+            bases=(MethodHolder,),
+        )
+
+        proxy_model.build()
+        generify_model_fields(proxy_model.model)
+        return cast(Type[Model], proxy_model.model)
 
     async def update(self, **kwargs: Any) -> Any:
         """
@@ -126,7 +161,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         """
         Performs the save instruction.
         """
-        column_values = self.extract_column_values(
+        column_values: Dict[str, Any] = self.extract_column_values(
             extracted_values=kwargs, is_partial=False, is_update=False
         )
         async with self.database as database, database.transaction():

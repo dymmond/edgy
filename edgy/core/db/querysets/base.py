@@ -1138,7 +1138,7 @@ class QuerySet(BaseQuerySet):
                 if self.model_class.meta.post_save_fields:
                     new_objs.append(obj)
             original = obj.extract_db_fields()
-            col_values = obj.extract_column_values(original)
+            col_values: Dict[str, Any] = obj.extract_column_values(original)
             col_values.update(await obj.execute_pre_save_hooks(col_values, original))
             return col_values
 
