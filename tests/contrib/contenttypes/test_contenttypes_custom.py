@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 import edgy
 from edgy.contrib.contenttypes.fields import ContentTypeField
@@ -57,18 +58,6 @@ class Person(edgy.Model):
         unique_together = [("first_name", "last_name")]
 
 
-class Profile(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    website = edgy.CharField(max_length=100)
-    person = edgy.OneToOneField(
-        Person,
-        on_delete=edgy.CASCADE,
-    )
-
-    class Meta:
-        registry = models
-
-
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     async with database:
@@ -82,6 +71,10 @@ async def create_test_database():
 async def rollback_transactions():
     async with models.database:
         yield
+
+
+async def test_registry_sanity():
+    assert models.content_type is models.get_model("ContentType")
 
 
 async def test_default_contenttypes():
@@ -102,7 +95,8 @@ async def test_default_contenttypes():
 
 
 async def test_explicit_contenttypes():
-    model1 = await Company.query.create(name="edgy inc", content_type={"name": "Company"})
+    # no name but still should work
+    model1 = await Company.query.create(name="edgy inc", content_type={})
     # wrong name type, but should be autocorrected
     model2 = await Organisation.query.create(name="edgy inc", content_type={"name": "Company"})
     assert model1.content_type.id is not None
@@ -117,3 +111,16 @@ async def test_explicit_contenttypes():
     # defer
     assert model_after_load.content_type.name == "Company"
     assert await model_after_load.content_type.get_instance() == model1
+
+
+async def test_collision():
+    assert await Company.query.count() == 0
+    model1 = await Company.query.create(
+        name="edgy inc", content_type={"collision_key": "edgy inc"}
+    )
+    assert model1.content_type.collision_key == "edgy inc"
+    with pytest.raises(IntegrityError):
+        await Organisation.query.create(
+            name="edgy inc", content_type={"collision_key": "edgy inc"}
+        )
+    assert await Organisation.query.count() == 0

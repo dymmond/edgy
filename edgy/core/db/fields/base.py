@@ -402,19 +402,10 @@ class PKField(BaseCompositeField):
 
 class BaseForeignKey(RelationshipField):
     is_m2m: bool = False
-
-    def __init__(
-        self,
-        *,
-        related_name: Union[str, Literal[False]] = "",
-        reverse_name: str = "",
-        **kwargs: Any,
-    ) -> None:
-        self.related_name = related_name
-        # name used for backward relations
-        # only useful if related_name = False because otherwise it gets overwritten
-        self.reverse_name = reverse_name
-        super().__init__(**kwargs)
+    related_name: Union[str, Literal[False]] = ""
+    # name used for backward relations
+    # only useful if related_name = False because otherwise it gets overwritten
+    reverse_name: str = ""
 
     @property
     def target(self) -> Any:

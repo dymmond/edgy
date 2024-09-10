@@ -34,6 +34,7 @@ from edgy.core.db.querysets.mixins import QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import Prefetch, PrefetchMixin, check_prefetch_collision
 from edgy.core.db.querysets.types import EdgyEmbedTarget, EdgyModel, QueryType
 from edgy.core.db.relationships.utils import crawl_relationship
+from edgy.core.utils.db import check_db_connection
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.types import Undefined
 
@@ -631,24 +632,10 @@ class BaseQuerySet(
 
         counter = 0
         last_element: Optional[Tuple[BaseModelType, BaseModelType]] = None
-        if fetch_all_at_once:
-            batch = await queryset.database.fetch_all(expression)
-            for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
-                if counter == 0:
-                    self._cache_first = result
-                last_element = result
-                counter += 1
-                self._cache_current_row = batch[row_num]  # type: ignore
-                yield result[1]
-            self._cache_current_row = None
-            self._cache_fetch_all = True
-        else:
-            async for batch in queryset.database.batched_iterate(
-                expression, batch_size=self._batch_size
-            ):
-                # clear only result cache
-                self._cache.clear()
-                self._cache_fetch_all = False
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            if fetch_all_at_once:
+                batch = await database.fetch_all(expression)
                 for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
                     if counter == 0:
                         self._cache_first = result
@@ -656,7 +643,23 @@ class BaseQuerySet(
                     counter += 1
                     self._cache_current_row = batch[row_num]  # type: ignore
                     yield result[1]
-            self._cache_current_row = None
+                self._cache_current_row = None
+                self._cache_fetch_all = True
+            else:
+                async for batch in database.batched_iterate(
+                    expression, batch_size=self._batch_size
+                ):
+                    # clear only result cache
+                    self._cache.clear()
+                    self._cache_fetch_all = False
+                    for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
+                        if counter == 0:
+                            self._cache_first = result
+                        last_element = result
+                        counter += 1
+                        self._cache_current_row = batch[row_num]  # type: ignore
+                        yield result[1]
+                self._cache_current_row = None
         # better update them once
         self._cache_count = counter
         self._cache_last = last_element
@@ -722,7 +725,9 @@ class BaseQuerySet(
         queryset: BaseQuerySet = self
 
         expression = queryset._build_select().limit(2)
-        rows = await queryset.database.fetch_all(expression)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            rows = await database.fetch_all(expression)
 
         if not rows:
             queryset._cache_count = 0
@@ -1035,7 +1040,9 @@ class QuerySet(BaseQuerySet):
         queryset: QuerySet = self
         expression = queryset._build_select()
         expression = sqlalchemy.exists(expression).select()
-        _exists = await queryset.database.fetch_val(expression)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            _exists = await database.fetch_val(expression)
         return cast(bool, _exists)
 
     async def count(self) -> int:
@@ -1047,7 +1054,9 @@ class QuerySet(BaseQuerySet):
         queryset: QuerySet = self
         expression = queryset._build_select().alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
-        self._cache_count = count = cast("int", await queryset.database.fetch_val(expression))
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            self._cache_count = count = cast("int", await database.fetch_val(expression))
         return count
 
     async def get_or_none(self, **kwargs: Any) -> Union[EdgyEmbedTarget, None]:
@@ -1076,7 +1085,9 @@ class QuerySet(BaseQuerySet):
         queryset = self
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
-        row = await queryset.database.fetch_one(queryset._build_select(), pos=0)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            row = await database.fetch_one(queryset._build_select(), pos=0)
         if row:
             return (await self._get_or_cache_row(row, extra_attr="_cache_first"))[1]
         return None
@@ -1092,7 +1103,9 @@ class QuerySet(BaseQuerySet):
         queryset = self
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
-        row = await queryset.database.fetch_one(queryset.reverse()._build_select(), pos=0)
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            row = await database.fetch_one(queryset.reverse()._build_select(), pos=0)
         if row:
             return (await self._get_or_cache_row(row, extra_attr="_cache_last"))[1]
         return None
@@ -1142,8 +1155,10 @@ class QuerySet(BaseQuerySet):
             col_values.update(await obj.execute_pre_save_hooks(col_values, original))
             return col_values
 
-        expression = queryset.table.insert().values([await _iterate(obj) for obj in objs])
-        await queryset.database.execute_many(expression)
+        check_db_connection(queryset.database)
+        async with queryset.database as database, database.transaction():
+            expression = queryset.table.insert().values([await _iterate(obj) for obj in objs])
+            await database.execute_many(expression)
         self._clear_cache(True)
         if new_objs:
             for obj in new_objs:
@@ -1172,25 +1187,27 @@ class QuerySet(BaseQuerySet):
 
         update_list = []
         fields_plus_pk = {*fields, *queryset.model_class.pkcolumns}
-        for obj in objs:
-            extracted = obj.extract_db_fields(fields_plus_pk)
-            update = queryset.model_class.extract_column_values(
-                extracted,
-                is_update=True,
-                is_partial=True,
-            )
-            update.update(await obj.execute_pre_save_hooks(update, extracted))
-            if "id" in update:
-                update["__id"] = update.pop("id")
-            update_list.append(update)
+        check_db_connection(queryset.database)
+        async with queryset.database as database, database.transaction():
+            for obj in objs:
+                extracted = obj.extract_db_fields(fields_plus_pk)
+                update = queryset.model_class.extract_column_values(
+                    extracted,
+                    is_update=True,
+                    is_partial=True,
+                )
+                update.update(await obj.execute_pre_save_hooks(update, extracted))
+                if "id" in update:
+                    update["__id"] = update.pop("id")
+                update_list.append(update)
 
-        values_placeholder: Any = {
-            pkcol: sqlalchemy.bindparam(pkcol, type_=getattr(queryset.table.c, pkcol).type)
-            for field in fields
-            for pkcol in queryset.model_class.meta.field_to_column_names[field]
-        }
-        expression = expression.values(values_placeholder)
-        await queryset.database.execute_many(expression, update_list)
+            values_placeholder: Any = {
+                pkcol: sqlalchemy.bindparam(pkcol, type_=getattr(queryset.table.c, pkcol).type)
+                for field in fields
+                for pkcol in queryset.model_class.meta.field_to_column_names[field]
+            }
+            expression = expression.values(values_placeholder)
+            await database.execute_many(expression, update_list)
         self._clear_cache()
         if (
             self.model_class.meta.post_save_fields
@@ -1212,7 +1229,9 @@ class QuerySet(BaseQuerySet):
         for filter_clause in self.filter_clauses:
             expression = expression.where(filter_clause)
 
-        row_count = cast(int, await self.database.execute(expression))
+        check_db_connection(self.database)
+        async with self.database as database:
+            row_count = cast(int, await database.execute(expression))
 
         # clear cache before executing post_delete. Fresh results can be retrieved in signals
         self._clear_cache()
@@ -1236,8 +1255,9 @@ class QuerySet(BaseQuerySet):
 
         for filter_clause in self.filter_clauses:
             expression = expression.where(filter_clause)
-
-        await self.database.execute(expression)
+        check_db_connection(self.database)
+        async with self.database as database:
+            await database.execute(expression)
 
         # Broadcast the update executed
         await self.model_class.meta.signals.post_update.send_async(self.__class__, instance=self)

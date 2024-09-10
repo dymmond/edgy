@@ -85,8 +85,11 @@ class Registry:
                 __metadata__=new_meta,
                 __bases__=(with_content_type,),
             )
+            if getattr(real_content_type, "__reflected__", False):
+                self.reflected["ContentType"] = real_content_type
+            else:
+                self.models["ContentType"] = real_content_type
             self.execute_model_callbacks(real_content_type)
-            self.models["ContentType"] = real_content_type
         self.content_type = real_content_type
 
         def callback(model_class: Type["BaseModelType"]) -> None:
@@ -110,7 +113,7 @@ class Registry:
                     ),
                 )
                 if model_class.meta._is_init:
-                    model_class.meta.pre_save_fields.add("content_type")
+                    model_class.meta.invalidate()
                 real_content_type.meta.fields[related_name] = RelatedField(
                     name=related_name,
                     foreign_key_name="content_type",
@@ -238,6 +241,7 @@ class Registry:
     async def create_all(self) -> None:
         if self.db_schema:
             await self.schema.create_schema(self.db_schema, True)
+        # don't warn here about inperformance
         async with self.database as database:
             with database.force_rollback(False):
                 await database.create_all(self.metadata)
@@ -245,6 +249,7 @@ class Registry:
     async def drop_all(self) -> None:
         if self.db_schema:
             await self.schema.drop_schema(self.db_schema, True, True)
+        # don't warn here about inperformance
         async with self.database as database:
             with database.force_rollback(False):
                 await database.drop_all(self.metadata)

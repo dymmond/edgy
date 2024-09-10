@@ -49,18 +49,6 @@ class Person(edgy.Model):
         unique_together = [("first_name", "last_name")]
 
 
-class Profile(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    website = edgy.CharField(max_length=100)
-    person = edgy.OneToOneField(
-        Person,
-        on_delete=edgy.CASCADE,
-    )
-
-    class Meta:
-        registry = models
-
-
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     async with database:
@@ -91,11 +79,25 @@ async def test_default_contenttypes():
     # defer
     assert model_after_load.content_type.name == "Company"
     assert await model_after_load.content_type.get_instance() == model1
+    # count
+    assert await models.content_type.query.count() == 2
+
+
+async def test_different_named_contenttypes():
+    model1 = await Person.query.create(first_name="edgy", last_name="foo")
+    with pytest.raises(AttributeError):
+        model1.content_type  # noqa
+    model_after_load = await Person.query.get(id=model1.id)
+    assert model_after_load.c.id is not None
+    # defer
+    assert model_after_load.c.name == "Person"
+    assert await model_after_load.c.get_instance() == model1
 
 
 async def test_explicit_contenttypes():
-    model1 = await Company.query.create(name="edgy inc", content_type={"name": "Company"})
-    # wrong type, should be autocorrected
+    # no name
+    model1 = await Company.query.create(name="edgy inc", content_type={})
+    # wrong name, should be autocorrected
     model2 = await Organisation.query.create(name="edgy inc", content_type={"name": "Company"})
     assert model1.content_type.id is not None
     assert model1.content_type.name == "Company"
@@ -109,16 +111,18 @@ async def test_explicit_contenttypes():
     # defer
     assert model_after_load.content_type.name == "Company"
     assert await model_after_load.content_type.get_instance() == model1
+    # count
+    assert await models.content_type.query.count() == 2
 
 
 async def test_collision():
     assert await Company.query.count() == 0
     model1 = await Company.query.create(
-        name="edgy inc", content_type={"name": "Company", "collision_key": "edgy inc"}
+        name="edgy inc", content_type={"collision_key": "edgy inc"}
     )
     assert model1.content_type.collision_key == "edgy inc"
     with pytest.raises(IntegrityError):
         await Organisation.query.create(
-            name="edgy inc", content_type={"name": "Organisation", "collision_key": "edgy inc"}
+            name="edgy inc", content_type={"collision_key": "edgy inc"}
         )
     assert await Organisation.query.count() == 0

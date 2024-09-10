@@ -14,7 +14,6 @@ from typing import (
     List,
     Optional,
     Sequence,
-    Set,
     Tuple,
     Type,
     Union,
@@ -262,10 +261,8 @@ class MetaInfo:
         self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
         self.secret_fields: FrozenSet[str] = frozenset(secret_fields)
         self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
-        # RelatedField belong to it, so make it updatable
-        self.post_save_fields: Set[str] = set(post_save_fields)
-        # ContentTypeField belong to it, so make it updatable
-        self.pre_save_fields: Set[str] = set(pre_save_fields)
+        self.post_save_fields: FrozenSet[str] = frozenset(post_save_fields)
+        self.pre_save_fields: frozenset[str] = frozenset(pre_save_fields)
         self.post_delete_fields: FrozenSet[str] = frozenset(post_delete_fields)
         self.foreign_key_fields: FrozenSet[str] = frozenset(foreign_key_fields)
         self.field_to_columns = FieldToColumns(self)
@@ -282,14 +279,9 @@ class MetaInfo:
         if self.model is None:
             return
         if clear_class_attrs:
-            for attr in ("_table", "_pknames", "_pkcolumns", "_db_schemas"):
+            for attr in ("_table", "_pknames", "_pkcolumns", "_db_schemas", "__proxy_model__"):
                 with contextlib.suppress(AttributeError):
                     delattr(self.model, attr)
-            # FIXME: a lazy proxy_model would be better
-            proxy_model = self.model.generate_proxy_model()
-            self.model.__proxy_model__ = proxy_model
-            self.model.__proxy_model__.__parent__ = self.model
-            self.model.__proxy_model__.model_rebuild(force=True)
 
     def full_init(self, init_column_mappers: bool = True, init_class_attrs: bool = True) -> None:
         if not self._is_init:
@@ -355,8 +347,7 @@ def _set_related_field(
     # Set the related name
     target.meta.fields[related_name] = related_field
     # for updating post_save_callback
-    if target.meta._is_init:
-        target.meta.post_save_fields.add(related_name)
+    target.meta.invalidate(True)
 
 
 def _set_related_name_for_foreign_keys(
@@ -881,6 +872,11 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         """
         Returns the proxy_model from the Model when called using the cache.
         """
+        if cls.__proxy_model__ is None:
+            proxy_model = cls.generate_proxy_model()
+            proxy_model.__parent__ = cls
+            proxy_model.model_rebuild(force=True)
+            cls.__proxy_model__ = proxy_model
         return cls.__proxy_model__
 
     @property

@@ -6,6 +6,7 @@ from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
 from edgy.core.db.models.model_proxy import ProxyModel
+from edgy.core.utils.db import check_db_connection
 from edgy.core.utils.models import generify_model_fields
 from edgy.exceptions import ObjectNotFound
 
@@ -88,6 +89,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         # empty updates shouldn't cause an error. E.g. only model references are updated
         if column_values:
+            check_db_connection(self.database)
             async with self.database as database, database.transaction():
                 # can update column_values
                 column_values.update(await self.execute_pre_save_hooks(column_values, kwargs))
@@ -132,7 +134,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(token)
         expression = self.table.delete().where(*self.identifying_clauses())
-        await self.database.execute(expression)
+        check_db_connection(self.database)
+        async with self.database as database:
+            await database.execute(expression)
         # we cannot load anymore
         self._loaded_or_deleted = True
         # now cleanup with the saved values
@@ -149,7 +153,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         expression = self.table.select().where(*self.identifying_clauses())
 
         # Perform the fetch.
-        row = await self.database.fetch_one(expression)
+        check_db_connection(self.database)
+        async with self.database as database:
+            row = await database.fetch_one(expression)
         # check if is in system
         if row is None:
             raise ObjectNotFound("row does not exist anymore")
@@ -164,6 +170,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         column_values: Dict[str, Any] = self.extract_column_values(
             extracted_values=kwargs, is_partial=False, is_update=False
         )
+        check_db_connection(self.database)
         async with self.database as database, database.transaction():
             # can update column_values
             column_values.update(await self.execute_pre_save_hooks(column_values, kwargs))

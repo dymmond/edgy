@@ -54,6 +54,7 @@ class Schema:
             except ProgrammingError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
+        # don't check inperformance here
         async with self.database as database:
             with database.force_rollback(False):
                 await database.run_sync(execute_create)
