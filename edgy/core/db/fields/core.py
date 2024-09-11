@@ -338,8 +338,8 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.DateTime(kwargs["with_timezone"])
+    def get_column_type(cls, with_timezone: bool = True, **kwargs: Any) -> Any:
+        return sqlalchemy.DateTime(with_timezone)
 
     @classmethod
     def get_default_values(
