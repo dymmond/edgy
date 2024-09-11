@@ -334,11 +334,12 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
         }
+        kwargs.setdefault("with_timezone", not remove_timezone)
         return super().__new__(cls, **kwargs)
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.DateTime()
+        return sqlalchemy.DateTime(kwargs["with_timezone"])
 
     @classmethod
     def get_default_values(
@@ -397,7 +398,7 @@ class TimeField(FieldFactory, datetime.time):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Time()
+        return sqlalchemy.Time(kwargs.get("with_timezone") or False)
 
 
 class JSONField(FieldFactory, pydantic.Json):  # type: ignore
