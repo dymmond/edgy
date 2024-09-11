@@ -70,7 +70,6 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         pydantic_type = cls.get_pydantic_type(**kwargs)
         constraints = cls.get_constraints(**kwargs)
         default: None = kwargs.pop("default", None)
-        server_default: None = kwargs.pop("server_default", None)
 
         new_field = cls._get_field_cls(cls)
 
@@ -79,7 +78,6 @@ class FieldFactory(metaclass=FieldFactoryMeta):
             annotation=pydantic_type,
             column_type=column_type,
             default=default,
-            server_default=server_default,
             constraints=constraints,
             factory=cls,
             **kwargs,

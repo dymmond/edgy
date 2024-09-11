@@ -614,6 +614,11 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                         raise ImproperlyConfigured(
                             f"Cannot create model {name}. No primary key found and reflected."
                         )
+                    elif registry.database.url.scheme.startswith("sqlite"):
+                        # sqlite special we cannot have a big IntegerField as PK
+                        fields["id"] = edgy_fields.IntegerField(
+                            primary_key=True, autoincrement=True, inherit=False, name="id"
+                        )  # type: ignore
                     else:
                         fields["id"] = edgy_fields.BigIntegerField(
                             primary_key=True, autoincrement=True, inherit=False, name="id"
@@ -868,7 +873,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cast("sqlalchemy.Table", schema_obj)
 
     @property
-    def proxy_model(cls) -> Any:
+    def proxy_model(cls: Type["Model"]) -> Any:
         """
         Returns the proxy_model from the Model when called using the cache.
         """

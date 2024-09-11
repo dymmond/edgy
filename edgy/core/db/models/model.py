@@ -92,7 +92,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             check_db_connection(self.database)
             async with self.database as database, database.transaction():
                 # can update column_values
-                column_values.update(await self.execute_pre_save_hooks(column_values, kwargs))
+                column_values.update(
+                    await self.execute_pre_save_hooks(column_values, kwargs, force_insert=False)
+                )
                 expression = (
                     self.table.update().values(**column_values).where(*self.identifying_clauses())
                 )
@@ -173,7 +175,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         check_db_connection(self.database)
         async with self.database as database, database.transaction():
             # can update column_values
-            column_values.update(await self.execute_pre_save_hooks(column_values, kwargs))
+            column_values.update(
+                await self.execute_pre_save_hooks(column_values, kwargs, force_insert=True)
+            )
             expression = self.table.insert().values(**column_values)
             autoincrement_value = await database.execute(expression)
         # sqlalchemy supports only one autoincrement column

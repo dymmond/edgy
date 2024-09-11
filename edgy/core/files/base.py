@@ -182,8 +182,6 @@ class File:
 
         Args:
             mode (str, optional): The mode in which to open the file. If not provided, uses the existing mode.
-            *args: Positional arguments to be passed to the `open` function.
-            **kwargs: Keyword arguments to be passed to the `open` function.
 
         Returns:
             File: The opened file.

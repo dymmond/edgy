@@ -10,6 +10,7 @@ from edgy.core.connection.registry import Registry
 from edgy.types import Undefined
 
 if TYPE_CHECKING:
+    from edgy.core.db.fields.factories import FieldFactory
     from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.db.models.types import BaseModelType
 
@@ -50,13 +51,15 @@ class BaseFieldDefinitions:
     skip_absorption_check: bool = False
     registry: Optional[Registry] = None
     field_type: Any = Any
-    factory: Any = None
+    factory: Optional[FieldFactory] = None
+
     __original_type__: Any = None
     name: str = ""
     secret: bool = False
     exclude: bool = False
     owner: Any = None
     default: Any = Undefined
+    server_default: Any = None
 
     # column specific
     primary_key: bool = False

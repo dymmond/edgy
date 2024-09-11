@@ -92,6 +92,9 @@ nav:
       - Reference ForeignKey: "reference-foreignkey.md"
       - Marshalls: "marshalls.md"
       - Connection: "connection.md"
+      - ContentTypes:
+          - Introduction: "contenttypes/intro.md"
+          - ContentTags - or how to replace elastic search: "contenttypes/replace_elasticsearch.md"
       - Tenancy:
           - Edgy: "tenancy/edgy.md"
           - Contrib: "tenancy/contrib.md"

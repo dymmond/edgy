@@ -367,7 +367,7 @@ See [FileField](file_handling.md#filefield).
 
 #### ImageField
 
-See [ImageField](file_handling.md#ImageField).
+See [ImageField](file_handling.md#imagefield).
 
 #### FloatField
 

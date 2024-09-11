@@ -616,7 +616,7 @@ class BaseQuerySet(
 
         expression = queryset._build_select()
 
-        if not fetch_all_at_once and queryset.database.force_rollback:
+        if not fetch_all_at_once and bool(queryset.database.force_rollback):
             # force_rollback on db = we have only one connection
             # so every operation must be atomic
             # Note: force_rollback is a bit magic, it evaluates its truthiness to the actual value
@@ -633,19 +633,20 @@ class BaseQuerySet(
         counter = 0
         last_element: Optional[Tuple[BaseModelType, BaseModelType]] = None
         check_db_connection(queryset.database)
-        async with queryset.database as database:
-            if fetch_all_at_once:
+        if fetch_all_at_once:
+            async with queryset.database as database:
                 batch = await database.fetch_all(expression)
-                for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
-                    if counter == 0:
-                        self._cache_first = result
-                    last_element = result
-                    counter += 1
-                    self._cache_current_row = batch[row_num]  # type: ignore
-                    yield result[1]
-                self._cache_current_row = None
-                self._cache_fetch_all = True
-            else:
+            for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
+                if counter == 0:
+                    self._cache_first = result
+                last_element = result
+                counter += 1
+                self._cache_current_row = batch[row_num]  # type: ignore
+                yield result[1]
+            self._cache_current_row = None
+            self._cache_fetch_all = True
+        else:
+            async with queryset.database as database:
                 async for batch in database.batched_iterate(
                     expression, batch_size=self._batch_size
                 ):
@@ -1152,7 +1153,9 @@ class QuerySet(BaseQuerySet):
                     new_objs.append(obj)
             original = obj.extract_db_fields()
             col_values: Dict[str, Any] = obj.extract_column_values(original)
-            col_values.update(await obj.execute_pre_save_hooks(col_values, original))
+            col_values.update(
+                await obj.execute_pre_save_hooks(col_values, original, force_insert=True)
+            )
             return col_values
 
         check_db_connection(queryset.database)
@@ -1196,7 +1199,9 @@ class QuerySet(BaseQuerySet):
                     is_update=True,
                     is_partial=True,
                 )
-                update.update(await obj.execute_pre_save_hooks(update, extracted))
+                update.update(
+                    await obj.execute_pre_save_hooks(update, extracted, force_insert=False)
+                )
                 if "id" in update:
                     update["__id"] = update.pop("id")
                 update_list.append(update)

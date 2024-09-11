@@ -26,7 +26,6 @@ from .types import BaseFieldType, ColumnDefinitionModel
 
 if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
-    from edgy.core.db.fields.factories import FieldFactory
     from edgy.core.db.models.types import BaseModelType
 
 
@@ -49,16 +48,13 @@ class BaseField(BaseFieldType, FieldInfo):
     # defs to simplify the life (can be None actually)
     owner: Type["BaseModelType"]
     registry: "Registry"
-    factory: Optional["FieldFactory"] = None
 
     def __init__(
         self,
         *,
         default: Any = Undefined,
-        server_default: Any = Undefined,
         **kwargs: Any,
     ) -> None:
-        self.server_default = server_default
         if "__type__" in kwargs:
             kwargs["field_type"] = kwargs.pop("__type__")
 
@@ -72,17 +68,6 @@ class BaseField(BaseFieldType, FieldInfo):
             default = None
         if default is not Undefined:
             self.default = default
-        if (default is not None and default is not Undefined) or (
-            self.server_default is not None and self.server_default != Undefined
-        ):
-            self.null = True
-
-        if self.primary_key:
-            self.field_type = Any
-            self.null = True
-
-        if isinstance(self.default, bool):
-            self.null = True
 
     def is_required(self) -> bool:
         """Check if the argument is required.
@@ -92,7 +77,11 @@ class BaseField(BaseFieldType, FieldInfo):
         """
         if self.primary_key and self.autoincrement:
             return False
-        return not (self.null or self.server_default)
+        return not (
+            self.null
+            or self.server_default is not None
+            or (self.default is not None and self.default is not Undefined)
+        )
 
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
@@ -268,43 +257,28 @@ class PKField(BaseCompositeField):
             **kwargs,
         )
 
-    async def aget(
-        self, instance: "BaseModelType", owner: Any = None
-    ) -> Union[Dict[str, Any], Any]:
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[Dict[str, Any], Any]:
+        pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
         pknames = cast(Sequence[str], self.owner.pknames)
-        d = {}
+        assert len(pkcolumns) >= 1
         # we don't want to issue loads
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
         try:
+            if len(pknames) == 1:
+                return getattr(instance, pknames[0], None)
+            d = {}
             for key in pknames:
                 translated_name = self.translate_name(key)
-                d[translated_name] = getattr(instance, key, None)
+                field = instance.meta.fields.get(key)
+                if field and hasattr(field, "__get__"):
+                    d[translated_name] = field.__get__(instance, owner)
+                else:
+                    d[translated_name] = getattr(instance, key, None)
             for key in self.fieldless_pkcolumns:
                 translated_name = self.translate_name(key)
                 d[translated_name] = getattr(instance, key, None)
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
-        return d
-
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[Dict[str, Any], Any]:
-        pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
-        pknames = cast(Sequence[str], self.owner.pknames)
-        assert len(pkcolumns) >= 1
-        if len(pknames) == 1:
-            return getattr(instance, pknames[0], None)
-        if MODEL_GETATTR_BEHAVIOR.get() == "coro":
-            return self.aget(instance, owner=owner)
-        d = {}
-        for key in pknames:
-            translated_name = self.translate_name(key)
-            field = instance.meta.fields.get(key)
-            if field and hasattr(field, "__get__"):
-                d[translated_name] = field.__get__(instance, owner)
-            else:
-                d[translated_name] = getattr(instance, key, None)
-        for key in self.fieldless_pkcolumns:
-            translated_name = self.translate_name(key)
-            d[translated_name] = getattr(instance, key, None)
         return d
 
     def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:

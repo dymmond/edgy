@@ -415,7 +415,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
     async def execute_pre_save_hooks(
-        self, column_values: Dict[str, Any], original: Dict[str, Any]
+        self, column_values: Dict[str, Any], original: Dict[str, Any], force_insert: bool
     ) -> Dict[str, Any]:
         # also handle defaults
         keys = {*column_values.keys(), *original.keys()}
@@ -434,6 +434,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                         await field.pre_save_callback(
                             column_values.get(field_name),
                             original.get(field_name),
+                            force_insert=force_insert,
                             instance=self,
                         )
                     )
@@ -476,10 +477,11 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         # phase 2: validate fields and set defaults for readonly
         need_second_pass: List[BaseFieldType] = []
         for field_name, field in cls.meta.fields.items():
-            if (
-                not is_partial or (field.inject_default_on_partial_update and is_update)
-            ) and field.read_only:
-                if field.has_default():
+            if field.read_only:
+                # if read_only, updates are not possible anymore
+                if (
+                    not is_partial or (field.inject_default_on_partial_update and is_update)
+                ) and field.has_default():
                     validated.update(
                         field.get_default_values(field_name, validated, is_update=is_update)
                     )

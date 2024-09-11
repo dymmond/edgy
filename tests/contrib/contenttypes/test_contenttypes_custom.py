@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 from sqlalchemy.exc import IntegrityError
 
@@ -92,6 +94,14 @@ async def test_default_contenttypes():
     # defer
     assert model_after_load.content_type.name == "Company"
     assert await model_after_load.content_type.get_instance() == model1
+    # fetch_all
+    [await content_type.get_instance() for content_type in await models.content_type.query.all()]
+    # iterate
+    with pytest.warns(UserWarning):
+        ops = [
+            content_type.get_instance() async for content_type in models.content_type.query.all()
+        ]
+    await asyncio.gather(*ops)
 
 
 async def test_explicit_contenttypes():

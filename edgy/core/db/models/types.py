@@ -156,7 +156,7 @@ class BaseModelType(ABC):
 
     @abstractmethod
     async def execute_pre_save_hooks(
-        self, values: Dict[str, Any], original: Dict[str, Any]
+        self, values: Dict[str, Any], original: Dict[str, Any], force_insert: bool
     ) -> Dict[str, Any]:
         """
         For async operations after clean. Can be used to reintroduce stripped values for save.

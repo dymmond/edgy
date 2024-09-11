@@ -7,14 +7,12 @@ import edgy
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL, full_isolation=True)
-models = edgy.Registry(database=database)
+database = DatabaseTestClient(DATABASE_URL)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 pytestmark = pytest.mark.anyio
 pydantic_version = __version__[:3]
-
-# TODO: disallow loading and check the crashes
 
 
 class EdgyTenantBaseModel(edgy.Model):
@@ -68,13 +66,19 @@ class Permission(EdgyTenantBaseModel):
         tablename = "ut_permission"
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     async with database:
         await models.create_all()
         yield
         if not database.drop:
             await models.drop_all()
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def rollback_transactions():
+    async with models.database:
+        yield
 
 
 async def test_inner_select():
