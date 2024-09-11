@@ -22,11 +22,10 @@ from typing import (
 
 import sqlalchemy
 
-from edgy.conf import settings
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR, get_schema
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields import CharField, TextField
-from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
+from edgy.core.db.fields.base import BaseField, BaseForeignKey, RelationshipField
 from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
@@ -50,6 +49,9 @@ def _removeprefix(text: str, prefix: str) -> str:
         return text[len(prefix) :]
     else:
         return text
+
+
+generic_field = BaseField()
 
 
 def clean_query_kwargs(
@@ -81,8 +83,6 @@ class BaseQuerySet(
     QueryType,
 ):
     """Internal definitions for queryset."""
-
-    ESCAPE_CHARACTERS = ["%", "_"]
 
     def __init__(
         self,
@@ -356,25 +356,12 @@ class BaseQuerySet(
             model_class, field_name, op, related_str, _ = crawl_relationship(self.model_class, key)
             if related_str and related_str not in select_related:
                 select_related.append(related_str)
-            column = model_class.table_schema(self.active_schema).columns[field_name]
-
-            # Map the operation code onto SQLAlchemy's ColumnElement
-            # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
-            op_attr = settings.filter_operators[op]
-            has_escaped_character = False
-
-            if op in ["contains", "icontains"]:
-                has_escaped_character = any(c for c in self.ESCAPE_CHARACTERS if c in value)
-                if has_escaped_character:
-                    # enable escape modifier
-                    for char in self.ESCAPE_CHARACTERS:
-                        value = value.replace(char, f"\\{char}")
-                value = f"%{value}%"
-
-            clause = getattr(column, op_attr)(value)
-            clause.modifiers["escape"] = "\\" if has_escaped_character else None
-            clauses.append(clause)
-
+            field = model_class.meta.fields.get(field_name, generic_field)
+            clauses.append(
+                field.operator_to_clause(
+                    field_name, op, model_class.table_schema(self.active_schema), value
+                )
+            )
         if exclude:
             if not or_:
                 filter_clauses.append(clauses_mod.not_(clauses_mod.and_(*clauses)))

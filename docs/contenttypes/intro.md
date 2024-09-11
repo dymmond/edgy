@@ -42,3 +42,19 @@ Or now we allow fruits with the same weight. Let's just remove the uniqueness fr
 ```python
 {!> ../docs_src/contenttypes/customized_nocollision.py !}
 ```
+
+## Tricks
+
+### Using in libraries
+
+ContentType is always available under the name `ContentType` if activated and as a `content_type` attribute on registry.
+
+If the attribute `content_type` on registry is not None, you can be assured ContentType is available.
+
+
+### Opting out
+
+Some models may should not be referencable by ContentType.
+
+You can opt out by overwriting `content_type` on the model to opt out with any Field.
+Use `ExcludeField` to remove the field entirely.

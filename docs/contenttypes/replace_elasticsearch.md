@@ -1,5 +1,6 @@
 # Building a tagged index (or replace elasticsearch)
 
+## Introduction
 Elasticsearch is a commonly used software for comparing data across domains.
 It comes at a hefty price:
 It is resource hungry and you have to leave the relational sql world for TCP which introduces round-trips on a by magnitudes
@@ -7,6 +8,8 @@ slower lane.
 
 In short: it is only useful for very big shared high performance setups. Not for yours, most probably.
 Here I explain how to do it much simpler and with way less resources in a relational db (this saves you hardware costs and shorts your electricity bill).
+
+## Setup
 
 First we need a generic table which maps to all other tables. We have ContentType. Check
 
@@ -22,7 +25,7 @@ The entries are now hashed (each entry) and afterwards a hash is build from all 
 
 
 ```python
-{!> ../docs_src/contenttypes/customized_nocollision.py !}
+{!> ../docs_src/contenttypes/contenttype_tags.py !}
 ```
 
 
@@ -33,5 +36,24 @@ collisions.
 !!! Note
     The seperator is up to you. I just `=` because I used this in the secretgraph project, but all chars are elligable. More logic you can lookup there.
 
+
+## Alternative implementations
+
+If you don't like the shared field for key value operations you may want seperate fields for both.
+Also it would be possible (for postgres and other more powerful dbs) to make the tag field unique.
+
+## Operations
+
+Searching for a key:
+
+use `registry.content_type.query.filter(tags__tag__startswith='key=')`
+
+Searching for a key and a value starting with:
+
+use `registry.content_type.query.filter(tags__tag__startswith='key=value_start')`
+
+
+
+## References
 
 [secretgraph](https://github.com/secretgraph/secretgraph)

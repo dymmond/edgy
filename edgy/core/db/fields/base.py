@@ -48,6 +48,20 @@ class BaseField(BaseFieldType, FieldInfo):
     # defs to simplify the life (can be None actually)
     owner: Type["BaseModelType"]
     registry: "Registry"
+    operator_mapping: Dict[str, str] = {
+        # aliases
+        "is": "is_",
+        "in": "in_",
+        # this operators are not directly available and need their alias
+        "exact": "__eq__",
+        "not": "__ne__",
+        "gt": "__gt__",
+        "ge": "__ge__",
+        "gte": "__ge__",
+        "lt": "__lt__",
+        "lte": "__le__",
+        "le": "__le__",
+    }
 
     def __init__(
         self,
@@ -68,6 +82,30 @@ class BaseField(BaseFieldType, FieldInfo):
             default = None
         if default is not Undefined:
             self.default = default
+
+    def operator_to_clause(
+        self, field_name: str, operator: str, table: sqlalchemy.Table, value: Any
+    ) -> Any:
+        """Base implementation, adaptable"""
+        # Map the operation code onto SQLAlchemy's ColumnElement
+        # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
+        # MUST raise an KeyError on missing columns, this code is used for the generic case if no field is available
+        column = table.columns[field_name]
+        operator = self.operator_mapping.get(operator, operator)
+        if operator in ["contains", "icontains", "iexact"]:
+            ESCAPE_CHARACTERS = ["%", "_"]
+            has_escaped_character = any(c for c in ESCAPE_CHARACTERS if c in value)
+            if has_escaped_character:
+                # enable escape modifier
+                for char in ESCAPE_CHARACTERS:
+                    value = value.replace(char, f"\\{char}")
+            if operator != "iexact":
+                value = f"%{value}%"
+            clause_fn = column.ilike if operator[0] == "i" else column.like
+            clause = clause_fn(value)
+            clause.modifiers["escape"] = "\\" if has_escaped_character else None
+            return clause
+        return getattr(column, operator)(value)
 
     def is_required(self) -> bool:
         """Check if the argument is required.

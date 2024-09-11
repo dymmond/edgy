@@ -698,8 +698,9 @@ Fields have to inherit from `edgy.db.fields.base.BaseField` and to provide follo
 - `get_columns(self, field_name)` - returns the sqlalchemy columns which should be created by this field.
 - `clean(self, field_name, value, to_query=False)` - returns the cleaned column values. to_query specifies if clean is used by the query sanitizer and must be more strict (no partial values).
 
-Additional they can provide following methods:
+Additional they can provide/overwrite following methods:
 
+* `operator_to_clause` - Generates clauses for db from the result of clean. Implies clean is called with `for_query=True`.
 * `__get__(self, instance, owner=None)` - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
   To prevent unwanted loads operate on the instance `__dict__`. You can throw an AttributeError to trigger a load.
 * `__set__(self, instance, value)` - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
@@ -729,6 +730,10 @@ You should also provide an init method which sets following attributes:
 
 `clean` is required to clean the values for the db. It has an extra parameter `for_query` which is set
 in a querying context (searching something in the db).
+
+When using a multi-column field, you can overwrite `operator_to_clause`. You may want to adjust clean called with
+`for_query=True` so it returns are suitable holder object (e.g. dict) for the fieldname.
+See `tests/fields/test_multi_column_fields.py` for an example.
 
 #### Using phases
 

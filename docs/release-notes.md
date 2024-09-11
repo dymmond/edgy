@@ -26,6 +26,7 @@ hide:
 - `modify_input` receives now an argument phase.
 - `foreign_key_fields` is now a frozenset.
 - Switch away from nest_asyncio.
+- All sqlalchemy operators are now accessable. The setting for them is gone.
 
 ### Fixed
 

@@ -88,6 +88,15 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         Returns the columns of the field being declared.
         """
 
+    def operator_to_clause(
+        self, field_name: str, operator: str, table: sqlalchemy.Table, value: Any
+    ) -> Any:
+        """
+        Analyzes the operator and build a clause from it.
+        Needs to be able to handle "exact".
+        """
+        raise NotImplementedError()
+
     def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
         """
         Validates a value and transform it into columns which can be used for querying and saving.
