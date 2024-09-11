@@ -92,19 +92,25 @@ class BaseField(BaseFieldType, FieldInfo):
         # MUST raise an KeyError on missing columns, this code is used for the generic case if no field is available
         column = table.columns[field_name]
         operator = self.operator_mapping.get(operator, operator)
-        if operator in ["contains", "icontains", "iexact"]:
+        if operator == "iexact":
             ESCAPE_CHARACTERS = ["%", "_"]
             has_escaped_character = any(c for c in ESCAPE_CHARACTERS if c in value)
             if has_escaped_character:
+                value = value.replace("\\", "\\\\")
                 # enable escape modifier
                 for char in ESCAPE_CHARACTERS:
                     value = value.replace(char, f"\\{char}")
-            if operator != "iexact":
-                value = f"%{value}%"
-            clause_fn = column.ilike if operator[0] == "i" else column.like
-            clause = clause_fn(value)
-            clause.modifiers["escape"] = "\\" if has_escaped_character else None  # type: ignore
+            clause = column.ilike(value, escape="\\" if has_escaped_character else None)
             return clause
+        elif operator in {
+            "contains",
+            "icontains",
+            "startswith",
+            "endswith",
+            "istartswith",
+            "iendswith",
+        }:
+            return getattr(column, operator)(value, autoescape=True)
         return getattr(column, operator)(value)
 
     def is_required(self) -> bool:
