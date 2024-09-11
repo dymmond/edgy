@@ -103,7 +103,7 @@ class BaseField(BaseFieldType, FieldInfo):
                 value = f"%{value}%"
             clause_fn = column.ilike if operator[0] == "i" else column.like
             clause = clause_fn(value)
-            clause.modifiers["escape"] = "\\" if has_escaped_character else None
+            clause.modifiers["escape"] = "\\" if has_escaped_character else None  # type: ignore
             return clause
         return getattr(column, operator)(value)
 
