@@ -4,10 +4,11 @@ import edgy
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL, full_isolation=True)
+database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
+
 
 class User(edgy.Model):
     id = edgy.IntegerField(primary_key=True)
@@ -38,8 +39,6 @@ async def test_model_defer():
 
     assert "description" not in users[0].model_dump()
     assert "description" not in users[1].model_dump()
-
-    # FIXME: hangs without full_isolation but shouldn't
 
     users[0].description  # noqa
     users[1].description  # noqa

@@ -1,14 +1,14 @@
 import pytest
 from pydantic import __version__
 
-from edgy import fields
-from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
+from edgy import Registry, fields
+from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL)
-models = TenantRegistry(database=database)
+models = Registry(database=database)
 
 
 pytestmark = pytest.mark.anyio

@@ -1,8 +1,8 @@
 import edgy
-from edgy.contrib.multi_tenancy import TenantModel, TenantRegistry
+from edgy.contrib.multi_tenancy import TenantModel
 
 database = edgy.Database("<YOUR-CONNECTION-STRING>")
-registry = TenantRegistry(database=database)
+registry = edgy.Registry(database=database)
 
 
 class User(TenantModel):

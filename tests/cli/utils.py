@@ -4,6 +4,7 @@ import subprocess
 
 def run_cmd(app, cmd, is_app=True):
     env = dict(os.environ)
+    env.setdefault("PYTHONPATH", env["PWD"])
     if is_app:
         env["EDGY_DEFAULT_APP"] = app
     cmd = f"hatch --env test run {cmd}"

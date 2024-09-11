@@ -26,7 +26,6 @@ from .types import BaseFieldType, ColumnDefinitionModel
 
 if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
-    from edgy.core.db.fields.factories import FieldFactory
     from edgy.core.db.models.types import BaseModelType
 
 
@@ -49,16 +48,27 @@ class BaseField(BaseFieldType, FieldInfo):
     # defs to simplify the life (can be None actually)
     owner: Type["BaseModelType"]
     registry: "Registry"
-    factory: Optional["FieldFactory"] = None
+    operator_mapping: Dict[str, str] = {
+        # aliases
+        "is": "is_",
+        "in": "in_",
+        # this operators are not directly available and need their alias
+        "exact": "__eq__",
+        "not": "__ne__",
+        "gt": "__gt__",
+        "ge": "__ge__",
+        "gte": "__ge__",
+        "lt": "__lt__",
+        "lte": "__le__",
+        "le": "__le__",
+    }
 
     def __init__(
         self,
         *,
         default: Any = Undefined,
-        server_default: Any = Undefined,
         **kwargs: Any,
     ) -> None:
-        self.server_default = server_default
         if "__type__" in kwargs:
             kwargs["field_type"] = kwargs.pop("__type__")
 
@@ -72,17 +82,30 @@ class BaseField(BaseFieldType, FieldInfo):
             default = None
         if default is not Undefined:
             self.default = default
-        if (default is not None and default is not Undefined) or (
-            self.server_default is not None and self.server_default != Undefined
-        ):
-            self.null = True
 
-        if self.primary_key:
-            self.field_type = Any
-            self.null = True
-
-        if isinstance(self.default, bool):
-            self.null = True
+    def operator_to_clause(
+        self, field_name: str, operator: str, table: sqlalchemy.Table, value: Any
+    ) -> Any:
+        """Base implementation, adaptable"""
+        # Map the operation code onto SQLAlchemy's ColumnElement
+        # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
+        # MUST raise an KeyError on missing columns, this code is used for the generic case if no field is available
+        column = table.columns[field_name]
+        operator = self.operator_mapping.get(operator, operator)
+        if operator in ["contains", "icontains", "iexact"]:
+            ESCAPE_CHARACTERS = ["%", "_"]
+            has_escaped_character = any(c for c in ESCAPE_CHARACTERS if c in value)
+            if has_escaped_character:
+                # enable escape modifier
+                for char in ESCAPE_CHARACTERS:
+                    value = value.replace(char, f"\\{char}")
+            if operator != "iexact":
+                value = f"%{value}%"
+            clause_fn = column.ilike if operator[0] == "i" else column.like
+            clause = clause_fn(value)
+            clause.modifiers["escape"] = "\\" if has_escaped_character else None  # type: ignore
+            return clause
+        return getattr(column, operator)(value)
 
     def is_required(self) -> bool:
         """Check if the argument is required.
@@ -92,7 +115,11 @@ class BaseField(BaseFieldType, FieldInfo):
         """
         if self.primary_key and self.autoincrement:
             return False
-        return not (self.null or self.server_default)
+        return not (
+            self.null
+            or self.server_default is not None
+            or (self.default is not None and self.default is not Undefined)
+        )
 
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
@@ -221,7 +248,6 @@ class BaseCompositeField(BaseField):
         field_name: str,
         value: Any,
         phase: str = "",
-        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         """
         Runs the checks for the fields being validated.
@@ -239,11 +265,7 @@ class BaseCompositeField(BaseField):
                 if phase == "init" or phase == "init_db":
                     continue
                 raise ErrorType(f"Missing sub-field: {sub_name} for {field_name}")
-            result.update(
-                field.to_model(
-                    sub_name, value.get(translated_name, None), phase=phase, instance=instance
-                )
-            )
+            result.update(field.to_model(sub_name, value.get(translated_name, None), phase=phase))
         return result
 
     def get_default_values(
@@ -273,43 +295,28 @@ class PKField(BaseCompositeField):
             **kwargs,
         )
 
-    async def aget(
-        self, instance: "BaseModelType", owner: Any = None
-    ) -> Union[Dict[str, Any], Any]:
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[Dict[str, Any], Any]:
+        pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
         pknames = cast(Sequence[str], self.owner.pknames)
-        d = {}
+        assert len(pkcolumns) >= 1
         # we don't want to issue loads
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
         try:
+            if len(pknames) == 1:
+                return getattr(instance, pknames[0], None)
+            d = {}
             for key in pknames:
                 translated_name = self.translate_name(key)
-                d[translated_name] = getattr(instance, key, None)
+                field = instance.meta.fields.get(key)
+                if field and hasattr(field, "__get__"):
+                    d[translated_name] = field.__get__(instance, owner)
+                else:
+                    d[translated_name] = getattr(instance, key, None)
             for key in self.fieldless_pkcolumns:
                 translated_name = self.translate_name(key)
                 d[translated_name] = getattr(instance, key, None)
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
-        return d
-
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[Dict[str, Any], Any]:
-        pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
-        pknames = cast(Sequence[str], self.owner.pknames)
-        assert len(pkcolumns) >= 1
-        if len(pknames) == 1:
-            return getattr(instance, pknames[0], None)
-        if MODEL_GETATTR_BEHAVIOR.get() == "coro":
-            return self.aget(instance, owner=owner)
-        d = {}
-        for key in pknames:
-            translated_name = self.translate_name(key)
-            field = instance.meta.fields.get(key)
-            if field and hasattr(field, "__get__"):
-                d[translated_name] = field.__get__(instance, owner)
-            else:
-                d[translated_name] = getattr(instance, key, None)
-        for key in self.fieldless_pkcolumns:
-            translated_name = self.translate_name(key)
-            d[translated_name] = getattr(instance, key, None)
         return d
 
     def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:
@@ -380,8 +387,8 @@ class PKField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.meta.fields[pknames[0]]
-            return field.to_model(pknames[0], value, phase=phase, instance=instance)
-        return super().to_model(field_name, value, phase=phase, instance=instance)
+            return field.to_model(pknames[0], value, phase=phase)
+        return super().to_model(field_name, value, phase=phase)
 
     def get_composite_fields(self) -> Dict[str, BaseFieldType]:
         return {
@@ -407,19 +414,10 @@ class PKField(BaseCompositeField):
 
 class BaseForeignKey(RelationshipField):
     is_m2m: bool = False
-
-    def __init__(
-        self,
-        *,
-        related_name: Union[str, Literal[False]] = "",
-        reverse_name: str = "",
-        **kwargs: Any,
-    ) -> None:
-        self.related_name = related_name
-        # name used for backward relations
-        # only useful if related_name = False because otherwise it gets overwritten
-        self.reverse_name = reverse_name
-        super().__init__(**kwargs)
+    related_name: Union[str, Literal[False]] = ""
+    # name used for backward relations
+    # only useful if related_name = False because otherwise it gets overwritten
+    reverse_name: str = ""
 
     @property
     def target(self) -> Any:
@@ -446,7 +444,8 @@ class BaseForeignKey(RelationshipField):
             delattr(self, "_target")
 
     def is_cross_db(self) -> bool:
-        return self.owner.meta.registry is not self.target.meta.registry
+        # self.registry should be self.owner.meta.registry
+        return self.registry is not self.target.meta.registry
 
     def expand_relationship(self, value: Any) -> Any:
         """
@@ -459,6 +458,5 @@ class BaseForeignKey(RelationshipField):
         field_name: str,
         value: Any,
         phase: str = "",
-        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         return {field_name: self.expand_relationship(value)}

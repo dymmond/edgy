@@ -22,10 +22,10 @@ class BaseMarshallField(FieldInfo, _repr.Representation):
         self.field_type = field_type
         super().__init__(**kwargs)
 
-        if self.null and default is Undefined:
-            self.default = None
         if default is not Undefined:
             self.default = default
+        elif self.null:
+            self.default = None
 
     def is_required(self) -> bool:
         """Check if the argument is required.

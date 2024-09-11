@@ -18,6 +18,7 @@ from typing import (
 import orjson
 import sqlalchemy
 
+from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import BaseCompositeField
 from edgy.core.db.fields.core import BigIntegerField, BooleanField, JSONField
 from edgy.core.db.fields.factories import FieldFactory
@@ -73,7 +74,6 @@ class ConcreteFileField(BaseCompositeField):
         field_name: str,
         value: Any,
         phase: str = "",
-        instance: Optional["BaseModelType"] = None,
     ) -> Dict[str, Any]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
@@ -86,6 +86,7 @@ class ConcreteFileField(BaseCompositeField):
             phase: the phase (set, creation, ...)
 
         """
+        instance = CURRENT_INSTANCE.get()
         if (
             phase in {"post_update", "post_insert"}
             and instance is not None

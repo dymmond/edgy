@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, Union
 
 import sqlalchemy
 from pydantic import BaseModel
@@ -48,6 +48,22 @@ class BaseForeignKeyField(BaseForeignKey):
         self.reverse_path_fn = reverse_path_fn
         super().__init__(**kwargs)
 
+    async def pre_save_callback(
+        self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
+    ) -> Any:
+        target = self.target
+        if value is None or (isinstance(value, dict) and not value):
+            value = original_value
+        # e.g. default was a Model
+        if isinstance(value, (target, target.proxy_model)):
+            await value.save(force_insert=force_insert)
+            return self.clean(self.name, value, for_query=False)
+        elif isinstance(value, dict):
+            return await self.pre_save_callback(
+                target(**value), None, force_insert=force_insert, instance=instance
+            )
+        return {self.name: value}
+
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         if self.relation_fn is not None:
             return self.relation_fn(**kwargs)
@@ -89,7 +105,6 @@ class BaseForeignKeyField(BaseForeignKey):
 
     def expand_relationship(self, value: Any) -> Any:
         target = self.target
-
         if isinstance(value, (target, target.proxy_model)):
             return value
         related_columns = self.related_columns.keys()
@@ -101,8 +116,6 @@ class BaseForeignKeyField(BaseForeignKey):
             return None
         instance = target.proxy_model(**value)
         instance.identifying_db_fields = related_columns
-        if not instance.can_load:
-            return None
         return instance
 
     def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
@@ -242,7 +255,7 @@ class ForeignKey(ForeignKeyFieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        to: "BaseModelType",
+        to: Union["BaseModelType", str],
         **kwargs: Any,
     ) -> BaseFieldType:
         return super().__new__(cls, to=to, **kwargs)

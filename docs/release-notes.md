@@ -13,6 +13,7 @@ hide:
 - ImageField stub (more is comming soon)
 - `stage` method in relations.
 - ModelRefs passed as normal positional arguments are automatically staged.
+- ContentType was added.
 
 ### Changed
 
@@ -22,7 +23,10 @@ hide:
 - `model_references` are superseeded by `post_save_fields` in meta.
 - ModelParser mixin is gone. Use the classmethod `extract_column_values` instead.
 - edgy_settr is not used internally anymore (circular imports).
-- `modify_input` receives now an argument phase
+- `modify_input` receives now an argument phase.
+- `foreign_key_fields` is now a frozenset.
+- Switch away from nest_asyncio.
+- All sqlalchemy operators are now accessable. The setting for them is gone.
 
 ### Fixed
 

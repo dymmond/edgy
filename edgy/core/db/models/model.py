@@ -1,9 +1,13 @@
+import copy
 import inspect
-from typing import Any, Dict, Union
+from typing import Any, Dict, Type, Union, cast
 
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
+from edgy.core.db.models.model_proxy import ProxyModel
+from edgy.core.utils.db import check_db_connection
+from edgy.core.utils.models import generify_model_fields
 from edgy.exceptions import ObjectNotFound
 
 
@@ -42,6 +46,38 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
     class Meta:
         abstract = True
 
+    @classmethod
+    def generate_proxy_model(cls) -> Type["Model"]:
+        """
+        Generates a proxy model for each model. This proxy model is a simple
+        shallow copy of the original model being generated.
+        """
+        fields = {key: copy.copy(field) for key, field in cls.meta.fields.items()}
+
+        class MethodHolder(Model):
+            pass
+
+        ignore = set(dir(MethodHolder))
+
+        for key in dir(cls):
+            if key in ignore or key.startswith("_"):
+                continue
+            val = inspect.getattr_static(cls, key)
+            if inspect.isfunction(val):
+                setattr(MethodHolder, key, val)
+
+        proxy_model = ProxyModel(
+            name=cls.__name__,
+            module=cls.__module__,
+            metadata=cls.meta,
+            definitions=fields,
+            bases=(MethodHolder,),
+        )
+
+        proxy_model.build()
+        generify_model_fields(proxy_model.model)
+        return cast(Type[Model], proxy_model.model)
+
     async def update(self, **kwargs: Any) -> Any:
         """
         Update operation of the database fields.
@@ -53,10 +89,16 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         # empty updates shouldn't cause an error. E.g. only model references are updated
         if column_values:
-            expression = (
-                self.table.update().values(**column_values).where(*self.identifying_clauses())
-            )
-            await self.database.execute(expression)
+            check_db_connection(self.database)
+            async with self.database as database, database.transaction():
+                # can update column_values
+                column_values.update(
+                    await self.execute_pre_save_hooks(column_values, kwargs, force_insert=False)
+                )
+                expression = (
+                    self.table.update().values(**column_values).where(*self.identifying_clauses())
+                )
+                await database.execute(expression)
 
             # Update the model instance.
             new_kwargs = self.transform_input(column_values, phase="post_update", instance=self)
@@ -94,7 +136,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(token)
         expression = self.table.delete().where(*self.identifying_clauses())
-        await self.database.execute(expression)
+        check_db_connection(self.database)
+        async with self.database as database:
+            await database.execute(expression)
         # we cannot load anymore
         self._loaded_or_deleted = True
         # now cleanup with the saved values
@@ -111,7 +155,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         expression = self.table.select().where(*self.identifying_clauses())
 
         # Perform the fetch.
-        row = await self.database.fetch_one(expression)
+        check_db_connection(self.database)
+        async with self.database as database:
+            row = await database.fetch_one(expression)
         # check if is in system
         if row is None:
             raise ObjectNotFound("row does not exist anymore")
@@ -123,12 +169,17 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         """
         Performs the save instruction.
         """
-        column_values = self.extract_column_values(
+        column_values: Dict[str, Any] = self.extract_column_values(
             extracted_values=kwargs, is_partial=False, is_update=False
         )
-
-        expression = self.table.insert().values(**column_values)
-        autoincrement_value = await self.database.execute(expression)
+        check_db_connection(self.database)
+        async with self.database as database, database.transaction():
+            # can update column_values
+            column_values.update(
+                await self.execute_pre_save_hooks(column_values, kwargs, force_insert=True)
+            )
+            expression = self.table.insert().values(**column_values)
+            autoincrement_value = await database.execute(expression)
         # sqlalchemy supports only one autoincrement column
         if autoincrement_value:
             column = self.table.autoincrement_column
@@ -164,14 +215,18 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         extracted_fields = self.extract_db_fields()
 
-        for pkcolumn in self.__class__.pkcolumns:
-            # should trigger load in case of identifying_db_fields
-            if (
-                getattr(self, pkcolumn, None) is None
-                and self.table.columns[pkcolumn].autoincrement
-            ):
-                extracted_fields.pop(pkcolumn, None)
-                force_save = True
+        token = MODEL_GETATTR_BEHAVIOR.set("coro")
+        try:
+            for pkcolumn in self.__class__.pkcolumns:
+                # should trigger load in case of identifying_db_fields
+                value = getattr(self, pkcolumn, None)
+                if inspect.isawaitable(value):
+                    value = await value
+                if value is None and self.table.columns[pkcolumn].autoincrement:
+                    extracted_fields.pop(pkcolumn, None)
+                    force_save = True
+        finally:
+            MODEL_GETATTR_BEHAVIOR.reset(token)
 
         if force_save:
             if values:

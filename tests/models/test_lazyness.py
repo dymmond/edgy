@@ -32,6 +32,8 @@ class Product(edgy.Model):
 
 
 def test_control_lazyness():
+    # test basics
+    assert User.meta is models.get_model("User").meta
     # initial
     assert not BaseUser.meta._is_init
     assert User.meta._is_init
@@ -46,6 +48,7 @@ def test_control_lazyness():
 
     # invalidate
     models.invalidate_models()
+    assert User.meta is models.get_model("User").meta
     assert not User.meta._is_init
     assert "name" not in User.meta.columns_to_field.data
     assert not Product.meta._is_init

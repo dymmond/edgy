@@ -7,7 +7,6 @@ from typing import (
     Union,
 )
 
-from edgy.conf import settings
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -58,7 +57,7 @@ def crawl_relationship(
             else:
                 forward_prefix_path = field_name
         elif len(splitted) == 2:
-            if "__" not in splitted[1] and splitted[1] in settings.filter_operators:
+            if "__" not in splitted[1]:
                 operator = splitted[1]
                 break
             else:

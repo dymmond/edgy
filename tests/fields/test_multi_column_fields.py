@@ -7,6 +7,7 @@ import edgy
 from edgy.core.db.fields.base import BaseField
 from edgy.core.db.fields.core import FieldFactory
 from edgy.core.db.fields.types import ColumnDefinitionModel
+from edgy.core.db.querysets.clauses import and_
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -16,6 +17,15 @@ models = edgy.Registry(database=database)
 
 
 class MultiColumnFieldInner(BaseField):
+    def operator_to_clause(
+        self, field_name: str, operator: str, table: sqlalchemy.Table, value: Any
+    ) -> Any:
+        # after clean
+        return and_(
+            super().operator_to_clause(field_name, operator, table, value["normal"]),
+            super().operator_to_clause(field_name + "_inner", operator, table, value["inner"]),
+        )
+
     def get_columns(self, field_name: str) -> Sequence[sqlalchemy.Column]:
         model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
         return [
@@ -33,13 +43,19 @@ class MultiColumnFieldInner(BaseField):
             ),
         ]
 
-    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
-        """
-        Runs the checks for the fields being validated.
-        """
+    def _clean(self, field_name: str, value: Any) -> Dict[str, Any]:
         if isinstance(value, str):
             return {field_name: value, field_name + "_inner": value}
         return {field_name: value["normal"], field_name + "_inner": value["inner"]}
+
+    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
+        if for_query:
+            # we need to wrap for operators
+            result = self._clean("normal", value)
+            result["inner"] = result.pop("normal_inner")
+            return {field_name: result}
+        else:
+            return self._clean(field_name, value)
 
     def modify_input(self, field_name: str, kwargs: Any, phase: str = "") -> None:
         if field_name not in kwargs and field_name + "_inner" not in kwargs:
@@ -53,9 +69,7 @@ class MultiColumnFieldInner(BaseField):
                 "inner": kwargs.pop(field_name + "_inner", normal),
             }
 
-    def to_model(
-        self, field_name: str, value: Any, phase: str = "", instance=None
-    ) -> Dict[str, Any]:
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
         if isinstance(value, str):
             return {field_name: {"normal": value, "inner": value}}
         return {field_name: value}
@@ -96,11 +110,14 @@ async def test_create_and_assign(create_test_database):
     assert obj.multi["normal"] == "edgy"
     assert obj.multi["inner"] == "edgytoo"
     assert hasattr(MyModel.table.columns, "multi_inner")
+    assert await MyModel.query.filter(multi__exact={"normal": "edgy", "inner": "edgytoo"}).exists()
+    assert await MyModel.query.filter(multi__startswith="edgy").exists()
     obj.multi = "test"
     assert obj.multi["normal"] == "test"
     assert obj.multi["inner"] == "test"
     await obj.save()
     assert await MyModel.query.filter(MyModel.table.columns.multi_inner == "test").exists()
+    assert await MyModel.query.filter(multi="test").exists()
     assert obj.multi["inner"] == "test"
 
     obj.multi = {"normal": "edgy", "inner": "foo"}

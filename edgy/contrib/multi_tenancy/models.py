@@ -10,6 +10,7 @@ from edgy import settings
 from edgy.contrib.multi_tenancy.utils import create_tables
 from edgy.core.db.models.model import Model
 from edgy.core.db.models.utils import get_model
+from edgy.core.utils.db import check_db_connection
 from edgy.exceptions import ModelSchemaError, ObjectNotFound
 
 
@@ -120,7 +121,8 @@ class DomainMixin(edgy.Model):
         values: Dict[str, Any] = None,
         **kwargs: Any,
     ) -> Model:
-        async with self.meta.registry.database.transaction():
+        check_db_connection(self.database)
+        async with self.database as database, database.transaction():
             domains = self.__class__.query.filter(tenant=self.tenant, is_primary=True).exclude(
                 pk=self.pk
             )

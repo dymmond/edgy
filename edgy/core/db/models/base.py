@@ -23,14 +23,12 @@ import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
-from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
-from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
-from edgy.core.utils.models import generify_model_fields
 from edgy.core.utils.sync import run_sync
 from edgy.types import Undefined
 
@@ -111,17 +109,21 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         new_kwargs: Dict[str, Any] = {}
 
         fields = cls.meta.fields
-        # phase 1: transform
-        # Note: this is order dependend. There should be no overlap.
-        for field_name in cls.meta.input_modifying_fields:
-            fields[field_name].modify_input(field_name, kwargs, phase=phase)
-        # phase 2: apply to_model
-        for key, value in kwargs.items():
-            field = fields.get(key, None)
-            if field is not None:
-                new_kwargs.update(**field.to_model(key, value, phase=phase, instance=instance))
-            else:
-                new_kwargs[key] = value
+        token = CURRENT_INSTANCE.set(instance)
+        try:
+            # phase 1: transform
+            # Note: this is order dependend. There should be no overlap.
+            for field_name in cls.meta.input_modifying_fields:
+                fields[field_name].modify_input(field_name, kwargs, phase=phase)
+            # phase 2: apply to_model
+            for key, value in kwargs.items():
+                field = fields.get(key, None)
+                if field is not None:
+                    new_kwargs.update(**field.to_model(key, value, phase=phase))
+                else:
+                    new_kwargs[key] = value
+        finally:
+            CURRENT_INSTANCE.reset(token)
         return new_kwargs
 
     def setup_model_from_kwargs(self, kwargs: Any) -> Any:
@@ -136,8 +138,12 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
 
     def __str__(self) -> str:
         pkl = []
-        for pkname in self.pknames:
-            pkl.append(f"{pkname}={getattr(self, pkname, None)}")
+        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+        try:
+            for identifier in self.identifying_db_fields:
+                pkl.append(f"{identifier}={getattr(self, identifier, None)}")
+        finally:
+            MODEL_GETATTR_BEHAVIOR.reset(token)
         return f"{self.__class__.__name__}({', '.join(pkl)})"
 
     @cached_property
@@ -252,27 +258,6 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                     yield getattr(self.table.columns, column) == value
             else:
                 yield getattr(self.table.columns, field_name) == self.__dict__[field_name]
-
-    @classmethod
-    def generate_proxy_model(cls) -> Type["Model"]:
-        """
-        Generates a proxy model for each model. This proxy model is a simple
-        shallow copy of the original model being generated.
-        """
-        if cls.__proxy_model__:
-            return cls.__proxy_model__
-
-        fields = {key: copy.copy(field) for key, field in cls.meta.fields.items()}
-        proxy_model = ProxyModel(
-            name=cls.__name__,
-            module=cls.__module__,
-            metadata=cls.meta,
-            definitions=fields,
-        )
-
-        proxy_model.build()
-        generify_model_fields(proxy_model.model)
-        return proxy_model.model
 
     def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
         """
@@ -429,11 +414,41 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         """
         return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
 
+    async def execute_pre_save_hooks(
+        self, column_values: Dict[str, Any], original: Dict[str, Any], force_insert: bool
+    ) -> Dict[str, Any]:
+        # also handle defaults
+        keys = {*column_values.keys(), *original.keys()}
+        affected_fields = self.meta.pre_save_fields.intersection(keys)
+        retdict: Dict[str, Any] = {}
+        if affected_fields:
+            # don't trigger loads
+            token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+            token2 = CURRENT_INSTANCE.set(self)
+            try:
+                for field_name in affected_fields:
+                    if field_name not in column_values and field_name not in original:
+                        continue
+                    field = self.meta.fields[field_name]
+                    retdict.update(
+                        await field.pre_save_callback(
+                            column_values.get(field_name),
+                            original.get(field_name),
+                            force_insert=force_insert,
+                            instance=self,
+                        )
+                    )
+            finally:
+                MODEL_GETATTR_BEHAVIOR.reset(token)
+                CURRENT_INSTANCE.reset(token2)
+        return retdict
+
     async def execute_post_save_hooks(self, fields: Sequence[str]) -> None:
         affected_fields = self.meta.post_save_fields.intersection(fields)
         if affected_fields:
             # don't trigger loads, AttributeErrors are used for skipping fields
             token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+            token2 = CURRENT_INSTANCE.set(self)
             try:
                 for field_name in affected_fields:
                     field = self.meta.fields[field_name]
@@ -444,6 +459,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                     await field.post_save_callback(value, instance=self)
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(token)
+                CURRENT_INSTANCE.reset(token2)
 
     @classmethod
     def extract_column_values(
@@ -461,10 +477,11 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         # phase 2: validate fields and set defaults for readonly
         need_second_pass: List[BaseFieldType] = []
         for field_name, field in cls.meta.fields.items():
-            if (
-                not is_partial or (field.inject_default_on_partial_update and is_update)
-            ) and field.read_only:
-                if field.has_default():
+            if field.read_only:
+                # if read_only, updates are not possible anymore
+                if (
+                    not is_partial or (field.inject_default_on_partial_update and is_update)
+                ) and field.has_default():
                     validated.update(
                         field.get_default_values(field_name, validated, is_update=is_update)
                     )
@@ -487,6 +504,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         if need_second_pass:
             for field in need_second_pass:
                 # check if field appeared e.g. by composite
+                # Note: default values are directly passed without validation
                 if field.name not in validated:
                     validated.update(
                         field.get_default_values(field.name, validated, is_update=is_update)
@@ -496,18 +514,22 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
     def __setattr__(self, key: str, value: Any) -> None:
         fields = self.meta.fields
         field = fields.get(key, None)
-        if field is not None:
-            if hasattr(field, "__set__"):
-                # not recommended, better to use to_model instead except for kept objects
-                # used in related_fields to mask and not to implement to_model
-                field.__set__(self, value)
+        token = CURRENT_INSTANCE.set(self)
+        try:
+            if field is not None:
+                if hasattr(field, "__set__"):
+                    # not recommended, better to use to_model instead except for kept objects
+                    # used in related_fields to mask and not to implement to_model
+                    field.__set__(self, value)
+                else:
+                    for k, v in field.to_model(key, value, phase="set").items():
+                        # bypass __setattr__ method
+                        object.__setattr__(self, k, v)
             else:
-                for k, v in field.to_model(key, value, phase="set", instance=self).items():
-                    # bypass __setattr__ method
-                    object.__setattr__(self, k, v)
-        else:
-            # bypass __setattr__ method
-            object.__setattr__(self, key, value)
+                # bypass __setattr__ method
+                object.__setattr__(self, key, value)
+        finally:
+            CURRENT_INSTANCE.reset(token)
 
     async def _agetattr_helper(self, name: str, getter: Any) -> Any:
         await self.load()

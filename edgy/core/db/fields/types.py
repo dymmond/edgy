@@ -10,6 +10,7 @@ from edgy.core.connection.registry import Registry
 from edgy.types import Undefined
 
 if TYPE_CHECKING:
+    from edgy.core.db.fields.factories import FieldFactory
     from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.db.models.types import BaseModelType
 
@@ -50,13 +51,15 @@ class BaseFieldDefinitions:
     skip_absorption_check: bool = False
     registry: Optional[Registry] = None
     field_type: Any = Any
-    factory: Any = None
+    factory: Optional[FieldFactory] = None
+
     __original_type__: Any = None
     name: str = ""
     secret: bool = False
     exclude: bool = False
     owner: Any = None
     default: Any = Undefined
+    server_default: Any = None
 
     # column specific
     primary_key: bool = False
@@ -85,6 +88,15 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         Returns the columns of the field being declared.
         """
 
+    def operator_to_clause(
+        self, field_name: str, operator: str, table: sqlalchemy.Table, value: Any
+    ) -> Any:
+        """
+        Analyzes the operator and build a clause from it.
+        Needs to be able to handle "exact".
+        """
+        raise NotImplementedError()
+
     def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
         """
         Validates a value and transform it into columns which can be used for querying and saving.
@@ -103,7 +115,6 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         field_name: str,
         value: Any,
         phase: str = "",
-        instance: Optional[BaseModelType] = None,
     ) -> Dict[str, Any]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).

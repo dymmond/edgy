@@ -70,7 +70,6 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         pydantic_type = cls.get_pydantic_type(**kwargs)
         constraints = cls.get_constraints(**kwargs)
         default: None = kwargs.pop("default", None)
-        server_default: None = kwargs.pop("server_default", None)
 
         new_field = cls._get_field_cls(cls)
 
@@ -79,7 +78,6 @@ class FieldFactory(metaclass=FieldFactoryMeta):
             annotation=pydantic_type,
             column_type=column_type,
             default=default,
-            server_default=server_default,
             constraints=constraints,
             factory=cls,
             **kwargs,
@@ -159,13 +157,10 @@ class ForeignKeyFieldFactory(FieldFactory):
         cls,
         *,
         to: Any = None,
-        null: bool = False,
         on_update: str = CASCADE,
         on_delete: str = RESTRICT,
         related_name: Union[str, Literal[False]] = "",
         server_onupdate: Any = None,
-        default: Any = None,
-        server_default: Any = None,
         **kwargs: Dict[str, Any],
     ) -> BaseFieldType:
         kwargs = {
@@ -181,7 +176,8 @@ class ForeignKeyFieldFactory(FieldFactory):
         """default validation useful for one_to_one and foreign_key"""
         on_delete = kwargs.get("on_delete", CASCADE)
         on_update = kwargs.get("on_update", RESTRICT)
-        null = kwargs.get("null", False)
+        kwargs.setdefault("null", False)
+        null = kwargs["null"]
 
         if on_delete is None:
             raise FieldDefinitionError("on_delete must not be null.")
@@ -199,3 +195,4 @@ class ForeignKeyFieldFactory(FieldFactory):
 
         if related_name:
             kwargs["related_name"] = related_name.lower()
+        kwargs.setdefault("default", None)
