@@ -14,6 +14,7 @@ hide:
 - `stage` method in relations.
 - ModelRefs passed as normal positional arguments are automatically staged.
 - ContentType was added.
+- Proper callback support was added.
 
 ### Changed
 
@@ -33,6 +34,7 @@ hide:
 - Factory overwrites can now access owner.
 - Foreign keys to reflected models.
 - Handling to string references not in registry loaded yet.
+- Timezone aware Datetime saved in timezone unaware database columns.
 
 ## 0.14.1
 

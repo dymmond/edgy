@@ -291,6 +291,7 @@ DateTimeField supports int, float, string (isoformat), date object and of course
 * `force_timezone` - ZoneInfo containing the timezone in which all datetimes are converted.
                          For naive datetimes it behaves like `default_timezone`
 * `remove_timezone` - Boolean. Default False. Remove timezone information from datetime. Useful if the db should only contain naive datetimes and not convert.
+* `with_timezone` - Boolean. Defaults to True for remove_timezone is False. It controls if timezones are included on db side. You most probably don't need setting it except you want a naive datetime saving in a timezone aware column which makes no sense.
 
 
 !!! Note
@@ -636,6 +637,10 @@ class MyModel(edgy.Model):
     ...
 
 ```
+
+##### Parameters
+
+- * `with_timezone` - Boolean. Default `False`. Enable timezone support for time in the db.
 
 #### URLField
 

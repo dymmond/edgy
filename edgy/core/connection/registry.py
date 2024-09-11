@@ -1,5 +1,17 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Literal, Mapping, Type, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Literal,
+    Mapping,
+    Optional,
+    Type,
+    Union,
+    cast,
+)
 
 import sqlalchemy
 from sqlalchemy import Engine
@@ -147,8 +159,11 @@ class Registry:
         self,
         name_or_class: Union[Type["BaseModelType"], str, None],
         callback: Callable[[Type["BaseModelType"]], None],
-        one_time: bool,
+        one_time: Optional[bool] = None,
     ) -> None:
+        if one_time is None:
+            # True for model specific callbacks, False for general callbacks
+            one_time = name_or_class is not None
         called: bool = False
         if name_or_class is None:
             for model in self.models.values():

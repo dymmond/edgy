@@ -150,3 +150,17 @@ Model class attributes `class_attrs` which are cleared or set are `table`, `pkna
 `init_column_mappers` initializes the `columns_to_field` via its `init()` method. This initializes the mappers `columns_to_field`, `field_to_columns` and `field_to_column_names`.
 
 `db_schema` internally calls also `invalidate_models()` to remove table references.
+
+
+## Callbacks
+
+Sometimes you want to modify all models or a specific model but aren't sure if they are available yet.
+Here we have now the callbacks in a registry.
+You register a callback with a model name or None (for all models) and whenever a model class of the criteria is added the callback with
+the model class as parameter is executed.
+Callbacks can be registered permanent or one time (the first match triggers them). If a model is already registered it is passed to the callback too.
+The method is called `register_callback(model_or_name, callback, one_time)`.
+
+Generally you use `one_time=True` for model specific callbacks and `one_time=False` for model unspecific callbacks.
+
+If `one_time` is not provided, the logic mentioned above is applied.
