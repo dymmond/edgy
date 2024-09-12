@@ -220,19 +220,22 @@ class BaseForeignKeyField(BaseForeignKey):
         return columns
 
     def get_global_constraints(
-        self, name: str, columns: Sequence[sqlalchemy.Column]
+        self,
+        name: str,
+        columns: Sequence[sqlalchemy.Column],
+        no_constraint: Optional[bool] = None,
     ) -> Sequence[sqlalchemy.Constraint]:
         constraints = []
-        no_constraint = self.no_constraint
-        if self.is_cross_db():
-            no_constraint = True
+        no_constraint = bool(no_constraint or self.no_constraint or self.is_cross_db())
         if not no_constraint:
             target = self.target
+            prefix = target.meta.tablename
+
             constraints.append(
                 sqlalchemy.ForeignKeyConstraint(
                     columns,
                     [
-                        f"{target.meta.tablename}.{self.from_fk_field_name(name, column.key)}"
+                        f"{prefix}.{self.from_fk_field_name(name, column.key)}"
                         for column in columns
                     ],
                     ondelete=self.on_delete,

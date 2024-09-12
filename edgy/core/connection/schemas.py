@@ -33,6 +33,7 @@ class Schema:
     async def activate_schema_path(
         self, database: Database, schema: str, is_shared: bool = True
     ) -> None:
+        # INSECURE, but not used
         path = (
             f"SET search_path TO {schema}, shared;"
             if is_shared

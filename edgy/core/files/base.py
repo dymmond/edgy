@@ -287,6 +287,7 @@ class FieldFile(File):
         storage: Union["Storage", str, None] = None,
         generate_name_fn: Optional[Callable[[str, Union[BinaryIO, File], bool], str]] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        multi_process_safe: bool = True,
         approved: bool = True,
         # only usable with correct approval handling
         change_removes_approval: bool = False,
@@ -299,6 +300,7 @@ class FieldFile(File):
         self.field = field
         self.generate_name_fn = generate_name_fn
         self.metadata = metadata or {}
+        self.multi_process_safe = multi_process_safe
         self.approved = approved
         self.change_removes_approval = change_removes_approval
         if size is not None:
@@ -340,6 +342,7 @@ class FieldFile(File):
         *,
         name: str = "",
         delete_old: bool = True,
+        multi_process_safe: Optional[bool] = None,
         approved: Optional[bool] = None,
         storage: Optional["Storage"] = None,
         overwrite: bool = False,
@@ -354,6 +357,9 @@ class FieldFile(File):
         if content is None:
             self.delete()
             return
+        # we can force multi_process_safe to add the process id also for overwrites
+        if multi_process_safe is None:
+            multi_process_safe = False if overwrite else self.multi_process_safe
 
         direct_name = True
         if not name:
@@ -374,7 +380,10 @@ class FieldFile(File):
 
         # filters invalid names
         name = storage.get_available_name(
-            name, max_length=getattr(self.field, "max_length", None), overwrite=overwrite
+            name,
+            max_length=getattr(self.field, "max_length", None),
+            overwrite=overwrite,
+            multi_process_safe=multi_process_safe,
         )
         if getattr(self, "file", None):
             self.close()

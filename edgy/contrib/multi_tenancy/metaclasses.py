@@ -76,7 +76,7 @@ class BaseTenantMeta(BaseModelMeta):
 
         if registry:
             try:
-                if meta.is_tenant and not meta.abstract:
+                if meta.is_tenant and not meta.abstract and not new_model.__is_proxy_model__:
                     registry.tenant_models[new_model.__name__] = new_model
             except KeyError:
                 ...  # pragma: no cover

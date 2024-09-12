@@ -1,10 +1,14 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Union
+from typing import TYPE_CHECKING, Any, Dict, Sequence, Union
 
+from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField, ForeignKey
 from edgy.core.terminal import Print
+from edgy.types import Undefined
 
 if TYPE_CHECKING:
+    import sqlalchemy
+
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
 
@@ -21,6 +25,10 @@ class BaseContentTypeFieldField(BaseForeignKeyField):
         # e.g. default was a Model
         if isinstance(value, (target, target.proxy_model)):
             value.name = self.owner.__name__
+            if instance.__using_schema__ is Undefined:
+                value.schema_name = get_schema()
+            else:
+                value.schema_name = instance.__using_schema__
         return await super().pre_save_callback(
             value, original_value, force_insert=force_insert, instance=instance
         )
@@ -39,6 +47,14 @@ class BaseContentTypeFieldField(BaseForeignKeyField):
     @cached_property
     def related_name(self) -> str:
         return f"reverse_{self.owner.__name__.lower()}"
+
+    def get_global_constraints(
+        self, name: str, columns: Sequence["sqlalchemy.Column"]
+    ) -> Sequence["sqlalchemy.Constraint"]:
+        target = self.target
+        # when setting this explicit
+        no_constraint = target.no_constraints
+        return super().get_global_constraints(name, columns, no_constraint=no_constraint)
 
 
 class ContentTypeField(ForeignKey):

@@ -2,7 +2,9 @@ from datetime import datetime
 
 import pytest
 
-from edgy import Database, Registry
+from edgy import Registry
+from edgy.contrib.contenttypes import ContentTypeField
+from edgy.contrib.contenttypes.models import ContentType as _ContentType
 from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.core.db import fields
@@ -10,7 +12,16 @@ from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL)
-models = Registry(database=Database(database, force_rollback=True))
+
+
+class ExplicitContentType(_ContentType):
+    no_constraints = True
+
+    class Meta:
+        abstract = True
+
+
+models = Registry(database=database, with_content_type=ExplicitContentType)
 
 pytestmark = pytest.mark.anyio
 
@@ -19,23 +30,13 @@ def time():
     return datetime.now().time()
 
 
-@pytest.fixture(autouse=True, scope="module")
+@pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     async with database:
         await models.create_all()
         yield
         if not database.drop:
             await models.drop_all()
-
-
-@pytest.fixture(autouse=True)
-async def rollback_transactions():
-    async with models.database:
-        yield
-
-
-async def drop_schemas(name):
-    await models.schema.drop_schema(name, if_exists=True)
 
 
 class Tenant(TenantMixin):
@@ -57,6 +58,9 @@ class Product(TenantModel):
     name: str = fields.CharField(max_length=255)
     user: User = fields.ForeignKey(User, null=True)
 
+    # FIXME: somehow no_constraint gets lost
+    content_type = ContentTypeField(no_constraint=True)
+
     class Meta:
         registry = models
         is_tenant = True
@@ -64,34 +68,7 @@ class Product(TenantModel):
 
 async def test_tenant_model_metaclass_tenant_models():
     assert Product.__name__ in Product.meta.registry.tenant_models
-
-
-async def test_schema():
-    tenant = await Tenant.query.create(
-        schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
-    )
-
-    for i in range(5):
-        await Product.query.using(tenant.schema_name).create(name=f"product-{i}")
-
-    total = await Product.query.using(tenant.schema_name).all()
-
-    assert len(total) == 5
-
-    total = await Product.query.all()
-
-    assert len(total) == 0
-
-    for i in range(15):
-        await Product.query.create(name=f"product-{i}")
-
-    total = await Product.query.all()
-
-    assert len(total) == 15
-
-    total = await Product.query.using(tenant.schema_name).all()
-
-    assert len(total) == 5
+    assert "ContentType" not in Product.meta.registry.tenant_models
 
 
 async def test_can_have_multiple_tenants_with_different_records():
@@ -133,6 +110,7 @@ async def test_can_have_multiple_tenants_with_different_records():
 
     users_saffier = await User.query.using(saffier.schema_name).all()
     assert len(users_saffier) == 11
+    assert await models.content_type.query.filter(name="User").count() == 32
 
 
 async def test_model_crud():

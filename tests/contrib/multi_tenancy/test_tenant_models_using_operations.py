@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from edgy import Registry
+from edgy import Database, Registry
 from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.core.db import fields
@@ -11,7 +11,7 @@ from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL)
-models = Registry(database=database)
+models = Registry(database=Database(database, force_rollback=True))
 
 pytestmark = pytest.mark.anyio
 
@@ -22,19 +22,17 @@ def time():
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    try:
+    async with database:
         await models.create_all()
         yield
-        await models.drop_all()
-    except Exception as e:
-        pytest.skip(f"Error: {str(e)}")
+        if not database.drop:
+            await models.drop_all()
 
 
 @pytest.fixture(autouse=True)
 async def rollback_transactions():
-    with database.force_rollback():
-        async with database:
-            yield
+    async with models.database:
+        yield
 
 
 async def drop_schemas(name):

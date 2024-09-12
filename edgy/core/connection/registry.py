@@ -32,16 +32,17 @@ class Registry:
     """
 
     db_schema: Union[str, None] = None
-    content_type: Union[Type["BaseModelType"], None]
+    content_type: Union[Type["BaseModelType"], None] = None
 
     def __init__(
         self,
         database: Union[Database, str, DatabaseURL],
         *,
         with_content_type: Union[bool, Type["BaseModelType"]] = False,
+        schema: Union[str, None] = None,
         **kwargs: Any,
     ) -> None:
-        self.db_schema = kwargs.pop("schema", None)
+        self.db_schema = schema
         extra = kwargs.pop("extra", {})
         self.database: Database = (
             database if isinstance(database, Database) else Database(database, **kwargs)
@@ -91,17 +92,13 @@ class Registry:
             }
 
             new_meta: MetaInfo = MetaInfo(None, **meta_args)
+            # model adds itself to registry and executes callbacks
             real_content_type = create_edgy_model(
                 "ContentType",
                 with_content_type.__module__,
                 __metadata__=new_meta,
                 __bases__=(with_content_type,),
             )
-            if getattr(real_content_type, "__reflected__", False):
-                self.reflected["ContentType"] = real_content_type
-            else:
-                self.models["ContentType"] = real_content_type
-            self.execute_model_callbacks(real_content_type)
         self.content_type = real_content_type
 
         def callback(model_class: Type["BaseModelType"]) -> None:
@@ -121,7 +118,11 @@ class Registry:
                 model_class.meta.fields["content_type"] = cast(
                     "BaseFieldType",
                     ContentTypeField(
-                        name="content_type", owner=model_class, to=real_content_type, registry=self
+                        name="content_type",
+                        owner=model_class,
+                        to=real_content_type,
+                        registry=self,
+                        no_constraint=real_content_type.no_constraints,
                     ),
                 )
                 if model_class.meta._is_init:

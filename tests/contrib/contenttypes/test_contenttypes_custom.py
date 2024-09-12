@@ -11,6 +11,7 @@ from tests.settings import DATABASE_URL
 
 
 class ExplicitContentType(_ContentType):
+    no_constraints = True
     custom_field = edgy.CharField(max_length=1, null=True)
 
     class Meta:

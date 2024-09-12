@@ -58,3 +58,38 @@ Some models may should not be referencable by ContentType.
 
 You can opt out by overwriting `content_type` on the model to opt out with any Field.
 Use `ExcludeField` to remove the field entirely.
+
+
+### Tenancy compatibility
+
+ContentType is not out of the box tenancy compatible.
+
+When wanting a cross schema ContentType we have to remove the FK constraint.
+
+``` python
+
+
+class CrossSchemaContentType(TenantModel, _ContentType):
+    no_constraints = True
+
+    class Meta:
+        abstract = True
+
+
+models = Registry(database=database, with_content_type=ExplicitContentType)
+
+```
+
+Somehow for some tenants the information gets lost. So you have to do something like
+
+``` python
+
+class Product(TenantModel):
+    id: int = fields.IntegerField(primary_key=True)
+    name: str = fields.CharField(max_length=255)
+    user: User = fields.ForeignKey(User, null=True)
+
+    content_type = ContentTypeField(no_constraint=True)
+```
+
+manually.
