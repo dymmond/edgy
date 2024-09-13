@@ -349,14 +349,17 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         return model
 
     @classmethod
-    def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:
+    def build(
+        cls, schema: Optional[str] = None, metadata: Optional[sqlalchemy.MetaData] = None
+    ) -> sqlalchemy.Table:
         """
         Builds the SQLAlchemy table representation from the loaded fields.
         """
         tablename: str = cls.meta.tablename  # type: ignore
         registry = cls.meta.registry
         assert registry is not None, "registry is not set"
-        metadata: sqlalchemy.MetaData = registry.metadata
+        if metadata is None:
+            metadata = registry.metadata
         if not schema:
             schema = registry.db_schema
         if not schema:

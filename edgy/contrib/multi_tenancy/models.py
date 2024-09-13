@@ -79,7 +79,10 @@ class TenantMixin(edgy.Model):
         assert registry is not None, "registry is not set"
         try:
             await registry.schema.create_schema(
-                schema=tenant.schema_name, if_not_exists=True, init_tenant_models=True
+                schema=tenant.schema_name,
+                if_not_exists=True,
+                init_tenant_models=True,
+                update_cache=False,
             )
         except Exception as e:
             message = f"Rolling back... {str(e)}"

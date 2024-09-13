@@ -79,6 +79,7 @@ class Registry:
         self.extra: Mapping[str, Database] = {
             k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
         }
+        self.metadata = sqlalchemy.MetaData()
 
         self.refresh_metadata()
         if with_content_type is not False:
@@ -178,7 +179,7 @@ class Registry:
             raise LookupError(f"Registry doesn't have a {model_name} model.") from None
 
     def refresh_metadata(self) -> None:
-        self.metadata = sqlalchemy.MetaData()
+        self.metadata.clear()
         for model_class in self.models.values():
             model_class._table = None
             model_class._db_schemas = {}
@@ -296,7 +297,7 @@ class Registry:
         if refresh_metadata:
             self.refresh_metadata()
         if self.db_schema:
-            await self.schema.create_schema(self.db_schema, True, True)
+            await self.schema.create_schema(self.db_schema, True, True, update_cache=True)
         else:
             # don't warn here about inperformance
             async with self.database as database:

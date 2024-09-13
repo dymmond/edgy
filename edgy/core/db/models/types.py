@@ -146,7 +146,9 @@ class BaseModelType(ABC):
 
     @classmethod
     @abstractmethod
-    def build(cls, schema: Optional[str] = None) -> "sqlalchemy.Table":
+    def build(
+        cls, schema: Optional[str] = None, metadata: Optional[sqlalchemy.MetaData] = None
+    ) -> "sqlalchemy.Table":
         """
         Builds the SQLAlchemy table representation from the loaded fields.
         """

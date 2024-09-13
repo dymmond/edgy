@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import sqlalchemy
 from sqlalchemy.exc import DBAPIError, ProgrammingError
@@ -52,10 +52,21 @@ class Schema:
         if_not_exists: bool = False,
         init_models: bool = False,
         init_tenant_models: bool = False,
+        update_cache: bool = True,
     ) -> None:
         """
         Creates a model schema if it does not exist.
         """
+        tables: List[sqlalchemy.Table] = []
+        if init_models:
+            for model_class in self.registry.models.values():
+                model_class.table_schema(schema=schema, update_cache=update_cache)
+        if init_tenant_models and init_models:
+            for model_class in self.registry.tenant_models.values():
+                model_class.table_schema(schema=schema, update_cache=update_cache)
+        elif init_tenant_models:
+            for model_class in self.registry.tenant_models.values():
+                tables.append(model_class.table_schema(schema=schema, update_cache=update_cache))
 
         def execute_create(connection: sqlalchemy.Connection) -> None:
             try:
@@ -64,18 +75,14 @@ class Schema:
                 )
             except ProgrammingError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
+            for table in tables:
+                table.create(connection, checkfirst=if_not_exists)
 
-        if init_models:
-            for model_class in self.registry.models.values():
-                model_class.table_schema(schema=schema, update_cache=True)
-        if init_tenant_models:
-            for model_class in self.registry.tenant_models.values():
-                model_class.table_schema(schema=schema, update_cache=True)
         # don't check for inperformance here
         async with self.database as database:
             with database.force_rollback(False):
                 await database.run_sync(execute_create)
-                if init_models or init_tenant_models:
+                if init_models:
                     await database.create_all(self.registry.metadata)
 
     async def drop_schema(
