@@ -78,7 +78,7 @@ nav:
       - Embedding: "embedding.md"
       - Managers: "managers.md"
       - Fields: "fields.md"
-      - File Handling: "file_handling.md"
+      - File Handling: "file-handling.md"
       - Queries:
           - Queries: "queries/queries.md"
           - Secrets: "queries/secrets.md"
