@@ -85,7 +85,6 @@ async def test_bulk_create_another_db():
 
 async def test_bulk_create_another_schema_and_db():
     await registry.schema.create_schema("foo", init_models=True, if_not_exists=True)
-    await registry.create_all(False)
     try:
         await Product.query.using_with_db("another", "foo").bulk_create(
             [

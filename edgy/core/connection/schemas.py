@@ -67,10 +67,10 @@ class Schema:
 
         if init_models:
             for model_class in self.registry.models.values():
-                model_class.table_schema(schema=schema)
+                model_class.table_schema(schema=schema, update_cache=True)
         if init_tenant_models:
             for model_class in self.registry.tenant_models.values():
-                model_class.table_schema(schema=schema)
+                model_class.table_schema(schema=schema, update_cache=True)
         # don't check for inperformance here
         async with self.database as database:
             with database.force_rollback(False):

@@ -848,16 +848,20 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         meta: MetaInfo = cls.meta
         return meta.signals
 
-    def table_schema(cls, schema: Union[str, None] = None) -> "sqlalchemy.Table":
+    def table_schema(
+        cls, schema: Union[str, None] = None, update_cache: bool = False
+    ) -> "sqlalchemy.Table":
         """
         Retrieve table for schema (nearly the same as build with scheme argument).
         Cache per class via a primitive LRU cache.
         """
         if schema is None:
+            if update_cache:
+                cls._table = None
             return cls.table
         # remove cache element so the key is reordered
         schema_obj = cls._db_schemas.pop(schema, None)
-        if schema_obj is None:
+        if schema_obj is None or update_cache:
             schema_obj = cls.build(schema=schema)
         # set element to last
         cls._db_schemas[schema] = schema_obj
