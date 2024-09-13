@@ -1,14 +1,13 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Dict, Union
 
+from edgy.core.db.constants import CASCADE
 from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField, ForeignKey
 from edgy.core.terminal import Print
 from edgy.types import Undefined
 
 if TYPE_CHECKING:
-    import sqlalchemy
-
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
 
@@ -48,15 +47,6 @@ class BaseContentTypeFieldField(BaseForeignKeyField):
     def related_name(self) -> str:
         return f"reverse_{self.owner.__name__.lower()}"
 
-    def get_global_constraints(
-        self, name: str, columns: Sequence["sqlalchemy.Column"], schema: Optional[str] = None
-    ) -> Sequence["sqlalchemy.Constraint"]:
-        target = self.target
-        assert not target.__is_proxy_model__
-        # when setting this explicit
-        no_constraint = bool(target.no_constraints)
-        return super().get_global_constraints(name, columns, no_constraint=no_constraint)
-
 
 class ContentTypeField(ForeignKey):
     field_bases = (BaseContentTypeFieldField,)
@@ -64,12 +54,13 @@ class ContentTypeField(ForeignKey):
     def __new__(  # type: ignore
         cls,
         to: Union["BaseModelType", str] = "ContentType",
+        on_delete: str = CASCADE,
         default: Any = lambda owner: owner.meta.registry.get_model("ContentType")(
             name=owner.__name__
         ),
         **kwargs: Any,
     ) -> "BaseFieldType":
-        return super().__new__(cls, to=to, default=default, **kwargs)
+        return super().__new__(cls, to=to, default=default, on_delete=on_delete, **kwargs)
 
     @classmethod
     def validate(cls, kwargs: Dict[str, Any]) -> None:

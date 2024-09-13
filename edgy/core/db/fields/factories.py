@@ -174,8 +174,8 @@ class ForeignKeyFieldFactory(FieldFactory):
     @classmethod
     def validate(cls, kwargs: Dict[str, Any]) -> None:
         """default validation useful for one_to_one and foreign_key"""
-        on_delete = kwargs.get("on_delete", CASCADE)
-        on_update = kwargs.get("on_update", RESTRICT)
+        on_update = kwargs.get("on_update", CASCADE)
+        on_delete = kwargs.get("on_delete", RESTRICT)
         kwargs.setdefault("null", False)
         null = kwargs["null"]
 

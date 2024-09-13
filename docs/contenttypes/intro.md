@@ -43,6 +43,24 @@ Or now we allow fruits with the same weight. Let's just remove the uniqueness fr
 {!> ../docs_src/contenttypes/customized_nocollision.py !}
 ```
 
+### Example 2: Snapshotting
+
+Sometime you want to know when an object is created (or updated), so you can reduce the search area
+or mark old data for deletion.
+
+Edgy is able to do this quite easily:
+
+
+```python
+{!> ../docs_src/contenttypes/snapshotting.py !}
+```
+
+If you don't want deletions caused by ContentTypes or doesn't like some many constraints you can use:
+
+```python
+{!> ../docs_src/contenttypes/snapshotting_no_constraints.py !}
+```
+
 ## Tricks
 
 ### Using in libraries
@@ -59,37 +77,6 @@ Some models may should not be referencable by ContentType.
 You can opt out by overwriting `content_type` on the model to opt out with any Field.
 Use `ExcludeField` to remove the field entirely.
 
-
 ### Tenancy compatibility
 
-ContentType is not out of the box tenancy compatible.
-
-When wanting a cross schema ContentType we have to remove the FK constraint.
-
-``` python
-
-
-class CrossSchemaContentType(TenantModel, _ContentType):
-    no_constraints = True
-
-    class Meta:
-        abstract = True
-
-
-models = Registry(database=database, with_content_type=ExplicitContentType)
-
-```
-
-Somehow for some tenants the information gets lost. So you have to do something like
-
-``` python
-
-class Product(TenantModel):
-    id: int = fields.IntegerField(primary_key=True)
-    name: str = fields.CharField(max_length=255)
-    user: User = fields.ForeignKey(User, null=True)
-
-    content_type = ContentTypeField(no_constraint=True)
-```
-
-manually.
+ContentType is out of the box tenancy compatible. You may want to use `no_constraints` in case of many, dynamic tenants.
