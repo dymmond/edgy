@@ -8,7 +8,6 @@ from typing import (
     Any,
     ClassVar,
     Dict,
-    Iterable,
     List,
     Literal,
     Optional,
@@ -250,14 +249,18 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         else:
             return cast(Sequence["sqlalchemy.Column"], _empty)
 
-    def identifying_clauses(self) -> Iterable[Any]:
+    def identifying_clauses(self) -> List[Any]:
+        clauses: List[Any] = []
         for field_name in self.identifying_db_fields:
             field = self.meta.fields.get(field_name)
             if field is not None:
                 for column, value in field.clean(field_name, self.__dict__[field_name]).items():
-                    yield getattr(self.table.columns, column) == value
+                    clauses.append(getattr(self.table.columns, column) == value)
             else:
-                yield getattr(self.table.columns, field_name) == self.__dict__[field_name]
+                clauses.append(
+                    getattr(self.table.columns, field_name) == self.__dict__[field_name]
+                )
+        return clauses
 
     def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
         """

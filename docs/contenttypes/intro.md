@@ -55,12 +55,6 @@ Edgy is able to do this quite easily:
 {!> ../docs_src/contenttypes/snapshotting.py !}
 ```
 
-If you don't want deletions caused by ContentTypes or doesn't like some many constraints you can use:
-
-```python
-{!> ../docs_src/contenttypes/snapshotting_no_constraints.py !}
-```
-
 ## Tricks
 
 ### Using in libraries
@@ -79,4 +73,4 @@ Use `ExcludeField` to remove the field entirely.
 
 ### Tenancy compatibility
 
-ContentType is out of the box tenancy compatible. You may want to use `no_constraints` in case of many, dynamic tenants.
+ContentType is out of the box tenancy compatible.

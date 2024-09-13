@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, cast
 
 import edgy
 
@@ -7,8 +7,7 @@ if TYPE_CHECKING:
 
 
 class ContentType(edgy.Model):
-    # if no foreignkey constraint should be used
-    no_constraints: ClassVar[bool] = False
+    __require_model_based_deletion__ = True
 
     class Meta:
         abstract = True
@@ -24,3 +23,12 @@ class ContentType(edgy.Model):
     async def get_instance(self) -> edgy.Model:
         reverse_name = f"reverse_{self.name.lower()}"
         return await cast("QuerySet", getattr(self, reverse_name)).using(self.schema_name).get()
+
+    async def delete(
+        self, skip_post_delete_hooks: bool = False, delete_orphan_call: bool = False
+    ) -> None:
+        reverse_name = f"reverse_{self.name.lower()}"
+        query = cast("QuerySet", getattr(self, reverse_name))
+        await super().delete(skip_post_delete_hooks=skip_post_delete_hooks)
+        if not delete_orphan_call:
+            await query.using(self.schema_name).delete()

@@ -1,10 +1,12 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Union
+from typing import TYPE_CHECKING, Any, Dict, Union, cast
 
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField, ForeignKey
+from edgy.core.db.relationships.relation import SingleRelation
 from edgy.core.terminal import Print
+from edgy.protocols.many_relationship import ManyRelationProtocol
 from edgy.types import Undefined
 
 if TYPE_CHECKING:
@@ -32,6 +34,16 @@ class BaseContentTypeFieldField(BaseForeignKeyField):
             value, original_value, force_insert=force_insert, instance=instance
         )
 
+    def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
+        if self.relation_fn is not None:
+            return self.relation_fn(**kwargs)
+        return cast(
+            ManyRelationProtocol,
+            SingleRelation(
+                to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs
+            ),
+        )
+
     def get_default_value(self) -> Any:
         default = getattr(self, "default", None)
         if callable(default):
@@ -55,12 +67,22 @@ class ContentTypeField(ForeignKey):
         cls,
         to: Union["BaseModelType", str] = "ContentType",
         on_delete: str = CASCADE,
+        no_constraint: bool = True,
+        delete_orphan: bool = True,
         default: Any = lambda owner: owner.meta.registry.get_model("ContentType")(
             name=owner.__name__
         ),
         **kwargs: Any,
     ) -> "BaseFieldType":
-        return super().__new__(cls, to=to, default=default, on_delete=on_delete, **kwargs)
+        return super().__new__(
+            cls,
+            to=to,
+            default=default,
+            on_delete=on_delete,
+            no_constraint=no_constraint,
+            delete_orphan=delete_orphan,
+            **kwargs,
+        )
 
     @classmethod
     def validate(cls, kwargs: Dict[str, Any]) -> None:

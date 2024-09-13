@@ -57,6 +57,7 @@ class BaseModelType(ABC):
 
     __parent__: ClassVar[Union[Type["BaseModelType"], None]] = None
     __is_proxy_model__: ClassVar[bool] = False
+    __require_model_based_deletion__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
 
     @property
@@ -124,7 +125,9 @@ class BaseModelType(ABC):
         """Save model"""
 
     @abstractmethod
-    async def delete(self, skip_post_delete_hooks: bool = False) -> None:
+    async def delete(
+        self, skip_post_delete_hooks: bool = False, delete_orphan_call: bool = False
+    ) -> None:
         """Delete Model"""
 
     @abstractmethod

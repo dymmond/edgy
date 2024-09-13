@@ -52,7 +52,7 @@ class Account(edgy.Model):
 
 class Contract(edgy.Model):
     owner = edgy.fields.ForeignKey("ContentType", on_delete="CASCADE")
-    account = edgy.fields.ForeignKey("Account", null=True, on_delete="SET_NULL")
+    account = edgy.fields.ForeignKey("Account", null=True, on_delete="SET NULL")
 
     class Meta:
         registry = models

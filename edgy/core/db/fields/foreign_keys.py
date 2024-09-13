@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
 import sqlalchemy
 from pydantic import BaseModel
@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.types import BaseFieldType
-from edgy.core.db.relationships.relation import SingleRelation
+from edgy.core.db.relationships.relation import OrphanDeletionSingleRelation, SingleRelation
 from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
@@ -27,6 +27,8 @@ def _removeprefix(text: str, prefix: str) -> str:
 
 
 class BaseForeignKeyField(BaseForeignKey):
+    force_orphan_deletion_relation: bool = False
+
     def __init__(
         self,
         *,
@@ -37,6 +39,7 @@ class BaseForeignKeyField(BaseForeignKey):
         embed_parent: Optional[Tuple[str, str]] = None,
         relation_fn: Optional[Callable[..., ManyRelationProtocol]] = None,
         reverse_path_fn: Optional[Callable[[str], Tuple[Any, str, str]]] = None,
+        delete_orphan: bool = False,
         **kwargs: Any,
     ) -> None:
         self.related_fields = related_fields
@@ -46,7 +49,13 @@ class BaseForeignKeyField(BaseForeignKey):
         self.embed_parent = embed_parent
         self.relation_fn = relation_fn
         self.reverse_path_fn = reverse_path_fn
+        self.delete_orphan = delete_orphan
+        if delete_orphan:
+            self.post_delete_callback = self._notset_post_delete_callback
         super().__init__(**kwargs)
+
+    async def _notset_post_delete_callback(self, value: Any, instance: "BaseModelType") -> None:
+        await self.expand_relationship(value).delete(delete_orphan_call=True)
 
     async def pre_save_callback(
         self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
@@ -67,8 +76,17 @@ class BaseForeignKeyField(BaseForeignKey):
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         if self.relation_fn is not None:
             return self.relation_fn(**kwargs)
-        return SingleRelation(
-            to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs
+        if self.force_orphan_deletion_relation or (
+            self.on_delete == "CASCADE" and self.no_constraint
+        ):
+            relation: Any = OrphanDeletionSingleRelation
+        else:
+            relation = SingleRelation
+        return cast(
+            ManyRelationProtocol,
+            relation(
+                to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs
+            ),
         )
 
     def traverse_field(self, path: str) -> Tuple[Any, str, str]:

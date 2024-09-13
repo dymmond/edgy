@@ -12,8 +12,6 @@ database = DatabaseTestClient(DATABASE_URL, drop_database=True, use_existing=Fal
 
 
 class ExplicitContentType(_ContentType):
-    no_constraints = True
-
     class Meta:
         abstract = True
 

@@ -153,7 +153,6 @@ class Registry:
                         name="content_type",
                         owner=model_class,
                         to=real_content_type,
-                        no_constraint=real_content_type.no_constraints,
                     ),
                 )
                 if model_class.meta._is_init:

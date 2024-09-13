@@ -88,16 +88,15 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         )
 
         # empty updates shouldn't cause an error. E.g. only model references are updated
-        if column_values:
+        clauses = self.identifying_clauses()
+        if column_values and clauses:
             check_db_connection(self.database)
             async with self.database as database, database.transaction():
                 # can update column_values
                 column_values.update(
                     await self.execute_pre_save_hooks(column_values, kwargs, force_insert=False)
                 )
-                expression = (
-                    self.table.update().values(**column_values).where(*self.identifying_clauses())
-                )
+                expression = self.table.update().values(**column_values).where(*clauses)
                 await database.execute(expression)
 
             # Update the model instance.
@@ -114,7 +113,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         return self
 
-    async def delete(self, skip_post_delete_hooks: bool = False) -> None:
+    async def delete(
+        self, skip_post_delete_hooks: bool = False, delete_orphan_call: bool = False
+    ) -> None:
         """Delete operation from the database"""
         await self.meta.signals.pre_delete.send_async(self.__class__, instance=self)
         # get values before deleting
@@ -135,29 +136,34 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                     field_values[field_name] = field_value
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(token)
-        expression = self.table.delete().where(*self.identifying_clauses())
-        check_db_connection(self.database)
-        async with self.database as database:
-            await database.execute(expression)
+        clauses = self.identifying_clauses()
+        if clauses:
+            expression = self.table.delete().where(*clauses)
+            check_db_connection(self.database)
+            async with self.database as database:
+                await database.execute(expression)
         # we cannot load anymore
         self._loaded_or_deleted = True
         # now cleanup with the saved values
         for field_name, value in field_values.items():
             field = self.meta.fields[field_name]
-            await field.post_delete_callback(value)
+            await field.post_delete_callback(value, instance=self)
 
         await self.meta.signals.post_delete.send_async(self.__class__, instance=self)
 
     async def load(self, only_needed: bool = False) -> None:
         if only_needed and self._loaded_or_deleted:
             return
-        # Build the select expression.
-        expression = self.table.select().where(*self.identifying_clauses())
+        row = None
+        clauses = self.identifying_clauses()
+        if clauses:
+            # Build the select expression.
+            expression = self.table.select().where(*clauses)
 
-        # Perform the fetch.
-        check_db_connection(self.database)
-        async with self.database as database:
-            row = await database.fetch_one(expression)
+            # Perform the fetch.
+            check_db_connection(self.database)
+            async with self.database as database:
+                row = await database.fetch_one(expression)
         # check if is in system
         if row is None:
             raise ObjectNotFound("row does not exist anymore")
