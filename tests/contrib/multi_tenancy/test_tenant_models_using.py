@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import pytest
 
 from edgy import Database, Registry
@@ -9,14 +7,10 @@ from edgy.core.db import fields
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, use_existing=False)
 models = Registry(database=Database(database, force_rollback=True))
 
 pytestmark = pytest.mark.anyio
-
-
-def time():
-    return datetime.now().time()
 
 
 @pytest.fixture(autouse=True, scope="module")

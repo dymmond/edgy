@@ -146,7 +146,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         pknames = set()
         if self.through:
             if isinstance(self.through, str):
-                self.through = self.registry.models[self.through]
+                assert self.owner.meta.registry is not None, "no registry found"
+                self.through = self.owner.meta.registry.models[self.through]
             through = self.through
             if through.meta.abstract:
                 pknames = set(cast(Sequence[str], through.pknames))
@@ -189,7 +190,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         tablename = f"{owner_name.lower()}s_{to_name}s".lower()
         meta_args = {
             "tablename": tablename,
-            "registry": self.registry,
+            "registry": self.owner.meta.registry,
             "multi_related": [to_name.lower()],
         }
         has_pknames = pknames and not pknames.issubset(

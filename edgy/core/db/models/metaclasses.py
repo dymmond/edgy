@@ -341,7 +341,6 @@ def _set_related_field(
         name=related_name,
         owner=target,
         related_from=source,
-        registry=target.meta.registry,
     )
 
     # Set the related name
@@ -563,8 +562,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                     has_explicit_primary_key = True
                 # set as soon as possible the field_name
                 value.name = key
-                if registry:
-                    value.registry = registry
 
                 # add fields and non BaseRefForeignKeyField to fields
                 # The BaseRefForeignKeyField is actually not a normal SQL Foreignkey
@@ -599,8 +596,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                             raise ValueError(f"sub field name collision: {sub_field_name}")
                         # set as soon as possible the field_name
                         sub_field.name = sub_field_name
-                        if registry:
-                            sub_field.registry = registry
                         if sub_field.primary_key:
                             has_explicit_primary_key = True
                         # insert as stronger element

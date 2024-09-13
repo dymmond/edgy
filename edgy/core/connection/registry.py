@@ -1,3 +1,4 @@
+import contextlib
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
@@ -26,6 +27,21 @@ if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
 
 
+def _copy_model(model: Type["BaseModelType"], registry: "Registry") -> Type["BaseModelType"]:
+    from edgy.core.utils.models import create_edgy_model
+
+    # we simply subclass, this is not clean but works, the callbacks are set again and reexecuted
+    new_meta = model.meta.__class__(model.meta)
+    new_meta.registry = registry
+    _copy = create_edgy_model(
+        model.__name__,
+        model.__module__,
+        __metadata__=new_meta,
+        __bases__=(model,),
+    )
+    return _copy
+
+
 class Registry:
     """
     The command center for the models of Edgy.
@@ -33,6 +49,7 @@ class Registry:
 
     db_schema: Union[str, None] = None
     content_type: Union[Type["BaseModelType"], None] = None
+    metadata: sqlalchemy.MetaData
 
     def __init__(
         self,
@@ -50,6 +67,8 @@ class Registry:
         self.models: Dict[str, Type[BaseModelType]] = {}
         self.reflected: Dict[str, Type[BaseModelType]] = {}
         self.tenant_models: Dict[str, Type[BaseModelType]] = {}
+
+        self.schema = Schema(registry=self)
         # when setting a Model or Reflected Model execute the callbacks
         # Note: they are only executed if the Model is not in Registry yet
         self._onetime_callbacks: Dict[
@@ -61,15 +80,27 @@ class Registry:
             k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
         }
 
-        self.schema = Schema(registry=self)
-
-        self._metadata: sqlalchemy.MetaData = (
-            sqlalchemy.MetaData(schema=self.db_schema)
-            if self.db_schema is not None
-            else sqlalchemy.MetaData()
-        )
+        self.refresh_metadata()
         if with_content_type is not False:
             self._set_content_type(with_content_type)
+
+    def __copy__(self) -> "Registry":
+        _copy = Registry(self.database)
+        _copy.extra = self.extra
+        _copy.models = {key: _copy_model(val, _copy) for key, val in self.models.items()}
+        _copy.reflected = {key: _copy_model(val, _copy) for key, val in self.reflected.items()}
+        _copy.tenant_models = {
+            key: _copy_model(val, _copy) for key, val in self.tenant_models.items()
+        }
+        if self.content_type is not None:
+            try:
+                _copy.content_type = self.get_model("ContentType")
+            except LookupError:
+                _copy.content_type = self.content_type
+            # init callbacks
+            _copy._set_content_type(_copy.content_type)
+        _copy.refresh_metadata()
+        return _copy
 
     def _set_content_type(
         self, with_content_type: Union[Literal[True], Type["BaseModelType"]]
@@ -121,7 +152,6 @@ class Registry:
                         name="content_type",
                         owner=model_class,
                         to=real_content_type,
-                        registry=self,
                         no_constraint=real_content_type.no_constraints,
                     ),
                 )
@@ -132,7 +162,6 @@ class Registry:
                     foreign_key_name="content_type",
                     related_from=model_class,
                     owner=real_content_type,
-                    registry=real_content_type.meta.registry,
                 )
                 real_content_type.meta.invalidate(True)
 
@@ -143,18 +172,21 @@ class Registry:
             return self.models[model_name]
         elif model_name in self.reflected:
             return self.reflected[model_name]
+        elif model_name in self.tenant_models:
+            return self.tenant_models[model_name]
         else:
             raise LookupError(f"Registry doesn't have a {model_name} model.") from None
 
-    @property
-    def metadata(self) -> Any:
+    def refresh_metadata(self) -> None:
+        self.metadata = sqlalchemy.MetaData()
         for model_class in self.models.values():
+            model_class._table = None
+            model_class._db_schemas = {}
             model_class.table_schema(schema=self.db_schema)
-        return self._metadata
 
-    @metadata.setter
-    def metadata(self, value: sqlalchemy.MetaData) -> None:
-        self._metadata = value
+        for model_class in self.reflected.values():
+            model_class._table = None
+            model_class._db_schemas = {}
 
     def register_callback(
         self,
@@ -173,15 +205,20 @@ class Registry:
             for model in self.reflected.values():
                 callback(model)
                 called = True
+            for name, model in self.tenant_models.items():
+                # for tenant only models
+                if name not in self.models:
+                    callback(model)
+                    called = True
         elif not isinstance(name_or_class, str):
             callback(name_or_class)
             called = True
         else:
-            if name_or_class in self.models:
-                callback(self.models[name_or_class])
-                called = True
-            elif name_or_class in self.reflected:
-                callback(self.reflected[name_or_class])
+            model_class = None
+            with contextlib.suppress(LookupError):
+                model_class = self.get_model(name_or_class)
+            if model_class is not None:
+                callback(model_class)
                 called = True
         if name_or_class is not None and not isinstance(name_or_class, str):
             name_or_class = name_or_class.__name__
@@ -254,13 +291,17 @@ class Registry:
         for model_class in self.reflected.values():
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
 
-    async def create_all(self) -> None:
+    async def create_all(self, refresh_metadata: bool = True) -> None:
+        # otherwise old references to non-existing tables, fks can lurk around
+        if refresh_metadata:
+            self.refresh_metadata()
         if self.db_schema:
-            await self.schema.create_schema(self.db_schema, True)
-        # don't warn here about inperformance
-        async with self.database as database:
-            with database.force_rollback(False):
-                await database.create_all(self.metadata)
+            await self.schema.create_schema(self.db_schema, True, True)
+        else:
+            # don't warn here about inperformance
+            async with self.database as database:
+                with database.force_rollback(False):
+                    await database.create_all(self.metadata)
 
     async def drop_all(self) -> None:
         if self.db_schema:

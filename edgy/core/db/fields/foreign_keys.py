@@ -223,14 +223,20 @@ class BaseForeignKeyField(BaseForeignKey):
         self,
         name: str,
         columns: Sequence[sqlalchemy.Column],
+        schema: Optional[str] = None,
         no_constraint: Optional[bool] = None,
     ) -> Sequence[sqlalchemy.Constraint]:
         constraints = []
         no_constraint = bool(no_constraint or self.no_constraint or self.is_cross_db())
         if not no_constraint:
             target = self.target
+            assert not target.__is_proxy_model__
             prefix = target.meta.tablename
-
+            if not schema:
+                schema = target.meta.registry.schema.get_default_schema()
+                # if schema and f"{schema}.{prefix}" in target.meta.registry.metadata.tables:
+            if schema:
+                prefix = f"{schema}.{prefix}"
             constraints.append(
                 sqlalchemy.ForeignKeyConstraint(
                     columns,

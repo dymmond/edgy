@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Type, cast
+from typing import TYPE_CHECKING, Optional
 
 import sqlalchemy
 from sqlalchemy.exc import DBAPIError, ProgrammingError
@@ -17,18 +17,22 @@ class Schema:
     All the operations regarding a schema are placed in one object
     """
 
-    def __init__(self, registry: Type["Registry"]) -> None:
+    _default_schema: Optional[str]
+
+    def __init__(self, registry: "Registry") -> None:
         self.registry = registry
 
     @property
     def database(self) -> "Database":
         return self.registry.database
 
-    def get_default_schema(self) -> str:
+    def get_default_schema(self) -> Optional[str]:
         """
         Returns the default schema which is usually None
         """
-        return cast("str", self.registry.engine.dialect.default_schema_name)
+        if not hasattr(self, "_default_schema"):
+            self._default_schema = self.database.url.sqla_url.get_dialect(True).default_schema_name
+        return self._default_schema
 
     async def activate_schema_path(
         self, database: Database, schema: str, is_shared: bool = True
@@ -42,7 +46,13 @@ class Schema:
         expression = sqlalchemy.text(path)
         await database.execute(expression)
 
-    async def create_schema(self, schema: str, if_not_exists: bool = False) -> None:
+    async def create_schema(
+        self,
+        schema: str,
+        if_not_exists: bool = False,
+        init_models: bool = False,
+        init_tenant_models: bool = False,
+    ) -> None:
         """
         Creates a model schema if it does not exist.
         """
@@ -55,10 +65,18 @@ class Schema:
             except ProgrammingError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
-        # don't check inperformance here
+        if init_models:
+            for model_class in self.registry.models.values():
+                model_class.table_schema(schema=schema)
+        if init_tenant_models:
+            for model_class in self.registry.tenant_models.values():
+                model_class.table_schema(schema=schema)
+        # don't check for inperformance here
         async with self.database as database:
             with database.force_rollback(False):
                 await database.run_sync(execute_create)
+                if init_models or init_tenant_models:
+                    await database.create_all(self.registry.metadata)
 
     async def drop_schema(
         self, schema: str, cascade: bool = False, if_exists: bool = False

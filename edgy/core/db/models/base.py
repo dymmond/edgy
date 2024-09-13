@@ -356,8 +356,11 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         tablename: str = cls.meta.tablename  # type: ignore
         registry = cls.meta.registry
         assert registry is not None, "registry is not set"
-        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", registry._metadata)  # type: ignore
-        metadata.schema = schema or registry.db_schema
+        metadata: sqlalchemy.MetaData = registry.metadata
+        if not schema:
+            schema = registry.db_schema
+        if not schema:
+            schema = registry.schema.get_default_schema()
 
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
@@ -367,7 +370,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         for name, field in cls.meta.fields.items():
             current_columns = field.get_columns(name)
             columns.extend(current_columns)
-            global_constraints.extend(field.get_global_constraints(name, current_columns))
+            global_constraints.extend(field.get_global_constraints(name, current_columns, schema))
 
         # Handle the uniqueness together
         uniques = []
@@ -388,6 +391,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
             *indexes,
             *global_constraints,
             extend_existing=True,
+            schema=schema,
         )
 
     @classmethod

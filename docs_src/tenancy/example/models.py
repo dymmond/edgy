@@ -39,7 +39,7 @@ class Tenant(edgy.Model):
 
             table = self.table_schema(model, schema)
 
-            logger.info(f"Creating table '{name}' for schema: '{schema}'")
+            logger.info(f"Creating table '{model.meta.tablename}' for schema: '{schema}'")
             try:
                 async with registry.engine.begin() as connection:
                     await connection.run_sync(table.create)

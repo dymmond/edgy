@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import pytest
 
 from edgy import Database, Registry
@@ -15,10 +13,6 @@ models = Registry(database=Database(database, force_rollback=True))
 pytestmark = pytest.mark.anyio
 
 
-def time():
-    return datetime.now().time()
-
-
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     async with database:
@@ -32,10 +26,6 @@ async def create_test_database():
 async def rollback_transactions():
     async with models.database:
         yield
-
-
-async def drop_schemas(name):
-    await models.schema.drop_schema(name, if_exists=True)
 
 
 class Tenant(TenantMixin):

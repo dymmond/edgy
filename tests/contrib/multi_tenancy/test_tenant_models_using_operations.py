@@ -10,7 +10,7 @@ from edgy.exceptions import ObjectNotFound
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL)
+database = DatabaseTestClient(DATABASE_URL, use_existing=False)
 models = Registry(database=Database(database, force_rollback=True))
 
 pytestmark = pytest.mark.anyio
@@ -33,10 +33,6 @@ async def create_test_database():
 async def rollback_transactions():
     async with models.database:
         yield
-
-
-async def drop_schemas(name):
-    await models.schema.drop_schema(name, if_exists=True)
 
 
 class Tenant(TenantMixin):

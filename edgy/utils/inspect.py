@@ -74,7 +74,7 @@ class InspectDB:
                 if self.schema is not None
                 else sqlalchemy.MetaData()
             )
-            metadata = await self.reflect(database=database, metadata=metadata)
+            metadata = await self.reflect(database=database, metadata=metadata, schema=self.schema)
 
             # Generate the tables
             tables, _ = self.generate_table_information(metadata)
@@ -229,14 +229,14 @@ class InspectDB:
         return meta
 
     async def reflect(
-        self, *, database: Database, metadata: sqlalchemy.MetaData
+        self, *, database: Database, metadata: sqlalchemy.MetaData, schema: Optional[str] = None
     ) -> sqlalchemy.MetaData:
         """
         Connects to the database and reflects all the information about the
         schema bringing all the data available.
         """
         logger.info("Collecting database tables information...")
-        await database.run_sync(metadata.reflect)
+        await database.run_sync(metadata.reflect, schema)
         return metadata
 
     def write_output(

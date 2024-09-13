@@ -34,9 +34,8 @@ class ReflectedModelMixin:
         """
         registry = cls.meta.registry
         assert registry is not None, "registry is not set"
-        metadata: sqlalchemy.MetaData = registry._metadata
+        metadata: sqlalchemy.MetaData = registry.metadata
         schema_name = schema or registry.db_schema
-        metadata.schema = schema_name
 
         tablename: str = cast("str", cls.meta.tablename)
         return run_sync(cls.reflect(registry, tablename, metadata, schema_name))

@@ -1,6 +1,7 @@
 import pytest
 
 from edgy import Registry
+from edgy.contrib.contenttypes.models import ContentType as _ContentType
 from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.core.db import fields
@@ -10,7 +11,15 @@ from tests.settings import DATABASE_URL
 database = DatabaseTestClient(DATABASE_URL, drop_database=True, use_existing=False)
 
 
-models = Registry(database=database, with_content_type=True)
+class ExplicitContentType(_ContentType):
+    no_constraints = True
+
+    class Meta:
+        abstract = True
+
+
+models = Registry(database=database, with_content_type=ExplicitContentType)
+
 
 pytestmark = pytest.mark.anyio
 

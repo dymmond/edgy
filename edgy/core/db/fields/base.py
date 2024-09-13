@@ -25,7 +25,6 @@ from edgy.types import Undefined
 from .types import BaseFieldType, ColumnDefinitionModel
 
 if TYPE_CHECKING:
-    from edgy.core.connection.registry import Registry
     from edgy.core.db.models.types import BaseModelType
 
 
@@ -47,7 +46,6 @@ class BaseField(BaseFieldType, FieldInfo):
 
     # defs to simplify the life (can be None actually)
     owner: Type["BaseModelType"]
-    registry: "Registry"
     operator_mapping: Dict[str, str] = {
         # aliases
         "is": "is_",
@@ -432,10 +430,8 @@ class BaseForeignKey(RelationshipField):
         """
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                try:
-                    self._target = self.registry.models[self.to]
-                except KeyError:
-                    self._target = self.registry.reflected[self.to]
+                assert self.owner.meta.registry is not None, "no registry found"
+                self._target = self.owner.meta.registry.get_model(self.to)
             else:
                 self._target = self.to
         return self._target
@@ -450,8 +446,7 @@ class BaseForeignKey(RelationshipField):
             delattr(self, "_target")
 
     def is_cross_db(self) -> bool:
-        # self.registry should be self.owner.meta.registry
-        return self.registry is not self.target.meta.registry
+        return self.owner.meta.registry is not self.target.meta.registry
 
     def expand_relationship(self, value: Any) -> Any:
         """

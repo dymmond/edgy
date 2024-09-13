@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Sequence, Union
+from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Union
 
 from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField, ForeignKey
@@ -49,11 +49,12 @@ class BaseContentTypeFieldField(BaseForeignKeyField):
         return f"reverse_{self.owner.__name__.lower()}"
 
     def get_global_constraints(
-        self, name: str, columns: Sequence["sqlalchemy.Column"]
+        self, name: str, columns: Sequence["sqlalchemy.Column"], schema: Optional[str] = None
     ) -> Sequence["sqlalchemy.Constraint"]:
         target = self.target
+        assert not target.__is_proxy_model__
         # when setting this explicit
-        no_constraint = target.no_constraints
+        no_constraint = bool(target.no_constraints)
         return super().get_global_constraints(name, columns, no_constraint=no_constraint)
 
 
