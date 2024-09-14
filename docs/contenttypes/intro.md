@@ -38,7 +38,6 @@ even replace the collision_key field via an IntegerField.
 
 Or now we allow fruits with the same weight. Let's just remove the uniqueness from the collision_key field.
 
-
 ```python
 {!> ../docs_src/contenttypes/customized_nocollision.py !}
 ```
@@ -49,7 +48,6 @@ Sometime you want to know when an object is created (or updated), so you can red
 or mark old data for deletion.
 
 Edgy is able to do this quite easily:
-
 
 ```python
 {!> ../docs_src/contenttypes/snapshotting.py !}

@@ -31,11 +31,9 @@ For building a hash for a collision key we can leverage an hash method adapted f
 First merge the keys with values with a seperator like `=` (or just use the tags) into an array. Sort the array.
 The entries are now hashed (each entry) and afterwards a hash is build from all the hashes as if they would be a long bytestring.
 
-
 ```python
 {!> ../docs_src/contenttypes/contenttype_tags.py !}
 ```
-
 
 !!! Note
     It is crucial that each entry is mangled (either by hash or an other mangling method) because otherwise malicious users could inject `=` in the value data and provoke
@@ -59,7 +57,6 @@ use `registry.content_type.query.filter(tags__tag__startswith='key=')`
 Searching for a key and a value starting with:
 
 use `registry.content_type.query.filter(tags__tag__startswith='key=value_start')`
-
 
 
 ## References
