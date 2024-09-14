@@ -130,7 +130,7 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         return {field_name: value}
 
     def get_global_constraints(
-        self, name: str, columns: Sequence[sqlalchemy.Column], schema: Optional[str] = None
+        self, name: str, columns: Sequence[sqlalchemy.Column], schemes: Sequence[str] = ()
     ) -> Sequence[sqlalchemy.Constraint]:
         """Return global constraints and indexes.
         Useful for multicolumn fields

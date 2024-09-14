@@ -126,7 +126,7 @@ class BaseModelType(ABC):
 
     @abstractmethod
     async def delete(
-        self, skip_post_delete_hooks: bool = False, delete_orphan_call: bool = False
+        self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
     ) -> None:
         """Delete Model"""
 

@@ -26,7 +26,7 @@ models = edgy.Registry(
 
 
 class ContentTypeTag(edgy.Model):
-    ctype = edgy.fields.ForeignKey(to="ContentType", related_name="tags")
+    ctype = edgy.fields.ForeignKey(to="ContentType", related_name="tags", on_delete=edgy.CASCADE)
     tag = edgy.fields.CharField(max_length=50)
 
     content_type = edgy.fields.ExcludeField()
@@ -102,6 +102,8 @@ async def test_default_contenttypes():
             content_type.get_instance() async for content_type in models.content_type.query.all()
         ]
     await asyncio.gather(*ops)
+    await models.content_type.query.delete()
+    assert await Company.query.get_or_none(name="edgy inc") is None
 
 
 async def test_explicit_contenttypes():
@@ -121,6 +123,8 @@ async def test_explicit_contenttypes():
     # defer
     assert model_after_load.content_type.name == "Company"
     assert await model_after_load.content_type.get_instance() == model1
+    await models.content_type.query.delete()
+    assert await Company.query.get_or_none(name="edgy inc") is None
 
 
 async def test_collision():

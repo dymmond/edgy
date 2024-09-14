@@ -67,7 +67,7 @@ class ContentTypeField(ForeignKey):
         cls,
         to: Union["BaseModelType", str] = "ContentType",
         on_delete: str = CASCADE,
-        no_constraint: bool = True,
+        no_constraint: bool = False,
         delete_orphan: bool = True,
         default: Any = lambda owner: owner.meta.registry.get_model("ContentType")(
             name=owner.__name__

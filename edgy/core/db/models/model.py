@@ -114,7 +114,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         return self
 
     async def delete(
-        self, skip_post_delete_hooks: bool = False, delete_orphan_call: bool = False
+        self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
     ) -> None:
         """Delete operation from the database"""
         await self.meta.signals.pre_delete.send_async(self.__class__, instance=self)

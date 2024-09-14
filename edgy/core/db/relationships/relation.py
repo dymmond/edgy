@@ -319,6 +319,6 @@ class SingleRelation(ManyRelationProtocol):
         return self
 
 
-class OrphanDeletionSingleRelation(SingleRelation):
+class VirtualCascadeDeletionSingleRelation(SingleRelation):
     async def post_delete_callback(self, instance: "Model") -> None:
         await self.delete()

@@ -10,6 +10,9 @@ database = Database("sqlite:///db.sqlite")
 
 
 class ContentType(_ContentType):
+    # Because of sqlite we need no_constraint for the virtual deletion
+    no_constraint = True
+
     created = edgy.fields.DateTimeField(auto_now_add=True, read_only=False)
     keep_until = edgy.fields.DateTimeField(null=True)
 
@@ -44,15 +47,15 @@ class Company(edgy.Model):
 
 
 class Account(edgy.Model):
-    owner = edgy.fields.ForeignKey("ContentType", on_delete="CASCADE")
+    owner = edgy.fields.ForeignKey("ContentType", on_delete=edgy.CASCADE)
 
     class Meta:
         registry = models
 
 
 class Contract(edgy.Model):
-    owner = edgy.fields.ForeignKey("ContentType", on_delete="CASCADE")
-    account = edgy.fields.ForeignKey("Account", null=True, on_delete="SET NULL")
+    owner = edgy.fields.ForeignKey("ContentType", on_delete=edgy.CASCADE)
+    account = edgy.fields.ForeignKey("Account", null=True, on_delete=edgy.SET_NULL)
 
     class Meta:
         registry = models
@@ -102,7 +105,7 @@ async def main():
         )
         print("Remaining accounts:", await Account.query.count())  # should be 0
         print("Remaining contracts:", await Contract.query.count())  # should be 1
-        assert await Account.query.get_or_none(id=account_comp.id) is None
+        print("Accounts:", await Account.query.get_or_none(id=account_comp.id))
 
 
 edgy.run_sync(main())

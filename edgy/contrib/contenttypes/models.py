@@ -1,13 +1,15 @@
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import edgy
+
+from .metaclasses import ContentTypeMeta
 
 if TYPE_CHECKING:
     from edgy.core.db.querysets.base import QuerySet
 
 
-class ContentType(edgy.Model):
-    __require_model_based_deletion__ = True
+class ContentType(edgy.Model, metaclass=ContentTypeMeta):
+    no_constraint: ClassVar[bool] = False
 
     class Meta:
         abstract = True
@@ -25,10 +27,10 @@ class ContentType(edgy.Model):
         return await cast("QuerySet", getattr(self, reverse_name)).using(self.schema_name).get()
 
     async def delete(
-        self, skip_post_delete_hooks: bool = False, delete_orphan_call: bool = False
+        self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
     ) -> None:
         reverse_name = f"reverse_{self.name.lower()}"
         query = cast("QuerySet", getattr(self, reverse_name))
         await super().delete(skip_post_delete_hooks=skip_post_delete_hooks)
-        if not delete_orphan_call:
+        if not remove_referenced_call and self.no_constraint:
             await query.using(self.schema_name).delete()

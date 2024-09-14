@@ -39,9 +39,9 @@ class BaseTenantMeta(BaseModelMeta):
     your own tenant model using the `is_tenant` inside the `Meta` object.
     """
 
-    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any) -> Any:
+    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any, **kwargs: Any) -> Any:
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
-        new_model = super().__new__(cls, name, bases, attrs)
+        new_model = super().__new__(cls, name, bases, attrs, **kwargs)
         meta: TenantMeta = TenantMeta(new_model.meta)
 
         if hasattr(meta_class, "is_tenant"):

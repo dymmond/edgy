@@ -15,6 +15,8 @@ hide:
 - ModelRefs passed as normal positional arguments are automatically staged.
 - ContentType was added.
 - Proper callback support was added.
+- `remove_referenced` parameter for ForeignKeys was added.
+- Virtual `CASCADE` deletion is now used for ForeignKeys without constraint.
 
 ### Changed
 

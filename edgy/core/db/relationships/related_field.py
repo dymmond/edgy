@@ -36,6 +36,8 @@ class RelatedField(RelationshipField):
             null=True,
             **kwargs,
         )
+        if self.foreign_key.relation_has_post_delete_callback:
+            self.post_delete_callback = self._notset_post_delete_callback
 
     @property
     def related_to(self) -> Type["BaseModelType"]:
@@ -108,7 +110,7 @@ class RelatedField(RelationshipField):
     ) -> None:
         await value.save_related()
 
-    async def post_delete_callback(
+    async def _notset_post_delete_callback(
         self, value: ManyRelationProtocol, instance: "BaseModelType"
     ) -> None:
         if hasattr(value, "post_delete_callback"):

@@ -57,6 +57,15 @@ Edgy is able to do this quite easily:
 
 ## Tricks
 
+### CASCADE deletion does not work or constraint problems
+
+Sometime CASCADE deletion is not possible because of the underlying database technology (see snapshotting example)
+or constraints doesn't work like expected, e.g. slowdown.
+
+You can switch to the virtual CASCADE deletion handling without a constraint by using `no_constraint = True`.
+
+If you want a completely different handling for one Model, you can use the ContentTypeField and overwrite all extras.
+
 ### Using in libraries
 
 ContentType is always available under the name `ContentType` if activated and as a `content_type` attribute on registry.
