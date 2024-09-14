@@ -79,7 +79,11 @@ class Storage(ABC):
         return f"{file_root}_{get_random_string(7)}{file_ext}"
 
     def get_available_name(
-        self, name: str, max_length: Union[int, None] = None, overwrite: bool = False
+        self,
+        name: str,
+        max_length: Union[int, None] = None,
+        overwrite: bool = False,
+        multi_process_safe: Union[bool] = None,
     ) -> str:
         """
         Return a filename that's free on the target storage system and
@@ -96,6 +100,8 @@ class Storage(ABC):
         Raises:
             SuspiciousFileOperation: If a path traversal attempt is detected or an available filename cannot be found.
         """
+        if multi_process_safe is None:
+            multi_process_safe = not overwrite
         name = str(name).replace("\\", "/")
         dir_name, file_name = os.path.split(name)
 
@@ -104,6 +110,13 @@ class Storage(ABC):
 
         validate_file_name(file_name)
         file_root, file_ext = os.path.splitext(file_name)
+        if multi_process_safe:
+            # Ddd hexified process pid to prevent collisions among processes.
+            # Adding proccess pid in front because it is most important to prevent classhes
+            # among multiple processes.
+            # Note: despite there is a thread id it is not always available and threads
+            # often shortlived, so use a lock instead (see FilesystemStorage).
+            file_root = f"{os.getpid() or 0:x}_{file_root}"
 
         while (max_length and len(name) > max_length) or (
             not self.reserve_name(name) and not overwrite

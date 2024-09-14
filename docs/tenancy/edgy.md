@@ -283,6 +283,12 @@ If you query the API, you should have similar results to this:
 The [data generated](#generate-example-data) for each schema (`shared` and `edgy`) should match
 the response total returned.
 
+
+###### Tenant only models
+
+By default a table will be generated for the non-tenancy db schema. If you don't want this,
+you can set the flag in the meta of the tenant model `register_default` to False.
+
 ##### Notes
 
 As you could see in the previous step-by=step example, using the [set_tenant](#set-tenant) can be

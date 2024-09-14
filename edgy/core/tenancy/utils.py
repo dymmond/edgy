@@ -31,10 +31,10 @@ async def create_tables(
     Iterates through the tenant models and creates them in the schema.
     """
 
-    for name, model in models.items():
+    for model in models.values():
         table = model.table_schema(schema)
 
-        logger.info(f"Creating table '{name}' for schema: '{schema}'")
+        logger.info(f"Creating table '{model.meta.tablename}' for schema: '{schema}'")
         try:
             async with registry.database as database:
                 await database.run_sync(table.create)

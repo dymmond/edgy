@@ -11,7 +11,15 @@ Here I explain how to do it much simpler and with way less resources in a relati
 
 ## Setup
 
-First we need a generic table which maps to all other tables. We have ContentType. Check
+First we need a generic table which maps to all other tables. We have ContentType. Done.
+
+Second we need a Tag. Here are many flavors possible:
+
+- Tags with seperate key, value fields.
+- Tags with merged key, value fields.
+- Tags with unique key, values; seperate or merged. Note: some dbs have 255 char limit.
+
+Depending if  mysql and others shall be supported
 
 Secondly we need tags, that are text fields with a key value syntax.
 We can use TextFields for this. In my projects I use a syntax: `key=value`. Stupidly simple but you have to check that you only seperate on the first
@@ -23,11 +31,9 @@ For building a hash for a collision key we can leverage an hash method adapted f
 First merge the keys with values with a seperator like `=` (or just use the tags) into an array. Sort the array.
 The entries are now hashed (each entry) and afterwards a hash is build from all the hashes as if they would be a long bytestring.
 
-
 ```python
 {!> ../docs_src/contenttypes/contenttype_tags.py !}
 ```
-
 
 !!! Note
     It is crucial that each entry is mangled (either by hash or an other mangling method) because otherwise malicious users could inject `=` in the value data and provoke
@@ -51,7 +57,6 @@ use `registry.content_type.query.filter(tags__tag__startswith='key=')`
 Searching for a key and a value starting with:
 
 use `registry.content_type.query.filter(tags__tag__startswith='key=value_start')`
-
 
 
 ## References

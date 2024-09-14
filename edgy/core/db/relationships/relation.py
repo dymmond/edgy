@@ -317,3 +317,8 @@ class SingleRelation(ManyRelationProtocol):
     def __get__(self, instance: "Model", owner: Any = None) -> ManyRelationProtocol:
         self.instance = instance
         return self
+
+
+class VirtualCascadeDeletionSingleRelation(SingleRelation):
+    async def post_delete_callback(self, instance: "Model") -> None:
+        await self.delete()

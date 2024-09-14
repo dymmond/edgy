@@ -1,13 +1,17 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
 
 import sqlalchemy
 from pydantic import BaseModel
 
+from edgy.core.db.constants import CASCADE
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.types import BaseFieldType
-from edgy.core.db.relationships.relation import SingleRelation
+from edgy.core.db.relationships.relation import (
+    SingleRelation,
+    VirtualCascadeDeletionSingleRelation,
+)
 from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
@@ -27,6 +31,9 @@ def _removeprefix(text: str, prefix: str) -> str:
 
 
 class BaseForeignKeyField(BaseForeignKey):
+    force_cascade_deletion_relation: bool = False
+    relation_has_post_delete_callback: bool = False
+
     def __init__(
         self,
         *,
@@ -37,6 +44,7 @@ class BaseForeignKeyField(BaseForeignKey):
         embed_parent: Optional[Tuple[str, str]] = None,
         relation_fn: Optional[Callable[..., ManyRelationProtocol]] = None,
         reverse_path_fn: Optional[Callable[[str], Tuple[Any, str, str]]] = None,
+        remove_referenced: bool = False,
         **kwargs: Any,
     ) -> None:
         self.related_fields = related_fields
@@ -46,7 +54,19 @@ class BaseForeignKeyField(BaseForeignKey):
         self.embed_parent = embed_parent
         self.relation_fn = relation_fn
         self.reverse_path_fn = reverse_path_fn
+        self.remove_referenced = remove_referenced
+        if remove_referenced:
+            self.post_delete_callback = self._notset_post_delete_callback
         super().__init__(**kwargs)
+        if self.force_cascade_deletion_relation or (
+            self.on_delete == CASCADE and self.no_constraint
+        ):
+            self.relation_has_post_delete_callback = True
+
+    async def _notset_post_delete_callback(self, value: Any, instance: "BaseModelType") -> None:
+        value = self.expand_relationship(value)
+        if value is not None:
+            await value.delete(remove_referenced_call=True)
 
     async def pre_save_callback(
         self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
@@ -67,8 +87,17 @@ class BaseForeignKeyField(BaseForeignKey):
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         if self.relation_fn is not None:
             return self.relation_fn(**kwargs)
-        return SingleRelation(
-            to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs
+        if self.force_cascade_deletion_relation or (
+            self.on_delete == CASCADE and self.no_constraint
+        ):
+            relation: Any = VirtualCascadeDeletionSingleRelation
+        else:
+            relation = SingleRelation
+        return cast(
+            ManyRelationProtocol,
+            relation(
+                to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs
+            ),
         )
 
     def traverse_field(self, path: str) -> Tuple[Any, str, str]:
@@ -220,19 +249,28 @@ class BaseForeignKeyField(BaseForeignKey):
         return columns
 
     def get_global_constraints(
-        self, name: str, columns: Sequence[sqlalchemy.Column]
+        self,
+        name: str,
+        columns: Sequence[sqlalchemy.Column],
+        schemes: Sequence[str] = (),
+        no_constraint: Optional[bool] = None,
     ) -> Sequence[sqlalchemy.Constraint]:
         constraints = []
-        no_constraint = self.no_constraint
-        if self.is_cross_db():
-            no_constraint = True
+        no_constraint = bool(no_constraint or self.no_constraint or self.is_cross_db())
         if not no_constraint:
             target = self.target
+            assert not target.__is_proxy_model__
+            # use the last prefix as fallback
+            prefix = ""
+            for schema in schemes:
+                prefix = f"{schema}.{target.meta.tablename}" if schema else target.meta.tablename
+                if prefix in target.meta.registry.metadata.tables:
+                    break
             constraints.append(
                 sqlalchemy.ForeignKeyConstraint(
                     columns,
                     [
-                        f"{target.meta.tablename}.{self.from_fk_field_name(name, column.key)}"
+                        f"{prefix}.{self.from_fk_field_name(name, column.key)}"
                         for column in columns
                     ],
                     ondelete=self.on_delete,

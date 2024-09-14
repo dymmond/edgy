@@ -38,12 +38,31 @@ even replace the collision_key field via an IntegerField.
 
 Or now we allow fruits with the same weight. Let's just remove the uniqueness from the collision_key field.
 
-
 ```python
 {!> ../docs_src/contenttypes/customized_nocollision.py !}
 ```
 
+### Example 2: Snapshotting
+
+Sometime you want to know when an object is created (or updated), so you can reduce the search area
+or mark old data for deletion.
+
+Edgy is able to do this quite easily:
+
+```python
+{!> ../docs_src/contenttypes/snapshotting.py !}
+```
+
 ## Tricks
+
+### CASCADE deletion does not work or constraint problems
+
+Sometime CASCADE deletion is not possible because of the underlying database technology (see snapshotting example)
+or constraints doesn't work like expected, e.g. slowdown.
+
+You can switch to the virtual CASCADE deletion handling without a constraint by using `no_constraint = True`.
+
+If you want a completely different handling for one Model, you can use the ContentTypeField and overwrite all extras.
 
 ### Using in libraries
 
@@ -58,3 +77,7 @@ Some models may should not be referencable by ContentType.
 
 You can opt out by overwriting `content_type` on the model to opt out with any Field.
 Use `ExcludeField` to remove the field entirely.
+
+### Tenancy compatibility
+
+ContentType is out of the box tenancy compatible.

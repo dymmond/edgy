@@ -78,7 +78,7 @@ nav:
       - Embedding: "embedding.md"
       - Managers: "managers.md"
       - Fields: "fields.md"
-      - File Handling: "file_handling.md"
+      - File Handling: "file-handling.md"
       - Queries:
           - Queries: "queries/queries.md"
           - Secrets: "queries/secrets.md"
@@ -94,7 +94,7 @@ nav:
       - Connection: "connection.md"
       - ContentTypes:
           - Introduction: "contenttypes/intro.md"
-          - ContentTags - or how to replace elastic search: "contenttypes/replace_elasticsearch.md"
+          - ContentTags - or how to replace elastic search: "contenttypes/replace-elasticsearch.md"
       - Tenancy:
           - Edgy: "tenancy/edgy.md"
           - Contrib: "tenancy/contrib.md"

@@ -8,7 +8,6 @@ from typing import (
     Any,
     ClassVar,
     Dict,
-    Iterable,
     List,
     Literal,
     Optional,
@@ -250,14 +249,18 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         else:
             return cast(Sequence["sqlalchemy.Column"], _empty)
 
-    def identifying_clauses(self) -> Iterable[Any]:
+    def identifying_clauses(self) -> List[Any]:
+        clauses: List[Any] = []
         for field_name in self.identifying_db_fields:
             field = self.meta.fields.get(field_name)
             if field is not None:
                 for column, value in field.clean(field_name, self.__dict__[field_name]).items():
-                    yield getattr(self.table.columns, column) == value
+                    clauses.append(getattr(self.table.columns, column) == value)
             else:
-                yield getattr(self.table.columns, field_name) == self.__dict__[field_name]
+                clauses.append(
+                    getattr(self.table.columns, field_name) == self.__dict__[field_name]
+                )
+        return clauses
 
     def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
         """
@@ -349,15 +352,21 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         return model
 
     @classmethod
-    def build(cls, schema: Optional[str] = None) -> sqlalchemy.Table:
+    def build(
+        cls, schema: Optional[str] = None, metadata: Optional[sqlalchemy.MetaData] = None
+    ) -> sqlalchemy.Table:
         """
         Builds the SQLAlchemy table representation from the loaded fields.
         """
         tablename: str = cls.meta.tablename  # type: ignore
         registry = cls.meta.registry
         assert registry is not None, "registry is not set"
-        metadata: sqlalchemy.MetaData = cast("sqlalchemy.MetaData", registry._metadata)  # type: ignore
-        metadata.schema = schema or registry.db_schema
+        if metadata is None:
+            metadata = registry.metadata
+        schemes: List[str] = []
+        if schema:
+            schemes.append(schema)
+        schemes.append(registry.db_schema or "")
 
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
@@ -367,7 +376,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         for name, field in cls.meta.fields.items():
             current_columns = field.get_columns(name)
             columns.extend(current_columns)
-            global_constraints.extend(field.get_global_constraints(name, current_columns))
+            global_constraints.extend(field.get_global_constraints(name, current_columns, schemes))
 
         # Handle the uniqueness together
         uniques = []
@@ -388,6 +397,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
             *indexes,
             *global_constraints,
             extend_existing=True,
+            schema=schema or registry.db_schema,
         )
 
     @classmethod

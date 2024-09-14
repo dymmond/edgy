@@ -7,7 +7,6 @@ from loguru import logger
 
 import edgy
 from edgy import settings
-from edgy.contrib.multi_tenancy.utils import create_tables
 from edgy.core.db.models.model import Model
 from edgy.core.db.models.utils import get_model
 from edgy.core.utils.db import check_db_connection
@@ -79,8 +78,12 @@ class TenantMixin(edgy.Model):
         registry = self.meta.registry
         assert registry is not None, "registry is not set"
         try:
-            await registry.schema.create_schema(schema=tenant.schema_name, if_not_exists=True)
-            await create_tables(registry, registry.tenant_models, tenant.schema_name)
+            await registry.schema.create_schema(
+                schema=tenant.schema_name,
+                if_not_exists=True,
+                init_tenant_models=True,
+                update_cache=False,
+            )
         except Exception as e:
             message = f"Rolling back... {str(e)}"
             logger.error(message)

@@ -1209,7 +1209,10 @@ class QuerySet(BaseQuerySet):
                 await obj.execute_post_save_hooks(fields)
 
     async def delete(self, use_models: bool = False) -> int:
-        if self.model_class.meta.post_delete_fields:
+        if (
+            self.model_class.__require_model_based_deletion__
+            or self.model_class.meta.post_delete_fields
+        ):
             use_models = True
         if use_models:
             return await self._model_based_delete()

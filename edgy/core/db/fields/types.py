@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+import warnings
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Optional, Sequence, cast
 
 import sqlalchemy
 from pydantic import BaseModel, Field
 
-from edgy.core.connection.registry import Registry
 from edgy.types import Undefined
 
 if TYPE_CHECKING:
+    from edgy.core.connection import Registry
     from edgy.core.db.fields.factories import FieldFactory
     from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.db.models.types import BaseModelType
@@ -49,7 +50,6 @@ class BaseFieldDefinitions:
     inject_default_on_partial_update: bool = False
     inherit: bool = True
     skip_absorption_check: bool = False
-    registry: Optional[Registry] = None
     field_type: Any = Any
     factory: Optional[FieldFactory] = None
 
@@ -130,7 +130,7 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         return {field_name: value}
 
     def get_global_constraints(
-        self, name: str, columns: Sequence[sqlalchemy.Column]
+        self, name: str, columns: Sequence[sqlalchemy.Column], schemes: Sequence[str] = ()
     ) -> Sequence[sqlalchemy.Constraint]:
         """Return global constraints and indexes.
         Useful for multicolumn fields
@@ -187,6 +187,15 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         """
 
     # helpers
+
+    @property
+    def registry(self) -> Registry:
+        warnings.warn(
+            "registry attribute of field is deprecated, use 'owner.meta.registry' instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.owner.meta.registry  # type: ignore
 
     def get_column_names(self, name: str = "") -> FrozenSet[str]:
         if name:

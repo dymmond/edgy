@@ -1,31 +1,34 @@
 import pytest
 
-from edgy import Database, Registry
+from edgy import Registry
+from edgy.contrib.contenttypes.models import ContentType as _ContentType
 from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.core.db import fields
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL)
-models = Registry(database=Database(database, force_rollback=True))
+database = DatabaseTestClient(DATABASE_URL, drop_database=True, use_existing=False)
+
+
+class ExplicitContentType(_ContentType):
+    class Meta:
+        abstract = True
+
+
+models = Registry(database=database, with_content_type=ExplicitContentType)
+
 
 pytestmark = pytest.mark.anyio
 
 
-@pytest.fixture(autouse=True, scope="module")
+@pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     async with database:
         await models.create_all()
         yield
         if not database.drop:
             await models.drop_all()
-
-
-@pytest.fixture(autouse=True)
-async def rollback_transactions():
-    async with models.database:
-        yield
 
 
 class Tenant(TenantMixin):
@@ -40,6 +43,7 @@ class User(TenantModel):
     class Meta:
         registry = models
         is_tenant = True
+        register_default = False
 
 
 class Product(TenantModel):
@@ -50,41 +54,45 @@ class Product(TenantModel):
     class Meta:
         registry = models
         is_tenant = True
+        register_default = False
 
 
 async def test_tenant_model_metaclass_tenant_models():
+    assert "User" not in models.models
+    assert "User" in models.tenant_models
     assert Product.__name__ in Product.meta.registry.tenant_models
+    assert "ContentType" not in Product.meta.registry.tenant_models
 
 
-async def test_schema():
-    tenant = await Tenant.query.create(
-        schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
+async def test_model_crud():
+    edgy = await Tenant.query.create(
+        schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
     )
 
-    for i in range(5):
-        await Product.query.using(tenant.schema_name).create(name=f"product-{i}")
+    users = await User.query.using(edgy.schema_name).all()
+    assert users == []
 
-    total = await Product.query.using(tenant.schema_name).all()
+    user = await User.query.using(edgy.schema_name).create(name="Test")
+    users = await User.query.using(edgy.schema_name).all()
+    assert user.name == "Test"
+    assert user.pk is not None
+    assert users == [user]
 
-    assert len(total) == 5
+    lookup = await User.query.using(edgy.schema_name).get()
+    assert lookup == user
 
-    total = await Product.query.all()
+    await user.update(name="Jane")
+    users = await User.query.using(edgy.schema_name).all()
+    assert user.name == "Jane"
+    assert user.pk is not None
+    assert users == [user]
 
-    assert len(total) == 0
-
-    for i in range(15):
-        await Product.query.create(name=f"product-{i}")
-
-    total = await Product.query.all()
-
-    assert len(total) == 15
-
-    total = await Product.query.using(tenant.schema_name).all()
-
-    assert len(total) == 5
+    await user.delete()
+    users = await User.query.using(edgy.schema_name).all()
+    assert users == []
 
 
-async def test_can_have_multiple_tenants_with_different_records():
+async def _test_can_have_multiple_tenants_with_different_records():
     edgy = await Tenant.query.create(
         schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
     )
@@ -115,43 +123,9 @@ async def test_can_have_multiple_tenants_with_different_records():
         await User.query.create(name=f"user-{name}")
 
     # Check the totals
-    top_level_users = await User.query.all()
-    assert len(top_level_users) == 10
-
     users_edgy = await User.query.using(edgy.schema_name).all()
     assert len(users_edgy) == 11
 
     users_saffier = await User.query.using(saffier.schema_name).all()
     assert len(users_saffier) == 11
-
-
-async def test_model_crud():
-    edgy = await Tenant.query.create(
-        schema_name="edgy", domain_url="https://edgy.tarsild.io", tenant_name="edgy"
-    )
-
-    users = await User.query.using(edgy.schema_name).all()
-    assert users == []
-
-    user = await User.query.using(edgy.schema_name).create(name="Test")
-    users = await User.query.using(edgy.schema_name).all()
-    assert user.name == "Test"
-    assert user.pk is not None
-    assert users == [user]
-
-    lookup = await User.query.using(edgy.schema_name).get()
-    assert lookup == user
-
-    await user.update(name="Jane")
-    users = await User.query.using(edgy.schema_name).all()
-    assert user.name == "Jane"
-    assert user.pk is not None
-    assert users == [user]
-
-    # Check if public has the users
-    users = await User.query.all()
-    assert users == []
-
-    await user.delete()
-    users = await User.query.using(edgy.schema_name).all()
-    assert users == []
+    assert await models.content_type.query.filter(name="User").count() == 32

@@ -36,6 +36,7 @@ IGNORED = ["cls", "__class__", "kwargs", "generate_name_fn"]
 
 
 class ConcreteFileField(BaseCompositeField):
+    multi_process_safe: bool = True
     field_file_class: Type[FieldFile]
     _generate_name_fn: Optional[
         Callable[[Optional["BaseModelType"], str, Union[File, BinaryIO], bool], str]
@@ -125,6 +126,7 @@ class ConcreteFileField(BaseCompositeField):
                     approved=field_instance_or_value.get(
                         f"{field_name}_approved", not self.with_approval
                     ),
+                    multi_process_safe=self.multi_process_safe,
                     change_removes_approval=self.with_approval,
                     generate_name_fn=partial(self.generate_name_fn, instance),
                 )
@@ -136,6 +138,7 @@ class ConcreteFileField(BaseCompositeField):
                     # not initialized yet
                     file_instance = self.field_file_class(
                         self,
+                        multi_process_safe=self.multi_process_safe,
                         generate_name_fn=partial(self.generate_name_fn, instance),
                         storage=self.storage,
                         approved=not self.with_approval,
@@ -225,7 +228,7 @@ class ConcreteFileField(BaseCompositeField):
         # cleanup temp file
         value.close(keep_size=True)
 
-    async def post_delete_callback(self, value: FieldFile) -> None:
+    async def post_delete_callback(self, value: FieldFile, instance: "BaseModelType") -> None:
         value.delete(instant=True)
 
 

@@ -116,6 +116,16 @@ then you can simply declare the model without the `id`.
 {!> ../docs_src/models/default_model.py !}
 ```
 
+##### Customizing the deletion variant
+
+By default a database only deletion is used where possible when using the QuerySet delete method.
+
+If you want to force the QuerySet calling the delete method of the model instead,
+you can set the class variable:
+
+`__require_model_based_deletion__ = True`
+
+
 ## The Meta class
 
 When declaring a model, it is **crucial** having the `Meta` class declared. There is where you

@@ -341,7 +341,6 @@ def _set_related_field(
         name=related_name,
         owner=target,
         related_from=source,
-        registry=target.meta.registry,
     )
 
     # Set the related name
@@ -563,8 +562,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                     has_explicit_primary_key = True
                 # set as soon as possible the field_name
                 value.name = key
-                if registry:
-                    value.registry = registry
 
                 # add fields and non BaseRefForeignKeyField to fields
                 # The BaseRefForeignKeyField is actually not a normal SQL Foreignkey
@@ -599,8 +596,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                             raise ValueError(f"sub field name collision: {sub_field_name}")
                         # set as soon as possible the field_name
                         sub_field.name = sub_field_name
-                        if registry:
-                            sub_field.registry = registry
                         if sub_field.primary_key:
                             has_explicit_primary_key = True
                         # insert as stronger element
@@ -853,16 +848,20 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         meta: MetaInfo = cls.meta
         return meta.signals
 
-    def table_schema(cls, schema: Union[str, None] = None) -> "sqlalchemy.Table":
+    def table_schema(
+        cls, schema: Union[str, None] = None, update_cache: bool = False
+    ) -> "sqlalchemy.Table":
         """
         Retrieve table for schema (nearly the same as build with scheme argument).
         Cache per class via a primitive LRU cache.
         """
         if schema is None:
+            if update_cache:
+                cls._table = None
             return cls.table
         # remove cache element so the key is reordered
         schema_obj = cls._db_schemas.pop(schema, None)
-        if schema_obj is None:
+        if schema_obj is None or update_cache:
             schema_obj = cls.build(schema=schema)
         # set element to last
         cls._db_schemas[schema] = schema_obj
