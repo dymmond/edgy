@@ -75,10 +75,10 @@ async def rollback_transactions():
 
 async def test_select_related_tenant():
     tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
-    designation = await Designation.query.using(tenant.schema_name).create(name="admin")
-    module = await AppModule.query.using(tenant.schema_name).create(name="payroll")
+    designation = await Designation.query.using(schema=tenant.schema_name).create(name="admin")
+    module = await AppModule.query.using(schema=tenant.schema_name).create(name="payroll")
 
-    permission = await Permission.query.using(tenant.schema_name).create(
+    permission = await Permission.query.using(schema=tenant.schema_name).create(
         designation=designation, module=module
     )
 
@@ -86,7 +86,9 @@ async def test_select_related_tenant():
 
     assert len(query) == 0
 
-    query = await Permission.query.using(tenant.schema_name).select_related("designation").all()
+    query = (
+        await Permission.query.using(schema=tenant.schema_name).select_related("designation").all()
+    )
 
     assert len(query) == 1
     assert query[0].pk == permission.pk

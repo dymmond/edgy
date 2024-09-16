@@ -101,11 +101,11 @@ async def get_products() -> List[Product]:
 
 @pytest.fixture()
 def app():
-    app = Esmerald(
-        routes=[Gateway(handler=get_products)],
-        middleware=[TenantMiddleware],
-        on_startup=[database.connect],
-        on_shutdown=[database.disconnect],
+    app = models.asgi(
+        Esmerald(
+            routes=[Gateway(handler=get_products)],
+            middleware=[TenantMiddleware],
+        )
     )
     return app
 
@@ -143,13 +143,15 @@ async def create_data():
     saffier = await User.query.create(name="saffier")
 
     edgy_tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
-    edgy = await User.query.using(edgy_tenant.schema_name).create(name="edgy")
+    edgy = await User.query.using(schema=edgy_tenant.schema_name).create(name="edgy")
 
     await TenantUser.query.create(user=edgy, tenant=edgy_tenant)
 
     # Products for Edgy
     for i in range(10):
-        await Product.query.using(edgy_tenant.schema_name).create(name=f"Product-{i}", user=edgy)
+        await Product.query.using(schema=edgy_tenant.schema_name).create(
+            name=f"Product-{i}", user=edgy
+        )
 
     # Products for Saffier
     for i in range(25):

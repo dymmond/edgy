@@ -46,12 +46,12 @@ async def test_can_create_tenant_records():
         await Item.query.create(name=f"item-{i}")
 
     for i in range(5):
-        await Item.query.using("esmerald").create(name=f"item-schema-{i}")
+        await Item.query.using(schema="esmerald").create(name=f"item-schema-{i}")
 
     total = await Item.query.count()
 
     assert total == 10
 
-    total_schema = await Item.query.using("esmerald").count()
+    total_schema = await Item.query.using(schema="esmerald").count()
 
     assert total_schema == 5

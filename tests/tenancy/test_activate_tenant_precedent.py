@@ -97,7 +97,9 @@ async def test_activate_using_takes_precedence():
 
     assert len(query) == 0
 
-    query = await Permission.query.using(tenant.schema_name).select_related("designation").all()
+    query = (
+        await Permission.query.using(schema=tenant.schema_name).select_related("designation").all()
+    )
 
     assert len(query) == 1
     assert query[0].pk == permission.pk
@@ -106,7 +108,9 @@ async def test_activate_using_takes_precedence():
 
     # Even if the activate_schema pointing to a different schema is enabled
     # The use of `using` takes precedence all the time
-    query = await Permission.query.using(tenant.schema_name).select_related("designation").all()
+    query = (
+        await Permission.query.using(schema=tenant.schema_name).select_related("designation").all()
+    )
 
     assert len(query) == 1
     assert query[0].pk == permission.pk

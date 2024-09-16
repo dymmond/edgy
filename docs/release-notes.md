@@ -5,6 +5,17 @@ hide:
 
 # Release Notes
 
+## Unreleased
+
+### Added
+
+- ASGI, async context manager support to connect/disconnect multiple dbs at once.
+- `create_all`/`drop_all`, `create_schema`/`drop_schema` are now capable of initializing dbs in extra.
+
+### Changed
+
+- Unify `using` to allow setting schema and database via keyword arguments and deprecate both former calls.
+
 ## 0.15.0
 
 ### Added

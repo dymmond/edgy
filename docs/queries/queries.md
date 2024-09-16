@@ -50,6 +50,20 @@ await User.query.filter(is_active=True, first_name__icontains="a").order_by("id"
 And that is it. Of course there are more filters and operations that you can do with the ORM and
 we will be covering that in this document but in a nutshell, querying the database is this simple.
 
+## Selecting the database
+
+By default the default schema and the default database is used. This are the `db_schema` and the `database` attributes of the registry.
+We can use different databases and schemas by using:
+
+`using(*, schema, database)`
+
+This method allows us to select a database specified in registry extra via its name or even an arbitary database object.
+
+For schema it is valid to use a string for a schema, None for the main schema or False to reset to the current default schema.
+
+It is the merge of the former methods `using` (with a positional argument) and `using_with_db` which are still valid but deprecated and have usability problems.
+
+
 ## Load the foreign keys beforehand with select related
 
 Select related is a functionality that *follows the foreign-key relationships* by selecting any

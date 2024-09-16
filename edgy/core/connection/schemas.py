@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, List, Optional
+import asyncio
+from typing import TYPE_CHECKING, List, Optional, Sequence, Union
 
 import sqlalchemy
 from sqlalchemy.exc import DBAPIError, ProgrammingError
@@ -53,6 +54,7 @@ class Schema:
         init_models: bool = False,
         init_tenant_models: bool = False,
         update_cache: bool = True,
+        databases: Sequence[Union[str, None]] = (None,),
     ) -> None:
         """
         Creates a model schema if it does not exist.
@@ -77,16 +79,24 @@ class Schema:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
             for table in tables:
                 table.create(connection, checkfirst=if_not_exists)
+            if init_models:
+                self.registry.metadata.create_all(connection, checkfirst=if_not_exists)
 
-        # don't check for inperformance here
-        async with self.database as database:
-            with database.force_rollback(False):
-                await database.run_sync(execute_create)
-                if init_models:
-                    await database.create_all(self.registry.metadata)
+        ops = []
+        for database in databases:
+            db = self.registry.database if database is None else self.registry.extra[database]
+            # don't warn here about inperformance
+            with db.force_rollback(False):
+                async with db as db:
+                    ops.append(db.run_sync(execute_create))
+        await asyncio.gather(*ops)
 
     async def drop_schema(
-        self, schema: str, cascade: bool = False, if_exists: bool = False
+        self,
+        schema: str,
+        cascade: bool = False,
+        if_exists: bool = False,
+        databases: Sequence[Union[str, None]] = (None,),
     ) -> None:
         """
         Drops an existing model schema.
@@ -100,6 +110,12 @@ class Schema:
             except DBAPIError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
 
-        async with self.database as database:
-            with database.force_rollback(False):
-                await database.run_sync(execute_drop)
+        ops = []
+
+        for database in databases:
+            db = self.registry.database if database is None else self.registry.extra[database]
+            # don't warn here about inperformance
+            with db.force_rollback(False):
+                async with db as db:
+                    ops.append(db.run_sync(execute_drop))
+        await asyncio.gather(*ops)

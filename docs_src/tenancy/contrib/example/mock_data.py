@@ -17,7 +17,7 @@ async def create_data():
     edgy_tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
 
     # HubUser - A user specific inside the edgy schema
-    edgy_schema_user = await HubUser.query.using(edgy_tenant.schema_name).create(
+    edgy_schema_user = await HubUser.query.using(schema=edgy_tenant.schema_name).create(
         name="edgy", email="edgy@esmerald.dev"
     )
 
@@ -25,7 +25,7 @@ async def create_data():
 
     # Products for Edgy HubUser specific
     for i in range(10):
-        await Product.query.using(edgy_tenant.schema_name).create(
+        await Product.query.using(schema=edgy_tenant.schema_name).create(
             name=f"Product-{i}", user=edgy_schema_user
         )
 

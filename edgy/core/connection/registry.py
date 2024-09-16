@@ -1,5 +1,7 @@
+import asyncio
 import contextlib
-from functools import cached_property
+from functools import cached_property, partial
+from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -9,9 +11,11 @@ from typing import (
     Literal,
     Mapping,
     Optional,
+    Sequence,
     Type,
     Union,
     cast,
+    overload,
 )
 
 import sqlalchemy
@@ -21,6 +25,8 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
+
+from .asgi import ASGIApp, ASGIHelper
 
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
@@ -292,22 +298,82 @@ class Registry:
         for model_class in self.reflected.values():
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
 
-    async def create_all(self, refresh_metadata: bool = True) -> None:
+    async def __aenter__(self) -> "Registry":
+        dbs = [self.database]
+        for db in self.extra.values():
+            dbs.append(db)
+        ops = [db.connect() for db in dbs]
+        results: List[Union[BaseException, bool]] = await asyncio.gather(
+            *ops, return_exceptions=True
+        )
+        if any(isinstance(x, BaseException) for x in results):
+            ops2 = []
+            for num, value in enumerate(results):
+                if not isinstance(value, BaseException):
+                    ops2.append(dbs[num].disconnect())
+            await asyncio.gather(*ops2)
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]] = None,
+        exc_value: Optional[BaseException] = None,
+        traceback: Optional[TracebackType] = None,
+    ) -> None:
+        ops = [self.database.disconnect()]
+        for value in self.extra.values():
+            ops.append(value.disconnect())
+        await asyncio.gather(*ops)
+
+    @overload
+    def asgi(
+        self,
+        app: None,
+        handle_lifespan: bool = False,
+    ) -> Callable[[ASGIApp], ASGIHelper]: ...
+
+    @overload
+    def asgi(
+        self,
+        app: ASGIApp,
+        handle_lifespan: bool = False,
+    ) -> ASGIHelper: ...
+
+    def asgi(
+        self,
+        app: Optional[ASGIApp] = None,
+        handle_lifespan: bool = False,
+    ) -> Union[ASGIHelper, Callable[[ASGIApp], ASGIHelper]]:
+        """Return wrapper for asgi integration."""
+        if app is not None:
+            return ASGIHelper(app=app, registry=self, handle_lifespan=handle_lifespan)
+        return partial(ASGIHelper, registry=self, handle_lifespan=handle_lifespan)
+
+    async def create_all(
+        self, refresh_metadata: bool = True, databases: Sequence[Union[str, None]] = (None,)
+    ) -> None:
         # otherwise old references to non-existing tables, fks can lurk around
         if refresh_metadata:
             self.refresh_metadata()
         if self.db_schema:
-            await self.schema.create_schema(self.db_schema, True, True, update_cache=True)
+            await self.schema.create_schema(
+                self.db_schema, True, True, update_cache=True, databases=databases
+            )
         else:
-            # don't warn here about inperformance
-            async with self.database as database:
-                with database.force_rollback(False):
-                    await database.create_all(self.metadata)
+            for database in databases:
+                db = self.database if database is None else self.extra[database]
+                # don't warn here about inperformance
+                with db.force_rollback(False):
+                    async with db as db:
+                        await db.create_all(self.metadata)
 
-    async def drop_all(self) -> None:
+    async def drop_all(self, databases: Sequence[Union[str, None]] = (None,)) -> None:
         if self.db_schema:
-            await self.schema.drop_schema(self.db_schema, True, True)
-        # don't warn here about inperformance
-        async with self.database as database:
-            with database.force_rollback(False):
-                await database.drop_all(self.metadata)
+            await self.schema.drop_schema(self.db_schema, True, True, databases=databases)
+        else:
+            for database in databases:
+                db = self.database if database is None else self.extra[database]
+                # don't warn here about inperformance
+                with db.force_rollback(False):
+                    async with db as db:
+                        await db.drop_all(self.metadata)

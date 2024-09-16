@@ -53,39 +53,41 @@ class User(TenantModel):
 async def test_schema_with_using():
     """
     using this:
-    await User.query.using('tenant_schema').filter(email="foo@bar.com").update(email="bar@foo.com")
+    await User.query.using(schema='tenant_schema').filter(email="foo@bar.com").update(email="bar@foo.com")
     is causing the updating the object it without the remaining column
     using:
 
-    user = await User.query.using('tenant_schema').get(email="foo@bar.com")
+    user = await User.query.using(schema='tenant_schema').get(email="foo@bar.com")
     await user.update(email="bar@foo.com")
     does not updated the data
-    also User.query.using('tenant_schema').get(email="foo@bar.com")
+    also User.query.using(schema='tenant_schema').get(email="foo@bar.com")
     """
     tenant = await Tenant.query.create(
         schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
     )
 
-    user = await User.query.using(tenant.schema_name).create(name="Edgy", email="edgy@edgy.dev")
-    total = await User.query.using(tenant.schema_name).all()
+    user = await User.query.using(schema=tenant.schema_name).create(
+        name="Edgy", email="edgy@edgy.dev"
+    )
+    total = await User.query.using(schema=tenant.schema_name).all()
 
     assert user.email == "edgy@edgy.dev"
     assert len(total) == 1
 
     await (
-        User.query.using(tenant.schema_name)
+        User.query.using(schema=tenant.schema_name)
         .filter(email="edgy@edgy.dev")
         .update(email="bar@foo.com")
     )
 
-    users = await User.query.using(tenant.schema_name).all()
+    users = await User.query.using(schema=tenant.schema_name).all()
     assert len(users) == 1
     assert users[0].email == "bar@foo.com"
     assert users[0].name == "Edgy"
 
-    user = await User.query.using(tenant.schema_name).get(email="bar@foo.com")
+    user = await User.query.using(schema=tenant.schema_name).get(email="bar@foo.com")
     assert users[0].email == "bar@foo.com"
     assert users[0].name == "Edgy"
 
     with pytest.raises(ObjectNotFound):
-        await User.query.using(tenant.schema_name).get(email="edgy@edgy.dev")
+        await User.query.using(schema=tenant.schema_name).get(email="edgy@edgy.dev")

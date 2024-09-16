@@ -65,7 +65,7 @@ async def rollback_transactions():
 
 async def test_bulk_create_another_tenant():
     with pytest.raises(ProgrammingError):
-        await Product.query.using("another").bulk_create(
+        await Product.query.using(schema="another").bulk_create(
             [
                 {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
                 {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},

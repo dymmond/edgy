@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any, Optional, Sequence, Union, cast
+import warnings
+from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Union, cast
 
 import sqlalchemy
 
@@ -48,44 +49,71 @@ class QuerySetPropsMixin:
         return self.model_class.pkcolumns  # type: ignore
 
 
+_sentinel = object()
+
+
 class TenancyMixin:
     """
-    Mixin used for querying a possible multi tenancy application
+    Mixin used for querying a possible multi tenancy and multi-database application
     """
 
-    def using(self, schema: Union[str, Any, None] = Undefined) -> "QuerySet":
+    def using(
+        self,
+        _positional: Any = _sentinel,
+        *,
+        database: Union[str, Any, None, "Database"] = Undefined,
+        schema: Union[str, Any, None, Literal[False]] = Undefined,
+    ) -> "QuerySet":
         """
-        Enables and switches the db schema.
+        Enables and switches the db schema and/or db.
 
         Generates the registry object pointing to the desired schema
         using the same connection.
+
+        Use schema=False to unset the schema to the active default schema.
+        Use database=None to use the default database again.
         """
+        if _positional is not _sentinel:
+            warnings.warn(
+                "Passing positional arguments to using is deprecated. Use schema= instead.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            schema = _positional
+            if schema is Undefined:
+                schema = False
+
         queryset = cast("QuerySet", self._clone())
-        queryset.using_schema = schema
-        queryset.active_schema = queryset.get_schema()
-        queryset.table = None  # type: ignore
+        if database is not Undefined:
+            if isinstance(database, Database):
+                connection: Database = database
+            elif database is None:
+                connection = self.model_class.meta.registry.database
+            else:
+                assert (
+                    database is None or database in self.model_class.meta.registry.extra
+                ), f"`{database}` is not in the connections extra of the model`{self.model_class.__name__}` registry"
+
+                connection = self.model_class.meta.registry.extra[database]
+            queryset.database = connection
+        if schema is not Undefined:
+            queryset.using_schema = schema if schema is not False else Undefined
+            queryset.active_schema = queryset.get_schema()
+            queryset.table = None  # type: ignore
         return queryset
 
     def using_with_db(
-        self, connection_name: str, schema: Union[str, Any] = Undefined
+        self, connection_name: str, schema: Union[str, Any, None, Literal[False]] = Undefined
     ) -> "QuerySet":
         """
-        Enables and switches the database connection.
-
-        Generates the new queryset using the selected connection provided in the extra of the model
-        registry.
+        Switches the database connection and schema
         """
-        assert (
-            connection_name in self.model_class.meta.registry.extra
-        ), f"`{connection_name}` is not in the connections extra of the model`{self.model_class.__name__}` registry"
-
-        connection: Database = self.model_class.meta.registry.extra[connection_name]
-        queryset = cast("QuerySet", self._clone())
-        queryset.database = connection
-        queryset.using_schema = schema
-        queryset.active_schema = queryset.get_schema()
-        queryset.table = None  # type: ignore
-        return queryset
+        warnings.warn(
+            "'using_with_db' is deprecated in favor of 'using' with schema, database arguments.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.using(database=connection_name, schema=schema)
 
 
 def activate_schema(tenant_name: str) -> None:

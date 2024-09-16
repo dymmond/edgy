@@ -58,18 +58,24 @@ async def test_queries():
     tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
 
     # Create a product with a user
-    user = await User.query.using(tenant.schema_name).create(name="user")
-    product = await Product.query.using(tenant.schema_name).create(name="product-1", user=user)
+    user = await User.query.using(schema=tenant.schema_name).create(name="user")
+    product = await Product.query.using(schema=tenant.schema_name).create(
+        name="product-1", user=user
+    )
 
     # Query tenants
-    users = await User.query.using(tenant.schema_name).all()
+    users = await User.query.using(schema=tenant.schema_name).all()
     assert len(users) == 1
 
-    products = await Product.query.using(tenant.schema_name).all()
+    products = await Product.query.using(schema=tenant.schema_name).all()
     assert len(products) == 1
 
     # Query related
-    prod = await Product.query.using(tenant.schema_name).filter(user__name__icontains="u").get()
+    prod = (
+        await Product.query.using(schema=tenant.schema_name)
+        .filter(user__name__icontains="u")
+        .get()
+    )
 
     assert prod.id == product.id
     assert prod.table.schema == tenant.schema_name
