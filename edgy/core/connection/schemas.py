@@ -86,8 +86,8 @@ class Schema:
         for database in databases:
             db = self.registry.database if database is None else self.registry.extra[database]
             # don't warn here about inperformance
-            with db.force_rollback(False):
-                async with db as db:
+            async with db as db:
+                with db.force_rollback(False):
                     ops.append(db.run_sync(execute_create))
         await asyncio.gather(*ops)
 
@@ -115,7 +115,7 @@ class Schema:
         for database in databases:
             db = self.registry.database if database is None else self.registry.extra[database]
             # don't warn here about inperformance
-            with db.force_rollback(False):
-                async with db as db:
+            async with db as db:
+                with db.force_rollback(False):
                     ops.append(db.run_sync(execute_drop))
         await asyncio.gather(*ops)

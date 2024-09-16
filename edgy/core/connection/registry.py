@@ -363,8 +363,8 @@ class Registry:
             for database in databases:
                 db = self.database if database is None else self.extra[database]
                 # don't warn here about inperformance
-                with db.force_rollback(False):
-                    async with db as db:
+                async with db as db:
+                    with db.force_rollback(False):
                         await db.create_all(self.metadata)
 
     async def drop_all(self, databases: Sequence[Union[str, None]] = (None,)) -> None:
@@ -374,6 +374,6 @@ class Registry:
             for database in databases:
                 db = self.database if database is None else self.extra[database]
                 # don't warn here about inperformance
-                with db.force_rollback(False):
-                    async with db as db:
+                async with db as db:
+                    with db.force_rollback(False):
                         await db.drop_all(self.metadata)
