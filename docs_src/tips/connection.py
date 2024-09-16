@@ -32,10 +32,10 @@ def get_application():
     build_path()
     database, registry = get_db_connection()
 
-    app = Esmerald(
-        routes=[Include(namespace="my_project.urls")],
-        on_startup=[database.connect],
-        on_shutdown=[database.disconnect],
+    app = registry.asgi(
+        Esmerald(
+            routes=[Include(namespace="my_project.urls")],
+        )
     )
 
     Migrate(app=app, registry=registry)

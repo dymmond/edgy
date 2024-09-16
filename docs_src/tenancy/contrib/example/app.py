@@ -23,9 +23,9 @@ async def products() -> List[Product]:
     return products
 
 
-app = Esmerald(
-    routes=[Gateway(handler=products)],
-    on_startup=[database.connect],
-    on_shutdown=[database.disconnect],
-    middleware=[TenantMiddleware],
+app = models.asgi(
+    Esmerald(
+        routes=[Gateway(handler=products)],
+        middleware=[TenantMiddleware],
+    )
 )
