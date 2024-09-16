@@ -50,7 +50,7 @@ await User.query.filter(is_active=True, first_name__icontains="a").order_by("id"
 And that is it. Of course there are more filters and operations that you can do with the ORM and
 we will be covering that in this document but in a nutshell, querying the database is this simple.
 
-## Selecting the database
+## Selecting the database and schema
 
 By default the default schema and the default database is used. This are the `db_schema` and the `database` attributes of the registry.
 We can use different databases and schemas by using:
