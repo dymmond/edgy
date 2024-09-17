@@ -44,16 +44,15 @@ Or doing it manually (that applies to every framework):
 {!> ../docs_src/connections/simple.py !}
 ```
 
-And that is pretty much this. Once the connection is hooked into your application lifecycle you
-won't have warnings about decreased performance.
+And that is pretty much this. Once the connection is hooked into your application lifecycle.
+Otherwise you will get warnings about decreased performance because the databasez backend is not connected and will be
+reininitialized for each operation.
 
 You are now free to use the ORM anywhere in your application. As well as extra defined database connections in registry.
-
 
 ## Django integration
 
 Django currently doesn't support the lifespan protocol. So we have a keyword parameter to handle it ourselves.
-
 
 ```python
 {!> ../docs_src/connections/django.py !}

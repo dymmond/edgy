@@ -52,7 +52,7 @@ we will be covering that in this document but in a nutshell, querying the databa
 
 ## Selecting the database and schema
 
-By default the default schema and the default database is used. This are the `db_schema` and the `database` attributes of the registry.
+By default the default schema and the default database is used. These are the `db_schema` and the `database` attributes of the registry.
 We can use different databases and schemas by using:
 
 `using(*, schema, database)`
@@ -62,7 +62,6 @@ This method allows us to select a database specified in registry extra via its n
 For schema it is valid to use a string for a schema, None for the main schema or False to reset to the current default schema.
 
 It is the merge of the former methods `using` (with a positional argument) and `using_with_db` which are still valid but deprecated and have usability problems.
-
 
 ## Load the foreign keys beforehand with select related
 
