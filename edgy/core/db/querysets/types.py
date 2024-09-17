@@ -21,7 +21,7 @@ from edgy.types import Undefined
 
 if TYPE_CHECKING:
     import sqlalchemy
-    from database.core.transaction import Transaction
+    from databasez.core.transaction import Transaction
 
     from edgy.core.connection import Database
     from edgy.core.db.models import BaseModelType, Model

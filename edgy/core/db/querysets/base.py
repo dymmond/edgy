@@ -40,7 +40,7 @@ from edgy.types import Undefined
 from . import clauses as clauses_mod
 
 if TYPE_CHECKING:  # pragma: no cover
-    from database.core.transaction import Transaction
+    from databasez.core.transaction import Transaction
 
     from edgy.core.connection import Database
 
