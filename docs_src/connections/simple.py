@@ -1,13 +1,18 @@
+from contextlib import asynccontextmanager
 from esmerald import Esmerald
 
-from edgy import Database, Registry
+from edgy import Registry
 
-database = Database("sqlite:///db.sqlite")
-models = Registry(database=database)
+models = Registry(database="sqlite:///db.sqlite", echo=True)
+
+
+@asynccontextmanager
+async def lifespan(app: Esmerald):
+    async with models:
+        yield
 
 
 app = Esmerald(
     routes=[...],
-    on_startup=[models.connect],
-    on_shutdown=[models.disconnect],
+    lifespan=lifespan,
 )

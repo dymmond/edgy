@@ -5,5 +5,4 @@ from esmerald.conf import settings
 
 @lru_cache()
 def get_db_connection():
-    database, registry = settings.db_connection
-    return database, registry
+    return settings.db_connection

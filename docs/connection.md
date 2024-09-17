@@ -40,7 +40,8 @@ with the ASGI integration:
 
 Or doing it manually (that applies to every framework):
 
-```python hl_lines="10-11"
+
+```python hl_lines="11-12"
 {!> ../docs_src/connections/simple.py !}
 ```
 

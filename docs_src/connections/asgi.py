@@ -1,9 +1,8 @@
 from esmerald import Esmerald
 
-from edgy import Database, Registry
+from edgy import Registry
 
-database = Database("sqlite:///db.sqlite")
-models = Registry(database=database)
+models = Registry(database="sqlite:///db.sqlite", echo=True)
 
 
 app = models.asgi(

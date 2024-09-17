@@ -1,10 +1,9 @@
 from django.core.asgi import get_asgi_application
 
 
-from edgy import Database, Registry
+from edgy import Registry
 
-database = Database("sqlite:///db.sqlite")
-models = Registry(database=database)
+models = Registry(database="sqlite:///db.sqlite", echo=True)
 
 
 application = models.asgi(handle_lifespan=True)(get_asgi_application())
