@@ -11,6 +11,7 @@ hide:
 
 - ASGI, async context manager support to connect/disconnect multiple dbs at once.
 - `create_all`/`drop_all`, `create_schema`/`drop_schema` are now capable of initializing dbs in extra.
+- Add `transaction` helper to Model and QuerySet.
 
 ### Changed
 
