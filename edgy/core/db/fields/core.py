@@ -159,6 +159,9 @@ class BigIntegerField(IntegerField):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
+        # sqlite special we cannot have a big IntegerField as PK
+        if kwargs.get("autoincrement"):
+            return sqlalchemy.BigInteger().with_variant(sqlalchemy.Integer, "sqlite")
         return sqlalchemy.BigInteger()
 
 

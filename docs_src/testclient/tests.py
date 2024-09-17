@@ -42,7 +42,7 @@ class Product(edgy.Model):
     updated_datetime: local_datetime = fields.DateTimeField(auto_now=True)
     updated_date: local_date = fields.DateField(auto_now=True)
     data: Dict[str, Any] = fields.JSONField(default={})
-    description: str = fields.CharField(blank=True, max_length=255)
+    description: str = fields.CharField(default="", max_length=255)
     huge_number: int = fields.BigIntegerField(default=0)
     price: decimal.Decimal = fields.DecimalField(max_digits=5, decimal_places=2, null=True)
     status: Enum = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)

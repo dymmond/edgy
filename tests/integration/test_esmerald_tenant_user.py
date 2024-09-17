@@ -50,12 +50,8 @@ class Product(TenantModel):
 
 
 class TenantUser(TenantUserMixin):
-    user = fields.ForeignKey(
-        "User", null=False, blank=False, related_name="tenant_user_users_test"
-    )
-    tenant = fields.ForeignKey(
-        "Tenant", null=False, blank=False, related_name="tenant_users_tenant_test"
-    )
+    user = fields.ForeignKey("User", null=False, related_name="tenant_user_users_test")
+    tenant = fields.ForeignKey("Tenant", null=False, related_name="tenant_users_tenant_test")
 
     class Meta:
         registry = models

@@ -527,14 +527,18 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
     __slots__ = ()
 
     def __new__(
-        cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any], **kwargs: Any
+        cls,
+        name: str,
+        bases: Tuple[Type, ...],
+        attrs: Dict[str, Any],
+        skip_registry: bool = False,
+        **kwargs: Any,
     ) -> Any:
         fields: Dict[str, BaseFieldType] = {}
         managers: Dict[str, BaseManager] = {}
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
         base_annotations: Dict[str, Any] = {}
         has_explicit_primary_key = False
-        registry: Optional[Registry] = get_model_registry(bases, meta_class)
         is_abstract: bool = getattr(meta_class, "abstract", False)
         parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
 
@@ -603,21 +607,16 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                         fields[sub_field_name] = sub_field
                         model_fields[sub_field_name] = sub_field
             # Handle with multiple primary keys and auto generated field if no primary key is provided
-            if not is_abstract and parents and registry and not has_explicit_primary_key:
+            if not is_abstract and parents and not has_explicit_primary_key:
                 if "id" not in fields:
                     if attrs.get("__reflected__", False):
                         raise ImproperlyConfigured(
                             f"Cannot create model {name}. No primary key found and reflected."
                         )
-                    elif registry.database.url.scheme.startswith("sqlite"):
-                        # sqlite special we cannot have a big IntegerField as PK
-                        fields["id"] = edgy_fields.IntegerField(
-                            primary_key=True, autoincrement=True, inherit=False, name="id"
-                        )  # type: ignore
                     else:
-                        fields["id"] = edgy_fields.BigIntegerField(
+                        fields["id"] = edgy_fields.BigIntegerField(  # type: ignore
                             primary_key=True, autoincrement=True, inherit=False, name="id"
-                        )  # type: ignore
+                        )
                 if not isinstance(fields["id"], BaseFieldType) or not fields["id"].primary_key:
                     raise ImproperlyConfigured(
                         f"Cannot create model {name} without explicit primary key if field 'id' is already present."
@@ -679,34 +678,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         for value in meta.managers.values():
             value.owner = new_class
 
-        # Validate meta for uniques and indexes
-        if meta.abstract:
-            if getattr(meta, "unique_together", None) is not None:
-                raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
-
-            if getattr(meta, "indexes", None) is not None:
-                raise ImproperlyConfigured("indexes cannot be in abstract classes.")
-
-        # Now set the registry of models
-        if meta.registry is None:
-            if getattr(new_class, "__db_model__", False):
-                meta.registry = registry
-            else:
-                new_class.model_rebuild(force=True)
-                return new_class
-        if registry is None:
-            raise ImproperlyConfigured(
-                "Registry for the table not found in the Meta class or any of the superclasses. You must set the registry in the Meta."
-            )
-
-        new_class.database = registry.database
-
-        # Making sure the tablename is always set if the value is not provided
-        if getattr(meta, "tablename", None) is None:
-            tablename = f"{name.lower()}s"
-            meta.tablename = tablename
-
         if getattr(meta, "unique_together", None) is not None:
+            if meta.abstract:
+                raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
             unique_together = meta.unique_together
             if not isinstance(unique_together, (list, tuple)):
                 value_type = type(unique_together).__name__
@@ -722,6 +696,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         # Handle indexes
         if getattr(meta, "indexes", None) is not None:
+            if meta.abstract:
+                raise ImproperlyConfigured("indexes cannot be in abstract classes.")
             indexes = meta.indexes
             if not isinstance(indexes, (list, tuple)):
                 value_type = type(indexes).__name__
@@ -733,42 +709,57 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                     if not isinstance(value, Index):
                         raise ValueError("Meta.indexes must be a list of Index types.")
 
-        for value in fields.values():
-            if isinstance(value, BaseManyToManyForeignKeyField):
-                value.create_through_model()
+        # Making sure the tablename is always set if the value is not provided
+        if getattr(meta, "tablename", None) is None:
+            tablename = f"{name.lower()}s"
+            meta.tablename = tablename
+        meta.model = new_class
+        if skip_registry:
+            new_class.model_rebuild(force=True)
+            return new_class
+
+        # Now set the registry of models
+        if meta.registry is None:
+            if getattr(new_class, "__db_model__", False):
+                registry: Optional[Registry] = get_model_registry(bases, meta_class)
+
+                if registry is None:
+                    raise ImproperlyConfigured(
+                        "Registry for the table not found in the Meta class or any of the superclasses. You must set the registry in the Meta."
+                    )
+                meta.registry = registry
+            else:
+                # is not a db model
+                new_class.model_rebuild(force=True)
+                return new_class
+        new_class.add_to_registry(meta.registry)
+        return new_class
+
+    def add_to_registry(cls, registry: Registry, name: str = "") -> None:
+        # when called if registry is not set
+        cls.meta.registry = registry
+        cls.database = registry.database
+        meta = cls.meta
+        if name:
+            cls.__name__ = name
 
         # Making sure it does not generate models if abstract or a proxy
-        if not meta.abstract and not new_class.__is_proxy_model__:
+        if not meta.abstract and not cls.__is_proxy_model__:
+            for value in meta.fields.values():
+                if isinstance(value, BaseManyToManyForeignKeyField):
+                    value.create_through_model()
             if getattr(cls, "__reflected__", False):
-                registry.reflected[name] = new_class
+                registry.reflected[cls.__name__] = cls
             else:
-                registry.models[name] = new_class
-
-        new_class.__db_model__ = True
-        meta.model = new_class
-
-        # Sets the foreign key fields
-        if not new_class.__is_proxy_model__:
+                registry.models[cls.__name__] = cls
+            # Sets the foreign key fields
             if meta.foreign_key_fields:
-                _set_related_name_for_foreign_keys(meta, new_class)
-            registry.execute_model_callbacks(new_class)
+                _set_related_name_for_foreign_keys(meta, cls)
+            registry.execute_model_callbacks(cls)
 
-        # Update the model references with the validations of the model
-        # Being done by the Edgy fields instead.
-        # Generates a proxy model for each model created
-        # Making sure the core model where the fields are inherited
-        # And mapped contains the main proxy_model
-        if not new_class.__is_proxy_model__ and not meta.abstract:
-            proxy_model = new_class.generate_proxy_model()
-            new_class.__proxy_model__ = proxy_model
-            new_class.__proxy_model__.__parent__ = new_class
-            new_class.__proxy_model__.model_rebuild(force=True)
-            meta.registry.models[new_class.__name__] = new_class  # type: ignore
-
+        cls.__db_model__ = True
         # finalize
-        new_class.model_rebuild(force=True)
-
-        return new_class
+        cls.model_rebuild(force=True)
 
     def get_db_schema(cls) -> Union[str, None]:
         """
@@ -876,6 +867,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         """
         Returns the proxy_model from the Model when called using the cache.
         """
+        if cls.__is_proxy_model__:
+            return cls
         if cls.__proxy_model__ is None:
             proxy_model = cls.generate_proxy_model()
             proxy_model.__parent__ = cls

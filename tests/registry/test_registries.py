@@ -43,3 +43,10 @@ async def test_has_multiple_connections():
 async def test_user_on_both():
     assert await User.query.count() == 0
     assert await User.query.using(database="alternative").count() == 0
+
+
+async def test_copy_registry():
+    _copy = registry.__copy__()
+    assert "User" in _copy.models and len(_copy.models) == 1
+    assert all(x.meta.registry is _copy for x in _copy.models.values())
+    assert all(x.owner is _copy.models["User"] for x in _copy.models["User"].meta.fields.values())

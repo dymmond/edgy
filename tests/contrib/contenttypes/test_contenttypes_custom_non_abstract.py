@@ -11,11 +11,7 @@ from tests.settings import DATABASE_URL
 
 
 class ExplicitContentType(_ContentType):
-    custom_field = edgy.CharField(max_length=1, null=True)
-    custom_field_non_inherited = edgy.CharField(max_length=1, null=True, inherit=False)
-
-    class Meta:
-        abstract = True
+    custom_field = edgy.CharField(max_length=1, null=True, inherit=False)
 
 
 pytestmark = pytest.mark.anyio

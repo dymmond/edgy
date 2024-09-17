@@ -35,6 +35,7 @@ from .types import BaseModelType
 
 if TYPE_CHECKING:
     from edgy import Model
+    from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.signals import Broadcaster
 
@@ -52,6 +53,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
     query_related: ClassVar[RedirectManager] = RedirectManager(redirect_name="query")
     meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True)
     __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
+    # is inheriting from a registered model, so the registry is true
     __db_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
     __show_pk__: ClassVar[bool] = False
@@ -144,6 +146,23 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
         return f"{self.__class__.__name__}({', '.join(pkl)})"
+
+    @classmethod
+    def copy_edgy_model(cls, registry: Optional["Registry"] = None) -> "Model":
+        # removes private pydantic stuff, except the prefixed ones
+        attrs = {
+            key: val
+            for key, val in cls.__dict__.items()
+            if key not in BaseModel.__dict__ or key.startswith("__")
+        }
+        attrs.pop("meta", None)
+        # managers and fields are gone, we have to readd them with the correct data
+        attrs.update(cls.meta.fields)
+        attrs.update(cls.meta.managers)
+        _copy = cast("Model", type(cls.__name__, cls.__bases__, attrs, skip_registry=True))
+        if registry is not None:
+            _copy.add_to_registry(registry)
+        return _copy
 
     @cached_property
     def proxy_model(self) -> Any:

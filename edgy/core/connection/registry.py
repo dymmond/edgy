@@ -33,21 +33,6 @@ if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
 
 
-def _copy_model(model: Type["BaseModelType"], registry: "Registry") -> Type["BaseModelType"]:
-    from edgy.core.utils.models import create_edgy_model
-
-    # we simply subclass, this is not clean but works, the callbacks are set again and reexecuted
-    new_meta = model.meta.__class__(model.meta)
-    new_meta.registry = registry
-    _copy = create_edgy_model(
-        model.__name__,
-        model.__module__,
-        __metadata__=new_meta,
-        __bases__=(model,),
-    )
-    return _copy
-
-
 class Registry:
     """
     The command center for the models of Edgy.
@@ -94,10 +79,10 @@ class Registry:
     def __copy__(self) -> "Registry":
         _copy = Registry(self.database)
         _copy.extra = self.extra
-        _copy.models = {key: _copy_model(val, _copy) for key, val in self.models.items()}
-        _copy.reflected = {key: _copy_model(val, _copy) for key, val in self.reflected.items()}
+        _copy.models = {key: val.copy_edgy_model(_copy) for key, val in self.models.items()}
+        _copy.reflected = {key: val.copy_edgy_model(_copy) for key, val in self.reflected.items()}
         _copy.tenant_models = {
-            key: _copy_model(val, _copy) for key, val in self.tenant_models.items()
+            key: val.copy_edgy_model(_copy) for key, val in self.tenant_models.items()
         }
         if self.content_type is not None:
             try:
@@ -137,6 +122,8 @@ class Registry:
                 __metadata__=new_meta,
                 __bases__=(with_content_type,),
             )
+        elif real_content_type.meta.registry is None:
+            real_content_type.add_to_registry(self, "ContentType")
         self.content_type = real_content_type
 
         def callback(model_class: Type["BaseModelType"]) -> None:
