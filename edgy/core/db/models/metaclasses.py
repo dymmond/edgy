@@ -735,7 +735,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         new_class.add_to_registry(meta.registry)
         return new_class
 
-    def add_to_registry(cls, registry: Registry, name: str = "") -> None:
+    def add_to_registry(cls: Type["Model"], registry: Registry, name: str = "") -> None:
         # when called if registry is not set
         cls.meta.registry = registry
         cls.database = registry.database
