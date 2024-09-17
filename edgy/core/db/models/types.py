@@ -14,8 +14,10 @@ from typing import (
 
 if TYPE_CHECKING:
     import sqlalchemy
+    from databasez.core.transaction import Transaction
 
-    from edgy import Database, Model
+    from edgy.core.connection.database import Database
+    from edgy.core.db.models.base import BaseModel
     from edgy.core.db.models.managers import BaseManager
     from edgy.core.db.models.metaclasses import MetaInfo
 
@@ -90,6 +92,10 @@ class BaseModelType(ABC):
         """Primary key fields."""
 
     @abstractmethod
+    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":
+        """Return database transaction for the assigned database."""
+
+    @abstractmethod
     def get_columns_for_name(self, name: str) -> Sequence["sqlalchemy.Column"]:
         """Helper for retrieving columns from field name."""
 
@@ -99,7 +105,7 @@ class BaseModelType(ABC):
 
     @classmethod
     @abstractmethod
-    def generate_proxy_model(cls) -> Type["Model"]:
+    def generate_proxy_model(cls) -> Type["BaseModel"]:
         """
         Generates a proxy model for each model. This proxy model is a simple
         shallow copy of the original model being generated.
@@ -121,7 +127,7 @@ class BaseModelType(ABC):
         force_save: bool = False,
         values: Dict[str, Any] = None,
         **kwargs: Any,
-    ) -> Union["Model", Any]:
+    ) -> Union["BaseModel", Any]:
         """Save model"""
 
     @abstractmethod

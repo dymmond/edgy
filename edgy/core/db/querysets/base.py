@@ -40,7 +40,9 @@ from edgy.types import Undefined
 from . import clauses as clauses_mod
 
 if TYPE_CHECKING:  # pragma: no cover
-    from edgy import Database
+    from database.core.transaction import Transaction
+
+    from edgy.core.connection import Database
 
 
 def _removeprefix(text: str, prefix: str) -> str:
@@ -1349,6 +1351,10 @@ class QuerySet(BaseQuerySet):
         except AttributeError:
             raise ValueError("'obj' must be a model or reflect model instance.") from None
         return await self.exists(**query)
+
+    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":
+        """Return database transaction for the assigned database."""
+        return self.database.transaction(force_rollback=force_rollback, **kwargs)
 
     def __await__(
         self,

@@ -16,11 +16,12 @@ Alembic.
 
 ## Parameters
 
-* **database** - An instance of `edgy.core.db.Database` object.
+* **database** - An instance of `edgy.core.db.Database` object or a string. When providing a string all unparsed keyword arguments are passed the created Database object.
 
 !!! Warning
-    Using the `Database` from the `databases` package will raise an assertation error. You must
-    use the `edgy.Database` object instead.
+    Using the `Database` from the `databases` package will raise an assertation error. Edgy is build on the
+    fork `databasez` and it is strongly recommended to use a string, `edgy.Database` or `edgy.testclient.TestClient` instead.
+    In future we may add more edgy specific functionality.
 
 * **schema** - The schema to connect to. This can be very useful for multi-tenancy applications if
 you want to specify a specific schema or simply if you just want to connect to a different schema
@@ -31,6 +32,29 @@ that is not the default.
 
     registry = Registry(database=..., schema="custom-schema")
     ```
+
+* **extra** - A dictionary with extra connections (same types like the database argument) which are managed by the registry too (connecting/disconnecting). They may can be arbitary connected databases. It is just ensured that they are not tore down during the registry is connected.
+
+* **with_content_type** - Either a bool or a custom abstract ContentType prototype. This enables ContentTypes and saves the actual used type as attribute: `content_type`
+
+
+## Connecting/Disconnecting
+
+Registries support the async contextmanager protocol as well as the ASGI lifespan protocol.
+This way all databases specified as database or extra are properly referenced and dereferenced
+(triggering the initialization and tear down routines when reaching 0).
+This way all of the dbs can be safely used no matter if they are used in different contexts.
+
+## Accessing the ContentType
+
+The registry has an attribute `content_type` for accessing the active ContentType.
+
+## Accessing directly the databases
+
+The registry has an attribute `database` for the main database and a dictionary `extra` containing the active extra
+databases.
+It is not necessary anymore to keep the Database object available, it can be simply retrieved from the db which is by the way
+safer. This way it is ensured you get the right one.
 
 ## Custom registry
 
@@ -66,6 +90,7 @@ As the name suggests, it is the functionality that allows you to create database
 
 * **schema** - String name of the schema.
 * **if_not_exists** - Flag indicating if should create if not exists.
+* **databases** - String or None for main database. You can create schemes on databases in extra too.
 
     <sup>Default: `False`</sup>
 
@@ -102,6 +127,7 @@ it will drop it from the database.
 * **if_exists** - Flag indicating if should create if not exists.
 
     <sup>Default: `False`</sup>
+* **databases** - String or None for main database. You can drop schemes on databases in extra too.
 
 ```python hl_lines="11"
 {!> ../docs_src/registry/drop_schema.py !}
@@ -140,16 +166,16 @@ and don't want to micro-optimize your code.
 
 Registry objects have two helper functions which can undo the lazyness (for optimizations or in case of an environment which requires everything being static after init.):
 
-**init_models(self, *, init_column_mappers=True, init_class_attrs=True)** - Fully initializes models and metas. Single sub-components can be excluded.
+**init_models(self, *, init_column_mappers=True, init_class_attrs=True)** - Fully initializes models and metas. Some elements can be excluded from initialization by providing False to the keyword argument.
 
-**invalidate_models(self, *, clear_class_attrs=True)** - Invalidates metas and removes cached class attributes. Single sub-components can be excluded.
+**invalidate_models(self, *, clear_class_attrs=True)** - Invalidates metas and removes cached class attributes. Single sub-components can be excluded from inval.
 
 
-Model class attributes `class_attrs` which are cleared or set are `table`, `pknames`, `pkcolumns`.
+Model class attributes `class_attrs` which are cleared or initialized are `table`, `pknames`, `pkcolumns`, `proxy_model`, `table_schema` (only cleared).
 
-`init_column_mappers` initializes the `columns_to_field` via its `init()` method. This initializes the mappers `columns_to_field`, `field_to_columns` and `field_to_column_names`.
+However in most cases it won't be necessary to initialize them manually and causes performance penalties.
 
-`db_schema` internally calls also `invalidate_models()` to remove table references.
+`init_column_mappers` initializes the `columns_to_field` via its `init()` method. This initializes the mappers `columns_to_field`, `field_to_columns` and `field_to_column_names`. This can be expensive for large models.
 
 
 ## Callbacks

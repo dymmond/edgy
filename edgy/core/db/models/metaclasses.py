@@ -289,7 +289,7 @@ class MetaInfo:
         if init_column_mappers:
             self.columns_to_field.init()
         if init_class_attrs:
-            for attr in ("table", "pknames", "pkcolumns"):
+            for attr in ("table", "pknames", "pkcolumns", "proxy_model"):
                 getattr(self.model, attr)
 
     def get_columns_for_name(self, name: str) -> Sequence["sqlalchemy.Column"]:
