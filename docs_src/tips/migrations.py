@@ -30,10 +30,12 @@ def get_application():
     This is optional. The function is only used for organisation purposes.
     """
     build_path()
-    database, registry = get_db_connection()
+    registry = get_db_connection()
 
-    app = Esmerald(
-        routes=[Include(namespace="my_project.urls")],
+    app = registry.asgi(
+        Esmerald(
+            routes=[Include(namespace="my_project.urls")],
+        )
     )
 
     Migrate(app=app, registry=registry)

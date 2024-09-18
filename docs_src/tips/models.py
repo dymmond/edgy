@@ -5,7 +5,7 @@ from my_project.utils import get_db_connection
 
 import edgy
 
-_, registry = get_db_connection()
+registry = get_db_connection()
 
 
 class ProfileChoice(Enum):

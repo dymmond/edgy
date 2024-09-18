@@ -65,10 +65,10 @@ async def create_user(data: User) -> User:
 
 @pytest.fixture()
 def app():
-    app = Esmerald(
-        routes=[Gateway(handler=create_user)],
-        on_startup=[database.connect],
-        on_shutdown=[database.disconnect],
+    app = models.asgi(
+        Esmerald(
+            routes=[Gateway(handler=create_user)],
+        )
     )
     return app
 

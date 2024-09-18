@@ -1,6 +1,6 @@
 import copy
 import inspect
-from typing import Any, Dict, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Type, Union, cast
 
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
@@ -9,6 +9,9 @@ from edgy.core.db.models.model_proxy import ProxyModel
 from edgy.core.utils.db import check_db_connection
 from edgy.core.utils.models import generify_model_fields
 from edgy.exceptions import ObjectNotFound
+
+if TYPE_CHECKING:
+    from databasez.core.transaction import Transaction
 
 
 class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
@@ -205,6 +208,10 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         self._loaded_or_deleted = False
 
         return self
+
+    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":
+        """Return database transaction for the assigned database"""
+        return self.database.transaction(force_rollback=force_rollback, **kwargs)
 
     async def save(
         self,

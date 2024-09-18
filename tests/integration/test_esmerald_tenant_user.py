@@ -50,12 +50,8 @@ class Product(TenantModel):
 
 
 class TenantUser(TenantUserMixin):
-    user = fields.ForeignKey(
-        "User", null=False, blank=False, related_name="tenant_user_users_test"
-    )
-    tenant = fields.ForeignKey(
-        "Tenant", null=False, blank=False, related_name="tenant_users_tenant_test"
-    )
+    user = fields.ForeignKey("User", null=False, related_name="tenant_user_users_test")
+    tenant = fields.ForeignKey("Tenant", null=False, related_name="tenant_users_tenant_test")
 
     class Meta:
         registry = models
@@ -159,7 +155,7 @@ async def create_data():
     user = await User.query.create(name="edgy", email="edgy@esmerald.dev")
     edgy_tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
 
-    edgy = await User.query.using(edgy_tenant.schema_name).create(
+    edgy = await User.query.using(schema=edgy_tenant.schema_name).create(
         name="edgy", email="edgy@esmerald.dev"
     )
 
@@ -167,7 +163,9 @@ async def create_data():
 
     # Products for Edgy
     for i in range(10):
-        await Product.query.using(edgy_tenant.schema_name).create(name=f"Product-{i}", user=edgy)
+        await Product.query.using(schema=edgy_tenant.schema_name).create(
+            name=f"Product-{i}", user=edgy
+        )
 
     # Products for Saffier
     for i in range(25):

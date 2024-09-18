@@ -76,7 +76,7 @@ async def rollback_another_db_transactions():
 
 async def test_bulk_create_another_tenant():
     with pytest.raises(AssertionError):
-        await Product.query.using_with_db("edgy").bulk_create(
+        await Product.query.using(database="edgy").bulk_create(
             [
                 {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
                 {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},

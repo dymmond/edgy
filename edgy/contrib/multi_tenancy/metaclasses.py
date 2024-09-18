@@ -54,7 +54,7 @@ class BaseTenantMeta(BaseModelMeta):
 
         # Handle the registry of models
         if getattr(meta, "registry", None) is None:
-            if hasattr(new_model, "__db_model__") and new_model.__db_model__:
+            if getattr(new_model, "__db_model__", False):
                 meta.registry = get_model_registry(bases)
             else:
                 return new_model

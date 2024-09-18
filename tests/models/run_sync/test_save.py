@@ -67,6 +67,22 @@ async def test_model_save_simple():
     assert total == 1
 
 
+async def test_model_save_transaction_rollback():
+    user = edgy.run_sync(User.query.create(name="Jane"))
+
+    user.name = "John"
+    async with user.transaction(force_rollback=True):
+        edgy.run_sync(user.save())
+
+    user = edgy.run_sync(User.query.get(pk=user.pk))
+
+    assert user.name == "Jane"
+
+    total = edgy.run_sync(User.query.count())
+
+    assert total == 1
+
+
 async def test_create_model_instance():
     edgy.run_sync(User.query.create(name="edgy"))
 

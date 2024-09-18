@@ -1,4 +1,3 @@
-from datetime import datetime
 from enum import Enum
 
 import pytest
@@ -12,10 +11,6 @@ pytestmark = pytest.mark.anyio
 
 database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=database, schema="another")
-
-
-def time():
-    return datetime.now().time()
 
 
 class StatusEnum(Enum):
@@ -33,16 +28,11 @@ class Product(edgy.Model):
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    await models.create_all()
-    yield
-    await models.drop_all()
-
-
-@pytest.fixture(autouse=True)
-async def rollback_transactions():
-    with database.force_rollback():
-        async with database:
-            yield
+    async with database:
+        await models.create_all()
+        yield
+        if not database.drop:
+            await models.drop_all()
 
 
 async def test_bulk_create():

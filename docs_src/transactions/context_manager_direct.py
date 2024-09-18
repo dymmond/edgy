@@ -6,8 +6,7 @@ from edgy import Database, Registry
 
 # These settings should be placed somewhere
 # Central where it can be accessed anywhere.
-database = Database("sqlite:///db.sqlite")
-models = Registry(database=database)
+models = Registry(database="sqlite:///db.sqlite", extra={"another": "sqlite:///another.sqlite"})
 
 
 class UserIn(BaseModel):
@@ -17,9 +16,10 @@ class UserIn(BaseModel):
 @post("/create", description="Creates a user and associates to a profile.")
 async def create_user(data: UserIn, request: Request) -> None:
     # This database insert occurs within a transaction.
-    # It will be rolled back by the `RuntimeError`.
+    # It will be rolled back by a transaction with force_rollback active.
 
-    async with User.transaction():
-        user = await User.query.create(email=data.email, is_active=True)
-        await Profile.query.create(user=user)
-        raise RuntimeError()
+    queryset = User.query.using(database="another")
+
+    async with queryset.database as database, database.transaction(force_rollback=True):
+        user = await queryset.create(email=data.email, is_active=True)
+        await Profile.query.using(database="another").create(user=user)

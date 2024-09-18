@@ -156,13 +156,11 @@ class TenantUserMixin(edgy.Model):
     user: Any = edgy.ForeignKey(
         settings.auth_user_model,
         null=False,
-        blank=False,
         related_name="tenant_user_users",
     )
     tenant: Any = edgy.ForeignKey(
         settings.tenant_model,
         null=False,
-        blank=False,
         related_name="tenant_users_tenant",
     )
     is_active: bool = edgy.BooleanField(default=False)  # type: ignore

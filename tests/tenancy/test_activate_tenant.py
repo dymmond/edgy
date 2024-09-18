@@ -98,7 +98,9 @@ async def test_activate_related_tenant():
 
     # Even if the activate_schema is enabled
     # The use of `using` takes precedence
-    query = await Permission.query.using(tenant.schema_name).select_related("designation").all()
+    query = (
+        await Permission.query.using(schema=tenant.schema_name).select_related("designation").all()
+    )
 
     assert len(query) == 1
     assert query[0].pk == permission.pk

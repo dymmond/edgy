@@ -82,7 +82,7 @@ the default set in the [registry][registry].
 The syntax is quite simple.
 
 ```python
-<Model>.query.using(<SCHEMA-NAME>).all()
+<Model>.query.using(schema=<SCHEMA-NAME>).all()
 ```
 
 This is not limited to the `all()` at all, you can use any of the available [query types](../queries/queries.md)
@@ -115,7 +115,7 @@ User.query.all()
 Query the users table from the `main` schema.
 
 ```python
-User.query.using('main').all()
+User.query.using(schema='main').all()
 ```
 
 And that is it, really. Using its a simple shortcut that allows querying different schemas
@@ -154,9 +154,9 @@ Let us see an example:
 ```python
 # Using the 'main' schema
 
-User.query.using('main').all()
-User.query.using('main').filter(email__icontains="user@example.com")
-User.query.using('main').get(pk=1)
+User.query.using(schema='main').all()
+User.query.using(schema='main').filter(email__icontains="user@example.com")
+User.query.using(schema='main').get(pk=1)
 ```
 
 **Using the activate_schema**

@@ -55,7 +55,7 @@ registry.database = another_db
 
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
-    async with database, another_db:
+    async with models:
         await models.create_all()
         registry.metadata = models.metadata
         await registry.create_all(False)
@@ -67,7 +67,7 @@ async def create_test_database():
 
 
 async def test_bulk_create_another_db():
-    await Product.query.using_with_db("another").bulk_create(
+    await Product.query.using(database="another").bulk_create(
         [
             {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
             {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
@@ -78,7 +78,7 @@ async def test_bulk_create_another_db():
 
     assert len(products) == 0
 
-    others = await Product.query.using_with_db("another").all()
+    others = await Product.query.using(database="another").all()
 
     assert len(others) == 2
 
@@ -86,7 +86,7 @@ async def test_bulk_create_another_db():
 async def test_bulk_create_another_schema_and_db():
     await registry.schema.create_schema("foo", init_models=True, if_not_exists=True)
     try:
-        await Product.query.using_with_db("another", "foo").bulk_create(
+        await Product.query.using(database="another", schema="foo").bulk_create(
             [
                 {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
                 {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
@@ -97,11 +97,11 @@ async def test_bulk_create_another_schema_and_db():
 
         assert len(products) == 0
 
-        products = await Product.query.using_with_db("another").all()
+        products = await Product.query.using(database="another").all()
 
         assert len(products) == 0
 
-        others = await Product.query.using_with_db("another", "foo").all()
+        others = await Product.query.using(database="another", schema="foo").all()
 
         assert len(others) == 2
     finally:

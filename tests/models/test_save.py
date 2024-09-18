@@ -67,6 +67,22 @@ async def test_model_save_simple():
     assert total == 1
 
 
+async def test_model_save_transaction_rollback():
+    user = await User.query.create(name="Jane")
+
+    user.name = "John"
+    async with user.transaction(force_rollback=True):
+        await user.save()
+
+    user = await User.query.get(pk=user.pk)
+
+    assert user.name == "Jane"
+
+    total = await User.query.count()
+
+    assert total == 1
+
+
 async def test_create_model_instance():
     await User.query.create(name="edgy")
 

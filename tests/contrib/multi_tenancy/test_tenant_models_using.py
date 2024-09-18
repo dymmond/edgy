@@ -57,9 +57,9 @@ async def test_schema_with_using_in_different_place():
         schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
     )
     for i in range(5):
-        await Product.query.using(tenant.schema_name).create(name=f"product-{i}")
+        await Product.query.using(schema=tenant.schema_name).create(name=f"product-{i}")
 
-    total = await Product.query.filter().using(tenant.schema_name).all()
+    total = await Product.query.filter().using(schema=tenant.schema_name).all()
 
     assert len(total) == 5
 
@@ -74,7 +74,7 @@ async def test_schema_with_using_in_different_place():
 
     assert len(total) == 15
 
-    total = await Product.query.filter().using(tenant.schema_name).all()
+    total = await Product.query.filter().using(schema=tenant.schema_name).all()
 
     assert len(total) == 5
 
@@ -88,39 +88,41 @@ async def test_can_have_multiple_tenants_with_different_records_with_using():
     )
 
     # Create a user for edgy
-    user_edgy = await User.query.only().using(edgy.schema_name).create(name="Edgy")
+    user_edgy = await User.query.only().using(schema=edgy.schema_name).create(name="Edgy")
 
     # Create products for user_edgy
     for i in range(5):
         await (
             Product.query.defer()
-            .using(edgy.schema_name)
+            .using(schema=edgy.schema_name)
             .create(name=f"product-{i}", user=user_edgy)
         )
 
     # Create a user for saffier
-    user_saffier = await User.query.group_by().using(saffier.schema_name).create(name="Saffier")
+    user_saffier = (
+        await User.query.group_by().using(schema=saffier.schema_name).create(name="Saffier")
+    )
 
     # Create products for user_saffier
     for i in range(25):
         await (
             Product.query.exclude()
-            .using(saffier.schema_name)
+            .using(schema=saffier.schema_name)
             .create(name=f"product-{i}", user=user_saffier)
         )
 
     # Create top level users
     for name in range(10):
-        await User.query.filter().using(saffier.schema_name).create(name=f"user-{name}")
-        await User.query.filter().using(edgy.schema_name).create(name=f"user-{name}")
+        await User.query.filter().using(schema=saffier.schema_name).create(name=f"user-{name}")
+        await User.query.filter().using(schema=edgy.schema_name).create(name=f"user-{name}")
         await User.query.distinct().create(name=f"user-{name}")
 
     # Check the totals
     top_level_users = await User.query.all()
     assert len(top_level_users) == 10
 
-    users_edgy = await User.query.using(edgy.schema_name).all()
+    users_edgy = await User.query.using(schema=edgy.schema_name).all()
     assert len(users_edgy) == 11
 
-    users_saffier = await User.query.using(saffier.schema_name).all()
+    users_saffier = await User.query.using(schema=saffier.schema_name).all()
     assert len(users_saffier) == 11

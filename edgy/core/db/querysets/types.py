@@ -8,6 +8,7 @@ from typing import (
     Generic,
     Iterable,
     List,
+    Literal,
     Sequence,
     Set,
     Tuple,
@@ -16,9 +17,13 @@ from typing import (
     Union,
 )
 
+from edgy.types import Undefined
+
 if TYPE_CHECKING:
     import sqlalchemy
+    from databasez.core.transaction import Transaction
 
+    from edgy.core.connection import Database
     from edgy.core.db.models import BaseModelType, Model
 
 # Create a var type for the Edgy Model
@@ -143,6 +148,18 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
 
     @abstractmethod
     async def contains(self, instance: "BaseModelType") -> bool: ...
+
+    @abstractmethod
+    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":
+        """Return database transaction for the assigned database."""
+
+    @abstractmethod
+    def using(
+        self,
+        *,
+        database: Union[str, Any, None, "Database"] = Undefined,
+        schema: Union[str, Any, None, Literal[False]] = Undefined,
+    ) -> "QueryType": ...
 
     @abstractmethod
     def __await__(self) -> Generator[Any, None, List[EdgyEmbedTarget]]: ...

@@ -32,18 +32,43 @@ For this example, since the author is the same as the one of [Esmerald](https://
 we will be using it for explanatory purposes, feel free to apply the same principle in your favourite
 framework.
 
-```python hl_lines="10-11"
+with the ASGI integration:
+
+```python hl_lines="9"
+{!> ../docs_src/connections/asgi.py !}
+```
+
+Or doing it manually (that applies to every framework):
+
+
+```python hl_lines="11-12"
 {!> ../docs_src/connections/simple.py !}
 ```
 
-And that is pretty much this. Once the connection is hooked into your application lifecycle you
-won't have error like `AssertationError: DatabaseBackend is not running`.
+And that is pretty much this. Once the connection is hooked into your application lifecycle.
+Otherwise you will get warnings about decreased performance because the databasez backend is not connected and will be
+reininitialized for each operation.
 
-You are now free to use the ORM anywhere in your application.
+You are now free to use the ORM anywhere in your application. As well as extra defined database connections in registry.
+
+## Django integration
+
+Django currently doesn't support the lifespan protocol. So we have a keyword parameter to handle it ourselves.
+
+```python
+{!> ../docs_src/connections/django.py !}
+```
 
 ## Querying other schemas
 
 Edgy supports that as well. Have a look at the [tenancy](./tenancy/edgy.md) section for more details.
+
+## Having multiple connections
+
+Edgy Registry has an extra parameter where named additional Database objects or strings can be defined. Having them there
+is useful because they will be connected/disconnected too.
+
+You can switch to them on the fly via [using](./queries/queries.md#selecting-the-database-and-schema).
 
 ## Note
 

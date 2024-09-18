@@ -601,7 +601,7 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    data: str = edgy.TextField(null=True, blank=True)
+    data: str = edgy.TextField(null=True)
     ...
 
 ```

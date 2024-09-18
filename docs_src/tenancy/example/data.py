@@ -12,13 +12,13 @@ async def create_data():
     )
 
     # Create a user in the `User` table inside the `edgy` tenant.
-    edgy = await User.query.using(tenant.schema_name).create(
+    edgy = await User.query.using(schema=tenant.schema_name).create(
         name="Edgy schema user",
     )
 
     # Products for Edgy (inside edgy schema)
     for i in range(10):
-        await Product.query.using(tenant.schema_name).create(
+        await Product.query.using(schema=tenant.schema_name).create(
             name=f"Product-{i}",
             user=edgy,
         )

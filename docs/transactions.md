@@ -47,17 +47,31 @@ still valid to be implemented.
 ## As a context manager
 
 This is probably the most common use-case for the majority of the applications where within a view
-or an operation, you will need to make some transactions that need atomocity.
+or an operation, you will need to make some transactions that need atomacity.
+It is recommended to use the model or queryset transaction method.
+This way the transaction of the right database is used.
 
 ```python hl_lines="22"
 {!> ../docs_src/transactions/context_manager.py!}
 ```
 
+It is also possible to use the current active database of a QuerySet:
+
+```python hl_lines="23"
+{!> ../docs_src/transactions/context_manager2.py!}
+```
+
+Of course you can also access the database and start the transaction:
+
+```python hl_lines="23"
+{!> ../docs_src/transactions/context_manager_direct.py!}
+```
+
 ## Important notes
 
-Edgy although running on the top of [Databases](https://www.encode.io/databases/) it varies in
-many aspects and limits some of the unecessary `free-style` usage to make sure it keeps its
-consistance.
+Edgy although running on the top of [Databasez](https://databasez.dymmond.com/) it varies in
+many aspects and offers features unprovided by sqlalchemy.
+For example the jdbc support or support for a mixed threading/async environment.
 
-If you are interested in knowing more about the low-level APIs of databases,
-[check out](https://www.encode.io/databases/) their [documentation](https://www.encode.io/databases/).
+If you are interested in knowing more about the low-level APIs of databasez,
+[check out](https://github.com/dymmond/databasez) or [documentation](https://databasez.dymmond.com/).

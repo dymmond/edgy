@@ -20,7 +20,7 @@ async def bulk_create_users() -> None:
     """
     Bulk creates some users.
     """
-    await User.query.using_with_db("alternative").bulk_create(
+    await User.query.using(database="alternative").bulk_create(
         [
             {"name": "Edgy", "email": "edgy@example.com"},
             {"name": "Edgy Alternative", "email": "edgy.alternative@example.com"},

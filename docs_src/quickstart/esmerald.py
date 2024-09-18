@@ -29,8 +29,8 @@ async def create_user(data: User) -> User:
     return user
 
 
-app = Esmerald(
-    routes=[Gateway(handler=create_user)],
-    on_startup=[database.connect],
-    on_shutdown=[database.disconnect],
+app = models.asgi(
+    Esmerald(
+        routes=[Gateway(handler=create_user)],
+    )
 )
