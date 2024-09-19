@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Type, Union, cast
 
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.context_vars import get_schema
@@ -65,7 +65,7 @@ class ContentTypeField(ForeignKey):
 
     def __new__(  # type: ignore
         cls,
-        to: Union["BaseModelType", str] = "ContentType",
+        to: Union[Type["BaseModelType"], str] = "ContentType",
         on_delete: str = CASCADE,
         no_constraint: bool = False,
         delete_orphan: bool = True,

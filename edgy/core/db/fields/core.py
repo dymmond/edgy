@@ -39,7 +39,7 @@ class CharField(FieldFactory, str):
         min_length: Optional[int] = None,
         regex: Union[str, Pattern] = None,
         pattern: Union[str, Pattern] = None,
-        **kwargs: Dict[str, Any],
+        **kwargs: Any,
     ) -> BaseFieldType:
         if pattern is None:
             pattern = regex
@@ -532,7 +532,7 @@ class IPAddressField(FieldFactory, str):
         match_ipv4 = IPV4_REGEX.match(value)
         match_ipv6 = IPV6_REGEX.match(value)
 
-        if not match_ipv4 and not match_ipv6:
+        if not match_ipv4 and not match_ipv6:  # type: ignore
             raise ValueError("Must be a valid IP format.")
 
         try:

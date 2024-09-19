@@ -4,6 +4,7 @@ from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
     from edgy import Model, QuerySet
+    from edgy.core.db.models.types import BaseModelType
 
 
 class Prefetch:
@@ -39,7 +40,7 @@ class Prefetch:
             bake_list.append(result)
 
 
-def check_prefetch_collision(model: "Model", related: Prefetch) -> Prefetch:
+def check_prefetch_collision(model: "BaseModelType", related: Prefetch) -> Prefetch:
     if (
         hasattr(model, related.to_attr)
         or related.to_attr in model.meta.fields

@@ -76,7 +76,7 @@ class Schema:
                     sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists)  # type: ignore
                 )
             except ProgrammingError as e:
-                raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
+                raise SchemaError(detail=e.orig.args[0]) from e
             for table in tables:
                 table.create(connection, checkfirst=if_not_exists)
             if init_models:
@@ -108,7 +108,7 @@ class Schema:
                     sqlalchemy.schema.DropSchema(name=schema, cascade=cascade, if_exists=if_exists)  # type: ignore
                 )
             except DBAPIError as e:
-                raise SchemaError(detail=e.orig.args[0]) from e  # type: ignore
+                raise SchemaError(detail=e.orig.args[0]) from e
 
         ops = []
 

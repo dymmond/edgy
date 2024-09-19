@@ -10,11 +10,11 @@ from typing import (
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 
 if TYPE_CHECKING:  # pragma: no cover
-    from edgy.core.db.models import Model
+    from edgy.core.db.models.types import BaseModelType
 
 
 class RelationshipCrawlResult(NamedTuple):
-    model_class: Type["Model"]
+    model_class: Type["BaseModelType"]
     field_name: str
     operator: str
     forward_path: str
@@ -22,7 +22,10 @@ class RelationshipCrawlResult(NamedTuple):
 
 
 def crawl_relationship(
-    model_class: Type["Model"], path: str, callback_fn: Any = None, traverse_last: bool = False
+    model_class: Type["BaseModelType"],
+    path: str,
+    callback_fn: Any = None,
+    traverse_last: bool = False,
 ) -> RelationshipCrawlResult:
     field = None
     forward_prefix_path = ""

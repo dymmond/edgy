@@ -9,7 +9,6 @@ from typing import (
 
 import sqlalchemy
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
-from sqlalchemy.ext.asyncio import AsyncConnection
 
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ImproperlyConfigured
@@ -71,7 +70,7 @@ class ReflectedModelMixin:
             ImproperlyConfigured: If there is an error during the reflection process.
         """
 
-        def execute_reflection(connection: AsyncConnection) -> sqlalchemy.Table:
+        def execute_reflection(connection: sqlalchemy.Connection) -> sqlalchemy.Table:
             """Helper function to create and reflect the table."""
             try:
                 return sqlalchemy.Table(

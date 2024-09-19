@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type
 
+from pydantic_core import PydanticUndefined
+
 if TYPE_CHECKING:
     from pydantic import ConfigDict
 
@@ -13,10 +15,10 @@ def create_edgy_model(
     __name__: str,
     __module__: str,
     __definitions__: Optional[Dict[str, Any]] = None,
-    __metadata__: Optional[Type["MetaInfo"]] = None,
+    __metadata__: Optional["MetaInfo"] = None,
     __qualname__: Optional[str] = None,
     __config__: Optional["ConfigDict"] = None,
-    __bases__: Optional[Tuple[Type["BaseModelType"]]] = None,
+    __bases__: Optional[Tuple[Type["BaseModelType"], ...]] = None,
     __proxy__: bool = False,
     __pydantic_extra__: Any = None,
 ) -> Type["Model"]:
@@ -64,6 +66,9 @@ def generify_model_fields(model: Type["EdgyBaseModel"]) -> Dict[Any, Any]:
     for name, field in model.model_fields.items():
         field.annotation = Any  # type: ignore
         field.null = True
+        # set a default to fix is_required
+        if field.default is PydanticUndefined:
+            field.default = None
         field.metadata = []
         fields[name] = field
     return fields

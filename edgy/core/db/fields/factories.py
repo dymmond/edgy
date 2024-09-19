@@ -60,7 +60,7 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         default_methods_overwritable_by_factory
     )
 
-    def __new__(cls, **kwargs: Dict[str, Any]) -> BaseFieldType:
+    def __new__(cls, **kwargs: Any) -> BaseFieldType:
         cls.validate(kwargs)
         return cls.build_field(**kwargs)
 
@@ -69,7 +69,6 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         column_type = cls.get_column_type(**kwargs)
         pydantic_type = cls.get_pydantic_type(**kwargs)
         constraints = cls.get_constraints(**kwargs)
-        default: None = kwargs.pop("default", None)
 
         new_field = cls._get_field_cls(cls)
 
@@ -77,7 +76,6 @@ class FieldFactory(metaclass=FieldFactoryMeta):
             field_type=pydantic_type,
             annotation=pydantic_type,
             column_type=column_type,
-            default=default,
             constraints=constraints,
             factory=cls,
             **kwargs,
@@ -161,7 +159,7 @@ class ForeignKeyFieldFactory(FieldFactory):
         on_delete: str = RESTRICT,
         related_name: Union[str, Literal[False]] = "",
         server_onupdate: Any = None,
-        **kwargs: Dict[str, Any],
+        **kwargs: Any,
     ) -> BaseFieldType:
         kwargs = {
             **kwargs,
@@ -195,4 +193,3 @@ class ForeignKeyFieldFactory(FieldFactory):
 
         if related_name:
             kwargs["related_name"] = related_name.lower()
-        kwargs.setdefault("default", None)

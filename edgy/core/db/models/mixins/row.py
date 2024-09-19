@@ -118,8 +118,9 @@ class ModelRowMixin:
             # and rebuild it with the new fields.
             proxy_model = model_related.proxy_model(**child_item)
             # don't pass table, it is only for the main model_class
+            proxy_database = database if model_related.database is cls.database else None
             proxy_model = apply_instance_extras(
-                proxy_model, model_related, using_schema, database=database
+                proxy_model, model_related, using_schema, database=proxy_database
             )
             proxy_model.identifying_db_fields = foreign_key.related_columns
 
@@ -146,7 +147,7 @@ class ModelRowMixin:
                     # fallback, sometimes the column is not found
                     item[column.key] = row._mapping[column.name]
         model: Model = (
-            cls(**item, __phase__="init_db")
+            cls(**item, __phase__="init_db")  # type: ignore
             if not exclude_secrets and not is_defer_fields and not _is_only
             else cls.proxy_model(**item)
         )

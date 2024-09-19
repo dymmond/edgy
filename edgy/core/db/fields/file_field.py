@@ -39,7 +39,7 @@ class ConcreteFileField(BaseCompositeField):
     multi_process_safe: bool = True
     field_file_class: Type[FieldFile]
     _generate_name_fn: Optional[
-        Callable[[Optional["BaseModelType"], str, Union[File, BinaryIO], bool], str]
+        Callable[[Optional["BaseModelType"], Union[File, BinaryIO], str, bool], str]
     ] = None
 
     def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:
@@ -245,7 +245,9 @@ class FileField(FieldFactory):
         extract_mime: Union[bool, Literal["approved_only"]] = True,
         mime_use_magic: bool = False,
         field_file_class: Type[FieldFile] = FieldFile,
-        generate_name_fn: Optional[Callable[[Optional["BaseModelType"], str], str]] = None,
+        generate_name_fn: Optional[
+            Callable[[Optional["BaseModelType"], Union[File, BinaryIO], str, bool], str]
+        ] = None,
         **kwargs: Any,
     ) -> "BaseFieldType":
         if not storage:
@@ -257,7 +259,7 @@ class FileField(FieldFactory):
             **kwargs,
             **{k: v for k, v in locals().items() if k not in IGNORED},
         }
-        return super().__new__(cls, _generate_name_fn=generate_name_fn, **kwargs)  # type: ignore
+        return super().__new__(cls, _generate_name_fn=generate_name_fn, **kwargs)
 
     @classmethod
     def validate(cls, kwargs: Dict[str, Any]) -> None:

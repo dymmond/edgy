@@ -29,7 +29,6 @@ class RelatedField(RelationshipField):
         super().__init__(
             inherit=False,
             exclude=True,
-            deprecated=False,
             field_type=Any,
             annotation=Any,
             column_type=None,
@@ -70,7 +69,7 @@ class RelatedField(RelationshipField):
 
     def __get__(self, instance: "BaseModelType", owner: Any = None) -> ManyRelationProtocol:
         if instance:
-            if self.name not in instance.__dict__:
+            if instance.__dict__.get(self.name, None) is None:
                 instance.__dict__[self.name] = self.get_relation()
             if instance.__dict__[self.name].instance is None:
                 instance.__dict__[self.name].instance = instance

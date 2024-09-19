@@ -127,7 +127,7 @@ class BaseModelType(ABC):
         force_save: bool = False,
         values: Dict[str, Any] = None,
         **kwargs: Any,
-    ) -> Union["BaseModel", Any]:
+    ) -> "BaseModelType":
         """Save model"""
 
     @abstractmethod

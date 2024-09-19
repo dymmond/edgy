@@ -282,7 +282,7 @@ async def test_nullable_foreign_key():
     member = await Member.query.get()
 
     assert member.email == "dev@edgy.com"
-    assert member.team.pk == {"id": None, "name": None}
+    assert member.team is None
 
 
 def test_assertation_error_on_set_null():

@@ -194,7 +194,9 @@ class InspectDB:
 
         # Handle the unique together
         for constraint in constraints:
-            if isinstance(constraint, schema.UniqueConstraint):
+            if isinstance(constraint, schema.UniqueConstraint) and isinstance(
+                constraint.name, str
+            ):
                 columns = [
                     column.name
                     for column in constraint.columns

@@ -1,5 +1,17 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Sequence, Tuple, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+    cast,
+)
 
 import sqlalchemy
 from pydantic import BaseModel
@@ -45,6 +57,7 @@ class BaseForeignKeyField(BaseForeignKey):
         relation_fn: Optional[Callable[..., ManyRelationProtocol]] = None,
         reverse_path_fn: Optional[Callable[[str], Tuple[Any, str, str]]] = None,
         remove_referenced: bool = False,
+        null: bool = False,
         **kwargs: Any,
     ) -> None:
         self.related_fields = related_fields
@@ -57,7 +70,9 @@ class BaseForeignKeyField(BaseForeignKey):
         self.remove_referenced = remove_referenced
         if remove_referenced:
             self.post_delete_callback = self._notset_post_delete_callback
-        super().__init__(**kwargs)
+        # if null:
+        #     kwargs.setdefault("default", None)
+        super().__init__(**kwargs, null=null)
         if self.force_cascade_deletion_relation or (
             self.on_delete == CASCADE and self.no_constraint
         ):
@@ -72,6 +87,8 @@ class BaseForeignKeyField(BaseForeignKey):
         self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
     ) -> Any:
         target = self.target
+        # value is clean result, check what is provided as kwarg
+        # still use value for handling defaults
         if value is None or (isinstance(value, dict) and not value):
             value = original_value
         # e.g. default was a Model
@@ -80,8 +97,11 @@ class BaseForeignKeyField(BaseForeignKey):
             return self.clean(self.name, value, for_query=False)
         elif isinstance(value, dict):
             return await self.pre_save_callback(
-                target(**value), None, force_insert=force_insert, instance=instance
+                target(**value), original_value=None, force_insert=force_insert, instance=instance
             )
+        # don't mess around when None, we cannot save something here
+        if value is None:
+            return {}
         return {self.name: value}
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
@@ -134,9 +154,14 @@ class BaseForeignKeyField(BaseForeignKey):
 
     def expand_relationship(self, value: Any) -> Any:
         target = self.target
-        if isinstance(value, (target, target.proxy_model)):
-            return value
         related_columns = self.related_columns.keys()
+        if isinstance(value, (target, target.proxy_model)):
+            # if all related columns are set to None
+            if all(
+                key in value.__dict__ and getattr(value, key) is None for key in related_columns
+            ):
+                return None
+            return value
         if len(related_columns) == 1 and not isinstance(value, (dict, BaseModel)):
             value = {next(iter(related_columns)): value}
         elif isinstance(value, BaseModel):
@@ -175,6 +200,9 @@ class BaseForeignKeyField(BaseForeignKey):
         column_names = self.get_column_names(name)
         assert len(column_names) >= 1
         if len(column_names) == 1:
+            # fake default
+            if phase == "post_insert":
+                kwargs.setdefault(name, None)
             return
         to_add = {}
         # for idempotency
@@ -183,6 +211,9 @@ class BaseForeignKeyField(BaseForeignKey):
                 to_add[self.from_fk_field_name(name, column_name)] = kwargs.pop(column_name)
         # empty
         if not to_add:
+            # fake default
+            if phase == "post_insert":
+                kwargs.setdefault(name, None)
             return
         if name in kwargs:
             # after removing the attributes return
@@ -254,8 +285,8 @@ class BaseForeignKeyField(BaseForeignKey):
         columns: Sequence[sqlalchemy.Column],
         schemes: Sequence[str] = (),
         no_constraint: Optional[bool] = None,
-    ) -> Sequence[sqlalchemy.Constraint]:
-        constraints = []
+    ) -> Sequence[Union[sqlalchemy.Constraint, sqlalchemy.Index]]:
+        constraints: List[Union[sqlalchemy.Constraint, sqlalchemy.Index]] = []
         no_constraint = bool(no_constraint or self.no_constraint or self.is_cross_db())
         if not no_constraint:
             target = self.target
@@ -293,7 +324,7 @@ class ForeignKey(ForeignKeyFieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        to: Union["BaseModelType", str],
+        to: Union[Type["BaseModelType"], str],
         **kwargs: Any,
     ) -> BaseFieldType:
         return super().__new__(cls, to=to, **kwargs)

@@ -270,7 +270,7 @@ async def test_on_delete_set_null():
     await team.delete()
 
     member = await Member.query.first()
-    assert member.team.pk is None
+    assert member.team is None
 
 
 async def test_one_to_one_field_crud():
@@ -307,7 +307,7 @@ async def test_nullable_foreign_key():
     member = await Member.query.get()
 
     assert member.email == "dev@edgy.com"
-    assert member.team.pk is None
+    assert member.team is None
 
 
 def test_assertation_error_on_set_null():

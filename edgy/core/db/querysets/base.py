@@ -516,7 +516,7 @@ class BaseQuerySet(
         self._cache_current_row: Optional[sqlalchemy.Row] = None
 
     async def _handle_batch(
-        self, batch: Sequence[sqlalchemy.Row], queryset: "QuerySet"
+        self, batch: Sequence[sqlalchemy.Row], queryset: "BaseQuerySet"
     ) -> Sequence[Tuple[BaseModelType, BaseModelType]]:
         is_only_fields = bool(queryset._only)
         is_defer_fields = bool(queryset._defer)
@@ -529,7 +529,7 @@ class BaseQuerySet(
                 getattr(self.table.columns, pkcol).in_([getattr(row, pkcol) for row in batch])
             )
         for prefetch in self._prefetch_related:
-            check_prefetch_collision(self.model_class, prefetch)
+            check_prefetch_collision(self.model_class, prefetch)  # type: ignore
 
             crawl_result = crawl_relationship(
                 self.model_class, prefetch.related_name, traverse_last=True
@@ -624,13 +624,13 @@ class BaseQuerySet(
         check_db_connection(queryset.database)
         if fetch_all_at_once:
             async with queryset.database as database:
-                batch = await database.fetch_all(expression)
+                batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
             for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
                 if counter == 0:
                     self._cache_first = result
                 last_element = result
                 counter += 1
-                self._cache_current_row = batch[row_num]  # type: ignore
+                self._cache_current_row = batch[row_num]
                 yield result[1]
             self._cache_current_row = None
             self._cache_fetch_all = True
@@ -746,7 +746,7 @@ class QuerySet(BaseQuerySet):
 
     def filter(
         self,
-        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression,
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -765,7 +765,7 @@ class QuerySet(BaseQuerySet):
 
     def or_(
         self,
-        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression,
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -775,7 +775,7 @@ class QuerySet(BaseQuerySet):
 
     def and_(
         self,
-        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression,
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -785,7 +785,7 @@ class QuerySet(BaseQuerySet):
 
     def not_(
         self,
-        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression,
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -795,7 +795,7 @@ class QuerySet(BaseQuerySet):
 
     def exclude(
         self,
-        *clauses: Tuple[sqlalchemy.sql.expression.BinaryExpression, ...],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression,
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -897,7 +897,7 @@ class QuerySet(BaseQuerySet):
         queryset.distinct_on = distinct_on
         return queryset
 
-    def only(self, *fields: Sequence[str]) -> "QuerySet":
+    def only(self, *fields: str) -> "QuerySet":
         """
         Returns a list of models with the selected only fields and always the primary
         key.

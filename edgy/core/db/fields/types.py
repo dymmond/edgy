@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Optional, Sequence, cast
+from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Optional, Sequence, Union, cast
 
 import sqlalchemy
 from pydantic import BaseModel, Field
@@ -59,6 +59,7 @@ class BaseFieldDefinitions:
     exclude: bool = False
     owner: Any = None
     default: Any = Undefined
+    explicit_none: bool = False
     server_default: Any = None
 
     # column specific
@@ -131,7 +132,7 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
 
     def get_global_constraints(
         self, name: str, columns: Sequence[sqlalchemy.Column], schemes: Sequence[str] = ()
-    ) -> Sequence[sqlalchemy.Constraint]:
+    ) -> Sequence[Union[sqlalchemy.Constraint, sqlalchemy.Index]]:
         """Return global constraints and indexes.
         Useful for multicolumn fields
         """

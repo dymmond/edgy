@@ -49,7 +49,9 @@ class Storage(ABC):
 
         name = self.sanitize_name(name)
 
-        if isinstance(content, (str, bytes)):
+        if isinstance(content, str):
+            content = ContentFile(content.encode("utf8"), name)
+        elif isinstance(content, bytes):
             content = ContentFile(content, name)
         elif not hasattr(content, "chunks"):
             content = File(content, name)

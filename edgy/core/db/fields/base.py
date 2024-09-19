@@ -69,6 +69,7 @@ class BaseField(BaseFieldType, FieldInfo):
     ) -> None:
         if "__type__" in kwargs:
             kwargs["field_type"] = kwargs.pop("__type__")
+        self.explicit_none = default is None
 
         super().__init__(**kwargs)
 
@@ -76,7 +77,12 @@ class BaseField(BaseFieldType, FieldInfo):
         for name, value in kwargs.items():
             setattr(self, name, value)
 
-        if self.null and default is Undefined:
+        # null is used for nullable columns and is_required is False
+        # this is required for backward compatibility and pydantic_core uses null=True too
+        # for opting out of nullable columns overwrite the get_column(s) method
+        if (
+            self.null or self.server_default is not None or self.autoincrement
+        ) and default is Undefined:
             default = None
         if default is not Undefined:
             self.default = default
@@ -122,12 +128,14 @@ class BaseField(BaseFieldType, FieldInfo):
         return not (
             self.null
             or self.server_default is not None
-            or (self.default is not None and self.default is not Undefined)
+            or ((self.default is not None or self.explicit_none) and self.default is not Undefined)
         )
 
     def has_default(self) -> bool:
         """Checks if the field has a default value set"""
-        return bool(self.default is not None and self.default is not Undefined)
+        return bool(
+            (self.default is not None or self.explicit_none) and self.default is not Undefined
+        )
 
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         """
@@ -148,7 +156,7 @@ class BaseField(BaseFieldType, FieldInfo):
         """
         field_copy = copy.copy(self)
         field_copy.name = new_fieldname
-        field_copy.owner = owner  # type: ignore
+        field_copy.owner = owner
         return field_copy
 
     def get_default_value(self) -> Any:

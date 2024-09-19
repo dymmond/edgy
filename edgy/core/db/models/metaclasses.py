@@ -40,6 +40,7 @@ from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured, Table
 
 if TYPE_CHECKING:
     from edgy.core.db.models import Model
+    from edgy.core.db.models.types import BaseModelType
 
 _empty_dict: Dict[str, Any] = {}
 _empty_set: FrozenSet[Any] = frozenset()
@@ -175,7 +176,7 @@ class MetaInfo:
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self._is_init = False
-        self.model: Optional[Type[Model]] = None
+        self.model: Optional[Type[BaseModelType]] = None
         #  Difference between meta extraction and kwargs: meta attributes are copied
         self.abstract: bool = getattr(meta, "abstract", False)
         # for embedding
@@ -314,7 +315,7 @@ def get_model_registry(
             return direct_registry
 
     for base in bases:
-        meta: MetaInfo = getattr(base, "meta", None)  # type: ignore
+        meta: MetaInfo = getattr(base, "meta", None)
         if not meta:
             continue
         found_registry: Optional[Registry] = getattr(meta, "registry", None)
@@ -325,11 +326,11 @@ def get_model_registry(
 
 
 def _set_related_field(
-    target: "Model",
+    target: Type["BaseModelType"],
     *,
     foreign_key_name: str,
     related_name: str,
-    source: "Model",
+    source: Type["BaseModelType"],
 ) -> None:
     if related_name in target.meta.fields:
         raise ForeignKeyBadConfigured(
@@ -351,7 +352,7 @@ def _set_related_field(
 
 def _set_related_name_for_foreign_keys(
     meta: "MetaInfo",
-    model_class: "Model",
+    model_class: Type["BaseModelType"],
 ) -> None:
     """
     Sets the related name for the foreign keys.
@@ -383,7 +384,7 @@ def _set_related_name_for_foreign_keys(
             foreign_key_name=name,
             related_name=related_name,
         )
-        registry: Registry = cast("Registry", model_class.meta.registry)
+        registry: Registry = model_class.meta.registry
         with contextlib.suppress(Exception):
             registry = cast("Registry", foreign_key.target.registry)
         registry.register_callback(foreign_key.to, related_field_fn, one_time=True)
@@ -735,7 +736,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         new_class.add_to_registry(meta.registry)
         return new_class
 
-    def add_to_registry(cls: Type["Model"], registry: Registry, name: str = "") -> None:
+    def add_to_registry(cls: Type["BaseModelType"], registry: Registry, name: str = "") -> None:
         # when called if registry is not set
         cls.meta.registry = registry
         cls.database = registry.database
@@ -863,7 +864,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cast("sqlalchemy.Table", schema_obj)
 
     @property
-    def proxy_model(cls: Type["Model"]) -> Any:
+    def proxy_model(cls: Type["Model"]) -> Type["BaseModelType"]:
         """
         Returns the proxy_model from the Model when called using the cache.
         """

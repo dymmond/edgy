@@ -25,6 +25,7 @@ class MarshallMeta(ModelMetaclass):
         base_annotations: Dict[str, Any] = {}
         show_pk: bool = False
         marshall_config: ConfigMarshall = attrs.pop("marshall_config", None)
+        # TODO: should have correct types
         attrs, model_fields = extract_field_annotations_and_defaults(attrs, BaseMarshallField)
 
         model_class = super().__new__
@@ -74,9 +75,7 @@ class MarshallMeta(ModelMetaclass):
             show_pk = True
         else:
             base_model_fields = {
-                k: v
-                for k, v in model.model_fields.items()
-                if k in base_fields_include  # type: ignore
+                k: v for k, v in model.model_fields.items() if k in base_fields_include
             }
 
         base_model_fields.update(model_fields)

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:  # pragma: nocover
     from edgy.core.db.models.types import BaseModelType
@@ -6,7 +6,7 @@ if TYPE_CHECKING:  # pragma: nocover
 
 @runtime_checkable
 class ManyRelationProtocol(Protocol):
-    instance: Any
+    instance: "BaseModelType"
 
     """Defines the what needs to be implemented when using the ManyRelationProtocol"""
 
