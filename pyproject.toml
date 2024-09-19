@@ -84,7 +84,7 @@ testing = [
     "pytest-timeout",
     "ipdb",
     "pytest-mock",
-    "mypy==1.11.2",
+    "mypy==1.10",
     "httpx",
     "types-orjson==3.6.2",
     "backports.zoneinfo;python_version<'3.9'"
