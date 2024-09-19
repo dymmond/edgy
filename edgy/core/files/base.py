@@ -71,7 +71,7 @@ class File:
         self.name = name or ""
 
         if hasattr(file, "mode"):
-            self.mode = file.mode  # type: ignore
+            self.mode = file.mode
 
     def __eq__(self, other: Union[str, "File"]) -> bool:
         if hasattr(other, "name"):
@@ -190,7 +190,7 @@ class File:
             FileOperationError: If the file cannot be reopened.
         """
         if not self.closed:
-            self.file.seek(0)  # type: ignore
+            self.file.seek(0)
         elif self.name and self.storage.exists(self.name):
             self.file = self.storage.open(self.name, mode or self.mode)  # noqa: SIM115
         else:
@@ -227,7 +227,7 @@ class File:
 
     def seek(self, offset: int, whence: int = 0) -> int:
         assert self.seekable()
-        return cast("BinaryIO", self.file).seek(offset, whence)
+        return self.file.seek(offset, whence)
 
     def tell(self) -> int:
         assert self.file is not None
@@ -464,4 +464,4 @@ class ImageFieldFile(FieldFile):
                 allowed_formats = None
             else:
                 allowed_formats = (*allowed_formats, *approved_image_formats)
-        return Image.open(self.open("rb"), formats=allowed_formats)
+        return Image.open(self.open("rb"), formats=allowed_formats)  # type: ignore

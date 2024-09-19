@@ -88,6 +88,8 @@ class ConcreteCompositeField(BaseCompositeField):
                     self.embedded_field_defs[field_def.name] = field_def
         return super().__init__(
             owner=owner,
+            # this is just a holder for real fields
+            null=True,
             **kwargs,
         )
 
@@ -209,7 +211,7 @@ class ConcreteCompositeField(BaseCompositeField):
 
         if not self.absorb_existing_fields:
             if self.owner is None:
-                duplicate_fields = set(self.embedded_field_defs.keys()).intersection(  # type: ignore
+                duplicate_fields = set(self.embedded_field_defs.keys()).intersection(
                     {k for k, v in fields.items() if v.owner is None}
                 )
                 if duplicate_fields:

@@ -1,6 +1,6 @@
 import copy
 import inspect
-from typing import TYPE_CHECKING, Any, Dict, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Dict, Sequence, Type, cast
 
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
@@ -78,7 +78,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         )
 
         proxy_model.build()
-        generify_model_fields(proxy_model.model)
+        generify_model_fields(cast(Type[EdgyBaseModel], proxy_model.model))
         return cast(Type[Model], proxy_model.model)
 
     async def update(self, **kwargs: Any) -> Any:
@@ -108,7 +108,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 setattr(self, k, v)
 
         # updates aren't required to change the db, they can also just affect the meta fields
-        await self.execute_post_save_hooks(kwargs.keys())
+        await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()))
         if kwargs:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
@@ -203,7 +203,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             setattr(self, k, v)
 
         if self.meta.post_save_fields:
-            await self.execute_post_save_hooks(kwargs.keys())
+            await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()))
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False
 
@@ -218,7 +218,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         force_save: bool = False,
         values: Dict[str, Any] = None,
         **kwargs: Any,
-    ) -> Union["Model", Any]:
+    ) -> "Model":
         """
         Performs a save of a given model instance.
         When creating a user it will make sure it can update existing or

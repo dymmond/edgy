@@ -60,7 +60,7 @@ class ASGIHelper:
                             await send({"type": "lifespan.startup.complete"})
                         elif message["type"] == "lifespan.shutdown":
                             await send({"type": "lifespan.shutdown.complete"})
-                            return
+                            break
                 return
 
         with suppress(MuteInteruptException):

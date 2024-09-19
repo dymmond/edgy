@@ -99,7 +99,7 @@ class RedirectManager(BaseManager):
     def __getattr__(self, name: str) -> Any:
         if name.startswith("_") or name == self.name:
             return super().__getattr__(name)
-        return getattr(self.owner.meta.managers[self.redirect_name], name)  # type: ignore
+        return getattr(self.owner.meta.managers[self.redirect_name], name)
 
     def get_queryset(self) -> "QuerySet":
         return cast("QuerySet", self.__getattr__("get_queryset")())

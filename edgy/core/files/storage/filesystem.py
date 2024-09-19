@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timezone
 from functools import cached_property
 from threading import Lock
-from typing import Any, Dict, List, Tuple, Union, cast
+from typing import Any, BinaryIO, Dict, List, Tuple, Union, cast
 from urllib.parse import urljoin
 
 from edgy.conf import settings
@@ -21,8 +21,8 @@ class FileSystemStorage(Storage):
         self,
         location: Union[str, os.PathLike, None] = None,
         base_url: Union[str, None] = None,
-        file_permissions_mode: Union[str, None] = None,
-        directory_permissions_mode: Union[str, None] = None,
+        file_permissions_mode: Union[int, None] = None,
+        directory_permissions_mode: Union[int, None] = None,
     ) -> None:
         self._location = location
         self._base_url = base_url
@@ -64,17 +64,17 @@ class FileSystemStorage(Storage):
         return self.value_or_setting(self._base_url, settings.media_url)
 
     @cached_property
-    def file_permissions_mode(self) -> str:
+    def file_permissions_mode(self) -> int:
         return self.value_or_setting(self._file_permissions_mode, settings.file_upload_permissions)
 
     @cached_property
-    def directory_permissions_mode(self) -> str:
+    def directory_permissions_mode(self) -> int:
         return self.value_or_setting(
             self._directory_permissions_mode, settings.file_upload_directory_permissions
         )
 
     def _open(self, name: str, mode: str) -> File:
-        return File(open(self.path(name), mode))  # noqa: SIM115
+        return File(cast(BinaryIO, open(self.path(name), mode)))  # noqa: SIM115
 
     def _save(self, content: File, name: str) -> None:
         """

@@ -2,7 +2,7 @@ from collections.abc import MutableMapping
 from typing import TYPE_CHECKING, Any, Dict, Generator
 
 if TYPE_CHECKING:
-    from edgy.core.marshalls import Marshall
+    from edgy.core.marshalls.base import BaseMarshall
 
 
 class MarshallFieldMapping(MutableMapping):
@@ -11,7 +11,7 @@ class MarshallFieldMapping(MutableMapping):
     the fields used in the Marshall.
     """
 
-    def __init__(self, marshall: "Marshall") -> None:
+    def __init__(self, marshall: "BaseMarshall") -> None:
         self._marshall = marshall
         self._fields: Dict[str, Any] = {}
 
@@ -25,7 +25,7 @@ class MarshallFieldMapping(MutableMapping):
         del self._fields[key]
 
     def __iter__(self) -> Generator:
-        return iter(self._fields)
+        return iter(self._fields)  # type: ignore
 
     def __len__(self) -> int:
         return len(self._fields)

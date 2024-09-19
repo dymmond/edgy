@@ -101,7 +101,9 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         self._loaded_or_deleted = False
 
     @classmethod
-    def transform_input(cls, kwargs: Any, phase: str, instance: Optional["Model"] = None) -> Any:
+    def transform_input(
+        cls, kwargs: Any, phase: str, instance: Optional["BaseModelType"] = None
+    ) -> Any:
         """
         Expand to_models and apply input modifications.
         """
@@ -165,8 +167,8 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         return _copy
 
     @cached_property
-    def proxy_model(self) -> Any:
-        return self.__class__.proxy_model
+    def proxy_model(self) -> Type[BaseModelType]:
+        return self.__class__.proxy_model  # type: ignore
 
     @cached_property
     def identifying_db_fields(self) -> Any:
@@ -377,7 +379,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         """
         Builds the SQLAlchemy table representation from the loaded fields.
         """
-        tablename: str = cls.meta.tablename  # type: ignore
+        tablename: str = cls.meta.tablename
         registry = cls.meta.registry
         assert registry is not None, "registry is not set"
         if metadata is None:
@@ -399,14 +401,14 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
 
         # Handle the uniqueness together
         uniques = []
-        for field in unique_together or []:
-            unique_constraint = cls._get_unique_constraints(field)
+        for unique_index in unique_together or []:
+            unique_constraint = cls._get_unique_constraints(unique_index)
             uniques.append(unique_constraint)
 
         # Handle the indexes
         indexes = []
-        for field in index_constraints or []:
-            index = cls._get_indexes(field)
+        for index_c in index_constraints or []:
+            index = cls._get_indexes(index_c)
             indexes.append(index)
         return sqlalchemy.Table(
             tablename,
@@ -441,7 +443,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         """
         Creates the index based on the Index fields
         """
-        return sqlalchemy.Index(index.name, *index.fields)  # type: ignore
+        return sqlalchemy.Index(index.name, *index.fields)
 
     async def execute_pre_save_hooks(
         self, column_values: Dict[str, Any], original: Dict[str, Any], force_insert: bool

@@ -751,6 +751,7 @@ Within a model context it contains the current phase it is called for:
 * `set`: Called in model `__setattr__` (when setting an attribute).
 * `load`: Called after load. Contains db values.
 * `post_insert`: Called after insert. Arguments are the ones passed to save.
+* `post_update`: Called after update. Arguments are the ones passed to save.
 
 #### Saving variables on Field
 

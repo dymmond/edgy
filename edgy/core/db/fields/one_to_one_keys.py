@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Type, Union
 
 from edgy.core.db.fields.foreign_keys import ForeignKey
 from edgy.core.terminal import Print
@@ -20,7 +20,7 @@ class OneToOneField(ForeignKey):
 
     def __new__(  # type: ignore
         cls,
-        to: Union[BaseModelType, str],
+        to: Union[Type[BaseModelType], str],
         **kwargs: Any,
     ) -> BaseFieldType:
         for argument in ["index", "unique"]:

@@ -11,6 +11,7 @@ terminal = Terminal()
 
 if TYPE_CHECKING:
     from edgy import Model, Registry
+    from edgy.core.db.models.types import BaseModelType
 
 
 def table_schema(model_class: Type["Model"], schema: str) -> sqlalchemy.Table:
@@ -23,7 +24,7 @@ def table_schema(model_class: Type["Model"], schema: str) -> sqlalchemy.Table:
 
 
 async def create_tables(
-    registry: "Registry", models: Dict[str, Type["Model"]], schema: str
+    registry: "Registry", models: Dict[str, Type["BaseModelType"]], schema: str
 ) -> None:
     """
     Creates the table models for a specific schema just generated.
@@ -46,7 +47,7 @@ async def create_tables(
 async def create_schema(
     registry: "Registry",
     schema_name: str,
-    models: Union[Dict[str, "Model"], None] = None,
+    models: Union[Dict[str, Type["BaseModelType"]], None] = None,
     if_not_exists: bool = False,
     should_create_tables: bool = False,
 ) -> None:

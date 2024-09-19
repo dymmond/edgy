@@ -84,7 +84,7 @@ testing = [
     "pytest-timeout",
     "ipdb",
     "pytest-mock",
-    "mypy==1.10.0",
+    "mypy==1.11.2",
     "httpx",
     "types-orjson==3.6.2",
     "backports.zoneinfo;python_version<'3.9'"
@@ -156,20 +156,22 @@ path = "edgy/__init__.py"
 plugins = [
   "pydantic.mypy"
 ]
-
+strict = true
 warn_unused_configs = true
 warn_unreachable = true
 warn_return_any = true
-strict = true
 disallow_untyped_decorators = true
 disallow_any_generics = false
 implicit_reexport = false
-no_implicit_optional = false
 show_error_codes = true
 disallow_incomplete_defs = true
-disable_error_code = "attr-defined,arg-type,override,misc"
+disable_error_code = "attr-defined,has-type,override,misc,safe-super"
 warn_unused_ignores = true
 warn_redundant_casts = true
+no_implicit_optional = false
+strict_equality = false
+strict_optional = false
+
 
 [tool.ruff]
 line-length = 99

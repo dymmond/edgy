@@ -20,7 +20,7 @@ class ProxyModel:
         *,
         bases: Union[Tuple[Type["BaseModelType"]], None] = None,
         definitions: Union[Dict[Any, Any], None] = None,
-        metadata: Union[Type["MetaInfo"], None] = None,
+        metadata: Union["MetaInfo", None] = None,
         qualname: Union[str, None] = None,
         config: Union[ConfigDict, None] = None,
         proxy: bool = True,
@@ -30,7 +30,7 @@ class ProxyModel:
         self.__module__: str = module
         self.__bases__: Union[Tuple[Type[BaseModelType]], None] = bases
         self.__definitions__: Union[Dict[Any, Any], None] = definitions
-        self.__metadata__: Union[Type[MetaInfo], None] = metadata
+        self.__metadata__: Union[MetaInfo, None] = metadata
         self.__qualname__: Union[str, None] = qualname
         self.__config__: Union[ConfigDict, None] = config
         self.__proxy__: bool = proxy

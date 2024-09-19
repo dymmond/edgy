@@ -16,7 +16,7 @@ class ImageField(FileField):
         # extra image formats after approval
         approved_image_formats: Optional[Sequence[str]] = None,
         field_file_class: Type[ImageFieldFile] = ImageFieldFile,
-        **kwargs: Dict[str, Any],
+        **kwargs: Any,
     ) -> "BaseFieldType":
         kwargs.setdefault("with_approval", True)
         return super().__new__(

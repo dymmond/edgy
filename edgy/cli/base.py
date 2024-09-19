@@ -83,17 +83,16 @@ class Migrate(BaseExtra):
 
         models = self.check_db_models(self.model_apps)
 
-        for name, _ in models.items():
+        for name, value in models.items():
             if name in self.registry.models:
                 warnings.warn(
                     f"There is already a model with the name {name} declared. Overriding the model will occur unless you rename it.",
                     stacklevel=2,
                 )
-
-        if self.registry.models:
-            self.registry.models = {**models, **self.registry.models}
-        else:
-            self.registry.models = models
+            # proper add to registry
+            value.add_to_registry(self.registry)
+        # we need to ensure initialized metadata
+        self.registry.refresh_metadata()
 
         self.directory = "migrations"
         self.alembic_ctx_kwargs = kwargs
@@ -205,7 +204,7 @@ def init(
     config = Config(template_directory=template_directory)
     config.set_main_option("script_location", directory)
     config.config_file_name = os.path.join(directory, "alembic.ini")
-    config = app._edgy_db["migrate"].migrate.call_configure_callbacks(config)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.call_configure_callbacks(config)
 
     if template is None:
         template = DEFAULT_TEMPLATE_NAME
@@ -229,7 +228,7 @@ def revision(
     Creates a new revision file
     """
     options = ["autogenerate"] if autogenerate else None
-    config = app._edgy_db["migrate"].migrate.get_config(directory, options)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(directory, options)
 
     command.revision(
         config,
@@ -258,7 +257,7 @@ def migrate(
     arg: Optional[typing.Any] = None,
 ) -> None:
     """Alias for 'revision --autogenerate'"""
-    config = app._edgy_db["migrate"].migrate.get_config(  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(
         directory, options=["autogenerate"], arg=arg
     )
 
@@ -281,7 +280,7 @@ def edit(
 ) -> None:
     """Edit current revision."""
     if alembic_version >= (1, 9, 4):
-        config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
+        config = app._edgy_db["migrate"].migrate.get_config(directory)
         command.edit(config, revision)
     else:
         raise RuntimeError("Alembic 1.9.4 or greater is required")
@@ -297,7 +296,7 @@ def merge(
     revision_id: Optional[str] = None,
 ) -> None:
     """Merge two revisions together.  Creates a new migration file"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(directory)
     command.merge(
         config, revisions, message=message, branch_label=branch_label, rev_id=revision_id
     )
@@ -313,7 +312,7 @@ def upgrade(
     arg: Optional[typing.Any] = None,
 ) -> None:
     """Upgrade to a later version"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory, arg=arg)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(directory, arg=arg)
     command.upgrade(config, revision, sql=sql, tag=tag)
 
 
@@ -327,7 +326,7 @@ def downgrade(
     arg: Optional[typing.Any] = None,
 ) -> None:
     """Revert to a previous version"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory, arg=arg)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(directory, arg=arg)
     if sql and revision == "-1":
         revision = "head:-1"
     command.downgrade(config, revision, sql=sql, tag=tag)
@@ -340,7 +339,7 @@ def show(
     revision: str = "head",
 ) -> None:
     """Show the revision denoted by the given symbol."""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(directory)
     command.show(config, revision)
 
 
@@ -353,7 +352,7 @@ def history(
     indicate_current: bool = False,
 ) -> None:
     """List changeset scripts in chronological order."""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(directory)
     command.history(config, rev_range, verbose=verbose, indicate_current=indicate_current)
 
 
@@ -365,7 +364,7 @@ def heads(
     resolve_dependencies: bool = False,
 ) -> None:
     """Show current available heads in the script directory"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(directory)
     command.heads(config, verbose=verbose, resolve_dependencies=resolve_dependencies)
 
 
@@ -374,7 +373,7 @@ def branches(
     app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False
 ) -> None:
     """Show current branch points"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(directory)
     command.branches(config, verbose=verbose)
 
 
@@ -383,7 +382,7 @@ def current(
     app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False
 ) -> None:
     """Display the current revision for each database."""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(directory)
     command.current(config, verbose=verbose)
 
 
@@ -397,7 +396,7 @@ def stamp(
 ) -> None:
     """'stamp' the revision table with the given revision; don't run any
     migrations"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(directory)
     command.stamp(config, revision, sql=sql, tag=tag)
 
 
@@ -407,5 +406,5 @@ def check(
     directory: Optional[str] = None,
 ) -> None:
     """Check if there are any new operations to migrate"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)  # type: ignore
+    config = app._edgy_db["migrate"].migrate.get_config(directory)
     command.check(config)

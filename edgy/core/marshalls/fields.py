@@ -1,12 +1,11 @@
 from typing import Any, ClassVar, Dict, Union
 
-from pydantic._internal import _repr
 from pydantic.fields import FieldInfo
 
 from edgy.types import Undefined
 
 
-class BaseMarshallField(FieldInfo, _repr.Representation):
+class BaseMarshallField(FieldInfo):
     __is_method__: ClassVar[bool] = False
 
     def __init__(
@@ -15,7 +14,7 @@ class BaseMarshallField(FieldInfo, _repr.Representation):
         source: Union[str, None] = None,
         allow_null: bool = False,
         default: Any = Undefined,
-        **kwargs: Dict[str, Any],
+        **kwargs: Any,
     ) -> None:
         self.source = source
         self.null = allow_null

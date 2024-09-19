@@ -26,6 +26,7 @@ from edgy.core.db.fields import (
 )
 from edgy.core.db.fields.base import BaseField, Field
 from edgy.exceptions import FieldDefinitionError
+from edgy.types import Undefined
 
 
 class Choices(str, enum.Enum):
@@ -233,7 +234,7 @@ def test_can_create_binary_field():
     field = BinaryField(max_length=25)
 
     assert isinstance(field, BaseField)
-    assert field.default is None
+    assert field.default is Undefined
 
 
 @pytest.mark.parametrize("klass", [FloatField, IntegerField, BigIntegerField, SmallIntegerField])
@@ -241,14 +242,14 @@ def test_can_create_integer_field(klass):
     field = klass(minimum=1, maximum=10)
 
     assert isinstance(field, BaseField)
-    assert field.default is None
+    assert field.default is Undefined
 
 
 def test_can_create_decimal_field():
     field = DecimalField(max_digits=2, decimal_places=2)
 
     assert isinstance(field, BaseField)
-    assert field.default is None
+    assert field.default is Undefined
 
 
 def test_can_create_uuid_field():

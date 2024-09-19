@@ -46,7 +46,7 @@ def _removeprefix(text: str, prefix: str) -> str:
         return text
 
 
-def _removeprefixes(text: str, *prefixes: Sequence[str]) -> str:
+def _removeprefixes(text: str, *prefixes: str) -> str:
     for prefix in prefixes:
         text = _removeprefix(text, prefix)
     return text
@@ -91,6 +91,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         return f"{self.reverse_name}__{self.embed_through}"
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
+        assert not isinstance(self.through, str), "through not initialized yet"
         return ManyRelation(
             through=self.through,
             to=self.to,
@@ -101,6 +102,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         )
 
     def get_reverse_relation(self, **kwargs: Any) -> ManyRelationProtocol:
+        assert not isinstance(self.through, str), "through not initialized yet"
         return ManyRelation(
             through=self.through,
             to=self.owner,
@@ -287,7 +289,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
 
     def __get__(self, instance: "BaseModelType", owner: Any = None) -> ManyRelationProtocol:
         if instance:
-            if self.name not in instance.__dict__:
+            if instance.__dict__.get(self.name, None) is None:
                 instance.__dict__[self.name] = self.get_relation()
             if instance.__dict__[self.name].instance is None:
                 instance.__dict__[self.name].instance = instance

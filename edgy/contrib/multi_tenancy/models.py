@@ -88,7 +88,7 @@ class TenantMixin(edgy.Model):
             message = f"Rolling back... {str(e)}"
             logger.error(message)
             await self.delete()
-        return cast(edgy.Model, tenant)
+        return tenant
 
     async def delete(self, force_drop: bool = False) -> None:
         """

@@ -19,7 +19,7 @@ from edgy.core.utils.sync import run_sync
     show_default=True,
 )
 @click.command()
-def shell(env: MigrationEnv, kernel: bool) -> None:
+def shell(env: MigrationEnv, kernel: str) -> None:
     """
     Starts an interactive ipython shell with all the models
     and important python libraries.
@@ -27,9 +27,9 @@ def shell(env: MigrationEnv, kernel: bool) -> None:
     This can be used with a Migration class or with EdgyExtra object lookup.
     """
     try:
-        registry = env.app._edgy_db["migrate"].registry  # type: ignore
+        registry = env.app._edgy_db["migrate"].registry
     except AttributeError:
-        registry = env.app._edgy_extra["extra"].registry  # type: ignore
+        registry = env.app._edgy_extra["extra"].registry
 
     if (
         sys.platform != "win32"

@@ -24,10 +24,10 @@ if TYPE_CHECKING:
     from databasez.core.transaction import Transaction
 
     from edgy.core.connection import Database
-    from edgy.core.db.models import BaseModelType, Model
+    from edgy.core.db.models import BaseModelType
 
 # Create a var type for the Edgy Model
-EdgyModel = TypeVar("EdgyModel", bound="Model")
+EdgyModel = TypeVar("EdgyModel", bound="BaseModelType")
 EdgyEmbedTarget = TypeVar("EdgyEmbedTarget")
 
 
@@ -40,7 +40,7 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
 
     @abstractmethod
     def filter(
-        self, *clauses: Tuple["sqlalchemy.sql.expression.BinaryExpression", ...], **kwargs: Any
+        self, *clauses: "sqlalchemy.sql.expression.BinaryExpression", **kwargs: Any
     ) -> "QueryType": ...
 
     @abstractmethod
@@ -48,14 +48,14 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
 
     @abstractmethod
     def exclude(
-        self, clauses: Tuple["sqlalchemy.sql.expression.BinaryExpression", ...], **kwargs: Any
+        self, *clauses: "sqlalchemy.sql.expression.BinaryExpression", **kwargs: Any
     ) -> "QueryType": ...
 
     @abstractmethod
     def lookup(self, term: Any) -> "QueryType": ...
 
     @abstractmethod
-    def order_by(self, columns: Union[List, str]) -> "QueryType": ...
+    def order_by(self, *columns: Union[List, str]) -> "QueryType": ...
 
     @abstractmethod
     def reverse(self) -> "QueryType": ...
