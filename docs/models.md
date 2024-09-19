@@ -125,6 +125,20 @@ you can set the class variable:
 
 `__require_model_based_deletion__ = True`
 
+##### Copying a model to a new registry
+
+We have now a method:
+
+`model.copy_edgy_model(registry=None)`
+
+to copy a model class and optionally add it to an other registry.
+
+You can add it to a registry later by using:
+
+`model_class.add_to_registry(registry)`
+
+In fact the last method is called when the registry parameter of `copy_edgy_model` is not `None`.
+
 
 ## The Meta class
 
