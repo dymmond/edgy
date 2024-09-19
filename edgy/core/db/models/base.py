@@ -151,6 +151,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
 
     @classmethod
     def copy_edgy_model(cls, registry: Optional["Registry"] = None) -> "Model":
+        """Copy the model class and optionally add it to another registry."""
         # removes private pydantic stuff, except the prefixed ones
         attrs = {
             key: val

@@ -5,17 +5,25 @@ hide:
 
 # Release Notes
 
-## Unreleased
+## 0.16.0
 
 ### Added
 
 - ASGI, async context manager support to connect/disconnect multiple dbs at once.
 - `create_all`/`drop_all`, `create_schema`/`drop_schema` are now capable of initializing dbs in extra.
 - Add `transaction` helper to Model and QuerySet.
+- Allow copying models properly.
+- Allow None as default.
 
 ### Changed
 
 - Unify `using` to allow setting schema and database via keyword arguments and deprecate both former calls.
+
+### Fixed
+
+- Esmerald typing issues.
+- Migration metadata was not completely initialized which caused problems.
+- Foreign keys None/null handling was inconsistent. Now we have a None for unset foreign keys.
 
 ## 0.15.0
 
