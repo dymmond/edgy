@@ -9,6 +9,7 @@ from typing import (
     Any,
     AsyncIterator,
     Awaitable,
+    Callable,
     Dict,
     Generator,
     Iterable,
@@ -424,7 +425,7 @@ class BaseQuerySet(
                     _value = _value(queryset)
                     if isawaitable(_value):
                         _value = await _value
-                    _field.operator_to_clause(
+                    return _field.operator_to_clause(
                         _field.name,
                         _op,
                         queryset.model_class.table_schema(queryset.active_schema),
@@ -834,7 +835,16 @@ class QuerySet(BaseQuerySet):
 
     def filter(
         self,
-        *clauses: sqlalchemy.sql.expression.BinaryExpression,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+        ],
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -853,7 +863,16 @@ class QuerySet(BaseQuerySet):
 
     def or_(
         self,
-        *clauses: sqlalchemy.sql.expression.BinaryExpression,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+        ],
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -863,7 +882,16 @@ class QuerySet(BaseQuerySet):
 
     def and_(
         self,
-        *clauses: sqlalchemy.sql.expression.BinaryExpression,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+        ],
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -873,7 +901,16 @@ class QuerySet(BaseQuerySet):
 
     def not_(
         self,
-        *clauses: sqlalchemy.sql.expression.BinaryExpression,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+        ],
         **kwargs: Any,
     ) -> "QuerySet":
         """
@@ -883,7 +920,16 @@ class QuerySet(BaseQuerySet):
 
     def exclude(
         self,
-        *clauses: sqlalchemy.sql.expression.BinaryExpression,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+        ],
         **kwargs: Any,
     ) -> "QuerySet":
         """
