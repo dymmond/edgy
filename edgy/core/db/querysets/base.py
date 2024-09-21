@@ -749,7 +749,18 @@ class BaseQuerySet(
     def _filter_or_exclude(
         self,
         kwargs: Any,
-        clauses: Sequence[sqlalchemy.sql.expression.BinaryExpression],
+        clauses: Sequence[
+            Union[
+                "sqlalchemy.sql.expression.BinaryExpression",
+                Callable[
+                    ["QueryType"],
+                    Union[
+                        "sqlalchemy.sql.expression.BinaryExpression",
+                        Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                    ],
+                ],
+            ]
+        ],
         exclude: bool = False,
         or_: bool = False,
     ) -> "QuerySet":
