@@ -72,4 +72,5 @@ async def test_query():
     # assert obj.b.a.self_ref is None
     obj.b.a.self_ref = obj.b.a
     await obj.b.a.save()
-    # ObjectC.query.filter(b__a__self_ref=obj.b.a)
+    objs = await ObjectC.query.filter(b__a__self_ref=obj.b.a)
+    assert objs[0] == obj

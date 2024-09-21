@@ -1,5 +1,7 @@
+import asyncio
 import copy
 import warnings
+from collections.abc import Iterable as CollectionsIterable
 from functools import cached_property
 from inspect import isawaitable
 from typing import (
@@ -34,6 +36,7 @@ from edgy.core.db.querysets.prefetch import Prefetch, PrefetchMixin, check_prefe
 from edgy.core.db.querysets.types import EdgyEmbedTarget, EdgyModel, QueryType
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.db import check_db_connection
+from edgy.core.utils.sync import run_sync
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.types import Undefined
 
@@ -68,14 +71,25 @@ def clean_query_kwargs(
                 key = _removeprefix(_removeprefix(key, embed_parent[1]), "__")
             else:
                 key = f"{embed_parent[0]}__{key}"
-        sub_model_class, field_name, _, _, _ = crawl_relationship(model_class, key)
-        field = sub_model_class.meta.fields.get(field_name)
+        sub_model_class, field_name, _, _, _, cross_db_remainder = crawl_relationship(
+            model_class, key
+        )
+        # we preserve the uncleaned argument
+        field = None if cross_db_remainder else sub_model_class.meta.fields.get(field_name)
         if field is not None:
             new_kwargs.update(field.clean(key, val, for_query=True))
         else:
             new_kwargs[key] = val
     assert "pk" not in new_kwargs, "pk should be already parsed"
     return new_kwargs
+
+
+async def _parse_clause_arg(arg: Any, instance: "BaseQuerySet") -> Any:
+    if callable(arg):
+        arg = arg(instance)
+    if isawaitable(arg):
+        arg = await arg
+    return arg
 
 
 class BaseQuerySet(
@@ -151,6 +165,15 @@ class BaseQuerySet(
         group_by = list(map(self._prepare_group_by, group_by))
         expression = expression.group_by(*group_by)
         return expression
+
+    async def _resolve_clause_args(self, args: Any) -> Any:
+        result: List[Any] = []
+        for arg in args:
+            result.append(_parse_clause_arg(arg, self))
+        if self.database.force_rollback:
+            return [await el for el in result]
+        else:
+            return await asyncio.gather(*result)
 
     def _build_filter_clauses_expression(self, filter_clauses: Any, expression: Any) -> Any:
         """Builds the filter clauses expression"""
@@ -274,7 +297,7 @@ class BaseQuerySet(
         columns = list(set(columns))
         return columns
 
-    def _build_select(self) -> Any:
+    async def _build_select(self) -> Any:
         """
         Builds the query select based on the given parameters and filters.
         """
@@ -301,12 +324,14 @@ class BaseQuerySet(
 
         if queryset.filter_clauses:
             expression = queryset._build_filter_clauses_expression(
-                queryset.filter_clauses, expression=expression
+                await self._resolve_clause_args(queryset.filter_clauses),
+                expression=expression,
             )
 
         if queryset.or_clauses:
             expression = queryset._build_or_clauses_expression(
-                queryset.or_clauses, expression=expression
+                await self._resolve_clause_args(queryset.or_clauses),
+                expression=expression,
             )
 
         if queryset._order_by:
@@ -352,23 +377,52 @@ class BaseQuerySet(
         kwargs = clean_query_kwargs(self.model_class, kwargs, self.embed_parent_filters)
 
         for key, value in kwargs.items():
-            assert not isinstance(
-                value, BaseModelType
-            ), f"should be parsed in clean: {key}: {value}"
-            model_class, field_name, op, related_str, _ = crawl_relationship(self.model_class, key)
+            model_class, field_name, op, related_str, _, cross_db_remainder = crawl_relationship(
+                self.model_class, key
+            )
             if related_str and related_str not in select_related:
                 select_related.append(related_str)
             field = model_class.meta.fields.get(field_name, generic_field)
-            clauses.append(
-                field.operator_to_clause(
-                    field_name, op, model_class.table_schema(self.active_schema), value
+            if cross_db_remainder:
+                assert field is not generic_field
+                sub_query = (
+                    field.target.query.filter(**{cross_db_remainder: value})
+                    .only(*field.related_columns.keys())
+                    .values_list(fields=field.related_columns.keys())
                 )
-            )
-        if exclude:
-            if not or_:
-                filter_clauses.append(clauses_mod.not_(clauses_mod.and_(*clauses)))
+
+                # bind local vars
+                async def wrapper(queryset: "QuerySet", _field=field, _sub_query=sub_query):
+                    fk_tuple = sqlalchemy.tuple_(
+                        *(
+                            getattr(queryset.table.columns, colname)
+                            for colname in _field.get_column_names()
+                        )
+                    )
+                    return fk_tuple.in_(await _sub_query)
+
+                clauses.append(wrapper)
+
             else:
-                or_clauses.append(clauses_mod.not_(clauses_mod.and_(*clauses)))
+                assert not isinstance(
+                    value, BaseModelType
+                ), f"should be parsed in clean: {key}: {value}"
+                clauses.append(
+                    field.operator_to_clause(
+                        field_name, op, model_class.table_schema(self.active_schema), value
+                    )
+                )
+        if exclude:
+
+            async def wrapper(queryset: "QuerySet"):
+                return clauses_mod.not_(
+                    clauses_mod.and_(*(await self._resolve_clause_args(clauses)))
+                )
+
+            if not or_:
+                filter_clauses.append(wrapper)
+            else:
+                or_clauses.append(wrapper)
         else:
             if not or_:
                 filter_clauses += clauses
@@ -534,6 +588,10 @@ class BaseQuerySet(
             crawl_result = crawl_relationship(
                 self.model_class, prefetch.related_name, traverse_last=True
             )
+            if crawl_result.cross_db_remainder:
+                raise NotImplementedError(
+                    "Cannot prefetch from other db yet. Maybe in future this feature will be added."
+                )
             prefetch_queryset: Optional[QuerySet] = prefetch.queryset
             if prefetch_queryset is None:
                 if crawl_result.reverse_path is False:
@@ -603,7 +661,7 @@ class BaseQuerySet(
             # activates distinct, not distinct on
             queryset = queryset.distinct()  # type: ignore
 
-        expression = queryset._build_select()
+        expression = await queryset._build_select()
 
         if not fetch_all_at_once and bool(queryset.database.force_rollback):
             # force_rollback on db = we have only one connection
@@ -714,7 +772,7 @@ class BaseQuerySet(
 
         queryset: BaseQuerySet = self
 
-        expression = queryset._build_select().limit(2)
+        expression = (await queryset._build_select()).limit(2)
         check_db_connection(queryset.database)
         async with queryset.database as database:
             rows = await database.fetch_all(expression)
@@ -737,7 +795,7 @@ class QuerySet(BaseQuerySet):
     @property
     def raw_query(self) -> Any:
         """Get SQL query (sqlalchemy)."""
-        return self._build_select()
+        return run_sync(self._build_select())
 
     @cached_property
     def sql(self) -> str:
@@ -950,17 +1008,18 @@ class QuerySet(BaseQuerySet):
         fields: Union[Sequence[str], str, None] = None,
         exclude: Union[Sequence[str], Set[str]] = None,
         exclude_none: bool = False,
-        flatten: bool = False,
-        **kwargs: Any,
     ) -> List[Any]:
         """
         Returns the results in a python dictionary format.
         """
-        fields = fields or []
+
+        if isinstance(fields, str):
+            fields = [fields]
+
         rows: List[BaseModelType] = await self
 
-        if not isinstance(fields, list):
-            raise QuerySetError(detail="Fields must be an iterable.")
+        if fields is not None and not isinstance(fields, CollectionsIterable):
+            raise QuerySetError(detail="Fields must be an iterable or unset.")
 
         if not fields:
             rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
@@ -969,19 +1028,6 @@ class QuerySet(BaseQuerySet):
                 row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)
                 for row in rows
             ]
-
-        as_tuple = kwargs.pop("__as_tuple__", False)
-
-        if not as_tuple:
-            return rows
-
-        if not flatten:
-            rows = [tuple(row.values()) for row in rows]  # type: ignore
-        else:
-            try:
-                rows = [row[fields[0]] for row in rows]  # type: ignore
-            except KeyError:
-                raise QuerySetError(detail=f"{fields[0]} does not exist in the results.") from None
         return rows
 
     async def values_list(
@@ -994,26 +1040,18 @@ class QuerySet(BaseQuerySet):
         """
         Returns the results in a python dictionary format.
         """
-        queryset: QuerySet = self._clone()
-        fields = fields or []
-        if flat and len(fields) > 1:
-            raise QuerySetError(
-                detail=f"Maximum of 1 in fields when `flat` is enables, got {len(fields)} instead."
-            ) from None
-
-        if flat and isinstance(fields, str):
-            fields = [fields]
-
-        if isinstance(fields, str):
-            fields = [fields]
-
-        return await queryset.values(
+        rows = await self.values(
             fields=fields,
             exclude=exclude,
             exclude_none=exclude_none,
-            flatten=flat,
-            __as_tuple__=True,
         )
+        if not flat:
+            return [tuple(row.values()) for row in rows]  # type: ignore
+        else:
+            try:
+                return [row[fields[0]] for row in rows]  # type: ignore
+            except KeyError:
+                raise QuerySetError(detail=f"{fields[0]} does not exist in the results.") from None
 
     async def exists(self, **kwargs: Any) -> bool:
         """
@@ -1028,7 +1066,7 @@ class QuerySet(BaseQuerySet):
             filter_query._cache = self._cache
             return await filter_query.exists()
         queryset: QuerySet = self
-        expression = queryset._build_select()
+        expression = await queryset._build_select()
         expression = sqlalchemy.exists(expression).select()
         check_db_connection(queryset.database)
         async with queryset.database as database:
@@ -1042,7 +1080,7 @@ class QuerySet(BaseQuerySet):
         if self._cache_count is not None:
             return self._cache_count
         queryset: QuerySet = self
-        expression = queryset._build_select().alias("subquery_for_count")
+        expression = (await queryset._build_select()).alias("subquery_for_count")
         expression = sqlalchemy.func.count().select().select_from(expression)
         check_db_connection(queryset.database)
         async with queryset.database as database:
@@ -1077,7 +1115,7 @@ class QuerySet(BaseQuerySet):
             queryset = queryset.order_by(*self.model_class.pkcolumns)
         check_db_connection(queryset.database)
         async with queryset.database as database:
-            row = await database.fetch_one(queryset._build_select(), pos=0)
+            row = await database.fetch_one(await queryset._build_select(), pos=0)
         if row:
             return (await self._get_or_cache_row(row, extra_attr="_cache_first"))[1]
         return None
@@ -1095,7 +1133,7 @@ class QuerySet(BaseQuerySet):
             queryset = queryset.order_by(*self.model_class.pkcolumns)
         check_db_connection(queryset.database)
         async with queryset.database as database:
-            row = await database.fetch_one(queryset.reverse()._build_select(), pos=0)
+            row = await database.fetch_one(await queryset.reverse()._build_select(), pos=0)
         if row:
             return (await self._get_or_cache_row(row, extra_attr="_cache_last"))[1]
         return None
@@ -1223,7 +1261,7 @@ class QuerySet(BaseQuerySet):
         await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
 
         expression = self.table.delete()
-        for filter_clause in self.filter_clauses:
+        for filter_clause in await self._resolve_clause_args(self.filter_clauses):
             expression = expression.where(filter_clause)
 
         check_db_connection(self.database)
@@ -1250,7 +1288,7 @@ class QuerySet(BaseQuerySet):
 
         expression = self.table.update().values(**kwargs)
 
-        for filter_clause in self.filter_clauses:
+        for filter_clause in await self._resolve_clause_args(self.filter_clauses):
             expression = expression.where(filter_clause)
         check_db_connection(self.database)
         async with self.database as database:
