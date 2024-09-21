@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Dict, Tuple, Type, cast
+from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, cast
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import RelationshipField
@@ -8,6 +8,7 @@ from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
+    from edgy.core.connection.database import Database
     from edgy.core.db.models.types import BaseModelType
 
 
@@ -86,8 +87,10 @@ class RelatedField(RelationshipField):
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         return self.foreign_key.get_relation(**kwargs)
 
-    def is_cross_db(self) -> bool:
-        return self.foreign_key.is_cross_db()
+    def is_cross_db(self, owner_database: Optional["Database"] = None) -> bool:
+        if owner_database is None:
+            owner_database = self.owner.database
+        return str(owner_database.url) != str(self.foreign_key.owner.database.url)
 
     @property
     def is_m2m(self) -> bool:

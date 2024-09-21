@@ -384,7 +384,7 @@ def _set_related_name_for_foreign_keys(
             foreign_key_name=name,
             related_name=related_name,
         )
-        registry: Registry = model_class.meta.registry
+        registry: Registry = foreign_key.target_registry
         with contextlib.suppress(Exception):
             registry = cast("Registry", foreign_key.target.registry)
         registry.register_callback(foreign_key.to, related_field_fn, one_time=True)

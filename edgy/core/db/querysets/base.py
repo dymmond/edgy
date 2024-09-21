@@ -64,6 +64,7 @@ def clean_query_kwargs(
     model_class: Type[BaseModelType],
     kwargs: Dict[str, Any],
     embed_parent: Optional[Tuple[str, str]] = None,
+    model_database: Optional["Database"] = None,
 ) -> Dict[str, Any]:
     new_kwargs: Dict[str, Any] = {}
     for key, val in kwargs.items():
@@ -73,11 +74,11 @@ def clean_query_kwargs(
             else:
                 key = f"{embed_parent[0]}__{key}"
         sub_model_class, field_name, _, _, _, cross_db_remainder = crawl_relationship(
-            model_class, key
+            model_class, key, model_database=model_database
         )
         # we preserve the uncleaned argument
         field = None if cross_db_remainder else sub_model_class.meta.fields.get(field_name)
-        if field is not None:
+        if field is not None and not callable(val):
             new_kwargs.update(field.clean(key, val, for_query=True))
         else:
             new_kwargs[key] = val
@@ -216,6 +217,7 @@ class BaseQuerySet(
             # For m2m relationships
             model_class = queryset.model_class
             former_table = queryset.table
+            model_database: Optional[Database] = queryset.database
             while select_path:
                 field_name = select_path.split("__", 1)[0]
                 try:
@@ -237,10 +239,12 @@ class BaseQuerySet(
                 else:
                     foreign_key = model_class.meta.fields[reverse_part]
                     reverse = True
-                if foreign_key.is_cross_db():
-                    raise NotImplementedError(
-                        "We cannot cross databases yet, this feature is planned"
+                if foreign_key.is_cross_db(model_database):
+                    raise QuerySetError(
+                        detail=f'Selected model "{field_name}" is on another database.'
                     )
+                # now use the one of the model_class itself
+                model_database = None
                 table = model_class.table_schema(self.active_schema)
                 if table.name not in tables:
                     select_from = sqlalchemy.sql.join(  # type: ignore
@@ -375,7 +379,9 @@ class BaseQuerySet(
         if self.model_class.__is_proxy_model__:
             self.model_class = self.model_class.__parent__
 
-        kwargs = clean_query_kwargs(self.model_class, kwargs, self.embed_parent_filters)
+        kwargs = clean_query_kwargs(
+            self.model_class, kwargs, self.embed_parent_filters, model_database=self.database
+        )
 
         for key, value in kwargs.items():
             model_class, field_name, op, related_str, _, cross_db_remainder = crawl_relationship(
@@ -405,6 +411,25 @@ class BaseQuerySet(
                         )
                     )
                     return fk_tuple.in_(await _sub_query)
+
+                clauses.append(wrapper)
+            elif callable(value):
+                # bind local vars
+                async def wrapper(
+                    queryset: "QuerySet",
+                    _field: "BaseFieldType" = field,
+                    _value: Any = value,
+                    _op: Optional[str] = op,
+                ) -> Any:
+                    _value = _value(queryset)
+                    if isawaitable(_value):
+                        _value = await _value
+                    _field.operator_to_clause(
+                        _field.name,
+                        _op,
+                        queryset.model_class.table_schema(queryset.active_schema),
+                        _value,
+                    )
 
                 clauses.append(wrapper)
 
@@ -1024,7 +1049,7 @@ class QuerySet(BaseQuerySet):
         rows: List[BaseModelType] = await self
 
         if fields is not None and not isinstance(fields, CollectionsIterable):
-            raise QuerySetError(detail="Fields must be an iterable or unset.")
+            raise QuerySetError(detail="Fields must be a suitable sequence of strings or unset.")
 
         if not fields:
             rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]

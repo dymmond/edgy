@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, Type, Unio
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 
 if TYPE_CHECKING:  # pragma: no cover
+    from edgy.core.connection.database import Database
     from edgy.core.db.models.types import BaseModelType
 
 
@@ -18,6 +19,8 @@ class RelationshipCrawlResult(NamedTuple):
 def crawl_relationship(
     model_class: Type["BaseModelType"],
     path: str,
+    *,
+    model_database: Optional["Database"] = None,
     callback_fn: Any = None,
     traverse_last: bool = False,
 ) -> RelationshipCrawlResult:
@@ -33,11 +36,12 @@ def crawl_relationship(
         field = model_class.meta.fields.get(field_name)
         if isinstance(field, RelationshipField) and len(splitted) == 2:
             model_class_new, reverse_part, path = field.traverse_field(path)
-            if field.is_cross_db():
+            if field.is_cross_db(model_database):
                 cross_db_remainder = path
                 break
             else:
                 model_class = model_class_new
+                model_database = None
             reverse = not isinstance(field, BaseForeignKey)
             if reverse_part and reverse_path is not False:
                 reverse_path = f"{reverse_part}__{reverse_path}" if reverse_path else reverse_part

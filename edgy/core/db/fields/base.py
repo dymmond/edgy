@@ -25,6 +25,8 @@ from edgy.types import Undefined
 from .types import BaseFieldType, ColumnDefinitionModel
 
 if TYPE_CHECKING:
+    from edgy.core.connection.database import Database
+    from edgy.core.connection.registry import Registry
     from edgy.core.db.models.types import BaseModelType
 
 
@@ -291,7 +293,7 @@ class RelationshipField(BaseField):
     def traverse_field(self, path: str) -> Tuple[Any, str, str]:
         raise NotImplementedError()
 
-    def is_cross_db(self) -> bool:
+    def is_cross_db(self, owner_database: Optional["Database"] = None) -> bool:
         raise NotImplementedError()
 
 
@@ -431,6 +433,14 @@ class BaseForeignKey(RelationshipField):
     # only useful if related_name = False because otherwise it gets overwritten
     reverse_name: str = ""
 
+    @cached_property
+    def target_registry(self) -> "Registry":
+        """Registry searched in case to is a string"""
+        assert (
+            self.owner.meta.registry is not None
+        ), "no registry found neither 'target_registry' set"
+        return self.owner.meta.registry
+
     @property
     def target(self) -> Any:
         """
@@ -438,23 +448,26 @@ class BaseForeignKey(RelationshipField):
         """
         if not hasattr(self, "_target"):
             if isinstance(self.to, str):
-                assert self.owner.meta.registry is not None, "no registry found"
-                self._target = self.owner.meta.registry.get_model(self.to)
+                self._target = self.target_registry.get_model(self.to)
             else:
                 self._target = self.to
         return self._target
 
     @target.setter
     def target(self, value: Any) -> None:
-        self._target = value
+        with contextlib.suppress(AttributeError):
+            delattr(self, "_target")
+        self.to = value
 
     @target.deleter
     def target(self, value: Any) -> None:
         with contextlib.suppress(AttributeError):
             delattr(self, "_target")
 
-    def is_cross_db(self) -> bool:
-        return self.owner.meta.registry is not self.target.meta.registry
+    def is_cross_db(self, owner_database: Optional["Database"] = None) -> bool:
+        if owner_database is None:
+            owner_database = self.owner.database
+        return str(owner_database.url) != str(self.target.database.url)
 
     def expand_relationship(self, value: Any) -> Any:
         """

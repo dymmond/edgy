@@ -5,6 +5,19 @@ hide:
 
 # Release Notes
 
+## Unreleased
+
+### Added
+
+- Support for querying across multiple databases.
+
+### Changed
+
+- `crawl_relationship` has a slightly changed interface: it has `cross_db_remainder` as kwarg for callbacks and in the result.
+  Also it doesn't raise NotImplementedError anymore when detecting a crossdb situation.
+
+
+
 ## 0.16.0
 
 ### Added

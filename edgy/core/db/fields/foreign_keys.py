@@ -287,7 +287,13 @@ class BaseForeignKeyField(BaseForeignKey):
         no_constraint: Optional[bool] = None,
     ) -> Sequence[Union[sqlalchemy.Constraint, sqlalchemy.Index]]:
         constraints: List[Union[sqlalchemy.Constraint, sqlalchemy.Index]] = []
-        no_constraint = bool(no_constraint or self.no_constraint or self.is_cross_db())
+        no_constraint = bool(
+            no_constraint
+            or self.no_constraint
+            # this does not work because fks are checked in metadata
+            # this implies is_cross_db and is just a stronger version
+            or self.owner.meta.registry is not self.target.meta.registry
+        )
         if not no_constraint:
             target = self.target
             assert not target.__is_proxy_model__
