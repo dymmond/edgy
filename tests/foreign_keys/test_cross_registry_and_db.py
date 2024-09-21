@@ -58,8 +58,12 @@ async def test_specs():
 
 
 async def test_empty_fk():
-    await ObjectA.query.create()
-    # assert obj.self_ref is None
+    obj = await ObjectA.query.create()
+    assert obj.self_ref is None
+    assert obj.c is None
+    obj = await ObjectB.query.create(a={})
+    assert obj.a.self_ref is None
+    assert obj.a.c is None
 
 
 async def test_create():

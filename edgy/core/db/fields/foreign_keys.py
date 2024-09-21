@@ -153,6 +153,8 @@ class BaseForeignKeyField(BaseForeignKey):
         return columns
 
     def expand_relationship(self, value: Any) -> Any:
+        if value is None:
+            return None
         target = self.target
         related_columns = self.related_columns.keys()
         if isinstance(value, (target, target.proxy_model)):
@@ -166,8 +168,6 @@ class BaseForeignKeyField(BaseForeignKey):
             value = {next(iter(related_columns)): value}
         elif isinstance(value, BaseModel):
             return self.expand_relationship({col: getattr(value, col) for col in related_columns})
-        elif value is None:
-            return None
         instance = target.proxy_model(**value)
         instance.identifying_db_fields = related_columns
         return instance
@@ -201,7 +201,7 @@ class BaseForeignKeyField(BaseForeignKey):
         assert len(column_names) >= 1
         if len(column_names) == 1:
             # fake default
-            if phase == "post_insert":
+            if phase in {"post_insert", "post_update", "load"}:
                 kwargs.setdefault(name, None)
             return
         to_add = {}
@@ -212,7 +212,7 @@ class BaseForeignKeyField(BaseForeignKey):
         # empty
         if not to_add:
             # fake default
-            if phase == "post_insert":
+            if phase in {"post_insert", "post_update", "load"}:
                 kwargs.setdefault(name, None)
             return
         if name in kwargs:
