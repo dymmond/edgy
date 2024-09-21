@@ -3,6 +3,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AsyncIterator,
+    Awaitable,
+    Callable,
     Dict,
     Generator,
     Generic,
@@ -40,15 +42,95 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
 
     @abstractmethod
     def filter(
-        self, *clauses: "sqlalchemy.sql.expression.BinaryExpression", **kwargs: Any
+        self,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+        ],
+        **kwargs: Any,
     ) -> "QueryType": ...
 
     @abstractmethod
     def all(self, clear_cache: bool = False) -> "QueryType": ...
 
     @abstractmethod
+    def or_(
+        self,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+        ],
+        **kwargs: Any,
+    ) -> "QueryType":
+        """
+        Filters the QuerySet by the OR operand.
+        """
+
+    @abstractmethod
+    def and_(
+        self,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+        ],
+        **kwargs: Any,
+    ) -> "QueryType":
+        """
+        Filters the QuerySet by the AND operand. Alias of filter.
+        """
+
+    @abstractmethod
+    def not_(
+        self,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+        ],
+        **kwargs: Any,
+    ) -> "QueryType":
+        """
+        Filters the QuerySet by the NOT operand. Alias of exclude.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
     def exclude(
-        self, *clauses: "sqlalchemy.sql.expression.BinaryExpression", **kwargs: Any
+        self,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+        ],
+        **kwargs: Any,
     ) -> "QueryType": ...
 
     @abstractmethod

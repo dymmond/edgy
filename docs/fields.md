@@ -422,6 +422,7 @@ When the second parameter is empty, the parent object is not included as attribu
 ##### Parameters
 
 * `to` - A string [model](./models.md) name or a class object of that same model.
+* `target_registry` - Registry where the model callback is installed if `to` is a string.
 * `related_name` - The name to use for the relation from the related object back to this one. Can be set to `False` to disable a reverse connection.
                      Note: Setting to `False` will also prevent prefetching and reversing via `__`.
                      See also [related_name](./queries/related-name.md) for defaults

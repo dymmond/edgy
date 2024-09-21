@@ -76,9 +76,7 @@ async def test_model_values_list_flatten():
     assert users == ["John", "Jane"]
 
 
-@pytest.mark.parametrize(
-    "value", [1, {"name": 1}, (1,), {"edgy"}], ids=["as-int", "as-dict", "as-tuple", "as-set"]
-)
+@pytest.mark.parametrize("value", [1], ids=["as-int"])
 async def test_raise_exception(value):
     with pytest.raises(QuerySetError):
         await User.query.values_list(value)

@@ -106,6 +106,15 @@ async def test_model_filter():
 
     products = Product.query.exclude(name__icontains="%")
     assert await products.count() == 3
+    # test lambda filters
+    products = Product.query.exclude(name__contains=lambda x: "%")
+    assert await products.count() == 3
+
+    async def custom_filter(x):
+        return "%"
+
+    products = Product.query.exclude(name__contains=custom_filter)
+    assert await products.count() == 3
 
 
 async def test_model_nested_filter():

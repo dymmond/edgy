@@ -1,45 +1,47 @@
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Literal,
-    NamedTuple,
-    Type,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, Type, Union
 
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 
 if TYPE_CHECKING:  # pragma: no cover
+    from edgy.core.connection.database import Database
     from edgy.core.db.models.types import BaseModelType
 
 
 class RelationshipCrawlResult(NamedTuple):
     model_class: Type["BaseModelType"]
     field_name: str
-    operator: str
+    operator: Optional[str]
     forward_path: str
     reverse_path: Union[str, Literal[False]]
+    cross_db_remainder: str
 
 
 def crawl_relationship(
     model_class: Type["BaseModelType"],
     path: str,
+    *,
+    model_database: Optional["Database"] = None,
     callback_fn: Any = None,
     traverse_last: bool = False,
 ) -> RelationshipCrawlResult:
     field = None
     forward_prefix_path = ""
     reverse_path: Union[str, Literal[False]] = ""
-    operator: str = "exact"
+    operator: Optional[str] = "exact"
     field_name: str = path
+    cross_db_remainder: str = ""
     while path:
         splitted = path.split("__", 1)
         field_name = splitted[0]
         field = model_class.meta.fields.get(field_name)
         if isinstance(field, RelationshipField) and len(splitted) == 2:
-            model_class, reverse_part, path = field.traverse_field(path)
-            if field.is_cross_db():
-                raise NotImplementedError("We cannot cross databases yet, this feature is planned")
+            model_class_new, reverse_part, path = field.traverse_field(path)
+            if field.is_cross_db(model_database):
+                cross_db_remainder = path
+                break
+            else:
+                model_class = model_class_new
+                model_database = None
             reverse = not isinstance(field, BaseForeignKey)
             if reverse_part and reverse_path is not False:
                 reverse_path = f"{reverse_part}__{reverse_path}" if reverse_path else reverse_part
@@ -54,6 +56,7 @@ def crawl_relationship(
                     forward_path=forward_prefix_path,
                     reverse=reverse,
                     operator=None,
+                    cross_db_remainder=cross_db_remainder,
                 )
             if forward_prefix_path:
                 forward_prefix_path = f"{forward_prefix_path}__{field_name}"
@@ -89,6 +92,7 @@ def crawl_relationship(
             forward_path=forward_prefix_path,
             reverse=reverse,
             operator=operator,
+            cross_db_remainder=cross_db_remainder,
         )
     return RelationshipCrawlResult(
         model_class=model_class,
@@ -96,4 +100,5 @@ def crawl_relationship(
         operator=operator,
         forward_path=forward_prefix_path,
         reverse_path=reverse_path,
+        cross_db_remainder=cross_db_remainder,
     )

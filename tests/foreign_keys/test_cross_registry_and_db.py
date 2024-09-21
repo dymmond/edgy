@@ -15,6 +15,7 @@ modelsc = edgy.Registry(database=database)
 
 class ObjectA(edgy.Model):
     self_ref = edgy.ForeignKey("ObjectA", on_delete=edgy.CASCADE, null=True)
+    c = edgy.ForeignKey("ObjectC", target_registry=modelsc, on_delete=edgy.CASCADE, null=True)
 
     class Meta:
         registry = modelsa
@@ -37,9 +38,9 @@ class ObjectC(edgy.Model):
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     async with database, database2:
-        await modelsa.create_all()
-        await modelsb.create_all()
         await modelsc.create_all()
+        await modelsb.create_all()
+        await modelsa.create_all()
         yield
         if not database.drop:
             await modelsa.drop_all()
@@ -49,27 +50,41 @@ async def create_test_database():
             await modelsb.drop_all()
 
 
+async def test_specs():
+    assert not ObjectA.meta.fields["self_ref"].is_cross_db()
+    assert not ObjectA.meta.fields["c"].is_cross_db()
+    assert ObjectB.meta.fields["a"].is_cross_db()
+    assert ObjectC.meta.fields["b"].is_cross_db()
+
+
 async def test_empty_fk():
-    await ObjectA.query.create()
-    # assert obj.self_ref is None
+    obj = await ObjectA.query.create()
+    assert obj.self_ref is None
+    assert obj.c is None
+    obj = await ObjectB.query.create(a={})
+    assert obj.a.self_ref is None
+    assert obj.a.c is None
 
 
 async def test_create():
-    obj = await ObjectC.query.create(b={"a": {"self_ref": None}})
+    obj = await ObjectC.query.create(b={"a": {"c": None, "self_ref": None}})
     # assert obj.b.a.self_ref is None
     obj.b.a.self_ref = obj.b.a
+    obj.b.a.c = obj
     await obj.b.a.save()
     loaded = await ObjectC.query.get(pk=obj.pk)
     assert loaded.id == obj.id
     assert loaded.b.id == obj.b.id
     assert loaded.b.a.meta.registry is modelsa
     assert loaded.b.a.id == obj.b.a.id
-    assert loaded.b.a.self_ref.id == obj.b.a.id
+    assert loaded.b.a.c == obj
 
 
 async def test_query():
-    obj = await ObjectC.query.create(b={"a": {"self_ref": None}})
+    obj = await ObjectC.query.create(b={"a": {"c": None, "self_ref": None}})
     # assert obj.b.a.self_ref is None
+    obj.b.a.c = obj
     obj.b.a.self_ref = obj.b.a
     await obj.b.a.save()
-    # ObjectC.query.filter(b__a__self_ref=obj.b.a)
+    objs = await ObjectC.query.filter(b__a__c=obj)
+    assert objs[0] == obj
