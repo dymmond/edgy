@@ -46,6 +46,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from databasez.core.transaction import Transaction
 
     from edgy.core.connection import Database
+    from edgy.core.db.fields.types import BaseFieldType
 
 
 def _removeprefix(text: str, prefix: str) -> str:
@@ -392,7 +393,11 @@ class BaseQuerySet(
                 )
 
                 # bind local vars
-                async def wrapper(queryset: "QuerySet", _field=field, _sub_query=sub_query):
+                async def wrapper(
+                    queryset: "QuerySet",
+                    _field: "BaseFieldType" = field,
+                    _sub_query: "QuerySet" = sub_query,
+                ) -> Any:
                     fk_tuple = sqlalchemy.tuple_(
                         *(
                             getattr(queryset.table.columns, colname)
@@ -414,7 +419,7 @@ class BaseQuerySet(
                 )
         if exclude:
 
-            async def wrapper(queryset: "QuerySet"):
+            async def wrapper(queryset: "QuerySet") -> Any:
                 return clauses_mod.not_(
                     clauses_mod.and_(*(await self._resolve_clause_args(clauses)))
                 )
@@ -1046,10 +1051,10 @@ class QuerySet(BaseQuerySet):
             exclude_none=exclude_none,
         )
         if not flat:
-            return [tuple(row.values()) for row in rows]  # type: ignore
+            return [tuple(row.values()) for row in rows]
         else:
             try:
-                return [row[fields[0]] for row in rows]  # type: ignore
+                return [row[fields[0]] for row in rows]
             except KeyError:
                 raise QuerySetError(detail=f"{fields[0]} does not exist in the results.") from None
 
