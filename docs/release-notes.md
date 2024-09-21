@@ -17,7 +17,11 @@ hide:
 - `crawl_relationship` has a slightly changed interface: it has `cross_db_remainder` as kwarg for callbacks and in the result.
   Also it doesn't raise NotImplementedError anymore when detecting a crossdb situation.
 - `is_cross_db` optionally gets a database as parameter and compares the databases instead of registries.
+- Relax fields parameter requirements for values/values_list.
 
+### Fixed
+
+- Fix ForeignKey not None but empty hull under some conditions.
 
 ## 0.16.0
 
