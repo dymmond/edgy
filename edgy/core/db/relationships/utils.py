@@ -28,7 +28,6 @@ def crawl_relationship(
     field_name: str = path
     cross_db_remainder: str = ""
     while path:
-        cross_db_remainder = ""
         splitted = path.split("__", 1)
         field_name = splitted[0]
         field = model_class.meta.fields.get(field_name)
