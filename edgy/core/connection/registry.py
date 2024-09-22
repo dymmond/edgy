@@ -301,7 +301,9 @@ class Registry:
         tmp_metadata = sqlalchemy.MetaData()
         await database.run_sync(tmp_metadata.reflect)
         for table in tmp_metadata.tables.values():
-            for pattern_model in self.pattern_models:
+            for pattern_model in self.pattern_models.values():
+                if name not in pattern_model.meta.databases:
+                    continue
                 if pattern_model.meta.pattern.match(table.name):
                     new_name = pattern_model.meta.template(table)
                     old_model = self.get_model(new_name)
