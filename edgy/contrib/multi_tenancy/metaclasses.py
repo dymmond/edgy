@@ -20,12 +20,16 @@ def _check_model_inherited_tenancy(bases: Tuple[Type, ...]) -> bool:
 
 
 class TenantMeta(MetaInfo):
+    __slots__ = ("is_tenant", "register_default")
+
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
-        super().__init__(meta, **kwargs)
         self.is_tenant: bool = getattr(meta, "is_tenant", False)
         # register in models too, so there is a default
         # otherwise they only exist as tenant models
         self.register_default: bool = getattr(meta, "register_default", True)
+
+        # must be last
+        super().__init__(meta, **kwargs)
 
     def set_tenant(self, is_tenant: bool) -> None:
         self.is_tenant = is_tenant
@@ -42,7 +46,7 @@ class BaseTenantMeta(BaseModelMeta):
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any, **kwargs: Any) -> Any:
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
         new_model = super().__new__(cls, name, bases, attrs, **kwargs)
-        meta: TenantMeta = TenantMeta(new_model.meta)
+        new_model.meta = meta = TenantMeta(new_model.meta)
 
         if hasattr(meta_class, "is_tenant"):
             meta.is_tenant = cast(bool, meta_class.is_tenant)
@@ -64,7 +68,6 @@ class BaseTenantMeta(BaseModelMeta):
                 "Registry for the table not found in the Meta class or any of the superclasses. You must set the registry in the Meta."
             )
 
-        new_model.meta = meta
         if registry and meta.is_tenant and not meta.abstract and not new_model.__is_proxy_model__:
             assert (
                 new_model.__reflected__ is False

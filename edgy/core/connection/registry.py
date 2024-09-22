@@ -12,6 +12,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
+    Set,
     Type,
     Union,
     cast,
@@ -29,6 +30,7 @@ from edgy.core.connection.schemas import Schema
 from .asgi import ASGIApp, ASGIHelper
 
 if TYPE_CHECKING:
+    from edgy.contrib.autoreflection.models import AutoReflectionModel
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
 
@@ -41,6 +43,7 @@ class Registry:
     db_schema: Union[str, None] = None
     content_type: Union[Type["BaseModelType"], None] = None
     metadata: sqlalchemy.MetaData
+    dbs_reflected: Set[Union[str, None]]
 
     def __init__(
         self,
@@ -58,6 +61,8 @@ class Registry:
         self.models: Dict[str, Type[BaseModelType]] = {}
         self.reflected: Dict[str, Type[BaseModelType]] = {}
         self.tenant_models: Dict[str, Type[BaseModelType]] = {}
+        self.pattern_models: Dict[str, Type[AutoReflectionModel]] = {}
+        self.dbs_reflected = set()
 
         self.schema = Schema(registry=self)
         # when setting a Model or Reflected Model execute the callbacks
@@ -84,6 +89,10 @@ class Registry:
         _copy.tenant_models = {
             key: val.copy_edgy_model(_copy) for key, val in self.tenant_models.items()
         }
+        _copy.pattern_models = {
+            key: val.copy_edgy_model(_copy) for key, val in self.pattern_models.items()
+        }
+        _copy.dbs_reflected = set(self.dbs_reflected)
         if self.content_type is not None:
             try:
                 _copy.content_type = self.get_model("ContentType")
@@ -285,11 +294,30 @@ class Registry:
         for model_class in self.reflected.values():
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
 
+    async def _connect_and_init(self, name: Union[str, None], database: "Database") -> None:
+        await database.connect()
+        if not self.pattern_models or name in self.dbs_reflected:
+            return
+        tmp_metadata = sqlalchemy.MetaData()
+        await database.run_sync(tmp_metadata.reflect)
+        for table in tmp_metadata.tables.values():
+            for pattern_model in self.pattern_models:
+                if pattern_model.meta.pattern.match(table.name):
+                    new_name = pattern_model.meta.template(table)
+                    old_model = self.get_model(new_name)
+                    if old_model is not None:
+                        raise Exception(
+                            f"Conflicting model: {old_model.__name__} with pattern model: {pattern_model.__name__}"
+                        )
+                    pattern_model = pattern_model.copy_edgy_model(self, name=new_name)
+                    pattern_model.meta.tablename = table.name
+        self.dbs_reflected.add(name)
+
     async def __aenter__(self) -> "Registry":
-        dbs = [self.database]
-        for db in self.extra.values():
-            dbs.append(db)
-        ops = [db.connect() for db in dbs]
+        dbs = [(None, self.database)]
+        for name, db in self.extra.items():
+            dbs.append((name, db))
+        ops = [self._connect_and_init(name, db) for name, db in dbs]
         results: List[Union[BaseException, bool]] = await asyncio.gather(
             *ops, return_exceptions=True
         )
@@ -297,7 +325,7 @@ class Registry:
             ops2 = []
             for num, value in enumerate(results):
                 if not isinstance(value, BaseException):
-                    ops2.append(dbs[num].disconnect())
+                    ops2.append(dbs[num][1].disconnect())
             await asyncio.gather(*ops2)
         return self
 

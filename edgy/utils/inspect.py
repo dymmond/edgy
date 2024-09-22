@@ -119,8 +119,9 @@ class InspectDB:
 
         return tables, models
 
+    @classmethod
     def get_foreign_keys(
-        self, table_or_column: Union[sqlalchemy.Table, sqlalchemy.Column]
+        cls, table_or_column: Union[sqlalchemy.Table, sqlalchemy.Column]
     ) -> List[Dict[str, Any]]:
         """
         Extracts all the information needed of the foreign keys.
@@ -230,16 +231,16 @@ class InspectDB:
             )
         return meta
 
+    @classmethod
     async def reflect(
-        self, *, database: Database, metadata: sqlalchemy.MetaData, schema: Optional[str] = None
+        cls, *, database: Database, metadata: sqlalchemy.MetaData, schema: Optional[str] = None
     ) -> sqlalchemy.MetaData:
         """
         Connects to the database and reflects all the information about the
         schema bringing all the data available.
         """
         logger.info("Collecting database tables information...")
-        await database.run_sync(metadata.reflect, schema)
-        return metadata
+        return await database.run_sync(metadata.reflect, schema)
 
     def write_output(
         self, tables: List[Any], connection_string: str, schema: Union[str, None] = None

@@ -213,9 +213,10 @@ class MetaInfo:
     def model_dump(self) -> Dict[Any, Any]:
         return {k: getattr(self, k, None) for k in self._include_dump}
 
-    def load_dict(self, values: Dict[str, Any], _init: bool = False) -> None:
+    def load_dict(self, values: Dict[str, Any]) -> None:
         """
         Loads the metadata from a dictionary.
+        You may want to overload it to create hooks to ensure types.
         """
         for key, value in values.items():
             # we want triggering invalidate in case it is fields
