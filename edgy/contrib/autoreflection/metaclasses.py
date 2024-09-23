@@ -16,7 +16,7 @@ class AutoReflectionMetaInfo(MetaInfo):
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self.pattern = getattr(meta, "pattern", None)
         self.template = getattr(meta, "template", None)
-        self.databases = getattr(meta, "databases", (None,))
+        self.databases = getattr(meta, "databases", (None,))  # type: ignore
 
         super().__init__(meta, **kwargs)
 

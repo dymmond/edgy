@@ -240,7 +240,8 @@ class InspectDB:
         schema bringing all the data available.
         """
         logger.info("Collecting database tables information...")
-        return await database.run_sync(metadata.reflect, schema)
+        await database.run_sync(metadata.reflect, schema)
+        return metadata
 
     def write_output(
         self, tables: List[Any], connection_string: str, schema: Union[str, None] = None

@@ -13,6 +13,7 @@ from typing import (
     Optional,
     Sequence,
     Set,
+    Tuple,
     Type,
     Union,
     cast,
@@ -42,7 +43,6 @@ class Registry:
 
     db_schema: Union[str, None] = None
     content_type: Union[Type["BaseModelType"], None] = None
-    metadata: sqlalchemy.MetaData
     dbs_reflected: Set[Union[str, None]]
 
     def __init__(
@@ -75,11 +75,20 @@ class Registry:
         self.extra: Mapping[str, Database] = {
             k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
         }
-        self.metadata = sqlalchemy.MetaData()
 
-        self.refresh_metadata()
         if with_content_type is not False:
             self._set_content_type(with_content_type)
+
+    @property
+    def metadata(self) -> sqlalchemy.MetaData:
+        if not hasattr(self, "_metadata"):
+            self._metadata = sqlalchemy.MetaData()
+            self.refresh_metadata()
+        return self._metadata
+
+    @metadata.setter
+    def metadata(self, value: sqlalchemy.MetaData) -> None:
+        self._metadata = value
 
     def __copy__(self) -> "Registry":
         _copy = Registry(self.database)
@@ -100,7 +109,6 @@ class Registry:
                 _copy.content_type = self.content_type
             # init callbacks
             _copy._set_content_type(_copy.content_type)
-        _copy.refresh_metadata()
         return _copy
 
     def _set_content_type(
@@ -158,15 +166,12 @@ class Registry:
                         no_constraint=real_content_type.no_constraint,
                     ),
                 )
-                if model_class.meta._is_init:
-                    model_class.meta.invalidate()
                 real_content_type.meta.fields[related_name] = RelatedField(
                     name=related_name,
                     foreign_key_name="content_type",
                     related_from=model_class,
                     owner=real_content_type,
                 )
-                real_content_type.meta.invalidate(True)
 
         self.register_callback(None, callback, one_time=False)
 
@@ -316,7 +321,7 @@ class Registry:
         self.dbs_reflected.add(name)
 
     async def __aenter__(self) -> "Registry":
-        dbs = [(None, self.database)]
+        dbs: List[Tuple[Union[str, None], Database]] = [(None, self.database)]
         for name, db in self.extra.items():
             dbs.append((name, db))
         ops = [self._connect_and_init(name, db) for name, db in dbs]

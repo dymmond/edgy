@@ -786,13 +786,12 @@ The third mode `load` is only relevant for models and querysets.
 
 ## Customizing fields after model initialization
 
-Dangerous! There can be many side-effects.
-
-The only safe thing to do is to update or replace a field and call `meta.invalidate()` afterwards. The type should match.
-
-Adding or excluding fields, or replacing the fields mappings are dangerous and could require a pydantic model rebuild.
-In case of an assignment of a new field mapping (dict) to `meta.fields` a `meta.invalidate()` is automatically issued.
+Dangerous! There can be many side-effects, especcially for non-metafields (have columns or attributes).
 
 If you just want to remove a field ExcludeField or the inherit flags are the ways to go.
 
-If you want to add a Field dynamically, check `edgy/core/db/models/metaclasses.py` first what is done and don't forget the annotations.
+Replacing or deleting a field is triggering automatically a required invalidation. But there could be more required by pydantic.
+For non-metafields you may need to rebuild the model.
+
+If you want to add/delete a Field dynamically, check `edgy/core/db/models/metaclasses.py` or `edgy/core/connection/registry.py`
+first what is done and don't forget the annotations.

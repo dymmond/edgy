@@ -14,6 +14,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     Tuple,
     Type,
     Union,
@@ -28,7 +29,7 @@ from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.fields.base import PKField
+from edgy.core.db.fields.base import PKField, RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.types import BaseFieldType
@@ -44,6 +45,59 @@ if TYPE_CHECKING:
 
 _empty_dict: Dict[str, Any] = {}
 _empty_set: FrozenSet[Any] = frozenset()
+
+
+class Fields(UserDict, Dict[str, BaseFieldType]):
+    """Smart wrapper which tries to prevent invalidation as far as possible"""
+
+    def __init__(self, meta: "MetaInfo", data: Optional[Dict[str, BaseFieldType]] = None):
+        self.meta = meta
+        super().__init__(data)
+
+    def add_field_to_meta(self, name: str, field: BaseFieldType) -> None:
+        if not self.meta._fields_are_initialized:
+            return
+        if hasattr(field, "__get__"):
+            self.meta.special_getter_fields.add(name)
+        if getattr(field, "exclude", False):
+            self.meta.excluded_fields.add(name)
+        if getattr(field, "secret", False):
+            self.meta.secret_fields.add(name)
+        if hasattr(field, "modify_input"):
+            self.meta.input_modifying_fields.add(name)
+        if hasattr(field, "post_save_callback"):
+            self.meta.post_save_fields.add(name)
+        if hasattr(field, "pre_save_callback"):
+            self.meta.pre_save_fields.add(name)
+        if hasattr(field, "post_delete_callback"):
+            self.meta.post_delete_fields.add(name)
+        if isinstance(field, BaseForeignKeyField):
+            self.meta.foreign_key_fields.add(name)
+        if isinstance(field, RelationshipField):
+            self.meta.relationship_fields.add(name)
+
+    def discard_field_from_meta(self, name: str) -> None:
+        if self.meta._fields_are_initialized:
+            for field_attr in _field_sets_to_clear:
+                getattr(self.meta, field_attr).discard(name)
+
+    def __getitem__(self, name: str) -> BaseFieldType:
+        return cast(BaseFieldType, self.data[name])
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.data
+
+    def __setitem__(self, name: str, value: BaseFieldType) -> None:
+        if name in self.data:
+            self.discard_field_from_meta(name)
+        self.data[name] = value
+        self.add_field_to_meta(name, value)
+        self.meta.invalidate(clear_class_attrs=True)
+
+    def __delitem__(self, name: str) -> None:
+        if self.data.pop(name, None) is not None:
+            self.discard_field_from_meta(name)
+            self.meta.invalidate(clear_class_attrs=True)
 
 
 class FieldToColumns(UserDict, Dict[str, Sequence["sqlalchemy.Column"]]):
@@ -130,6 +184,12 @@ _trigger_attributes_MetaInfo = {
     "post_delete_fields",
     "excluded_fields",
     "secret_fields",
+    # not used here in code but usefully for third-party code
+    "relationship_fields",
+}
+
+_field_sets_to_clear: Set[str] = {
+    attr for attr in _trigger_attributes_MetaInfo if attr.endswith("_fields")
 }
 
 
@@ -158,24 +218,31 @@ class MetaInfo:
         "special_getter_fields",
         "excluded_fields",
         "secret_fields",
-        "_is_init",
+        "relationship_fields",
+        "_fields_are_initialized",
     )
     _include_dump = (
         *filter(
             lambda x: x
-            not in {"field_to_columns", "field_to_column_names", "columns_to_field", "_is_init"},
+            not in {
+                "field_to_columns",
+                "field_to_column_names",
+                "columns_to_field",
+                "_fields_are_initialized",
+            },
             __slots__,
         ),
         "pk",
         "is_multi",
     )
 
+    fields: Fields
     field_to_columns: FieldToColumns
     field_to_column_names: FieldToColumnNames
     columns_to_field: ColumnsToField
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
-        self._is_init = False
+        self._fields_are_initialized = False
         self.model: Optional[Type[BaseModelType]] = None
         #  Difference between meta extraction and kwargs: meta attributes are copied
         self.abstract: bool = getattr(meta, "abstract", False)
@@ -188,7 +255,7 @@ class MetaInfo:
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
         self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
-        self.fields: Dict[str, BaseFieldType] = {**getattr(meta, "fields", _empty_dict)}
+        self.fields = {**getattr(meta, "fields", _empty_dict)}  # type: ignore
         self.managers: Dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
         self.multi_related: List[str] = [*getattr(meta, "multi_related", _empty_set)]
         self.load_dict(kwargs)
@@ -223,61 +290,46 @@ class MetaInfo:
             setattr(self, key, value)
 
     def __setattr__(self, name: str, value: Any) -> None:
+        if name == "fields":
+            value = Fields(self, value)
         super().__setattr__(name, value)
-        if name == "fields" and getattr(self, "_is_init", False):
+        if name == "fields":
             self.invalidate()
 
     def __getattribute__(self, name: str) -> Any:
         # lazy execute
-        if name in _trigger_attributes_MetaInfo and not self._is_init:
+        if name in _trigger_attributes_MetaInfo and not self._fields_are_initialized:
             self.init_fields_mapping()
         return super().__getattribute__(name)
 
     def init_fields_mapping(self) -> None:
-        special_getter_fields = set()
-        excluded_fields = set()
-        secret_fields = set()
-        input_modifying_fields = set()
-        pre_save_fields = set()
-        post_save_fields = set()
-        post_delete_fields = set()
-        foreign_key_fields = set()
+        self.special_getter_fields: Set[str] = set()
+        self.excluded_fields: Set[str] = set()
+        self.secret_fields: Set[str] = set()
+        self.input_modifying_fields: Set[str] = set()
+        self.post_save_fields: Set[str] = set()
+        self.pre_save_fields: Set[str] = set()
+        self.post_delete_fields: Set[str] = set()
+        self.foreign_key_fields: Set[str] = set()
+        self.relationship_fields: Set[str] = set()
+        self.field_to_columns = FieldToColumns(self)
+        self.field_to_column_names = FieldToColumnNames(self)
+        self.columns_to_field = ColumnsToField(self)
+        self._fields_are_initialized = True
         for key, field in self.fields.items():
-            if hasattr(field, "__get__"):
-                special_getter_fields.add(key)
-            if getattr(field, "exclude", False):
-                excluded_fields.add(key)
-            if getattr(field, "secret", False):
-                secret_fields.add(key)
-            if hasattr(field, "modify_input"):
-                input_modifying_fields.add(key)
-            if hasattr(field, "post_save_callback"):
-                post_save_fields.add(key)
-            if hasattr(field, "pre_save_callback"):
-                pre_save_fields.add(key)
-            if hasattr(field, "post_delete_callback"):
-                post_delete_fields.add(key)
-            if isinstance(field, BaseForeignKeyField):
-                foreign_key_fields.add(key)
-        self.special_getter_fields: FrozenSet[str] = frozenset(special_getter_fields)
-        self.excluded_fields: FrozenSet[str] = frozenset(excluded_fields)
-        self.secret_fields: FrozenSet[str] = frozenset(secret_fields)
-        self.input_modifying_fields: FrozenSet[str] = frozenset(input_modifying_fields)
-        self.post_save_fields: FrozenSet[str] = frozenset(post_save_fields)
-        self.pre_save_fields: frozenset[str] = frozenset(pre_save_fields)
-        self.post_delete_fields: FrozenSet[str] = frozenset(post_delete_fields)
-        self.foreign_key_fields: FrozenSet[str] = frozenset(foreign_key_fields)
-        self.field_to_columns = FieldToColumns(self)
-        self.field_to_column_names = FieldToColumnNames(self)
-        self.columns_to_field = ColumnsToField(self)
-        self._is_init = True
+            self.fields.add_field_to_meta(key, field)
 
-    def invalidate(self, clear_class_attrs: bool = True) -> None:
-        self._is_init = False
-        # prevent cycles and mem-leaks
-        self.field_to_columns = FieldToColumns(self)
-        self.field_to_column_names = FieldToColumnNames(self)
-        self.columns_to_field = ColumnsToField(self)
+    def invalidate(self, clear_class_attrs: bool = True, invalidate_fields: bool = True) -> None:
+        if invalidate_fields and self._fields_are_initialized:
+            # prevent cycles and mem-leaks
+            for attr in (
+                "field_to_columns",
+                "field_to_column_names",
+                "columns_to_field",
+            ):
+                with contextlib.suppress(AttributeError):
+                    delattr(self, attr)
+            self._fields_are_initialized = False
         if self.model is None:
             return
         if clear_class_attrs:
@@ -286,7 +338,7 @@ class MetaInfo:
                     delattr(self.model, attr)
 
     def full_init(self, init_column_mappers: bool = True, init_class_attrs: bool = True) -> None:
-        if not self._is_init:
+        if not self._fields_are_initialized:
             self.init_fields_mapping()
         if init_column_mappers:
             self.columns_to_field.init()
@@ -347,8 +399,6 @@ def _set_related_field(
 
     # Set the related name
     target.meta.fields[related_name] = related_field
-    # for updating post_save_callback
-    target.meta.invalidate(True)
 
 
 def _set_related_name_for_foreign_keys(
@@ -635,15 +685,16 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             parents=parents,
             managers=managers,
         )
+        del fields
         if is_abstract:
             meta.abstract = True
 
         del is_abstract
-        if not fields:
+        if not meta.fields:
             meta.abstract = True
 
         if not meta.abstract:
-            fields["pk"] = PKField(exclude=True, name="pk", inherit=False)
+            meta.fields["pk"] = PKField(exclude=True, name="pk", inherit=False)
 
         model_class = super().__new__
 
@@ -674,7 +725,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         # Set the owner of the field, must be done as early as possible
         # don't use meta.fields to not trigger the lazy evaluation
-        for value in fields.values():
+        for value in meta.fields.values():
             value.owner = new_class
         # set the model_class of managers
         for value in meta.managers.values():
