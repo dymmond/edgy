@@ -583,6 +583,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         name: str,
         bases: Tuple[Type, ...],
         attrs: Dict[str, Any],
+        meta_info_class: Type[MetaInfo] = MetaInfo,
         skip_registry: bool = False,
         **kwargs: Any,
     ) -> Any:
@@ -679,19 +680,17 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         for manager_name in managers:
             attrs.pop(manager_name, None)
-        attrs["meta"] = meta = MetaInfo(
+        attrs["meta"] = meta = meta_info_class(
             meta_class,
             fields=fields,
             parents=parents,
             managers=managers,
         )
         del fields
-        if is_abstract:
+        if is_abstract or not meta.fields:
             meta.abstract = True
 
         del is_abstract
-        if not meta.fields:
-            meta.abstract = True
 
         if not meta.abstract:
             meta.fields["pk"] = PKField(exclude=True, name="pk", inherit=False)

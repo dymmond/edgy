@@ -163,6 +163,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         attrs.update(cls.meta.fields)
         attrs.update(cls.meta.managers)
         _copy = cast("Model", type(cls.__name__, cls.__bases__, attrs, skip_registry=True))
+        _copy.meta.model = _copy
         if name:
             _copy.__name__ = name
         if registry is not None:

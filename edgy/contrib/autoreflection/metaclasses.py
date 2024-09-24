@@ -8,12 +8,13 @@ if TYPE_CHECKING:
 
 
 class AutoReflectionMetaInfo(MetaInfo):
-    __slots__ = ("pattern", "template", "databases")
+    __slots__ = ("pattern", "template", "databases", "concrete")
     pattern: re.Pattern
     template: Callable[["Table"], str]
     databases: FrozenSet[Union[str, None]]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
+        self.concrete = getattr(meta, "concrete", False)
         self.pattern = getattr(meta, "pattern", None)
         self.template = getattr(meta, "template", None)
         self.databases = getattr(meta, "databases", (None,))  # type: ignore
@@ -47,10 +48,27 @@ class AutoReflectionMetaInfo(MetaInfo):
 
 class AutoReflectionMeta(BaseModelMeta):
     def __new__(
-        cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any], **kwargs: Any
+        cls,
+        name: str,
+        bases: Tuple[Type, ...],
+        attrs: Dict[str, Any],
+        skip_registry: bool = False,
+        **kwargs: Any,
     ) -> Any:
-        new_model = super().__new__(cls, name, bases, attrs, skip_registry=True, **kwargs)
-        new_model.meta = AutoReflectionMetaInfo(new_model.meta)
-        if not new_model.meta.is_abstract and new_model.meta.registry is not None:
+        new_model = super().__new__(
+            cls,
+            name,
+            bases,
+            attrs,
+            meta_info_class=AutoReflectionMetaInfo,
+            skip_registry=True,
+            **kwargs,
+        )
+        if (
+            not skip_registry
+            and not new_model.meta.concrete
+            and not new_model.meta.abstract
+            and new_model.meta.registry is not None
+        ):
             new_model.meta.registry.pattern_models[new_model.__name__] = new_model
         return new_model

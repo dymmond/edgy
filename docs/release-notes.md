@@ -11,6 +11,8 @@ hide:
 
 - Support for querying across multiple databases.
 - Support for passing functions as clauses or keyword parameters.
+- Support for autocreated reflection objects by pattern matching.
+-
 
 ### Changed
 
@@ -18,6 +20,9 @@ hide:
   Also it doesn't raise NotImplementedError anymore when detecting a crossdb situation.
 - `is_cross_db` optionally gets a database as parameter and compares the databases instead of registries.
 - Relax fields parameter requirements for values/values_list.
+- More lazy meta/metadata.
+
+
 
 ### Fixed
 

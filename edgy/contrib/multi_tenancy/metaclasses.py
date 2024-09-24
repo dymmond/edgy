@@ -45,8 +45,8 @@ class BaseTenantMeta(BaseModelMeta):
 
     def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any, **kwargs: Any) -> Any:
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
-        new_model = super().__new__(cls, name, bases, attrs, **kwargs)
-        new_model.meta = meta = TenantMeta(new_model.meta)
+        new_model = super().__new__(cls, name, bases, attrs, meta_info_class=TenantMeta, **kwargs)
+        meta = new_model.meta
 
         if hasattr(meta_class, "is_tenant"):
             meta.is_tenant = cast(bool, meta_class.is_tenant)
