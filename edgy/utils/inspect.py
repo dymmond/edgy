@@ -55,25 +55,30 @@ class InspectDB:
         """
         Creates an instance of an InspectDB and triggers the proccess.
         """
-        self._database = database
-        self._schema = schema
+        self.database = Database(database)
+        self.schema = schema or None
 
-    @property
-    def database(self) -> Database:
-        return Database(self._database)
+    @staticmethod
+    async def reflect(
+        *, database: Database, metadata: sqlalchemy.MetaData, **kwargs: Any
+    ) -> sqlalchemy.MetaData:
+        """
+        Connects to the database and reflects all the information about the
+        schema bringing all the data available.
 
-    @property
-    def schema(self) -> Optional[str]:
-        return self._schema
+        Wrapper around metadata.reflect with logger output
+        If you don't want the logger output run:
+
+        `await database.run_sync(metadata.reflect, **kwargs)` directly
+        """
+        logger.info("Collecting database tables information...")
+        await database.run_sync(metadata.reflect, **kwargs)
+        return metadata
 
     async def _inspect(self) -> None:
         async with self.database as database:
             # Connect to a schema
-            metadata: sqlalchemy.MetaData = (
-                sqlalchemy.MetaData(schema=self.schema)
-                if self.schema is not None
-                else sqlalchemy.MetaData()
-            )
+            metadata: sqlalchemy.MetaData = sqlalchemy.MetaData(schema=self.schema)
             metadata = await self.reflect(database=database, metadata=metadata, schema=self.schema)
 
             # Generate the tables
@@ -88,8 +93,9 @@ class InspectDB:
         """
         run_sync(self._inspect())
 
+    @classmethod
     def generate_table_information(
-        self, metadata: sqlalchemy.MetaData
+        cls, metadata: sqlalchemy.MetaData
     ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
         """
         Generates the tables from the reflection and maps them into the
@@ -110,7 +116,7 @@ class InspectDB:
             models[key] = key.replace("_", "").capitalize()
 
             # Get the details of the foreign key
-            table_details["foreign_keys"] = self.get_foreign_keys(table)
+            table_details["foreign_keys"] = cls.get_foreign_keys(table)
 
             # Get the details of the indexes
             table_details["indexes"] = table.indexes
@@ -140,6 +146,7 @@ class InspectDB:
 
         return details
 
+    @classmethod
     def get_field_type(self, column: sqlalchemy.Column, is_fk: bool = False) -> Any:
         """
         Gets the field type. If the field is a foreign key, this is evaluated,
@@ -182,8 +189,9 @@ class InspectDB:
 
         return field_type, field_params
 
+    @classmethod
     def get_meta(
-        self, table: Dict[str, Any], unique_constraints: Set[str], _indexes: Set[str]
+        cls, table: Dict[str, Any], unique_constraints: Set[str], _indexes: Set[str]
     ) -> NoReturn:
         """
         Produces the Meta class.
@@ -232,19 +240,8 @@ class InspectDB:
         return meta
 
     @classmethod
-    async def reflect(
-        cls, *, database: Database, metadata: sqlalchemy.MetaData, schema: Optional[str] = None
-    ) -> sqlalchemy.MetaData:
-        """
-        Connects to the database and reflects all the information about the
-        schema bringing all the data available.
-        """
-        logger.info("Collecting database tables information...")
-        await database.run_sync(metadata.reflect, schema)
-        return metadata
-
     def write_output(
-        self, tables: List[Any], connection_string: str, schema: Union[str, None] = None
+        cls, tables: List[Any], connection_string: str, schema: Union[str, None] = None
     ) -> NoReturn:
         """
         Writes to stdout and runs some internal validations.
@@ -294,11 +291,11 @@ class InspectDB:
             # Get the column information
             for column in columns:
                 # ForeignKey related
-                foreign_keys = self.get_foreign_keys(column)
+                foreign_keys = cls.get_foreign_keys(column)
                 is_fk: bool = bool(foreign_keys)
                 attr_name = column.name
 
-                field_type, field_params = self.get_field_type(column, is_fk)
+                field_type, field_params = cls.get_field_type(column, is_fk)
                 field_params["null"] = column.nullable
 
                 if column.primary_key:
@@ -341,4 +338,4 @@ class InspectDB:
                 yield f"    {field_description}"
 
             yield "\n"
-            yield from self.get_meta(table, unique_constraints, indexes)
+            yield from cls.get_meta(table, unique_constraints, indexes)
