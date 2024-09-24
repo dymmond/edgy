@@ -393,10 +393,11 @@ class BaseQuerySet(
             field = model_class.meta.fields.get(field_name, generic_field)
             if cross_db_remainder:
                 assert field is not generic_field
+                fk_field = cast(BaseForeignKey, field)
                 sub_query = (
-                    field.target.query.filter(**{cross_db_remainder: value})
-                    .only(*field.related_columns.keys())
-                    .values_list(fields=field.related_columns.keys())
+                    fk_field.target.query.filter(**{cross_db_remainder: value})
+                    .only(*fk_field.related_columns.keys())
+                    .values_list(fields=fk_field.related_columns.keys())
                 )
 
                 # bind local vars

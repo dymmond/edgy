@@ -318,7 +318,7 @@ class Registry:
                     if not pattern_model.meta.pattern.match(table.name):
                         continue
                     new_name = pattern_model.meta.template(table)
-                    old_model: Optional[BaseModelType] = None
+                    old_model: Optional[type[BaseModelType]] = None
                     with contextlib.suppress(LookupError):
                         old_model = self.get_model(new_name)
                     if old_model is not None:

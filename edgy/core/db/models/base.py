@@ -150,7 +150,9 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         return f"{self.__class__.__name__}({', '.join(pkl)})"
 
     @classmethod
-    def copy_edgy_model(cls, registry: Optional["Registry"] = None, name: str = "") -> "Model":
+    def copy_edgy_model(
+        cls, registry: Optional["Registry"] = None, name: str = ""
+    ) -> Type["Model"]:
         """Copy the model class and optionally add it to another registry."""
         # removes private pydantic stuff, except the prefixed ones
         attrs = {
@@ -162,7 +164,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         # managers and fields are gone, we have to readd them with the correct data
         attrs.update(cls.meta.fields)
         attrs.update(cls.meta.managers)
-        _copy = cast("Model", type(cls.__name__, cls.__bases__, attrs, skip_registry=True))
+        _copy = cast(Type["Model"], type(cls.__name__, cls.__bases__, attrs, skip_registry=True))
         _copy.meta.model = _copy
         if name:
             _copy.__name__ = name
