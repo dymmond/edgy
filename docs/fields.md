@@ -364,11 +364,11 @@ obj.email = "foo@example.com"
 
 #### FileField
 
-See [FileField](file_handling.md#filefield).
+See [FileField](file-handling.md#filefield).
 
 #### ImageField
 
-See [ImageField](file_handling.md#imagefield).
+See [ImageField](file-handling.md#imagefield).
 
 #### FloatField
 
