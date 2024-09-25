@@ -158,6 +158,12 @@ class BigIntegerField(IntegerField):
     """Representation of big integer field"""
 
     @classmethod
+    def validate(cls, kwargs: Dict[str, Any]) -> None:
+        super().validate(kwargs)
+        if kwargs.get("autoincrement", False):
+            kwargs.setdefault("skip_reflection_type_check", True)
+
+    @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         # sqlite special we cannot have a big IntegerField as PK
         if kwargs.get("autoincrement"):

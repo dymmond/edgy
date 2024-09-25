@@ -668,7 +668,10 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                         )
                     else:
                         fields["id"] = edgy_fields.BigIntegerField(  # type: ignore
-                            primary_key=True, autoincrement=True, inherit=False, name="id"
+                            primary_key=True,
+                            autoincrement=True,
+                            inherit=False,
+                            name="id",
                         )
                 if not isinstance(fields["id"], BaseFieldType) or not fields["id"].primary_key:
                     raise ImproperlyConfigured(

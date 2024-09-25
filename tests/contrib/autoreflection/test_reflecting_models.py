@@ -48,6 +48,20 @@ async def test_basic_reflection():
         class Meta:
             registry = reflected
 
+    class AutoNever(AutoReflectModel):
+        non_matching = edgy.CharField(max_length=40)
+
+        class Meta:
+            registry = reflected
+            template = r"AutoNever"
+
+    class AutoNever2(AutoReflectModel):
+        id = edgy.CharField(max_length=40, primary_key=True)
+
+        class Meta:
+            registry = reflected
+            template = r"AutoNever2"
+
     class AutoFoo(AutoReflectModel):
         class Meta:
             registry = reflected
@@ -69,6 +83,8 @@ async def test_basic_reflection():
             == 3
         )
         assert "bars_bars" in reflected.reflected
+        assert "AutoNever" not in reflected.reflected
+        assert "AutoNever2" not in reflected.reflected
 
         assert (
             sum(

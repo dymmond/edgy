@@ -49,9 +49,7 @@ class ReflectedModelMixin:
                     table.columns.get(column.key) is None
                     or (
                         field_has_typing_check
-                        and not isinstance(
-                            column.type, table.columns[column.key].type.as_generic().__class__
-                        )
+                        and column.type.__class__ != table.columns[column.key].type.__class__
                     )
                 ):
                     field_names.add(field_name)
