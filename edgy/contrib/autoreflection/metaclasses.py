@@ -25,15 +25,13 @@ class AutoReflectionMetaInfo(MetaInfo):
         super().load_dict(values)
         template: Any = self.template
         if template is None:
+            template = "{modelname}{tablename}"
+        if isinstance(template, str):
 
             def _(table: "Table") -> str:
-                return f"{self.model.__name__}{table.name}"
-
-            self.template = _
-        elif isinstance(template, str):
-
-            def _(table: "Table") -> str:
-                return template.format(tablename=table.name, model_class=self.model)
+                return template.format(
+                    tablename=table.name, tablekey=table.key, modelname=self.model.__name__
+                )
 
             self.template = _
 

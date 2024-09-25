@@ -8,3 +8,15 @@ and create reflection models from it.
 For doing so we have selections via Pattern Models:
 
 They contain a Meta with the regex attribute and generate via the template string or function a new ReflectionModel:
+
+
+```python
+from edgy.contrib.autoreflection import AutoReflectModel
+
+class Reflected(AutoReflectModel):
+    class Meta:
+        pattern = ".*"  # regex or string, default .*
+        template = "{modelname}{tablename}"  # string or function with arguments tablename, modelname, tablekey
+        database = (None,)  # Restrict reflection to databases. None: main database of registry, string extra databases of registry
+
+```

@@ -317,6 +317,8 @@ class Registry:
                     # table.key would contain the schema name
                     if not pattern_model.meta.pattern.match(table.name):
                         continue
+                    if pattern_model.fields_not_supported_by_table(table):
+                        continue
                     new_name = pattern_model.meta.template(table)
                     old_model: Optional[Type[BaseModelType]] = None
                     with contextlib.suppress(LookupError):
