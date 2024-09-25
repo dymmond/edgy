@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from edgy import Model
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
+    from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.signals import Broadcaster
 
 _empty = cast(Set[str], frozenset())
@@ -151,7 +152,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
 
     @classmethod
     def copy_edgy_model(
-        cls, registry: Optional["Registry"] = None, name: str = ""
+        cls, registry: Optional["Registry"] = None, name: str = "", **kwargs: Any
     ) -> Type["Model"]:
         """Copy the model class and optionally add it to another registry."""
         # removes private pydantic stuff, except the prefixed ones
@@ -164,7 +165,10 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         # managers and fields are gone, we have to readd them with the correct data
         attrs.update(cls.meta.fields)
         attrs.update(cls.meta.managers)
-        _copy = cast(Type["Model"], type(cls.__name__, cls.__bases__, attrs, skip_registry=True))
+        _copy = cast(
+            Type["Model"],
+            type(cls.__name__, cls.__bases__, attrs, skip_registry=True, **kwargs),
+        )
         _copy.meta.model = _copy
         if name:
             _copy.__name__ = name

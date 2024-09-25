@@ -1,5 +1,16 @@
 import re
-from typing import TYPE_CHECKING, Any, Callable, Dict, FrozenSet, Tuple, Type, Union, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    FrozenSet,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+    cast,
+)
 
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
 
@@ -8,14 +19,15 @@ if TYPE_CHECKING:
 
 
 class AutoReflectionMetaInfo(MetaInfo):
-    __slots__ = ("pattern", "template", "databases", "concrete")
-    pattern: re.Pattern
+    __slots__ = ("include_pattern", "exclude_pattern", "template", "databases")
+    include_pattern: re.Pattern
+    exclude_pattern: Optional[re.Pattern]
     template: Callable[["Table"], str]
     databases: FrozenSet[Union[str, None]]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
-        self.concrete = getattr(meta, "concrete", False)
-        self.pattern = getattr(meta, "pattern", None)
+        self.include_pattern = getattr(meta, "include_pattern", None)
+        self.exclude_pattern = getattr(meta, "exclude_pattern", None)
         self.template = getattr(meta, "template", None)
         self.databases = getattr(meta, "databases", (None,))  # type: ignore
 
@@ -35,11 +47,19 @@ class AutoReflectionMetaInfo(MetaInfo):
 
             self.template = _
 
-        pattern: Any = self.pattern
-        if not pattern:
-            pattern = ".*"
-        if isinstance(pattern, str):
-            self.pattern = re.compile(pattern)
+        include_pattern: Any = self.include_pattern
+        if not include_pattern:
+            include_pattern = ".*"
+        if isinstance(include_pattern, str):
+            include_pattern = re.compile(include_pattern)
+        self.include_pattern = include_pattern
+
+        exclude_pattern: Any = self.exclude_pattern
+        if not exclude_pattern:
+            exclude_pattern = None
+        if isinstance(exclude_pattern, str):
+            exclude_pattern = re.compile(exclude_pattern)
+        self.exclude_pattern = exclude_pattern
 
         self.databases = frozenset(cast(Any, self.databases))
 
@@ -51,6 +71,7 @@ class AutoReflectionMeta(BaseModelMeta):
         bases: Tuple[Type, ...],
         attrs: Dict[str, Any],
         skip_registry: bool = False,
+        meta_info_class: Type[AutoReflectionMetaInfo] = AutoReflectionMetaInfo,
         **kwargs: Any,
     ) -> Any:
         new_model = super().__new__(
@@ -58,13 +79,13 @@ class AutoReflectionMeta(BaseModelMeta):
             name,
             bases,
             attrs,
-            meta_info_class=AutoReflectionMetaInfo,
+            meta_info_class=meta_info_class,
             skip_registry=True,
             **kwargs,
         )
         if (
             not skip_registry
-            and not new_model.meta.concrete
+            and isinstance(new_model.meta, AutoReflectionMetaInfo)
             and not new_model.meta.abstract
             and new_model.meta.registry is not None
         ):

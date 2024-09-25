@@ -62,15 +62,21 @@ async def test_basic_reflection():
             registry = reflected
             template = r"AutoNever2"
 
+    class AutoNever3(AutoReflectModel):
+        class Meta:
+            registry = reflected
+            template = r"AutoNever3"
+            exclude_pattern = r".*"
+
     class AutoFoo(AutoReflectModel):
         class Meta:
             registry = reflected
-            pattern = r"^foos$"
+            include_pattern = r"^foos$"
 
     class AutoBar(AutoReflectModel):
         class Meta:
             registry = reflected
-            pattern = r"^bars"
+            include_pattern = r"^bars"
             template = r"{tablename}_{tablename}"
 
     assert AutoBar.meta.template
@@ -85,6 +91,7 @@ async def test_basic_reflection():
         assert "bars_bars" in reflected.reflected
         assert "AutoNever" not in reflected.reflected
         assert "AutoNever2" not in reflected.reflected
+        assert "AutoNever3" not in reflected.reflected
 
         assert (
             sum(

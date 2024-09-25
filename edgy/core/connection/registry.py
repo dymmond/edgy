@@ -303,6 +303,8 @@ class Registry:
     async def _connect_and_init(
         self, name: Union[str, None], database: "Database", schema: Optional[str] = None
     ) -> None:
+        from edgy.core.db.models.metaclasses import MetaInfo
+
         await database.connect()
         if not self.pattern_models or name in self.dbs_reflected:
             return
@@ -315,7 +317,10 @@ class Registry:
                         continue
                     assert pattern_model.meta.model is pattern_model
                     # table.key would contain the schema name
-                    if not pattern_model.meta.pattern.match(table.name):
+                    if not pattern_model.meta.include_pattern.match(table.name) or (
+                        pattern_model.meta.exclude_pattern
+                        and pattern_model.meta.exclude_pattern.match(table.name)
+                    ):
                         continue
                     if pattern_model.fields_not_supported_by_table(table):
                         continue
@@ -327,10 +332,12 @@ class Registry:
                         raise Exception(
                             f"Conflicting model: {old_model.__name__} with pattern model: {pattern_model.__name__}"
                         )
-                    pattern_model = pattern_model.copy_edgy_model(name=new_name)
-                    pattern_model.meta.tablename = table.name
-                    pattern_model.meta.concrete = True
-                    pattern_model.add_to_registry(self)
+                    concrete_reflect_model = pattern_model.copy_edgy_model(
+                        name=new_name, meta_info_class=MetaInfo
+                    )
+                    concrete_reflect_model.meta.tablename = table.name
+                    concrete_reflect_model.database = database
+                    concrete_reflect_model.add_to_registry(self)
 
             self.dbs_reflected.add(name)
         except BaseException as exc:

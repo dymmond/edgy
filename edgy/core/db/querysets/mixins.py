@@ -23,7 +23,7 @@ class QuerySetPropsMixin:
     @property
     def database(self) -> Database:
         if self._database is None:
-            return cast("Database", self.model_class.meta.registry.database)
+            return cast("Database", self.model_class.database)
         return self._database
 
     @database.setter
