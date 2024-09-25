@@ -36,16 +36,22 @@ class ReflectedModelMixin:
         return run_sync(cls.reflect(registry, tablename, metadata, schema_name))
 
     @classmethod
-    def fields_not_supported_by_table(cls, table: sqlalchemy.Table) -> Set[str]:
+    def fields_not_supported_by_table(
+        cls, table: sqlalchemy.Table, check_type: bool = True
+    ) -> Set[str]:
         """Check if the model fields are a subset of the table."""
         field_names = set()
-        for field_name in cls.meta.fields:
+        for field_name, field in cls.meta.fields.items():
+            field_has_typing_check = not field.skip_reflection_type_check and check_type
             for column in cls.meta.field_to_columns[field_name]:
                 if (
                     # string not in is not supported by sqlalchemy
                     table.columns.get(column.key) is None
-                    or not isinstance(
-                        column.type, table.columns[column.key].type.as_generic().__class__
+                    or (
+                        field_has_typing_check
+                        and not isinstance(
+                            column.type, table.columns[column.key].type.as_generic().__class__
+                        )
                     )
                 ):
                     field_names.add(field_name)
@@ -98,7 +104,7 @@ class ReflectedModelMixin:
             raise ImproperlyConfigured(detail=str(e)) from e
         unsupported_fields = cls.fields_not_supported_by_table(table)
         if unsupported_fields:
-            raise Exception(
+            raise ImproperlyConfigured(
                 "Following fields have columns not matching the table specification:",
                 ", ".join(unsupported_fields),
             )

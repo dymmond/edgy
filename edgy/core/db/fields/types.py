@@ -50,6 +50,7 @@ class BaseFieldDefinitions:
     inject_default_on_partial_update: bool = False
     inherit: bool = True
     skip_absorption_check: bool = False
+    skip_reflection_type_check: bool = False
     field_type: Any = Any
     factory: Optional[FieldFactory] = None
 

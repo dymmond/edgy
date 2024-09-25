@@ -17,6 +17,7 @@ Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions
 - `index` - A boolean. Determine if a database index should be created.
 - `inherit` - A boolean. Determine if a field can be inherited in submodels. Default is True. It is used by PKField, RelatedField and the injected ID Field.
 - `skip_absorption_check` - A boolean. Default False. Dangerous option! By default when defining a CompositeField with embedded fields and the `absorb_existing_fields` option it is checked that the field type of the absorbed field is compatible with the field type of the embedded field. This option skips the check.
+- `skip_reflection_type_check` -  A boolean. Default False. Skip reflection column type check.
 - `unique` - A boolean. Determine if a unique constraint should be created for the field.
 Check the [unique_together](./models.md#unique-together) for more details.
 - `column_name` - A string. Database name of the column (by default the same as the name)
