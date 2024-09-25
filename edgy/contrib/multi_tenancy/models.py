@@ -1,6 +1,6 @@
 import uuid
 from datetime import date
-from typing import Any, Dict, Union, cast
+from typing import Any, Union, cast
 from uuid import UUID
 
 from loguru import logger
@@ -48,7 +48,7 @@ class TenantMixin(edgy.Model):
     async def save(
         self: Any,
         force_save: bool = False,
-        values: Dict[str, Any] = None,
+        values: dict[str, Any] = None,
         **kwargs: Any,
     ) -> Model:
         """
@@ -121,7 +121,7 @@ class DomainMixin(edgy.Model):
     async def save(
         self: Any,
         force_save: bool = False,
-        values: Dict[str, Any] = None,
+        values: dict[str, Any] = None,
         **kwargs: Any,
     ) -> Model:
         check_db_connection(self.database)

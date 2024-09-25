@@ -1,14 +1,10 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Dict,
-    Iterable,
-    List,
     Optional,
-    Sequence,
-    Type,
     Union,
 )
 
@@ -54,10 +50,10 @@ class BaseModelType(ABC):
     query: ClassVar["BaseManager"]
     query_related: ClassVar["BaseManager"]
     meta: ClassVar["MetaInfo"]
-    _db_schemas: ClassVar[Dict[str, Type["BaseModelType"]]]
+    _db_schemas: ClassVar[dict[str, type["BaseModelType"]]]
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
 
-    __parent__: ClassVar[Union[Type["BaseModelType"], None]] = None
+    __parent__: ClassVar[Union[type["BaseModelType"], None]] = None
     __is_proxy_model__: ClassVar[bool] = False
     __require_model_based_deletion__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
@@ -105,7 +101,7 @@ class BaseModelType(ABC):
 
     @classmethod
     @abstractmethod
-    def generate_proxy_model(cls) -> Type["BaseModel"]:
+    def generate_proxy_model(cls) -> type["BaseModel"]:
         """
         Generates a proxy model for each model. This proxy model is a simple
         shallow copy of the original model being generated.
@@ -125,7 +121,7 @@ class BaseModelType(ABC):
     async def save(
         self,
         force_save: bool = False,
-        values: Dict[str, Any] = None,
+        values: dict[str, Any] = None,
         **kwargs: Any,
     ) -> "BaseModelType":
         """Save model"""
@@ -143,7 +139,7 @@ class BaseModelType(ABC):
         """Load model and all models referenced by foreign keys."""
 
     @abstractmethod
-    def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
+    def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> dict[str, Any]:
         """
         An updated version of the model dump.
         It can show the pk always and handles the exclude attribute on fields correctly and
@@ -167,8 +163,8 @@ class BaseModelType(ABC):
 
     @abstractmethod
     async def execute_pre_save_hooks(
-        self, values: Dict[str, Any], original: Dict[str, Any], force_insert: bool
-    ) -> Dict[str, Any]:
+        self, values: dict[str, Any], original: dict[str, Any], force_insert: bool
+    ) -> dict[str, Any]:
         """
         For async operations after clean. Can be used to reintroduce stripped values for save.
         The async operations run in a transaction with save or update. This allows to intervene with the operation.
@@ -181,10 +177,10 @@ class BaseModelType(ABC):
     @abstractmethod
     def extract_column_values(
         cls,
-        extracted_values: Dict[str, Any],
+        extracted_values: dict[str, Any],
         is_update: bool = False,
         is_partial: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Extracts all the default values from the given fields and returns the raw
         value corresponding to each field.
@@ -192,7 +188,7 @@ class BaseModelType(ABC):
 
     # helpers
 
-    def extract_db_fields(self, only: Optional[Sequence[str]] = None) -> Dict[str, Any]:
+    def extract_db_fields(self, only: Optional[Sequence[str]] = None) -> dict[str, Any]:
         """
         Extracts all the db fields, model references and fields.
         Related fields are not included because they are disjoint.
@@ -215,7 +211,7 @@ class BaseModelType(ABC):
         """
         Build a cache key for the model.
         """
-        pk_key_list: List[Any] = [type(self).__name__]
+        pk_key_list: list[Any] = [type(self).__name__]
         # there are no columns, only column results
         for attr in self.pkcolumns:
             pk_key_list.append(str(getattr(self, attr)))

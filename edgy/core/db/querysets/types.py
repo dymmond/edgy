@@ -1,20 +1,11 @@
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator, Awaitable, Generator, Iterable, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Awaitable,
     Callable,
-    Dict,
-    Generator,
     Generic,
-    Iterable,
-    List,
     Literal,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     TypeVar,
     Union,
 )
@@ -35,9 +26,9 @@ EdgyEmbedTarget = TypeVar("EdgyEmbedTarget")
 
 class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     __slots__ = ("model_class",)
-    model_class: Type[EdgyModel]
+    model_class: type[EdgyModel]
 
-    def __init__(self, model_class: Type[EdgyModel]) -> None:
+    def __init__(self, model_class: type[EdgyModel]) -> None:
         self.model_class = model_class
 
     @abstractmethod
@@ -137,7 +128,7 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     def lookup(self, term: Any) -> "QueryType": ...
 
     @abstractmethod
-    def order_by(self, *columns: Union[List, str]) -> "QueryType": ...
+    def order_by(self, *columns: Union[list, str]) -> "QueryType": ...
 
     @abstractmethod
     def reverse(self) -> "QueryType": ...
@@ -149,13 +140,13 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     def offset(self, offset: int) -> "QueryType": ...
 
     @abstractmethod
-    def group_by(self, group_by: Union[List, str]) -> "QueryType": ...
+    def group_by(self, group_by: Union[list, str]) -> "QueryType": ...
 
     @abstractmethod
     def distinct(self, *distinct_on: Sequence[str]) -> "QueryType": ...
 
     @abstractmethod
-    def select_related(self, related: Union[List, str]) -> "QueryType": ...
+    def select_related(self, related: Union[list, str]) -> "QueryType": ...
 
     @abstractmethod
     def only(self, *fields: Sequence[str]) -> "QueryType": ...
@@ -185,10 +176,10 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     async def create(self, *args: Any, **kwargs: Any) -> EdgyEmbedTarget: ...
 
     @abstractmethod
-    async def bulk_create(self, objs: Iterable[Union[Dict[str, Any], EdgyModel]]) -> None: ...
+    async def bulk_create(self, objs: Iterable[Union[dict[str, Any], EdgyModel]]) -> None: ...
 
     @abstractmethod
-    async def bulk_update(self, objs: Sequence[EdgyModel], fields: List[str]) -> None: ...
+    async def bulk_update(self, objs: Sequence[EdgyModel], fields: list[str]) -> None: ...
 
     @abstractmethod
     async def delete(self) -> None: ...
@@ -200,33 +191,33 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     async def values(
         self,
         fields: Union[Sequence[str], str, None],
-        exclude: Union[Sequence[str], Set[str]],
+        exclude: Union[Sequence[str], set[str]],
         exclude_none: bool,
         flatten: bool,
         **kwargs: Any,
-    ) -> List[Any]: ...
+    ) -> list[Any]: ...
 
     @abstractmethod
     async def values_list(
         self,
         fields: Union[Sequence[str], str, None],
-        exclude: Union[Sequence[str], Set[str]],
+        exclude: Union[Sequence[str], set[str]],
         exclude_none: bool,
         flat: bool,
-    ) -> List[Any]: ...
+    ) -> list[Any]: ...
 
     @abstractmethod
     async def get_or_create(
         self,
-        defaults: Union[Dict[str, Any], Any, None] = None,
+        defaults: Union[dict[str, Any], Any, None] = None,
         *args: Any,
         **kwargs: Any,
-    ) -> Tuple[EdgyEmbedTarget, bool]: ...
+    ) -> tuple[EdgyEmbedTarget, bool]: ...
 
     @abstractmethod
     async def update_or_create(
-        self, defaults: Union[Dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
-    ) -> Tuple[EdgyEmbedTarget, bool]: ...
+        self, defaults: Union[dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
+    ) -> tuple[EdgyEmbedTarget, bool]: ...
 
     @abstractmethod
     async def contains(self, instance: "BaseModelType") -> bool: ...
@@ -244,7 +235,7 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     ) -> "QueryType": ...
 
     @abstractmethod
-    def __await__(self) -> Generator[Any, None, List[EdgyEmbedTarget]]: ...
+    def __await__(self) -> Generator[Any, None, list[EdgyEmbedTarget]]: ...
 
     @abstractmethod
     async def __aiter__(self) -> AsyncIterator[EdgyEmbedTarget]: ...

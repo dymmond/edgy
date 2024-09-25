@@ -5,14 +5,13 @@ hide:
 
 # Release Notes
 
-## Unreleased
+## 0.17.0
 
 ### Added
 
 - Support for querying across multiple databases.
 - Support for passing functions as clauses or keyword parameters.
 - Support for autocreated reflection objects by pattern matching.
--
 
 ### Changed
 
@@ -21,8 +20,9 @@ hide:
 - `is_cross_db` optionally gets a database as parameter and compares the databases instead of registries.
 - Relax fields parameter requirements for values/values_list.
 - More lazy meta/metadata.
-
-
+- `database` attribute of models is used for queries instead of the main database of the registry.
+- We use more metaclass kwarg arguments.
+- Switch to python >= 3.9.
 
 ### Fixed
 

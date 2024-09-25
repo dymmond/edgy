@@ -1,7 +1,7 @@
 import os
 from functools import cached_property
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Union
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -19,7 +19,7 @@ class MediaSettings(BaseSettings):
     media_url: str = ""
 
     # Storage defaults
-    storages: Dict[str, dict] = {
+    storages: dict[str, dict] = {
         "default": {
             "backend": "edgy.core.files.storage.filesystem.FileSystemStorage",
         },
@@ -31,8 +31,8 @@ class MediaSettings(BaseSettings):
 
 class EdgySettings(MediaSettings):
     model_config = SettingsConfigDict(extra="allow", ignored_types=(cached_property,))
-    ipython_args: List[str] = ["--no-banner"]
+    ipython_args: list[str] = ["--no-banner"]
     ptpython_config_file: str = "~/.config/ptpython/config.py"
 
     # General settings
-    dialects: Dict[str, str] = {"postgres": "postgres", "postgresql": "postgresql"}
+    dialects: dict[str, str] = {"postgres": "postgres", "postgresql": "postgresql"}

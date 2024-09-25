@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Set, Tuple, Type, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic._internal._model_construction import ModelMetaclass
 
@@ -21,8 +21,8 @@ class MarshallMeta(ModelMetaclass):
 
     __slots__ = ()
 
-    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any]) -> Any:
-        base_annotations: Dict[str, Any] = {}
+    def __new__(cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> Any:
+        base_annotations: dict[str, Any] = {}
         show_pk: bool = False
         marshall_config: ConfigMarshall = attrs.pop("marshall_config", None)
         # TODO: should have correct types
@@ -61,7 +61,7 @@ class MarshallMeta(ModelMetaclass):
             base_fields_include is not None or base_fields_exclude is not None
         ), "Either 'fields' or 'exclude' must be declared."
 
-        base_model_fields: Dict[str, Any] = {}
+        base_model_fields: dict[str, Any] = {}
 
         # Define the fields for the Marshall
         if base_fields_exclude is not None:
@@ -81,7 +81,7 @@ class MarshallMeta(ModelMetaclass):
         base_model_fields.update(model_fields)
 
         # Handles with the fields not declared in the model.
-        custom_fields: Dict[str, BaseMarshallField] = {}
+        custom_fields: dict[str, BaseMarshallField] = {}
 
         # For custom model_fields
         for k, v in attrs.items():
@@ -104,7 +104,7 @@ class MarshallMeta(ModelMetaclass):
         model_class.model_fields = base_model_fields
 
         # Handle annotations
-        annotations: Dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
+        annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
         model_class.__init_annotations__ = annotations
         model_class.__show_pk__ = show_pk
         model_class.__custom_fields__ = custom_fields
@@ -113,7 +113,7 @@ class MarshallMeta(ModelMetaclass):
         model_class.model_rebuild(force=True)
 
         # Raise for error if any of the required fields is not in the Marshall
-        required_fields: Set[str] = {f"'{k}'" for k, v in model.model_fields.items() if not v.null}
+        required_fields: set[str] = {f"'{k}'" for k, v in model.model_fields.items() if not v.null}
         if any(value not in model_class.model_fields for value in required_fields):
             fields = ", ".join(sorted(required_fields))
             raise MarshallFieldDefinitionError(

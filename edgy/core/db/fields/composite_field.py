@@ -1,15 +1,10 @@
 import copy
 import inspect
+from collections.abc import Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    List,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     Union,
     cast,
 )
@@ -44,14 +39,14 @@ class ConcreteCompositeField(BaseCompositeField):
         self,
         *,
         inner_fields: Union[
-            Sequence[Union[str, Tuple[str, BaseFieldType]]],
-            Type["BaseModelType"],
-            Dict[str, BaseFieldType],
+            Sequence[Union[str, tuple[str, BaseFieldType]]],
+            type["BaseModelType"],
+            dict[str, BaseFieldType],
         ] = (),
         **kwargs: Any,
     ):
-        self.inner_field_names: List[str] = []
-        self.embedded_field_defs: Dict[str, BaseFieldType] = {}
+        self.inner_field_names: list[str] = []
+        self.embedded_field_defs: dict[str, BaseFieldType] = {}
         if hasattr(inner_fields, "meta"):
             kwargs.setdefault("model", inner_fields)
             kwargs.setdefault("inherit", inner_fields.meta.inherit)
@@ -62,7 +57,7 @@ class ConcreteCompositeField(BaseCompositeField):
         self.prefix_embedded: str = kwargs.pop("prefix_embedded", "")
         self.unsafe_json_serialization: bool = kwargs.pop("unsafe_json_serialization", False)
         self.absorb_existing_fields: bool = kwargs.pop("absorb_existing_fields", False)
-        self.model: Optional[Union[Type[BaseModel], Type[ConditionalRedirect]]] = kwargs.pop(
+        self.model: Optional[Union[type[BaseModel], type[ConditionalRedirect]]] = kwargs.pop(
             "model", None
         )
         for field in inner_fields:
@@ -103,7 +98,7 @@ class ConcreteCompositeField(BaseCompositeField):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[Type["BaseModelType"]] = None,
+        owner: Optional[type["BaseModelType"]] = None,
         parent: Optional[BaseFieldType] = None,
     ) -> BaseFieldType:
         field_copy = cast(
@@ -133,7 +128,7 @@ class ConcreteCompositeField(BaseCompositeField):
 
     async def aget(
         self, instance: "BaseModelType", owner: Any = None
-    ) -> Union[Dict[str, Any], Any]:
+    ) -> Union[dict[str, Any], Any]:
         d = {}
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
@@ -149,7 +144,7 @@ class ConcreteCompositeField(BaseCompositeField):
             return self.model(**d)
         return d
 
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[Dict[str, Any], Any]:
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[dict[str, Any], Any]:
         assert len(self.inner_field_names) >= 1
         if self.model is ConditionalRedirect and len(self.inner_field_names) == 1:
             try:
@@ -173,7 +168,7 @@ class ConcreteCompositeField(BaseCompositeField):
             return self.model(**d)
         return d
 
-    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         assert len(self.inner_field_names) >= 1
         if (
             self.model is ConditionalRedirect
@@ -190,7 +185,7 @@ class ConcreteCompositeField(BaseCompositeField):
         field_name: str,
         value: Any,
         phase: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         assert len(self.inner_field_names) >= 1
         if (
             self.model is ConditionalRedirect
@@ -203,8 +198,8 @@ class ConcreteCompositeField(BaseCompositeField):
         return super().to_model(field_name, value, phase=phase)
 
     def get_embedded_fields(
-        self, name: str, fields: Dict[str, "BaseFieldType"]
-    ) -> Dict[str, "BaseFieldType"]:
+        self, name: str, fields: dict[str, "BaseFieldType"]
+    ) -> dict[str, "BaseFieldType"]:
         retdict = {}
         # owner is set: further down in hierarchy, or uninitialized embeddable, where the owner = model
         # owner is not set: current class
@@ -248,7 +243,7 @@ class ConcreteCompositeField(BaseCompositeField):
                     )
         return retdict
 
-    def get_composite_fields(self) -> Dict[str, BaseFieldType]:
+    def get_composite_fields(self) -> dict[str, BaseFieldType]:
         return {field: self.owner.meta.fields[field] for field in self.inner_field_names}
 
     def is_required(self) -> bool:
@@ -270,10 +265,10 @@ class CompositeField(FieldFactory):
         """Returns the type for pydantic"""
         if "model" in kwargs:
             return kwargs.get("model")
-        return Dict[str, Any]
+        return dict[str, Any]
 
     @classmethod
-    def validate(cls, kwargs: Dict[str, Any]) -> None:
+    def validate(cls, kwargs: dict[str, Any]) -> None:
         inner_fields = kwargs.get("inner_fields")
         if inner_fields is not None:
             if hasattr(inner_fields, "meta"):
@@ -285,7 +280,7 @@ class CompositeField(FieldFactory):
                 raise FieldDefinitionError("inner_fields must be a Sequence, a dict or a model")
             if not inner_fields:
                 raise FieldDefinitionError("inner_fields mustn't be empty")
-            inner_field_names: Set[str] = set()
+            inner_field_names: set[str] = set()
             for field in inner_fields:
                 if isinstance(field, str):
                     if field in inner_field_names:

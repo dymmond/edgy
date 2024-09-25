@@ -1,7 +1,8 @@
 import functools
 import inspect
 import typing
-from typing import Any, Callable, Optional, Sequence, TypeVar
+from collections.abc import Sequence
+from typing import Any, Callable, Optional, TypeVar
 
 Scope = typing.MutableMapping[str, typing.Any]
 Message = typing.MutableMapping[str, typing.Any]

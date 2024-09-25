@@ -2,7 +2,7 @@ import copy
 import decimal
 from datetime import date, datetime
 from enum import Enum
-from typing import Any, Dict
+from typing import Any
 from uuid import UUID
 
 import pytest
@@ -38,7 +38,7 @@ class Product(edgy.Model):
     created_datetime: datetime = fields.DateTimeField(auto_now_add=True)
     updated_datetime: datetime = fields.DateTimeField(auto_now=True)
     updated_date: datetime = fields.DateField(auto_now=True)
-    data: Dict[Any, Any] = fields.JSONField(default={})
+    data: dict[Any, Any] = fields.JSONField(default={})
     description: str = fields.CharField(null=True, max_length=255)
     huge_number: int = fields.BigIntegerField(default=0)
     price: decimal.Decimal = fields.DecimalField(max_digits=9, decimal_places=2, null=True)

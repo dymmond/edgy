@@ -1,6 +1,7 @@
 import copy
 import inspect
-from typing import TYPE_CHECKING, Any, Dict, Sequence, Type, cast
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, cast
 
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
@@ -50,7 +51,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         abstract = True
 
     @classmethod
-    def generate_proxy_model(cls) -> Type["Model"]:
+    def generate_proxy_model(cls) -> type["Model"]:
         """
         Generates a proxy model for each model. This proxy model is a simple
         shallow copy of the original model being generated.
@@ -78,8 +79,8 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         )
 
         proxy_model.build()
-        generify_model_fields(cast(Type[EdgyBaseModel], proxy_model.model))
-        return cast(Type[Model], proxy_model.model)
+        generify_model_fields(cast(type[EdgyBaseModel], proxy_model.model))
+        return cast(type[Model], proxy_model.model)
 
     async def update(self, **kwargs: Any) -> Any:
         """
@@ -122,7 +123,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         """Delete operation from the database"""
         await self.meta.signals.pre_delete.send_async(self.__class__, instance=self)
         # get values before deleting
-        field_values: Dict[str, Any] = {}
+        field_values: dict[str, Any] = {}
         if not skip_post_delete_hooks and self.meta.post_delete_fields:
             token = MODEL_GETATTR_BEHAVIOR.set("coro")
             try:
@@ -178,7 +179,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         """
         Performs the save instruction.
         """
-        column_values: Dict[str, Any] = self.extract_column_values(
+        column_values: dict[str, Any] = self.extract_column_values(
             extracted_values=kwargs, is_partial=False, is_update=False
         )
         check_db_connection(self.database)
@@ -216,7 +217,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
     async def save(
         self,
         force_save: bool = False,
-        values: Dict[str, Any] = None,
+        values: dict[str, Any] = None,
         **kwargs: Any,
     ) -> "Model":
         """

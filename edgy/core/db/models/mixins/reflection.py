@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, ClassVar, Optional, Set, Union, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, Union, cast
 
 import sqlalchemy
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
@@ -38,7 +38,7 @@ class ReflectedModelMixin:
     @classmethod
     def fields_not_supported_by_table(
         cls, table: sqlalchemy.Table, check_type: bool = True
-    ) -> Set[str]:
+    ) -> set[str]:
         """Check if the model fields are a subset of the table."""
         field_names = set()
         for field_name, field in cls.meta.fields.items():

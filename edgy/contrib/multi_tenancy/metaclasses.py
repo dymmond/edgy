@@ -1,4 +1,4 @@
-from typing import Any, Optional, Tuple, Type, cast
+from typing import Any, Optional, cast
 
 from edgy.core.db.models.metaclasses import (
     BaseModelMeta,
@@ -6,7 +6,7 @@ from edgy.core.db.models.metaclasses import (
 )
 
 
-def _check_model_inherited_tenancy(bases: Tuple[Type, ...]) -> bool:
+def _check_model_inherited_tenancy(bases: tuple[type, ...]) -> bool:
     for base in bases:
         meta: Optional[MetaInfo] = getattr(base, "meta", None)
         if meta is None:
@@ -42,7 +42,7 @@ class BaseTenantMeta(BaseModelMeta):
     your own tenant model using the `is_tenant` inside the `Meta` object.
     """
 
-    def __new__(cls, name: str, bases: Tuple[Type, ...], attrs: Any, **kwargs: Any) -> Any:
+    def __new__(cls, name: str, bases: tuple[type, ...], attrs: Any, **kwargs: Any) -> Any:
         new_model = super().__new__(cls, name, bases, attrs, meta_info_class=TenantMeta, **kwargs)
         if new_model.meta.is_tenant is None:
             new_model.meta.is_tenant = _check_model_inherited_tenancy(bases)

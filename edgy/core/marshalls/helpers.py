@@ -1,5 +1,5 @@
-from collections.abc import MutableMapping
-from typing import TYPE_CHECKING, Any, Dict, Generator
+from collections.abc import Generator, MutableMapping
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from edgy.core.marshalls.base import BaseMarshall
@@ -13,7 +13,7 @@ class MarshallFieldMapping(MutableMapping):
 
     def __init__(self, marshall: "BaseMarshall") -> None:
         self._marshall = marshall
-        self._fields: Dict[str, Any] = {}
+        self._fields: dict[str, Any] = {}
 
     def __setitem__(self, key: str, field: Any) -> None:
         self._fields[key] = field

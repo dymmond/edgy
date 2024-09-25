@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Type
+from typing import TYPE_CHECKING, Any
 
 from edgy.core.db.fields.factories import FieldFactory
 
@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
 
 
-class ExcludeField(FieldFactory, Type[None]):
+class ExcludeField(FieldFactory, type[None]):
     """
     Meta field that masks fields
     """
@@ -31,7 +31,7 @@ class ExcludeField(FieldFactory, Type[None]):
         value: Any,
         for_query: bool = False,
         original_fn: Any = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """remove any value from input."""
         return {}
 
@@ -43,7 +43,7 @@ class ExcludeField(FieldFactory, Type[None]):
         value: Any,
         phase: str = "",
         original_fn: Any = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """remove any value from input and raise when setting an attribute."""
         if phase == "set":
             raise ValueError("field is excluded")

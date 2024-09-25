@@ -4,19 +4,13 @@ import inspect
 import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
+from collections.abc import Sequence
 from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Dict,
-    FrozenSet,
-    List,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     Union,
     cast,
     get_origin,
@@ -40,17 +34,18 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured, TableBuildError
 
 if TYPE_CHECKING:
+    from edgy.core.connection.database import Database
     from edgy.core.db.models import Model
     from edgy.core.db.models.types import BaseModelType
 
-_empty_dict: Dict[str, Any] = {}
-_empty_set: FrozenSet[Any] = frozenset()
+_empty_dict: dict[str, Any] = {}
+_empty_set: frozenset[Any] = frozenset()
 
 
-class Fields(UserDict, Dict[str, BaseFieldType]):
+class Fields(UserDict, dict[str, BaseFieldType]):
     """Smart wrapper which tries to prevent invalidation as far as possible"""
 
-    def __init__(self, meta: "MetaInfo", data: Optional[Dict[str, BaseFieldType]] = None):
+    def __init__(self, meta: "MetaInfo", data: Optional[dict[str, BaseFieldType]] = None):
         self.meta = meta
         super().__init__(data)
 
@@ -100,7 +95,7 @@ class Fields(UserDict, Dict[str, BaseFieldType]):
             self.meta.invalidate(clear_class_attrs=True)
 
 
-class FieldToColumns(UserDict, Dict[str, Sequence["sqlalchemy.Column"]]):
+class FieldToColumns(UserDict, dict[str, Sequence["sqlalchemy.Column"]]):
     def __init__(self, meta: "MetaInfo"):
         self.meta = meta
         super().__init__()
@@ -127,16 +122,16 @@ class FieldToColumns(UserDict, Dict[str, Sequence["sqlalchemy.Column"]]):
             return False
 
 
-class FieldToColumnNames(FieldToColumns, Dict[str, FrozenSet[str]]):
-    def __getitem__(self, name: str) -> FrozenSet[str]:
+class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
+    def __getitem__(self, name: str) -> frozenset[str]:
         if name in self.data:
-            return cast(FrozenSet[str], self.data[name])
+            return cast(frozenset[str], self.data[name])
         column_names = frozenset(column.key for column in self.meta.field_to_columns[name])
         result = self.data[name] = column_names
         return result
 
 
-class ColumnsToField(UserDict, Dict[str, str]):
+class ColumnsToField(UserDict, dict[str, str]):
     def __init__(self, meta: "MetaInfo"):
         self.meta = meta
         self._init = False
@@ -145,7 +140,7 @@ class ColumnsToField(UserDict, Dict[str, str]):
     def init(self) -> None:
         if not self._init:
             self._init = True
-            _columns_to_field: Dict[str, str] = {}
+            _columns_to_field: dict[str, str] = {}
             for field_name in self.meta.fields:
                 # init structure
                 column_names = self.meta.field_to_column_names[field_name]
@@ -188,7 +183,7 @@ _trigger_attributes_MetaInfo = {
     "relationship_fields",
 }
 
-_field_sets_to_clear: Set[str] = {
+_field_sets_to_clear: set[str] = {
     attr for attr in _trigger_attributes_MetaInfo if attr.endswith("_fields")
 }
 
@@ -243,7 +238,7 @@ class MetaInfo:
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self._fields_are_initialized = False
-        self.model: Optional[Type[BaseModelType]] = None
+        self.model: Optional[type[BaseModelType]] = None
         #  Difference between meta extraction and kwargs: meta attributes are copied
         self.abstract: bool = getattr(meta, "abstract", False)
         # for embedding
@@ -254,10 +249,10 @@ class MetaInfo:
         self.indexes: Any = getattr(meta, "indexes", None)
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
-        self.parents: List[Any] = [*getattr(meta, "parents", _empty_set)]
+        self.parents: list[Any] = [*getattr(meta, "parents", _empty_set)]
         self.fields = {**getattr(meta, "fields", _empty_dict)}  # type: ignore
-        self.managers: Dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
-        self.multi_related: List[str] = [*getattr(meta, "multi_related", _empty_set)]
+        self.managers: dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
+        self.multi_related: list[str] = [*getattr(meta, "multi_related", _empty_set)]
         self.load_dict(kwargs)
 
     @property
@@ -265,7 +260,7 @@ class MetaInfo:
         return cast(Optional[PKField], self.fields.get("pk"))
 
     @property
-    def fields_mapping(self) -> Dict[str, BaseFieldType]:
+    def fields_mapping(self) -> dict[str, BaseFieldType]:
         warnings.warn(
             "'fields_mapping' has been deprecated, use 'fields' instead.",
             DeprecationWarning,
@@ -277,10 +272,10 @@ class MetaInfo:
     def is_multi(self) -> bool:
         return bool(self.multi_related)
 
-    def model_dump(self) -> Dict[Any, Any]:
+    def model_dump(self) -> dict[Any, Any]:
         return {k: getattr(self, k, None) for k in self._include_dump}
 
-    def load_dict(self, values: Dict[str, Any]) -> None:
+    def load_dict(self, values: dict[str, Any]) -> None:
         """
         Loads the metadata from a dictionary.
         You may want to overload it to create hooks to ensure types.
@@ -303,15 +298,15 @@ class MetaInfo:
         return super().__getattribute__(name)
 
     def init_fields_mapping(self) -> None:
-        self.special_getter_fields: Set[str] = set()
-        self.excluded_fields: Set[str] = set()
-        self.secret_fields: Set[str] = set()
-        self.input_modifying_fields: Set[str] = set()
-        self.post_save_fields: Set[str] = set()
-        self.pre_save_fields: Set[str] = set()
-        self.post_delete_fields: Set[str] = set()
-        self.foreign_key_fields: Set[str] = set()
-        self.relationship_fields: Set[str] = set()
+        self.special_getter_fields: set[str] = set()
+        self.excluded_fields: set[str] = set()
+        self.secret_fields: set[str] = set()
+        self.input_modifying_fields: set[str] = set()
+        self.post_save_fields: set[str] = set()
+        self.pre_save_fields: set[str] = set()
+        self.post_delete_fields: set[str] = set()
+        self.foreign_key_fields: set[str] = set()
+        self.relationship_fields: set[str] = set()
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)
         self.columns_to_field = ColumnsToField(self)
@@ -356,7 +351,7 @@ class MetaInfo:
 
 
 def get_model_registry(
-    bases: Tuple[Type, ...], meta_class: Optional[Union["object", MetaInfo]] = None
+    bases: tuple[type, ...], meta_class: Optional[Union["object", MetaInfo]] = None
 ) -> Optional[Registry]:
     """
     When a registry is missing from the Meta class, it should look up for the bases
@@ -379,11 +374,11 @@ def get_model_registry(
 
 
 def _set_related_field(
-    target: Type["BaseModelType"],
+    target: type["BaseModelType"],
     *,
     foreign_key_name: str,
     related_name: str,
-    source: Type["BaseModelType"],
+    source: type["BaseModelType"],
 ) -> None:
     if related_name in target.meta.fields:
         raise ForeignKeyBadConfigured(
@@ -403,7 +398,7 @@ def _set_related_field(
 
 def _set_related_name_for_foreign_keys(
     meta: "MetaInfo",
-    model_class: Type["BaseModelType"],
+    model_class: type["BaseModelType"],
 ) -> None:
     """
     Sets the related name for the foreign keys.
@@ -441,7 +436,7 @@ def _set_related_name_for_foreign_keys(
         registry.register_callback(foreign_key.to, related_field_fn, one_time=True)
 
 
-def _handle_annotations(base: Type, base_annotations: Dict[str, Any]) -> None:
+def _handle_annotations(base: type, base_annotations: dict[str, Any]) -> None:
     for parent in base.__mro__[1:]:
         _handle_annotations(parent, base_annotations)
     if hasattr(base, "__init_annotations__") and base.__init_annotations__:
@@ -451,8 +446,8 @@ def _handle_annotations(base: Type, base_annotations: Dict[str, Any]) -> None:
 
 
 def handle_annotations(
-    bases: Tuple[Type, ...], base_annotations: Dict[str, Any], attrs: Any
-) -> Dict[str, Any]:
+    bases: tuple[type, ...], base_annotations: dict[str, Any], attrs: Any
+) -> dict[str, Any]:
     """
     Handles and copies some of the annotations for
     initialiasation.
@@ -460,7 +455,7 @@ def handle_annotations(
     for base in bases:
         _handle_annotations(base, base_annotations)
 
-    annotations: Dict[str, Any] = (
+    annotations: dict[str, Any] = (
         copy.copy(attrs["__init_annotations__"])
         if "__init_annotations__" in attrs
         else copy.copy(attrs["__annotations__"])
@@ -472,7 +467,7 @@ def handle_annotations(
 _occluded_sentinel = object()
 
 
-def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
+def _extract_fields_and_managers(base: type, attrs: dict[str, Any]) -> None:
     from edgy.core.db.fields.composite_field import CompositeField
 
     meta: Union[MetaInfo, None] = getattr(base, "meta", None)
@@ -541,8 +536,8 @@ def _extract_fields_and_managers(base: Type, attrs: Dict[str, Any]) -> None:
 
 
 def extract_fields_and_managers(
-    bases: Sequence[Type], attrs: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    bases: Sequence[type], attrs: Optional[dict[str, Any]] = None
+) -> dict[str, Any]:
     """
     Search for fields and managers and return them.
 
@@ -581,16 +576,16 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
     def __new__(
         cls,
         name: str,
-        bases: Tuple[Type, ...],
-        attrs: Dict[str, Any],
-        meta_info_class: Type[MetaInfo] = MetaInfo,
+        bases: tuple[type, ...],
+        attrs: dict[str, Any],
+        meta_info_class: type[MetaInfo] = MetaInfo,
         skip_registry: bool = False,
         **kwargs: Any,
     ) -> Any:
-        fields: Dict[str, BaseFieldType] = {}
-        managers: Dict[str, BaseManager] = {}
+        fields: dict[str, BaseFieldType] = {}
+        managers: dict[str, BaseManager] = {}
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
-        base_annotations: Dict[str, Any] = {}
+        base_annotations: dict[str, Any] = {}
         has_explicit_primary_key = False
         is_abstract: bool = getattr(meta_class, "abstract", False)
         parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
@@ -701,7 +696,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         model_class = super().__new__
 
         # Handle annotations
-        annotations: Dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
+        annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
 
         for k, _ in meta.managers.items():
             if annotations and k not in annotations:
@@ -714,7 +709,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # Ensure the initialization is only performed for subclasses of EdgyBaseModel
         attrs["__init_annotations__"] = annotations
 
-        new_class = cast(Type["Model"], model_class(cls, name, bases, attrs, **kwargs))
+        new_class = cast(type["Model"], model_class(cls, name, bases, attrs, **kwargs))
         meta.model = new_class
         # Ensure initialization is only performed for subclasses of EdgyBaseModel
         # (excluding the EdgyBaseModel class itself).
@@ -790,10 +785,18 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         new_class.add_to_registry(meta.registry)
         return new_class
 
-    def add_to_registry(cls: Type["BaseModelType"], registry: Registry, name: str = "") -> None:
+    def add_to_registry(
+        cls: type["BaseModelType"],
+        registry: Registry,
+        name: str = "",
+        database: Union[bool, "Database"] = True,
+    ) -> None:
         # when called if registry is not set
         cls.meta.registry = registry
-        cls.database = registry.database
+        if database is True:
+            cls.database = registry.database
+        elif database is not False:
+            cls.database = database
         meta = cls.meta
         if name:
             cls.__name__ = name
@@ -918,7 +921,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cast("sqlalchemy.Table", schema_obj)
 
     @property
-    def proxy_model(cls: Type["Model"]) -> Type["BaseModelType"]:
+    def proxy_model(cls: type["Model"]) -> type["BaseModelType"]:
         """
         Returns the proxy_model from the Model when called using the cache.
         """
@@ -936,7 +939,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cast("sqlalchemy.sql.ColumnCollection", cls.table.columns)
 
     @property
-    def fields(cls) -> Dict[str, BaseFieldType]:
+    def fields(cls) -> dict[str, BaseFieldType]:
         warnings.warn(
             "'fields' has been deprecated, use 'meta.fields' instead.",
             DeprecationWarning,

@@ -7,7 +7,7 @@ name = "edgy"
 description = "🔥 The perfect ORM to work with complex databases 🔥"
 long_description = "🔥 The perfect ORM to work with complex databases 🔥"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dynamic = ['version']
 license = "MIT"
 authors = [{ name = "Tiago Silva", email = "tiago.arasilva@gmail.com" }]

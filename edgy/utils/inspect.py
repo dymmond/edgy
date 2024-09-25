@@ -1,6 +1,6 @@
 import inspect
 import sys
-from typing import Any, Callable, Dict, List, NoReturn, Optional, Set, Tuple, Union
+from typing import Any, Callable, NoReturn, Optional, Union
 
 import sqlalchemy
 from loguru import logger
@@ -96,19 +96,19 @@ class InspectDB:
     @classmethod
     def generate_table_information(
         cls, metadata: sqlalchemy.MetaData
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    ) -> tuple[list[dict[str, Any]], dict[str, str]]:
         """
         Generates the tables from the reflection and maps them into the
         `reflected` dictionary of the `Registry`.
         """
         tables_dict = dict(metadata.tables.items())
         tables = []
-        models: Dict[str, str] = {}
+        models: dict[str, str] = {}
         for key, table in tables_dict.items():
-            table_details: Dict[str, Any] = {}
+            table_details: dict[str, Any] = {}
             table_details["tablename"] = key
 
-            table_name_list: List[str] = key.split(".")
+            table_name_list: list[str] = key.split(".")
             table_name = table_name_list[1] if len(table_name_list) > 1 else table_name_list[0]
             table_details["class_name"] = table_name.replace("_", "").replace(".", "").capitalize()
             table_details["class"] = None
@@ -128,14 +128,14 @@ class InspectDB:
     @classmethod
     def get_foreign_keys(
         cls, table_or_column: Union[sqlalchemy.Table, sqlalchemy.Column]
-    ) -> List[Dict[str, Any]]:
+    ) -> list[dict[str, Any]]:
         """
         Extracts all the information needed of the foreign keys.
         """
-        details: List[Dict[str, Any]] = []
+        details: list[dict[str, Any]] = []
 
         for foreign_key in table_or_column.foreign_keys:
-            fk: Dict[str, Any] = {}
+            fk: dict[str, Any] = {}
             fk["column"] = foreign_key.column
             fk["column_name"] = foreign_key.column.name
             fk["tablename"] = foreign_key.column.table.name
@@ -171,7 +171,7 @@ class InspectDB:
             )
             field_type = "TextField"
 
-        field_params: Dict[str, Any] = {}
+        field_params: dict[str, Any] = {}
 
         if field_type == "CharField":
             field_params["max_length"] = real_field.length
@@ -191,13 +191,13 @@ class InspectDB:
 
     @classmethod
     def get_meta(
-        cls, table: Dict[str, Any], unique_constraints: Set[str], _indexes: Set[str]
+        cls, table: dict[str, Any], unique_constraints: set[str], _indexes: set[str]
     ) -> NoReturn:
         """
         Produces the Meta class.
         """
-        unique_together: List[edgy.UniqueConstraint] = []
-        unique_indexes: List[edgy.Index] = []
+        unique_together: list[edgy.UniqueConstraint] = []
+        unique_indexes: list[edgy.Index] = []
         indexes = list(table["indexes"])
         constraints = list(table["constraints"])
 
@@ -241,7 +241,7 @@ class InspectDB:
 
     @classmethod
     def write_output(
-        cls, tables: List[Any], connection_string: str, schema: Union[str, None] = None
+        cls, tables: list[Any], connection_string: str, schema: Union[str, None] = None
     ) -> NoReturn:
         """
         Writes to stdout and runs some internal validations.
@@ -276,8 +276,8 @@ class InspectDB:
 
         # Start writing the classes
         for table in tables:
-            unique_constraints: Set[str] = set()
-            indexes: Set[str] = set()
+            unique_constraints: set[str] = set()
+            indexes: set[str] = set()
 
             yield "\n"
             yield "\n"

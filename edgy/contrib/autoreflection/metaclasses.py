@@ -3,11 +3,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
-    FrozenSet,
     Optional,
-    Tuple,
-    Type,
     Union,
     cast,
 )
@@ -23,7 +19,7 @@ class AutoReflectionMetaInfo(MetaInfo):
     include_pattern: re.Pattern
     exclude_pattern: Optional[re.Pattern]
     template: Callable[["Table"], str]
-    databases: FrozenSet[Union[str, None]]
+    databases: frozenset[Union[str, None]]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self.include_pattern = getattr(meta, "include_pattern", None)
@@ -33,7 +29,7 @@ class AutoReflectionMetaInfo(MetaInfo):
 
         super().__init__(meta, **kwargs)
 
-    def load_dict(self, values: Dict[str, Any]) -> None:
+    def load_dict(self, values: dict[str, Any]) -> None:
         super().load_dict(values)
         template: Any = self.template
         if template is None:
@@ -68,10 +64,10 @@ class AutoReflectionMeta(BaseModelMeta):
     def __new__(
         cls,
         name: str,
-        bases: Tuple[Type, ...],
-        attrs: Dict[str, Any],
+        bases: tuple[type, ...],
+        attrs: dict[str, Any],
         skip_registry: bool = False,
-        meta_info_class: Type[AutoReflectionMetaInfo] = AutoReflectionMetaInfo,
+        meta_info_class: type[AutoReflectionMetaInfo] = AutoReflectionMetaInfo,
         **kwargs: Any,
     ) -> Any:
         new_model = super().__new__(

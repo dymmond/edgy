@@ -1,20 +1,14 @@
 import asyncio
 import contextlib
+from collections.abc import Mapping, Sequence
 from functools import cached_property, partial
 from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
-    List,
     Literal,
-    Mapping,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     Union,
     cast,
     overload,
@@ -43,14 +37,14 @@ class Registry:
     """
 
     db_schema: Union[str, None] = None
-    content_type: Union[Type["BaseModelType"], None] = None
-    dbs_reflected: Set[Union[str, None]]
+    content_type: Union[type["BaseModelType"], None] = None
+    dbs_reflected: set[Union[str, None]]
 
     def __init__(
         self,
         database: Union[Database, str, DatabaseURL],
         *,
-        with_content_type: Union[bool, Type["BaseModelType"]] = False,
+        with_content_type: Union[bool, type["BaseModelType"]] = False,
         schema: Union[str, None] = None,
         **kwargs: Any,
     ) -> None:
@@ -59,19 +53,19 @@ class Registry:
         self.database: Database = (
             database if isinstance(database, Database) else Database(database, **kwargs)
         )
-        self.models: Dict[str, Type[BaseModelType]] = {}
-        self.reflected: Dict[str, Type[BaseModelType]] = {}
-        self.tenant_models: Dict[str, Type[BaseModelType]] = {}
-        self.pattern_models: Dict[str, Type[AutoReflectionModel]] = {}
+        self.models: dict[str, type[BaseModelType]] = {}
+        self.reflected: dict[str, type[BaseModelType]] = {}
+        self.tenant_models: dict[str, type[BaseModelType]] = {}
+        self.pattern_models: dict[str, type[AutoReflectionModel]] = {}
         self.dbs_reflected = set()
 
         self.schema = Schema(registry=self)
         # when setting a Model or Reflected Model execute the callbacks
         # Note: they are only executed if the Model is not in Registry yet
-        self._onetime_callbacks: Dict[
-            Union[str, None], List[Callable[[Type[BaseModelType]], None]]
+        self._onetime_callbacks: dict[
+            Union[str, None], list[Callable[[type[BaseModelType]], None]]
         ] = {}
-        self._callbacks: Dict[Union[str, None], List[Callable[[Type[BaseModelType]], None]]] = {}
+        self._callbacks: dict[Union[str, None], list[Callable[[type[BaseModelType]], None]]] = {}
 
         self.extra: Mapping[str, Database] = {
             k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
@@ -113,7 +107,7 @@ class Registry:
         return _copy
 
     def _set_content_type(
-        self, with_content_type: Union[Literal[True], Type["BaseModelType"]]
+        self, with_content_type: Union[Literal[True], type["BaseModelType"]]
     ) -> None:
         from edgy.contrib.contenttypes.fields import BaseContentTypeFieldField, ContentTypeField
         from edgy.contrib.contenttypes.models import ContentType
@@ -124,7 +118,7 @@ class Registry:
         if with_content_type is True:
             with_content_type = ContentType
 
-        real_content_type: Type[BaseModelType] = with_content_type
+        real_content_type: type[BaseModelType] = with_content_type
 
         if real_content_type.meta.abstract:
             meta_args = {
@@ -144,7 +138,7 @@ class Registry:
             real_content_type.add_to_registry(self, "ContentType")
         self.content_type = real_content_type
 
-        def callback(model_class: Type["BaseModelType"]) -> None:
+        def callback(model_class: type["BaseModelType"]) -> None:
             # they are not updated, despite this shouldn't happen anyway
             if issubclass(model_class, ContentType):
                 return
@@ -176,7 +170,7 @@ class Registry:
 
         self.register_callback(None, callback, one_time=False)
 
-    def get_model(self, model_name: str) -> Type["BaseModelType"]:
+    def get_model(self, model_name: str) -> type["BaseModelType"]:
         if model_name in self.models:
             return self.models[model_name]
         elif model_name in self.reflected:
@@ -199,8 +193,8 @@ class Registry:
 
     def register_callback(
         self,
-        name_or_class: Union[Type["BaseModelType"], str, None],
-        callback: Callable[[Type["BaseModelType"]], None],
+        name_or_class: Union[type["BaseModelType"], str, None],
+        callback: Callable[[type["BaseModelType"]], None],
         one_time: Optional[bool] = None,
     ) -> None:
         if one_time is None:
@@ -238,7 +232,7 @@ class Registry:
         else:
             self._callbacks.setdefault(name_or_class, []).append(callback)
 
-    def execute_model_callbacks(self, model_class: Type["BaseModelType"]) -> None:
+    def execute_model_callbacks(self, model_class: type["BaseModelType"]) -> None:
         name = model_class.__name__
         callbacks = self._onetime_callbacks.get(name)
         while callbacks:
@@ -325,7 +319,7 @@ class Registry:
                     if pattern_model.fields_not_supported_by_table(table):
                         continue
                     new_name = pattern_model.meta.template(table)
-                    old_model: Optional[Type[BaseModelType]] = None
+                    old_model: Optional[type[BaseModelType]] = None
                     with contextlib.suppress(LookupError):
                         old_model = self.get_model(new_name)
                     if old_model is not None:
@@ -345,11 +339,11 @@ class Registry:
             raise exc
 
     async def __aenter__(self) -> "Registry":
-        dbs: List[Tuple[Union[str, None], Database]] = [(None, self.database)]
+        dbs: list[tuple[Union[str, None], Database]] = [(None, self.database)]
         for name, db in self.extra.items():
             dbs.append((name, db))
         ops = [self._connect_and_init(name, db, schema=self.db_schema or None) for name, db in dbs]
-        results: List[Union[BaseException, bool]] = await asyncio.gather(
+        results: list[Union[BaseException, bool]] = await asyncio.gather(
             *ops, return_exceptions=True
         )
         if any(isinstance(x, BaseException) for x in results):
@@ -364,7 +358,7 @@ class Registry:
 
     async def __aexit__(
         self,
-        exc_type: Optional[Type[BaseException]] = None,
+        exc_type: Optional[type[BaseException]] = None,
         exc_value: Optional[BaseException] = None,
         traceback: Optional[TracebackType] = None,
     ) -> None:

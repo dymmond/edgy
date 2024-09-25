@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 from edgy.core.db.context_vars import get_tenant, set_tenant
 from edgy.core.db.querysets.base import QuerySet
@@ -11,7 +11,7 @@ class BaseManager:
     def __init__(
         self,
         *,
-        owner: Optional[Union[Type["BaseModelType"]]] = None,
+        owner: Optional[Union[type["BaseModelType"]]] = None,
         inherit: bool = True,
         name: str = "",
         instance: Optional[Union["BaseModelType"]] = None,

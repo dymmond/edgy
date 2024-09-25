@@ -1,5 +1,6 @@
 import warnings
-from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Union, cast
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 
 import sqlalchemy
 

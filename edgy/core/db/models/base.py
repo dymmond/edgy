@@ -2,18 +2,14 @@ import contextlib
 import copy
 import inspect
 import warnings
+from collections.abc import Sequence
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
-    Dict,
-    List,
     Literal,
     Optional,
-    Sequence,
-    Set,
-    Type,
     Union,
     cast,
 )
@@ -40,7 +36,7 @@ if TYPE_CHECKING:
     from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.signals import Broadcaster
 
-_empty = cast(Set[str], frozenset())
+_empty = cast(set[str], frozenset())
 
 
 class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
@@ -53,7 +49,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
     query: ClassVar[Manager] = Manager()
     query_related: ClassVar[RedirectManager] = RedirectManager(redirect_name="query")
     meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True)
-    __proxy_model__: ClassVar[Union[Type["Model"], None]] = None
+    __proxy_model__: ClassVar[Union[type["Model"], None]] = None
     # is inheriting from a registered model, so the registry is true
     __db_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
@@ -110,7 +106,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         """
 
         kwargs = {**kwargs}
-        new_kwargs: Dict[str, Any] = {}
+        new_kwargs: dict[str, Any] = {}
 
         fields = cls.meta.fields
         token = CURRENT_INSTANCE.set(instance)
@@ -153,7 +149,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
     @classmethod
     def copy_edgy_model(
         cls, registry: Optional["Registry"] = None, name: str = "", **kwargs: Any
-    ) -> Type["Model"]:
+    ) -> type["Model"]:
         """Copy the model class and optionally add it to another registry."""
         # removes private pydantic stuff, except the prefixed ones
         attrs = {
@@ -166,7 +162,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         attrs.update(cls.meta.fields)
         attrs.update(cls.meta.managers)
         _copy = cast(
-            Type["Model"],
+            type["Model"],
             type(cls.__name__, cls.__bases__, attrs, skip_registry=True, **kwargs),
         )
         _copy.meta.model = _copy
@@ -177,7 +173,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         return _copy
 
     @cached_property
-    def proxy_model(self) -> Type[BaseModelType]:
+    def proxy_model(self) -> type[BaseModelType]:
         return self.__class__.proxy_model  # type: ignore
 
     @cached_property
@@ -197,7 +193,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         self,
         only_needed: bool = False,
         only_needed_nest: bool = False,
-        _seen: Optional[Set[Any]] = None,
+        _seen: Optional[set[Any]] = None,
     ) -> None:
         if _seen is None:
             _seen = {self.create_model_key()}
@@ -230,7 +226,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         return self.meta.signals
 
     @property
-    def fields(self) -> Dict[str, "BaseFieldType"]:
+    def fields(self) -> dict[str, "BaseFieldType"]:
         warnings.warn(
             "'fields' has been deprecated, use 'meta.fields' instead.",
             DeprecationWarning,
@@ -280,8 +276,8 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         else:
             return cast(Sequence["sqlalchemy.Column"], _empty)
 
-    def identifying_clauses(self) -> List[Any]:
-        clauses: List[Any] = []
+    def identifying_clauses(self) -> list[Any]:
+        clauses: list[Any] = []
         for field_name in self.identifying_db_fields:
             field = self.meta.fields.get(field_name)
             if field is not None:
@@ -293,7 +289,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                 )
         return clauses
 
-    def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> Dict[str, Any]:
+    def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> dict[str, Any]:
         """
         An updated version of the model dump.
         It can show the pk always and handles the exclude attribute on fields correctly and
@@ -303,7 +299,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
             show_pk: bool - Enforces showing the primary key in the model_dump.
         """
         # we want a copy
-        exclude: Union[Set[str], Dict[str, Any], None] = kwargs.pop("exclude", None)
+        exclude: Union[set[str], dict[str, Any], None] = kwargs.pop("exclude", None)
         if exclude is None:
             initial_full_field_exclude = _empty
             # must be writable
@@ -323,7 +319,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
             exclude.update(self.meta.special_getter_fields)
             exclude.update(self.meta.excluded_fields)
             exclude.add("__show_pk__")
-        include: Union[Set[str], Dict[str, Any], None] = kwargs.pop("include", None)
+        include: Union[set[str], dict[str, Any], None] = kwargs.pop("include", None)
         mode: Union[Literal["json", "python"], str] = kwargs.pop("mode", "python")
 
         should_show_pk = show_pk or self.__show_pk__
@@ -394,7 +390,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         assert registry is not None, "registry is not set"
         if metadata is None:
             metadata = registry.metadata
-        schemes: List[str] = []
+        schemes: list[str] = []
         if schema:
             schemes.append(schema)
         schemes.append(registry.db_schema or "")
@@ -402,8 +398,8 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
 
-        columns: List[sqlalchemy.Column] = []
-        global_constraints: List[Any] = []
+        columns: list[sqlalchemy.Column] = []
+        global_constraints: list[Any] = []
         for name, field in cls.meta.fields.items():
             current_columns = field.get_columns(name)
             columns.extend(current_columns)
@@ -456,12 +452,12 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         return sqlalchemy.Index(index.name, *index.fields)
 
     async def execute_pre_save_hooks(
-        self, column_values: Dict[str, Any], original: Dict[str, Any], force_insert: bool
-    ) -> Dict[str, Any]:
+        self, column_values: dict[str, Any], original: dict[str, Any], force_insert: bool
+    ) -> dict[str, Any]:
         # also handle defaults
         keys = {*column_values.keys(), *original.keys()}
         affected_fields = self.meta.pre_save_fields.intersection(keys)
-        retdict: Dict[str, Any] = {}
+        retdict: dict[str, Any] = {}
         if affected_fields:
             # don't trigger loads
             token = MODEL_GETATTR_BEHAVIOR.set("passdown")
@@ -505,18 +501,18 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
     @classmethod
     def extract_column_values(
         cls,
-        extracted_values: Dict[str, Any],
+        extracted_values: dict[str, Any],
         is_update: bool = False,
         is_partial: bool = False,
-    ) -> Dict[str, Any]:
-        validated: Dict[str, Any] = {}
+    ) -> dict[str, Any]:
+        validated: dict[str, Any] = {}
         # phase 1: transform when required
         if cls.meta.input_modifying_fields:
             extracted_values = {**extracted_values}
             for field_name in cls.meta.input_modifying_fields:
                 cls.meta.fields[field_name].modify_input(field_name, extracted_values)
         # phase 2: validate fields and set defaults for readonly
-        need_second_pass: List[BaseFieldType] = []
+        need_second_pass: list[BaseFieldType] = []
         for field_name, field in cls.meta.fields.items():
             if field.read_only:
                 # if read_only, updates are not possible anymore

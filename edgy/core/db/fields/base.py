@@ -1,16 +1,12 @@
 import contextlib
 import copy
+from collections.abc import Sequence
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
-    FrozenSet,
     Literal,
     Optional,
-    Sequence,
-    Tuple,
-    Type,
     Union,
     cast,
 )
@@ -47,8 +43,8 @@ class BaseField(BaseFieldType, FieldInfo):
     """
 
     # defs to simplify the life (can be None actually)
-    owner: Type["BaseModelType"]
-    operator_mapping: Dict[str, str] = {
+    owner: type["BaseModelType"]
+    operator_mapping: dict[str, str] = {
         # aliases
         "is": "is_",
         "in": "in_",
@@ -149,7 +145,7 @@ class BaseField(BaseFieldType, FieldInfo):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[Type["BaseModelType"]] = None,
+        owner: Optional[type["BaseModelType"]] = None,
         parent: Optional["BaseField"] = None,
     ) -> Optional["BaseField"]:
         """
@@ -169,7 +165,7 @@ class BaseField(BaseFieldType, FieldInfo):
         return default
 
     def get_default_values(
-        self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool = False
+        self, field_name: str, cleaned_data: dict[str, Any], is_update: bool = False
     ) -> Any:
         # for multidefaults overwrite in subclasses get_default_values to
         # parse default values differently
@@ -191,7 +187,7 @@ class Field(BaseField):
         """
         return value
 
-    def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
+    def clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         """
         Runs the checks for the fields being validated. Multiple columns possible
         """
@@ -224,22 +220,22 @@ class BaseCompositeField(BaseField):
         """translate name for inner objects and parsing values"""
         return name
 
-    def get_composite_fields(self) -> Dict[str, BaseFieldType]:
+    def get_composite_fields(self) -> dict[str, BaseFieldType]:
         """return dictionary of fields with untranslated names"""
         raise NotImplementedError()
 
     @cached_property
-    def composite_fields(self) -> Dict[str, BaseFieldType]:
+    def composite_fields(self) -> dict[str, BaseFieldType]:
         # return untranslated names
         return self.get_composite_fields()
 
-    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
         prefix = _removesuffix(field_name, self.name)
         result = {}
-        ErrorType: Type[Exception] = KeyError
+        ErrorType: type[Exception] = KeyError
         if not isinstance(value, dict):
             # simpler
             value = value.__dict__
@@ -262,12 +258,12 @@ class BaseCompositeField(BaseField):
         field_name: str,
         value: Any,
         phase: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
         result = {}
-        ErrorType: Type[Exception] = KeyError
+        ErrorType: type[Exception] = KeyError
         if not isinstance(value, dict):
             # simpler
             value = value.__dict__
@@ -283,14 +279,14 @@ class BaseCompositeField(BaseField):
         return result
 
     def get_default_values(
-        self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool = False
+        self, field_name: str, cleaned_data: dict[str, Any], is_update: bool = False
     ) -> Any:
         # fields should provide their own default which is used as long as they are in the fields mapping
         return {}
 
 
 class RelationshipField(BaseField):
-    def traverse_field(self, path: str) -> Tuple[Any, str, str]:
+    def traverse_field(self, path: str) -> tuple[Any, str, str]:
         raise NotImplementedError()
 
     def is_cross_db(self, owner_database: Optional["Database"] = None) -> bool:
@@ -309,7 +305,7 @@ class PKField(BaseCompositeField):
             **kwargs,
         )
 
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[Dict[str, Any], Any]:
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[dict[str, Any], Any]:
         pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
         pknames = cast(Sequence[str], self.owner.pknames)
         assert len(pkcolumns) >= 1
@@ -333,7 +329,7 @@ class PKField(BaseCompositeField):
             MODEL_GETATTR_BEHAVIOR.reset(token)
         return d
 
-    def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:
+    def modify_input(self, name: str, kwargs: dict[str, Any], phase: str = "") -> None:
         if name not in kwargs:
             return
         # check for collisions
@@ -345,12 +341,12 @@ class PKField(BaseCompositeField):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[Type["BaseModelType"]] = None,
+        owner: Optional[type["BaseModelType"]] = None,
         parent: Optional[BaseFieldType] = None,
     ) -> Optional[BaseFieldType]:
         return None
 
-    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         pknames = cast(Sequence[str], self.owner.pknames)
         pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
         prefix = _removesuffix(field_name, self.name)
@@ -390,7 +386,7 @@ class PKField(BaseCompositeField):
         value: Any,
         phase: str = "",
         instance: Optional["BaseModelType"] = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         pknames = cast(Sequence[str], self.owner.pknames)
         assert len(cast(Sequence[str], self.owner.pkcolumns)) >= 1
         if self.is_incomplete:
@@ -404,14 +400,14 @@ class PKField(BaseCompositeField):
             return field.to_model(pknames[0], value, phase=phase)
         return super().to_model(field_name, value, phase=phase)
 
-    def get_composite_fields(self) -> Dict[str, BaseFieldType]:
+    def get_composite_fields(self) -> dict[str, BaseFieldType]:
         return {
             field: self.owner.meta.fields[field]
             for field in cast(Sequence[str], self.owner.pknames)
         }
 
     @cached_property
-    def fieldless_pkcolumns(self) -> FrozenSet[str]:
+    def fieldless_pkcolumns(self) -> frozenset[str]:
         field_less = set()
         for colname in self.owner.pkcolumns:
             if colname not in self.owner.meta.columns_to_field:
@@ -480,5 +476,5 @@ class BaseForeignKey(RelationshipField):
         field_name: str,
         value: Any,
         phase: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         return {field_name: self.expand_relationship(value)}

@@ -72,7 +72,7 @@ class MigrationEnv:
         app = getattr(module, app_name)
         return Scaffold(path=path, app=app)
 
-    def _get_folders(self, path: Path) -> typing.List[str]:
+    def _get_folders(self, path: Path) -> list[str]:
         """
         Lists all the folders and checks if there is any file from the DISCOVERY_FILES available
         """

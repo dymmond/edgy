@@ -1,14 +1,10 @@
+from collections.abc import Sequence
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Dict,
-    List,
     Optional,
-    Sequence,
-    Tuple,
-    Type,
     Union,
     cast,
 )
@@ -53,9 +49,9 @@ class BaseForeignKeyField(BaseForeignKey):
         on_delete: str,
         related_fields: Sequence[str] = (),
         no_constraint: bool = False,
-        embed_parent: Optional[Tuple[str, str]] = None,
+        embed_parent: Optional[tuple[str, str]] = None,
         relation_fn: Optional[Callable[..., ManyRelationProtocol]] = None,
-        reverse_path_fn: Optional[Callable[[str], Tuple[Any, str, str]]] = None,
+        reverse_path_fn: Optional[Callable[[str], tuple[Any, str, str]]] = None,
         remove_referenced: bool = False,
         null: bool = False,
         **kwargs: Any,
@@ -120,18 +116,18 @@ class BaseForeignKeyField(BaseForeignKey):
             ),
         )
 
-    def traverse_field(self, path: str) -> Tuple[Any, str, str]:
+    def traverse_field(self, path: str) -> tuple[Any, str, str]:
         return self.target, self.reverse_name, _removeprefix(_removeprefix(path, self.name), "__")
 
-    def reverse_traverse_field(self, path: str) -> Tuple[Any, str, str]:
+    def reverse_traverse_field(self, path: str) -> tuple[Any, str, str]:
         if self.reverse_path_fn:
             return self.reverse_path_fn(path)
         return self.owner, self.name, _removeprefix(_removeprefix(path, self.reverse_name), "__")
 
     @cached_property
-    def related_columns(self) -> Dict[str, Optional[sqlalchemy.Column]]:
+    def related_columns(self) -> dict[str, Optional[sqlalchemy.Column]]:
         target = self.target
-        columns: Dict[str, Optional[sqlalchemy.Column]] = {}
+        columns: dict[str, Optional[sqlalchemy.Column]] = {}
         if self.related_fields:
             for field_name in self.related_fields:
                 if field_name in target.meta.fields:
@@ -172,8 +168,8 @@ class BaseForeignKeyField(BaseForeignKey):
         instance.identifying_db_fields = related_columns
         return instance
 
-    def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
-        retdict: Dict[str, Any] = {}
+    def clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
+        retdict: dict[str, Any] = {}
         column_names = self.owner.meta.field_to_column_names[name]
         assert len(column_names) >= 1
         if value is None:
@@ -196,7 +192,7 @@ class BaseForeignKeyField(BaseForeignKey):
             raise ValueError(f"cannot handle: {value} of type {type(value)}")
         return retdict
 
-    def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:
+    def modify_input(self, name: str, kwargs: dict[str, Any], phase: str = "") -> None:
         column_names = self.get_column_names(name)
         assert len(column_names) >= 1
         if len(column_names) == 1:
@@ -286,7 +282,7 @@ class BaseForeignKeyField(BaseForeignKey):
         schemes: Sequence[str] = (),
         no_constraint: Optional[bool] = None,
     ) -> Sequence[Union[sqlalchemy.Constraint, sqlalchemy.Index]]:
-        constraints: List[Union[sqlalchemy.Constraint, sqlalchemy.Index]] = []
+        constraints: list[Union[sqlalchemy.Constraint, sqlalchemy.Index]] = []
         no_constraint = bool(
             no_constraint
             or self.no_constraint
@@ -330,13 +326,13 @@ class ForeignKey(ForeignKeyFieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        to: Union[Type["BaseModelType"], str],
+        to: Union[type["BaseModelType"], str],
         **kwargs: Any,
     ) -> BaseFieldType:
         return super().__new__(cls, to=to, **kwargs)
 
     @classmethod
-    def validate(cls, kwargs: Dict[str, Any]) -> None:
+    def validate(cls, kwargs: dict[str, Any]) -> None:
         super().validate(kwargs)
         embed_parent = kwargs.get("embed_parent")
         if embed_parent and "__" in embed_parent[1]:

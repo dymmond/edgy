@@ -59,3 +59,5 @@ In the registry you specify a main database (which is here None) and via the ext
 The extra databases can be selected via their name while the main can be selected by `None`.
 
 This controls from which database the models are reflected. This is useful to extract data from other databases and to use it in the main application.
+
+By default the autoreflection only uses the main databases.

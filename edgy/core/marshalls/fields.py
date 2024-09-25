@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Dict, Union
+from typing import Any, ClassVar, Union
 
 from pydantic.fields import FieldInfo
 
@@ -45,7 +45,7 @@ class MarshallMethodField(BaseMarshallField):
     def __init__(
         self,
         field_type: type,
-        **kwargs: Dict[str, Any],
+        **kwargs: dict[str, Any],
     ) -> None:
         kwargs.pop("default", None)
         kwargs.pop("source", None)
@@ -58,7 +58,7 @@ class MarshallField(BaseMarshallField):
         self,
         field_type: type,
         source: Union[str, None] = None,
-        **kwargs: Dict[str, Any],
+        **kwargs: dict[str, Any],
     ) -> None:
         kwargs.pop("default", None)
         kwargs.pop("allow_null", None)

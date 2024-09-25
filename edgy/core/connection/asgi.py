@@ -1,17 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict
+from typing import TYPE_CHECKING, Any, Callable
 
 if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
 
 ASGIApp = Callable[
     [
-        Dict[str, Any],
-        Callable[[], Awaitable[Dict[str, Any]]],
-        Callable[[Dict[str, Any]], Awaitable[None]],
+        dict[str, Any],
+        Callable[[], Awaitable[dict[str, Any]]],
+        Callable[[dict[str, Any]], Awaitable[None]],
     ],
     Awaitable[None],
 ]
@@ -29,14 +30,14 @@ class ASGIHelper:
 
     async def __call__(
         self,
-        scope: Dict[str, Any],
-        receive: Callable[[], Awaitable[Dict[str, Any]]],
-        send: Callable[[Dict[str, Any]], Awaitable[None]],
+        scope: dict[str, Any],
+        receive: Callable[[], Awaitable[dict[str, Any]]],
+        send: Callable[[dict[str, Any]], Awaitable[None]],
     ) -> None:
         if scope["type"] == "lifespan":
             original_receive = receive
 
-            async def receive() -> Dict[str, Any]:
+            async def receive() -> dict[str, Any]:
                 message = await original_receive()
                 if message["type"] == "lifespan.startup":
                     try:
