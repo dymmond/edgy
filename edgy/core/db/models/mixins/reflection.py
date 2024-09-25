@@ -93,7 +93,7 @@ class ReflectedModelMixin:
             registry = registry.database
         try:
             async with registry as database:
-                table = await database.run_sync(execute_reflection)  # type: ignore
+                table: sqlalchemy.Table = await database.run_sync(execute_reflection)
         except Exception as e:
             raise ImproperlyConfigured(detail=str(e)) from e
         unsupported_fields = cls.fields_not_supported_by_table(table)
