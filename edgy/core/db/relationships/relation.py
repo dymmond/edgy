@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any, Literal, Optional, Sequence, Tuple, Type, Union, cast
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
@@ -40,8 +41,8 @@ class ManyRelation(ManyRelationProtocol):
         *,
         from_foreign_key: str,
         to_foreign_key: str,
-        to: Type["BaseModelType"],
-        through: Type["BaseModelType"],
+        to: type["BaseModelType"],
+        through: type["BaseModelType"],
         reverse: bool = False,
         embed_through: Union[Literal[False], str] = "",
         refs: Any = (),
@@ -202,8 +203,8 @@ class SingleRelation(ManyRelationProtocol):
         self,
         *,
         to_foreign_key: str,
-        to: Type["BaseModelType"],
-        embed_parent: Optional[Tuple[str, str]] = None,
+        to: type["BaseModelType"],
+        embed_parent: Optional[tuple[str, str]] = None,
         refs: Any = (),
         instance: Optional["BaseModelType"] = None,
         **kwargs: Any,

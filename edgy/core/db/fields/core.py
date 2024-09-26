@@ -3,8 +3,10 @@ import decimal
 import enum
 import ipaddress
 import uuid
+from collections.abc import Sequence
 from enum import EnumMeta
-from typing import TYPE_CHECKING, Any, Dict, Optional, Pattern, Sequence, Tuple, Union
+from re import Pattern
+from typing import TYPE_CHECKING, Any, Optional, Union
 
 import pydantic
 import sqlalchemy
@@ -52,7 +54,7 @@ class CharField(FieldFactory, str):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def validate(cls, kwargs: Dict[str, Any]) -> None:
+    def validate(cls, kwargs: dict[str, Any]) -> None:
         max_length = kwargs.get("max_length", 0)
         if max_length <= 0:
             raise FieldDefinitionError(detail=f"'max_length' is required for {cls.__name__}")
@@ -158,6 +160,12 @@ class BigIntegerField(IntegerField):
     """Representation of big integer field"""
 
     @classmethod
+    def validate(cls, kwargs: dict[str, Any]) -> None:
+        super().validate(kwargs)
+        if kwargs.get("autoincrement", False):
+            kwargs.setdefault("skip_reflection_type_check", True)
+
+    @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         # sqlite special we cannot have a big IntegerField as PK
         if kwargs.get("autoincrement"):
@@ -201,7 +209,7 @@ class DecimalField(FieldFactory, decimal.Decimal):
         )
 
     @classmethod
-    def validate(cls, kwargs: Dict[str, Any]) -> None:
+    def validate(cls, kwargs: dict[str, Any]) -> None:
         super().validate(kwargs)
 
         max_digits = kwargs.get("max_digits")
@@ -283,7 +291,7 @@ class TimezonedField:
         field_name: str,
         value: Any,
         phase: str = "",
-    ) -> Dict[str, Optional[Union[datetime.datetime, datetime.date]]]:
+    ) -> dict[str, Optional[Union[datetime.datetime, datetime.date]]]:
         """
         Convert input object to datetime
         """
@@ -349,7 +357,7 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         cls,
         field_obj: Field,
         field_name: str,
-        cleaned_data: Dict[str, Any],
+        cleaned_data: dict[str, Any],
         is_update: bool = False,
         original_fn: Any = None,
     ) -> Any:
@@ -456,8 +464,8 @@ class ChoiceField(FieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        choices: Optional[Sequence[Union[Tuple[str, str], Tuple[str, int]]]] = None,
-        **kwargs: Dict[str, Any],
+        choices: Optional[Sequence[Union[tuple[str, str], tuple[str, int]]]] = None,
+        **kwargs: dict[str, Any],
     ) -> BaseFieldType:
         kwargs = {
             **kwargs,
@@ -466,7 +474,7 @@ class ChoiceField(FieldFactory):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def validate(cls, kwargs: Dict[str, Any]) -> None:
+    def validate(cls, kwargs: dict[str, Any]) -> None:
         choice_class = kwargs.get("choices")
         if choice_class is None or not isinstance(choice_class, EnumMeta):
             raise FieldDefinitionError("ChoiceField choices must be an Enum")

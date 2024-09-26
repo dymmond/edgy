@@ -64,15 +64,18 @@ def file_move_safe(
     except OSError:
         pass
 
-    with open(old_file_name, "rb") as old_file, os.open(
-        new_file_name,
-        (
-            os.O_WRONLY
-            | os.O_CREAT
-            | getattr(os, "O_BINARY", 0)
-            | (os.O_EXCL if not allow_overwrite else 0)
-        ),
-    ) as fd:
+    with (
+        open(old_file_name, "rb") as old_file,
+        os.open(
+            new_file_name,
+            (
+                os.O_WRONLY
+                | os.O_CREAT
+                | getattr(os, "O_BINARY", 0)
+                | (os.O_EXCL if not allow_overwrite else 0)
+            ),
+        ) as fd,
+    ):
         locks.lock(fd, locks.LOCK_EX)
         while True:
             current_chunk = old_file.read(chunk_size)

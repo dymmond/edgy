@@ -892,5 +892,31 @@ run_sync(User.query.create(name="Edgy"))
 
 And that is it! You can now run all queries synchronously within any framework, literally.
 
+## Cross database queries
+
+Suppose you have a chain of db1 -> db2 -> db3. Give you specified foreign keys queries across them is as easy as:
+
+`fk_to_db2__fk_to_db3=value`
+
+There is a performance penalty doing so because we have to load the whole matching values of db3 to calculate the values of db2 and then to use the values to filter the original query but this works.
+
+Under the hood dynamic queries are used.
+
+## Dynamic queries
+
+Instead of providing a value to filter, it is also possible to provide a sync/async function which takes
+as positional argument the current queryset.
+
+The returned value is now used.
+
+This works for edgy style as well as SQLALchemy style queries.
+
+Note: sqlalchemy provides a similar functionality which does not take an argument. Also it is sync only.
+It is called lambda statement.
+
+
+
+
 [model]: ../models.md
 [managers]: ../managers.md
+[lambda statements](https://docs.sqlalchemy.org/en/20/core/sqlelement.html#sqlalchemy.sql.expression.lambda_stmt)

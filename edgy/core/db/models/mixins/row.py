@@ -1,5 +1,6 @@
 import asyncio
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set, Type
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Optional
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.models.utils import apply_instance_extras
@@ -21,7 +22,7 @@ class ModelRowMixin:
 
     @classmethod
     async def from_sqla_row(
-        cls: Type["Model"],
+        cls: type["Model"],
         row: "Row",
         select_related: Optional[Sequence[Any]] = None,
         prefetch_related: Optional[Sequence["Prefetch"]] = None,
@@ -48,10 +49,10 @@ class ModelRowMixin:
 
         :return: Model class.
         """
-        item: Dict[str, Any] = {}
+        item: dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
-        secret_columns: Set[str] = set()
+        secret_columns: set[str] = set()
         if exclude_secrets:
             for name in cls.meta.secret_fields:
                 secret_columns.update(cls.meta.field_to_column_names[name])
@@ -182,7 +183,7 @@ class ModelRowMixin:
         """
         Build a cache key for the model.
         """
-        pk_key_list: List[Any] = [cls.__name__]
+        pk_key_list: list[Any] = [cls.__name__]
         for attr in cls.pkcolumns:
             try:
                 pk_key_list.append(str(row._mapping[getattr(cls.table.columns, attr)]))

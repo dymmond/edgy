@@ -1,5 +1,3 @@
-from typing import Type
-
 import pytest
 
 from edgy.core.db.fields import (
@@ -74,10 +72,10 @@ def test_deleting_fields():
             abstract = True
 
     class ConcreteModel1(AbstractModel):
-        last_name: Type[None] = ExcludeField()
+        last_name: type[None] = ExcludeField()
 
     class ConcreteModel2(ConcreteModel1):
-        first_name: Type[None] = ExcludeField()
+        first_name: type[None] = ExcludeField()
 
     assert ConcreteModel1.meta.fields["first_name"].max_length == 255
     model1 = ConcreteModel1(first_name="edgy", last_name="edgy")

@@ -129,13 +129,13 @@ you can set the class variable:
 
 We have now a method:
 
-`model.copy_edgy_model(registry=None)`
+`model.copy_edgy_model(registry=None, name="")`
 
 to copy a model class and optionally add it to an other registry.
 
 You can add it to a registry later by using:
 
-`model_class.add_to_registry(registry)`
+`model_class.add_to_registry(registry, name="")`
 
 In fact the last method is called when the registry parameter of `copy_edgy_model` is not `None`.
 

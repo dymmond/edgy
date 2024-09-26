@@ -2,7 +2,7 @@ import os
 import pathlib
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, List, Tuple, TypeVar, Union
+from typing import Any, TypeVar, Union
 
 from edgy.core.files.base import ContentFile, File
 from edgy.exceptions import SuspiciousFileOperation
@@ -169,7 +169,7 @@ class Storage(ABC):
         """
 
     @abstractmethod
-    def listdir(self, path: str) -> Tuple[List[str], List[str]]:
+    def listdir(self, path: str) -> tuple[list[str], list[str]]:
         """
         List the contents of the specified path. Return a 2-tuple of lists:
         the first item being directories, the second item being files.

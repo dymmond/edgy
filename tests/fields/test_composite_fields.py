@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from pydantic import BaseModel
@@ -42,7 +42,7 @@ class MyModel2(edgy.Model):
 class MyModelEmbedded(edgy.Model):
     first_name: str = edgy.CharField(max_length=255)
     last_name: str = edgy.CharField(max_length=255, skip_absorption_check=True)
-    embedded: Dict[str, Any] = edgy.CompositeField(
+    embedded: dict[str, Any] = edgy.CompositeField(
         inner_fields=[
             ("first_name", edgy.CharField(max_length=255, exclude=True)),
             ("last_name", edgy.CharField(max_length=255, exclude=True)),
@@ -58,7 +58,7 @@ class MyModelEmbedded(edgy.Model):
 class MyModelEmbedded2(edgy.Model):
     first_name: str = edgy.CharField(max_length=255)
     last_name: str = edgy.CharField(max_length=255, skip_absorption_check=True)
-    embedded: Dict[str, Any] = edgy.CompositeField(
+    embedded: dict[str, Any] = edgy.CompositeField(
         inner_fields=[
             ("first_name", edgy.CharField(max_length=255, exclude=True)),
             ("last_name", edgy.CharField(max_length=255, exclude=True)),
@@ -234,7 +234,7 @@ def test_dump_composite_model():
 
 def test_inheritance():
     class AbstractModel(edgy.Model):
-        composite: Dict[str, Any] = edgy.CompositeField(
+        composite: dict[str, Any] = edgy.CompositeField(
             inner_fields=[
                 ("first_name", edgy.CharField(max_length=255)),
                 ("last_name", edgy.CharField(max_length=255)),
@@ -246,7 +246,7 @@ def test_inheritance():
             abstract = True
 
     class ConcreteModel1(AbstractModel):
-        composite: Dict[str, Any] = edgy.CompositeField(
+        composite: dict[str, Any] = edgy.CompositeField(
             inner_fields=[
                 ("first_name", edgy.CharField(max_length=255)),
                 ("last_name", edgy.CharField(max_length=51)),
@@ -257,7 +257,7 @@ def test_inheritance():
     assert ConcreteModel1.meta.fields["last_name"].max_length == 51
 
     class ConcreteModel2(AbstractModel):
-        composite2: Dict[str, Any] = edgy.CompositeField(
+        composite2: dict[str, Any] = edgy.CompositeField(
             inner_fields=[
                 ("first_name", edgy.CharField(max_length=255)),
                 ("last_name", edgy.CharField(max_length=50)),
@@ -269,7 +269,7 @@ def test_inheritance():
     assert ConcreteModel2.meta.fields["last_name"].max_length == 255
 
     class ConcreteModel3(AbstractModel):
-        composite3: Dict[str, Any] = edgy.CompositeField(
+        composite3: dict[str, Any] = edgy.CompositeField(
             inner_fields=[
                 ("first_name", edgy.CharField(max_length=255)),
                 ("last_name", edgy.CharField(max_length=50)),

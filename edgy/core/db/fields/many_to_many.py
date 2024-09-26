@@ -1,13 +1,10 @@
+from collections.abc import Sequence
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
-    Dict,
     Literal,
     Optional,
-    Sequence,
-    Tuple,
-    Type,
     Union,
     cast,
 )
@@ -62,7 +59,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         to_foreign_key: str = "",
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
-        through: Union[str, Type["BaseModelType"]] = "",
+        through: Union[str, type["BaseModelType"]] = "",
         embed_through: Union[str, Literal[False]] = "",
         **kwargs: Any,
     ) -> None:
@@ -113,7 +110,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             **kwargs,
         )
 
-    def traverse_field(self, path: str) -> Tuple[Any, str, str]:
+    def traverse_field(self, path: str) -> tuple[Any, str, str]:
         if self.embed_through_prefix and path.startswith(self.embed_through_prefix):
             return (
                 self.through,
@@ -122,7 +119,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             )
         return self.to, self.reverse_name, _removeprefixes(path, self.name, "__")
 
-    def reverse_traverse_field_fk(self, path: str) -> Tuple[Any, str, str]:
+    def reverse_traverse_field_fk(self, path: str) -> tuple[Any, str, str]:
         # used for target fk
         if self.reverse_embed_through_prefix and path.startswith(
             self.reverse_embed_through_prefix
@@ -144,7 +141,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         from edgy.core.db.models.metaclasses import MetaInfo
 
         self.to = self.target
-        __bases__: Tuple[Type[BaseModelType], ...] = ()
+        __bases__: tuple[type[BaseModelType], ...] = ()
         pknames = set()
         if self.through:
             if isinstance(self.through, str):
@@ -259,7 +256,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         field_name: str,
         value: Any,
         phase: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Meta field
         """
@@ -280,7 +277,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         return False
 
     def get_default_values(
-        self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool = False
+        self, field_name: str, cleaned_data: dict[str, Any], is_update: bool = False
     ) -> Any:
         """
         Meta field
@@ -320,7 +317,7 @@ class ManyToManyField(ForeignKeyFieldFactory):
         )
 
     @classmethod
-    def validate(cls, kwargs: Dict[str, Any]) -> None:
+    def validate(cls, kwargs: dict[str, Any]) -> None:
         super().validate(kwargs)
         embed_through = kwargs.get("embed_through")
         if embed_through and "__" in embed_through:

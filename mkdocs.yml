@@ -74,7 +74,9 @@ nav:
   - Core:
       - Models: "models.md"
       - Declarative Models: "declarative-models.md"
-      - Reflection: "reflection.md"
+      - Reflection:
+          - Reflection: "reflection.md"
+          - Automatic Reflection: "autoreflection.md"
       - Embedding: "embedding.md"
       - Managers: "managers.md"
       - Fields: "fields.md"

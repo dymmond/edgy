@@ -1,5 +1,6 @@
+from collections.abc import Sequence
 from functools import lru_cache, partial
-from typing import Any, Dict, FrozenSet, Literal, Sequence, Set, Union, cast
+from typing import Any, Literal, Union, cast
 
 from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL
 from edgy.core.db.fields.base import Field
@@ -8,7 +9,7 @@ from edgy.exceptions import FieldDefinitionError
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
-default_methods_overwritable_by_factory: Set[str] = {
+default_methods_overwritable_by_factory: set[str] = {
     key
     for key, attr in BaseFieldType.__dict__.items()
     if callable(attr) and not key.startswith("_")
@@ -56,7 +57,7 @@ class FieldFactory(metaclass=FieldFactoryMeta):
 
     field_bases: Sequence[Any] = (Field,)
     field_type: Any = None
-    methods_overwritable_by_factory: FrozenSet[str] = frozenset(
+    methods_overwritable_by_factory: frozenset[str] = frozenset(
         default_methods_overwritable_by_factory
     )
 
@@ -118,7 +119,7 @@ class FieldFactory(metaclass=FieldFactoryMeta):
                     )
 
     @classmethod
-    def validate(cls, kwargs: Dict[str, Any]) -> None:  # pragma no cover
+    def validate(cls, kwargs: dict[str, Any]) -> None:  # pragma no cover
         """
         Used to validate if all required parameters on a given field type are set and modify them if needed.
         :param kwargs: dict with all params passed during construction
@@ -170,7 +171,7 @@ class ForeignKeyFieldFactory(FieldFactory):
         return cls.build_field(**kwargs)
 
     @classmethod
-    def validate(cls, kwargs: Dict[str, Any]) -> None:
+    def validate(cls, kwargs: dict[str, Any]) -> None:
         """default validation useful for one_to_one and foreign_key"""
         on_update = kwargs.get("on_update", CASCADE)
         on_delete = kwargs.get("on_delete", RESTRICT)

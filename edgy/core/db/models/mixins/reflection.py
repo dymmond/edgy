@@ -1,11 +1,4 @@
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    ClassVar,
-    Optional,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, Union, cast
 
 import sqlalchemy
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
@@ -41,6 +34,27 @@ class ReflectedModelMixin:
 
         tablename: str = cast("str", cls.meta.tablename)
         return run_sync(cls.reflect(registry, tablename, metadata, schema_name))
+
+    @classmethod
+    def fields_not_supported_by_table(
+        cls, table: sqlalchemy.Table, check_type: bool = True
+    ) -> set[str]:
+        """Check if the model fields are a subset of the table."""
+        field_names = set()
+        for field_name, field in cls.meta.fields.items():
+            field_has_typing_check = not field.skip_reflection_type_check and check_type
+            for column in cls.meta.field_to_columns[field_name]:
+                if (
+                    # string not in is not supported by sqlalchemy
+                    table.columns.get(column.key) is None
+                    or (
+                        field_has_typing_check
+                        and column.type.__class__ != table.columns[column.key].type.__class__
+                    )
+                ):
+                    field_names.add(field_name)
+
+        return field_names
 
     @classmethod
     async def reflect(
@@ -83,7 +97,14 @@ class ReflectedModelMixin:
             registry = registry.database
         try:
             async with registry as database:
-                with database.force_rollback(False):
-                    return await database.run_sync(execute_reflection)  # type: ignore
+                table: sqlalchemy.Table = await database.run_sync(execute_reflection)
         except Exception as e:
             raise ImproperlyConfigured(detail=str(e)) from e
+        unsupported_fields = cls.fields_not_supported_by_table(table)
+        if unsupported_fields:
+            raise ImproperlyConfigured(
+                "Following fields have columns not matching the table specification:",
+                ", ".join(unsupported_fields),
+            )
+
+        return table

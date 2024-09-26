@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Type, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from edgy.conf import settings
 from edgy.conf.module_import import import_string
@@ -15,12 +15,12 @@ class StorageHandler:
     of the system.
     """
 
-    def __init__(self, backends: Union[Dict[str, Any], None] = None) -> None:
+    def __init__(self, backends: Union[dict[str, Any], None] = None) -> None:
         self._backends = backends
-        self._storages: Dict[str, Storage] = {}
+        self._storages: dict[str, Storage] = {}
 
     @cached_property
-    def backends(self) -> Dict[str, Any]:
+    def backends(self) -> dict[str, Any]:
         if self._backends is None:
             self._backends = settings.storages.copy()
         return self._backends
@@ -51,7 +51,7 @@ class StorageHandler:
         self._storages[alias] = storage
         return storage
 
-    def create_storage(self, params: Dict[str, Any]) -> "Storage":
+    def create_storage(self, params: dict[str, Any]) -> "Storage":
         """
         Create a storage instance based on the provided parameters.
 
@@ -68,7 +68,7 @@ class StorageHandler:
         options = params.pop("options", {})
 
         try:
-            storage_cls: Type[Storage] = import_string(backend)
+            storage_cls: type[Storage] = import_string(backend)
         except ImportError as e:
             raise InvalidStorageError(f"Could not find backend {backend!r}: {e}") from e
         return storage_cls(**options)

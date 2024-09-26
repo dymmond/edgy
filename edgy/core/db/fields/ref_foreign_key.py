@@ -1,6 +1,6 @@
 import typing
 from inspect import isclass
-from typing import TYPE_CHECKING, Any, Dict, Optional, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 from typing_extensions import get_origin
 
@@ -24,7 +24,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         cls,
         field_obj: "BaseFieldType",
         name: str,
-        kwargs: Dict[str, Any],
+        kwargs: dict[str, Any],
         phase: str = "",
         original_fn: Any = None,
     ) -> None:
@@ -36,7 +36,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[Type["BaseModelType"]] = None,
+        owner: Optional[type["BaseModelType"]] = None,
         parent: Optional["BaseFieldType"] = None,
     ) -> Optional["BaseFieldType"]:
         return None

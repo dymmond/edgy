@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Set, Type, TypeVar, cast
+from collections.abc import Iterable
+from typing import TYPE_CHECKING, Any, Optional, TypeVar, cast
 
 if TYPE_CHECKING:
     from sqlalchemy import Table
@@ -23,7 +24,7 @@ def build_pknames(model_class: Any) -> None:
     Set explicit pknames (field names with primary_key=True set)
     """
     meta = model_class.meta
-    pknames: Set[str] = set()
+    pknames: set[str] = set()
     for field_name, field in meta.fields.items():
         if field.primary_key:
             pknames.add(field_name)
@@ -35,7 +36,7 @@ def build_pkcolumns(model_class: Any) -> None:
     Set pkcolumns (columns with primary_key set)
     """
     table = model_class.table
-    pkcolumns: Set[str] = set()
+    pkcolumns: set[str] = set()
     for column in table.columns:
         if column.primary_key:
             # key is the sqlalchemy name, in our case name and key should be identically
@@ -53,7 +54,7 @@ _model_type = TypeVar("_model_type", bound="BaseModelType")
 
 def apply_instance_extras(
     model: _model_type,
-    model_class: Type["BaseModelType"],
+    model_class: type["BaseModelType"],
     schema: Optional[str] = None,
     database: Optional["Database"] = None,
     table: Optional["Table"] = None,

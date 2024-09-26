@@ -6,13 +6,11 @@ from logging.config import fileConfig
 from typing import Any, Optional
 
 from alembic import context
-from databasez import DatabaseURL
 from rich.console import Console
-from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import create_async_engine
 
 from edgy.cli.constants import APP_PARAMETER
 from edgy.cli.env import MigrationEnv
+from edgy.core.connection import Database
 from edgy.exceptions import EdgyException
 
 # The console used for the outputs
@@ -79,16 +77,16 @@ def get_metadata() -> Any:
 
 
 def run_migrations_offline() -> Any:
-    """Run migrations in 'offline' mode.
+    """
+    Run migrations in 'offline' mode.
 
     This configures the context with just a URL
     and not an Engine, though an Engine is acceptable
-    here as well.  By skipping the Engine creation
+    here as well. By skipping the Engine creation
     we don't even need a DBAPI to be available.
 
     Calls to context.execute() here emit the given string to the
     script output.
-
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(url=url, target_metadata=get_metadata(), literal_binds=True)
@@ -120,26 +118,20 @@ def do_run_migrations(connection: Any) -> Any:
 
 
 async def run_migrations_online() -> Any:
-    """Run migrations in 'online' mode.
+    """
+    Run migrations in 'online' mode.
 
     In this scenario we need to create an Engine
     and associate a connection with the context.
 
     """
-    database_url = DatabaseURL(get_engine_url())
-    is_async = database_url.sqla_url.get_dialect(True).is_async
-
-    if is_async:
-        connectable = create_async_engine(database_url._url)
-        async with connectable.connect() as connection:
-            await connection.run_sync(do_run_migrations)
-    else:
-        connectable = create_engine(database_url._url)  # type: ignore
-        with connectable.connect() as connection:
-            do_run_migrations(connection)
+    # the original script checked for the async compatibilit
+    # we are only compatible with async drivers so just use Database
+    async with Database(get_engine_url()) as database:
+        await database.run_sync(do_run_migrations)
 
 
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    asyncio.get_event_loop().run_until_complete(run_migrations_online())
+    asyncio.run(run_migrations_online())

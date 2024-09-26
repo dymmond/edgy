@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, Type, Union
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, Optional, Union
 
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 
@@ -8,7 +8,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 class RelationshipCrawlResult(NamedTuple):
-    model_class: Type["BaseModelType"]
+    model_class: type["BaseModelType"]
     field_name: str
     operator: Optional[str]
     forward_path: str
@@ -17,7 +17,7 @@ class RelationshipCrawlResult(NamedTuple):
 
 
 def crawl_relationship(
-    model_class: Type["BaseModelType"],
+    model_class: type["BaseModelType"],
     path: str,
     *,
     model_database: Optional["Database"] = None,

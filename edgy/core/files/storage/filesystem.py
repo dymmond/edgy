@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timezone
 from functools import cached_property
 from threading import Lock
-from typing import Any, BinaryIO, Dict, List, Tuple, Union, cast
+from typing import Any, BinaryIO, Union, cast
 from urllib.parse import urljoin
 
 from edgy.conf import settings
@@ -29,7 +29,7 @@ class FileSystemStorage(Storage):
         self._file_permissions_mode = file_permissions_mode
         self._directory_permissions_mode = directory_permissions_mode
         self._name_lock = Lock()
-        self._name_dict: Dict[str, datetime] = {}
+        self._name_dict: dict[str, datetime] = {}
 
     def reserve_name(self, name: str) -> bool:
         with self._name_lock:
@@ -209,7 +209,7 @@ class FileSystemStorage(Storage):
         """
         return os.path.lexists(self.path(name))
 
-    def listdir(self, path: str) -> Tuple[List[str], List[str]]:
+    def listdir(self, path: str) -> tuple[list[str], list[str]]:
         """
         List directories and files in the given path.
 

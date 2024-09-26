@@ -2,7 +2,7 @@
 All functional common to Edgy
 """
 
-from typing import Any, Dict, Tuple, Type, Union
+from typing import Any, Union
 
 from pydantic.fields import FieldInfo
 
@@ -14,8 +14,8 @@ edgy_setattr = object.__setattr__
 
 
 def extract_field_annotations_and_defaults(
-    attrs: Dict[Any, Any], base_type: Union[Type[FieldInfo], Type[BaseFieldType]] = BaseFieldType
-) -> Tuple[Dict[Any, Any], Dict[Any, Any]]:
+    attrs: dict[Any, Any], base_type: Union[type[FieldInfo], type[BaseFieldType]] = BaseFieldType
+) -> tuple[dict[Any, Any], dict[Any, Any]]:
     """
     Extracts annotations from class namespace dict and triggers
     extraction of ormar model_fields.
@@ -27,8 +27,8 @@ def extract_field_annotations_and_defaults(
 
 
 def get_model_fields(
-    attrs: Union[Dict, Any], base_type: Union[Type[FieldInfo], Type[BaseFieldType]] = BaseFieldType
-) -> Dict:
+    attrs: Union[dict, Any], base_type: Union[type[FieldInfo], type[BaseFieldType]] = BaseFieldType
+) -> dict:
     """
     Gets all the fields in current model class that are Edgy Fields.
     """
@@ -36,8 +36,8 @@ def get_model_fields(
 
 
 def populate_pydantic_default_values(
-    attrs: Dict, base_type: Union[Type[FieldInfo], Type[BaseFieldType]] = BaseFieldType
-) -> Tuple[Dict, Dict]:
+    attrs: dict, base_type: Union[type[FieldInfo], type[BaseFieldType]] = BaseFieldType
+) -> tuple[dict, dict]:
     """
     Making sure the fields from Edgy are the ones being validated by Edgy models
     and delegates the validations from pydantic to that functionality.

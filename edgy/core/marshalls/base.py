@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, ClassVar, Dict
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
@@ -22,7 +22,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
     model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True)
 
     __show_pk__: ClassVar[bool] = False
-    __custom_fields__: ClassVar[Dict[str, BaseMarshallField]] = {}
+    __custom_fields__: ClassVar[dict[str, BaseMarshallField]] = {}
 
     def __init__(self, /, **data: Any) -> None:
         super().__init__(**data)
@@ -118,7 +118,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
                 # bypass __setattr__ method
                 object.__setattr__(self, pk_attribute, getattr(instance, pk_attribute))
 
-    def _get_fields(self) -> Dict[str, Any]:
+    def _get_fields(self) -> dict[str, Any]:
         return self.model_fields.copy()
 
     @property

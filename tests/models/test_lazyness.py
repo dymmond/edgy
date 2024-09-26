@@ -35,10 +35,10 @@ def test_control_lazyness():
     # test basics
     assert User.meta is models.get_model("User").meta
     # initial
-    assert not BaseUser.meta._is_init
-    assert User.meta._is_init
+    assert not BaseUser.meta._fields_are_initialized
+    assert User.meta._fields_are_initialized
     assert "name" not in User.meta.columns_to_field.data
-    assert Product.meta._is_init
+    assert Product.meta._fields_are_initialized
     assert "rating" not in Product.meta.columns_to_field.data
 
     # init pk stuff
@@ -49,9 +49,9 @@ def test_control_lazyness():
     # invalidate
     models.invalidate_models()
     assert User.meta is models.get_model("User").meta
-    assert not User.meta._is_init
+    assert not User.meta._fields_are_initialized
     assert "name" not in User.meta.columns_to_field.data
-    assert not Product.meta._is_init
+    assert not Product.meta._fields_are_initialized
     assert "rating" not in Product.meta.columns_to_field.data
 
     models.init_models(init_column_mappers=False, init_class_attrs=False)

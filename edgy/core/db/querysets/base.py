@@ -1,24 +1,15 @@
 import asyncio
 import copy
 import warnings
+from collections.abc import AsyncIterator, Awaitable, Generator, Iterable, Sequence
 from collections.abc import Iterable as CollectionsIterable
 from functools import cached_property
 from inspect import isawaitable
 from typing import (
     TYPE_CHECKING,
     Any,
-    AsyncIterator,
-    Awaitable,
     Callable,
-    Dict,
-    Generator,
-    Iterable,
-    List,
     Optional,
-    Sequence,
-    Set,
-    Tuple,
-    Type,
     Union,
     cast,
 )
@@ -62,12 +53,12 @@ generic_field = BaseField()
 
 
 def clean_query_kwargs(
-    model_class: Type[BaseModelType],
-    kwargs: Dict[str, Any],
-    embed_parent: Optional[Tuple[str, str]] = None,
+    model_class: type[BaseModelType],
+    kwargs: dict[str, Any],
+    embed_parent: Optional[tuple[str, str]] = None,
     model_database: Optional["Database"] = None,
-) -> Dict[str, Any]:
-    new_kwargs: Dict[str, Any] = {}
+) -> dict[str, Any]:
+    new_kwargs: dict[str, Any] = {}
     for key, val in kwargs.items():
         if embed_parent:
             if embed_parent[1] and key.startswith(embed_parent[1]):
@@ -105,7 +96,7 @@ class BaseQuerySet(
 
     def __init__(
         self,
-        model_class: Union[Type[BaseModelType], None] = None,
+        model_class: Union[type[BaseModelType], None] = None,
         database: Union["Database", None] = None,
         filter_clauses: Any = None,
         or_clauses: Any = None,
@@ -170,7 +161,7 @@ class BaseQuerySet(
         return expression
 
     async def _resolve_clause_args(self, args: Any) -> Any:
-        result: List[Any] = []
+        result: list[Any] = []
         for arg in args:
             result.append(_parse_clause_arg(arg, self))
         if self.database.force_rollback:
@@ -282,8 +273,8 @@ class BaseQuerySet(
             raise QuerySetError("You cannot use .only() and .defer() at the same time.")
 
     def _secret_recursive_names(
-        self, model_class: Any, columns: Union[List[str], None] = None
-    ) -> List[str]:
+        self, model_class: Any, columns: Union[list[str], None] = None
+    ) -> list[str]:
         """
         Recursively gets the names of the fields excluding the secrets.
         """
@@ -393,10 +384,11 @@ class BaseQuerySet(
             field = model_class.meta.fields.get(field_name, generic_field)
             if cross_db_remainder:
                 assert field is not generic_field
+                fk_field = cast(BaseForeignKey, field)
                 sub_query = (
-                    field.target.query.filter(**{cross_db_remainder: value})
-                    .only(*field.related_columns.keys())
-                    .values_list(fields=field.related_columns.keys())
+                    fk_field.target.query.filter(**{cross_db_remainder: value})
+                    .only(*fk_field.related_columns.keys())
+                    .values_list(fields=fk_field.related_columns.keys())
                 )
 
                 # bind local vars
@@ -499,7 +491,7 @@ class BaseQuerySet(
 
     async def _embed_parent_in_result(
         self, result: Union[EdgyModel, Awaitable[EdgyModel]]
-    ) -> Tuple[EdgyModel, Any]:
+    ) -> tuple[EdgyModel, Any]:
         if isawaitable(result):
             result = await result
         if not self.embed_parent:
@@ -519,7 +511,7 @@ class BaseQuerySet(
 
     async def _get_or_cache_row(
         self, row: Any, extra_attr: str = "", raw: bool = False
-    ) -> Tuple[EdgyModel, EdgyModel]:
+    ) -> tuple[EdgyModel, EdgyModel]:
         is_only_fields = bool(self._only)
         is_defer_fields = bool(self._defer)
         raw_result, result = (
@@ -592,8 +584,8 @@ class BaseQuerySet(
         if not keep_result_cache:
             self._cache.clear()
         self._cache_count: Optional[int] = None
-        self._cache_first: Optional[Tuple[BaseModelType, BaseModelType]] = None
-        self._cache_last: Optional[Tuple[BaseModelType, BaseModelType]] = None
+        self._cache_first: Optional[tuple[BaseModelType, BaseModelType]] = None
+        self._cache_last: Optional[tuple[BaseModelType, BaseModelType]] = None
         # fetch all is in cache
         self._cache_fetch_all: bool = False
         # get current row during iteration. Used for prefetching.
@@ -602,11 +594,11 @@ class BaseQuerySet(
 
     async def _handle_batch(
         self, batch: Sequence[sqlalchemy.Row], queryset: "BaseQuerySet"
-    ) -> Sequence[Tuple[BaseModelType, BaseModelType]]:
+    ) -> Sequence[tuple[BaseModelType, BaseModelType]]:
         is_only_fields = bool(queryset._only)
         is_defer_fields = bool(queryset._defer)
         del queryset
-        _prefetch_related: List[Prefetch] = []
+        _prefetch_related: list[Prefetch] = []
 
         clauses = []
         for pkcol in self.model_class.pkcolumns:
@@ -655,7 +647,7 @@ class BaseQuerySet(
             _prefetch_related.append(new_prefetch)
 
         return cast(
-            Sequence[Tuple[BaseModelType, BaseModelType]],
+            Sequence[tuple[BaseModelType, BaseModelType]],
             await self._cache.aget_or_cache_many(
                 self.model_class,
                 batch,
@@ -683,7 +675,7 @@ class BaseQuerySet(
         """
         if self._cache_fetch_all:
             for result in cast(
-                Sequence[Tuple[BaseModelType, BaseModelType]],
+                Sequence[tuple[BaseModelType, BaseModelType]],
                 self._cache.get_category(self.model_class).values(),
             ):
                 yield result[1]
@@ -709,7 +701,7 @@ class BaseQuerySet(
                 fetch_all_at_once = True
 
         counter = 0
-        last_element: Optional[Tuple[BaseModelType, BaseModelType]] = None
+        last_element: Optional[tuple[BaseModelType, BaseModelType]] = None
         check_db_connection(queryset.database)
         if fetch_all_at_once:
             async with queryset.database as database:
@@ -743,7 +735,7 @@ class BaseQuerySet(
         self._cache_count = counter
         self._cache_last = last_element
 
-    async def _execute_all(self) -> List[EdgyModel]:
+    async def _execute_all(self) -> list[EdgyModel]:
         return [result async for result in self._execute_iterate(fetch_all_at_once=True)]
 
     def _filter_or_exclude(
@@ -796,14 +788,14 @@ class BaseQuerySet(
         self._clear_cache()
         return counter
 
-    async def _get_raw(self, **kwargs: Any) -> Tuple[BaseModelType, Any]:
+    async def _get_raw(self, **kwargs: Any) -> tuple[BaseModelType, Any]:
         """
         Returns a single record based on the given kwargs.
         """
 
         if kwargs:
             cached = cast(
-                Optional[Tuple[BaseModelType, Any]], self._cache.get(self.model_class, kwargs)
+                Optional[tuple[BaseModelType, Any]], self._cache.get(self.model_class, kwargs)
             )
             if cached is not None:
                 return cached
@@ -1093,9 +1085,9 @@ class QuerySet(BaseQuerySet):
     async def values(
         self,
         fields: Union[Sequence[str], str, None] = None,
-        exclude: Union[Sequence[str], Set[str]] = None,
+        exclude: Union[Sequence[str], set[str]] = None,
         exclude_none: bool = False,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """
         Returns the results in a python dictionary format.
         """
@@ -1103,7 +1095,7 @@ class QuerySet(BaseQuerySet):
         if isinstance(fields, str):
             fields = [fields]
 
-        rows: List[BaseModelType] = await self
+        rows: list[BaseModelType] = await self
 
         if fields is not None and not isinstance(fields, CollectionsIterable):
             raise QuerySetError(detail="Fields must be a suitable sequence of strings or unset.")
@@ -1120,10 +1112,10 @@ class QuerySet(BaseQuerySet):
     async def values_list(
         self,
         fields: Union[Sequence[str], str, None] = None,
-        exclude: Union[Sequence[str], Set[str]] = None,
+        exclude: Union[Sequence[str], set[str]] = None,
         exclude_none: bool = False,
         flat: bool = False,
-    ) -> List[Any]:
+    ) -> list[Any]:
         """
         Returns the results in a python dictionary format.
         """
@@ -1245,15 +1237,15 @@ class QuerySet(BaseQuerySet):
         self._cache.update([result])
         return cast(EdgyEmbedTarget, result[1])
 
-    async def bulk_create(self, objs: Iterable[Union[Dict[str, Any], EdgyModel]]) -> None:
+    async def bulk_create(self, objs: Iterable[Union[dict[str, Any], EdgyModel]]) -> None:
         """
         Bulk creates records in a table
         """
         queryset: QuerySet = self._clone()
 
-        new_objs: List[EdgyModel] = []
+        new_objs: list[EdgyModel] = []
 
-        async def _iterate(obj_or_dict: Union[EdgyModel, Dict[str, Any]]) -> Dict[str, Any]:
+        async def _iterate(obj_or_dict: Union[EdgyModel, dict[str, Any]]) -> dict[str, Any]:
             if isinstance(obj_or_dict, dict):
                 obj: EdgyModel = queryset.model_class(**obj_or_dict)
                 if (
@@ -1266,7 +1258,7 @@ class QuerySet(BaseQuerySet):
                 if self.model_class.meta.post_save_fields:
                     new_objs.append(obj)
             original = obj.extract_db_fields()
-            col_values: Dict[str, Any] = obj.extract_column_values(original)
+            col_values: dict[str, Any] = obj.extract_column_values(original)
             col_values.update(
                 await obj.execute_pre_save_hooks(col_values, original, force_insert=True)
             )
@@ -1281,7 +1273,7 @@ class QuerySet(BaseQuerySet):
             for obj in new_objs:
                 await obj.execute_post_save_hooks(self.model_class.meta.fields.keys())
 
-    async def bulk_update(self, objs: List[EdgyModel], fields: List[str]) -> None:
+    async def bulk_update(self, objs: list[EdgyModel], fields: list[str]) -> None:
         """
         Bulk updates records in a table.
 
@@ -1386,8 +1378,8 @@ class QuerySet(BaseQuerySet):
         self._clear_cache()
 
     async def get_or_create(
-        self, defaults: Union[Dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
-    ) -> Tuple[EdgyEmbedTarget, bool]:
+        self, defaults: Union[dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
+    ) -> tuple[EdgyEmbedTarget, bool]:
         """
         Creates a record in a specific table or updates if already exists.
         """
@@ -1424,8 +1416,8 @@ class QuerySet(BaseQuerySet):
         return cast(EdgyEmbedTarget, get_instance), False
 
     async def update_or_create(
-        self, defaults: Union[Dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
-    ) -> Tuple[EdgyEmbedTarget, bool]:
+        self, defaults: Union[dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
+    ) -> tuple[EdgyEmbedTarget, bool]:
         """
         Updates a record in a specific table or creates a new one.
         """
@@ -1483,7 +1475,7 @@ class QuerySet(BaseQuerySet):
 
     def __await__(
         self,
-    ) -> Generator[Any, None, List[Any]]:
+    ) -> Generator[Any, None, list[Any]]:
         return self._execute_all().__await__()
 
     async def __aiter__(self) -> AsyncIterator[Any]:

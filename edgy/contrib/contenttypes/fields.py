@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Dict, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Union, cast
 
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.context_vars import get_schema
@@ -65,7 +65,7 @@ class ContentTypeField(ForeignKey):
 
     def __new__(  # type: ignore
         cls,
-        to: Union[Type["BaseModelType"], str] = "ContentType",
+        to: Union[type["BaseModelType"], str] = "ContentType",
         on_delete: str = CASCADE,
         no_constraint: bool = False,
         delete_orphan: bool = True,
@@ -85,7 +85,7 @@ class ContentTypeField(ForeignKey):
         )
 
     @classmethod
-    def validate(cls, kwargs: Dict[str, Any]) -> None:
+    def validate(cls, kwargs: dict[str, Any]) -> None:
         for argument in ["related_name", "reverse_name", "unique", "null"]:
             if kwargs.get(argument):
                 terminal.write_warning(

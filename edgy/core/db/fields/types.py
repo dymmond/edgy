@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import warnings
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, Optional, Sequence, Union, cast
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import sqlalchemy
 from pydantic import BaseModel, Field
@@ -50,6 +51,7 @@ class BaseFieldDefinitions:
     inject_default_on_partial_update: bool = False
     inherit: bool = True
     skip_absorption_check: bool = False
+    skip_reflection_type_check: bool = False
     field_type: Any = Any
     factory: Optional[FieldFactory] = None
 
@@ -98,7 +100,7 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         """
         raise NotImplementedError()
 
-    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         """
         Validates a value and transform it into columns which can be used for querying and saving.
 
@@ -116,7 +118,7 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         field_name: str,
         value: Any,
         phase: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
         Validation happens later.
@@ -139,8 +141,8 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         return []
 
     def get_embedded_fields(
-        self, field_name: str, fields: Dict[str, BaseFieldType]
-    ) -> Dict[str, BaseFieldType]:
+        self, field_name: str, fields: dict[str, BaseFieldType]
+    ) -> dict[str, BaseFieldType]:
         """
         Define extra fields on the fly. Often no owner is available yet.
 
@@ -155,7 +157,7 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
 
     @abstractmethod
     def get_default_values(
-        self, field_name: str, cleaned_data: Dict[str, Any], is_update: bool = False
+        self, field_name: str, cleaned_data: dict[str, Any], is_update: bool = False
     ) -> Any:
         """
         Define for each field/column a default. Non-private multicolumn fields should
@@ -198,7 +200,7 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         )
         return self.owner.meta.registry  # type: ignore
 
-    def get_column_names(self, name: str = "") -> FrozenSet[str]:
+    def get_column_names(self, name: str = "") -> frozenset[str]:
         if name:
             return cast("MetaInfo", self.owner.meta).field_to_column_names[name]
         return cast("MetaInfo", self.owner.meta).field_to_column_names[self.name]

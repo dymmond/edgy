@@ -1,5 +1,6 @@
 import os
 import sys
+from collections.abc import Generator, Sequence
 from functools import cached_property
 from io import BytesIO
 from typing import (
@@ -8,12 +9,8 @@ from typing import (
     BinaryIO,
     Callable,
     ClassVar,
-    Dict,
-    Generator,
     Literal,
     Optional,
-    Sequence,
-    Tuple,
     Union,
     cast,
 )
@@ -272,11 +269,11 @@ class ContentFile(File):
 
 class FieldFile(File):
     operation: Literal["none", "save", "save_delete", "delete"] = "none"
-    old: Optional[Tuple["Storage", str, bool]] = None
+    old: Optional[tuple["Storage", str, bool]] = None
     instance: Optional["BaseModelType"] = None
     # can extract metadata
     approved: bool
-    metadata: Dict[str, Any]
+    metadata: dict[str, Any]
 
     def __init__(
         self,
@@ -286,7 +283,7 @@ class FieldFile(File):
         size: Optional[int] = None,
         storage: Union["Storage", str, None] = None,
         generate_name_fn: Optional[Callable[[str, Union[BinaryIO, File], bool], str]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: Optional[dict[str, Any]] = None,
         multi_process_safe: bool = True,
         approved: bool = True,
         # only usable with correct approval handling

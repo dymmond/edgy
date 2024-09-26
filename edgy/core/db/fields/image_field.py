@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any, Dict, Optional, Sequence, Type
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Any, Optional
 
 from edgy.core.db.fields.file_field import FileField
 from edgy.core.files import ImageFieldFile
@@ -15,7 +16,7 @@ class ImageField(FileField):
         image_formats: Optional[Sequence[str]] = (),
         # extra image formats after approval
         approved_image_formats: Optional[Sequence[str]] = None,
-        field_file_class: Type[ImageFieldFile] = ImageFieldFile,
+        field_file_class: type[ImageFieldFile] = ImageFieldFile,
         **kwargs: Any,
     ) -> "BaseFieldType":
         kwargs.setdefault("with_approval", True)
@@ -30,10 +31,10 @@ class ImageField(FileField):
     @classmethod
     def extract_metadata(
         cls, field_obj: "BaseFieldType", field_name: str, field_file: "ImageFieldFile"
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         from PIL import UnidentifiedImageError
 
-        data: Dict[str, Any] = super().extract_metadata(
+        data: dict[str, Any] = super().extract_metadata(
             field_obj, field_name=field_name, field_file=field_file
         )
         assert isinstance(field_file, ImageFieldFile)
@@ -49,7 +50,7 @@ class ImageField(FileField):
         return data
 
     @classmethod
-    def validate(cls, kwargs: Dict[str, Any]) -> None:
+    def validate(cls, kwargs: dict[str, Any]) -> None:
         super().validate(kwargs)
         try:
             import PIL  # noqa: F401

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, List, Union
+from typing import TYPE_CHECKING, Union
 
 from typing_extensions import TypedDict
 
@@ -12,8 +12,8 @@ class ConfigMarshall(TypedDict, total=False):
     model: Union["BaseModelType", str]
     """The model from there the marshall will read from."""
 
-    fields: Union[List[str], None]
+    fields: Union[list[str], None]
     """A list of fields to be serialized"""
 
-    exclude: Union[List[str], None]
+    exclude: Union[list[str], None]
     """A list of fields to be excluded from the serialization."""

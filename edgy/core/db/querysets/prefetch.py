@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional, Type
+from typing import TYPE_CHECKING, Optional
 
 from edgy.exceptions import QuerySetError
 
@@ -26,7 +26,7 @@ class Prefetch:
         self._baked_results: dict = {}
         self._baked = False
 
-    async def init_bake(self, model_class: Type["Model"]) -> None:
+    async def init_bake(self, model_class: type["Model"]) -> None:
         if self._baked or not self._is_finished or self.queryset is None:
             return
         self._baked = True

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Dict, Tuple, Type, Union, cast
+from typing import TYPE_CHECKING, Any, Union, cast
 
 from pydantic import ConfigDict
 
@@ -18,8 +18,8 @@ class ProxyModel:
         name: str,
         module: str,
         *,
-        bases: Union[Tuple[Type["BaseModelType"]], None] = None,
-        definitions: Union[Dict[Any, Any], None] = None,
+        bases: Union[tuple[type["BaseModelType"]], None] = None,
+        definitions: Union[dict[Any, Any], None] = None,
         metadata: Union["MetaInfo", None] = None,
         qualname: Union[str, None] = None,
         config: Union[ConfigDict, None] = None,
@@ -28,8 +28,8 @@ class ProxyModel:
     ) -> None:
         self.__name__: str = name
         self.__module__: str = module
-        self.__bases__: Union[Tuple[Type[BaseModelType]], None] = bases
-        self.__definitions__: Union[Dict[Any, Any], None] = definitions
+        self.__bases__: Union[tuple[type[BaseModelType]], None] = bases
+        self.__definitions__: Union[dict[Any, Any], None] = definitions
         self.__metadata__: Union[MetaInfo, None] = metadata
         self.__qualname__: Union[str, None] = qualname
         self.__config__: Union[ConfigDict, None] = config
@@ -43,7 +43,7 @@ class ProxyModel:
         """
         from edgy.core.utils.models import create_edgy_model
 
-        model: Type[BaseModelType] = create_edgy_model(
+        model: type[BaseModelType] = create_edgy_model(
             __name__=self.__name__,
             __module__=self.__module__,
             __bases__=self.__bases__,
@@ -58,11 +58,11 @@ class ProxyModel:
         return self
 
     @property
-    def model(self) -> Type["BaseModelType"]:
-        return cast(Type["BaseModelType"], self.__model__)
+    def model(self) -> type["BaseModelType"]:
+        return cast(type["BaseModelType"], self.__model__)
 
     @model.setter
-    def model(self, value: Type["BaseModelType"]) -> None:
+    def model(self, value: type["BaseModelType"]) -> None:
         self.__model__ = value  # type: ignore
 
     def __repr__(self) -> str:

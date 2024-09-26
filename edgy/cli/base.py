@@ -4,7 +4,7 @@ import os
 import typing
 import warnings
 from importlib import import_module
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union, cast
 
 from alembic import __version__ as __alembic_version__
 from alembic import command
@@ -62,7 +62,7 @@ class Migrate(BaseExtra):
         self,
         app: typing.Any,
         registry: "Registry",
-        model_apps: Union[Dict[str, str], Tuple[str], List[str], None] = None,
+        model_apps: Union[dict[str, str], tuple[str], list[str], None] = None,
         compare_type: bool = True,
         render_as_batch: bool = True,
         **kwargs: Any,
@@ -70,7 +70,7 @@ class Migrate(BaseExtra):
         super().__init__(**kwargs)
 
         self.app = app
-        self.configure_callbacks: typing.List[Callable] = []
+        self.configure_callbacks: list[Callable] = []
         self.registry = registry
         self.model_apps = model_apps or {}
 
@@ -79,7 +79,7 @@ class Migrate(BaseExtra):
         ), "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
 
         if isinstance(self.model_apps, dict):
-            self.model_apps = cast(Dict[str, str], self.model_apps.values())
+            self.model_apps = cast(dict[str, str], self.model_apps.values())
 
         models = self.check_db_models(self.model_apps)
 
@@ -102,15 +102,15 @@ class Migrate(BaseExtra):
         self.set_edgy_extension(app)
 
     def check_db_models(
-        self, model_apps: Union[Dict[str, str], Tuple[str], List[str]]
-    ) -> Dict[str, Any]:
+        self, model_apps: Union[dict[str, str], tuple[str], list[str]]
+    ) -> dict[str, Any]:
         """
         Goes through all the model applications declared in the migrate and
         adds them into the registry.
         """
         from edgy.core.db.models import Model, ReflectModel
 
-        models: Dict[str, Any] = {}
+        models: dict[str, Any] = {}
 
         for location in model_apps:
             module = import_module(location)

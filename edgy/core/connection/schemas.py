@@ -1,5 +1,6 @@
 import asyncio
-from typing import TYPE_CHECKING, List, Optional, Sequence, Union
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, Optional, Union
 
 import sqlalchemy
 from sqlalchemy.exc import DBAPIError, ProgrammingError
@@ -59,7 +60,7 @@ class Schema:
         """
         Creates a model schema if it does not exist.
         """
-        tables: List[sqlalchemy.Table] = []
+        tables: list[sqlalchemy.Table] = []
         if init_models:
             for model_class in self.registry.models.values():
                 model_class.table_schema(schema=schema, update_cache=update_cache)

@@ -1,4 +1,5 @@
-from typing import Any, Dict, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import pytest
 import sqlalchemy
@@ -43,12 +44,12 @@ class MultiColumnFieldInner(BaseField):
             ),
         ]
 
-    def _clean(self, field_name: str, value: Any) -> Dict[str, Any]:
+    def _clean(self, field_name: str, value: Any) -> dict[str, Any]:
         if isinstance(value, str):
             return {field_name: value, field_name + "_inner": value}
         return {field_name: value["normal"], field_name + "_inner": value["inner"]}
 
-    def clean(self, field_name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
+    def clean(self, field_name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         if for_query:
             # we need to wrap for operators
             result = self._clean("normal", value)
@@ -69,7 +70,7 @@ class MultiColumnFieldInner(BaseField):
                 "inner": kwargs.pop(field_name + "_inner", normal),
             }
 
-    def to_model(self, field_name: str, value: Any, phase: str = "") -> Dict[str, Any]:
+    def to_model(self, field_name: str, value: Any, phase: str = "") -> dict[str, Any]:
         if isinstance(value, str):
             return {field_name: {"normal": value, "inner": value}}
         return {field_name: value}

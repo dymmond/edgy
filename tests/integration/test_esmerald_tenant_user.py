@@ -1,4 +1,5 @@
-from typing import Any, AsyncGenerator, Coroutine, List
+from collections.abc import AsyncGenerator, Coroutine
+from typing import Any
 
 import pytest
 from anyio import from_thread, sleep, to_thread
@@ -105,7 +106,7 @@ def blocking_function():
 
 
 @get("/products")
-async def get_products() -> List[Product]:
+async def get_products() -> list[Product]:
     products = await Product.query.all()
     return products
 

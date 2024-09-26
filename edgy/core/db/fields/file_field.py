@@ -1,16 +1,13 @@
 import mimetypes
+from collections.abc import Sequence
 from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
     Callable,
-    Dict,
-    List,
     Literal,
     Optional,
-    Sequence,
-    Type,
     Union,
     cast,
 )
@@ -37,16 +34,16 @@ IGNORED = ["cls", "__class__", "kwargs", "generate_name_fn"]
 
 class ConcreteFileField(BaseCompositeField):
     multi_process_safe: bool = True
-    field_file_class: Type[FieldFile]
+    field_file_class: type[FieldFile]
     _generate_name_fn: Optional[
         Callable[[Optional["BaseModelType"], Union[File, BinaryIO], str, bool], str]
     ] = None
 
-    def modify_input(self, name: str, kwargs: Dict[str, Any], phase: str = "") -> None:
+    def modify_input(self, name: str, kwargs: dict[str, Any], phase: str = "") -> None:
         # we are empty
         if name not in kwargs:
             return
-        extracted_names: List[str] = [name, f"{name}_storage"]
+        extracted_names: list[str] = [name, f"{name}_storage"]
         if self.with_size:
             extracted_names.append(f"{name}_size")
         if self.with_approval:
@@ -75,7 +72,7 @@ class ConcreteFileField(BaseCompositeField):
         field_name: str,
         value: Any,
         phase: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
         Validation happens later.
@@ -175,9 +172,9 @@ class ConcreteFileField(BaseCompositeField):
         ]
 
     def get_embedded_fields(
-        self, name: str, fields: Dict[str, "BaseFieldType"]
-    ) -> Dict[str, "BaseFieldType"]:
-        retdict: Dict[str, Any] = {}
+        self, name: str, fields: dict[str, "BaseFieldType"]
+    ) -> dict[str, "BaseFieldType"]:
+        retdict: dict[str, Any] = {}
         # TODO: use embed_field
         if self.with_size:
             size_name = f"{name}_size"
@@ -213,8 +210,8 @@ class ConcreteFileField(BaseCompositeField):
                 )
         return retdict
 
-    def get_composite_fields(self) -> Dict[str, "BaseFieldType"]:
-        field_names: List[str] = [self.name]
+    def get_composite_fields(self) -> dict[str, "BaseFieldType"]:
+        field_names: list[str] = [self.name]
         if self.with_size:
             field_names.append(f"{self.name}_size")
         if self.with_approval:
@@ -244,7 +241,7 @@ class FileField(FieldFactory):
         with_approval: bool = False,
         extract_mime: Union[bool, Literal["approved_only"]] = True,
         mime_use_magic: bool = False,
-        field_file_class: Type[FieldFile] = FieldFile,
+        field_file_class: type[FieldFile] = FieldFile,
         generate_name_fn: Optional[
             Callable[[Optional["BaseModelType"], Union[File, BinaryIO], str, bool], str]
         ] = None,
@@ -262,7 +259,7 @@ class FileField(FieldFactory):
         return super().__new__(cls, _generate_name_fn=generate_name_fn, **kwargs)
 
     @classmethod
-    def validate(cls, kwargs: Dict[str, Any]) -> None:
+    def validate(cls, kwargs: dict[str, Any]) -> None:
         super().validate(kwargs)
         if kwargs.get("mime_use_magic"):
             try:
@@ -281,8 +278,8 @@ class FileField(FieldFactory):
     @classmethod
     def extract_metadata(
         cls, field_obj: "BaseFieldType", field_name: str, field_file: FieldFile
-    ) -> Dict[str, Any]:
-        data: Dict[str, Any] = {}
+    ) -> dict[str, Any]:
+        data: dict[str, Any] = {}
         if field_obj.extract_mime and (
             field_file.approved or field_obj.extract_mime != "approved_only"
         ):
@@ -304,7 +301,7 @@ class FileField(FieldFactory):
         value: Union[FieldFile, str, dict],
         for_query: bool = False,
         original_fn: Any = None,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Validates a value and transform it into columns which can be used for querying and saving.
 
@@ -323,7 +320,7 @@ class FileField(FieldFactory):
             if isinstance(value, str):
                 return {field_name: value}
             assert isinstance(value, FieldFile)
-            query_dict: Dict[str, Any] = {
+            query_dict: dict[str, Any] = {
                 field_name: value.name,
             }
             query_dict[f"{field_name}_storage"] = value.storage.name
@@ -331,7 +328,7 @@ class FileField(FieldFactory):
         else:
             if not isinstance(value, FieldFile):
                 raise ValueError(f"invalid value for for_query=False: {value} ({value!r})")
-            retdict: Dict[str, Any] = {
+            retdict: dict[str, Any] = {
                 field_name: value.name,
             }
             retdict[f"{field_name}_storage"] = value.storage.name

@@ -1,6 +1,6 @@
 import functools
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import RelationshipField
@@ -22,7 +22,7 @@ class RelatedField(RelationshipField):
         self,
         *,
         foreign_key_name: str,
-        related_from: Type["BaseModelType"],
+        related_from: type["BaseModelType"],
         **kwargs: Any,
     ) -> None:
         self.foreign_key_name = foreign_key_name
@@ -40,7 +40,7 @@ class RelatedField(RelationshipField):
             self.post_delete_callback = self._notset_post_delete_callback
 
     @property
-    def related_to(self) -> Type["BaseModelType"]:
+    def related_to(self) -> type["BaseModelType"]:
         return self.owner
 
     @property
@@ -52,7 +52,7 @@ class RelatedField(RelationshipField):
         field_name: str,
         value: Any,
         phase: str = "",
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """
         Meta field
         """
@@ -81,7 +81,7 @@ class RelatedField(RelationshipField):
     def foreign_key(self) -> BaseForeignKeyField:
         return cast(BaseForeignKeyField, self.related_from.meta.fields[self.foreign_key_name])
 
-    def traverse_field(self, path: str) -> Tuple[Any, str, str]:
+    def traverse_field(self, path: str) -> tuple[Any, str, str]:
         return self.foreign_key.reverse_traverse_field(path)
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
@@ -96,7 +96,7 @@ class RelatedField(RelationshipField):
     def is_m2m(self) -> bool:
         return self.foreign_key.is_m2m
 
-    def clean(self, name: str, value: Any, for_query: bool = False) -> Dict[str, Any]:
+    def clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         if not for_query:
             return {}
         return self.related_to.meta.pk.clean("pk", value, for_query=for_query)  # type: ignore

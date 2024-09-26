@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple, Type
+from typing import Any
 
 from edgy.core.db.models.metaclasses import (
     BaseModelMeta,
@@ -7,7 +7,7 @@ from edgy.core.db.models.metaclasses import (
 
 class ContentTypeMeta(BaseModelMeta):
     def __new__(
-        cls, name: str, bases: Tuple[Type, ...], attrs: Dict[str, Any], **kwargs: Any
+        cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any], **kwargs: Any
     ) -> Any:
         new_model = super().__new__(cls, name, bases, attrs, **kwargs)
         if new_model.no_constraint:

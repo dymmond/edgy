@@ -1,8 +1,9 @@
 import asyncio
 import weakref
+from collections.abc import Awaitable
 from contextvars import copy_context
 from threading import Event, Thread
-from typing import Any, Awaitable, Dict, Optional, cast
+from typing import Any, Optional, cast
 
 
 async def _coro_helper(awaitable: Awaitable, timeout: Optional[float]) -> Any:
@@ -12,8 +13,8 @@ async def _coro_helper(awaitable: Awaitable, timeout: Optional[float]) -> Any:
 
 
 # python <= 3.8 doesn't support WeakKeyDictionary as type
-weak_subloop_map: Dict[asyncio.AbstractEventLoop, asyncio.AbstractEventLoop] = cast(
-    Dict[asyncio.AbstractEventLoop, asyncio.AbstractEventLoop], weakref.WeakKeyDictionary()
+weak_subloop_map: dict[asyncio.AbstractEventLoop, asyncio.AbstractEventLoop] = cast(
+    dict[asyncio.AbstractEventLoop, asyncio.AbstractEventLoop], weakref.WeakKeyDictionary()
 )
 
 

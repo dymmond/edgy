@@ -1,4 +1,5 @@
-from typing import Any, AsyncGenerator, Dict
+from collections.abc import AsyncGenerator
+from typing import Any
 
 import pytest
 from anyio import from_thread, sleep, to_thread
@@ -65,12 +66,12 @@ class UserMarshall(Marshall):
     marshall_config = ConfigMarshall(model=User, fields=["__all__"])
     details: fields.MarshallMethodField = fields.MarshallMethodField(field_type=str)
     age: fields.MarshallField = fields.MarshallField(int, source="age")
-    data: fields.MarshallMethodField = fields.MarshallMethodField(Dict[str, Any])
+    data: fields.MarshallMethodField = fields.MarshallMethodField(dict[str, Any])
 
     def get_details(self, instance) -> str:
         return instance.get_name()
 
-    def get_data(self, instance) -> Dict[str, Any]:
+    def get_data(self, instance) -> dict[str, Any]:
         item = Item(sku="1234", name="laptop", age=1)
         return item.model_dump()
 
