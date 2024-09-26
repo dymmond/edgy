@@ -19,6 +19,7 @@ class Reflected(AutoReflectModel):
         exclude_pattern = None  # regex or string, default None (disabled). Matches against the tablename
         template = "{modelname}{tablename}"  # string or function with arguments tablename, modelname, tablekey
         databases = (None,)  # Restrict reflection to databases. None: main database of registry, string extra databases of registry
+        schemes = (None,) # Which schemes to checks
 ```
 
 Note: when a reflected model is generated the meta is switched in the copy to a regular MetaInfo.
@@ -61,3 +62,10 @@ The extra databases can be selected via their name while the main can be selecte
 This controls from which database the models are reflected. This is useful to extract data from other databases and to use it in the main application.
 
 By default the autoreflection only uses the main databases.
+
+
+### Schemes
+
+This parameter is providing the schemes which should be scanned for models.
+
+This parameter is required when the models which should be reflected are in a different schema.

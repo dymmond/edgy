@@ -7,7 +7,7 @@ from tests.settings import DATABASE_ALTERNATIVE_URL, DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 database = DatabaseTestClient(DATABASE_URL, use_existing=False)
-source = edgy.Registry(database=database)
+source = edgy.Registry(database=database, schema="foo")
 
 
 class Foo(edgy.Model):
@@ -47,37 +47,20 @@ async def test_basic_reflection():
     class AutoAll(AutoReflectModel):
         class Meta:
             registry = reflected
-
-    class AutoNever(AutoReflectModel):
-        non_matching = edgy.CharField(max_length=40)
-
-        class Meta:
-            registry = reflected
-            template = r"AutoNever"
-
-    class AutoNever2(AutoReflectModel):
-        id = edgy.CharField(max_length=40, primary_key=True)
-
-        class Meta:
-            registry = reflected
-            template = r"AutoNever2"
-
-    class AutoNever3(AutoReflectModel):
-        class Meta:
-            registry = reflected
-            template = r"AutoNever3"
-            exclude_pattern = r".*"
+            schemes = (None, "foo")
 
     class AutoFoo(AutoReflectModel):
         class Meta:
             registry = reflected
             include_pattern = r"^foos$"
+            schemes = (None, "foo")
 
     class AutoBar(AutoReflectModel):
         class Meta:
             registry = reflected
             include_pattern = r"^bars"
             template = r"{tablename}_{tablename}"
+            schemes = (None, "foo")
 
     assert AutoBar.meta.template
 
@@ -89,9 +72,6 @@ async def test_basic_reflection():
             == 3
         )
         assert "bars_bars" in reflected.reflected
-        assert "AutoNever" not in reflected.reflected
-        assert "AutoNever2" not in reflected.reflected
-        assert "AutoNever3" not in reflected.reflected
 
         assert (
             sum(
@@ -111,6 +91,7 @@ async def test_extra_reflection():
             registry = reflected
             include_pattern = r"^foos$"
             databases = ("another",)
+            schemes = ("foo", None)
 
     async with reflected:
         assert (

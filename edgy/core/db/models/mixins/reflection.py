@@ -5,6 +5,7 @@ from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ImproperlyConfigured
+from edgy.types import Undefined
 
 if TYPE_CHECKING:
     from edgy import Registry
@@ -30,10 +31,13 @@ class ReflectedModelMixin:
         assert registry is not None, "registry is not set"
         if metadata is None:
             metadata = registry.metadata
-        schema_name = schema or registry.db_schema
+        if cls.__using_schema__ is not Undefined:
+            schema_name = cls.__using_schema__
+        else:
+            schema_name = schema or registry.db_schema
 
         tablename: str = cast("str", cls.meta.tablename)
-        return run_sync(cls.reflect(registry, tablename, metadata, schema_name))
+        return run_sync(cls.reflect(cls.database, tablename, metadata, schema_name))
 
     @classmethod
     def fields_not_supported_by_table(
@@ -49,7 +53,8 @@ class ReflectedModelMixin:
                     table.columns.get(column.key) is None
                     or (
                         field_has_typing_check
-                        and column.type.__class__ != table.columns[column.key].type.__class__
+                        and column.type.as_generic().__class__
+                        != table.columns[column.key].type.as_generic().__class__
                     )
                 ):
                     field_names.add(field_name)

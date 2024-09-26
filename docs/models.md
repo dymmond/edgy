@@ -459,10 +459,9 @@ the model field.
 {!> ../docs_src/models/indexes/complex_together.py !}
 ```
 
-## Meta metrics
+## Meta info attributes
 
-The metaclass also calculates lazily following attributes:
-
+The metaclass also calculates following readonly attributes:
 
 - `special_getter_fields` (set): Field names with `__get__` function. This is used for the pseudo-descriptor `__get__` protocol for fields.
 - `excluded_fields` (set): Field names of fields with `exclude=True` set. They are excluded by default.
@@ -473,7 +472,12 @@ The metaclass also calculates lazily following attributes:
 - `post_delete_fields` (set): Field names of fields with a `post_save_callback` method.
 - `foreign_key_fields` (set): Field names of ForeignKey fields. Note: this does not include ManyToMany fields but their internal ForeignKeys.
 - `relationship_fields` (set): Field names of fields inheriting from RelationshipField.
-- `field_to_columns` (pseudo dictionary): Maps a fieldname to its defined columns. Cached.
-- `field_to_column_names` (pseudo dictionary): Maps a fieldname to its defined column keys. Cached. Uses internally `field_to_columns`.
-- `columns_to_field` (pseudo dictionary): Maps a column key to its defining field. Cached.
-- `fields` (pseudo dictionary): Holds fields. This is one attribute which is not readonly but can be actually assigned.
+- `field_to_columns` (pseudo dictionary): Maps a fieldname to its defined columns.
+- `field_to_column_names` (pseudo dictionary): Maps a fieldname to its defined column keys. Uses internally `field_to_columns`.
+- `columns_to_field` (pseudo dictionary): Maps a column key to its defining field.
+
+Some other interesting attributes are:
+
+- `fields` (pseudo dictionary): Holds fields. When setting/deleting fields it updates the attributes.
+- `model` (model_class): This attribute is special in it's way that it is not retrieved from a meta class. It must be explicitly set.
+                         This has implications for custom MetaInfo. You either replace the original one by passing meta_info_class as metaclass argument or set it in your overwrite manually.
