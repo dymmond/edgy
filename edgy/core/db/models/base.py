@@ -312,12 +312,14 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
             exclude = copy.copy(initial_full_field_exclude)
 
         if isinstance(exclude, dict):
+            # exclude __show_pk__ attribute from showing up
             exclude["__show_pk__"] = True
             for field_name in self.meta.excluded_fields:
                 exclude[field_name] = True
         else:
             exclude.update(self.meta.special_getter_fields)
             exclude.update(self.meta.excluded_fields)
+            # exclude __show_pk__ attribute from showing up
             exclude.add("__show_pk__")
         include: Union[set[str], dict[str, Any], None] = kwargs.pop("include", None)
         mode: Union[Literal["json", "python"], str] = kwargs.pop("mode", "python")

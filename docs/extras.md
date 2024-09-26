@@ -25,6 +25,7 @@ So how can you still use those features without depending on the Migrate object?
 This is the object you want to use when **you don't need Edgy to manage the migrations for you**
 and yet still being able to use Edgy tools like the [shell](./shell.md).
 
+
 ### How does it work
 
 Well, its actually very similar to Migrate object in terms of setup.

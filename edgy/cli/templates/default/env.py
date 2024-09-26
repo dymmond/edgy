@@ -8,7 +8,7 @@ from typing import Any, Optional
 from alembic import context
 from rich.console import Console
 
-from edgy.cli.constants import APP_PARAMETER
+from edgy.cli.constants import APP_PARAMETER, EDGY_DB
 from edgy.cli.env import MigrationEnv
 from edgy.core.connection import Database
 from edgy.exceptions import EdgyException
@@ -62,7 +62,7 @@ app: Any = get_app()
 # target_metadata = mymodel.Base.metadata
 config.set_main_option("sqlalchemy.url", get_engine_url())
 
-target_db = app._edgy_db["migrate"].registry
+target_db = getattr(app, EDGY_DB)["migrate"].registry
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -110,7 +110,7 @@ def do_run_migrations(connection: Any) -> Any:
         connection=connection,
         target_metadata=get_metadata(),
         process_revision_directives=process_revision_directives,
-        **app._edgy_db["migrate"].kwargs,
+        **getattr(app, EDGY_DB)["migrate"].kwargs,
     )
 
     with context.begin_transaction():

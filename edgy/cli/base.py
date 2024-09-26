@@ -130,8 +130,7 @@ class Migrate(BaseExtra):
         """
         migrate = MigrateConfig(self, self.registry, **self.alembic_ctx_kwargs)
         # bypass __setattr__ method
-        object.__setattr__(app, EDGY_DB, {})
-        app._edgy_db["migrate"] = migrate
+        object.__setattr__(app, EDGY_DB, {"migrate": migrate})
 
     def configure(self, f: Callable) -> Any:
         self.configure_callbacks.append(f)
@@ -204,7 +203,7 @@ def init(
     config = Config(template_directory=template_directory)
     config.set_main_option("script_location", directory)
     config.config_file_name = os.path.join(directory, "alembic.ini")
-    config = app._edgy_db["migrate"].migrate.call_configure_callbacks(config)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.call_configure_callbacks(config)
 
     if template is None:
         template = DEFAULT_TEMPLATE_NAME
@@ -228,7 +227,7 @@ def revision(
     Creates a new revision file
     """
     options = ["autogenerate"] if autogenerate else None
-    config = app._edgy_db["migrate"].migrate.get_config(directory, options)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory, options)
 
     command.revision(
         config,
@@ -257,7 +256,7 @@ def migrate(
     arg: Optional[typing.Any] = None,
 ) -> None:
     """Alias for 'revision --autogenerate'"""
-    config = app._edgy_db["migrate"].migrate.get_config(
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(
         directory, options=["autogenerate"], arg=arg
     )
 
@@ -280,7 +279,7 @@ def edit(
 ) -> None:
     """Edit current revision."""
     if alembic_version >= (1, 9, 4):
-        config = app._edgy_db["migrate"].migrate.get_config(directory)
+        config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory)
         command.edit(config, revision)
     else:
         raise RuntimeError("Alembic 1.9.4 or greater is required")
@@ -296,7 +295,7 @@ def merge(
     revision_id: Optional[str] = None,
 ) -> None:
     """Merge two revisions together.  Creates a new migration file"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory)
     command.merge(
         config, revisions, message=message, branch_label=branch_label, rev_id=revision_id
     )
@@ -312,7 +311,7 @@ def upgrade(
     arg: Optional[typing.Any] = None,
 ) -> None:
     """Upgrade to a later version"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory, arg=arg)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory, arg=arg)
     command.upgrade(config, revision, sql=sql, tag=tag)
 
 
@@ -326,7 +325,7 @@ def downgrade(
     arg: Optional[typing.Any] = None,
 ) -> None:
     """Revert to a previous version"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory, arg=arg)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory, arg=arg)
     if sql and revision == "-1":
         revision = "head:-1"
     command.downgrade(config, revision, sql=sql, tag=tag)
@@ -339,7 +338,7 @@ def show(
     revision: str = "head",
 ) -> None:
     """Show the revision denoted by the given symbol."""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory)
     command.show(config, revision)
 
 
@@ -352,7 +351,7 @@ def history(
     indicate_current: bool = False,
 ) -> None:
     """List changeset scripts in chronological order."""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory)
     command.history(config, rev_range, verbose=verbose, indicate_current=indicate_current)
 
 
@@ -364,7 +363,7 @@ def heads(
     resolve_dependencies: bool = False,
 ) -> None:
     """Show current available heads in the script directory"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory)
     command.heads(config, verbose=verbose, resolve_dependencies=resolve_dependencies)
 
 
@@ -373,7 +372,7 @@ def branches(
     app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False
 ) -> None:
     """Show current branch points"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory)
     command.branches(config, verbose=verbose)
 
 
@@ -382,7 +381,7 @@ def current(
     app: Optional[typing.Any], directory: Optional[str] = None, verbose: bool = False
 ) -> None:
     """Display the current revision for each database."""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory)
     command.current(config, verbose=verbose)
 
 
@@ -396,7 +395,7 @@ def stamp(
 ) -> None:
     """'stamp' the revision table with the given revision; don't run any
     migrations"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory)
     command.stamp(config, revision, sql=sql, tag=tag)
 
 
@@ -406,5 +405,5 @@ def check(
     directory: Optional[str] = None,
 ) -> None:
     """Check if there are any new operations to migrate"""
-    config = app._edgy_db["migrate"].migrate.get_config(directory)
+    config = getattr(app, EDGY_DB)["migrate"].migrate.get_config(directory)
     command.check(config)
