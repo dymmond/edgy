@@ -23,7 +23,7 @@ hide:
 - `database` attribute of models is used for queries instead of the main database of the registry.
 - We use more metaclass kwarg arguments.
 - Switch to python >= 3.9.
-- rename internal `_is_init` of MetaInfo to `_fields_are_initialized`.
+- Rename internal `_is_init` of MetaInfo to `_fields_are_initialized`.
 
 ### Fixed
 
