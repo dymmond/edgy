@@ -135,3 +135,30 @@ the `ReflectModel` declaration, **the operation on that field will not happen**.
 !!! Warning
     If you are reflecting SQL views, you probably will not be able to write (create, update...) as
     the SQL view has that same limitation.
+
+
+## Reflection outside of the defaults
+
+Sometimes you want reflect from a different database or schema than the main database or schema.
+This is possible by setting`__using_schema__` to None/string and set explicitly the class database after model creation:
+
+``` python
+
+import edgy
+
+registry = edgy.Registry(...)
+
+class AdvancedReflected(edgy.ReflectModel):
+    __using_schema__ = "foo"
+    a = edgy.CharField(max_length=40)
+    # here we cannot define database, it will be overwritten
+
+    class Meta:
+        registry = registry
+
+AdvancedReflected.database = otherdb
+# you can set __using_schema__ also here
+AdvancedReflected.__using_schema__ = "foo"
+```
+
+This trick is used by AutoReflectModels.
