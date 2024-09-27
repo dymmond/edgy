@@ -82,7 +82,7 @@ class MultiColumnField(FieldFactory):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Text(collation=kwargs.get("collation", None))
+        return sqlalchemy.Text(collation=kwargs.get("collation"))
 
 
 class MyModel(edgy.Model):
@@ -97,7 +97,8 @@ async def create_test_database():
     async with database:
         await models.create_all()
         yield
-    await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
 
 
 def test_basic_model():
@@ -125,3 +126,19 @@ async def test_create_and_assign(create_test_database):
     await obj.save()
     assert await MyModel.query.filter(MyModel.table.columns.multi_inner == "foo").exists()
     assert obj.multi["normal"] == "edgy"
+
+
+async def test_indb(create_test_database):
+    obj = await MyModel.query.create(multi="edgy", multi_inner="edgytoo")
+    assert obj.multi["normal"] == "edgy"
+    assert obj.multi["inner"] == "edgytoo"
+
+    await MyModel.query.update(
+        multi={
+            "normal": MyModel.table.c.multi + "foo",
+            "inner": MyModel.table.c.multi_inner + "foo",
+        }
+    )
+    await obj.load()
+    assert obj.multi["normal"] == "edgyfoo"
+    assert obj.multi["inner"] == "edgytoofoo"

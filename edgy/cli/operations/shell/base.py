@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional
 import click
 
 from edgy import Registry
+from edgy.cli.constants import EDGY_DB, EDGY_EXTRA
 from edgy.cli.env import MigrationEnv
 from edgy.cli.operations.shell.enums import ShellOption
 from edgy.core.events import AyncLifespanContextManager
@@ -28,9 +29,11 @@ def shell(env: MigrationEnv, kernel: str) -> None:
     This can be used with a Migration class or with EdgyExtra object lookup.
     """
     try:
-        registry = env.app._edgy_db["migrate"].registry
+        # try to retrieve a migration config object from app
+        registry = getattr(env.app, EDGY_DB)["migrate"].registry
     except AttributeError:
-        registry = env.app._edgy_extra["extra"].registry
+        # try to retrieve a EDGY_EXTRA config object from app
+        registry = getattr(env.app, EDGY_EXTRA)["extra"].registry
 
     if (
         sys.platform != "win32"

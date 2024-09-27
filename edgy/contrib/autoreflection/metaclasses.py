@@ -15,17 +15,19 @@ if TYPE_CHECKING:
 
 
 class AutoReflectionMetaInfo(MetaInfo):
-    __slots__ = ("include_pattern", "exclude_pattern", "template", "databases")
+    __slots__ = ("include_pattern", "exclude_pattern", "template", "databases", "schemes")
     include_pattern: re.Pattern
     exclude_pattern: Optional[re.Pattern]
     template: Callable[["Table"], str]
     databases: frozenset[Union[str, None]]
+    schemes: frozenset[Union[str, None]]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self.include_pattern = getattr(meta, "include_pattern", None)
         self.exclude_pattern = getattr(meta, "exclude_pattern", None)
         self.template = getattr(meta, "template", None)
         self.databases = getattr(meta, "databases", (None,))  # type: ignore
+        self.schemes = getattr(meta, "schemes", (None,))  # type: ignore
 
         super().__init__(meta, **kwargs)
 
@@ -58,6 +60,7 @@ class AutoReflectionMetaInfo(MetaInfo):
         self.exclude_pattern = exclude_pattern
 
         self.databases = frozenset(cast(Any, self.databases))
+        self.schemes = frozenset(cast(Any, (x if x else None for x in self.schemes)))
 
 
 class AutoReflectionMeta(BaseModelMeta):

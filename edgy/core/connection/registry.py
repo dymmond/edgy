@@ -46,10 +46,11 @@ class Registry:
         *,
         with_content_type: Union[bool, type["BaseModelType"]] = False,
         schema: Union[str, None] = None,
+        extra: Optional[dict[str, Database]] = None,
         **kwargs: Any,
     ) -> None:
         self.db_schema = schema
-        extra = kwargs.pop("extra", {})
+        extra = extra or {}
         self.database: Database = (
             database if isinstance(database, Database) else Database(database, **kwargs)
         )
@@ -294,20 +295,24 @@ class Registry:
         for model_class in self.reflected.values():
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
 
-    async def _connect_and_init(
-        self, name: Union[str, None], database: "Database", schema: Optional[str] = None
-    ) -> None:
+    async def _connect_and_init(self, name: Union[str, None], database: "Database") -> None:
         from edgy.core.db.models.metaclasses import MetaInfo
 
         await database.connect()
         if not self.pattern_models or name in self.dbs_reflected:
             return
+        schemes = set()
+        for pattern_model in self.pattern_models.values():
+            if name not in pattern_model.meta.databases:
+                continue
+            schemes.update(pattern_model.meta.schemes)
         tmp_metadata = sqlalchemy.MetaData()
-        await database.run_sync(tmp_metadata.reflect, schema=schema)
+        for schema in schemes:
+            await database.run_sync(tmp_metadata.reflect, schema=schema)
         try:
             for table in tmp_metadata.tables.values():
                 for pattern_model in self.pattern_models.values():
-                    if name not in pattern_model.meta.databases:
+                    if name not in pattern_model.meta.databases or table.schema not in schemes:
                         continue
                     assert pattern_model.meta.model is pattern_model
                     # table.key would contain the schema name
@@ -330,8 +335,8 @@ class Registry:
                         name=new_name, meta_info_class=MetaInfo
                     )
                     concrete_reflect_model.meta.tablename = table.name
-                    concrete_reflect_model.database = database
-                    concrete_reflect_model.add_to_registry(self)
+                    concrete_reflect_model.__using_schema__ = table.schema
+                    concrete_reflect_model.add_to_registry(self, database=database)
 
             self.dbs_reflected.add(name)
         except BaseException as exc:
@@ -342,7 +347,7 @@ class Registry:
         dbs: list[tuple[Union[str, None], Database]] = [(None, self.database)]
         for name, db in self.extra.items():
             dbs.append((name, db))
-        ops = [self._connect_and_init(name, db, schema=self.db_schema or None) for name, db in dbs]
+        ops = [self._connect_and_init(name, db) for name, db in dbs]
         results: list[Union[BaseException, bool]] = await asyncio.gather(
             *ops, return_exceptions=True
         )

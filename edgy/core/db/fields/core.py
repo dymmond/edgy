@@ -69,7 +69,7 @@ class CharField(FieldFactory, str):
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.String(
-            length=kwargs.get("max_length"), collation=kwargs.get("collation", None)
+            length=kwargs.get("max_length"), collation=kwargs.get("collation")
         )
 
 
@@ -98,7 +98,7 @@ class TextField(FieldFactory, str):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Text(collation=kwargs.get("collation", None))
+        return sqlalchemy.Text(collation=kwargs.get("collation"))
 
 
 class IntegerField(FieldFactory, int):
@@ -212,12 +212,9 @@ class DecimalField(FieldFactory, decimal.Decimal):
     def validate(cls, kwargs: dict[str, Any]) -> None:
         super().validate(kwargs)
 
-        max_digits = kwargs.get("max_digits")
         decimal_places = kwargs.get("decimal_places")
-        if max_digits is None or max_digits < 0 or decimal_places is None or decimal_places < 0:
-            raise FieldDefinitionError(
-                "max_digits and decimal_places are required for DecimalField"
-            )
+        if decimal_places is None or decimal_places < 0:
+            raise FieldDefinitionError("decimal_places are required for DecimalField")
 
 
 class BooleanField(FieldFactory, int):

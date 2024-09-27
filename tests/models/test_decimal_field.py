@@ -68,21 +68,6 @@ async def test_raises_field_definition_error_missing_decimal_places():
                 return f"Employee: {self.name}, Age: {self.date_of_birth}, Salary: {self.salary}"
 
 
-async def test_raises_field_definition_error_missing_max_digits():
-    with pytest.raises(FieldDefinitionError):  # noqa
-
-        class AnotherEmployee(edgy.Model):
-            name: str = fields.CharField(max_length=255, null=True)
-            date_of_birth: date = fields.DateField(auto_now=True)
-            salary: decimal.Decimal = fields.DecimalField(decimal_places=2, null=True)
-
-            class Meta:
-                registry = models
-
-            def __str__(self):
-                return f"Employee: {self.name}, Age: {self.date_of_birth}, Salary: {self.salary}"
-
-
 @pytest.mark.parametrize(
     "max_digits,decimal_places", [(-1, None), (None, -2), (None, None), (-1, -2)]
 )

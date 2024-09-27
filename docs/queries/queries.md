@@ -414,6 +414,23 @@ Or not very common but also possible, update all rows in a table.
 user = await User.query.update(email="bar@foo.com")
 ```
 
+### In-database updates
+
+For most fields it is possible to do something like
+
+``` python
+await User.query.update(balance=User.table.columns.balance - 10)
+```
+
+This updates the value directly in db without roundtrip.
+In multi column fields or heavily customized fields like ForeignKeys this may not work.
+
+Why do I need this?
+
+This is a race-free way to update values. Suppose you want to update the balance of a customer.
+This allows to update it without worrying about concurrency.
+
+
 ### Get
 
 Obtains a single record from the database.

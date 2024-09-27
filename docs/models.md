@@ -7,7 +7,7 @@ What about the Django interface type for tables? Cleaner right? Well, **Edgy** a
 the top of SQLAlchemy core, it provides a Django like experience when it comes to create models.
 
 Do you already have a database with tables and views you would simply would like to reflect them
-back instead of the opposite? [Check the reflection section](./reflection.md) for more details.
+back instead of the opposite? [Check the reflection section](./reflection/reflection.md) for more details.
 
 ## What is a model
 
@@ -147,8 +147,7 @@ declare the `metadata` needed for your models.
 
 Currently the available parameters for the meta are:
 
-* **registry** - The [registry](./registry.md) instance for where the model will be generated. This
-field is **mandatory** and it will raise an `ImproperlyConfigured` error if no registry is found.
+* **registry** - The [registry](./registry.md) instance for where the model will be generated.
 
 * **tablename** - The name of the table in the database, **not the class name**.
 
@@ -459,3 +458,26 @@ the model field.
 ```python hl_lines="16-19"
 {!> ../docs_src/models/indexes/complex_together.py !}
 ```
+
+## Meta info attributes
+
+The metaclass also calculates following readonly attributes:
+
+- `special_getter_fields` (set): Field names with `__get__` function. This is used for the pseudo-descriptor `__get__` protocol for fields.
+- `excluded_fields` (set): Field names of fields with `exclude=True` set. They are excluded by default.
+- `secret_fields` (set): Field names of fields with `secret=True` set. They are excluded by default when using `exclude_secret`.
+- `input_modifying_fields` (set): Field names of fields with a `modify_input` method. They are altering the input kwargs of `transform_input` (setting to model) and `extract_column_values`.
+- `post_save_fields` (set): Field names of fields with a `post_save_callback` method.
+- `pre_save_fields` (set): Field names of fields with a `pre_save_callback` method.
+- `post_delete_fields` (set): Field names of fields with a `post_save_callback` method.
+- `foreign_key_fields` (set): Field names of ForeignKey fields. Note: this does not include ManyToMany fields but their internal ForeignKeys.
+- `relationship_fields` (set): Field names of fields inheriting from RelationshipField.
+- `field_to_columns` (pseudo dictionary): Maps a fieldname to its defined columns.
+- `field_to_column_names` (pseudo dictionary): Maps a fieldname to its defined column keys. Uses internally `field_to_columns`.
+- `columns_to_field` (pseudo dictionary): Maps a column key to its defining field.
+
+Some other interesting attributes are:
+
+- `fields` (pseudo dictionary): Holds fields. When setting/deleting fields it updates the attributes.
+- `model` (model_class): This attribute is special in it's way that it is not retrieved from a meta class. It must be explicitly set.
+                         This has implications for custom MetaInfo. You either replace the original one by passing meta_info_class as metaclass argument or set it in your overwrite manually.

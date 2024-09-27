@@ -23,13 +23,12 @@ test_media/
 
 # files
 **/*.so
-**/*.sqlite
+*.sqlite
 *.iml
 .DS_Store
 .coverage
 .coverage.*
 .python-version
 coverage.*
-example.sqlite
 docker-compose.override.yml
 compose.override.yml

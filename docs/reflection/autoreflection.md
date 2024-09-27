@@ -3,7 +3,7 @@
 Let's reflect reflection:
 
 we can reflect tables from database in a model. The next step is to retrieve the tables
-and create reflection models from it.
+and create reflection models from it automatically. This can be useful to create interfaces procedural.
 
 For doing so we have selections via Pattern Models:
 
@@ -19,6 +19,7 @@ class Reflected(AutoReflectModel):
         exclude_pattern = None  # regex or string, default None (disabled). Matches against the tablename
         template = "{modelname}{tablename}"  # string or function with arguments tablename, modelname, tablekey
         databases = (None,)  # Restrict reflection to databases. None: main database of registry, string extra databases of registry
+        schemes = (None,) # Which schemes to checks
 ```
 
 Note: when a reflected model is generated the meta is switched in the copy to a regular MetaInfo.
@@ -61,3 +62,41 @@ The extra databases can be selected via their name while the main can be selecte
 This controls from which database the models are reflected. This is useful to extract data from other databases and to use it in the main application.
 
 By default the autoreflection only uses the main databases.
+
+
+### Schemes
+
+This parameter is providing the schemes which should be scanned for models.
+
+This parameter is required when the models which should be reflected are in a different schema.
+
+
+## Examples
+
+### Procedural interface
+
+To build an application there is also a data driven approach. Instead of defining relations and fields by hand
+they are all automatically generated.
+
+For creating the tables we can use:
+
+```python title="source.py"
+{!> ../docs_src/reflection/autoreflection/datadriven_source.py !}
+```
+
+Then we can reflect:
+
+```python title="procedural.py"
+{!> ../docs_src/reflection/autoreflection/datadriven.py !}
+```
+
+
+### Legacy databases
+
+
+Suppose you have a new modern database, a legacy database and an ancient database which very few capabilities from which both you need data.
+In the legacy and ancient database, you are only allowed to update some specific fields.
+
+```python title="legacy.py"
+{!> ../docs_src/reflection/autoreflection/legacy.py !}
+```

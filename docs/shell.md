@@ -28,7 +28,7 @@ Edgy ecosystem is complex internally but simpler to the user. Edgy will use the 
 using the [migration](./migrations/migrations.md#migration) and automatically extract the
 [registry](./registry.md) from it.
 
-From there it will automatically load the [models](./models.md) and [reflected models](./reflection.md)
+From there it will automatically load the [models](./models.md) and [reflected models](./reflection/reflection.md)
 into the interactive python shell and load them for you with ease 🎉.
 
 ### Requirements
@@ -110,7 +110,7 @@ Let us see an example using example using Esmerald and we will have:
     * User - From an [esmerald application][esmerald_application] `accounts`.
     * Customer - From an [esmerald application][esmerald_application] `customers`.
     * Product - From an [esmerald application][esmerald_application] `products`.
-* Two [reflected models](./reflection.md):
+* Two [reflected models](./reflection/reflection.md):
     * Payment - From a payments table reflected from the existing database.
     * RecordView - From a SQL View reflected from the existing database.
 
