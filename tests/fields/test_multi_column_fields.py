@@ -128,7 +128,7 @@ async def test_create_and_assign(create_test_database):
     assert obj.multi["normal"] == "edgy"
 
 
-async def test_inplace(create_test_database):
+async def test_indb(create_test_database):
     obj = await MyModel.query.create(multi="edgy", multi_inner="edgytoo")
     assert obj.multi["normal"] == "edgy"
     assert obj.multi["inner"] == "edgytoo"
