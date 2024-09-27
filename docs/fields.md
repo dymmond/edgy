@@ -84,11 +84,15 @@ class MyModel(edgy.Model):
 
 This field is used as a default field for the `id` of a model.
 
+!!! Note
+    For sqlite with autoincrement an integer field is used. Sqlite doesn't support BigInteger for autoincrement.
+
 ##### Parameters:
 
 * `minimum` - An integer indicating the minimum.
 * `maximum` - An integer indicating the maximum.
 * `multiple_of` - An integer indicating the multiple of.
+* `increment_on_save` - An integery which is applied on every save.
 
 #### IntegerField
 
@@ -108,6 +112,28 @@ class MyModel(edgy.Model):
 * `minimum` - An integer indicating the minimum.
 * `maximum` - An integer indicating the maximum.
 * `multiple_of` - An integer indicating the multiple of.
+* `increment_on_save` - An integery which is applied on every save.
+
+
+#### SmallIntegerField
+
+```python
+import edgy
+
+
+class MyModel(edgy.Model):
+    a_number: int = edgy.SmallIntegerField(default=0)
+    another_number: int = edgy.SmallIntegerField(minimum=10)
+    ...
+
+```
+
+##### Parameters:
+
+* `minimum` - An integer indicating the minimum.
+* `maximum` - An integer indicating the maximum.
+* `multiple_of` - An integer indicating the multiple of.
+* `increment_on_save` - An integery which is applied on every save.
 
 #### BooleanField
 
@@ -674,6 +700,93 @@ class MyModel(edgy.Model):
 
 Derives from the same as [CharField](#charfield) and validates the value of an UUID.
 
+## Advanced Fieldpatterns
+
+These are not actually fields but patterns.
+
+### Revision Field
+
+You remember the strange `increment_on_save` parameter on Integer like fields?
+
+Here is how to use it.
+
+#### Just counting up
+
+The simplest case:
+
+
+```python
+import edgy
+
+
+class MyModel(edgy.Model):
+    rev: int = edgy.SmallIntegerField(default=0, increment_on_save=1)
+    ...
+
+async def main():
+    obj = await MyModel.query.create()
+    # obj.rev == 0
+    await obj.save()
+    # obj.rev == 1
+
+```
+
+What happens here? On every save the counter is in database increased. When accessing the attribute it is automatically loaded.
+
+#### Revisioning
+
+That is boring let's go farther. What happens when we make it a primary key?
+
+Hint: it has a very special handling.
+
+
+
+```python
+import edgy
+
+
+class MyModel(edgy.Model):
+    id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
+    rev: int = edgy.SmallIntegerField(default=0, increment_on_save=1, primary_key=True)
+    ...
+
+async def main():
+    obj = await MyModel.query.create()
+    # obj.rev == 0
+    await obj.save()
+    # obj.rev == 1
+    assert len(await MyModel.query.all()) == 2
+```
+
+This implements a copy on save. We have now revision safe models.
+
+### Countdown Field
+
+Until now we have seen only `increment_on_save=1` but it can be also negative. That is useful for a countdown.
+
+
+```python
+import edgy
+
+
+class MyModel(edgy.Model):
+    rev: int = edgy.SmallIntegerField(default=10, increment_on_save=-1)
+    ...
+
+async def main():
+    obj = await MyModel.query.create()
+    # obj.rev == 10
+    await obj.save()
+    # obj.rev == 9
+    # we can reset
+    await obj.save(values={"rev": 100})
+    # obj.rev == 100
+    # or specify a different default value
+    obj = await MyModel.query.create(rev=50)
+    # obj.rev == 50
+```
+
+Other values than 0, -1 and 1 are of course also possible but probably not used.
 
 ## Custom Fields
 

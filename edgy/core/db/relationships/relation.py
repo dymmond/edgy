@@ -141,7 +141,7 @@ class ManyRelation(ManyRelationProtocol):
         child = self.expand_relationship(child)
         # try saving intermediate model. If it fails another instance already exists and return None
         try:
-            return await child.save(force_save=True)
+            return await child.save(force_insert=True)
         except IntegrityError:
             pass
         return None

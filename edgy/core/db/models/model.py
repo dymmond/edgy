@@ -1,7 +1,8 @@
 import copy
 import inspect
+import warnings
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 from edgy.core.db.context_vars import EXPLICIT_SPECIFIED_VALUES, MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
@@ -184,7 +185,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         self.__dict__.update(self.transform_input(dict(row._mapping), phase="load", instance=self))
         self._loaded_or_deleted = True
 
-    async def _save(self, **kwargs: Any) -> "Model":
+    async def _insert(self, **kwargs: Any) -> "Model":
         """
         Performs the save instruction.
         """
@@ -225,18 +226,34 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
     async def save(
         self,
-        force_save: bool = False,
-        values: dict[str, Any] = None,
+        force_insert: bool = False,
+        values: Union[dict[str, Any], set[str], None] = None,
+        force_save: Optional[bool] = None,
     ) -> "Model":
         """
         Performs a save of a given model instance.
         When creating a user it will make sure it can update existing or
         create a new one.
         """
+        if force_save is not None:
+            warnings.warn(
+                "'force_save' is deprecated in favor of 'force_insert'",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            force_insert = force_save
+
         await self.meta.signals.pre_save.send_async(self.__class__, instance=self)
 
         extracted_fields = self.extract_db_fields()
-        EXPLICIT_SPECIFIED_VALUES = set() if values is None else set(values.keys())
+        if values is None:
+            explicit_values: set[str] = set()
+        elif isinstance(values, set):
+            # special mode for marking values as explicit values
+            explicit_values = set(values)
+            values = None
+        else:
+            explicit_values = set(values.keys())
 
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
@@ -247,23 +264,22 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                     value = await value
                 if value is None and self.table.columns[pkcolumn].autoincrement:
                     extracted_fields.pop(pkcolumn, None)
-                    force_save = True
+                    force_insert = True
                 field = self.meta.fields.get(pkcolumn)
                 # this is an IntegerField
-                if field is not None and getattr(field, "increment_on_update", 0) != 0:
+                if field is not None and getattr(field, "increment_on_save", 0) != 0:
                     # we create a new revision.
-                    force_save = True
-
+                    force_insert = True
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
 
-        token = EXPLICIT_SPECIFIED_VALUES.set(EXPLICIT_SPECIFIED_VALUES)
+        token = EXPLICIT_SPECIFIED_VALUES.set(explicit_values)
         try:
-            if force_save:
+            if force_insert:
                 if values:
                     extracted_fields.update(values)
                 # force save must ensure a complete mapping
-                await self._save(**extracted_fields)
+                await self._insert(**extracted_fields)
             else:
                 await self._update(**(extracted_fields if values is None else values))
         finally:

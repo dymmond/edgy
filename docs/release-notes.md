@@ -12,6 +12,9 @@ hide:
 - Support for querying across multiple databases.
 - Support for passing functions as clauses or keyword parameters.
 - Support for autocreated reflection objects by pattern matching.
+- Added some context variables for `extract_column_values` and `transform_input`:
+  - `CURRENT_PHASE`: allows retrieving the current context in which it was executed.
+  - `EXPLICIT_SPECIFIED_VALUES`: when set, it returns a set of the keys from the explicitly specified values.
 
 ### Changed
 
@@ -27,6 +30,7 @@ hide:
 - `phase` argument is shifted to `CURRENT_PHASE` context_var. If you rely on the correct phase you need to use it instead.
 - `extract_column_values` provides now also a `CURRENT_PHASE` environment.
 - `is_update` argument of `get_defaults` is now replaced by `CURRENT_PHASE` too. It is way more accurate.
+- Deprecate `force_save` kwarg of save in favor of `force_insert`. This is way more precise.
 
 ### Fixed
 

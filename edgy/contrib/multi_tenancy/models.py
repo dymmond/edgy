@@ -1,6 +1,7 @@
 import uuid
+import warnings
 from datetime import date
-from typing import Any, Union, cast
+from typing import Any, Optional, Union, cast
 from uuid import UUID
 
 from loguru import logger
@@ -46,10 +47,10 @@ class TenantMixin(edgy.Model):
         return f"{self.tenant_name} - {self.schema_name}"
 
     async def save(
-        self: Any,
-        force_save: bool = False,
-        values: dict[str, Any] = None,
-        **kwargs: Any,
+        self,
+        force_insert: bool = False,
+        values: Union[dict[str, Any], set[str], None] = None,
+        force_save: Optional[bool] = None,
     ) -> Model:
         """
         Creates a tenant record and generates a schema in the database.
@@ -57,6 +58,13 @@ class TenantMixin(edgy.Model):
         When a schema is created, then generates the tables for that same schema
         from the tenant models.
         """
+        if force_save is not None:
+            warnings.warn(
+                "'force_save' is deprecated in favor of 'force_insert'",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            force_insert = force_save
         fields = self.extract_db_fields()
         schema_name = fields.get("schema_name", None)
 
@@ -74,7 +82,7 @@ class TenantMixin(edgy.Model):
                 f"Can't update tenant outside it's own schema or the public schema. Current schema is '{current_schema}'"
             )
 
-        tenant = await super().save(force_save, values, **kwargs)
+        tenant = await super().save(force_insert, values)
         registry = self.meta.registry
         assert registry is not None, "registry is not set"
         try:
@@ -120,10 +128,12 @@ class DomainMixin(edgy.Model):
 
     async def save(
         self: Any,
-        force_save: bool = False,
-        values: dict[str, Any] = None,
-        **kwargs: Any,
+        force_insert: bool = False,
+        values: Union[dict[str, Any], set[str], None] = None,
+        force_save: Optional[bool] = None,
     ) -> Model:
+        if force_save is not None:
+            force_insert = force_save
         check_db_connection(self.database)
         async with self.database as database, database.transaction():
             domains = self.__class__.query.filter(tenant=self.tenant, is_primary=True).exclude(
@@ -136,7 +146,7 @@ class DomainMixin(edgy.Model):
             if self.is_primary:
                 await domains.update(is_primary=False)
 
-            return await super().save(force_save, values, **kwargs)
+            return await super().save(force_insert, values)
 
     async def delete(self) -> None:
         tenant = await self.tenant.load()

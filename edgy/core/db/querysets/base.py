@@ -1231,7 +1231,8 @@ class QuerySet(BaseQuerySet):
             table=queryset.table,
             database=queryset.database,
         )
-        instance = await instance.save(force_save=True)
+        # values=kwargs is required for ensuring all kwargs are seen as explicit kwargs
+        instance = await instance.save(force_insert=True, values=set(kwargs.keys()))
         result = await self._embed_parent_in_result(instance)
         self._clear_cache(True)
         self._cache.update([result])

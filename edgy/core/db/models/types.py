@@ -120,9 +120,8 @@ class BaseModelType(ABC):
     @abstractmethod
     async def save(
         self,
-        force_save: bool = False,
-        values: dict[str, Any] = None,
-        **kwargs: Any,
+        force_insert: bool = False,
+        values: Union[dict[str, Any], set[str], list[str], None] = None,
     ) -> "BaseModelType":
         """Save model"""
 

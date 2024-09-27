@@ -51,12 +51,11 @@ class Tenant(edgy.Model):
         await registry.schema.create_schema(self.schema_name)
 
     async def save(
-        self: Any,
-        force_save: bool = False,
-        values: Dict[str, Any] = None,
-        **kwargs: Any,
+        self,
+        force_insert: bool = False,
+        values: Union[dict[str, Any], set[str], None] = None,
     ) -> Type[Model]:
-        tenant = await super().save(force_save, values, **kwargs)
+        tenant = await super().save(force_insert, values)
         try:
             await self.create_schema(schema=tenant.schema_name, if_not_exists=True)
             await self.create_tables(

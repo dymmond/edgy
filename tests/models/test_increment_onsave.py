@@ -12,7 +12,7 @@ pytestmark = pytest.mark.anyio
 
 
 class MyWebsite(edgy.Model):
-    rev: int = edgy.IntegerField(increment_on_update=1, default=0)
+    rev: int = edgy.IntegerField(increment_on_save=1, default=0)
 
     class Meta:
         registry = models
@@ -20,7 +20,7 @@ class MyWebsite(edgy.Model):
 
 class MyRevSafe(edgy.Model):
     id: int = edgy.BigIntegerField(primary_key=True, autoincrement=True)
-    rev: int = edgy.IntegerField(increment_on_update=1, primary_key=True, default=1)
+    rev: int = edgy.IntegerField(increment_on_save=1, primary_key=True, default=1)
 
     class Meta:
         registry = models
@@ -28,7 +28,7 @@ class MyRevSafe(edgy.Model):
 
 class MyCountdown(edgy.Model):
     name = edgy.CharField(max_length=5)
-    rev: int = edgy.IntegerField(increment_on_update=-1, default=10, read_only=False)
+    rev: int = edgy.IntegerField(increment_on_save=-1, default=10, read_only=False)
 
     class Meta:
         registry = models
@@ -59,7 +59,7 @@ async def test_website():
     await websites[1].load()
     assert websites[1].rev == 0
     with pytest.raises(IntegrityError):
-        await websites[0].save(force_save=True)
+        await websites[0].save(force_insert=True)
 
     await websites[0].load()
     assert websites[0].rev == 1

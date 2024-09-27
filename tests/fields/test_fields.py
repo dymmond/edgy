@@ -172,7 +172,7 @@ def test_can_create_datetime_field():
     field = DateTimeField(auto_now=True)
 
     assert isinstance(field, BaseField)
-    assert field.default == datetime.datetime.now
+    assert field.default.func == datetime.datetime.now
     assert field.read_only is True
 
 
@@ -185,7 +185,7 @@ def test_can_create_date_field():
     field = DateField(auto_now=True)
 
     assert isinstance(field, BaseField)
-    assert field.default == datetime.datetime.now
+    assert field.default.func == datetime.datetime.now
     assert field.read_only is True
 
 

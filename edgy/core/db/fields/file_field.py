@@ -313,8 +313,15 @@ class FileField(FieldFactory):
         """
         assert field_obj.owner
         # unpack
-        if isinstance(value, dict) and isinstance(value.get(field_name), FieldFile):
-            value = value[field_name]
+        if isinstance(value, dict) and value.get(field_name) is not None:
+            instance = CURRENT_INSTANCE.get()
+            if isinstance(value[field_name], FieldFile):
+                value = value[field_name]
+            elif getattr(instance, "__db_model__", False):
+                # save was called and values passed
+                to_save = value[field_name]
+                value = getattr(instance, field_name)
+                value.save(to_save)
         assert for_query or isinstance(value, FieldFile), f"Not a FieldFile: {value!r}"
         if for_query:
             if isinstance(value, str):

@@ -5,6 +5,7 @@ import ipaddress
 import uuid
 from collections.abc import Sequence
 from enum import EnumMeta
+from functools import partial
 from re import Pattern
 from typing import TYPE_CHECKING, Any, Optional, Union
 
@@ -102,13 +103,13 @@ class TextField(FieldFactory, str):
 
 
 class IncrementOnSaveBaseField(Field):
-    increment_on_update: int = 0
+    increment_on_save: int = 0
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(
             **kwargs,
         )
-        if self.increment_on_update != 0:
+        if self.increment_on_save != 0:
             self.pre_save_callback = self._notset_pre_save_callback
 
     async def _notset_pre_save_callback(
@@ -123,13 +124,13 @@ class IncrementOnSaveBaseField(Field):
             if original_value is None:
                 return {self.name: self.get_default_value()}
             else:
-                return {self.name: value + self.increment_on_update}
+                return {self.name: value + self.increment_on_save}
         else:
             return {
                 self.name: (
                     model_or_query if model_or_query is not None else instance
                 ).table.columns[self.name]
-                + self.increment_on_update
+                + self.increment_on_save
             }
 
     def get_default_values(
@@ -137,7 +138,7 @@ class IncrementOnSaveBaseField(Field):
         field_name: str,
         cleaned_data: dict[str, Any],
     ) -> dict[str, Any]:
-        if self.increment_on_update != 0:
+        if self.increment_on_save != 0:
             phase = CURRENT_PHASE.get()
             if phase in "prepare_update":
                 return {field_name: None}
@@ -150,7 +151,7 @@ class IncrementOnSaveBaseField(Field):
     ) -> dict[str, Any]:
         phase = CURRENT_PHASE.get()
         instance = CURRENT_INSTANCE.get()
-        if self.increment_on_update != 0 and phase == "post_update":
+        if self.increment_on_save != 0 and phase == "post_update":
             # a bit dirty but works
             instance.__dict__.pop(field_name, None)
             return {}
@@ -173,7 +174,7 @@ class IntegerField(FieldFactory, int):
         le: Union[int, float, decimal.Decimal, None] = None,
         lt: Union[int, float, decimal.Decimal, None] = None,
         multiple_of: Optional[int] = None,
-        increment_on_update: int = 0,
+        increment_on_save: int = 0,
         **kwargs: Any,
     ) -> BaseFieldType:
         kwargs = {
@@ -188,13 +189,13 @@ class IntegerField(FieldFactory, int):
 
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
-        increment_on_update = kwargs.get("increment_on_update", 0)
-        if increment_on_update == 0 and kwargs.get("primary_key", False):
+        increment_on_save = kwargs.get("increment_on_save", 0)
+        if increment_on_save == 0 and kwargs.get("primary_key", False):
             kwargs.setdefault("autoincrement", True)
-        if increment_on_update != 0:
+        if increment_on_save != 0:
             if kwargs.get("autoincrement"):
                 raise FieldDefinitionError(
-                    detail="'autoincrement' is incompatible with 'increment_on_update'"
+                    detail="'autoincrement' is incompatible with 'increment_on_save'"
                 )
             kwargs.setdefault("read_only", True)
             kwargs["inject_default_on_partial_update"] = True
@@ -372,6 +373,7 @@ class AutoNowMixin(FieldFactory):
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
+        default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         if auto_now_add and auto_now:
@@ -386,7 +388,8 @@ class AutoNowMixin(FieldFactory):
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
         }
         if auto_now_add or auto_now:
-            kwargs["default"] = datetime.datetime.now
+            # date.today cannot handle timezone so use alway datetime and convert back to date
+            kwargs["default"] = partial(datetime.datetime.now, default_timezone)
         return super().__new__(cls, **kwargs)
 
 

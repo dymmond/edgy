@@ -72,7 +72,7 @@ async def test_save_file_create_approved(create_test_database):
             assert "height" not in model.ifield.metadata
             assert "width" not in model.ifield.metadata
             model.ifield.set_approved(True)
-            await model.save(ifield=model.ifield)
+            await model.save(values={"ifield": model.ifield})
         else:
             assert model.ifield.metadata["mime"] == "image/jpeg"
 
