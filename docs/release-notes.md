@@ -28,6 +28,7 @@ hide:
 ### Fixed
 
 - Fix ForeignKey not None but empty hull under some conditions.
+- Fix DecimalField requiring `max_digits`.
 
 ## 0.16.0
 

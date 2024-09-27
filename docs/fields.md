@@ -314,7 +314,7 @@ class MyModel(edgy.Model):
 
 * `minimum` - An integer indicating the minimum.
 * `maximum` - An integer indicating the maximum.
-* `max_digits` - An integer indicating the total maximum digits.
+* `max_digits` - An integer indicating the total maximum digits. Optional.
 * `decimal_places` - An integer indicating the total decimal places.
 * `multiple_of` - An integer, float or decimal indicating the multiple of.
 
