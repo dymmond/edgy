@@ -11,7 +11,7 @@ by Edgy that doesn't necessarily requires migration management?
 
 The Migrate object is the way of Edgy knowing what to do and how to manage your models but there
 are cases where that doesn't happen and it is not needed, for example,
-**a project using [reflect models](./reflection.md)**.
+**a project using [reflect models](./reflection/reflection.md)**.
 
 A project using reflect models, means that somehow migrations are managed externally and not by
 Edgy and Edgy only needs to reflect those tables back into your code, so, do you really need

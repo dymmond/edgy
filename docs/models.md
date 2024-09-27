@@ -7,7 +7,7 @@ What about the Django interface type for tables? Cleaner right? Well, **Edgy** a
 the top of SQLAlchemy core, it provides a Django like experience when it comes to create models.
 
 Do you already have a database with tables and views you would simply would like to reflect them
-back instead of the opposite? [Check the reflection section](./reflection.md) for more details.
+back instead of the opposite? [Check the reflection section](./reflection/reflection.md) for more details.
 
 ## What is a model
 

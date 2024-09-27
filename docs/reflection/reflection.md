@@ -8,7 +8,7 @@ This is where Edgy reflection comes in.
 
 ## What is reflection
 
-Reflection means the opposite of creating the [models](./models.md), meaning, reading
+Reflection means the opposite of creating the [models](../models.md), meaning, reading
 **tables and views** from an existing back into your code.
 
 Let us see an example.
@@ -45,7 +45,7 @@ model reflect to reflect existing database tables and database views from any ex
 
 ## ReflectModel
 
-The reflect model is very similar to `Model` from [models](./models.md) but with a main difference
+The reflect model is very similar to `Model` from [models](../models.md) but with a main difference
 that won't generate any migrations.
 
 ```python
@@ -59,7 +59,7 @@ as per normal behaviour.
 
 As per normal model, it is required the `Meta` class with two parameters.
 
-* **registry** - The [registry](./registry.md) instance for where the model will be generated. This
+* **registry** - The [registry](../registry.md) instance for where the model will be generated. This
 field is **mandatory** and it will raise an `ImproperlyConfigured` error if no registry is found.
 
 * **tablename** - The name of the table or view to be reflected from the database, **not the class name**.
@@ -74,7 +74,7 @@ Example:
 
 ## Fields
 
-The fields should be declared as per normal [fields](./fields.md) that represents the columns from
+The fields should be declared as per normal [fields](../fields.md) that represents the columns from
 the reflected database table or view.
 
 Example:
@@ -123,7 +123,7 @@ What about the database operations like the CRUD? Are they still possible with `
 The answer is **yes**.
 
 With `ReflectModel` you can still perform the normal operations as you would do with
-[models](./models.md) anyway.
+[models](../models.md) anyway.
 
 Remember the [difference from the models](#the-difference-from-the-models)? Well here is another
 thing. The `ReflectModel` will only perform operations on the declared fields of the
