@@ -414,7 +414,7 @@ Or not very common but also possible, update all rows in a table.
 user = await User.query.update(email="bar@foo.com")
 ```
 
-### Inplace database updates
+### In-database updates
 
 For most fields it is possible to do something like
 
