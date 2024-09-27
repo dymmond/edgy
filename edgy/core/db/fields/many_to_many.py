@@ -255,12 +255,11 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self,
         field_name: str,
         value: Any,
-        phase: str = "",
     ) -> dict[str, Any]:
         """
         Meta field
         """
-        instance = CURRENT_INSTANCE.get()
+        instance = cast("BaseModelType", CURRENT_INSTANCE.get())
         if isinstance(value, ManyRelationProtocol):
             return {field_name: value}
         if instance:
@@ -276,9 +275,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """Checks if the field has a default value set"""
         return False
 
-    def get_default_values(
-        self, field_name: str, cleaned_data: dict[str, Any], is_update: bool = False
-    ) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: dict[str, Any]) -> Any:
         """
         Meta field
         """

@@ -19,7 +19,7 @@ terminal = Print()
 class BaseContentTypeFieldField(BaseForeignKeyField):
     async def pre_save_callback(
         self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
-    ) -> Any:
+    ) -> dict[str, Any]:
         target = self.target
         if value is None or (isinstance(value, dict) and not value):
             value = original_value

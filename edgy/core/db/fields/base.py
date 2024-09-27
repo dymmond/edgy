@@ -15,7 +15,7 @@ import sqlalchemy
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
-from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.context_vars import CURRENT_PHASE, MODEL_GETATTR_BEHAVIOR
 from edgy.types import Undefined
 
 from .types import BaseFieldType, ColumnDefinitionModel
@@ -164,9 +164,7 @@ class BaseField(BaseFieldType, FieldInfo):
             return default()
         return default
 
-    def get_default_values(
-        self, field_name: str, cleaned_data: dict[str, Any], is_update: bool = False
-    ) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: dict[str, Any]) -> Any:
         # for multidefaults overwrite in subclasses get_default_values to
         # parse default values differently
         # NOTE: multi value fields should always check here if defaults were already applied
@@ -257,12 +255,12 @@ class BaseCompositeField(BaseField):
         self,
         field_name: str,
         value: Any,
-        phase: str = "",
     ) -> dict[str, Any]:
         """
         Runs the checks for the fields being validated.
         """
         result = {}
+        phase = CURRENT_PHASE.get()
         ErrorType: type[Exception] = KeyError
         if not isinstance(value, dict):
             # simpler
@@ -275,12 +273,10 @@ class BaseCompositeField(BaseField):
                 if phase == "init" or phase == "init_db":
                     continue
                 raise ErrorType(f"Missing sub-field: {sub_name} for {field_name}")
-            result.update(field.to_model(sub_name, value.get(translated_name, None), phase=phase))
+            result.update(field.to_model(sub_name, value.get(translated_name, None)))
         return result
 
-    def get_default_values(
-        self, field_name: str, cleaned_data: dict[str, Any], is_update: bool = False
-    ) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: dict[str, Any]) -> Any:
         # fields should provide their own default which is used as long as they are in the fields mapping
         return {}
 
@@ -298,10 +294,10 @@ class PKField(BaseCompositeField):
     Field for pk
     """
 
-    def __init__(self, **kwargs: Any):
+    def __init__(self, **kwargs: Any) -> None:
         kwargs["default"] = kwargs["server_default"] = None
         kwargs["field_type"] = kwargs["annotation"] = Any
-        return super().__init__(
+        super().__init__(
             **kwargs,
         )
 
@@ -329,7 +325,7 @@ class PKField(BaseCompositeField):
             MODEL_GETATTR_BEHAVIOR.reset(token)
         return d
 
-    def modify_input(self, name: str, kwargs: dict[str, Any], phase: str = "") -> None:
+    def modify_input(self, name: str, kwargs: dict[str, Any]) -> None:
         if name not in kwargs:
             return
         # check for collisions
@@ -384,8 +380,6 @@ class PKField(BaseCompositeField):
         self,
         field_name: str,
         value: Any,
-        phase: str = "",
-        instance: Optional["BaseModelType"] = None,
     ) -> dict[str, Any]:
         pknames = cast(Sequence[str], self.owner.pknames)
         assert len(cast(Sequence[str], self.owner.pkcolumns)) >= 1
@@ -397,8 +391,8 @@ class PKField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.meta.fields[pknames[0]]
-            return field.to_model(pknames[0], value, phase=phase)
-        return super().to_model(field_name, value, phase=phase)
+            return field.to_model(pknames[0], value)
+        return super().to_model(field_name, value)
 
     def get_composite_fields(self) -> dict[str, BaseFieldType]:
         return {
@@ -475,6 +469,5 @@ class BaseForeignKey(RelationshipField):
         self,
         field_name: str,
         value: Any,
-        phase: str = "",
     ) -> dict[str, Any]:
         return {field_name: self.expand_relationship(value)}

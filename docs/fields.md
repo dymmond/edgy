@@ -712,12 +712,12 @@ Additional they can provide/overwrite following methods:
 * `__get__(self, instance, owner=None)` - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
   To prevent unwanted loads operate on the instance `__dict__`. You can throw an AttributeError to trigger a load.
 * `__set__(self, instance, value)` - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
-* `to_model(self, field_name, phase="")` - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`.
+* `to_model(self, field_name)` - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`.
 * `get_embedded_fields(self, field_name, fields)` - Define internal fields.
-* `get_default_values(self, field_name, cleaned_data, is_update=False)` - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
+* `get_default_values(self, field_name, cleaned_data)` - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
 * `get_default_value(self)` - return default value for one column fields.
 * `get_global_constraints(self, field_name, columns, schemes)` - takes as second parameter (self excluded) the columns defined by this field (by get_columns). Returns a global constraint, which can be multi-column. The last one provides the schemes in descending priority.
-* `modify_input(name, kwargs, phase="")`: Modifying the input (kwargs is a dict). E.g. providing defaults only when loaded from db or collecting fields and columns for a
+* `modify_input(name, kwargs)`: Modifying the input (kwargs is a dict). E.g. providing defaults only when loaded from db or collecting fields and columns for a
   multi column, composite field (e.g. FileField). Note: this method is very powerful. You should only manipulate sub-fields and columns belonging to the field.
 * `embed_field(prefix, new_fieldname, owner=None, parent=None)`: Controlling the embedding of the field in other fields. Return None to disable embedding.
 
@@ -745,7 +745,7 @@ See `tests/fields/test_multi_column_fields.py` for an example.
 
 #### Using phases
 
-`to_model` receives an argument named phase. If used outside of a model context it defaults to an empty string.
+The `CURRENT_PHASE` ContextVariable contains the current phase. If used outside of a model context it defaults to an empty string.
 
 Within a model context it contains the current phase it is called for:
 
@@ -754,6 +754,23 @@ Within a model context it contains the current phase it is called for:
 * `load`: Called after load. Contains db values.
 * `post_insert`: Called after insert. Arguments are the ones passed to save.
 * `post_update`: Called after update. Arguments are the ones passed to save.
+
+For  `extract_column_values` following phases exist (except called manually):
+
+* `prepare_insert`: Called in extract_column_values for insert.
+* `prepare_update`: Called in extract_column_values for update.
+* `compare`: Called when comparing model instances.
+
+#### Using the instance
+
+There is a ContextVar named `CURRENT_INSTANCE`. It is optionally available in `transform_input` and set during `__init__` as well as `__set__`
+afaik in all cases the `transform_input` is called internally.
+In `extract_column_values` it is different: it is also valid that QuerySet is passed.
+
+#### Finding out which values are explicit set
+
+The `EXPLICIT_SPECIFIED_VALUES` ContextVar is either None or contains the key names of the explicit specified values.
+It is set in `save` and `update`.
 
 #### Saving variables on Field
 

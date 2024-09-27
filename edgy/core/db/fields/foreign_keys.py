@@ -13,6 +13,7 @@ import sqlalchemy
 from pydantic import BaseModel
 
 from edgy.core.db.constants import CASCADE
+from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.types import BaseFieldType
@@ -81,7 +82,7 @@ class BaseForeignKeyField(BaseForeignKey):
 
     async def pre_save_callback(
         self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
-    ) -> Any:
+    ) -> dict[str, Any]:
         target = self.target
         # value is clean result, check what is provided as kwarg
         # still use value for handling defaults
@@ -192,7 +193,8 @@ class BaseForeignKeyField(BaseForeignKey):
             raise ValueError(f"cannot handle: {value} of type {type(value)}")
         return retdict
 
-    def modify_input(self, name: str, kwargs: dict[str, Any], phase: str = "") -> None:
+    def modify_input(self, name: str, kwargs: dict[str, Any]) -> None:
+        phase = CURRENT_PHASE.get()
         column_names = self.get_column_names(name)
         assert len(column_names) >= 1
         if len(column_names) == 1:

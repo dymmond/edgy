@@ -3,7 +3,7 @@ import inspect
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
-from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.context_vars import EXPLICIT_SPECIFIED_VALUES, MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
 from edgy.core.db.models.model_proxy import ProxyModel
@@ -82,15 +82,18 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         generify_model_fields(cast(type[EdgyBaseModel], proxy_model.model))
         return cast(type[Model], proxy_model.model)
 
-    async def update(self, **kwargs: Any) -> Any:
+    async def _update(self, **kwargs: Any) -> Any:
         """
         Update operation of the database fields.
         """
         await self.meta.signals.pre_update.send_async(self.__class__, instance=self)
         column_values = self.extract_column_values(
-            extracted_values=kwargs, is_partial=True, is_update=True
+            extracted_values=kwargs,
+            is_partial=True,
+            is_update=True,
+            phase="prepare_update",
+            instance=self,
         )
-
         # empty updates shouldn't cause an error. E.g. only model references are updated
         clauses = self.identifying_clauses()
         if column_values and clauses:
@@ -110,11 +113,17 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         # updates aren't required to change the db, they can also just affect the meta fields
         await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()))
-        if kwargs:
+        if column_values or kwargs:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
         await self.meta.signals.post_update.send_async(self.__class__, instance=self)
 
+    async def update(self, **kwargs: Any) -> "Model":
+        token = EXPLICIT_SPECIFIED_VALUES.set(kwargs.keys())
+        try:
+            await self._update(**kwargs)
+        finally:
+            EXPLICIT_SPECIFIED_VALUES.reset(token)
         return self
 
     async def delete(
@@ -180,7 +189,11 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         Performs the save instruction.
         """
         column_values: dict[str, Any] = self.extract_column_values(
-            extracted_values=kwargs, is_partial=False, is_update=False
+            extracted_values=kwargs,
+            is_partial=False,
+            is_update=False,
+            phase="prepare_insert",
+            instance=self,
         )
         check_db_connection(self.database)
         async with self.database as database, database.transaction():
@@ -210,15 +223,10 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
 
         return self
 
-    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":
-        """Return database transaction for the assigned database"""
-        return self.database.transaction(force_rollback=force_rollback, **kwargs)
-
     async def save(
         self,
         force_save: bool = False,
         values: dict[str, Any] = None,
-        **kwargs: Any,
     ) -> "Model":
         """
         Performs a save of a given model instance.
@@ -228,6 +236,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         await self.meta.signals.pre_save.send_async(self.__class__, instance=self)
 
         extracted_fields = self.extract_db_fields()
+        EXPLICIT_SPECIFIED_VALUES = set() if values is None else set(values.keys())
 
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
@@ -239,19 +248,32 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 if value is None and self.table.columns[pkcolumn].autoincrement:
                     extracted_fields.pop(pkcolumn, None)
                     force_save = True
+                field = self.meta.fields.get(pkcolumn)
+                # this is an IntegerField
+                if field is not None and getattr(field, "increment_on_update", 0) != 0:
+                    # we create a new revision.
+                    force_save = True
+
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
 
-        if force_save:
-            if values:
-                extracted_fields.update(values)
-            # force save must ensure a complete mapping
-            await self._save(**extracted_fields)
-        else:
-            await self.update(**(extracted_fields if values is None else values))
-
+        token = EXPLICIT_SPECIFIED_VALUES.set(EXPLICIT_SPECIFIED_VALUES)
+        try:
+            if force_save:
+                if values:
+                    extracted_fields.update(values)
+                # force save must ensure a complete mapping
+                await self._save(**extracted_fields)
+            else:
+                await self._update(**(extracted_fields if values is None else values))
+        finally:
+            EXPLICIT_SPECIFIED_VALUES.reset(token)
         await self.meta.signals.post_save.send_async(self.__class__, instance=self)
         return self
+
+    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":
+        """Return database transaction for the assigned database"""
+        return self.database.transaction(force_rollback=force_rollback, **kwargs)
 
 
 class ReflectModel(ReflectedModelMixin, Model):

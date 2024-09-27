@@ -24,6 +24,9 @@ hide:
 - We use more metaclass kwarg arguments.
 - Switch to python >= 3.9.
 - Rename internal `_is_init` of MetaInfo to `_fields_are_initialized`.
+- `phase` argument is shifted to `CURRENT_PHASE` context_var. If you rely on the correct phase you need to use it instead.
+- `extract_column_values` provides now also a `CURRENT_PHASE` environment.
+- `is_update` argument of `get_defaults` is now replaced by `CURRENT_PHASE` too. It is way more accurate.
 
 ### Fixed
 

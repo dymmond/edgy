@@ -15,7 +15,7 @@ from typing import (
 import orjson
 import sqlalchemy
 
-from edgy.core.db.context_vars import CURRENT_INSTANCE
+from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE
 from edgy.core.db.fields.base import BaseCompositeField
 from edgy.core.db.fields.core import BigIntegerField, BooleanField, JSONField
 from edgy.core.db.fields.factories import FieldFactory
@@ -39,7 +39,7 @@ class ConcreteFileField(BaseCompositeField):
         Callable[[Optional["BaseModelType"], Union[File, BinaryIO], str, bool], str]
     ] = None
 
-    def modify_input(self, name: str, kwargs: dict[str, Any], phase: str = "") -> None:
+    def modify_input(self, name: str, kwargs: dict[str, Any]) -> None:
         # we are empty
         if name not in kwargs:
             return
@@ -71,7 +71,6 @@ class ConcreteFileField(BaseCompositeField):
         self,
         field_name: str,
         value: Any,
-        phase: str = "",
     ) -> dict[str, Any]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
@@ -84,6 +83,7 @@ class ConcreteFileField(BaseCompositeField):
             phase: the phase (set, creation, ...)
 
         """
+        phase = CURRENT_PHASE.get()
         instance = CURRENT_INSTANCE.get()
         if (
             phase in {"post_update", "post_insert"}
@@ -272,7 +272,7 @@ class FileField(FieldFactory):
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.String(
-            length=kwargs.get("max_length", 255), collation=kwargs.get("collation", None)
+            length=kwargs.get("max_length", 255), collation=kwargs.get("collation")
         )
 
     @classmethod

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union, cast
 from typing_extensions import get_origin
 
 import edgy
+from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields.base import BaseField
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.exceptions import ModelReferenceError
@@ -25,9 +26,9 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         field_obj: "BaseFieldType",
         name: str,
         kwargs: dict[str, Any],
-        phase: str = "",
         original_fn: Any = None,
     ) -> None:
+        phase = CURRENT_PHASE.get()
         # we are empty
         if name not in kwargs and phase == "init_db":
             kwargs[name] = []

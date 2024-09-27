@@ -51,12 +51,11 @@ class RelatedField(RelationshipField):
         self,
         field_name: str,
         value: Any,
-        phase: str = "",
     ) -> dict[str, Any]:
         """
         Meta field
         """
-        instance = CURRENT_INSTANCE.get()
+        instance = cast("BaseModelType", CURRENT_INSTANCE.get())
         if isinstance(value, ManyRelationProtocol):
             return {field_name: value}
         if instance:

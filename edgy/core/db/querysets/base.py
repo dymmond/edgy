@@ -1258,7 +1258,9 @@ class QuerySet(BaseQuerySet):
                 if self.model_class.meta.post_save_fields:
                     new_objs.append(obj)
             original = obj.extract_db_fields()
-            col_values: dict[str, Any] = obj.extract_column_values(original)
+            col_values: dict[str, Any] = obj.extract_column_values(
+                original, phase="prepare_insert", instance=self
+            )
             col_values.update(
                 await obj.execute_pre_save_hooks(col_values, original, force_insert=True)
             )
@@ -1304,6 +1306,8 @@ class QuerySet(BaseQuerySet):
                     extracted,
                     is_update=True,
                     is_partial=True,
+                    phase="prepare_update",
+                    instance=self,
                 )
                 update.update(
                     await obj.execute_pre_save_hooks(update, extracted, force_insert=False)
@@ -1358,7 +1362,9 @@ class QuerySet(BaseQuerySet):
         Updates records in a specific table with the given kwargs.
         """
 
-        kwargs = self.model_class.extract_column_values(kwargs, is_update=True, is_partial=True)
+        kwargs = self.model_class.extract_column_values(
+            kwargs, is_update=True, is_partial=True, phase="prepare_update", instance=self
+        )
 
         # Broadcast the initial update details
         await self.model_class.meta.signals.pre_update.send_async(
