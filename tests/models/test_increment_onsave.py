@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
 import edgy
@@ -19,6 +20,7 @@ class MyWebsite(edgy.Model):
 
 
 class MyRevSafe(edgy.Model):
+    name = edgy.CharField(max_length=50)
     id: int = edgy.BigIntegerField(primary_key=True, autoincrement=True)
     rev: int = edgy.IntegerField(increment_on_save=1, primary_key=True, default=1)
 
@@ -26,9 +28,26 @@ class MyRevSafe(edgy.Model):
         registry = models
 
 
+class MyRevUnsafe(edgy.Model):
+    name = edgy.CharField(max_length=50)
+    id: int = edgy.BigIntegerField(primary_key=True, autoincrement=True)
+    rev: int = edgy.IntegerField(increment_on_save=1, primary_key=True, default=1, read_only=False)
+
+    class Meta:
+        registry = models
+
+
 class MyCountdown(edgy.Model):
-    name = edgy.CharField(max_length=5)
+    name = edgy.CharField(max_length=50)
     rev: int = edgy.IntegerField(increment_on_save=-1, default=10, read_only=False)
+
+    class Meta:
+        registry = models
+
+
+class MyCountdownNoDefault(edgy.Model):
+    name = edgy.CharField(max_length=50)
+    rev: int = edgy.IntegerField(increment_on_save=-1, read_only=False)
 
     class Meta:
         registry = models
@@ -66,13 +85,31 @@ async def test_website():
 
 
 async def test_rev_safe():
-    obj = await MyRevSafe.query.create()
+    obj = await MyRevSafe.query.create(name="foo")
     assert obj.rev == 1
     await obj.save()
     assert obj.rev == 2
     objs = await MyRevSafe.query.all()
     assert len(objs) == 2
     assert objs[0].rev == 1
+    assert objs[1].rev == 2
+
+
+async def test_rev_unsafe():
+    obj = await MyRevUnsafe.query.create(name="foo")
+    assert obj.rev == 1
+    await obj.save()
+    assert obj.rev == 2
+    objs = await MyRevUnsafe.query.all()
+    assert len(objs) == 2
+    assert objs[0].rev == 1
+    assert objs[1].rev == 2
+    # it shall fail
+    with pytest.raises(IntegrityError):
+        await obj.update(name="bar")
+    # revision unsafe update
+    await obj.update(name="bar", rev=obj.rev)
+    assert obj.rev == 2
 
 
 async def test_countdown():
@@ -82,3 +119,12 @@ async def test_countdown():
     assert obj.rev == 9
     await obj.save(values={"rev": 100})
     assert obj.rev == 100
+
+
+async def test_countdown_nodefault():
+    with pytest.raises(ValidationError):
+        await MyCountdownNoDefault.query.create(name="count")
+    obj = await MyCountdownNoDefault.query.create(name="count", rev=10)
+    assert obj.rev == 10
+    await obj.save()
+    assert obj.rev == 9

@@ -266,10 +266,11 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                     extracted_fields.pop(pkcolumn, None)
                     force_insert = True
                 field = self.meta.fields.get(pkcolumn)
-                # this is an IntegerField
+                # this is an IntegerField with primary_key set
                 if field is not None and getattr(field, "increment_on_save", 0) != 0:
                     # we create a new revision.
                     force_insert = True
+                    # Note: we definitely want this because it is easy for forget a force_insert
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
 

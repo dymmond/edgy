@@ -744,7 +744,6 @@ Hint: it has a very special handling.
 ```python
 import edgy
 
-
 class MyModel(edgy.Model):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     rev: int = edgy.SmallIntegerField(default=0, increment_on_save=1, primary_key=True)
@@ -758,11 +757,36 @@ async def main():
     assert len(await MyModel.query.all()) == 2
 ```
 
-This implements a copy on save. We have now revision safe models.
+This implements a copy on save. We have now revision safe models. This is very strictly checked.
+
+
+#### Revisioning with unsafe updates
+
+Sometimes you want to be able to modify old revisions. There is a second revisioning pattern allowing this:
+
+```python
+import edgy
+
+class MyModel(edgy.Model):
+    id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
+    rev: int = edgy.SmallIntegerField(default=0, increment_on_save=1, primary_key=True, read_only=False)
+    name = edgy.CharField(max_length=50)
+    ...
+
+async def main():
+    obj = await MyModel.query.create(name="foo")
+    # obj.rev == 0
+    await obj.save()
+    # obj.rev == 1
+    assert len(await MyModel.query.all()) == 2
+    # rev must be in update otherwise it fails (what is good)
+    await obj.update(name="bar", rev=obj.rev)
+```
 
 ### Countdown Field
 
-Until now we have seen only `increment_on_save=1` but it can be also negative. That is useful for a countdown.
+Until now we have seen only `increment_on_save=1` but it can be also negative.
+That is useful for a countdown.
 
 
 ```python
@@ -770,23 +794,22 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    rev: int = edgy.SmallIntegerField(default=10, increment_on_save=-1)
+    counter: int = edgy.IntegerField(increment_on_save=-1)
     ...
 
 async def main():
-    obj = await MyModel.query.create()
-    # obj.rev == 10
+    # we have no default here
+    obj = await MyModel.query.create(counter=10)
+    # obj.counter == 10
     await obj.save()
-    # obj.rev == 9
+    # obj.counter == 9
     # we can reset
-    await obj.save(values={"rev": 100})
-    # obj.rev == 100
+    await obj.save(values={"counter": 100})
+    # obj.counter == 100
     # or specify a different default value
-    obj = await MyModel.query.create(rev=50)
-    # obj.rev == 50
+    obj = await MyModel.query.create(counter=50)
+    # obj.counter == 50
 ```
-
-Other values than 0, -1 and 1 are of course also possible but probably not used.
 
 ## Custom Fields
 

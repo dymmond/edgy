@@ -125,13 +125,17 @@ class IncrementOnSaveBaseField(Field):
                 return {self.name: self.get_default_value()}
             else:
                 return {self.name: value + self.increment_on_save}
-        else:
+        elif not self.primary_key:
+            # update path
             return {
                 self.name: (
                     model_or_query if model_or_query is not None else instance
                 ).table.columns[self.name]
                 + self.increment_on_save
             }
+        else:
+            # update path
+            return {}
 
     def get_default_values(
         self,
@@ -151,7 +155,7 @@ class IncrementOnSaveBaseField(Field):
     ) -> dict[str, Any]:
         phase = CURRENT_PHASE.get()
         instance = CURRENT_INSTANCE.get()
-        if self.increment_on_save != 0 and phase == "post_update":
+        if self.increment_on_save != 0 and not self.primary_key and phase == "post_update":
             # a bit dirty but works
             instance.__dict__.pop(field_name, None)
             return {}
@@ -196,6 +200,10 @@ class IntegerField(FieldFactory, int):
             if kwargs.get("autoincrement"):
                 raise FieldDefinitionError(
                     detail="'autoincrement' is incompatible with 'increment_on_save'"
+                )
+            if kwargs.get("null"):
+                raise FieldDefinitionError(
+                    detail="'null' is incompatible with 'increment_on_save'"
                 )
             kwargs.setdefault("read_only", True)
             kwargs["inject_default_on_partial_update"] = True
