@@ -317,26 +317,27 @@ class FileField(FieldFactory):
         # unpack
         if isinstance(value, dict) and field_name in value:
             instance = CURRENT_INSTANCE.get()
+            phase = CURRENT_PHASE.get()
             if isinstance(value[field_name], FieldFile) or value[field_name] is None:
                 value = value[field_name]
             elif getattr(instance, "__db_model__", False):
                 # save was called and values passed
                 to_save = value[field_name]
                 value = cast("FieldFile", getattr(instance, field_name))
-                value.save(to_save)
+                value.save(to_save, delete_old=phase == "prepare_update")
         if value is None:
-            retdict: dict[str, Any] = {
+            nulldict: dict[str, Any] = {
                 field_name: None,
             }
-            retdict[f"{field_name}_storage"] = None
+            nulldict[f"{field_name}_storage"] = None
             if not for_query:
                 if field_obj.with_approval:
-                    retdict[f"{field_name}_approved"] = False
+                    nulldict[f"{field_name}_approved"] = False
                 if field_obj.with_size:
-                    retdict[f"{field_name}_size"] = None
+                    nulldict[f"{field_name}_size"] = None
                 if field_obj.with_metadata:
-                    retdict[f"{field_name}_metadata"] = {}
-            return retdict
+                    nulldict[f"{field_name}_metadata"] = {}
+            return nulldict
 
         if for_query:
             if isinstance(value, str):

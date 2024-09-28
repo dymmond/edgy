@@ -761,6 +761,9 @@ This implements a copy on save. We have now revision safe models. This is very s
 It even works with FileFields or ImageFields.
 
 
+!!! Warning
+    When using FileField or ImageField and want to be able to delete single revisions make sure you save a copy per revision with `to_file()`.
+
 #### Revisioning with unsafe updates
 
 Sometimes you want to be able to modify old revisions. There is a second revisioning pattern allowing this:
@@ -778,7 +781,8 @@ class MyModel(edgy.Model):
 async def main():
     obj = await MyModel.query.create(name="foo")
     # obj.rev == 0
-    await obj.save()
+    # cloak FileField so a new filename is generated
+    await obj.save(document=obj.document.to_file())
     # obj.rev == 1
     assert len(await MyModel.query.all()) == 2
     # rev must be in update otherwise it fails (what is good)
@@ -786,7 +790,7 @@ async def main():
 ```
 
 !!! Warning
-    When using FileField or ImageField make sure you save revisi
+    When using FileField or ImageField make sure you save per revision with to_file().
 
 ### Countdown Field
 

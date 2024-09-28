@@ -298,11 +298,17 @@ class FieldFile(File):
         self.generate_name_fn = generate_name_fn
         self.metadata = metadata or {}
         self.multi_process_safe = multi_process_safe
-        self.approved = approved
         self.change_removes_approval = change_removes_approval
+        self.approved = approved
         if size is not None:
             # set value to cached_property
             self.size = size
+
+    def to_file(self) -> Optional[File]:
+        """Cloak FileField so it looks like a regular File. Required for copies."""
+        if self:
+            return File(cast(BinaryIO, self), name=self.name, storage=self.storage)
+        return None
 
     async def execute_operation(self, nodelete_old: bool = False) -> None:
         operation = self.operation

@@ -103,13 +103,17 @@ async def test_rev_safe():
     objs[1].document.delete(instant=True)
 
 
-async def test_rev_unsafe():
+async def test_rev_unsafe_with_document():
     obj = await MyRevUnsafe.query.create(
         name="foo", document=edgy.files.ContentFile(b"foo", name="foo.bytes")
     )
+    old_name = obj.document.name
+    assert obj.document
     assert obj.rev == 1
-    await obj.save(values={"document": obj.document.open() if obj.document else None})
+    fileobj = obj.document.to_file()
+    await obj.save(values={"document": fileobj})
     assert obj.rev == 2
+    assert obj.document.name != old_name
     objs = await MyRevUnsafe.query.all()
     assert len(objs) == 2
     assert objs[0].rev == 1
@@ -124,16 +128,18 @@ async def test_rev_unsafe():
         name="bar", rev=obj.rev, document=edgy.files.ContentFile(b"zar", name="foo.bytes")
     )
     assert obj.rev == 2
+    await objs[0].load()
+    assert objs[0].document.open().read() == b"foo"
     await objs[1].load()
     assert objs[1].document.open().read() == b"zar"
     objs[0].document.delete(instant=True)
     objs[1].document.delete(instant=True)
 
 
-async def test_rev_unsafe2():
+async def test_rev_unsafe_without_document():
     obj = await MyRevUnsafe.query.create(name="foo")
     assert obj.rev == 1
-    await obj.save(values={"document": obj.document.open() if obj.document else None})
+    await obj.save(values={"document": obj.document.to_file()})
     assert obj.rev == 2
     objs = await MyRevUnsafe.query.all()
     assert len(objs) == 2
