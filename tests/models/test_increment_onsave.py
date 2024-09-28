@@ -21,6 +21,7 @@ class MyWebsite(edgy.Model):
 
 class MyRevSafe(edgy.Model):
     name = edgy.CharField(max_length=50)
+    document: edgy.files.FieldFile = edgy.fields.FileField(null=True)
     id: int = edgy.BigIntegerField(primary_key=True, autoincrement=True)
     rev: int = edgy.IntegerField(increment_on_save=1, primary_key=True, default=1)
 
@@ -30,6 +31,7 @@ class MyRevSafe(edgy.Model):
 
 class MyRevUnsafe(edgy.Model):
     name = edgy.CharField(max_length=50)
+    document: edgy.files.FieldFile = edgy.fields.FileField(null=True)
     id: int = edgy.BigIntegerField(primary_key=True, autoincrement=True)
     rev: int = edgy.IntegerField(increment_on_save=1, primary_key=True, default=1, read_only=False)
 
@@ -85,31 +87,72 @@ async def test_website():
 
 
 async def test_rev_safe():
-    obj = await MyRevSafe.query.create(name="foo")
+    obj = await MyRevSafe.query.create(
+        name="foo", document=edgy.files.ContentFile(b"foo", name="foo.bytes")
+    )
     assert obj.rev == 1
-    await obj.save()
+    await obj.save(values={"document": edgy.files.ContentFile(b"bar", name="foo.bytes")})
     assert obj.rev == 2
     objs = await MyRevSafe.query.all()
     assert len(objs) == 2
     assert objs[0].rev == 1
+    assert objs[0].document.open().read() == b"foo"
     assert objs[1].rev == 2
+    assert objs[1].document.open().read() == b"bar"
+    objs[0].document.delete(instant=True)
+    objs[1].document.delete(instant=True)
 
 
 async def test_rev_unsafe():
-    obj = await MyRevUnsafe.query.create(name="foo")
+    obj = await MyRevUnsafe.query.create(
+        name="foo", document=edgy.files.ContentFile(b"foo", name="foo.bytes")
+    )
     assert obj.rev == 1
-    await obj.save()
+    await obj.save(values={"document": obj.document.open() if obj.document else None})
     assert obj.rev == 2
     objs = await MyRevUnsafe.query.all()
     assert len(objs) == 2
     assert objs[0].rev == 1
+    assert objs[0].document.open().read() == b"foo"
     assert objs[1].rev == 2
+    assert objs[1].document.open().read() == b"foo"
     # it shall fail
     with pytest.raises(IntegrityError):
         await obj.update(name="bar")
     # revision unsafe update
-    await obj.update(name="bar", rev=obj.rev)
+    await obj.update(
+        name="bar", rev=obj.rev, document=edgy.files.ContentFile(b"zar", name="foo.bytes")
+    )
     assert obj.rev == 2
+    await objs[1].load()
+    assert objs[1].document.open().read() == b"zar"
+    objs[0].document.delete(instant=True)
+    objs[1].document.delete(instant=True)
+
+
+async def test_rev_unsafe2():
+    obj = await MyRevUnsafe.query.create(name="foo")
+    assert obj.rev == 1
+    await obj.save(values={"document": obj.document.open() if obj.document else None})
+    assert obj.rev == 2
+    objs = await MyRevUnsafe.query.all()
+    assert len(objs) == 2
+    assert objs[0].rev == 1
+    assert not objs[0].document
+    assert objs[1].rev == 2
+    assert not objs[1].document
+    # it shall fail
+    with pytest.raises(IntegrityError):
+        await obj.update(name="bar")
+    # revision unsafe update
+    await obj.update(
+        name="bar", rev=obj.rev, document=edgy.files.ContentFile(b"zar", name="foo.bytes")
+    )
+    assert obj.rev == 2
+    await objs[1].load()
+    assert objs[1].document.open().read() == b"zar"
+    objs[0].document.delete(instant=True)
+    objs[1].document.delete(instant=True)
 
 
 async def test_countdown():

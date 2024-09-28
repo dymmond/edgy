@@ -758,6 +758,7 @@ async def main():
 ```
 
 This implements a copy on save. We have now revision safe models. This is very strictly checked.
+It even works with FileFields or ImageFields.
 
 
 #### Revisioning with unsafe updates
@@ -769,6 +770,7 @@ import edgy
 
 class MyModel(edgy.Model):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
+    document = edgy.fields.FileField(null=True)
     rev: int = edgy.SmallIntegerField(default=0, increment_on_save=1, primary_key=True, read_only=False)
     name = edgy.CharField(max_length=50)
     ...
@@ -782,6 +784,9 @@ async def main():
     # rev must be in update otherwise it fails (what is good)
     await obj.update(name="bar", rev=obj.rev)
 ```
+
+!!! Warning
+    When using FileField or ImageField make sure you save revisi
 
 ### Countdown Field
 

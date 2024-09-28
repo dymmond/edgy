@@ -73,6 +73,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         obj: "BaseFieldType",
         value: Optional[list],
         instance: "BaseModelType",
+        force_insert: bool,
         original_fn: Any = None,
     ) -> None:
         if not value:

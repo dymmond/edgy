@@ -485,7 +485,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                 CURRENT_INSTANCE.reset(token2)
         return retdict
 
-    async def execute_post_save_hooks(self, fields: Sequence[str]) -> None:
+    async def execute_post_save_hooks(self, fields: Sequence[str], force_insert: bool) -> None:
         affected_fields = self.meta.post_save_fields.intersection(fields)
         if affected_fields:
             # don't trigger loads, AttributeErrors are used for skipping fields
@@ -498,7 +498,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                         value = getattr(self, field_name)
                     except AttributeError:
                         continue
-                    await field.post_save_callback(value, instance=self)
+                    await field.post_save_callback(value, instance=self, force_insert=force_insert)
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(token)
                 CURRENT_INSTANCE.reset(token2)

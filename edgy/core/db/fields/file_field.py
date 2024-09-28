@@ -220,8 +220,10 @@ class ConcreteFileField(BaseCompositeField):
             field_names.append(f"{self.name}_metadata")
         return {name: self.owner.meta.fields[name] for name in field_names}
 
-    async def post_save_callback(self, value: FieldFile, instance: "BaseModelType") -> None:
-        await value.execute_operation()
+    async def post_save_callback(
+        self, value: FieldFile, instance: "BaseModelType", force_insert: bool
+    ) -> None:
+        await value.execute_operation(nodelete_old=force_insert)
         # cleanup temp file
         value.close(keep_size=True)
 
@@ -313,16 +315,29 @@ class FileField(FieldFactory):
         """
         assert field_obj.owner
         # unpack
-        if isinstance(value, dict) and value.get(field_name) is not None:
+        if isinstance(value, dict) and field_name in value:
             instance = CURRENT_INSTANCE.get()
-            if isinstance(value[field_name], FieldFile):
+            if isinstance(value[field_name], FieldFile) or value[field_name] is None:
                 value = value[field_name]
             elif getattr(instance, "__db_model__", False):
                 # save was called and values passed
                 to_save = value[field_name]
                 value = cast("FieldFile", getattr(instance, field_name))
                 value.save(to_save)
-        assert for_query or isinstance(value, FieldFile), f"Not a FieldFile: {value!r}"
+        if value is None:
+            retdict: dict[str, Any] = {
+                field_name: None,
+            }
+            retdict[f"{field_name}_storage"] = None
+            if not for_query:
+                if field_obj.with_approval:
+                    retdict[f"{field_name}_approved"] = False
+                if field_obj.with_size:
+                    retdict[f"{field_name}_size"] = None
+                if field_obj.with_metadata:
+                    retdict[f"{field_name}_metadata"] = {}
+            return retdict
+
         if for_query:
             if isinstance(value, str):
                 return {field_name: value}

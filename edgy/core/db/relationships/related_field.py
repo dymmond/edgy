@@ -107,7 +107,7 @@ class RelatedField(RelationshipField):
         return f"({self.related_to.__name__}={self.related_name})"
 
     async def post_save_callback(
-        self, value: ManyRelationProtocol, instance: "BaseModelType"
+        self, value: ManyRelationProtocol, instance: "BaseModelType", force_insert: bool
     ) -> None:
         await value.save_related()
 

@@ -113,7 +113,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 setattr(self, k, v)
 
         # updates aren't required to change the db, they can also just affect the meta fields
-        await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()))
+        await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()), force_insert=False)
         if column_values or kwargs:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
@@ -218,7 +218,9 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             setattr(self, k, v)
 
         if self.meta.post_save_fields:
-            await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()))
+            await self.execute_post_save_hooks(
+                cast(Sequence[str], kwargs.keys()), force_insert=True
+            )
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False
 

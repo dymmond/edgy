@@ -31,6 +31,7 @@ hide:
 - `extract_column_values` provides now also a `CURRENT_PHASE` environment.
 - `is_update` argument of `get_defaults` is now replaced by `CURRENT_PHASE` too. It is way more accurate.
 - Deprecate `force_save` kwarg of save in favor of `force_insert`. This is way more precise.
+- `post_save_callback` receives now also the `force_insert` parameter.
 
 ### Fixed
 

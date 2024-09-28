@@ -304,7 +304,7 @@ class FieldFile(File):
             # set value to cached_property
             self.size = size
 
-    async def execute_operation(self) -> None:
+    async def execute_operation(self, nodelete_old: bool = False) -> None:
         operation = self.operation
         self.operation = "none"
         if operation == "save" or operation == "save_delete":
@@ -317,7 +317,8 @@ class FieldFile(File):
             finally:
                 self.storage.unreserve_name(self.name)
             if (
-                operation == "save_delete"
+                not nodelete_old
+                and operation == "save_delete"
                 and self.old is not None
                 and self.old[1]
                 and self.old[1] != self.name
@@ -328,7 +329,7 @@ class FieldFile(File):
                 self.close()
             # old should not be None anyway but check that
             # if name is empty or None skip deletion
-            if self.old is not None and self.old[1]:
+            if not nodelete_old and self.old is not None and self.old[1]:
                 self.old[0].delete(self.old[1])
         # else approve operation or metadata update
         self.old = None

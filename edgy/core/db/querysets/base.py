@@ -1266,7 +1266,9 @@ class QuerySet(BaseQuerySet):
         self._clear_cache(True)
         if new_objs:
             for obj in new_objs:
-                await obj.execute_post_save_hooks(self.model_class.meta.fields.keys())
+                await obj.execute_post_save_hooks(
+                    self.model_class.meta.fields.keys(), force_insert=True
+                )
 
     async def bulk_update(self, objs: list[EdgyModel], fields: list[str]) -> None:
         """
@@ -1322,7 +1324,7 @@ class QuerySet(BaseQuerySet):
             and not self.model_class.meta.post_save_fields.isdisjoint(fields)
         ):
             for obj in objs:
-                await obj.execute_post_save_hooks(fields)
+                await obj.execute_post_save_hooks(fields, force_insert=False)
 
     async def delete(self, use_models: bool = False) -> int:
         if (

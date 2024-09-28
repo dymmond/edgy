@@ -275,7 +275,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         raise ValueError("Missing instance")
 
     async def post_save_callback(
-        self, value: ManyRelationProtocol, instance: "BaseModelType"
+        self, value: ManyRelationProtocol, instance: "BaseModelType", force_insert: bool
     ) -> None:
         await value.save_related()
 
