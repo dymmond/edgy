@@ -41,14 +41,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.fields.types import BaseFieldType
 
 
-def _removeprefix(text: str, prefix: str) -> str:
-    # TODO: replace with removeprefix when python3.9 is minimum
-    if text.startswith(prefix):
-        return text[len(prefix) :]
-    else:
-        return text
-
-
 generic_field = BaseField()
 
 
@@ -62,7 +54,7 @@ def clean_query_kwargs(
     for key, val in kwargs.items():
         if embed_parent:
             if embed_parent[1] and key.startswith(embed_parent[1]):
-                key = _removeprefix(_removeprefix(key, embed_parent[1]), "__")
+                key = key.removeprefix(embed_parent[1]).removeprefix("__")
             else:
                 key = f"{embed_parent[0]}__{key}"
         sub_model_class, field_name, _, _, _, cross_db_remainder = crawl_relationship(

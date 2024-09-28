@@ -31,14 +31,6 @@ if TYPE_CHECKING:
 FK_CHAR_LIMIT = 63
 
 
-def _removeprefix(text: str, prefix: str) -> str:
-    # TODO: replace with removeprefix when python3.9 is minimum
-    if text.startswith(prefix):
-        return text[len(prefix) :]
-    else:
-        return text
-
-
 class BaseForeignKeyField(BaseForeignKey):
     force_cascade_deletion_relation: bool = False
     relation_has_post_delete_callback: bool = False
@@ -118,12 +110,12 @@ class BaseForeignKeyField(BaseForeignKey):
         )
 
     def traverse_field(self, path: str) -> tuple[Any, str, str]:
-        return self.target, self.reverse_name, _removeprefix(_removeprefix(path, self.name), "__")
+        return self.target, self.reverse_name, path.removeprefix(self.name).removeprefix("__")
 
     def reverse_traverse_field(self, path: str) -> tuple[Any, str, str]:
         if self.reverse_path_fn:
             return self.reverse_path_fn(path)
-        return self.owner, self.name, _removeprefix(_removeprefix(path, self.reverse_name), "__")
+        return self.owner, self.name, path.removeprefix(self.reverse_name).removeprefix("__")
 
     @cached_property
     def related_columns(self) -> dict[str, Optional[sqlalchemy.Column]]:
@@ -256,7 +248,7 @@ class BaseForeignKeyField(BaseForeignKey):
     def from_fk_field_name(self, name: str, fieldname: str) -> str:
         if len(self.related_columns) == 1:
             return next(iter(self.related_columns.keys()))
-        return _removeprefix(fieldname, f"{name}_")
+        return fieldname.removeprefix(f"{name}_")
 
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         target = self.target
