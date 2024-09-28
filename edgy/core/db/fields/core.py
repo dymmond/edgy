@@ -114,7 +114,7 @@ class IncrementOnSaveBaseField(Field):
 
     async def _notset_pre_save_callback(
         self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
-    ) -> dict[str:Any]:
+    ) -> dict[str, Any]:
         explicit_values = EXPLICIT_SPECIFIED_VALUES.get()
         if explicit_values is not None and self.name in explicit_values:
             return {}

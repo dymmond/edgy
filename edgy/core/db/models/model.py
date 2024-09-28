@@ -120,7 +120,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         await self.meta.signals.post_update.send_async(self.__class__, instance=self)
 
     async def update(self, **kwargs: Any) -> "Model":
-        token = EXPLICIT_SPECIFIED_VALUES.set(kwargs.keys())
+        token = EXPLICIT_SPECIFIED_VALUES.set(set(kwargs.keys()))
         try:
             await self._update(**kwargs)
         finally:
@@ -273,7 +273,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
 
-        token = EXPLICIT_SPECIFIED_VALUES.set(explicit_values)
+        token2 = EXPLICIT_SPECIFIED_VALUES.set(explicit_values)
         try:
             if force_insert:
                 if values:
@@ -283,7 +283,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             else:
                 await self._update(**(extracted_fields if values is None else values))
         finally:
-            EXPLICIT_SPECIFIED_VALUES.reset(token)
+            EXPLICIT_SPECIFIED_VALUES.reset(token2)
         await self.meta.signals.post_save.send_async(self.__class__, instance=self)
         return self
 

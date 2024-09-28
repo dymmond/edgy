@@ -320,7 +320,7 @@ class FileField(FieldFactory):
             elif getattr(instance, "__db_model__", False):
                 # save was called and values passed
                 to_save = value[field_name]
-                value = getattr(instance, field_name)
+                value = cast("FieldFile", getattr(instance, field_name))
                 value.save(to_save)
         assert for_query or isinstance(value, FieldFile), f"Not a FieldFile: {value!r}"
         if for_query:

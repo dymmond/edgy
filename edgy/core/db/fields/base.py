@@ -164,7 +164,7 @@ class BaseField(BaseFieldType, FieldInfo):
             return default()
         return default
 
-    def get_default_values(self, field_name: str, cleaned_data: dict[str, Any]) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: dict[str, Any]) -> dict[str, Any]:
         # for multidefaults overwrite in subclasses get_default_values to
         # parse default values differently
         # NOTE: multi value fields should always check here if defaults were already applied
