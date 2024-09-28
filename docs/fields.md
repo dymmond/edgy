@@ -92,7 +92,7 @@ This field is used as a default field for the `id` of a model.
 * `minimum` - An integer indicating the minimum.
 * `maximum` - An integer indicating the maximum.
 * `multiple_of` - An integer indicating the multiple of.
-* `increment_on_save` - An integery which is applied on every save.
+* `increment_on_save` - An integer which is applied on every save.
 
 #### IntegerField
 
@@ -112,7 +112,7 @@ class MyModel(edgy.Model):
 * `minimum` - An integer indicating the minimum.
 * `maximum` - An integer indicating the maximum.
 * `multiple_of` - An integer indicating the multiple of.
-* `increment_on_save` - An integery which is applied on every save.
+* `increment_on_save` - An integer which is applied on every save.
 
 
 #### SmallIntegerField
@@ -133,7 +133,7 @@ class MyModel(edgy.Model):
 * `minimum` - An integer indicating the minimum.
 * `maximum` - An integer indicating the maximum.
 * `multiple_of` - An integer indicating the multiple of.
-* `increment_on_save` - An integery which is applied on every save.
+* `increment_on_save` - An integer which is applied on every save.
 
 #### BooleanField
 
