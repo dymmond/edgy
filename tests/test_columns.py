@@ -30,12 +30,12 @@ class StatusEnum(Enum):
 class Product(edgy.Model):
     id = fields.IntegerField(primary_key=True)
     uuid = fields.UUIDField(null=True)
-    created = fields.DateTimeField(default=datetime.datetime.now)
+    created = fields.DateTimeField(default=datetime.datetime.now, with_timezone=False)
     created_day = fields.DateField(default=datetime.date.today)
     created_time = fields.TimeField(default=time)
-    created_date = fields.DateField(auto_now_add=True)
-    created_datetime = fields.DateTimeField(auto_now_add=True)
-    updated_datetime = fields.DateTimeField(auto_now=True)
+    created_date = fields.DateField(auto_now_add=True, with_timezone=False)
+    created_datetime = fields.DateTimeField(auto_now_add=True, with_timezone=False)
+    updated_datetime = fields.DateTimeField(auto_now=True, with_timezone=False)
     updated_date = fields.DateField(auto_now=True)
     data = fields.JSONField(default={})
     description = fields.CharField(null=True, max_length=255)
@@ -83,11 +83,17 @@ async def rollback_transactions():
 
 
 async def test_model_crud():
+    # fails e.g. at 2024-09-27T23:17:53+00:00 when not having with_timezone=False
+    # why? the database starts to inject a timezone when none is set
+    # strangely this doesn't happen with tests/models/test_datetime.py
     product = await Product.query.create()
     product = await Product.query.get(pk=product.pk)
     assert product.created.year == datetime.datetime.now().year
+    assert product.meta.fields["created"].get_default_value().tzinfo is None
+    assert product.created.tzinfo is None
     assert product.created_day == datetime.date.today()
     assert product.created_date == datetime.date.today()
+    assert product.created_datetime.tzinfo is None
     assert product.created_datetime.date() == datetime.datetime.now().date()
     assert product.updated_date == datetime.date.today()
     assert product.updated_datetime.date() == datetime.datetime.now().date()

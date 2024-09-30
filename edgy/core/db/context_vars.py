@@ -3,9 +3,14 @@ from typing import TYPE_CHECKING, Literal, Optional, Union
 
 if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
+    from edgy.core.db.querysets.base import QuerySet
 
-CURRENT_INSTANCE: ContextVar[Optional["BaseModelType"]] = ContextVar(
+CURRENT_INSTANCE: ContextVar[Optional[Union["BaseModelType", "QuerySet"]]] = ContextVar(
     "CURRENT_INSTANCE", default=None
+)
+CURRENT_PHASE: ContextVar[str] = ContextVar("CURRENT_PHASE", default="")
+EXPLICIT_SPECIFIED_VALUES: ContextVar[Optional[set[str]]] = ContextVar(
+    "EXPLICIT_SPECIFIED_VALUES", default=None
 )
 MODEL_GETATTR_BEHAVIOR: ContextVar[Literal["passdown", "load", "coro"]] = ContextVar(
     "MODEL_GETATTR_BEHAVIOR", default="load"

@@ -120,9 +120,8 @@ class BaseModelType(ABC):
     @abstractmethod
     async def save(
         self,
-        force_save: bool = False,
-        values: dict[str, Any] = None,
-        **kwargs: Any,
+        force_insert: bool = False,
+        values: Union[dict[str, Any], set[str], list[str], None] = None,
     ) -> "BaseModelType":
         """Save model"""
 
@@ -159,7 +158,7 @@ class BaseModelType(ABC):
         """
 
     @abstractmethod
-    async def execute_post_save_hooks(self, fields: Sequence[str]) -> None: ...
+    async def execute_post_save_hooks(self, fields: Sequence[str], force_insert: bool) -> None: ...
 
     @abstractmethod
     async def execute_pre_save_hooks(

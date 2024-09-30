@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 import sqlalchemy
 
+from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields import (
     BigIntegerField,
     BinaryField,
@@ -171,7 +172,7 @@ def test_can_create_datetime_field():
     field = DateTimeField(auto_now=True)
 
     assert isinstance(field, BaseField)
-    assert field.default == datetime.datetime.now
+    assert field.default.func == datetime.datetime.now
     assert field.read_only is True
 
 
@@ -184,7 +185,7 @@ def test_can_create_date_field():
     field = DateField(auto_now=True)
 
     assert isinstance(field, BaseField)
-    assert field.default == datetime.datetime.now
+    assert field.default.func == datetime.datetime.now
     assert field.read_only is True
 
 
@@ -210,17 +211,23 @@ def test_autonow_field(mocker):
     spy = mocker.spy(Foo, "get_default_values")
 
     field = Bar(auto_now_add=True)
-    field.get_default_values("field_name", {}, is_update=True)
+    token = CURRENT_PHASE.set("prepare_update")
+    field.get_default_values("field_name", {})
+    CURRENT_PHASE.reset(token)
     spy.assert_not_called()
-    field.get_default_values("field_name", {}, is_update=False)
+    token = CURRENT_PHASE.set("prepare_insert")
+    field.get_default_values("field_name", {})
+    CURRENT_PHASE.reset(token)
     spy.assert_called()
 
 
 def test_can_overwrite_method_autonow_field(mocker):
     field = DateTimeField(auto_now_add=True)
+    token = CURRENT_PHASE.set("prepare_update")
     spy = mocker.spy(field, "get_default_values")
-    field.get_default_values("field_name", {}, is_update=True)
-    spy.assert_called_with("field_name", {}, is_update=True)
+    field.get_default_values("field_name", {})
+    CURRENT_PHASE.reset(token)
+    spy.assert_called_with("field_name", {})
 
 
 def test_can_create_json_field():

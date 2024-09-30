@@ -339,7 +339,10 @@ user = await User.query.get(email="foo@bar.com")
 user.email = "bar@foo.com"
 
 await user.save()
+# or as explicit parameter
+await user.save(values={"email": "sky@example.com"})
 ```
+
 
 Now a more unique, yet possible scenario with a save. Imagine you need to create an exact copy
 of an object and store it in the database. These cases are more common than you think but this is
@@ -355,6 +358,29 @@ user = await User.query.get(email="foo@bar.com")
 user.id = None
 new_user = await user.save()
 # User(id=2)
+```
+
+#### Parameters
+
+`save` has following signature:
+
+`save(force_insert=False,values=None)`
+
+What they do is:
+
+- `force_insert` (former `force_save`): Instead of conditionally updating, force an insert.
+- `values`: Overwrite values explicitly. Values specified here are marked as explicit set parameters.
+
+### Update
+
+Models have an `update` method too. It enforces updates:
+
+```python
+await User.query.create(is_active=True, email="foo@bar.com")
+
+user = await User.query.get(email="foo@bar.com")
+
+await user.update(email="bar@example.com")
 ```
 
 ### Create

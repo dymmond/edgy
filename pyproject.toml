@@ -87,7 +87,6 @@ testing = [
     "mypy==1.10",
     "httpx",
     "types-orjson==3.6.2",
-    "backports.zoneinfo;python_version<'3.9'"
 ]
 mime = ["python-magic"]
 image = ["pillow"]

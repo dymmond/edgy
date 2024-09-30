@@ -39,6 +39,8 @@ async def rollback_transactions():
 
 async def test_creates_and_updates_only_updated_at():
     user = await User.query.create(name="Test")
+    assert user.created_at.tzinfo is None
+    assert user.updated_at.tzinfo is None
 
     last_created_datetime = user.created_at
     last_updated_datetime = user.updated_at
@@ -49,6 +51,8 @@ async def test_creates_and_updates_only_updated_at():
 
     assert user.created_at == last_created_datetime
     assert user.updated_at != last_updated_datetime
+    assert user.created_at.tzinfo is None
+    assert user.updated_at.tzinfo is None
 
 
 async def test_creates_and_updates_only_updated_at_on_save():

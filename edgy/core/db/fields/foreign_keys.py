@@ -13,6 +13,7 @@ import sqlalchemy
 from pydantic import BaseModel
 
 from edgy.core.db.constants import CASCADE
+from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.types import BaseFieldType
@@ -28,14 +29,6 @@ if TYPE_CHECKING:
 
 
 FK_CHAR_LIMIT = 63
-
-
-def _removeprefix(text: str, prefix: str) -> str:
-    # TODO: replace with removeprefix when python3.9 is minimum
-    if text.startswith(prefix):
-        return text[len(prefix) :]
-    else:
-        return text
 
 
 class BaseForeignKeyField(BaseForeignKey):
@@ -81,7 +74,7 @@ class BaseForeignKeyField(BaseForeignKey):
 
     async def pre_save_callback(
         self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
-    ) -> Any:
+    ) -> dict[str, Any]:
         target = self.target
         # value is clean result, check what is provided as kwarg
         # still use value for handling defaults
@@ -89,7 +82,7 @@ class BaseForeignKeyField(BaseForeignKey):
             value = original_value
         # e.g. default was a Model
         if isinstance(value, (target, target.proxy_model)):
-            await value.save(force_insert=force_insert)
+            await value.save()
             return self.clean(self.name, value, for_query=False)
         elif isinstance(value, dict):
             return await self.pre_save_callback(
@@ -117,12 +110,12 @@ class BaseForeignKeyField(BaseForeignKey):
         )
 
     def traverse_field(self, path: str) -> tuple[Any, str, str]:
-        return self.target, self.reverse_name, _removeprefix(_removeprefix(path, self.name), "__")
+        return self.target, self.reverse_name, path.removeprefix(self.name).removeprefix("__")
 
     def reverse_traverse_field(self, path: str) -> tuple[Any, str, str]:
         if self.reverse_path_fn:
             return self.reverse_path_fn(path)
-        return self.owner, self.name, _removeprefix(_removeprefix(path, self.reverse_name), "__")
+        return self.owner, self.name, path.removeprefix(self.reverse_name).removeprefix("__")
 
     @cached_property
     def related_columns(self) -> dict[str, Optional[sqlalchemy.Column]]:
@@ -192,7 +185,8 @@ class BaseForeignKeyField(BaseForeignKey):
             raise ValueError(f"cannot handle: {value} of type {type(value)}")
         return retdict
 
-    def modify_input(self, name: str, kwargs: dict[str, Any], phase: str = "") -> None:
+    def modify_input(self, name: str, kwargs: dict[str, Any]) -> None:
+        phase = CURRENT_PHASE.get()
         column_names = self.get_column_names(name)
         assert len(column_names) >= 1
         if len(column_names) == 1:
@@ -254,7 +248,7 @@ class BaseForeignKeyField(BaseForeignKey):
     def from_fk_field_name(self, name: str, fieldname: str) -> str:
         if len(self.related_columns) == 1:
             return next(iter(self.related_columns.keys()))
-        return _removeprefix(fieldname, f"{name}_")
+        return fieldname.removeprefix(f"{name}_")
 
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         target = self.target

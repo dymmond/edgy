@@ -22,14 +22,6 @@ if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
 
 
-def _removeprefix(text: str, prefix: str) -> str:
-    # TODO: replace with removeprefix when python3.9 is minimum
-    if text.startswith(prefix):
-        return text[len(prefix) :]
-    else:
-        return text
-
-
 class ConcreteCompositeField(BaseCompositeField):
     """
     Conrete, internal implementation of the CompositeField
@@ -91,7 +83,7 @@ class ConcreteCompositeField(BaseCompositeField):
     def translate_name(self, name: str) -> str:
         if self.prefix_embedded and name in self.embedded_field_defs:
             # PYTHON 3.8 compatibility
-            return _removeprefix(name, self.prefix_embedded)
+            return name.removeprefix(self.prefix_embedded)
         return name
 
     def embed_field(
@@ -184,7 +176,6 @@ class ConcreteCompositeField(BaseCompositeField):
         self,
         field_name: str,
         value: Any,
-        phase: str = "",
     ) -> dict[str, Any]:
         assert len(self.inner_field_names) >= 1
         if (
@@ -194,8 +185,8 @@ class ConcreteCompositeField(BaseCompositeField):
             and not isinstance(value, (dict, BaseModel))
         ):
             field = self.owner.meta.fields[self.inner_field_names[0]]
-            return field.to_model(self.inner_field_names[0], value, phase=phase)
-        return super().to_model(field_name, value, phase=phase)
+            return field.to_model(self.inner_field_names[0], value)
+        return super().to_model(field_name, value)
 
     def get_embedded_fields(
         self, name: str, fields: dict[str, "BaseFieldType"]

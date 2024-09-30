@@ -41,14 +41,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.fields.types import BaseFieldType
 
 
-def _removeprefix(text: str, prefix: str) -> str:
-    # TODO: replace with removeprefix when python3.9 is minimum
-    if text.startswith(prefix):
-        return text[len(prefix) :]
-    else:
-        return text
-
-
 generic_field = BaseField()
 
 
@@ -62,7 +54,7 @@ def clean_query_kwargs(
     for key, val in kwargs.items():
         if embed_parent:
             if embed_parent[1] and key.startswith(embed_parent[1]):
-                key = _removeprefix(_removeprefix(key, embed_parent[1]), "__")
+                key = key.removeprefix(embed_parent[1]).removeprefix("__")
             else:
                 key = f"{embed_parent[0]}__{key}"
         sub_model_class, field_name, _, _, _, cross_db_remainder = crawl_relationship(
@@ -1231,7 +1223,8 @@ class QuerySet(BaseQuerySet):
             table=queryset.table,
             database=queryset.database,
         )
-        instance = await instance.save(force_save=True)
+        # values=kwargs is required for ensuring all kwargs are seen as explicit kwargs
+        instance = await instance.save(force_insert=True, values=set(kwargs.keys()))
         result = await self._embed_parent_in_result(instance)
         self._clear_cache(True)
         self._cache.update([result])
@@ -1258,7 +1251,9 @@ class QuerySet(BaseQuerySet):
                 if self.model_class.meta.post_save_fields:
                     new_objs.append(obj)
             original = obj.extract_db_fields()
-            col_values: dict[str, Any] = obj.extract_column_values(original)
+            col_values: dict[str, Any] = obj.extract_column_values(
+                original, phase="prepare_insert", instance=self
+            )
             col_values.update(
                 await obj.execute_pre_save_hooks(col_values, original, force_insert=True)
             )
@@ -1271,7 +1266,9 @@ class QuerySet(BaseQuerySet):
         self._clear_cache(True)
         if new_objs:
             for obj in new_objs:
-                await obj.execute_post_save_hooks(self.model_class.meta.fields.keys())
+                await obj.execute_post_save_hooks(
+                    self.model_class.meta.fields.keys(), force_insert=True
+                )
 
     async def bulk_update(self, objs: list[EdgyModel], fields: list[str]) -> None:
         """
@@ -1304,6 +1301,8 @@ class QuerySet(BaseQuerySet):
                     extracted,
                     is_update=True,
                     is_partial=True,
+                    phase="prepare_update",
+                    instance=self,
                 )
                 update.update(
                     await obj.execute_pre_save_hooks(update, extracted, force_insert=False)
@@ -1325,7 +1324,7 @@ class QuerySet(BaseQuerySet):
             and not self.model_class.meta.post_save_fields.isdisjoint(fields)
         ):
             for obj in objs:
-                await obj.execute_post_save_hooks(fields)
+                await obj.execute_post_save_hooks(fields, force_insert=False)
 
     async def delete(self, use_models: bool = False) -> int:
         if (
@@ -1358,7 +1357,9 @@ class QuerySet(BaseQuerySet):
         Updates records in a specific table with the given kwargs.
         """
 
-        kwargs = self.model_class.extract_column_values(kwargs, is_update=True, is_partial=True)
+        kwargs = self.model_class.extract_column_values(
+            kwargs, is_update=True, is_partial=True, phase="prepare_update", instance=self
+        )
 
         # Broadcast the initial update details
         await self.model_class.meta.signals.pre_update.send_async(

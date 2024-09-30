@@ -5,6 +5,7 @@ import ipaddress
 import uuid
 from collections.abc import Sequence
 from enum import EnumMeta
+from functools import partial
 from re import Pattern
 from typing import TYPE_CHECKING, Any, Optional, Union
 
@@ -12,6 +13,7 @@ import pydantic
 import sqlalchemy
 from pydantic import EmailStr
 
+from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE, EXPLICIT_SPECIFIED_VALUES
 from edgy.core.db.fields._internal import IPAddress
 from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
 from edgy.core.db.fields.base import Field
@@ -20,10 +22,9 @@ from edgy.core.db.fields.types import BaseFieldType
 from edgy.exceptions import FieldDefinitionError
 
 if TYPE_CHECKING:
-    try:
-        import zoneinfo  # type: ignore[import-not-found, unused-ignore]
-    except ImportError:
-        zoneinfo = Any  # type: ignore[unused-ignore, no-redef, assignment]
+    import zoneinfo
+
+    from edgy.core.db.models.types import BaseModelType
 
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
@@ -101,12 +102,73 @@ class TextField(FieldFactory, str):
         return sqlalchemy.Text(collation=kwargs.get("collation"))
 
 
+class IncrementOnSaveBaseField(Field):
+    increment_on_save: int = 0
+
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(
+            **kwargs,
+        )
+        if self.increment_on_save != 0:
+            self.pre_save_callback = self._notset_pre_save_callback
+
+    async def _notset_pre_save_callback(
+        self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
+    ) -> dict[str, Any]:
+        explicit_values = EXPLICIT_SPECIFIED_VALUES.get()
+        if explicit_values is not None and self.name in explicit_values:
+            return {}
+        model_or_query = CURRENT_INSTANCE.get()
+
+        if force_insert:
+            if original_value is None:
+                return {self.name: self.get_default_value()}
+            else:
+                return {self.name: value + self.increment_on_save}
+        elif not self.primary_key:
+            # update path
+            return {
+                self.name: (
+                    model_or_query if model_or_query is not None else instance
+                ).table.columns[self.name]
+                + self.increment_on_save
+            }
+        else:
+            # update path
+            return {}
+
+    def get_default_values(
+        self,
+        field_name: str,
+        cleaned_data: dict[str, Any],
+    ) -> dict[str, Any]:
+        if self.increment_on_save != 0:
+            phase = CURRENT_PHASE.get()
+            if phase in "prepare_update":
+                return {field_name: None}
+        return super().get_default_values(field_name, cleaned_data)
+
+    def to_model(
+        self,
+        field_name: str,
+        value: Any,
+    ) -> dict[str, Any]:
+        phase = CURRENT_PHASE.get()
+        instance = CURRENT_INSTANCE.get()
+        if self.increment_on_save != 0 and not self.primary_key and phase == "post_update":
+            # a bit dirty but works
+            instance.__dict__.pop(field_name, None)
+            return {}
+        return super().to_model(field_name, value)
+
+
 class IntegerField(FieldFactory, int):
     """
     Integer field factory that construct Field classes and populated their values.
     """
 
     field_type = int
+    field_bases = (IncrementOnSaveBaseField,)
 
     def __new__(  # type: ignore
         cls,
@@ -116,10 +178,9 @@ class IntegerField(FieldFactory, int):
         le: Union[int, float, decimal.Decimal, None] = None,
         lt: Union[int, float, decimal.Decimal, None] = None,
         multiple_of: Optional[int] = None,
+        increment_on_save: int = 0,
         **kwargs: Any,
     ) -> BaseFieldType:
-        if kwargs.get("primary_key", False):
-            kwargs.setdefault("autoincrement", True)
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in ["cls", "__class__", "kwargs"]},
@@ -129,6 +190,23 @@ class IntegerField(FieldFactory, int):
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
         return sqlalchemy.Integer()
+
+    @classmethod
+    def validate(cls, kwargs: dict[str, Any]) -> None:
+        increment_on_save = kwargs.get("increment_on_save", 0)
+        if increment_on_save == 0 and kwargs.get("primary_key", False):
+            kwargs.setdefault("autoincrement", True)
+        if increment_on_save != 0:
+            if kwargs.get("autoincrement"):
+                raise FieldDefinitionError(
+                    detail="'autoincrement' is incompatible with 'increment_on_save'"
+                )
+            if kwargs.get("null"):
+                raise FieldDefinitionError(
+                    detail="'null' is incompatible with 'increment_on_save'"
+                )
+            kwargs.setdefault("read_only", True)
+            kwargs["inject_default_on_partial_update"] = True
 
 
 class FloatField(FieldFactory, float):
@@ -287,7 +365,6 @@ class TimezonedField:
         self,
         field_name: str,
         value: Any,
-        phase: str = "",
     ) -> dict[str, Optional[Union[datetime.datetime, datetime.date]]]:
         """
         Convert input object to datetime
@@ -304,6 +381,7 @@ class AutoNowMixin(FieldFactory):
         *,
         auto_now: Optional[bool] = False,
         auto_now_add: Optional[bool] = False,
+        default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         if auto_now_add and auto_now:
@@ -318,7 +396,8 @@ class AutoNowMixin(FieldFactory):
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
         }
         if auto_now_add or auto_now:
-            kwargs["default"] = datetime.datetime.now
+            # date.today cannot handle timezone so use alway datetime and convert back to date
+            kwargs["default"] = partial(datetime.datetime.now, default_timezone)
         return super().__new__(cls, **kwargs)
 
 
@@ -355,12 +434,12 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         field_obj: Field,
         field_name: str,
         cleaned_data: dict[str, Any],
-        is_update: bool = False,
         original_fn: Any = None,
     ) -> Any:
-        if field_obj.auto_now_add and is_update:
+        phase = CURRENT_PHASE.get()
+        if field_obj.auto_now_add and phase == "prepare_update":
             return {}
-        return original_fn(field_name, cleaned_data, is_update=is_update)
+        return original_fn(field_name, cleaned_data)
 
 
 class DateField(AutoNowMixin, datetime.date):

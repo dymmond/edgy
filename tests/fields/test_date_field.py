@@ -1,11 +1,7 @@
 import datetime
+import zoneinfo
 
 from edgy.core.db.fields import DateField
-
-try:
-    import zoneinfo  # type: ignore[import-not-found, unused-ignore]
-except ImportError:
-    from backports import zoneinfo  # type: ignore[import-not-found, no-redef, unused-ignore]
 
 
 def test_default_timezone():

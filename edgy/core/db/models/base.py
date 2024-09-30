@@ -18,7 +18,7 @@ import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
-from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE, MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.metaclasses import MetaInfo
+    from edgy.core.db.querysets.base import QuerySet
     from edgy.core.signals import Broadcaster
 
 _empty = cast(set[str], frozenset())
@@ -99,7 +100,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
 
     @classmethod
     def transform_input(
-        cls, kwargs: Any, phase: str, instance: Optional["BaseModelType"] = None
+        cls, kwargs: Any, phase: str = "", instance: Optional["BaseModelType"] = None
     ) -> Any:
         """
         Expand to_models and apply input modifications.
@@ -110,19 +111,21 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
 
         fields = cls.meta.fields
         token = CURRENT_INSTANCE.set(instance)
+        token2 = CURRENT_PHASE.set(phase)
         try:
             # phase 1: transform
             # Note: this is order dependend. There should be no overlap.
             for field_name in cls.meta.input_modifying_fields:
-                fields[field_name].modify_input(field_name, kwargs, phase=phase)
+                fields[field_name].modify_input(field_name, kwargs)
             # phase 2: apply to_model
             for key, value in kwargs.items():
                 field = fields.get(key, None)
                 if field is not None:
-                    new_kwargs.update(**field.to_model(key, value, phase=phase))
+                    new_kwargs.update(**field.to_model(key, value))
                 else:
                     new_kwargs[key] = value
         finally:
+            CURRENT_PHASE.reset(token2)
             CURRENT_INSTANCE.reset(token)
         return new_kwargs
 
@@ -482,7 +485,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                 CURRENT_INSTANCE.reset(token2)
         return retdict
 
-    async def execute_post_save_hooks(self, fields: Sequence[str]) -> None:
+    async def execute_post_save_hooks(self, fields: Sequence[str], force_insert: bool) -> None:
         affected_fields = self.meta.post_save_fields.intersection(fields)
         if affected_fields:
             # don't trigger loads, AttributeErrors are used for skipping fields
@@ -495,7 +498,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                         value = getattr(self, field_name)
                     except AttributeError:
                         continue
-                    await field.post_save_callback(value, instance=self)
+                    await field.post_save_callback(value, instance=self, force_insert=force_insert)
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(token)
                 CURRENT_INSTANCE.reset(token2)
@@ -506,54 +509,59 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         extracted_values: dict[str, Any],
         is_update: bool = False,
         is_partial: bool = False,
+        phase: str = "",
+        instance: Optional[Union["BaseModelType", "QuerySet"]] = None,
     ) -> dict[str, Any]:
         validated: dict[str, Any] = {}
-        # phase 1: transform when required
-        if cls.meta.input_modifying_fields:
-            extracted_values = {**extracted_values}
-            for field_name in cls.meta.input_modifying_fields:
-                cls.meta.fields[field_name].modify_input(field_name, extracted_values)
-        # phase 2: validate fields and set defaults for readonly
-        need_second_pass: list[BaseFieldType] = []
-        for field_name, field in cls.meta.fields.items():
-            if field.read_only:
-                # if read_only, updates are not possible anymore
-                if (
+        token = CURRENT_PHASE.set(phase)
+        token2 = CURRENT_INSTANCE.set(instance)
+        try:
+            # phase 1: transform when required
+            if cls.meta.input_modifying_fields:
+                extracted_values = {**extracted_values}
+                for field_name in cls.meta.input_modifying_fields:
+                    cls.meta.fields[field_name].modify_input(field_name, extracted_values)
+            # phase 2: validate fields and set defaults for readonly
+            need_second_pass: list[BaseFieldType] = []
+            for field_name, field in cls.meta.fields.items():
+                if field.read_only:
+                    # if read_only, updates are not possible anymore
+                    if (
+                        not is_partial or (field.inject_default_on_partial_update and is_update)
+                    ) and field.has_default():
+                        validated.update(field.get_default_values(field_name, validated))
+                    continue
+                if field_name in extracted_values:
+                    item = extracted_values[field_name]
+                    assert field.owner
+                    for sub_name, value in field.clean(field_name, item).items():
+                        if sub_name in validated:
+                            raise ValueError(f"value set twice for key: {sub_name}")
+                        validated[sub_name] = value
+                elif (
                     not is_partial or (field.inject_default_on_partial_update and is_update)
                 ) and field.has_default():
-                    validated.update(
-                        field.get_default_values(field_name, validated, is_update=is_update)
-                    )
-                continue
-            if field_name in extracted_values:
-                item = extracted_values[field_name]
-                assert field.owner
-                for sub_name, value in field.clean(field_name, item).items():
-                    if sub_name in validated:
-                        raise ValueError(f"value set twice for key: {sub_name}")
-                    validated[sub_name] = value
-            elif (
-                not is_partial or (field.inject_default_on_partial_update and is_update)
-            ) and field.has_default():
-                # add field without a value to the second pass (in case no value appears)
-                # only include fields which have inject_default_on_partial_update set or if not is_partial
-                need_second_pass.append(field)
+                    # add field without a value to the second pass (in case no value appears)
+                    # only include fields which have inject_default_on_partial_update set or if not is_partial
+                    need_second_pass.append(field)
 
-        # phase 3: set defaults for the rest if not partial or inject_default_on_partial_update
-        if need_second_pass:
-            for field in need_second_pass:
-                # check if field appeared e.g. by composite
-                # Note: default values are directly passed without validation
-                if field.name not in validated:
-                    validated.update(
-                        field.get_default_values(field.name, validated, is_update=is_update)
-                    )
+            # phase 3: set defaults for the rest if not partial or inject_default_on_partial_update
+            if need_second_pass:
+                for field in need_second_pass:
+                    # check if field appeared e.g. by composite
+                    # Note: default values are directly passed without validation
+                    if field.name not in validated:
+                        validated.update(field.get_default_values(field.name, validated))
+        finally:
+            CURRENT_INSTANCE.reset(token2)
+            CURRENT_PHASE.reset(token)
         return validated
 
     def __setattr__(self, key: str, value: Any) -> None:
         fields = self.meta.fields
         field = fields.get(key, None)
         token = CURRENT_INSTANCE.set(self)
+        token2 = CURRENT_PHASE.set("set")
         try:
             if field is not None:
                 if hasattr(field, "__set__"):
@@ -561,7 +569,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                     # used in related_fields to mask and not to implement to_model
                     field.__set__(self, value)
                 else:
-                    for k, v in field.to_model(key, value, phase="set").items():
+                    for k, v in field.to_model(key, value).items():
                         # bypass __setattr__ method
                         object.__setattr__(self, k, v)
             else:
@@ -569,6 +577,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                 object.__setattr__(self, key, value)
         finally:
             CURRENT_INSTANCE.reset(token)
+            CURRENT_PHASE.reset(token2)
 
     async def _agetattr_helper(self, name: str, getter: Any) -> Any:
         await self.load()
@@ -642,10 +651,13 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         if self.meta.tablename != other.meta.tablename:
             return False
         self_dict = self.extract_column_values(
-            self.extract_db_fields(self.pkcolumns), is_partial=True
+            self.extract_db_fields(self.pkcolumns), is_partial=True, phase="compare", instance=self
         )
         other_dict = other.extract_column_values(
-            other.extract_db_fields(self.pkcolumns), is_partial=True
+            other.extract_db_fields(self.pkcolumns),
+            is_partial=True,
+            phase="compare",
+            instance=other,
         )
         key_set = {*self_dict.keys(), *other_dict.keys()}
         for field_name in key_set:

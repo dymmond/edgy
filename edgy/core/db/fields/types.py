@@ -117,7 +117,6 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         self,
         field_name: str,
         value: Any,
-        phase: str = "",
     ) -> dict[str, Any]:
         """
         Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
@@ -156,9 +155,7 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         return {}
 
     @abstractmethod
-    def get_default_values(
-        self, field_name: str, cleaned_data: dict[str, Any], is_update: bool = False
-    ) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: dict[str, Any]) -> Any:
         """
         Define for each field/column a default. Non-private multicolumn fields should
         always check if the default was already applied.
@@ -166,8 +163,6 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         Args:
             field_name: the field name (can be different from name)
             cleaned_data: currently validated data. Useful to check if the default was already applied.
-        Kwargs:
-            is_update: phase. Is update phase or is creation phase. For e.g. autonow_add
 
         """
 

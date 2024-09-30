@@ -27,25 +27,9 @@ if TYPE_CHECKING:
 terminal = Print()
 
 
-def _removesuffix(text: str, suffix: str) -> str:
-    # TODO: replace with _removesuffix when python3.9 is minimum
-    if text.endswith(suffix):
-        return text[: -len(suffix)]
-    else:
-        return text
-
-
-def _removeprefix(text: str, prefix: str) -> str:
-    # TODO: replace with removeprefix when python3.9 is minimum
-    if text.startswith(prefix):
-        return text[len(prefix) :]
-    else:
-        return text
-
-
 def _removeprefixes(text: str, *prefixes: str) -> str:
     for prefix in prefixes:
-        text = _removeprefix(text, prefix)
+        text = text.removeprefix(prefix)
     return text
 
 
@@ -115,9 +99,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             return (
                 self.through,
                 self.from_foreign_key,
-                _removeprefixes(path, self.embed_through_prefix, "__"),
+                path.removeprefix(self.embed_through_prefix).removeprefix("__"),
             )
-        return self.to, self.reverse_name, _removeprefixes(path, self.name, "__")
+        return self.to, self.reverse_name, path.removeprefix(self.name).removeprefix("__")
 
     def reverse_traverse_field_fk(self, path: str) -> tuple[Any, str, str]:
         # used for target fk
@@ -127,9 +111,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             return (
                 self.through,
                 self.to_foreign_key,
-                _removeprefix(_removeprefix(path, self.reverse_embed_through_prefix), "__"),
+                path.removeprefix(self.reverse_embed_through_prefix).removeprefix("__"),
             )
-        return self.owner, self.name, _removeprefixes(path, self.reverse_name, "__")
+        return self.owner, self.name, path.removeprefix(self.reverse_name).removeprefix("__")
 
     def create_through_model(self) -> None:
         """
@@ -255,12 +239,11 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self,
         field_name: str,
         value: Any,
-        phase: str = "",
     ) -> dict[str, Any]:
         """
         Meta field
         """
-        instance = CURRENT_INSTANCE.get()
+        instance = cast("BaseModelType", CURRENT_INSTANCE.get())
         if isinstance(value, ManyRelationProtocol):
             return {field_name: value}
         if instance:
@@ -276,9 +259,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """Checks if the field has a default value set"""
         return False
 
-    def get_default_values(
-        self, field_name: str, cleaned_data: dict[str, Any], is_update: bool = False
-    ) -> Any:
+    def get_default_values(self, field_name: str, cleaned_data: dict[str, Any]) -> Any:
         """
         Meta field
         """
@@ -294,7 +275,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         raise ValueError("Missing instance")
 
     async def post_save_callback(
-        self, value: ManyRelationProtocol, instance: "BaseModelType"
+        self, value: ManyRelationProtocol, instance: "BaseModelType", force_insert: bool
     ) -> None:
         await value.save_related()
 

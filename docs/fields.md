@@ -84,11 +84,15 @@ class MyModel(edgy.Model):
 
 This field is used as a default field for the `id` of a model.
 
+!!! Note
+    For sqlite with autoincrement an integer field is used. Sqlite doesn't support BigInteger for autoincrement.
+
 ##### Parameters:
 
 * `minimum` - An integer indicating the minimum.
 * `maximum` - An integer indicating the maximum.
 * `multiple_of` - An integer indicating the multiple of.
+* `increment_on_save` - An integer which is applied on every save.
 
 #### IntegerField
 
@@ -108,6 +112,28 @@ class MyModel(edgy.Model):
 * `minimum` - An integer indicating the minimum.
 * `maximum` - An integer indicating the maximum.
 * `multiple_of` - An integer indicating the multiple of.
+* `increment_on_save` - An integer which is applied on every save.
+
+
+#### SmallIntegerField
+
+```python
+import edgy
+
+
+class MyModel(edgy.Model):
+    a_number: int = edgy.SmallIntegerField(default=0)
+    another_number: int = edgy.SmallIntegerField(minimum=10)
+    ...
+
+```
+
+##### Parameters:
+
+* `minimum` - An integer indicating the minimum.
+* `maximum` - An integer indicating the maximum.
+* `multiple_of` - An integer indicating the multiple of.
+* `increment_on_save` - An integer which is applied on every save.
 
 #### BooleanField
 
@@ -674,6 +700,125 @@ class MyModel(edgy.Model):
 
 Derives from the same as [CharField](#charfield) and validates the value of an UUID.
 
+## Advanced Fieldpatterns
+
+These are not actually fields but patterns.
+
+### Revision Field
+
+You remember the strange `increment_on_save` parameter on Integer like fields?
+
+Here is how to use it.
+
+#### Just counting up
+
+The simplest case:
+
+
+```python
+import edgy
+
+
+class MyModel(edgy.Model):
+    rev: int = edgy.SmallIntegerField(default=0, increment_on_save=1)
+    ...
+
+async def main():
+    obj = await MyModel.query.create()
+    # obj.rev == 0
+    await obj.save()
+    # obj.rev == 1
+
+```
+
+What happens here? On every save the counter is in database increased. When accessing the attribute it is automatically loaded.
+
+#### Revisioning
+
+That is boring let's go farther. What happens when we make it a primary key?
+
+Hint: it has a very special handling.
+
+
+
+```python
+import edgy
+
+class MyModel(edgy.Model):
+    id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
+    rev: int = edgy.SmallIntegerField(default=0, increment_on_save=1, primary_key=True)
+    ...
+
+async def main():
+    obj = await MyModel.query.create()
+    # obj.rev == 0
+    await obj.save()
+    # obj.rev == 1
+    assert len(await MyModel.query.all()) == 2
+```
+
+This implements a copy on save. We have now revision safe models. This is very strictly checked.
+It even works with FileFields or ImageFields.
+
+
+!!! Warning
+    When using FileField or ImageField and want to be able to delete single revisions make sure you save a copy per revision with `to_file()`.
+
+#### Revisioning with unsafe updates
+
+Sometimes you want to be able to modify old revisions. There is a second revisioning pattern allowing this:
+
+```python
+import edgy
+
+class MyModel(edgy.Model):
+    id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
+    document = edgy.fields.FileField(null=True)
+    rev: int = edgy.SmallIntegerField(default=0, increment_on_save=1, primary_key=True, read_only=False)
+    name = edgy.CharField(max_length=50)
+    ...
+
+async def main():
+    obj = await MyModel.query.create(name="foo")
+    # obj.rev == 0
+    # cloak FileField so a new filename is generated
+    await obj.save(document=obj.document.to_file())
+    # obj.rev == 1
+    assert len(await MyModel.query.all()) == 2
+    # rev must be in update otherwise it fails (what is good)
+    await obj.update(name="bar", rev=obj.rev)
+```
+
+!!! Warning
+    When using FileField or ImageField make sure you save per revision with to_file().
+
+### Countdown Field
+
+Until now we have seen only `increment_on_save=1` but it can be also negative.
+That is useful for a countdown.
+
+
+```python
+import edgy
+
+
+class MyModel(edgy.Model):
+    counter: int = edgy.IntegerField(increment_on_save=-1)
+    ...
+
+async def main():
+    # we have no default here
+    obj = await MyModel.query.create(counter=10)
+    # obj.counter == 10
+    await obj.save()
+    # obj.counter == 9
+    # we can reset
+    await obj.save(values={"counter": 100})
+    # obj.counter == 100
+    # or specify a different default value
+    obj = await MyModel.query.create(counter=50)
+    # obj.counter == 50
+```
 
 ## Custom Fields
 
@@ -712,12 +857,12 @@ Additional they can provide/overwrite following methods:
 * `__get__(self, instance, owner=None)` - Descriptor protocol like get access customization. Second parameter contains the class where the field was specified.
   To prevent unwanted loads operate on the instance `__dict__`. You can throw an AttributeError to trigger a load.
 * `__set__(self, instance, value)` - Descriptor protocol like set access customization. Dangerous to use. Better use to_model.
-* `to_model(self, field_name, phase="")` - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`.
+* `to_model(self, field_name)` - like clean, just for setting attributes or initializing a model. It is also used when setting attributes or in initialization (phase contains the phase where it is called). This way it is much more powerful than `__set__`.
 * `get_embedded_fields(self, field_name, fields)` - Define internal fields.
-* `get_default_values(self, field_name, cleaned_data, is_update=False)` - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
+* `get_default_values(self, field_name, cleaned_data)` - returns the default values for the field. Can provide default values for embedded fields. If your field spans only one column you can also use the simplified get_default_value instead. This way you don't have to check for collisions. By default get_default_value is used internally.
 * `get_default_value(self)` - return default value for one column fields.
 * `get_global_constraints(self, field_name, columns, schemes)` - takes as second parameter (self excluded) the columns defined by this field (by get_columns). Returns a global constraint, which can be multi-column. The last one provides the schemes in descending priority.
-* `modify_input(name, kwargs, phase="")`: Modifying the input (kwargs is a dict). E.g. providing defaults only when loaded from db or collecting fields and columns for a
+* `modify_input(name, kwargs)`: Modifying the input (kwargs is a dict). E.g. providing defaults only when loaded from db or collecting fields and columns for a
   multi column, composite field (e.g. FileField). Note: this method is very powerful. You should only manipulate sub-fields and columns belonging to the field.
 * `embed_field(prefix, new_fieldname, owner=None, parent=None)`: Controlling the embedding of the field in other fields. Return None to disable embedding.
 
@@ -745,7 +890,7 @@ See `tests/fields/test_multi_column_fields.py` for an example.
 
 #### Using phases
 
-`to_model` receives an argument named phase. If used outside of a model context it defaults to an empty string.
+The `CURRENT_PHASE` ContextVariable contains the current phase. If used outside of a model context it defaults to an empty string.
 
 Within a model context it contains the current phase it is called for:
 
@@ -754,6 +899,23 @@ Within a model context it contains the current phase it is called for:
 * `load`: Called after load. Contains db values.
 * `post_insert`: Called after insert. Arguments are the ones passed to save.
 * `post_update`: Called after update. Arguments are the ones passed to save.
+
+For  `extract_column_values` following phases exist (except called manually):
+
+* `prepare_insert`: Called in extract_column_values for insert.
+* `prepare_update`: Called in extract_column_values for update.
+* `compare`: Called when comparing model instances.
+
+#### Using the instance
+
+There is a ContextVar named `CURRENT_INSTANCE`. It is optionally available in `transform_input` and set during `__init__` as well as `__set__`
+afaik in all cases the `transform_input` is called internally.
+In `extract_column_values` it is different: it is also valid that QuerySet is passed.
+
+#### Finding out which values are explicit set
+
+The `EXPLICIT_SPECIFIED_VALUES` ContextVar is either None or contains the key names of the explicit specified values.
+It is set in `save` and `update`.
 
 #### Saving variables on Field
 

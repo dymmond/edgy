@@ -298,13 +298,19 @@ class FieldFile(File):
         self.generate_name_fn = generate_name_fn
         self.metadata = metadata or {}
         self.multi_process_safe = multi_process_safe
-        self.approved = approved
         self.change_removes_approval = change_removes_approval
+        self.approved = approved
         if size is not None:
             # set value to cached_property
             self.size = size
 
-    async def execute_operation(self) -> None:
+    def to_file(self) -> Optional[File]:
+        """Cloak FileField so it looks like a regular File. Required for copies."""
+        if self:
+            return File(cast(BinaryIO, self), name=self.name, storage=self.storage)
+        return None
+
+    async def execute_operation(self, nodelete_old: bool = False) -> None:
         operation = self.operation
         self.operation = "none"
         if operation == "save" or operation == "save_delete":
@@ -317,7 +323,8 @@ class FieldFile(File):
             finally:
                 self.storage.unreserve_name(self.name)
             if (
-                operation == "save_delete"
+                not nodelete_old
+                and operation == "save_delete"
                 and self.old is not None
                 and self.old[1]
                 and self.old[1] != self.name
@@ -328,7 +335,7 @@ class FieldFile(File):
                 self.close()
             # old should not be None anyway but check that
             # if name is empty or None skip deletion
-            if self.old is not None and self.old[1]:
+            if not nodelete_old and self.old is not None and self.old[1]:
                 self.old[0].delete(self.old[1])
         # else approve operation or metadata update
         self.old = None

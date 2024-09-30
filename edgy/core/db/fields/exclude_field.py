@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Any
 
+from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields.factories import FieldFactory
 
 if TYPE_CHECKING:
@@ -41,10 +42,10 @@ class ExcludeField(FieldFactory, type[None]):
         obj: "BaseFieldType",
         name: str,
         value: Any,
-        phase: str = "",
         original_fn: Any = None,
     ) -> dict[str, Any]:
         """remove any value from input and raise when setting an attribute."""
+        phase = CURRENT_PHASE.get()
         if phase == "set":
             raise ValueError("field is excluded")
         return {}
