@@ -5,6 +5,13 @@ hide:
 
 # Release Notes
 
+## 0.17.1
+
+### Fixed
+
+- Under circumstances it was possible for the assigned database attribute to appear as value.
+- Typings of some (class) properties are now correctly detected.
+
 ## 0.17.0
 
 ### Added

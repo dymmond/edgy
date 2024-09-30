@@ -836,6 +836,14 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cls.get_db_schema()
 
     @property
+    def database(cls) -> "Database":
+        return cls._database
+
+    @database.setter
+    def database(cls, value: "Database") -> None:
+        cls._database = value
+
+    @property
     def table(cls) -> "sqlalchemy.Table":
         """
         Making sure the tables on inheritance state, creates the new
