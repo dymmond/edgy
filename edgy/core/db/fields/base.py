@@ -8,7 +8,6 @@ from typing import (
     Literal,
     Optional,
     Union,
-    cast,
 )
 
 import sqlalchemy
@@ -302,8 +301,8 @@ class PKField(BaseCompositeField):
         )
 
     def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[dict[str, Any], Any]:
-        pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
-        pknames = cast(Sequence[str], self.owner.pknames)
+        pkcolumns = self.owner.pkcolumns
+        pknames = self.owner.pknames
         assert len(pkcolumns) >= 1
         # we don't want to issue loads
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
@@ -343,8 +342,8 @@ class PKField(BaseCompositeField):
         return None
 
     def clean(self, field_name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
-        pknames = cast(Sequence[str], self.owner.pknames)
-        pkcolumns = cast(Sequence[str], self.owner.pkcolumns)
+        pkcolumns = self.owner.pkcolumns
+        pknames = self.owner.pknames
         prefix = _removesuffix(field_name, self.name)
         assert len(pkcolumns) >= 1
         if (
@@ -381,8 +380,8 @@ class PKField(BaseCompositeField):
         field_name: str,
         value: Any,
     ) -> dict[str, Any]:
-        pknames = cast(Sequence[str], self.owner.pknames)
-        assert len(cast(Sequence[str], self.owner.pkcolumns)) >= 1
+        pknames = self.owner.pknames
+        assert len(self.owner.pkcolumns) >= 1
         if self.is_incomplete:
             raise ValueError("Cannot set an incomplete defined pk!")
         if (
@@ -395,10 +394,7 @@ class PKField(BaseCompositeField):
         return super().to_model(field_name, value)
 
     def get_composite_fields(self) -> dict[str, BaseFieldType]:
-        return {
-            field: self.owner.meta.fields[field]
-            for field in cast(Sequence[str], self.owner.pknames)
-        }
+        return {field: self.owner.meta.fields[field] for field in self.owner.pknames}
 
     @cached_property
     def fieldless_pkcolumns(self) -> frozenset[str]:

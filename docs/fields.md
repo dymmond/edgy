@@ -790,7 +790,8 @@ async def main():
 ```
 
 !!! Warning
-    When using FileField or ImageField make sure you save per revision with to_file().
+    When using FileField or ImageField make sure you save per revision the field with to_file().
+    This requirement will later be removed but is currently required.
 
 ### Countdown Field
 
@@ -910,7 +911,15 @@ For  `extract_column_values` following phases exist (except called manually):
 
 There is a ContextVar named `CURRENT_INSTANCE`. It is optionally available in `transform_input` and set during `__init__` as well as `__set__`
 afaik in all cases the `transform_input` is called internally.
-In `extract_column_values` it is different: it is also valid that QuerySet is passed.
+In `extract_column_values` it is different: it is also valid that a QuerySet is passed.
+
+Note: when using bulk_create/bulk_update/update there is a chance the instance parameter of pre_save_callback is differing from `CURRENT_INSTANCE`.
+The `CURRENT_INSTANCE` can be the QuerySet while the instance is a model instance.
+
+You may want to use the pre_save_callback with its instance parameter to ensure you get a model instance.
+
+Note: with update there is no instance.
+
 
 #### Finding out which values are explicit set
 

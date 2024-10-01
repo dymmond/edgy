@@ -47,6 +47,11 @@ class BaseModelType(ABC):
 
     columns: ClassVar["sqlalchemy.sql.ColumnCollection"]
     database: ClassVar["Database"]
+    table: ClassVar["sqlalchemy.Table"]
+    # Primary key columns
+    pkcolumns: ClassVar[Sequence[str]]
+    # Primary key fields
+    pknames: ClassVar[Sequence[str]]
     query: ClassVar["BaseManager"]
     query_related: ClassVar["BaseManager"]
     meta: ClassVar["MetaInfo"]
@@ -71,21 +76,6 @@ class BaseModelType(ABC):
     @abstractmethod
     def can_load(self) -> bool:
         """identifying_db_fields are completely specified."""
-
-    @property
-    @abstractmethod
-    def table(self) -> "sqlalchemy.Table":
-        """Overwritable table attribute."""
-
-    @property
-    @abstractmethod
-    def pkcolumns(self) -> Sequence[str]:
-        """Primary key columns."""
-
-    @property
-    @abstractmethod
-    def pknames(self) -> Sequence[str]:
-        """Primary key fields."""
 
     @abstractmethod
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":

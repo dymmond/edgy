@@ -31,6 +31,7 @@ from .types import BaseModelType
 
 if TYPE_CHECKING:
     from edgy import Model
+    from edgy.core.connection.database import Database
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.metaclasses import MetaInfo
@@ -250,6 +251,16 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         with contextlib.suppress(AttributeError):
             del self._pkcolumns
         self._table = value
+
+    @property
+    def database(self) -> "Database":
+        if getattr(self, "_database", None) is None:
+            return cast("Database", self.__class__.database)
+        return self._database
+
+    @database.setter
+    def database(self, value: "Database") -> None:
+        self._database = value
 
     @property
     def pkcolumns(self) -> Sequence[str]:

@@ -133,7 +133,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 self.through = self.owner.meta.registry.models[self.through]
             through = self.through
             if through.meta.abstract:
-                pknames = set(cast(Sequence[str], through.pknames))
+                pknames = set(through.pknames)
                 __bases__ = (through,)
             else:
                 if not self.from_foreign_key:
