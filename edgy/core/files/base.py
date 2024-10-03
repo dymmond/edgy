@@ -1,6 +1,7 @@
 import os
 import sys
 from collections.abc import Generator, Sequence
+from copy import copy
 from functools import cached_property
 from io import BytesIO
 from typing import (
@@ -307,7 +308,7 @@ class FieldFile(File):
     def to_file(self) -> Optional[File]:
         """Cloak FileField so it looks like a regular File. Required for copies."""
         if self:
-            return File(cast(BinaryIO, self), name=self.name, storage=self.storage)
+            return File(cast(BinaryIO, copy(self)), name=self.name, storage=self.storage)
         return None
 
     async def execute_operation(self, nodelete_old: bool = False) -> None:
@@ -378,6 +379,8 @@ class FieldFile(File):
         # Generate filename based on name
         if self.generate_name_fn is not None:
             name = self.generate_name_fn(name, content, direct_name)
+
+        assert name, "no name found"
 
         if storage is None:
             storage = self.storage

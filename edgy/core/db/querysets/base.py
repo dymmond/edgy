@@ -16,7 +16,7 @@ from typing import (
 
 import sqlalchemy
 
-from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR, get_schema
+from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR, get_schema
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.fields.base import BaseField, BaseForeignKey, RelationshipField
@@ -1260,15 +1260,19 @@ class QuerySet(BaseQuerySet):
             return col_values
 
         check_db_connection(queryset.database)
-        async with queryset.database as database, database.transaction():
-            expression = queryset.table.insert().values([await _iterate(obj) for obj in objs])
-            await database.execute_many(expression)
-        self._clear_cache(True)
-        if new_objs:
-            for obj in new_objs:
-                await obj.execute_post_save_hooks(
-                    self.model_class.meta.fields.keys(), force_insert=True
-                )
+        token = CURRENT_INSTANCE.set(self)
+        try:
+            async with queryset.database as database, database.transaction():
+                expression = queryset.table.insert().values([await _iterate(obj) for obj in objs])
+                await database.execute_many(expression)
+            self._clear_cache(True)
+            if new_objs:
+                for obj in new_objs:
+                    await obj.execute_post_save_hooks(
+                        self.model_class.meta.fields.keys(), force_insert=True
+                    )
+        finally:
+            CURRENT_INSTANCE.reset(token)
 
     async def bulk_update(self, objs: list[EdgyModel], fields: list[str]) -> None:
         """
@@ -1294,22 +1298,25 @@ class QuerySet(BaseQuerySet):
         update_list = []
         fields_plus_pk = {*fields, *queryset.model_class.pkcolumns}
         check_db_connection(queryset.database)
-        async with queryset.database as database, database.transaction():
-            for obj in objs:
-                extracted = obj.extract_db_fields(fields_plus_pk)
-                update = queryset.model_class.extract_column_values(
-                    extracted,
-                    is_update=True,
-                    is_partial=True,
-                    phase="prepare_update",
-                    instance=self,
-                )
-                update.update(
-                    await obj.execute_pre_save_hooks(update, extracted, force_insert=False)
-                )
-                if "id" in update:
-                    update["__id"] = update.pop("id")
-                update_list.append(update)
+        token = CURRENT_INSTANCE.set(self)
+        try:
+            async with queryset.database as database, database.transaction():
+                for obj in objs:
+                    extracted = obj.extract_db_fields(fields_plus_pk)
+                    update = queryset.model_class.extract_column_values(
+                        extracted,
+                        is_update=True,
+                        is_partial=True,
+                        phase="prepare_update",
+                        instance=self,
+                        model_instance=obj,
+                    )
+                    update.update(
+                        await obj.execute_pre_save_hooks(update, extracted, force_insert=False)
+                    )
+                    if "id" in update:
+                        update["__id"] = update.pop("id")
+                    update_list.append(update)
 
             values_placeholder: Any = {
                 pkcol: sqlalchemy.bindparam(pkcol, type_=getattr(queryset.table.c, pkcol).type)
@@ -1318,13 +1325,15 @@ class QuerySet(BaseQuerySet):
             }
             expression = expression.values(values_placeholder)
             await database.execute_many(expression, update_list)
-        self._clear_cache()
-        if (
-            self.model_class.meta.post_save_fields
-            and not self.model_class.meta.post_save_fields.isdisjoint(fields)
-        ):
-            for obj in objs:
-                await obj.execute_post_save_hooks(fields, force_insert=False)
+            self._clear_cache()
+            if (
+                self.model_class.meta.post_save_fields
+                and not self.model_class.meta.post_save_fields.isdisjoint(fields)
+            ):
+                for obj in objs:
+                    await obj.execute_post_save_hooks(fields, force_insert=False)
+        finally:
+            CURRENT_INSTANCE.reset(token)
 
     async def delete(self, use_models: bool = False) -> int:
         if (

@@ -88,7 +88,8 @@ class ConcreteFileField(BaseCompositeField):
         if (
             phase in {"post_update", "post_insert"}
             and instance is not None
-            and self.name in instance.__dict__
+            and getattr(instance, "__db_model__", False)
+            and isinstance(instance.__dict__.get(self.name), FieldFile)
         ):
             # use old one
             field_instance_or_value: Any = cast(FieldFile, instance.__dict__[self.name])
@@ -102,8 +103,9 @@ class ConcreteFileField(BaseCompositeField):
         if isinstance(field_instance_or_value, FieldFile):
             file_instance = field_instance_or_value
             if isinstance(value, dict):
-                # update
-                if value.get(f"{field_name}_size") is not None:
+                # update after post_insert/post_update, so just update some limited values
+                # which does not affect operation
+                if f"{field_name}_size" in value:
                     file_instance.size = value[f"{field_name}_size"]
                 if value.get(f"{field_name}_metadata") is not None:
                     file_instance.metadata = value[f"{field_name}_metadata"]

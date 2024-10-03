@@ -18,7 +18,12 @@ import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
-from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE, MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.context_vars import (
+    CURRENT_INSTANCE,
+    CURRENT_MODEL_INSTANCE,
+    CURRENT_PHASE,
+    MODEL_GETATTR_BEHAVIOR,
+)
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
@@ -112,7 +117,8 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
 
         fields = cls.meta.fields
         token = CURRENT_INSTANCE.set(instance)
-        token2 = CURRENT_PHASE.set(phase)
+        token2 = CURRENT_MODEL_INSTANCE.set(instance)
+        token3 = CURRENT_PHASE.set(phase)
         try:
             # phase 1: transform
             # Note: this is order dependend. There should be no overlap.
@@ -126,7 +132,8 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                 else:
                     new_kwargs[key] = value
         finally:
-            CURRENT_PHASE.reset(token2)
+            CURRENT_PHASE.reset(token3)
+            CURRENT_MODEL_INSTANCE.reset(token2)
             CURRENT_INSTANCE.reset(token)
         return new_kwargs
 
@@ -477,7 +484,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         if affected_fields:
             # don't trigger loads
             token = MODEL_GETATTR_BEHAVIOR.set("passdown")
-            token2 = CURRENT_INSTANCE.set(self)
+            token2 = CURRENT_MODEL_INSTANCE.set(self)
             try:
                 for field_name in affected_fields:
                     if field_name not in column_values and field_name not in original:
@@ -493,7 +500,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                     )
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(token)
-                CURRENT_INSTANCE.reset(token2)
+                CURRENT_MODEL_INSTANCE.reset(token2)
         return retdict
 
     async def execute_post_save_hooks(self, fields: Sequence[str], force_insert: bool) -> None:
@@ -501,7 +508,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         if affected_fields:
             # don't trigger loads, AttributeErrors are used for skipping fields
             token = MODEL_GETATTR_BEHAVIOR.set("passdown")
-            token2 = CURRENT_INSTANCE.set(self)
+            token2 = CURRENT_MODEL_INSTANCE.set(self)
             try:
                 for field_name in affected_fields:
                     field = self.meta.fields[field_name]
@@ -512,7 +519,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                     await field.post_save_callback(value, instance=self, force_insert=force_insert)
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(token)
-                CURRENT_INSTANCE.reset(token2)
+                CURRENT_MODEL_INSTANCE.reset(token2)
 
     @classmethod
     def extract_column_values(
@@ -522,10 +529,12 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         is_partial: bool = False,
         phase: str = "",
         instance: Optional[Union["BaseModelType", "QuerySet"]] = None,
+        model_instance: Optional["BaseModelType"] = None,
     ) -> dict[str, Any]:
         validated: dict[str, Any] = {}
         token = CURRENT_PHASE.set(phase)
         token2 = CURRENT_INSTANCE.set(instance)
+        token3 = CURRENT_MODEL_INSTANCE.set(model_instance)
         try:
             # phase 1: transform when required
             if cls.meta.input_modifying_fields:
@@ -564,6 +573,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                     if field.name not in validated:
                         validated.update(field.get_default_values(field.name, validated))
         finally:
+            CURRENT_MODEL_INSTANCE.reset(token3)
             CURRENT_INSTANCE.reset(token2)
             CURRENT_PHASE.reset(token)
         return validated
@@ -662,13 +672,18 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         if self.meta.tablename != other.meta.tablename:
             return False
         self_dict = self.extract_column_values(
-            self.extract_db_fields(self.pkcolumns), is_partial=True, phase="compare", instance=self
+            self.extract_db_fields(self.pkcolumns),
+            is_partial=True,
+            phase="compare",
+            instance=self,
+            model_instance=self,
         )
         other_dict = other.extract_column_values(
             other.extract_db_fields(self.pkcolumns),
             is_partial=True,
             phase="compare",
             instance=other,
+            model_instance=other,
         )
         key_set = {*self_dict.keys(), *other_dict.keys()}
         for field_name in key_set:

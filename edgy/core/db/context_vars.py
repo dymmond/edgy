@@ -8,6 +8,9 @@ if TYPE_CHECKING:
 CURRENT_INSTANCE: ContextVar[Optional[Union["BaseModelType", "QuerySet"]]] = ContextVar(
     "CURRENT_INSTANCE", default=None
 )
+CURRENT_MODEL_INSTANCE: ContextVar[Optional["BaseModelType"]] = ContextVar(
+    "CURRENT_MODEL_INSTANCE", default=None
+)
 CURRENT_PHASE: ContextVar[str] = ContextVar("CURRENT_PHASE", default="")
 EXPLICIT_SPECIFIED_VALUES: ContextVar[Optional[set[str]]] = ContextVar(
     "EXPLICIT_SPECIFIED_VALUES", default=None

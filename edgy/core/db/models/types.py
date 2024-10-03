@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from edgy.core.db.models.base import BaseModel
     from edgy.core.db.models.managers import BaseManager
     from edgy.core.db.models.metaclasses import MetaInfo
+    from edgy.core.db.querysets.base import QuerySet
 
 
 class DescriptiveMeta:
@@ -169,6 +170,8 @@ class BaseModelType(ABC):
         extracted_values: dict[str, Any],
         is_update: bool = False,
         is_partial: bool = False,
+        instance: Optional[Union["BaseModelType", "QuerySet"]] = None,
+        model_instance: Optional["BaseModelType"] = None,
     ) -> dict[str, Any]:
         """
         Extracts all the default values from the given fields and returns the raw
