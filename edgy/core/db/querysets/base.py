@@ -1318,13 +1318,13 @@ class QuerySet(BaseQuerySet):
                         update["__id"] = update.pop("id")
                     update_list.append(update)
 
-            values_placeholder: Any = {
-                pkcol: sqlalchemy.bindparam(pkcol, type_=getattr(queryset.table.c, pkcol).type)
-                for field in fields
-                for pkcol in queryset.model_class.meta.field_to_column_names[field]
-            }
-            expression = expression.values(values_placeholder)
-            await database.execute_many(expression, update_list)
+                values_placeholder: Any = {
+                    pkcol: sqlalchemy.bindparam(pkcol, type_=getattr(queryset.table.c, pkcol).type)
+                    for field in fields
+                    for pkcol in queryset.model_class.meta.field_to_column_names[field]
+                }
+                expression = expression.values(values_placeholder)
+                await database.execute_many(expression, update_list)
             self._clear_cache()
             if (
                 self.model_class.meta.post_save_fields
