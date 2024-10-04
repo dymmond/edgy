@@ -1364,18 +1364,20 @@ class QuerySet(BaseQuerySet):
     async def update(self, **kwargs: Any) -> None:
         """
         Updates records in a specific table with the given kwargs.
+
+        Warning: does not execute pre_save_callback/post_save_callback hooks and passes values directly to clean.
         """
 
-        kwargs = self.model_class.extract_column_values(
+        column_values = self.model_class.extract_column_values(
             kwargs, is_update=True, is_partial=True, phase="prepare_update", instance=self
         )
 
         # Broadcast the initial update details
         await self.model_class.meta.signals.pre_update.send_async(
-            self.__class__, instance=self, kwargs=kwargs
+            self.__class__, instance=self, kwargs=column_values
         )
 
-        expression = self.table.update().values(**kwargs)
+        expression = self.table.update().values(**column_values)
 
         for filter_clause in await self._resolve_clause_args(self.filter_clauses):
             expression = expression.where(filter_clause)

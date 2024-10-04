@@ -869,6 +869,9 @@ You should also provide an init method which sets following attributes:
     The `annotation` field parameter is for pydantic (automatically set by factories).
     For examples have a look in `tests/fields/test_composite_fields.py` or in `edgy/core/db/fields/core.py`.
 
+!!! Note
+    Instance parameters are always model instances.
+
 ### Tricks
 
 #### Using for_query
@@ -887,6 +890,7 @@ The `CURRENT_PHASE` ContextVariable contains the current phase. If used outside 
 Within a model context it contains the current phase it is called for:
 
 * `init`: Called in model `__init__`.
+* `init_db`: Called in model `__init__` when loaded from a row.
 * `set`: Called in model `__setattr__` (when setting an attribute).
 * `load`: Called after load. Contains db values.
 * `post_insert`: Called after insert. Arguments are the ones passed to save.
@@ -900,16 +904,16 @@ For  `extract_column_values` following phases exist (except called manually):
 
 #### Using the instance
 
-There is a ContextVar named `CURRENT_INSTANCE`. It is optionally available in `transform_input` and set during `__init__` as well as `__set__`
-afaik in all cases the `transform_input` is called internally.
-In `extract_column_values` it is different: it is also valid that a QuerySet is passed.
-
-Note: when using bulk_create/bulk_update/update there is a chance the instance parameter of pre_save_callback is differing from `CURRENT_INSTANCE`.
-The `CURRENT_INSTANCE` can be the QuerySet while the instance is a model instance.
+There are 2 ContextVar named `CURRENT_INSTANCE` and `CURRENT_MODEL_INSTANCE`. `CURRENT_INSTANCE` is the executing instance of a QuerySet or Model while
+`CURRENT_MODEL_INSTANCE` is always a model instance. Both can be also `None` (empty).
+They are available during setting an attribute, `transform_input` and `extract_column_values` calls when set as well as in the `pre_save_callback` or `post_save_callback` hooks.
+This implies you can use them in all sub methods like get_default...
 
 You may want to use the pre_save_callback with its instance parameter to ensure you get a model instance.
 
-Note: with update there is no instance.
+Note: When using in-db updates of QuerySet there is no instance.
+
+Note: There is one exception of a QuerySet method which use a model instance as `CURRENT_INSTANCE`: `create`.
 
 
 #### Finding out which values are explicit set

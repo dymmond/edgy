@@ -457,6 +457,10 @@ This is a race-free way to update values. Suppose you want to update the balance
 This allows to update it without worrying about concurrency.
 
 
+!!! Warning
+    Here exist no temporary model instances. This implies neither pre_save_callback/post_save_callback hooks are called nor to_model is executed before.
+    Data is passed to clean rawly.
+
 ### Get
 
 Obtains a single record from the database.
