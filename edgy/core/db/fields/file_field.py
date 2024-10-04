@@ -337,7 +337,9 @@ class FileField(FieldFactory):
                         and explicit_values is not None
                         and field_name not in explicit_values
                     ):
-                        value.save(value.to_file(), delete_old=False)
+                        cast(FileField, value).save(
+                            cast(FileField, value).to_file(), delete_old=False
+                        )
                 else:
                     instance = CURRENT_MODEL_INSTANCE.get()
                     assert instance is not None, "No model instance found"
