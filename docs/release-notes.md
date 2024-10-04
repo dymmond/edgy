@@ -7,10 +7,16 @@ hide:
 
 ## 0.17.1
 
+### Added
+
+- `CURRENT_MODEL_INSTANCE` COntextVariable which always point to a model instance.
+
 ### Fixed
 
 - Under circumstances it was possible for the assigned database attribute to appear as value.
 - Typings of some (class) properties are now correctly detected.
+- FileFields doesn't need an explicit `to_file` call assignment anymore to work with revisions. This restriction was lifted.
+- Execute database operation of `bulk_update` in right scope.
 
 ## 0.17.0
 

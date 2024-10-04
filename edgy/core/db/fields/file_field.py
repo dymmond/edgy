@@ -15,7 +15,12 @@ from typing import (
 import orjson
 import sqlalchemy
 
-from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE
+from edgy.core.db.context_vars import (
+    CURRENT_INSTANCE,
+    CURRENT_MODEL_INSTANCE,
+    CURRENT_PHASE,
+    EXPLICIT_SPECIFIED_VALUES,
+)
 from edgy.core.db.fields.base import BaseCompositeField
 from edgy.core.db.fields.core import BigIntegerField, BooleanField, JSONField
 from edgy.core.db.fields.factories import FieldFactory
@@ -88,9 +93,10 @@ class ConcreteFileField(BaseCompositeField):
         if (
             phase in {"post_update", "post_insert"}
             and instance is not None
-            and self.name in instance.__dict__
+            and getattr(instance, "__db_model__", False)
+            and isinstance(instance.__dict__.get(self.name), FieldFile)
         ):
-            # use old one
+            # use old one, when instance is no queryset
             field_instance_or_value: Any = cast(FieldFile, instance.__dict__[self.name])
         else:
             field_instance_or_value = value
@@ -102,8 +108,9 @@ class ConcreteFileField(BaseCompositeField):
         if isinstance(field_instance_or_value, FieldFile):
             file_instance = field_instance_or_value
             if isinstance(value, dict):
-                # update
-                if value.get(f"{field_name}_size") is not None:
+                # update after post_insert/post_update, so just update some limited values
+                # which does not affect operation
+                if f"{field_name}_size" in value:
                     file_instance.size = value[f"{field_name}_size"]
                 if value.get(f"{field_name}_metadata") is not None:
                     file_instance.metadata = value[f"{field_name}_metadata"]
@@ -142,7 +149,7 @@ class ConcreteFileField(BaseCompositeField):
                         change_removes_approval=self.with_approval,
                     )
                 # file creation if value is not None otherwise deletion
-                file_instance.save(field_instance_or_value)
+                file_instance.save(field_instance_or_value, delete_old=phase == "post_update")
         retdict: Any = {field_name: file_instance}
         if self.with_size:
             retdict[f"{field_name}_size"] = file_instance.size
@@ -316,15 +323,33 @@ class FileField(FieldFactory):
         assert field_obj.owner
         # unpack
         if isinstance(value, dict) and field_name in value:
-            instance = CURRENT_INSTANCE.get()
-            phase = CURRENT_PHASE.get()
-            if isinstance(value[field_name], FieldFile) or value[field_name] is None:
-                value = value[field_name]
-            elif getattr(instance, "__db_model__", False):
-                # save was called and values passed
-                to_save = value[field_name]
-                value = cast("FieldFile", getattr(instance, field_name))
-                value.save(to_save, delete_old=phase == "prepare_update")
+            if for_query:
+                if isinstance(value[field_name], (FieldFile, str, type(None))):
+                    value = value[field_name]
+            else:
+                # to_model is assumed to be called already
+                phase = CURRENT_PHASE.get()
+                explicit_values = EXPLICIT_SPECIFIED_VALUES.get()
+                if isinstance(value[field_name], FieldFile):
+                    value = value[field_name]
+                    if (
+                        phase == "prepare_insert"
+                        and explicit_values is not None
+                        and field_name not in explicit_values
+                    ):
+                        cast(FileField, value).save(
+                            cast(FileField, value).to_file(), delete_old=False
+                        )
+                else:
+                    instance = CURRENT_MODEL_INSTANCE.get()
+                    assert instance is not None, "No model instance found"
+                    # use model instance
+                    to_save = value[field_name]
+                    value = cast("FieldFile", getattr(instance, field_name))
+                    # set the file and file name
+                    value.save(to_save, delete_old=phase == "prepare_update")
+
+        # handle None
         if value is None:
             nulldict: dict[str, Any] = {
                 field_name: None,

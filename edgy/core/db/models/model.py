@@ -4,7 +4,11 @@ import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
-from edgy.core.db.context_vars import EXPLICIT_SPECIFIED_VALUES, MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.context_vars import (
+    CURRENT_INSTANCE,
+    EXPLICIT_SPECIFIED_VALUES,
+    MODEL_GETATTR_BEHAVIOR,
+)
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.mixins import DeclarativeMixin, ModelRowMixin, ReflectedModelMixin
 from edgy.core.db.models.model_proxy import ProxyModel
@@ -94,26 +98,38 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             is_update=True,
             phase="prepare_update",
             instance=self,
+            model_instance=self,
         )
         # empty updates shouldn't cause an error. E.g. only model references are updated
         clauses = self.identifying_clauses()
-        if column_values and clauses:
-            check_db_connection(self.database)
-            async with self.database as database, database.transaction():
-                # can update column_values
-                column_values.update(
-                    await self.execute_pre_save_hooks(column_values, kwargs, force_insert=False)
+        token = CURRENT_INSTANCE.set(self)
+        try:
+            if column_values and clauses:
+                check_db_connection(self.database)
+                async with self.database as database, database.transaction():
+                    # can update column_values
+                    column_values.update(
+                        await self.execute_pre_save_hooks(
+                            column_values, kwargs, force_insert=False
+                        )
+                    )
+                    expression = self.table.update().values(**column_values).where(*clauses)
+                    await database.execute(expression)
+
+                # Update the model instance.
+                new_kwargs = self.transform_input(
+                    column_values, phase="post_update", instance=self
                 )
-                expression = self.table.update().values(**column_values).where(*clauses)
-                await database.execute(expression)
+                for k, v in new_kwargs.items():
+                    setattr(self, k, v)
 
-            # Update the model instance.
-            new_kwargs = self.transform_input(column_values, phase="post_update", instance=self)
-            for k, v in new_kwargs.items():
-                setattr(self, k, v)
+            # updates aren't required to change the db, they can also just affect the meta fields
+            await self.execute_post_save_hooks(
+                cast(Sequence[str], kwargs.keys()), force_insert=False
+            )
 
-        # updates aren't required to change the db, they can also just affect the meta fields
-        await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()), force_insert=False)
+        finally:
+            CURRENT_INSTANCE.reset(token)
         if column_values or kwargs:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
@@ -195,32 +211,37 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
             is_update=False,
             phase="prepare_insert",
             instance=self,
+            model_instance=self,
         )
         check_db_connection(self.database)
-        async with self.database as database, database.transaction():
-            # can update column_values
-            column_values.update(
-                await self.execute_pre_save_hooks(column_values, kwargs, force_insert=True)
-            )
-            expression = self.table.insert().values(**column_values)
-            autoincrement_value = await database.execute(expression)
-        # sqlalchemy supports only one autoincrement column
-        if autoincrement_value:
-            column = self.table.autoincrement_column
-            if column is not None and hasattr(autoincrement_value, "_mapping"):
-                autoincrement_value = autoincrement_value._mapping[column.key]
-            # can be explicit set, which causes an invalid value returned
-            if column is not None and column.key not in column_values:
-                column_values[column.key] = autoincrement_value
+        token = CURRENT_INSTANCE.set(self)
+        try:
+            async with self.database as database, database.transaction():
+                # can update column_values
+                column_values.update(
+                    await self.execute_pre_save_hooks(column_values, kwargs, force_insert=True)
+                )
+                expression = self.table.insert().values(**column_values)
+                autoincrement_value = await database.execute(expression)
+            # sqlalchemy supports only one autoincrement column
+            if autoincrement_value:
+                column = self.table.autoincrement_column
+                if column is not None and hasattr(autoincrement_value, "_mapping"):
+                    autoincrement_value = autoincrement_value._mapping[column.key]
+                # can be explicit set, which causes an invalid value returned
+                if column is not None and column.key not in column_values:
+                    column_values[column.key] = autoincrement_value
 
-        new_kwargs = self.transform_input(column_values, phase="post_insert", instance=self)
-        for k, v in new_kwargs.items():
-            setattr(self, k, v)
+            new_kwargs = self.transform_input(column_values, phase="post_insert", instance=self)
+            for k, v in new_kwargs.items():
+                setattr(self, k, v)
 
-        if self.meta.post_save_fields:
-            await self.execute_post_save_hooks(
-                cast(Sequence[str], kwargs.keys()), force_insert=True
-            )
+            if self.meta.post_save_fields:
+                await self.execute_post_save_hooks(
+                    cast(Sequence[str], kwargs.keys()), force_insert=True
+                )
+        finally:
+            CURRENT_INSTANCE.reset(token)
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False
 
