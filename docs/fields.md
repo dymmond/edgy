@@ -905,7 +905,7 @@ For  `extract_column_values` following phases exist (except called manually):
 #### Using the instance
 
 There are 2 ContextVar named `CURRENT_INSTANCE` and `CURRENT_MODEL_INSTANCE`. `CURRENT_INSTANCE` is the executing instance of a QuerySet or Model while
-`CURRENT_MODEL_INSTANCE` is always a model instance. Both can be also `None` (empty).
+`CURRENT_MODEL_INSTANCE` is always a model instance or `None`. When calling manually also `CURRENT_INSTANCE` can be `None`.
 They are available during setting an attribute, `transform_input` and `extract_column_values` calls when set as well as in the `pre_save_callback` or `post_save_callback` hooks.
 This implies you can use them in all sub methods like get_default...
 
