@@ -962,7 +962,7 @@ Note: sqlalchemy provides a similar functionality which does not take an argumen
 It is called lambda statement.
 
 
-## Raw db queries
+## Raw database queries
 
 Sometimes it is necessary to skip all edgy query modifications and issue raw queries.
 We can simply use the `database` and `table` attribute of a Model or QuerySet like we can do in databasez.
@@ -974,18 +974,31 @@ The pendant in a model are `identifying_clauses`.
 query = Model.query.filter(id=1)
 # ensures that the db connection doesn't drop during operation
 async with query.database as database:
-    await database.fetch_all(query.table.select(await query.build_where_clause()))
+    expression = query.table.select().where(await query.build_where_clause())
+    # as generic sql
+    print(str(expression))
+    # as dialect specific sql
+    print(expression.compile(database.engine))
+    # use with sqlalchemy/databasez
+    await database.fetch_all()
 ```
 
 or direct with a model:
-
 
 ``` python
 # ensures that the db connection doesn't drop during operation
 async with model.database as database:
     expression = model.table.select().where(*model.identifying_clauses)
+    # as generic sql
+    print(str(expression))
+    # as dialect specific sql
+    print(expression.compile(database.engine))
+    # use with sqlalchemy/databasez
     await database.fetch_all(expression)
 ```
+
+If you want raw sql see the print statements. You most probably want a dialect specific sql string for non-basic
+sql types because otherwise some features are not supported or cause warnings.
 
 [model]: ../models.md
 [managers]: ../managers.md
