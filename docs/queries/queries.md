@@ -962,7 +962,30 @@ Note: sqlalchemy provides a similar functionality which does not take an argumen
 It is called lambda statement.
 
 
+## Raw db queries
 
+Sometimes it is necessary to skip all edgy query modifications and issue raw queries.
+We can simply use the `database` and `table` attribute of a Model or QuerySet like we can do in databasez.
+For getting the right objects QuerySet has the async function `build_where_clause` which evaluates all dynamic queries and returns an expression.
+The pendant in a model are `identifying_clauses`.
+
+``` python
+# note: we don't await
+query = Model.query.filter(id=1)
+# ensures that the db connection doesn't drop during operation
+async with query.database as database:
+    await database.fetch_all(query.table.select(await query.build_where_clause()))
+```
+
+or direct with a model:
+
+
+``` python
+# ensures that the db connection doesn't drop during operation
+async with model.database as database:
+    expression = model.table.select().where(*model.identifying_clauses)
+    await database.fetch_all(expression)
+```
 
 [model]: ../models.md
 [managers]: ../managers.md

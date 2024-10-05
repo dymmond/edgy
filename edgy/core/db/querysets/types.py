@@ -32,6 +32,9 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
         self.model_class = model_class
 
     @abstractmethod
+    async def build_where_clause(self) -> Any: ...
+
+    @abstractmethod
     def filter(
         self,
         *clauses: Union[
