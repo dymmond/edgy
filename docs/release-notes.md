@@ -14,6 +14,8 @@ hide:
 ### Fixed
 
 - `update` and `delete` methods of QuerySet did ignore or clauses.
+- Fixed ManyToMany fields not able to use their Owner Model as target.
+- Fixed makemigration failing with foreignkeys when using model_apps.
 
 ## 0.17.1
 

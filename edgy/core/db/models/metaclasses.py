@@ -379,8 +379,16 @@ def _set_related_field(
     foreign_key_name: str,
     related_name: str,
     source: type["BaseModelType"],
+    replace_related_field: bool,
 ) -> None:
-    if related_name in target.meta.fields:
+    if related_name in target.meta.fields and not replace_related_field:
+        # is already correctly set, required for migrate of model_apps with registry set
+        related_field = target.meta.fields[related_name]
+        if (
+            related_field.related_from is source
+            and related_field.foreign_key_name == foreign_key_name
+        ):
+            return
         raise ForeignKeyBadConfigured(
             f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
         )
@@ -397,8 +405,7 @@ def _set_related_field(
 
 
 def _set_related_name_for_foreign_keys(
-    meta: "MetaInfo",
-    model_class: type["BaseModelType"],
+    meta: "MetaInfo", model_class: type["BaseModelType"], replace_related_field: bool = False
 ) -> None:
     """
     Sets the related name for the foreign keys.
@@ -429,6 +436,7 @@ def _set_related_name_for_foreign_keys(
             source=model_class,
             foreign_key_name=name,
             related_name=related_name,
+            replace_related_field=replace_related_field,
         )
         registry: Registry = foreign_key.target_registry
         with contextlib.suppress(Exception):
@@ -803,13 +811,14 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         # Making sure it does not generate models if abstract or a proxy
         if not meta.abstract and not cls.__is_proxy_model__:
-            for value in meta.fields.values():
-                if isinstance(value, BaseManyToManyForeignKeyField):
-                    value.create_through_model()
             if getattr(cls, "__reflected__", False):
                 registry.reflected[cls.__name__] = cls
             else:
                 registry.models[cls.__name__] = cls
+            # after registrating the own model
+            for value in list(meta.fields.values()):
+                if isinstance(value, BaseManyToManyForeignKeyField):
+                    value.create_through_model()
             # Sets the foreign key fields
             if meta.foreign_key_fields:
                 _set_related_name_for_foreign_keys(meta, cls)
