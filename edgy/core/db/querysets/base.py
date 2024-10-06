@@ -161,20 +161,22 @@ class BaseQuerySet(
         else:
             return await asyncio.gather(*result)
 
-    def _build_filter_clauses_expression(self, filter_clauses: Any, expression: Any) -> Any:
-        """Builds the filter clauses expression"""
-        if len(filter_clauses) == 1:
-            clause = filter_clauses[0]
-        else:
-            clause = clauses_mod.and_(*filter_clauses)
-        expression = expression.where(clause)
-        return expression
+    async def build_where_clause(self) -> Any:
+        """Build a where clause from the filters which can be passed in a where function."""
+        build_where_clause: list[Any] = []
 
-    def _build_or_clauses_expression(self, or_clauses: Any, expression: Any) -> Any:
-        """Builds the filter clauses expression"""
-        clause = or_clauses[0] if len(or_clauses) == 1 else clauses_mod.or_(*or_clauses)
-        expression = expression.where(clause)
-        return expression
+        if self.or_clauses:
+            or_clauses = await self._resolve_clause_args(self.or_clauses)
+            build_where_clause.append(
+                or_clauses[0] if len(or_clauses) == 1 else clauses_mod.or_(*or_clauses)
+            )
+
+        if self.filter_clauses:
+            # we AND by default
+            build_where_clause.extend(await self._resolve_clause_args(self.filter_clauses))
+        # this simplifies the integration.
+        # otherwise unrolling is required which needs extra wrapping with async functions
+        return clauses_mod.and_(*build_where_clause)
 
     def _build_select_distinct(self, distinct_on: Optional[Sequence[str]], expression: Any) -> Any:
         """Filters selects only specific fields. Leave empty to use simple distinct"""
@@ -311,17 +313,7 @@ class BaseQuerySet(
             columns = [column for column in select_from.columns if column.name in model_columns]
             expression = expression.with_only_columns(*columns)
 
-        if queryset.filter_clauses:
-            expression = queryset._build_filter_clauses_expression(
-                await self._resolve_clause_args(queryset.filter_clauses),
-                expression=expression,
-            )
-
-        if queryset.or_clauses:
-            expression = queryset._build_or_clauses_expression(
-                await self._resolve_clause_args(queryset.or_clauses),
-                expression=expression,
-            )
+        expression = expression.where(await queryset.build_where_clause())
 
         if queryset._order_by:
             expression = queryset._build_order_by_expression(
@@ -820,12 +812,12 @@ class QuerySet(BaseQuerySet):
 
     @property
     def raw_query(self) -> Any:
-        """Get SQL query (sqlalchemy)."""
+        """Get SQL select query (sqlalchemy)."""
         return run_sync(self._build_select())
 
     @cached_property
     def sql(self) -> str:
-        """Get SQL query as string."""
+        """Get SQL select query as string."""
         return str(self.raw_query)
 
     def filter(
@@ -1348,8 +1340,7 @@ class QuerySet(BaseQuerySet):
         await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
 
         expression = self.table.delete()
-        for filter_clause in await self._resolve_clause_args(self.filter_clauses):
-            expression = expression.where(filter_clause)
+        expression = expression.where(await self.build_where_clause())
 
         check_db_connection(self.database)
         async with self.database as database:
@@ -1378,9 +1369,7 @@ class QuerySet(BaseQuerySet):
         )
 
         expression = self.table.update().values(**column_values)
-
-        for filter_clause in await self._resolve_clause_args(self.filter_clauses):
-            expression = expression.where(filter_clause)
+        expression = expression.where(await self.build_where_clause())
         check_db_connection(self.database)
         async with self.database as database:
             await database.execute(expression)

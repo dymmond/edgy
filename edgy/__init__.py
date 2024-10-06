@@ -1,4 +1,4 @@
-__version__ = "0.17.1"
+__version__ = "0.17.2"
 
 from .cli.base import Migrate
 from .conf import settings

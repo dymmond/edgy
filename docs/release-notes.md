@@ -5,11 +5,21 @@ hide:
 
 # Release Notes
 
+## 0.17.2
+
+### Added
+
+- `build_where_clause` method in QuerySet for easing the integration in raw SQLAlchemy queries.
+
+### Fixed
+
+- `update` and `delete` methods of QuerySet did ignore or clauses.
+
 ## 0.17.1
 
 ### Added
 
-- `CURRENT_MODEL_INSTANCE` COntextVariable which always point to a model instance.
+- `CURRENT_MODEL_INSTANCE` ContextVariable which always point to a model instance.
 
 ### Fixed
 
