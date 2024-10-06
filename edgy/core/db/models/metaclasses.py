@@ -381,7 +381,7 @@ def _set_related_field(
     source: type["BaseModelType"],
     replace_related_field: bool,
 ) -> None:
-    if related_name in target.meta.fields and not replace_related_field:
+    if not replace_related_field and related_name in target.meta.fields:
         # is already correctly set, required for migrate of model_apps with registry set
         related_field = target.meta.fields[related_name]
         if (
