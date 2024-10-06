@@ -659,6 +659,18 @@ users.all(True)
 await users
 ```
 
+### Global or
+
+A nice feature of edgy QuerySet are global ORs. This means you can attach new `or` clauses also later.
+
+
+```python
+# actually and_ is a synonym for filter
+user_query = User.query.and_(active=True).or_(email="gmail")
+user_query._or(email="outlook")
+# active users with email gmail or outlook are retrieved
+users = await user_query
+```
 
 ## Useful methods
 
