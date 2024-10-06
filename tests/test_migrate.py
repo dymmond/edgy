@@ -24,10 +24,11 @@ class User(edgy.Model):
 
 class Profile(User):
     age = edgy.IntegerField()
+    parent = edgy.ForeignKey("Profile", null=True, inherit=False)
+    related = edgy.ManyToMany("Profile", inherit=False)
 
     class Meta:
         registry = models
-        tablename = "profiles"
 
 
 class Contact(Profile):
@@ -36,16 +37,14 @@ class Contact(Profile):
 
     class Meta:
         registry = models
-        tablename = "contacts"
 
 
-class ReflectedContact(edgy.ReflectModel):
-    age = edgy.CharField(max_length=255)
-    address = edgy.CharField(max_length=255)
+def test_migrate_without_model_apps():
+    app = Esmerald()
+    migrate = Migrate(app=app, registry=models)
 
-    class Meta:
-        tablename = "contacts"
-        registry = models
+    assert len(models.models) == 3
+    assert len(migrate.registry.models) == 3
 
 
 @pytest.mark.parametrize(
@@ -53,15 +52,15 @@ class ReflectedContact(edgy.ReflectModel):
     [{"tests": "tests.test_migrate"}, ("tests.test_migrate",), ["tests.test_migrate"]],
     ids=["dict", "tuple", "list"],
 )
-def test_migrate_with_model_apps(model_apps):
+def test_migrate_with_fake_model_apps(model_apps):
     app = Esmerald()
-    models.models = {}
+    nother.models = {}
 
-    assert len(models.models) == 0
+    assert len(nother.models) == 0
 
-    migrate = Migrate(app=app, registry=models, model_apps=model_apps)
+    migrate = Migrate(app=app, registry=nother, model_apps=model_apps)
 
-    assert len(models.models) == 2
+    assert len(nother.models) == 2
     assert len(migrate.registry.models) == 2
 
 
@@ -72,9 +71,9 @@ def test_migrate_with_model_apps(model_apps):
 )
 def test_raises_assertation_error_on_model_apps(model_apps):
     app = Esmerald()
-    models.models = {}
+    nother.models = {}
 
-    assert len(models.models) == 0
+    assert len(nother.models) == 0
 
     with pytest.raises(AssertionError):
-        Migrate(app=app, registry=models, model_apps=model_apps)
+        Migrate(app=app, registry=nother, model_apps=model_apps)
