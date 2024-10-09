@@ -11,17 +11,17 @@ database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 
-class User(edgy.Model):
-    name = edgy.CharField(max_length=100)
+class Studio(edgy.Model):
+    name = edgy.CharField(max_length=255)
+    users = edgy.ManyToMany("User", embed_through="embedded")
+    albums = edgy.ManyToMany("Album", embed_through="embedded")
 
     class Meta:
         registry = models
 
 
-class Track(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    title = edgy.CharField(max_length=100)
-    position = edgy.IntegerField()
+class User(edgy.Model):
+    name = edgy.CharField(max_length=100)
 
     class Meta:
         registry = models
@@ -36,10 +36,10 @@ class Album(edgy.Model):
         registry = models
 
 
-class Studio(edgy.Model):
-    name = edgy.CharField(max_length=255)
-    users = edgy.ManyToMany("User", embed_through="embedded")
-    albums = edgy.ManyToMany("Album", embed_through="embedded")
+class Track(edgy.Model):
+    id = edgy.IntegerField(primary_key=True)
+    title = edgy.CharField(max_length=100)
+    position = edgy.IntegerField()
 
     class Meta:
         registry = models
