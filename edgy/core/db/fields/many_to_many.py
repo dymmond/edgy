@@ -75,7 +75,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         assert not isinstance(self.through, str), "through not initialized yet"
         return ManyRelation(
             through=self.through,
-            to=self.to,
+            to=self.target,
             from_foreign_key=self.from_foreign_key,
             to_foreign_key=self.to_foreign_key,
             embed_through=self.embed_through,
@@ -101,7 +101,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 self.from_foreign_key,
                 path.removeprefix(self.embed_through_prefix).removeprefix("__"),
             )
-        return self.to, self.reverse_name, path.removeprefix(self.name).removeprefix("__")
+        return self.target, self.reverse_name, path.removeprefix(self.name).removeprefix("__")
 
     def reverse_traverse_field_fk(self, path: str) -> tuple[Any, str, str]:
         # used for target fk
@@ -124,7 +124,6 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         from edgy.core.db.models.metaclasses import MetaInfo
 
-        self.to = self.target
         __bases__: tuple[type[BaseModelType], ...] = ()
         pknames = set()
         if self.through:
@@ -152,7 +151,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                     candidate = None
                     for field_name in through.meta.foreign_key_fields:
                         field = through.meta.fields[field_name]
-                        if field.target == self.to:
+                        if field.target == self.target:
                             if candidate:
                                 raise ValueError("multiple foreign keys to target")
                             else:
@@ -162,7 +161,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                     self.to_foreign_key = candidate
                 return
         owner_name = self.owner.__name__
-        to_name = self.to.__name__
+        to_name = self.target.__name__
         class_name = f"{owner_name}{to_name}"
         if not self.from_foreign_key:
             self.from_foreign_key = owner_name.lower()
@@ -211,7 +210,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 index=self.index,
             ),
             f"{self.to_foreign_key}": ForeignKey(
-                self.to,
+                self.target,
                 null=True,
                 on_delete=CASCADE,
                 unique=self.unique,
