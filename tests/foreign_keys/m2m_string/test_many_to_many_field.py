@@ -10,6 +10,8 @@ pytestmark = pytest.mark.anyio
 database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
+# test lazyness by referencing not yet existing models
+
 
 class Studio(edgy.Model):
     name = edgy.CharField(max_length=255)

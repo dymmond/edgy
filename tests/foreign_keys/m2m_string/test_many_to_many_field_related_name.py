@@ -9,21 +9,7 @@ pytestmark = pytest.mark.anyio
 database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
-
-class User(edgy.Model):
-    name = edgy.CharField(max_length=100)
-
-    class Meta:
-        registry = models
-
-
-class Track(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    title = edgy.CharField(max_length=100)
-    position = edgy.IntegerField()
-
-    class Meta:
-        registry = models
+# test lazyness by referencing not yet existing models
 
 
 class Album(edgy.Model):
@@ -39,6 +25,22 @@ class Studio(edgy.Model):
     name = edgy.CharField(max_length=255)
     users = edgy.ManyToManyField("User", related_name="studio_users", embed_through="embedded")
     albums = edgy.ManyToManyField("Album", related_name="studio_albums", embed_through="embedded")
+
+    class Meta:
+        registry = models
+
+
+class User(edgy.Model):
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Track(edgy.Model):
+    id = edgy.IntegerField(primary_key=True)
+    title = edgy.CharField(max_length=100)
+    position = edgy.IntegerField()
 
     class Meta:
         registry = models
