@@ -818,7 +818,15 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             # after registrating the own model
             for value in list(meta.fields.values()):
                 if isinstance(value, BaseManyToManyForeignKeyField):
-                    value.create_through_model()
+                    m2m_registry: Registry = value.target_registry
+                    with contextlib.suppress(Exception):
+                        m2m_registry = cast("Registry", value.target.registry)
+
+                    def create_through_model(x: Any, field: "BaseFieldType" = value) -> None:
+                        # we capture with field = ... the variable
+                        field.create_through_model()
+
+                    m2m_registry.register_callback(value.to, create_through_model, one_time=True)
             # Sets the foreign key fields
             if meta.foreign_key_fields:
                 _set_related_name_for_foreign_keys(meta, cls)
