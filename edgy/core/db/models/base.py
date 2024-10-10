@@ -62,9 +62,9 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
     __db_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
     __show_pk__: ClassVar[bool] = False
+    __using_schema__: Union[str, None, Any] = Undefined
     # private attribute
     _loaded_or_deleted: bool = False
-    __using_schema__: Union[str, None, Any] = Undefined
 
     def __init__(
         self, *args: Any, __show_pk__: bool = False, __phase__: str = "init", **kwargs: Any

@@ -163,7 +163,7 @@ class MyModel(edgy.Model):
 
 ##### Parameters:
 
-* `max_length` - An integer indicating the total length of string.
+* `max_length` - An integer indicating the total length of string. Required. Set to None for creating a field without a string length restriction.
 * `min_length` - An integer indicating the minimum length of string.
 
 #### ChoiceField
@@ -353,10 +353,13 @@ import edgy
 class MyModel(edgy.Model):
     email: str = edgy.EmailField(max_length=60, null=True)
     ...
-
 ```
 
 Derives from the same as [CharField](#charfield) and validates the email value.
+
+##### Parameters
+
+- `max_length` - Integer/None. Default: 255.
 
 #### ExcludeField
 
@@ -640,15 +643,32 @@ Similar to [CharField](#charfield) but has no `max_length` restrictions.
 
 ```python
 import edgy
+import secrets
 
+hasher = Hasher()
 
 class MyModel(edgy.Model):
-    data: str = edgy.PasswordField(null=False, max_length=255)
+    pw: str = edgy.PasswordField(null=False, derive_fn=hasher.derive)
+    token: str = edgy.PasswordField(null=False, default=secrets.token_hex)
     ...
 
+# we can check if the pw matches by providing a tuple
+obj = await MyModel.query.create(pw=("foobar", "foobar"))
+# now let's check the pw
+hasher.compare_pw(obj.pw, "foobar")
+obj.token == "<token>"
 ```
 
-Similar to [CharField](#charfield) and it can be used to represent a password text.
+Similar to [CharField](#charfield) and it can be used to represent a password text. The secret parameter defaults to `True`.
+
+##### Parameters
+
+- `max_length` - Integer/None. Default: 255.
+- `derive_fn` - Callable. Default: None. When provided it automatically hashes an incoming string. Should be a good key deriving function.
+- `keep_original` - Boolean. Default: `True` when `derive_fn` is provided `False` otherwise. When True, an attribute named: `<fieldname>_original` is added
+  whenever a password is manually set. It contains the password in plaintext. After saving/loading the attribute is set to `None`.
+
+Ideally the key derivation function includes the parameters (and derive algorithm) used for deriving in the hash so a compare_pw function can reproduce the result.
 
 #### TimeField
 
@@ -680,10 +700,13 @@ import edgy
 class MyModel(edgy.Model):
     url: str = fields.URLField(null=True, max_length=1024)
     ...
-
 ```
 
 Derives from the same as [CharField](#charfield) and validates the value of an URL.
+
+##### Parameters
+
+- `max_length` - Integer/None. Default: 255.
 
 #### UUIDField
 
