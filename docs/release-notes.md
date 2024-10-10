@@ -11,6 +11,7 @@ hide:
 
 - `model_dump_json` returns right result.
 - `show_pk=False` can now be used to disable the inclusion of pk fields regardless of `__show_pk__`.
+- `__setattr__` is called after insert/update. We have transform_input already.
 
 ## 0.17.3
 

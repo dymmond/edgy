@@ -3,11 +3,11 @@ import decimal
 import enum
 import ipaddress
 import uuid
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from enum import EnumMeta
 from functools import partial
 from re import Pattern
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import pydantic
 import sqlalchemy
@@ -38,7 +38,6 @@ class CharField(FieldFactory, str):
     def __new__(  # type: ignore
         cls,
         *,
-        max_length: Optional[int] = 0,
         min_length: Optional[int] = None,
         regex: Union[str, Pattern] = None,
         pattern: Union[str, Pattern] = None,
@@ -57,7 +56,7 @@ class CharField(FieldFactory, str):
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
         max_length = kwargs.get("max_length", 0)
-        if max_length <= 0:
+        if max_length is not None and max_length <= 0:
             raise FieldDefinitionError(detail=f"'max_length' is required for {cls.__name__}")
 
         min_length = kwargs.get("min_length")
@@ -68,38 +67,21 @@ class CharField(FieldFactory, str):
         assert pattern is None or isinstance(pattern, (str, Pattern))
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.String(
-            length=kwargs.get("max_length"), collation=kwargs.get("collation")
+    def get_column_type(cls, max_length: Optional[int] = None, **kwargs: Any) -> Any:
+        return (
+            sqlalchemy.Text(collation=kwargs.get("collation"))
+            if max_length is None
+            else sqlalchemy.String(length=max_length, collation=kwargs.get("collation"))
         )
 
 
-class TextField(FieldFactory, str):
+class TextField(CharField):
     """String representation of a text field which means no max_length required"""
 
-    field_type = str
-
-    def __new__(
-        cls,
-        *,
-        min_length: int = 0,
-        max_length: Optional[int] = None,
-        regex: Union[str, Pattern] = None,
-        pattern: Union[str, Pattern] = None,
-        **kwargs: Any,
-    ) -> BaseFieldType:
-        if pattern is None:
-            pattern = regex
-        del regex
-        kwargs = {
-            **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
-
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Text(collation=kwargs.get("collation"))
+    def validate(cls, kwargs: dict[str, Any]) -> None:
+        kwargs.setdefault("max_length", None)
+        super().validate(kwargs)
 
 
 class IncrementOnSaveBaseField(Field):
@@ -541,7 +523,7 @@ class ChoiceField(FieldFactory):
     def __new__(  # type: ignore
         cls,
         choices: Optional[Sequence[Union[tuple[str, str], tuple[str, int]]]] = None,
-        **kwargs: dict[str, Any],
+        **kwargs: Any,
     ) -> BaseFieldType:
         kwargs = {
             **kwargs,
@@ -566,23 +548,61 @@ class PasswordField(CharField):
     Representation of a Password
     """
 
+    def __new__(  # type: ignore
+        cls,
+        derive_fn: Optional[Callable[[str], str]] = None,
+        **kwargs: Any,
+    ) -> BaseFieldType:
+        kwargs.setdefault("keep_original", derive_fn is not None)
+        return super().__new__(cls, derive_fn=derive_fn, **kwargs)
+
     @classmethod
-    def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
-        return sqlalchemy.String(length=kwargs.get("max_length"))
+    def to_model(
+        cls, field_obj: BaseFieldType, field_name: str, value: Any, original_fn: Any = None
+    ) -> dict[str, Any]:
+        if isinstance(value, (tuple, list)):
+            if value[0] != value[1]:
+                raise ValueError("Password doesn't match.")
+            else:
+                value = value[0]
+        retval: dict[str, Any] = {}
+        phase = CURRENT_PHASE.get()
+        derive_fn = cast(Optional[Callable[[str], str]], field_obj.derive_fn)
+        if phase in {"set", "init"} and derive_fn is not None:
+            retval[field_name] = derive_fn(value)
+            if getattr(field_obj, "keep_original", False):
+                retval[f"{field_name}_original"] = value
+        else:
+            retval[field_name] = value
+            # blank after saving or loading
+            if phase in {"post_insert", "post_update", "load"} and getattr(
+                field_obj, "keep_original", False
+            ):
+                retval[f"{field_name}_original"] = None
+
+        return retval
+
+    @classmethod
+    def validate(cls, kwargs: dict[str, Any]) -> None:
+        kwargs.setdefault("secret", True)
+        kwargs.setdefault("max_length", 255)
+        super().validate(kwargs)
 
 
 class EmailField(CharField):
     field_type = EmailStr
 
     @classmethod
-    def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
-        return sqlalchemy.String(length=kwargs.get("max_length"))
+    def validate(cls, kwargs: dict[str, Any]) -> None:
+        kwargs.setdefault("max_length", 255)
+        super().validate(kwargs)
 
 
 class URLField(CharField):
     @classmethod
-    def get_column_type(self, **kwargs: Any) -> sqlalchemy.String:
-        return sqlalchemy.String(length=kwargs.get("max_length"))
+    def validate(cls, kwargs: dict[str, Any]) -> None:
+        kwargs.setdefault("max_length", 255)
+        super().validate(kwargs)
 
 
 class IPAddressField(FieldFactory, str):
