@@ -21,7 +21,7 @@ class SampleHasher:
     def derive(self, password: str, iterations: int = 10):
         assert not password.startswith("pbkdf2")
         # the default is not secure
-        return f"pbkdf2:{iterations}:{pbkdf2_hmac('sha256', password.encode(), salt=b"a", iterations=iterations).hex()}"
+        return f"pbkdf2:{iterations}:{pbkdf2_hmac('sha256', password.encode(), salt=b'', iterations=iterations).hex()}"
 
     def compare_pw(self, hash: str, password: str):
         algo, iterations, _ = hash.split(":", 2)

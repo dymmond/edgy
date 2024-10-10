@@ -120,8 +120,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                 new_kwargs = self.transform_input(
                     column_values, phase="post_update", instance=self
                 )
-                for k, v in new_kwargs.items():
-                    object.__setattr__(self, k, v)
+                self.__dict__.update(new_kwargs)
 
             # updates aren't required to change the db, they can also just affect the meta fields
             await self.execute_post_save_hooks(
@@ -233,8 +232,7 @@ class Model(ModelRowMixin, DeclarativeMixin, EdgyBaseModel):
                     column_values[column.key] = autoincrement_value
 
             new_kwargs = self.transform_input(column_values, phase="post_insert", instance=self)
-            for k, v in new_kwargs.items():
-                object.__setattr__(self, k, v)
+            self.__dict__.update(new_kwargs)
 
             if self.meta.post_save_fields:
                 await self.execute_post_save_hooks(
