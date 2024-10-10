@@ -1,4 +1,5 @@
 import datetime
+import json
 
 import pytest
 
@@ -78,3 +79,9 @@ async def test_exclude_secrets():
     assert result.pk == gratitude.pk
 
     assert result.owner.model_dump() == {"id": 1, "first_name": "Edgy", "email": "edgy@edgy.dev"}
+
+    assert json.loads(result.owner.model_dump_json()) == {
+        "id": 1,
+        "first_name": "Edgy",
+        "email": "edgy@edgy.dev",
+    }

@@ -14,6 +14,7 @@ from typing import (
     cast,
 )
 
+import orjson
 import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
@@ -345,7 +346,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         include: Union[set[str], dict[str, Any], None] = kwargs.pop("include", None)
         mode: Union[Literal["json", "python"], str] = kwargs.pop("mode", "python")
 
-        should_show_pk = show_pk or self.__show_pk__
+        should_show_pk = self.__show_pk__ if show_pk is None else show_pk
         model = dict(super().model_dump(exclude=exclude, include=include, mode=mode, **kwargs))
         # Workaround for metafields, computed field logic introduces many problems
         # so reimplement the logic here
@@ -395,11 +396,14 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
             elif getattr(field, "alias", None):
                 alias = field.alias
             model[alias] = retval
-        # tenants cause excluded fields to reappear
+        # proxyModel? cause excluded fields to reappear
         # TODO: find a better bugfix
         for excluded_field in self.meta.excluded_fields:
             model.pop(excluded_field, None)
         return model
+
+    def model_dump_json(self, **kwargs: Any) -> str:
+        return orjson.dumps(self.model_dump(mode="json", **kwargs)).decode()
 
     @classmethod
     def build(

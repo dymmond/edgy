@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 import edgy
@@ -62,6 +64,11 @@ async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_no
     )
 
     assert org.model_dump() == {
+        "user": {"id": 1, "profile": {"id": 1, "name": "edgy"}, "email": "user@dev.com"},
+        "id": 1,
+    }
+
+    assert json.loads(org.model_dump_json()) == {
         "user": {"id": 1, "profile": {"id": 1, "name": "edgy"}, "email": "user@dev.com"},
         "id": 1,
     }

@@ -11,9 +11,15 @@ back instead of the opposite? [Check the reflection section](./reflection/reflec
 
 ## What is a model
 
-A model in Edgy is a python class with attributes that represents a database table.
+A model in Edgy is a python class with attributes that represents a database table as well as a pydantic model which enables serialization and validation.
 
 In other words, it is what represents your SQL table in your codebase.
+
+## Model dump
+
+The `model_dump` and `model_dump_json` methods are here overloaded and supports an argument:
+
+`show_pk` which auto-includes the the primary key fields when set to `True`. Default to the value of `__show_pk__` of models.
 
 ## Embedding
 
