@@ -5,6 +5,13 @@ hide:
 
 # Release Notes
 
+## 0.17.4
+
+### Fixed
+
+- `model_dump_json` returns right result.
+- `show_pk=False` can now be used to disable the inclusion of pk fields regardless of `__show_pk__`.
+
 ## 0.17.3
 
 ### Fixed
