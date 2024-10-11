@@ -68,14 +68,21 @@ class Manager(BaseManager):
         Checks for a global possible tenant and returns the corresponding queryset.
         """
         assert self.owner is not None
+        if self.instance is not None:
+            using_schema = self.instance.__using_schema__
+            database = self.instance.database
+        else:
+            using_schema = self.owner.__using_schema__
+            database = self.owner.database
         tenant = get_tenant()
         if tenant:
             set_tenant(None)
             return QuerySet(
                 self.owner,
-                table=self.owner.table_schema(tenant),  # type: ignore
+                using_schema=tenant,
+                database=database,
             )
-        return QuerySet(self.owner, using_schema=self.owner.__using_schema__)
+        return QuerySet(self.owner, using_schema=using_schema, database=database)
 
     def __getattr__(self, name: str) -> Any:
         """

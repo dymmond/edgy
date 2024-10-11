@@ -125,9 +125,6 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         Args:
             field_name: the field name (can be different from name)
             value: the field value
-        Kwargs:
-            phase: the phase (set, creation, ...)
-
         """
         return {field_name: value}
 

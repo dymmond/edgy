@@ -5,6 +5,17 @@ hide:
 
 # Release Notes
 
+## 0.18.0
+
+### Added
+
+- ComputedField.
+- Permission template.
+
+### Fixed
+
+- Managers use now instance attributes (database, schema).
+
 ## 0.17.4
 
 ### Fixed
