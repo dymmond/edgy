@@ -23,13 +23,13 @@ class PermissionManager(Manager):
         query = cast(QuerySet, self.all())
         for source in sources:
             if isinstance(source, UserField.target):
-                clause: dict[str, Any] = {"users__pk": source.pk}
+                clause: dict[str, Any] = {"users": source}
                 if GroupField is not None:
-                    clause[f"groups__{self.owner.users_field_group}__pk"] = source.pk
+                    clause[f"groups__{self.owner.users_field_group}"] = source
                 query = query.or_(**clause)
                 return query
             elif GroupField is not None and isinstance(source, GroupField.target):
-                query = query.or_(groups__pk=source.pk)
+                query = query.or_(groups=source)
             else:
                 raise ValueError(f"Invalid source: {source}.")
         return query
@@ -76,11 +76,9 @@ class PermissionManager(Manager):
         query = cast("QuerySet", UserField.target.query.filter(**clauses))
         if objects is not None:
             for obj in objects:
-                clause = {f"{UserField.reverse_name}__obj__pk": obj.pk}
+                clause = {f"{UserField.reverse_name}__obj": obj}
                 if GroupField is not None:
-                    clause[
-                        f"{self.owner.groups_field_user}__{GroupField.reverse_name}__obj__pk"
-                    ] = obj.pk
+                    clause[f"{self.owner.groups_field_user}__{GroupField.reverse_name}__obj"] = obj
                 query = query.or_(**clause)
         return query
 
@@ -111,6 +109,6 @@ class PermissionManager(Manager):
         query = cast("QuerySet", GroupField.target.query.filter(**clauses))
         if objects is not None:
             for obj in objects:
-                clause = {f"{GroupField.reverse_name}__obj__pk": obj.pk}
+                clause = {f"{GroupField.reverse_name}__obj": obj}
                 query = query.or_(**clause)
         return query
