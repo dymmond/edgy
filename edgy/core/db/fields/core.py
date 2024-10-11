@@ -33,9 +33,13 @@ CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 class ComputedField(BaseField):
     def __init__(
         self,
-        getter: Union[Callable[["BaseModelType", str], Any], str],
-        setter: Union[Callable[["BaseModelType", str, Any], None], str, None] = None,
-        fallback_getter: Optional[Callable[["BaseModelType", str], Any]] = None,
+        getter: Union[
+            Callable[[BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any], str
+        ],
+        setter: Union[Callable[[BaseFieldType, "BaseModelType", Any], None], str, None] = None,
+        fallback_getter: Optional[
+            Callable[[BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any]
+        ] = None,
         **kwargs: Any,
     ) -> None:
         kwargs["default"] = None
@@ -48,10 +52,16 @@ class ComputedField(BaseField):
         )
 
     @cached_property
-    def compute_getter(self) -> Callable[["BaseModelType", str], Any]:
+    def compute_getter(
+        self,
+    ) -> Callable[[BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any]:
         if isinstance(self.getter, str):
             fn = cast(
-                Optional[Callable[["BaseModelType", str], Any]],
+                Optional[
+                    Callable[
+                        [BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any
+                    ]
+                ],
                 getattr(self.owner, self.getter, None),
             )
         else:
@@ -63,10 +73,10 @@ class ComputedField(BaseField):
         return fn
 
     @cached_property
-    def compute_setter(self) -> Callable[["BaseModelType", str, Any], None]:
+    def compute_setter(self) -> Callable[[BaseFieldType, "BaseModelType", Any], None]:
         if isinstance(self.setter, str):
             fn = cast(
-                Optional[Callable[["BaseModelType", str, Any], None]],
+                Optional[Callable[[BaseFieldType, "BaseModelType", Any], None]],
                 getattr(self.owner, self.setter, None),
             )
         else:
@@ -83,10 +93,10 @@ class ComputedField(BaseField):
         return {}
 
     def __get__(self, instance: "BaseModelType", owner: Any = None) -> Any:
-        return self.compute_getter(instance, self.name)
+        return self.compute_getter(self, instance, owner)
 
     def __set__(self, instance: "BaseModelType", value: Any) -> None:
-        self.compute_setter(instance, self.name, value)
+        self.compute_setter(self, instance, value)
 
 
 class CharField(FieldFactory, str):

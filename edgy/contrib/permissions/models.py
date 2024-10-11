@@ -15,7 +15,7 @@ class BasePermission(edgy.Model):
         getter="get_description",
         setter="set_description",
         # default to name
-        fallback_getter=lambda instance, field_name: instance.name,
+        fallback_getter=lambda field, instance, owner: instance.name,
     )
 
     # users = edgy.fields.ManyToMany(User)
