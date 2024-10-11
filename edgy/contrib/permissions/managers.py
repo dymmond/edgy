@@ -48,20 +48,31 @@ class PermissionManager(Manager):
             objects = [objects]
         UserField = self.owner.meta.fields["users"]
         GroupField = self.owner.meta.fields.get("groups", None)
+        ModelNameField = self.owner.meta.fields.get("model_name", None)
+        ContentTypeField = self.owner.meta.fields.get("obj", None)
         if objects is not None and len(objects) == 0:
             # none
             return cast("QuerySet", UserField.target.query.filter(and_()))
         clauses: dict[str, Any] = {f"{UserField.reverse_name}__name__in": permissions}
         if model_names is not None:
-            clauses[f"{UserField.reverse_name}__model_name__in"] = model_names
+            if ModelNameField is not None:
+                clauses[f"{UserField.reverse_name}__model_name__in"] = model_names
+            elif ContentTypeField is not None:
+                clauses[f"{UserField.reverse_name}__obj__name__in"] = model_names
         if GroupField is not None:
             clauses[f"{self.owner.groups_field_user}__{GroupField.reverse_name}__name__in"] = (
                 permissions
             )
             if model_names is not None:
-                clauses[
-                    f"{self.owner.groups_field_user}__{GroupField.reverse_name}__model_name__in"
-                ] = model_names
+                if ModelNameField is not None:
+                    clauses[
+                        f"{self.owner.groups_field_user}__{GroupField.reverse_name}__model_name__in"
+                    ] = model_names
+                elif ContentTypeField is not None:
+                    clauses[
+                        f"{self.owner.groups_field_user}__{GroupField.reverse_name}__obj__name__in"
+                    ] = model_names
+
         query = cast("QuerySet", UserField.target.query.filter(**clauses))
         if objects is not None:
             for obj in objects:
@@ -86,12 +97,17 @@ class PermissionManager(Manager):
         if isinstance(objects, BaseModelType):
             objects = [objects]
         GroupField = self.owner.meta.fields["groups"]
+        ModelNameField = self.owner.meta.fields.get("model_name", None)
+        ContentTypeField = self.owner.meta.fields.get("obj", None)
         if objects is not None and len(objects) == 0:
             # none
             return cast("QuerySet", GroupField.target.query.filter(and_()))
         clauses: dict[str, Any] = {f"{GroupField.reverse_name}__name__in": permissions}
         if model_names is not None:
-            clauses[f"{GroupField.reverse_name}__model_name__in"] = model_names
+            if ModelNameField is not None:
+                clauses[f"{GroupField.reverse_name}__model_name__in"] = model_names
+            elif ContentTypeField is not None:
+                clauses[f"{GroupField.reverse_name}__obj__name__in"] = model_names
         query = cast("QuerySet", GroupField.target.query.filter(**clauses))
         if objects is not None:
             for obj in objects:

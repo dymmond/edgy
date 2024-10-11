@@ -19,9 +19,10 @@ class BasePermission(edgy.Model):
     )
 
     # users = edgy.fields.ManyToMany(User)
-    # groups = edgy.fields.ManyToMany(User)
+    # groups = edgy.fields.ManyToMany(Group)
 
     query = PermissionManager()
 
     class Meta:
         abstract = True
+        # unique_together=[(name, model_name, obj)]
