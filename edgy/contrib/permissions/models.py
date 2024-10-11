@@ -12,7 +12,10 @@ class BasePermission(edgy.Model):
     # model_name: str = edgy.fields.CharField(max_length=100, null=True)
     # obj = edgy.fields.ForeignKey("ContentType")
     description: Optional[str] = edgy.fields.ComputedField(  # type: ignore
-        getter="get_description", setter="set_description"
+        getter="get_description",
+        setter="set_description",
+        # default to name
+        fallback_getter=lambda instance, field_name: instance.name,
     )
 
     # users = edgy.fields.ManyToMany(User)
