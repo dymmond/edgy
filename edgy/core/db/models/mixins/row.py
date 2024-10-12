@@ -29,11 +29,14 @@ class ModelRowMixin:
     ) -> bool:
         if table is None:
             table = cls.table_schema(using_schema)
+        # FIXME: the extraction of cols does not work because of clashing names new names are assigned
+        # find a way to get the original name or control the select to use speaking aliases
         return bool(
-            cls.meta.registry
+            cls.meta.registry is not None
             and not cls.meta.abstract
             and all(
-                row._mapping.get(getattr(table.columns, col, col)) is not None
+                row._mapping.get(getattr(table.columns, col)) is not None
+                and row._mapping.get(col) is not None
                 for col in cls.pkcolumns
             )
         )
@@ -89,6 +92,7 @@ class ModelRowMixin:
                 raise QuerySetError(
                     detail=f'Selected field "{field_name}" is not a RelationshipField on {cls}.'
                 ) from None
+
             if not model_class.can_load_from_row(row, using_schema=using_schema):
                 continue
             if remainder:

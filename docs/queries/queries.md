@@ -689,6 +689,15 @@ instead returns a `None`.
 user = await User.query.get_or_none(id=1)
 ```
 
+### Convert to select expression
+
+Sometimes you want directly work with a sqlalchemy select expression. This is possible via
+`as_select`:
+
+```python
+user_select = await User.query.filter(id=1).as_select()
+```
+
 ## Using the cache
 
 `first`, `last`, `count` are always cached and also initialized when iterating over the query or requesting all results.

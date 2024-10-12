@@ -17,6 +17,7 @@ hide:
 ### Changed
 
 - Managers use now instance attributes (database, schema).
+- Expose `as_select` instead of `raw_query`.
 
 ### Fixed
 

@@ -6,8 +6,8 @@ import edgy
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL)
-models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
+database = DatabaseTestClient(DATABASE_URL, use_existing=False, drop_database=True)
+models = edgy.Registry(database)
 
 pytestmark = pytest.mark.anyio
 
@@ -34,19 +34,14 @@ class Organisation(Base):
     user: User = edgy.ForeignKey(User)
 
 
-@pytest.fixture(autouse=True, scope="module")
+# ??? it works only with rollback
+@pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
-    async with database:
+    async with models:
         await models.create_all()
         yield
         if not database.drop:
             await models.drop_all()
-
-
-@pytest.fixture(autouse=True, scope="function")
-async def rollback_transactions():
-    async with models.database:
-        yield
 
 
 async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_not_secret():
@@ -56,12 +51,12 @@ async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_no
     )
     await Organisation.query.create(user=user)
 
-    org = (
-        await Organisation.query.select_related(["user", "user__profile"])
+    org_query = (
+        Organisation.query.select_related(["user", "user__profile"])
         .exclude_secrets()
         .order_by("id")
-        .last()
     )
+    org = await org_query.last()
 
     assert org.model_dump() == {
         "user": {"id": 1, "profile": {"id": 1, "name": "edgy"}, "email": "user@dev.com"},
