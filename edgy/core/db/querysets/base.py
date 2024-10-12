@@ -256,9 +256,12 @@ class BaseQuerySet(
                 select_from = sqlalchemy.sql.join(  # type: ignore
                     select_from,
                     table,
-                    *self._select_from_relationship_clause_generator(
-                        foreign_key, table, reverse, former_table
+                    clauses_mod.and_(
+                        *self._select_from_relationship_clause_generator(
+                            foreign_key, table, reverse, former_table
+                        )
                     ),
+                    isouter=True,
                 )
                 tables[table.name] = table
                 former_table = table
@@ -720,6 +723,7 @@ class BaseQuerySet(
         ],
         exclude: bool = False,
         or_: bool = False,
+        allow_global_or: bool = True,
     ) -> "QuerySet":
         """
         Filters or excludes a given clause for a specific QuerySet.
@@ -765,7 +769,7 @@ class BaseQuerySet(
                             *(await self._resolve_clause_args(_extracted_clauses))
                         )
 
-                    if len(clauses) == 1:
+                    if allow_global_or and len(clauses) == 1:
                         # add to global or
                         assert not exclude
                         queryset.or_clauses.append(wrapper_and)
@@ -774,6 +778,9 @@ class BaseQuerySet(
                 else:
                     converted_clauses.extend(extracted_clauses)
             elif isinstance(raw_clause, QuerySet):
+                assert (
+                    raw_clause.model_class is queryset.model_class
+                ), f"QuerySet arg has wrong model_class {raw_clause.model_class}"
                 converted_clauses.append(raw_clause.build_where_clause)
                 for related in raw_clause._select_related:
                     if related not in queryset._select_related:

@@ -184,20 +184,6 @@ q &= Q(User.columns.name == "Edgy")
 User.query.filter(q)
 ```
 
-
-##### Using  `and_` and `or_` with kwargs
-
-Often you want to check against an dict of key-values which should all match.
-For this there is an extension of edgy's `and_` and `or_` which takes a model or columns and
-matches kwargs against:
-
-```python
-users = await User.query.filter(and_.from_kwargs(User, name="foo", email="foo@example.com"))
-# or
-
-users = await User.query.filter(and_.from_kwargs(User, **my_dict))
-```
-
 #### SQLAlchemy style
 
 Since Edgy uses SQLAlchemy core, it is also possible to do queries in SQLAlchemy style.
@@ -215,6 +201,66 @@ users = await User.query.filter(User.columns.id.in_([1, 2, 3]))
     The `columns` refers to the columns of the underlying SQLAlchemy table.
 
 All the operations you would normally do in SQLAlchemy syntax, are allowed here.
+
+##### Using  `and_` and `or_` with kwargs
+
+Often you want to check against an dict of key-values which should all match.
+For this there is an extension of edgy's `and_` and `or_` which takes a model or columns and
+matches kwargs against:
+
+```python
+users = await User.query.filter(and_.from_kwargs(User, name="foo", email="foo@example.com"))
+# or
+
+users = await User.query.filter(and_.from_kwargs(User, **my_dict))
+```
+
+#### Global OR
+
+Edgy QuerySet can do global ORs. This means you can attach new OR clauses also later.
+
+```python
+# actually and_ is a synonym for filter
+user_query = User.query.and_(active=True).or_(email="gmail")
+user_query._or(email="outlook")
+# active users with email gmail or outlook are retrieved
+users = await user_query
+```
+
+Note: when passing multiple clauses to `or_` a local OR is executed instead.
+Because of the broad scope this is only recommended for simple queries.
+
+You can do instead something like:
+
+```python
+# actually and_ is a synonym for filter
+user_query = User.query.and_(active=True)
+# add a local or
+user_query = user_query.or_({"email": "outlook"}, {"email": "gmail"})
+# active users with email gmail or outlook are retrieved
+users = await user_query
+```
+
+or pass querysets:
+
+```python
+# actually and_ is a synonym for filter
+user_query = User.query.and_(active=True)
+user_query = user_query.or_(user_query, {"email": "outlook"}, {"email": "gmail"})
+# active users or users with email gmail or outlook are retrieved
+users = await user_query
+```
+
+#### Passing multiple keyword based filters
+
+You can also passing multiple keyword based filters by providing them as a dictionary
+
+```python
+user_query = User.query.or_({"active": True}, {"email": "outlook"}, {"email": "gmail"}).
+# active users or users with email gmail or outlook are retrieved
+users = await user_query
+```
+
 
 ### Limit
 
@@ -659,19 +705,6 @@ users.all(True)
 await users
 ```
 
-### Global or
-
-A nice feature of edgy QuerySet are global ORs. This means you can attach new `or` clauses also later.
-
-
-```python
-# actually and_ is a synonym for filter
-user_query = User.query.and_(active=True).or_(email="gmail")
-user_query._or(email="outlook")
-# active users with email gmail or outlook are retrieved
-users = await user_query
-```
-
 ## Useful methods
 
 ### Get or create
@@ -874,7 +907,7 @@ The same principle as the [and_](#and) but applied to the `OR`.
 {!> ../docs_src/queries/clauses/style/or.py !}
 ```
 
-With multiple `or_` or nultiple parametes in the same `or_`
+With multiple `or_` or multiple parametes in the same `or_`
 
 ```python
 {!> ../docs_src/queries/clauses/style/or_two.py !}

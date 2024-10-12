@@ -51,13 +51,23 @@ async def rollback_transactions():
         yield
 
 
-async def test_querying():
+async def test_querying_via_group():
     user = await User.query.create(name="edgy")
     group = await Group.query.create(name="admin", users=[user])
-    permission = await Permission.query.create(users=[user], name="view")
     permission2 = await Permission.query.create(groups=[group], name="admin")
     assert await Permission.query.filter(name="admin").get()
-    assert await Permission.query.permissions_of(user).get(name="view") == permission
+    permissions = await Permission.query.permissions_of(group)
+    assert permissions == [permission2]
+
+
+async def test_querying_mixed():
+    user = await User.query.create(name="edgy")
+    group = await Group.query.create(name="admin", users=[user])
+    await Permission.query.create(users=[user], name="view")
+    permission2 = await Permission.query.create(groups=[group], name="admin")
+    assert await Permission.query.filter(name="admin").get()
+    permissions = await Permission.query.permissions_of(user)
+    assert len(permissions) == 2
     permissions = await Permission.query.permissions_of(group)
     assert permissions == [permission2]
     assert await Permission.query.users("view").get() == user

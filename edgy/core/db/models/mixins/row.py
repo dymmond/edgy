@@ -21,6 +21,24 @@ class ModelRowMixin:
     """
 
     @classmethod
+    def can_load_from_row(
+        cls: type["Model"],
+        row: "Row",
+        table: Optional["Table"] = None,
+        using_schema: Optional[str] = None,
+    ) -> bool:
+        if table is None:
+            table = cls.table_schema(using_schema)
+        return bool(
+            cls.meta.registry
+            and not cls.meta.abstract
+            and all(
+                row._mapping.get(getattr(table.columns, col, col)) is not None
+                for col in cls.pkcolumns
+            )
+        )
+
+    @classmethod
     async def from_sqla_row(
         cls: type["Model"],
         row: "Row",
@@ -71,6 +89,8 @@ class ModelRowMixin:
                 raise QuerySetError(
                     detail=f'Selected field "{field_name}" is not a RelationshipField on {cls}.'
                 ) from None
+            if not model_class.can_load_from_row(row, using_schema=using_schema):
+                continue
             if remainder:
                 # don't pass table, it is only for the main model_class
                 item[field_name] = await model_class.from_sqla_row(

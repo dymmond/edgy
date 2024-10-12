@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from edgy.core.db.models.managers import Manager
 from edgy.core.db.models.types import BaseModelType
@@ -26,27 +26,18 @@ class PermissionManager(Manager):
         assert (
             GroupField is None or GroupField.embed_through is False or GroupField.embed_through
         ), "groups field need embed_through=foo|False."
-        query = cast("QuerySet", self.all())
 
-        groups_field_user: Literal[False] | str = False
-        if GroupField is not None:
-            groups_field_user = GroupField.target.meta.fields[
-                self.owner.users_field_group
-            ].reverse_name
-            assert isinstance(
-                groups_field_user, str
-            ), f"{GroupField.target} {self.owner.users_field_group} field needs reverse_name."
+        clauses: [dict[str, Any]] = []
         for source in sources:
             if isinstance(source, UserField.target):
-                clause: dict[str, Any] = {"users__pk": source}
-                if groups_field_user:
-                    clause[f"{groups_field_user}__{self.owner.users_field_group}__pk"] = source
-                query = query.or_(**clause)
+                clauses.append({"users__pk": source})
+                if GroupField is not None:
+                    clauses.append({f"groups__{self.owner.users_field_group}__pk": source})
             elif GroupField is not None and isinstance(source, GroupField.target):
-                query = query.or_(groups__pk=source)
+                clauses.append({"groups__pk": source})
             else:
                 raise ValueError(f"Invalid source: {source}.")
-        return query
+        return cast("QuerySet", self.or_(*clauses))
 
     def users(
         self,
