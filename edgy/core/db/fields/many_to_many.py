@@ -71,6 +71,16 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             return self.reverse_name
         return f"{self.reverse_name}__{self.embed_through}"
 
+    def clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
+        if not for_query:
+            return {}
+        raise NotImplementedError(f"Not implemented yet for ManyToMany {name}")
+
+    def reverse_clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
+        if not for_query:
+            return {}
+        raise NotImplementedError(f"Not implemented yet for ManyToMany {name}")
+
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         assert not isinstance(self.through, str), "through not initialized yet"
         return ManyRelation(
@@ -95,23 +105,43 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         )
 
     def traverse_field(self, path: str) -> tuple[Any, str, str]:
-        if self.embed_through_prefix and path.startswith(self.embed_through_prefix):
+        if self.embed_through_prefix is False or self.embed_through_prefix:
+            # select embedded
+            if self.embed_through_prefix is not False and path.startswith(
+                self.embed_through_prefix
+            ):
+                return (
+                    self.through,
+                    self.from_foreign_key,
+                    path.removeprefix(self.embed_through_prefix).removeprefix("__"),
+                )
+            # proxy
             return (
-                self.through,
-                self.from_foreign_key,
-                path.removeprefix(self.embed_through_prefix).removeprefix("__"),
+                self.target,
+                self.reverse_name,
+                f'{path.removeprefix(self.name).removeprefix("__")}',
             )
         return self.target, self.reverse_name, path.removeprefix(self.name).removeprefix("__")
 
     def reverse_traverse_field_fk(self, path: str) -> tuple[Any, str, str]:
         # used for target fk
-        if self.reverse_embed_through_prefix and path.startswith(
+        if self.reverse_embed_through_prefix is False or path.startswith(
             self.reverse_embed_through_prefix
         ):
+            # select embedded
+            if self.reverse_embed_through_prefix and path.startswith(
+                self.reverse_embed_through_prefix
+            ):
+                return (
+                    self.through,
+                    self.to_foreign_key,
+                    path.removeprefix(self.reverse_embed_through_prefix).removeprefix("__"),
+                )
+            # proxy
             return (
-                self.through,
-                self.to_foreign_key,
-                path.removeprefix(self.reverse_embed_through_prefix).removeprefix("__"),
+                self.owner,
+                self.name,
+                f'{path.removeprefix(self.reverse_name).removeprefix("__")}',
             )
         return self.owner, self.name, path.removeprefix(self.reverse_name).removeprefix("__")
 

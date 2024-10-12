@@ -11,10 +11,16 @@ hide:
 
 - ComputedField.
 - Permission template.
+- `reverse_clean` for ForeignKeys.
+- Expanded filter methods of querysets (can pass now dict and querysets).
+
+### Changed
+
+- Managers use now instance attributes (database, schema).
 
 ### Fixed
 
-- Managers use now instance attributes (database, schema).
+- `select_related` works across ManyToMany fields.
 
 ## 0.17.4
 

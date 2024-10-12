@@ -96,9 +96,7 @@ class RelatedField(RelationshipField):
         return self.foreign_key.is_m2m
 
     def clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
-        if not for_query:
-            return {}
-        return self.related_to.meta.pk.clean("pk", value, for_query=for_query)  # type: ignore
+        return self.foreign_key.reverse_clean(name, value, for_query=for_query)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {self}>"

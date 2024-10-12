@@ -6,7 +6,6 @@ from .managers import PermissionManager
 
 
 class BasePermission(edgy.Model):
-    groups_field_user: ClassVar[str] = "groups"
     users_field_group: ClassVar[str] = "users"
     name: str = edgy.fields.CharField(max_length=100, null=False)
     # model_name: str = edgy.fields.CharField(max_length=100, null=True)
@@ -18,8 +17,9 @@ class BasePermission(edgy.Model):
         fallback_getter=lambda field, instance, owner: instance.name,
     )
 
-    # users = edgy.fields.ManyToMany(User)
-    # groups = edgy.fields.ManyToMany(Group)
+    # Important: embed_through must be set for enabling full proxying
+    # users = edgy.fields.ManyToMany("User", embed_through=False)
+    # groups = edgy.fields.ManyToMany("Group", embed_through=False)
 
     query = PermissionManager()
 

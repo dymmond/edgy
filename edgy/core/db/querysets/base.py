@@ -91,7 +91,6 @@ class BaseQuerySet(
         model_class: Union[type[BaseModelType], None] = None,
         database: Union["Database", None] = None,
         filter_clauses: Any = None,
-        or_clauses: Any = None,
         select_related: Any = None,
         prefetch_related: Any = None,
         limit_count: Any = None,
@@ -111,7 +110,7 @@ class BaseQuerySet(
     ) -> None:
         super().__init__(model_class=model_class)
         self.filter_clauses = [] if filter_clauses is None else filter_clauses
-        self.or_clauses = [] if or_clauses is None else or_clauses
+        self.or_clauses: Any = []
         self.limit_count = limit_count
         self._select_related = [] if select_related is None else select_related
         self._prefetch_related = [] if prefetch_related is None else prefetch_related
@@ -161,22 +160,21 @@ class BaseQuerySet(
         else:
             return await asyncio.gather(*result)
 
-    async def build_where_clause(self) -> Any:
+    async def build_where_clause(self, _: Any = None) -> Any:
         """Build a where clause from the filters which can be passed in a where function."""
-        build_where_clause: list[Any] = []
-
+        # ignored args for passing build_where_clause in filter_clauses
+        where_clause: list[Any] = []
         if self.or_clauses:
             or_clauses = await self._resolve_clause_args(self.or_clauses)
-            build_where_clause.append(
+            where_clause.append(
                 or_clauses[0] if len(or_clauses) == 1 else clauses_mod.or_(*or_clauses)
             )
 
         if self.filter_clauses:
             # we AND by default
-            build_where_clause.extend(await self._resolve_clause_args(self.filter_clauses))
-        # this simplifies the integration.
-        # otherwise unrolling is required which needs extra wrapping with async functions
-        return clauses_mod.and_(*build_where_clause)
+            where_clause.extend(await self._resolve_clause_args(self.filter_clauses))
+        # for nicer unpacking
+        return clauses_mod.and_(*where_clause)
 
     def _build_select_distinct(self, distinct_on: Optional[Sequence[str]], expression: Any) -> Any:
         """Filters selects only specific fields. Leave empty to use simple distinct"""
@@ -232,15 +230,37 @@ class BaseQuerySet(
                 # now use the one of the model_class itself
                 model_database = None
                 table = model_class.table_schema(self.active_schema)
-                if table.name not in tables:
-                    select_from = sqlalchemy.sql.join(  # type: ignore
-                        select_from,
-                        table,
-                        *self._select_from_relationship_clause_generator(
-                            foreign_key, table, reverse, former_table
-                        ),
-                    )
-                    tables[table.name] = table
+
+                if table.name in tables:
+                    former_table = table
+                    continue
+                if foreign_key.is_m2m:
+                    # we need to inject the through model for the select
+                    model_class = foreign_key.through
+                    table = model_class.table_schema(self.active_schema)
+                    if reverse:
+                        select_path = f"{foreign_key.from_foreign_key}__{select_path}"
+                    else:
+                        select_path = f"{foreign_key.to_foreign_key}__{select_path}"
+                    # if select_path is empty
+                    select_path = select_path.removesuffix("__")
+                    if table.name in tables:
+                        former_table = table
+                        continue
+                    if reverse:
+                        foreign_key = model_class.meta.fields[foreign_key.to_foreign_key]
+                    else:
+                        foreign_key = model_class.meta.fields[foreign_key.from_foreign_key]
+                        reverse = True
+
+                select_from = sqlalchemy.sql.join(  # type: ignore
+                    select_from,
+                    table,
+                    *self._select_from_relationship_clause_generator(
+                        foreign_key, table, reverse, former_table
+                    ),
+                )
+                tables[table.name] = table
                 former_table = table
 
         return tables.values(), select_from
@@ -253,6 +273,7 @@ class BaseQuerySet(
         former_table: Any,
     ) -> Any:
         column_names = foreign_key.get_column_names(foreign_key.name)
+        assert column_names, f"foreign key without column names detected: {foreign_key.name}"
         for col in column_names:
             colname = foreign_key.from_fk_field_name(foreign_key.name, col) if reverse else col
             if reverse:
@@ -338,28 +359,23 @@ class BaseQuerySet(
 
         return expression
 
-    def _filter_query(
+    def _kwargs_to_clauses(
         self,
         kwargs: Any,
-        exclude: bool = False,
-        or_: bool = False,
-    ) -> "QuerySet":
+    ) -> tuple[list[Any], list[str]]:
         clauses = []
-        filter_clauses = self.filter_clauses
-        or_clauses = self.or_clauses
         select_related = list(self._select_related)
-        prefetch_related = list(self._prefetch_related)
 
         # Making sure for queries we use the main class and not the proxy
         # And enable the parent
         if self.model_class.__is_proxy_model__:
             self.model_class = self.model_class.__parent__
 
-        kwargs = clean_query_kwargs(
+        cleaned_kwargs = clean_query_kwargs(
             self.model_class, kwargs, self.embed_parent_filters, model_database=self.database
         )
 
-        for key, value in kwargs.items():
+        for key, value in cleaned_kwargs.items():
             model_class, field_name, op, related_str, _, cross_db_remainder = crawl_relationship(
                 self.model_class, key
             )
@@ -419,45 +435,8 @@ class BaseQuerySet(
                         field_name, op, model_class.table_schema(self.active_schema), value
                     )
                 )
-        if exclude:
 
-            async def wrapper(queryset: "QuerySet") -> Any:
-                return clauses_mod.not_(
-                    clauses_mod.and_(*(await self._resolve_clause_args(clauses)))
-                )
-
-            if not or_:
-                filter_clauses.append(wrapper)
-            else:
-                or_clauses.append(wrapper)
-        else:
-            if not or_:
-                filter_clauses += clauses
-            else:
-                or_clauses += clauses
-
-        return cast(
-            "QuerySet",
-            self.__class__(
-                model_class=self.model_class,
-                database=self._database,
-                filter_clauses=filter_clauses,
-                or_clauses=or_clauses,
-                select_related=select_related,
-                prefetch_related=prefetch_related,
-                limit_count=self.limit_count,
-                limit_offset=self._offset,
-                batch_size=self._batch_size,
-                order_by=self._order_by,
-                only_fields=self._only,
-                defer_fields=self._defer,
-                embed_parent=self.embed_parent,
-                embed_parent_filters=self.embed_parent_filters,
-                table=getattr(self, "_table", None),
-                exclude_secrets=self._exclude_secrets,
-                using_schema=self.using_schema,
-            ),
-        )
+        return clauses, select_related
 
     def _prepare_order_by(self, order_by: str) -> Any:
         reverse = order_by.startswith("-")
@@ -546,10 +525,10 @@ class BaseQuerySet(
         queryset.active_schema = self.get_schema()
 
         queryset._table = getattr(self, "_table", None)
-        queryset.filter_clauses = copy.copy(self.filter_clauses)
-        queryset.or_clauses = copy.copy(self.or_clauses)
+        queryset.filter_clauses = list(self.filter_clauses)
+        queryset.or_clauses = list(self.or_clauses)
         queryset.limit_count = copy.copy(self.limit_count)
-        queryset._select_related = copy.copy(self._select_related)
+        queryset._select_related = list(self._select_related)
         queryset._prefetch_related = copy.copy(self._prefetch_related)
         queryset._offset = copy.copy(self._offset)
         queryset._order_by = copy.copy(self._order_by)
@@ -735,6 +714,8 @@ class BaseQuerySet(
                         Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
                     ],
                 ],
+                dict[str, Any],
+                "QuerySet",
             ]
         ],
         exclude: bool = False,
@@ -745,14 +726,80 @@ class BaseQuerySet(
         """
         queryset: QuerySet = self._clone()
         if kwargs:
-            queryset = queryset._filter_query(kwargs, exclude=exclude, or_=or_)
-        if not clauses:
+            clauses = [*clauses, kwargs]
+        converted_clauses: Sequence[
+            Union[
+                sqlalchemy.sql.expression.BinaryExpression,
+                Callable[
+                    [QueryType],
+                    Union[
+                        sqlalchemy.sql.expression.BinaryExpression,
+                        Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+                    ],
+                ],
+            ]
+        ] = []
+        for raw_clause in clauses:
+            if isinstance(raw_clause, dict):
+                extracted_clauses, queryset._select_related = queryset._kwargs_to_clauses(
+                    kwargs=raw_clause
+                )
+                if or_ and extracted_clauses:
+
+                    async def wrapper_and(
+                        queryset: "QuerySet",
+                        _extracted_clauses: Sequence[
+                            Union[
+                                "sqlalchemy.sql.expression.BinaryExpression",
+                                Callable[
+                                    ["QueryType"],
+                                    Union[
+                                        "sqlalchemy.sql.expression.BinaryExpression",
+                                        Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                                    ],
+                                ],
+                            ]
+                        ] = extracted_clauses,
+                    ) -> Any:
+                        return clauses_mod.and_(
+                            *(await self._resolve_clause_args(_extracted_clauses))
+                        )
+
+                    if len(clauses) == 1:
+                        # add to global or
+                        assert not exclude
+                        queryset.or_clauses.append(wrapper_and)
+                        return queryset
+                    converted_clauses.append(wrapper_and)
+                else:
+                    converted_clauses.extend(extracted_clauses)
+            elif isinstance(raw_clause, QuerySet):
+                converted_clauses.append(raw_clause.build_where_clause)
+                for related in raw_clause._select_related:
+                    if related not in queryset._select_related:
+                        queryset._select_related.append(related)
+
+            else:
+                converted_clauses.append(raw_clause)
+        if not converted_clauses:
             return queryset
-        op = clauses_mod.or_ if or_ else clauses_mod.and_
+
         if exclude:
-            queryset.filter_clauses.append(clauses_mod.not_(op(*clauses)))
+            op = clauses_mod.and_ if not or_ else clauses_mod.or_
+
+            async def wrapper(queryset: "QuerySet") -> Any:
+                return clauses_mod.not_(op(*(await self._resolve_clause_args(converted_clauses))))
+
+            queryset.filter_clauses.append(wrapper)
+        elif or_:
+
+            async def wrapper(queryset: "QuerySet") -> Any:
+                return clauses_mod.or_(*(await self._resolve_clause_args(converted_clauses)))
+
+            queryset.filter_clauses.append(wrapper)
         else:
-            queryset.filter_clauses.append(op(*clauses))
+            # default to and
+            queryset.filter_clauses.extend(converted_clauses)
         return queryset
 
     async def _model_based_delete(self) -> int:
@@ -831,6 +878,8 @@ class QuerySet(BaseQuerySet):
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
                 ],
             ],
+            dict[str, Any],
+            "QuerySet",
         ],
         **kwargs: Any,
     ) -> "QuerySet":
@@ -859,6 +908,8 @@ class QuerySet(BaseQuerySet):
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
                 ],
             ],
+            dict[str, Any],
+            "QuerySet",
         ],
         **kwargs: Any,
     ) -> "QuerySet":
@@ -878,13 +929,14 @@ class QuerySet(BaseQuerySet):
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
                 ],
             ],
+            dict[str, Any],
         ],
         **kwargs: Any,
     ) -> "QuerySet":
         """
         Filters the QuerySet by the AND operand. Alias of filter.
         """
-        return self.filter(*clauses, **kwargs)
+        return self._filter_or_exclude(clauses=clauses, kwargs=kwargs)
 
     def not_(
         self,
@@ -897,6 +949,8 @@ class QuerySet(BaseQuerySet):
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
                 ],
             ],
+            dict[str, Any],
+            "QuerySet",
         ],
         **kwargs: Any,
     ) -> "QuerySet":
@@ -916,6 +970,8 @@ class QuerySet(BaseQuerySet):
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
                 ],
             ],
+            dict[str, Any],
+            "QuerySet",
         ],
         **kwargs: Any,
     ) -> "QuerySet":
@@ -1062,8 +1118,7 @@ class QuerySet(BaseQuerySet):
         if not isinstance(related, (list, tuple)):
             related = [related]
 
-        related = list(queryset._select_related) + related
-        queryset._select_related = related
+        queryset._select_related.extend(related)
         return queryset
 
     async def values(

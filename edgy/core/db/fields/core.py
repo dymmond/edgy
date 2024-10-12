@@ -42,7 +42,9 @@ class ComputedField(BaseField):
         ] = None,
         **kwargs: Any,
     ) -> None:
-        kwargs["default"] = None
+        kwargs["exclude"] = True
+        kwargs["null"] = True
+        kwargs["primary_key"] = False
         kwargs["field_type"] = kwargs["annotation"] = Any
         self.getter = getter
         self.fallback_getter = fallback_getter
@@ -89,6 +91,14 @@ class ComputedField(BaseField):
         self,
         field_name: str,
         value: Any,
+    ) -> dict[str, Any]:
+        return {}
+
+    def clean(
+        self,
+        name: str,
+        value: Any,
+        for_query: bool = False,
     ) -> dict[str, Any]:
         return {}
 

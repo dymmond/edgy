@@ -160,6 +160,20 @@ async def test_filter_or_clause_select():
     assert len(results) == 2
 
 
+async def test_filter_or_clause_select_new():
+    user = await User.query.create(name="Adam", email="adam@edgy.dev")
+    await User.query.create(name="Edgy", email="adam@edgy.dev")
+
+    results = await User.query.or_({"name": "Test"}, {"name": "Adam"})
+
+    assert len(results) == 1
+    assert results[0].pk == user.pk
+
+    results = await User.query.or_({"name": "Edgy"}, {"name": "Adam"})
+
+    assert len(results) == 2
+
+
 async def test_filter_or_clause_mixed():
     user = await User.query.create(name="Adam", email="adam@edgy.dev")
     await User.query.create(name="Edgy", email="adam@edgy.dev")

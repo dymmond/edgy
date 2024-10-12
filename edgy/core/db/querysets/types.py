@@ -46,6 +46,8 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
                 ],
             ],
+            dict[str, Any],
+            "QueryType",
         ],
         **kwargs: Any,
     ) -> "QueryType": ...
@@ -65,6 +67,7 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
                 ],
             ],
+            "QueryType",
         ],
         **kwargs: Any,
     ) -> "QueryType":
@@ -84,6 +87,8 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
                 ],
             ],
+            dict[str, Any],
+            "QueryType",
         ],
         **kwargs: Any,
     ) -> "QueryType":
@@ -103,6 +108,8 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
                 ],
             ],
+            dict[str, Any],
+            "QueryType",
         ],
         **kwargs: Any,
     ) -> "QueryType":
@@ -123,6 +130,8 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
                 ],
             ],
+            dict[str, Any],
+            "QueryType",
         ],
         **kwargs: Any,
     ) -> "QueryType": ...
