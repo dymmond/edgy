@@ -44,6 +44,7 @@ async def create_test_database():
             await models.drop_all()
 
 
+# FIXME: test is flaky
 async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_not_secret():
     profile = await Profile.query.create(is_enabled=False, name="edgy")
     user = await User.query.create(

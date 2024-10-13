@@ -84,6 +84,7 @@ class ModelRowMixin:
                     detail=f'Selected field "{field_name}" is not a RelationshipField on {cls}.'
                 ) from None
 
+            # stop selecting when None. Related models are not available.
             if not model_class._can_load_from_row(
                 row,
                 tables_and_models[
