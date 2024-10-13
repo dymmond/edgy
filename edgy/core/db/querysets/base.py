@@ -120,7 +120,7 @@ class BaseQuerySet(
         self._group_by = [] if group_by is None else group_by
         self.distinct_on = distinct_on
         self._only = set([] if only_fields is None else only_fields)
-        self._defer = [] if defer_fields is None else defer_fields
+        self._defer = set([] if defer_fields is None else defer_fields)
         self.embed_parent = embed_parent
         self.using_schema = using_schema
         self.embed_parent_filters = embed_parent_filters
@@ -198,9 +198,11 @@ class BaseQuerySet(
         select_from = queryset.table
         maintablekey = select_from.key
         tables_and_models = {select_from.key: (select_from, self.model_class)}
+        transitions: dict[(str, str), Any] = {}
+        transitions_is_full_outer: dict[(str, str), bool] = {}
 
         # Select related
-        for select_path in sorted(queryset._select_related, key=len, reverse=True):
+        for select_path in queryset._select_related:
             # For m2m relationships
             model_class = queryset.model_class
             former_table = queryset.table
@@ -255,20 +257,35 @@ class BaseQuerySet(
                     else:
                         foreign_key = model_class.meta.fields[foreign_key.from_foreign_key]
                         reverse = True
-
-                # FIXME: need to or conditions and to make it full outer when traversing back
-                select_from = sqlalchemy.sql.join(  # type: ignore
-                    select_from,
-                    table,
-                    clauses_mod.and_(
-                        *self._select_from_relationship_clause_generator(
-                            foreign_key, table, reverse, former_table
-                        )
-                    ),
-                    isouter=True,
+                and_clause = clauses_mod.and_(
+                    *self._select_from_relationship_clause_generator(
+                        foreign_key, table, reverse, former_table
+                    )
                 )
+                if (former_table.key, table.key) in transitions:
+                    transitions[(former_table.key, table.key)] = clauses_mod.or_(
+                        transitions[(former_table.key, table.key)], and_clause
+                    )
+                elif (table.key, former_table.key) in transitions:
+                    # inverted
+                    # only make full outer when not the main query
+                    if former_table.key != maintablekey:
+                        transitions_is_full_outer[(table.key, former_table.key)] = True
+                    transitions[(table.key, former_table.key)] = clauses_mod.or_(
+                        transitions[(table.key, former_table.key)], and_clause
+                    )
+                else:
+                    transitions[(former_table.key, table.key)] = and_clause
                 tables_and_models[table.key] = table, model_class
                 former_table = table
+        for (former_table_key, next_table_key), condition in transitions.items():
+            select_from = sqlalchemy.sql.join(  # type: ignore
+                select_from,
+                tables_and_models[next_table_key][0],
+                condition,
+                isouter=True,
+                full=transitions_is_full_outer.get((former_table_key, next_table_key), False),
+            )
 
         return maintablekey, tables_and_models, select_from
 
@@ -312,7 +329,7 @@ class BaseQuerySet(
                     field_name = model_class.meta.columns_to_field.get(column.key, column.key)
                     if queryset._only and field_name not in queryset._only:
                         continue
-                    if queryset._defer and field_name not in queryset._defer:
+                    if queryset._defer and field_name in queryset._defer:
                         continue
                     if (
                         queryset._exclude_secrets
@@ -543,7 +560,7 @@ class BaseQuerySet(
         queryset.embed_parent_filters = self.embed_parent_filters
         queryset._batch_size = self._batch_size
         queryset._only = set(self._only)
-        queryset._defer = copy.copy(self._defer)
+        queryset._defer = set(self._defer)
         queryset._database = self.database
         queryset._exclude_secrets = self._exclude_secrets
         return cast("QuerySet", queryset)
@@ -1082,6 +1099,7 @@ class QuerySet(BaseQuerySet):
         Returns a list of models with the selected only fields and always the primary
         key.
         """
+        queryset: QuerySet = self._clone()
         only_fields = set(fields)
         if self.model_class.pknames:
             for pkname in self.model_class.pknames:
@@ -1091,7 +1109,6 @@ class QuerySet(BaseQuerySet):
         else:
             for pkcolumn in self.model_class.pkcolumns:
                 only_fields.add(pkcolumn.key)
-        queryset: QuerySet = self._clone()
         queryset._only = only_fields
         return queryset
 
@@ -1101,7 +1118,9 @@ class QuerySet(BaseQuerySet):
         key.
         """
         queryset: QuerySet = self._clone()
-        queryset._defer = fields
+
+        defer_fields = set(fields)
+        queryset._defer = defer_fields
         return queryset
 
     def select_related(self, related: Any) -> "QuerySet":
