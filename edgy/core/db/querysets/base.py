@@ -186,20 +186,22 @@ class BaseQuerySet(
 
     def _build_tables_select_from_relationship(
         self,
-    ) -> tuple[str, dict[str, tuple[type["BaseModelType"], "sqlalchemy.Table"], Any]]:
+    ) -> tuple[str, dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]], Any]:
         """
         Builds the tables relationships and joins.
         When a table contains more than one foreign key pointing to the same
         destination table, a lookup for the related field is made to understand
         from which foreign key the table is looked up from.
         """
-        queryset: QuerySet = self
+        queryset: BaseQuerySet = self
 
         select_from = queryset.table
         maintablekey = select_from.key
-        tables_and_models = {select_from.key: (select_from, self.model_class)}
-        transitions: dict[(str, str), Any] = {}
-        transitions_is_full_outer: dict[(str, str), bool] = {}
+        tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]] = {
+            select_from.key: (select_from, self.model_class)
+        }
+        transitions: dict[tuple[str, str], Any] = {}
+        transitions_is_full_outer: dict[tuple[str, str], bool] = {}
 
         # Select related
         for select_path in queryset._select_related:
@@ -311,7 +313,9 @@ class BaseQuerySet(
         if self._only and self._defer:
             raise QuerySetError("You cannot use .only() and .defer() at the same time.")
 
-    async def as_select(self) -> Any:
+    async def as_select_with_tables(
+        self,
+    ) -> tuple[Any, dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]]]:
         """
         Builds the query select based on the given parameters and filters.
         """
@@ -379,7 +383,12 @@ class BaseQuerySet(
             expression = queryset._build_select_distinct(
                 queryset.distinct_on, expression=expression
             )
-        return expression
+        return expression, tables_and_models
+
+    async def as_select(
+        self,
+    ) -> Any:
+        return (await self.as_select_with_tables())[0]
 
     def _kwargs_to_clauses(
         self,
@@ -495,7 +504,11 @@ class BaseQuerySet(
         return cast(EdgyModel, result), new_result
 
     async def _get_or_cache_row(
-        self, row: Any, extra_attr: str = "", raw: bool = False
+        self,
+        row: Any,
+        tables_and_models: dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]],
+        extra_attr: str = "",
+        raw: bool = False,
     ) -> tuple[EdgyModel, EdgyModel]:
         is_only_fields = bool(self._only)
         is_defer_fields = bool(self._defer)
@@ -503,8 +516,9 @@ class BaseQuerySet(
             await self._cache.aget_or_cache_many(
                 self.model_class,
                 [row],
-                cache_fn=lambda row: self.model_class.from_sqla_row(
-                    row,
+                cache_fn=lambda _row: self.model_class.from_sqla_row(
+                    _row,
+                    tables_and_models=tables_and_models,
                     select_related=self._select_related,
                     is_only_fields=is_only_fields,
                     only_fields=self._only,
@@ -513,7 +527,6 @@ class BaseQuerySet(
                     exclude_secrets=self._exclude_secrets,
                     using_schema=self.active_schema,
                     database=self.database,
-                    table=self.table,
                 ),
                 transform_fn=self._embed_parent_in_result,
             )
@@ -578,7 +591,10 @@ class BaseQuerySet(
         self._cache_current_row: Optional[sqlalchemy.Row] = None
 
     async def _handle_batch(
-        self, batch: Sequence[sqlalchemy.Row], queryset: "BaseQuerySet"
+        self,
+        batch: Sequence[sqlalchemy.Row],
+        tables_and_models: dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]],
+        queryset: "BaseQuerySet",
     ) -> Sequence[tuple[BaseModelType, BaseModelType]]:
         is_only_fields = bool(queryset._only)
         is_defer_fields = bool(queryset._defer)
@@ -638,6 +654,7 @@ class BaseQuerySet(
                 batch,
                 cache_fn=lambda row: self.model_class.from_sqla_row(
                     row,
+                    tables_and_models=tables_and_models,
                     select_related=self._select_related,
                     is_only_fields=is_only_fields,
                     only_fields=self._only,
@@ -646,7 +663,6 @@ class BaseQuerySet(
                     exclude_secrets=self._exclude_secrets,
                     using_schema=self.active_schema,
                     database=self.database,
-                    table=self.table,
                 ),
                 transform_fn=self._embed_parent_in_result,
             ),
@@ -669,7 +685,7 @@ class BaseQuerySet(
             # activates distinct, not distinct on
             queryset = queryset.distinct()  # type: ignore
 
-        expression = await queryset.as_select()
+        expression, tables_and_models = await queryset.as_select_with_tables()
 
         if not fetch_all_at_once and bool(queryset.database.force_rollback):
             # force_rollback on db = we have only one connection
@@ -691,7 +707,9 @@ class BaseQuerySet(
         if fetch_all_at_once:
             async with queryset.database as database:
                 batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
-            for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
+            for row_num, result in enumerate(
+                await self._handle_batch(batch, tables_and_models, queryset)
+            ):
                 if counter == 0:
                     self._cache_first = result
                 last_element = result
@@ -708,7 +726,9 @@ class BaseQuerySet(
                     # clear only result cache
                     self._cache.clear()
                     self._cache_fetch_all = False
-                    for row_num, result in enumerate(await self._handle_batch(batch, queryset)):
+                    for row_num, result in enumerate(
+                        await self._handle_batch(batch, tables_and_models, queryset)
+                    ):
                         if counter == 0:
                             self._cache_first = result
                         last_element = result
@@ -861,8 +881,7 @@ class BaseQuerySet(
             return await filter_query._get_raw()
 
         queryset: BaseQuerySet = self
-
-        expression = (await queryset.as_select()).limit(2)
+        expression, tables_and_models = await queryset.limit(2).as_select_with_tables()
         check_db_connection(queryset.database)
         async with queryset.database as database:
             rows = await database.fetch_all(expression)
@@ -874,7 +893,9 @@ class BaseQuerySet(
             raise MultipleObjectsReturned()
         queryset._cache_count = 1
 
-        return await queryset._get_or_cache_row(rows[0], "_cache_first,_cache_last")
+        return await queryset._get_or_cache_row(
+            rows[0], tables_and_models, "_cache_first,_cache_last"
+        )
 
 
 class QuerySet(BaseQuerySet):
@@ -1248,11 +1269,14 @@ class QuerySet(BaseQuerySet):
         queryset = self
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
+        expression, tables_and_models = await queryset.as_select_with_tables()
         check_db_connection(queryset.database)
         async with queryset.database as database:
-            row = await database.fetch_one(await queryset.as_select(), pos=0)
+            row = await database.fetch_one(expression, pos=0)
         if row:
-            return (await self._get_or_cache_row(row, extra_attr="_cache_first"))[1]
+            return (
+                await self._get_or_cache_row(row, tables_and_models, extra_attr="_cache_first")
+            )[1]
         return None
 
     async def last(self) -> Union[EdgyEmbedTarget, None]:
@@ -1266,11 +1290,14 @@ class QuerySet(BaseQuerySet):
         queryset = self
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
+        expression, tables_and_models = await queryset.reverse().as_select_with_tables()
         check_db_connection(queryset.database)
         async with queryset.database as database:
-            row = await database.fetch_one(await queryset.reverse().as_select(), pos=0)
+            row = await database.fetch_one(expression, pos=0)
         if row:
-            return (await self._get_or_cache_row(row, extra_attr="_cache_last"))[1]
+            return (
+                await self._get_or_cache_row(row, tables_and_models, extra_attr="_cache_last")
+            )[1]
         return None
 
     async def create(self, *args: Any, **kwargs: Any) -> EdgyEmbedTarget:

@@ -13,6 +13,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy.engine.result import Row
 
     from edgy import Database, Model
+    from edgy.core.db.models.types import BaseModelType
 
 
 class ModelRowMixin:
@@ -21,23 +22,12 @@ class ModelRowMixin:
     """
 
     @classmethod
-    def can_load_from_row(
-        cls: type["Model"],
-        row: "Row",
-        table: Optional["Table"] = None,
-        using_schema: Optional[str] = None,
-    ) -> bool:
-        if table is None:
-            table = cls.table_schema(using_schema)
-        # FIXME: the extraction of cols does not work because of clashing names new names are assigned
-        # find a way to get the original name or control the select to use speaking aliases
+    def can_load_from_row(cls: type["Model"], row: "Row", table: "Table") -> bool:
         return bool(
             cls.meta.registry is not None
             and not cls.meta.abstract
             and all(
-                row._mapping.get(getattr(table.columns, col)) is not None
-                and row._mapping.get(col) is not None
-                for col in cls.pkcolumns
+                row._mapping.get(getattr(table.columns, col)) is not None for col in cls.pkcolumns
             )
         )
 
@@ -45,6 +35,8 @@ class ModelRowMixin:
     async def from_sqla_row(
         cls: type["Model"],
         row: "Row",
+        # contain the mappings used for select
+        tables_and_models: dict[str, tuple["Table", type["BaseModelType"]]],
         select_related: Optional[Sequence[Any]] = None,
         prefetch_related: Optional[Sequence["Prefetch"]] = None,
         is_only_fields: bool = False,
@@ -53,8 +45,6 @@ class ModelRowMixin:
         exclude_secrets: bool = False,
         using_schema: Optional[str] = None,
         database: Optional["Database"] = None,
-        # local only parameter
-        table: Optional["Table"] = None,
     ) -> Optional["Model"]:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
@@ -93,12 +83,20 @@ class ModelRowMixin:
                     detail=f'Selected field "{field_name}" is not a RelationshipField on {cls}.'
                 ) from None
 
-            if not model_class.can_load_from_row(row, using_schema=using_schema):
+            if not model_class.can_load_from_row(
+                row,
+                tables_and_models[
+                    model_class.meta.tablename
+                    if using_schema is None
+                    else f"{using_schema}.{model_class.meta.tablename}"
+                ][0],
+            ):
                 continue
             if remainder:
                 # don't pass table, it is only for the main model_class
                 item[field_name] = await model_class.from_sqla_row(
                     row,
+                    tables_and_models=tables_and_models,
                     select_related=[remainder],
                     prefetch_related=prefetch_related,
                     exclude_secrets=exclude_secrets,
@@ -109,11 +107,14 @@ class ModelRowMixin:
                 # don't pass table, it is only for the main model_class
                 item[field_name] = await model_class.from_sqla_row(
                     row,
+                    tables_and_models=tables_and_models,
                     exclude_secrets=exclude_secrets,
                     using_schema=using_schema,
                     database=database,
                 )
-        table_columns = cls.table_schema(using_schema).columns
+        table_columns = tables_and_models[
+            cls.meta.tablename if using_schema is None else f"{using_schema}.{cls.meta.tablename}"
+        ][0].columns
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
         # This way it is not overritten by any value
@@ -142,10 +143,13 @@ class ModelRowMixin:
             # For the related fields. We simply chnage the structure of the model
             # and rebuild it with the new fields.
             proxy_model = model_related.proxy_model(**child_item)
-            # don't pass table, it is only for the main model_class
             proxy_database = database if model_related.database is cls.database else None
+            # don't pass a table. It is not in the row (select related path) and has not an explicit table
             proxy_model = apply_instance_extras(
-                proxy_model, model_related, using_schema, database=proxy_database
+                proxy_model,
+                model_related,
+                using_schema,
+                database=proxy_database,
             )
             proxy_model.identifying_db_fields = foreign_key.related_columns
 
@@ -169,6 +173,7 @@ class ModelRowMixin:
                 if column in row._mapping:
                     item[column.key] = row._mapping[column]
                 elif column.name in row._mapping:
+                    # FIXME: this path should not happen, we use the right tables
                     # fallback, sometimes the column is not found
                     item[column.key] = row._mapping[column.name]
         model: Model = (
@@ -177,7 +182,17 @@ class ModelRowMixin:
             else cls.proxy_model(**item)
         )
         # Apply the schema to the model
-        model = apply_instance_extras(model, cls, using_schema, database=database, table=table)
+        model = apply_instance_extras(
+            model,
+            cls,
+            using_schema,
+            database=database,
+            table=tables_and_models[
+                cls.meta.tablename
+                if using_schema is None
+                else f"{using_schema}.{cls.meta.tablename}"
+            ][0],
+        )
 
         # Handle prefetch related fields.
         await cls.__handle_prefetch_related(

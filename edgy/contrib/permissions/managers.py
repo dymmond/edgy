@@ -27,7 +27,7 @@ class PermissionManager(Manager):
             GroupField is None or GroupField.embed_through is False or GroupField.embed_through
         ), "groups field need embed_through=foo|False."
 
-        clauses: [dict[str, Any]] = []
+        clauses: list[dict[str, Any]] = []
         for source in sources:
             if isinstance(source, UserField.target):
                 clauses.append({"users__pk": source})
