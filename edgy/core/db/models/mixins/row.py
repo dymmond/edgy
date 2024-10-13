@@ -22,12 +22,13 @@ class ModelRowMixin:
     """
 
     @classmethod
-    def can_load_from_row(cls: type["Model"], row: "Row", table: "Table") -> bool:
+    def _can_load_from_row(cls: type["Model"], row: "Row", table: "Table") -> bool:
         return bool(
             cls.meta.registry is not None
             and not cls.meta.abstract
             and all(
-                row._mapping.get(getattr(table.columns, col)) is not None for col in cls.pkcolumns
+                row._mapping.get(f"{table.key.replace('.', '_')}_{col}") is not None
+                for col in cls.pkcolumns
             )
         )
 
@@ -83,7 +84,7 @@ class ModelRowMixin:
                     detail=f'Selected field "{field_name}" is not a RelationshipField on {cls}.'
                 ) from None
 
-            if not model_class.can_load_from_row(
+            if not model_class._can_load_from_row(
                 row,
                 tables_and_models[
                     model_class.meta.tablename
@@ -135,9 +136,12 @@ class ModelRowMixin:
             child_item = {}
             for column_name in columns_to_check:
                 column = getattr(table_columns, column_name, None)
-                if column is not None and column in row._mapping:
+                if (
+                    column is not None
+                    and f"{column.table.key.replace('.', '_')}_{column.key}" in row._mapping
+                ):
                     child_item[foreign_key.from_fk_field_name(related, column_name)] = (
-                        row._mapping[column]
+                        row._mapping[f"{column.table.key.replace('.', '_')}_{column.key}"]
                     )
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
@@ -169,13 +173,13 @@ class ModelRowMixin:
             if column.key not in cls.meta.columns_to_field:
                 continue
             # set if not of an foreign key with one column
-            elif column.key not in item:
-                if column in row._mapping:
-                    item[column.key] = row._mapping[column]
-                elif column.name in row._mapping:
-                    # FIXME: this path should not happen, we use the right tables
-                    # fallback, sometimes the column is not found
-                    item[column.key] = row._mapping[column.name]
+            elif (
+                column.key not in item
+                and f"{column.table.key.replace('.', '_')}_{column.key}" in row._mapping
+            ):
+                item[column.key] = row._mapping[
+                    f"{column.table.key.replace('.', '_')}_{column.key}"
+                ]
         model: Model = (
             cls(**item, __phase__="init_db")  # type: ignore
             if not exclude_secrets and not is_defer_fields and not _is_only
@@ -196,7 +200,14 @@ class ModelRowMixin:
 
         # Handle prefetch related fields.
         await cls.__handle_prefetch_related(
-            row=row, model=model, prefetch_related=prefetch_related
+            row=row,
+            table=tables_and_models[
+                cls.meta.tablename
+                if using_schema is None
+                else f"{using_schema}.{cls.meta.tablename}"
+            ][0],
+            model=model,
+            prefetch_related=prefetch_related,
         )
         assert model.pk is not None, model
         return model
@@ -231,7 +242,13 @@ class ModelRowMixin:
         return tuple(pk_key_list)
 
     @classmethod
-    async def __set_prefetch(cls, row: "Row", model: "Model", related: "Prefetch") -> None:
+    async def __set_prefetch(
+        cls,
+        row: "Row",
+        table: "Table",
+        model: "Model",
+        related: "Prefetch",
+    ) -> None:
         model_key = ()
         if related._is_finished:
             await related.init_bake(type(model))
@@ -241,7 +258,10 @@ class ModelRowMixin:
         else:
             clauses = []
             for pkcol in cls.pkcolumns:
-                clauses.append(getattr(model.table.columns, pkcol) == getattr(row, pkcol))
+                clauses.append(
+                    getattr(table.columns, pkcol)
+                    == row._mapping[f"{table.key.replace('.', '_')}_{pkcol}"]
+                )
             queryset = related.queryset
             if related._is_finished:
                 assert queryset is not None, "Queryset is not set but _is_finished flag"
@@ -276,6 +296,7 @@ class ModelRowMixin:
     async def __handle_prefetch_related(
         cls,
         row: "Row",
+        table: "Table",
         model: "Model",
         prefetch_related: Sequence["Prefetch"],
     ) -> None:
@@ -293,6 +314,6 @@ class ModelRowMixin:
             # Check for conflicting names
             # Check as early as possible
             check_prefetch_collision(model=model, related=related)
-            queries.append(cls.__set_prefetch(row=row, model=model, related=related))
+            queries.append(cls.__set_prefetch(row=row, table=table, model=model, related=related))
         if queries:
             await asyncio.gather(*queries)

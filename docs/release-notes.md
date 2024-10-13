@@ -22,6 +22,8 @@ hide:
 ### Fixed
 
 - `select_related` works across ManyToMany fields.
+- Fix identifying clashing column names in joins, so every model gets its right parameters.
+
 
 ## 0.17.4
 

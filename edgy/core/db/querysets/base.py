@@ -358,8 +358,10 @@ class BaseQuerySet(
                     # columns.append(column.label(f"{table.key.replace(".", "_")}_{column.key}"))
                     columns.append(column)
         assert columns, "no columns specified"
-        # TODO: alias all columns
-        expression = sqlalchemy.sql.select(*columns)
+        # all columns are aliased now
+        expression = sqlalchemy.sql.select(*columns).set_label_style(
+            sqlalchemy.LABEL_STYLE_TABLENAME_PLUS_COL
+        )
         expression = expression.select_from(select_from)
         expression = expression.where(await queryset.build_where_clause())
 
@@ -604,7 +606,12 @@ class BaseQuerySet(
         clauses = []
         for pkcol in self.model_class.pkcolumns:
             clauses.append(
-                getattr(self.table.columns, pkcol).in_([getattr(row, pkcol) for row in batch])
+                getattr(self.table.columns, pkcol).in_(
+                    [
+                        row._mapping[f"{self.table.key.replace('.', '_', 1)}_{pkcol}"]
+                        for row in batch
+                    ]
+                )
             )
         for prefetch in self._prefetch_related:
             check_prefetch_collision(self.model_class, prefetch)  # type: ignore
