@@ -22,7 +22,9 @@ class ModelRowMixin:
     """
 
     @classmethod
-    def _can_load_from_row(cls: type["Model"], row: "Row", table: "Table") -> bool:
+    def can_load_from_row(cls: type["Model"], row: "Row", table: "Table") -> bool:
+        """Check if a model_class can be loaded from a row for the table."""
+
         return bool(
             cls.meta.registry is not None
             and not cls.meta.abstract
@@ -85,7 +87,7 @@ class ModelRowMixin:
                 ) from None
 
             # stop selecting when None. Related models are not available.
-            if not model_class._can_load_from_row(
+            if not model_class.can_load_from_row(
                 row,
                 tables_and_models[
                     model_class.meta.tablename
