@@ -119,15 +119,25 @@ class TenancyMixin:
 
 def activate_schema(tenant_name: str) -> None:
     """
-    Activates the tenant for the context of the query.
+    Activates the schema for the context of the query.
     """
+    warnings.warn(
+        "`activate_schema` is deprecated use `with_schema` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     set_schema(tenant_name)
 
 
 def deactivate_schema() -> None:
     """
-    Deactivates the tenant for the context of the query.
+    Deactivates the schema for the context of the query.
     """
+    warnings.warn(
+        "`activate_schema` is deprecated use `with_schema` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     set_schema(None)
 
 

@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
-from edgy.core.db.context_vars import get_tenant, set_tenant
 from edgy.core.db.querysets.base import QuerySet
 
 if TYPE_CHECKING:
@@ -74,15 +73,6 @@ class Manager(BaseManager):
         else:
             using_schema = self.owner.__using_schema__
             database = self.owner.database
-        tenant = get_tenant()
-        if tenant:
-            # FIXME: works only on first query
-            set_tenant(None)
-            return QuerySet(
-                self.owner,
-                using_schema=tenant,
-                database=database,
-            )
         return QuerySet(self.owner, using_schema=using_schema, database=database)
 
     def __getattr__(self, name: str) -> Any:

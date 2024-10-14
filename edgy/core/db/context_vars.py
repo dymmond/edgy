@@ -1,6 +1,7 @@
 from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from typing import TYPE_CHECKING, Literal, Optional, Union
+from warnings import warn
 
 if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
@@ -21,7 +22,7 @@ MODEL_GETATTR_BEHAVIOR: ContextVar[Literal["passdown", "load", "coro"]] = Contex
 )
 TENANT: ContextVar[str] = ContextVar("tenant", default=None)
 SCHEMA: ContextVar[str] = ContextVar("SCHEMA", default=None)
-# for bw compatibility
+# for backward compatibility
 SHEMA = SCHEMA
 
 
@@ -32,29 +33,45 @@ def get_tenant() -> Union[str, None]:
     return TENANT.get()
 
 
-def set_tenant(value: Union[str, None]) -> None:
+def set_tenant(value: Union[str, None]) -> Token:
     """
     Sets the global tenant for the context of the queries.
-    When a global tenant is set the `get_context_schema` -> `SCHEMA` is ignored.
+    When a global tenant is set the `get_schema` -> `SCHEMA` is ignored.
     """
-    TENANT.set(value)
+    warn(
+        "`set_tenant` is deprecated use `with_tenant` instead. WARNING: this function is broken and doesn't reset the tenant.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    # why deprecating this? It overwrites schema and can lead to hard to debug issues when the scope isn't resetted.
 
-
-def get_schema() -> Union[str, None]:
-    return SCHEMA.get()
-
-
-def set_schema(value: Union[str, None]) -> None:
-    SCHEMA.set(value)
+    return TENANT.set(value)
 
 
 @contextmanager
 def with_tenant(tenant: Union[str, None]) -> None:
+    """
+    Sets the global tenant for the context of the queries.
+    When a global tenant is set the `get_schema` -> `SCHEMA` is ignored.
+    """
     token = TENANT.set(tenant)
     try:
         yield
     finally:
         TENANT.reset(token)
+
+
+def get_schema(check_tenant: bool = True) -> Union[str, None]:
+    if check_tenant:
+        tenant = get_tenant()
+        if tenant is not None:
+            return tenant
+    return SCHEMA.get()
+
+
+def set_schema(value: Union[str, None]) -> Token:
+    """Set the schema and return the token for resetting. Manual way of with_schema."""
+    return SCHEMA.set(value)
 
 
 @contextmanager

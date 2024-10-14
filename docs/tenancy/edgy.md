@@ -19,7 +19,7 @@ Edgy has three different ways of achieving this in a simple and clean fashion.
 
 1. Using the [using](#using) in the queryset.
 2. Using the [using_with_db](#what-is-multi-tenancy) in the queryset.
-3. Using the [set_tenant](#set-tenant) as global.
+3. Using the [with_tenant](#set-tenant) as global.
 
 You can also use the [Edgy helpers for schemas][schemas] if you need to use it.
 
@@ -128,51 +128,6 @@ a different database instead? Well, that is possible with the use of the `using_
 
 {!> ../docs_src/shared/extra.md !}
 
-### Using with `activate_schema`
-
-!!! Warning
-    This feature is experimental and might be inconsistent with the intended results. Use it at your
-    own discretion.
-
-This is an **alternative** to [using](#using) and serves solely as the purpose of avoiding
-writing all the time `Model.query.using(...)`.
-
-You can use `activate_schema(...)` and `deactivate_schema()` to tell the query to always query
-a specific tenant, in other words, using the `activate_schema()` you don't need to constantly
-write `using(...)`.
-
-Importing is as simple as this:
-
-```python
-from edgy.core.db.querysets.mixins import activate_schema, deactivate_schema
-```
-
-Let us see an example:
-
-**With the classic .using()**
-
-```python
-# Using the 'main' schema
-
-User.query.using(schema='main').all()
-User.query.using(schema='main').filter(email__icontains="user@example.com")
-User.query.using(schema='main').get(pk=1)
-```
-
-**Using the activate_schema**
-
-```python
-# Using the 'main' schema
-activate_schema("main")
-
-# Query the 'User' from the 'main' schema
-User.query.all()
-User.query.filter(email__icontains="user@example.com")
-User.query.get(pk=1)
-
-# Deactivate the schema and default to the public
-deactivate_schema("main")
-```
 
 ### Set tenant
 
@@ -183,19 +138,22 @@ want every request for a specific `tenant` to always hit their corresponding ten
 This is specially useful for multi-tenant applications where your tenant users will only see their
 own data.
 
-To use the `set_tenant` you can import it via:
+To use the `with_tenant` you can import it via:
 
 ```python
-from edgy.core.db import set_tenant
+from edgy.core.db import with_tenant
 ```
 
 !!! Tip
-    Use the `set_tenant` in things like application middlewares or interceptors, right before
+    Use the `with_tenant` in things like application middlewares or interceptors, right before
     reaching the API.
+
+!!! Warning
+    There is a function named `set_tenant`. Because it doesn't set the scope correctly its use is not recommended and it is deprecated.
 
 #### Practical case
 
-The `set_tenant` can be somehow confusing without a proper example so let us run one 😁.
+The `with_tenant` can be somehow confusing without a proper example so let us run one 😁.
 
 As usual, for this example [Esmerald][esmerald] will be used. This can be applied to any framework
 of your choice of course.
@@ -255,7 +213,7 @@ tenant exist.
 ```
 
 Now this is getting somewhere! As you could now see, this is where we take advantage of the
-[set_tenant](#set-tenant).
+[with_tenant](#set-tenant).
 
 In the middleware, the tenant is intercepted and all the calls in the API will now query **only**
 the tenant data, which means that **there is no need for `using` or `using_with_db` anymore**.
@@ -291,7 +249,7 @@ you can set the flag in the meta of the tenant model `register_default` to False
 
 ##### Notes
 
-As you could see in the previous step-by=step example, using the [set_tenant](#set-tenant) can be
+As you could see in the previous step-by=step example, using the [with_tenant](#set-tenant) can be
 extremely useful mostrly for those large scale applications where multi-tenancy is a **must** so
 you can actually take advantage of this.
 

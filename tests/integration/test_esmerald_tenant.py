@@ -12,7 +12,7 @@ from pydantic import __version__
 from edgy import Registry
 from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin, TenantUserMixin
-from edgy.core.db import fields, set_tenant
+from edgy.core.db import fields, with_tenant
 from edgy.exceptions import ObjectNotFound
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
@@ -71,8 +71,8 @@ class TenantMiddleware(MiddlewareProtocol):
         except ObjectNotFound:
             tenant = None
 
-        set_tenant(tenant)
-        await self.app(scope, receive, send)
+        with with_tenant(tenant):
+            await self.app(scope, receive, send)
 
 
 @pytest.fixture(autouse=True, scope="module")
