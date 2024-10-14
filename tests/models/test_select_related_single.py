@@ -8,7 +8,7 @@ from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL)
-models = edgy.Registry(database=database)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 pytestmark = pytest.mark.anyio
@@ -38,8 +38,8 @@ class AppModule(EdgyTenantBaseModel):
 
 
 class Permission(EdgyTenantBaseModel):
-    module: Optional[AppModule] = edgy.ForeignKey(AppModule)
-    designation: Optional[Designation] = edgy.ForeignKey("Designation")
+    module: Optional[AppModule] = edgy.ForeignKey(AppModule, null=True)
+    designation: Optional[Designation] = edgy.ForeignKey("Designation", null=True)
     can_read: bool = edgy.BooleanField(default=False)
     can_write: bool = edgy.BooleanField(default=False)
     can_update: bool = edgy.BooleanField(default=False)
@@ -61,7 +61,7 @@ async def create_test_database():
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
-    async with models.database:
+    async with models:
         yield
 
 
@@ -86,3 +86,18 @@ async def test_select_related():
     assert len(query) == 1
     assert query[0].pk == permission.pk
     assert query[0].module.model_dump() == {"id": 1, "name": "payroll"}
+
+
+async def test_select_related_without_relation():
+    permission = await Permission.query.create()
+    permission2 = await Permission.query.create()
+
+    query = await Permission.query.all()
+
+    assert len(query) == 2
+
+    query = await Permission.query.select_related(["designation", "module"]).all()
+
+    assert len(query) == 2
+    assert query[0].pk == permission.pk
+    assert query[1].pk == permission2.pk
