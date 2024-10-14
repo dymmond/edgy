@@ -66,7 +66,7 @@ class BaseModelType(ABC):
 
     @property
     @abstractmethod
-    def proxy_model(self) -> Any: ...
+    def proxy_model(self) -> type["BaseModelType"]: ...
 
     @property
     @abstractmethod

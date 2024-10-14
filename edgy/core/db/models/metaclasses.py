@@ -79,6 +79,12 @@ class Fields(UserDict, dict[str, BaseFieldType]):
     def __getitem__(self, name: str) -> BaseFieldType:
         return cast(BaseFieldType, self.data[name])
 
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
     def __contains__(self, key: str) -> bool:
         return key in self.data
 
@@ -87,6 +93,8 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             self.discard_field_from_meta(name)
         self.data[name] = value
         self.add_field_to_meta(name, value)
+        if self.meta.model is not None:
+            self.meta.model.model_fields[name] = value  # type: ignore
         self.meta.invalidate(clear_class_attrs=True)
 
     def __delitem__(self, name: str) -> None:
@@ -113,6 +121,12 @@ class FieldToColumns(UserDict, dict[str, Sequence["sqlalchemy.Column"]]):
     def __iter__(self) -> Any:
         self.meta.columns_to_field.init()
         return super().__iter__()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        try:
+            return self[key]
+        except KeyError:
+            return default
 
     def __contains__(self, key: str) -> bool:
         try:
@@ -633,6 +647,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                 # We split the keys (store them) in different places to be able to easily maintain and
                 #  what is what.
                 fields[key] = value
+                model_fields[key] = value
             elif isinstance(value, BaseManager):
                 value = copy.copy(value)
                 value.name = key
@@ -661,7 +676,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                         # insert as stronger element
                         fieldnames_to_check.appendleft(sub_field_name)
                         fields[sub_field_name] = sub_field
-                        model_fields[sub_field_name] = sub_field
+                        if not sub_field.exclude:
+                            model_fields[sub_field_name] = sub_field
             # Handle with multiple primary keys and auto generated field if no primary key is provided
             if not is_abstract and parents and not has_explicit_primary_key:
                 if "id" not in fields:
@@ -670,7 +686,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                             f"Cannot create model {name}. No primary key found and reflected."
                         )
                     else:
-                        fields["id"] = edgy_fields.BigIntegerField(  # type: ignore
+                        model_fields["id"] = fields["id"] = edgy_fields.BigIntegerField(  # type: ignore
                             primary_key=True,
                             autoincrement=True,
                             inherit=False,
@@ -699,9 +715,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         del is_abstract
 
         if not meta.abstract:
+            # don't add to model_fields
             meta.fields["pk"] = PKField(exclude=True, name="pk", inherit=False)
-
-        model_class = super().__new__
 
         # Handle annotations
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
@@ -717,15 +732,15 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # Ensure the initialization is only performed for subclasses of EdgyBaseModel
         attrs["__init_annotations__"] = annotations
 
-        new_class = cast(type["Model"], model_class(cls, name, bases, attrs, **kwargs))
+        new_class = cast(type["Model"], super().__new__(cls, name, bases, attrs, **kwargs))
         meta.model = new_class
         # Ensure initialization is only performed for subclasses of EdgyBaseModel
         # (excluding the EdgyBaseModel class itself).
         if not parents:
             return new_class
 
-        # Update the model_fields are updated to the latest
-        new_class.model_fields = {**new_class.model_fields, **model_fields}
+        # Ensure the model_fields are updated to the latest
+        new_class.model_fields = model_fields
         new_class._db_schemas = {}
 
         # Set the owner of the field, must be done as early as possible
@@ -929,7 +944,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         Retrieve table for schema (nearly the same as build with scheme argument).
         Cache per class via a primitive LRU cache.
         """
-        if schema is None:
+        if schema is None or schema == "":
+            # sqlalchemy uses "" for empty schema
             if update_cache:
                 cls._table = None
             return cls.table
@@ -946,7 +962,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cast("sqlalchemy.Table", schema_obj)
 
     @property
-    def proxy_model(cls: type["Model"]) -> type["BaseModelType"]:
+    def proxy_model(cls: type["Model"]) -> type["Model"]:
         """
         Returns the proxy_model from the Model when called using the cache.
         """

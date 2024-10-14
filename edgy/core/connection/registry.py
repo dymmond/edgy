@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from functools import cached_property, partial
 from types import TracebackType
@@ -65,8 +66,10 @@ class Registry:
         # Note: they are only executed if the Model is not in Registry yet
         self._onetime_callbacks: dict[
             Union[str, None], list[Callable[[type[BaseModelType]], None]]
-        ] = {}
-        self._callbacks: dict[Union[str, None], list[Callable[[type[BaseModelType]], None]]] = {}
+        ] = defaultdict(list)
+        self._callbacks: dict[Union[str, None], list[Callable[[type[BaseModelType]], None]]] = (
+            defaultdict(list)
+        )
 
         self.extra: Mapping[str, Database] = {
             k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
@@ -229,9 +232,9 @@ class Registry:
         if called and one_time:
             return
         if one_time:
-            self._onetime_callbacks.setdefault(name_or_class, []).append(callback)
+            self._onetime_callbacks[name_or_class].append(callback)
         else:
-            self._callbacks.setdefault(name_or_class, []).append(callback)
+            self._callbacks[name_or_class].append(callback)
 
     def execute_model_callbacks(self, model_class: type["BaseModelType"]) -> None:
         name = model_class.__name__

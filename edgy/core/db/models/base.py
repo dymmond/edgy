@@ -24,6 +24,7 @@ from edgy.core.db.context_vars import (
     CURRENT_MODEL_INSTANCE,
     CURRENT_PHASE,
     MODEL_GETATTR_BEHAVIOR,
+    get_schema,
 )
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager, RedirectManager
@@ -36,11 +37,11 @@ from edgy.types import Undefined
 from .types import BaseModelType
 
 if TYPE_CHECKING:
-    from edgy import Model
     from edgy.core.connection.database import Database
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.metaclasses import MetaInfo
+    from edgy.core.db.models.model import Model
     from edgy.core.db.querysets.base import QuerySet
     from edgy.core.signals import Broadcaster
 
@@ -154,6 +155,9 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         try:
             for identifier in self.identifying_db_fields:
                 pkl.append(f"{identifier}={getattr(self, identifier, None)}")
+        except AttributeError:
+            # for abstract embedded
+            pass
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
         return f"{self.__class__.__name__}({', '.join(pkl)})"
@@ -185,7 +189,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         return _copy
 
     @cached_property
-    def proxy_model(self) -> type[BaseModelType]:
+    def proxy_model(self) -> type["Model"]:
         return self.__class__.proxy_model  # type: ignore
 
     @cached_property
@@ -249,7 +253,13 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
     @property
     def table(self) -> sqlalchemy.Table:
         if getattr(self, "_table", None) is None:
-            return cast("sqlalchemy.Table", self.__class__.table)
+            schema = self.__using_schema__
+            if schema is Undefined:
+                schema = get_schema()
+            return cast(
+                "sqlalchemy.Table",
+                self.table_schema(schema),
+            )
         return self._table
 
     @table.setter
@@ -347,7 +357,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         mode: Union[Literal["json", "python"], str] = kwargs.pop("mode", "python")
 
         should_show_pk = self.__show_pk__ if show_pk is None else show_pk
-        model = dict(super().model_dump(exclude=exclude, include=include, mode=mode, **kwargs))
+        model = super().model_dump(exclude=exclude, include=include, mode=mode, **kwargs)
         # Workaround for metafields, computed field logic introduces many problems
         # so reimplement the logic here
         for field_name in self.meta.special_getter_fields:

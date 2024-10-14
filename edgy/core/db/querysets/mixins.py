@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 import sqlalchemy
 
 from edgy.core.connection.database import Database
-from edgy.core.db.context_vars import set_schema
+from edgy.core.db.context_vars import set_schema, with_schema
 from edgy.types import Undefined
 
 if TYPE_CHECKING:
@@ -129,3 +129,12 @@ def deactivate_schema() -> None:
     Deactivates the tenant for the context of the query.
     """
     set_schema(None)
+
+
+__all__ = [
+    "QuerySetPropsMixin",
+    "TenancyMixin",
+    "with_schema",
+    "activate_schema",
+    "deactivate_schema",
+]

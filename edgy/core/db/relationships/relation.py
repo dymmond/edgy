@@ -109,7 +109,7 @@ class ManyRelation(ManyRelationProtocol):
         instance = through.proxy_model(
             **{self.from_foreign_key: self.instance, self.to_foreign_key: value}
         )
-        instance.identifying_db_fields = [self.from_foreign_key, self.to_foreign_key]
+        instance.identifying_db_fields = [self.from_foreign_key, self.to_foreign_key]  # type: ignore
         return instance
 
     def stage(self, *children: "BaseModelType") -> None:
@@ -252,7 +252,7 @@ class SingleRelation(ManyRelationProtocol):
         if len(related_columns) == 1 and not isinstance(value, (dict, BaseModel)):
             value = {next(iter(related_columns)): value}
         instance = target.proxy_model(**value)
-        instance.identifying_db_fields = related_columns
+        instance.identifying_db_fields = related_columns  # type: ignore
         return instance
 
     def stage(self, *children: "BaseModelType") -> None:

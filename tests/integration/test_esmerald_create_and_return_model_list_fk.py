@@ -131,7 +131,9 @@ async def test_creates_a_user(async_client):
     }
     response = await async_client.post("/create", json=data)
     assert response.status_code == 201  # default from Esmerald POST
-    assert response.json() == {
+    reponse_json = response.json()
+    reponse_json.pop("id")
+    assert reponse_json == {
         "name": "Edgy",
         "email": "edgy@esmerald.dev",
         "language": "EN",

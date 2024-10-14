@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Literal, Optional, Union
 
@@ -45,3 +46,21 @@ def get_schema() -> Union[str, None]:
 
 def set_schema(value: Union[str, None]) -> None:
     SCHEMA.set(value)
+
+
+@contextmanager
+def with_tenant(tenant: Union[str, None]) -> None:
+    token = TENANT.set(tenant)
+    try:
+        yield
+    finally:
+        TENANT.reset(token)
+
+
+@contextmanager
+def with_schema(schema: Union[str, None]) -> None:
+    token = SCHEMA.set(schema)
+    try:
+        yield
+    finally:
+        SCHEMA.reset(token)

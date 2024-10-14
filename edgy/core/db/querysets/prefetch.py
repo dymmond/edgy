@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Optional
+from collections import defaultdict
+from typing import TYPE_CHECKING, Any, Optional
 
 from edgy.exceptions import QuerySetError
 
@@ -23,7 +24,7 @@ class Prefetch:
         self.to_attr = to_attr
         self.queryset: Optional[QuerySet] = queryset
         self._is_finished = False
-        self._baked_results: dict = {}
+        self._baked_results: dict[tuple[str, ...], list[Any]] = defaultdict(list)
         self._baked = False
 
     async def init_bake(self, model_class: type["Model"]) -> None:
@@ -36,8 +37,7 @@ class Prefetch:
             model_key = model_class.create_model_key_from_sqla_row(
                 self.queryset._cache_current_row
             )
-            bake_list = self._baked_results.setdefault(model_key, [])
-            bake_list.append(result)
+            self._baked_results[model_key].append(result)
 
 
 def check_prefetch_collision(model: "BaseModelType", related: Prefetch) -> Prefetch:

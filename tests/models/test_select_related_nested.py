@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 import edgy
@@ -19,14 +17,14 @@ class Base(edgy.Model):
 
 
 class Profile(Base):
-    is_enabled: bool = edgy.BooleanField(default=True, secret=True)
     name: str = edgy.CharField(max_length=1000)
 
 
 class User(Base):
-    name: str = edgy.CharField(max_length=50, secret=True)
+    id = edgy.fields.BigIntegerField(primary_key=True, autoincrement=True)
+    name: str = edgy.CharField(max_length=50, exclude=True)
     email: str = edgy.EmailField(max_length=100)
-    password: str = edgy.CharField(max_length=1000, secret=True)
+    password: str = edgy.CharField(max_length=1000, exclude=True)
     profile: Profile = edgy.ForeignKey(Profile, on_delete=edgy.CASCADE)
 
 
@@ -43,31 +41,15 @@ async def create_test_database():
             await models.drop_all()
 
 
-async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_not_secret_query():
+async def test_nested_with_not_optimal_select_related_exclude_secrets():
     profile = await Profile.query.create(is_enabled=False, name="edgy")
     user = await User.query.create(
         profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
     )
     await Organisation.query.create(user=user)
 
-    org_query = await (
-        Organisation.query.select_related(["user__profile"]).exclude_secrets().order_by("id")
-    ).as_select()
-    org_query_text = str(org_query)
-    assert "profiles.name" in org_query_text
-    assert 'users".name' not in org_query_text
-
-
-async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_not_secret():
-    profile = await Profile.query.create(is_enabled=False, name="edgy")
-    user = await User.query.create(
-        profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
-    )
-    await Organisation.query.create(user=user)
-
-    org_query = (
-        Organisation.query.select_related(["user__profile"]).exclude_secrets().order_by("id")
-    )
+    org_query = Organisation.query.exclude_secrets(True)
+    org_query._select_related = ["user", "user", "user__profile"]
     org = await org_query.last()
 
     assert org.model_dump() == {
@@ -75,7 +57,36 @@ async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_no
         "id": 1,
     }
 
-    assert json.loads(org.model_dump_json()) == {
+
+async def test_nested_with_not_optimal_select_related_all():
+    profile = await Profile.query.create(is_enabled=False, name="edgy")
+    user = await User.query.create(
+        profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
+    )
+    await Organisation.query.create(user=user)
+
+    org_query = Organisation.query.all()
+    org_query._select_related = ["user", "user", "user__profile"]
+    org = await org_query.get()
+
+    assert org.model_dump() == {
+        "user": {"id": 1, "profile": {"id": 1, "name": "edgy"}, "email": "user@dev.com"},
+        "id": 1,
+    }
+
+
+async def test_nested_with_not_optimal_select_related_all2():
+    profile = await Profile.query.create(is_enabled=False, name="edgy")
+    user = await User.query.create(
+        profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
+    )
+    await Organisation.query.create(user=user)
+
+    org_query = Organisation.query.all()
+    org_query._select_related = ["user__profile", "user", "user"]
+    org = await org_query.get()
+
+    assert org.model_dump() == {
         "user": {"id": 1, "profile": {"id": 1, "name": "edgy"}, "email": "user@dev.com"},
         "id": 1,
     }

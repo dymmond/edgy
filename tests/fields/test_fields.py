@@ -20,12 +20,14 @@ from edgy.core.db.fields import (
     FloatField,
     IntegerField,
     JSONField,
+    RefForeignKey,
     SmallIntegerField,
     TextField,
     TimeField,
     UUIDField,
 )
 from edgy.core.db.fields.base import BaseField, Field
+from edgy.core.db.models.model_reference import ModelRef
 from edgy.exceptions import FieldDefinitionError
 from edgy.types import Undefined
 
@@ -33,6 +35,10 @@ from edgy.types import Undefined
 class Choices(str, enum.Enum):
     ACTIVE = "active"
     INACTIVE = "inactive"
+
+
+class UserRef(ModelRef):
+    __related_name__ = "user"
 
 
 def test_column_type():
@@ -92,6 +98,7 @@ def test_field_annotation(field, annotation):
         (SmallIntegerField(null=False), True),
         (DecimalField(max_digits=20, decimal_places=2, null=False), True),
         (ChoiceField(choices=Choices, null=False), True),
+        (RefForeignKey(UserRef), True),
     ],
 )
 def test_field_required(field, is_required):

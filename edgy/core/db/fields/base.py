@@ -1,5 +1,6 @@
 import contextlib
 import copy
+from abc import abstractmethod
 from collections.abc import Sequence
 from functools import cached_property
 from typing import (
@@ -454,6 +455,9 @@ class BaseForeignKey(RelationshipField):
         if owner_database is None:
             owner_database = self.owner.database
         return str(owner_database.url) != str(self.target.database.url)
+
+    @abstractmethod
+    def reverse_clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]: ...
 
     def expand_relationship(self, value: Any) -> Any:
         """

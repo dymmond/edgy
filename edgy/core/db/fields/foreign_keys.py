@@ -185,6 +185,32 @@ class BaseForeignKeyField(BaseForeignKey):
             raise ValueError(f"cannot handle: {value} of type {type(value)}")
         return retdict
 
+    def reverse_clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
+        if not for_query:
+            return {}
+        retdict: dict[str, Any] = {}
+        column_names = self.owner.meta.field_to_column_names[self.name]
+        assert len(column_names) >= 1
+        if value is None:
+            for column_name in column_names:
+                retdict[self.from_fk_field_name(name, column_name)] = None
+        elif isinstance(value, dict):
+            for column_name in column_names:
+                translated_name = self.from_fk_field_name(name, column_name)
+                if translated_name in value:
+                    retdict[translated_name] = value[translated_name]
+        elif isinstance(value, BaseModel):
+            for column_name in column_names:
+                translated_name = self.from_fk_field_name(name, column_name)
+                if hasattr(value, translated_name):
+                    retdict[translated_name] = getattr(value, translated_name)
+        elif len(column_names) == 1:
+            translated_name = self.from_fk_field_name(name, next(iter(column_names)))
+            retdict[translated_name] = value
+        else:
+            raise ValueError(f"cannot handle: {value} of type {type(value)}")
+        return retdict
+
     def modify_input(self, name: str, kwargs: dict[str, Any]) -> None:
         phase = CURRENT_PHASE.get()
         column_names = self.get_column_names(name)
