@@ -97,6 +97,8 @@ nav:
       - ContentTypes:
           - Introduction: "contenttypes/intro.md"
           - ContentTags - or how to replace elastic search: "contenttypes/replace-elasticsearch.md"
+      - Permissions:
+          - Introduction: "permissions/intro.md"
       - Tenancy:
           - Edgy: "tenancy/edgy.md"
           - Contrib: "tenancy/contrib.md"
