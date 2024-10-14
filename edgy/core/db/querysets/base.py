@@ -184,6 +184,37 @@ class BaseQuerySet(
         else:
             return expression.distinct()
 
+    @classmethod
+    def _join_table_helper(
+        cls,
+        join_clause: Any,
+        current_transition: tuple[str, str],
+        *,
+        transitions: dict[tuple[str, str], tuple[Any, set[tuple[str, str]]]],
+        tables_and_models: dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]],
+        transitions_is_full_outer: dict[tuple[str, str], bool],
+    ) -> Any:
+        if current_transition not in transitions:
+            return join_clause
+        transition_value = transitions.pop(current_transition)
+
+        for dep in transition_value[1]:
+            join_clause = cls._join_table_helper(
+                join_clause,
+                dep,
+                transitions=transitions,
+                tables_and_models=tables_and_models,
+                transitions_is_full_outer=transitions_is_full_outer,
+            )
+
+        return sqlalchemy.sql.join(
+            join_clause,
+            tables_and_models[current_transition[1]][0],
+            transition_value[0],
+            isouter=True,
+            full=transitions_is_full_outer.get(current_transition, False),
+        )
+
     def _build_tables_select_from_relationship(
         self,
     ) -> tuple[str, dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]], Any]:
@@ -193,6 +224,15 @@ class BaseQuerySet(
         destination table, a lookup for the related field is made to understand
         from which foreign key the table is looked up from.
         """
+
+        # How does this work?
+        # First we build a transitions table with dependencies in case multiple pathes to the same table exist
+        # Secondly we check if a select_related path is joining a table from the set in an opposite direction
+        # If yes, we mark the transition for a full outer join (dangerous, there could be side-effects)
+        # At last we iter through the transisitions and build their dependencies first
+        # We pop out the transitions so a path is not taken 2 times
+
+        # Why left outer join? It is possible and legal for a relation to not exist we check that already in filtering.
         queryset: BaseQuerySet = self
 
         select_from = queryset.table
@@ -200,7 +240,7 @@ class BaseQuerySet(
         tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]] = {
             select_from.key: (select_from, self.model_class)
         }
-        transitions: dict[tuple[str, str], Any] = {}
+        transitions: dict[tuple[str, str], tuple[Any, set[tuple[str, str]]]] = {}
         transitions_is_full_outer: dict[tuple[str, str], bool] = {}
 
         # Select related
@@ -208,6 +248,7 @@ class BaseQuerySet(
             # For m2m relationships
             model_class = queryset.model_class
             former_table = queryset.table
+            former_transition = None
             model_database: Optional[Database] = queryset.database
             while select_path:
                 field_name = select_path.split("__", 1)[0]
@@ -237,10 +278,10 @@ class BaseQuerySet(
                 # now use the one of the model_class itself
                 model_database = None
                 table = model_class.table_schema(self.active_schema)
-
+                # use table from tables_and_models
                 if table.key in tables_and_models:
-                    former_table = table
-                    continue
+                    table = tables_and_models[table.key][0]
+
                 if foreign_key.is_m2m:
                     # we need to inject the through model for the select
                     model_class = foreign_key.through
@@ -251,44 +292,64 @@ class BaseQuerySet(
                         select_path = f"{foreign_key.to_foreign_key}__{select_path}"
                     # if select_path is empty
                     select_path = select_path.removesuffix("__")
-                    if table.key in tables_and_models:
-                        former_table = table
-                        continue
                     if reverse:
                         foreign_key = model_class.meta.fields[foreign_key.to_foreign_key]
                     else:
                         foreign_key = model_class.meta.fields[foreign_key.from_foreign_key]
                         reverse = True
+                transition_key = (former_table.key, table.key)
+                if transition_key in transitions:
+                    # can not provide new informations
+                    former_table = table
+                    former_transition = transition_key
+                    continue
                 and_clause = clauses_mod.and_(
                     *self._select_from_relationship_clause_generator(
                         foreign_key, table, reverse, former_table
                     )
                 )
-                if (former_table.key, table.key) in transitions:
-                    transitions[(former_table.key, table.key)] = clauses_mod.or_(
-                        transitions[(former_table.key, table.key)], and_clause
-                    )
-                elif (table.key, former_table.key) in transitions:
+                if (table.key, former_table.key) in transitions:
+                    _transition_key = (table.key, former_table.key)
                     # inverted
                     # only make full outer when not the main query
                     if former_table.key != maintablekey:
-                        transitions_is_full_outer[(table.key, former_table.key)] = True
-                    transitions[(table.key, former_table.key)] = clauses_mod.or_(
-                        transitions[(table.key, former_table.key)], and_clause
+                        transitions_is_full_outer[_transition_key] = True
+                    transitions[_transition_key] = (
+                        clauses_mod.or_(transitions[_transition_key][0], and_clause),
+                        {*transitions[_transition_key][1], former_transition}
+                        if former_transition
+                        else transitions[_transition_key][1],
+                    )
+                elif table.key in tables_and_models:
+                    for _transition_key in transitions:
+                        if _transition_key[1] == table.key:
+                            break
+                    else:
+                        # this should never happen
+                        raise Exception("transition not found despite in tables_and_models")
+                    transitions[_transition_key] = (
+                        clauses_mod.or_(and_clause, transitions[_transition_key][0]),
+                        {*transitions[_transition_key][1], former_transition}
+                        if former_transition
+                        else transitions[_transition_key][0],
                     )
                 else:
-                    transitions[(former_table.key, table.key)] = and_clause
+                    transitions[(former_table.key, table.key)] = (
+                        and_clause,
+                        {former_transition} if former_transition else set(),
+                    )
                 tables_and_models[table.key] = table, model_class
                 former_table = table
-        for (former_table_key, next_table_key), condition in transitions.items():
-            select_from = sqlalchemy.sql.join(  # type: ignore
-                select_from,
-                tables_and_models[next_table_key][0],
-                condition,
-                isouter=True,
-                full=transitions_is_full_outer.get((former_table_key, next_table_key), False),
-            )
+                former_transition = transition_key
 
+        while transitions:
+            select_from = self._join_table_helper(
+                select_from,
+                next(iter(transitions.keys())),
+                transitions=transitions,
+                tables_and_models=tables_and_models,
+                transitions_is_full_outer=transitions_is_full_outer,
+            )
         return maintablekey, tables_and_models, select_from
 
     @staticmethod
