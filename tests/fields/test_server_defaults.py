@@ -43,7 +43,7 @@ async def test_partial_overwrite():
 
 async def test_export_without_load():
     obj = await MyModel.query.create(first_name="foobar")
-    assert obj.model_dump() == {
+    assert obj.model_dump(exclude=["id"]) == {
         "first_name": "foobar",
     }
 
@@ -52,10 +52,10 @@ async def test_export_with_implicit_load():
     obj = await MyModel.query.create(first_name="foobar")
     # triggers also implicit load
     assert obj.last_name == "edge"
-    assert obj.model_dump() == {"first_name": "foobar", "last_name": "edge"}
+    assert obj.model_dump(exclude=["id"]) == {"first_name": "foobar", "last_name": "edge"}
 
 
 async def test_export_with_explicit_load():
     obj = await MyModel.query.create(first_name="foobar")
     await obj.load()
-    assert obj.model_dump() == {"first_name": "foobar", "last_name": "edge"}
+    assert obj.model_dump(exclude=["id"]) == {"first_name": "foobar", "last_name": "edge"}

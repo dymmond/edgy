@@ -118,16 +118,14 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
                 # bypass __setattr__ method
                 object.__setattr__(self, pk_attribute, getattr(instance, pk_attribute))
 
-    def _get_fields(self) -> dict[str, Any]:
-        return self.model_fields.copy()
-
     @property
     def fields(self) -> MarshallFieldMapping:
         """
         Returns all the fields of the Marshall.
         """
         fields = MarshallFieldMapping(self)
-        for k, v in self._get_fields().items():
+        # copy fields from model_fields
+        for k, v in self.model_fields.items():
             fields[k] = v
         return fields
 

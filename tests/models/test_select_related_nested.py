@@ -21,6 +21,7 @@ class Profile(Base):
 
 
 class User(Base):
+    id = edgy.fields.BigIntegerField(primary_key=True, autoincrement=True)
     name: str = edgy.CharField(max_length=50, exclude=True)
     email: str = edgy.EmailField(max_length=100)
     password: str = edgy.CharField(max_length=1000, exclude=True)
@@ -40,14 +41,14 @@ async def create_test_database():
             await models.drop_all()
 
 
-async def test_nested_with_not_optimal_select_related():
+async def test_nested_with_not_optimal_select_related_exclude_secrets():
     profile = await Profile.query.create(is_enabled=False, name="edgy")
     user = await User.query.create(
         profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
     )
     await Organisation.query.create(user=user)
 
-    org_query = Organisation.query.all()
+    org_query = Organisation.query.exclude_secrets(True)
     org_query._select_related = ["user", "user", "user__profile"]
     org = await org_query.last()
 
@@ -57,7 +58,24 @@ async def test_nested_with_not_optimal_select_related():
     }
 
 
-async def test_nested_with_not_optimal_select_related2():
+async def test_nested_with_not_optimal_select_related_all():
+    profile = await Profile.query.create(is_enabled=False, name="edgy")
+    user = await User.query.create(
+        profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
+    )
+    await Organisation.query.create(user=user)
+
+    org_query = Organisation.query.all()
+    org_query._select_related = ["user", "user", "user__profile"]
+    org = await org_query.get()
+
+    assert org.model_dump() == {
+        "user": {"id": 1, "profile": {"id": 1, "name": "edgy"}, "email": "user@dev.com"},
+        "id": 1,
+    }
+
+
+async def test_nested_with_not_optimal_select_related_all2():
     profile = await Profile.query.create(is_enabled=False, name="edgy")
     user = await User.query.create(
         profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
@@ -66,7 +84,7 @@ async def test_nested_with_not_optimal_select_related2():
 
     org_query = Organisation.query.all()
     org_query._select_related = ["user__profile", "user", "user"]
-    org = await org_query.last()
+    org = await org_query.get()
 
     assert org.model_dump() == {
         "user": {"id": 1, "profile": {"id": 1, "name": "edgy"}, "email": "user@dev.com"},

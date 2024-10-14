@@ -155,6 +155,9 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         try:
             for identifier in self.identifying_db_fields:
                 pkl.append(f"{identifier}={getattr(self, identifier, None)}")
+        except AttributeError:
+            # for abstract embedded
+            pass
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
         return f"{self.__class__.__name__}({', '.join(pkl)})"
@@ -354,7 +357,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         mode: Union[Literal["json", "python"], str] = kwargs.pop("mode", "python")
 
         should_show_pk = self.__show_pk__ if show_pk is None else show_pk
-        model = dict(super().model_dump(exclude=exclude, include=include, mode=mode, **kwargs))
+        model = super().model_dump(exclude=exclude, include=include, mode=mode, **kwargs)
         # Workaround for metafields, computed field logic introduces many problems
         # so reimplement the logic here
         for field_name in self.meta.special_getter_fields:

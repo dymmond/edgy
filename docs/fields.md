@@ -104,7 +104,6 @@ class MyModel(edgy.Model):
     a_number: int = edgy.IntegerField(default=0)
     another_number: int = edgy.IntegerField(minimum=10)
     ...
-
 ```
 
 ##### Parameters:
@@ -125,7 +124,6 @@ class MyModel(edgy.Model):
     a_number: int = edgy.SmallIntegerField(default=0)
     another_number: int = edgy.SmallIntegerField(minimum=10)
     ...
-
 ```
 
 ##### Parameters:
@@ -247,7 +245,6 @@ It changes the behaviour of CompositeField in this way:
 - `inner_fields` with 1 element: Reads and writes are redirected to this field. When setting a dict or pydantic BaseModel the value is tried to be extracted like in the normal mode. Otherwise the logic of the single field is used. When returning only the value of the single field is returned
 - `inner_fields` with >1 element: normal behavior. Dicts are returned
 
-
 ##### Inheritance
 
 CompositeFields are evaluated in non-abstract models. When overwritten by another field and the evaluation didn't take place yet no fields are generated.
@@ -257,6 +254,40 @@ When overwritten after evaluation the fields are still lingering around.
 You can also overwrite from CompositeField generated fields in subclasses regardless if the CompositeField used absorb_existing_fields inside.
 
 You may want to use **ExcludeField** to remove fields.
+
+
+#### ComputedField
+
+This is a pseudo field similar to the GeneratedField of Django. It is different in the way it operates on
+an instance instead of a sql query and supports setting values. It features also a string getter/setter (which retrieves the getter/setter from the class) and
+a fallback_getter which is used in case the getter is not available.
+It is used in the contrib permissions feature.
+
+```python
+import edgy
+
+class BasePermission(edgy.Model):
+    name: str = edgy.fields.CharField(max_length=100, null=False)
+    description: Optional[str] = edgy.fields.ComputedField(
+        getter="get_description",  # uses the getter classmethod/staticmethod of the class/subclass
+        setter="set_description",  # uses the setter classmethod/staticmethod of the class/subclass
+        fallback_getter=lambda field, instance, owner: instance.name,  # fallback to return the name
+    )
+    @classmethod
+    def get_description(cls, field, instance, owner=None) -> str:
+        return instance.name
+
+    @classmethod
+    def set_description(cls, field, instance, value) -> None:
+        instance.name = value
+```
+
+##### Parameters
+
+- getter (Optional) -String to classmethod/staticmethod or a callable. Getter which is used to provide a value in model_dump or on direct access to the field.
+- setter (Optional) -String to classmethod/staticmethod or a callable. Setter which is executed when assigning a value to the field. If not provided assignments are simply dismissed.
+- fallback_getter (Optional) -Callable. Is used as fallback when the getter was not found. Useful for inheritance so subclasses can provide a getter but works also without.
+
 
 #### DateField
 
@@ -714,11 +745,9 @@ Derives from the same as [CharField](#charfield) and validates the value of an U
 from uuid import UUID
 import edgy
 
-
 class MyModel(edgy.Model):
     uuid: UUID = fields.UUIDField()
     ...
-
 ```
 
 Derives from the same as [CharField](#charfield) and validates the value of an UUID.

@@ -42,12 +42,13 @@ class ModelRowMixin:
         tables_and_models: dict[str, tuple["Table", type["BaseModelType"]]],
         select_related: Optional[Sequence[Any]] = None,
         prefetch_related: Optional[Sequence["Prefetch"]] = None,
-        is_only_fields: bool = False,
         only_fields: Sequence[str] = None,
         is_defer_fields: bool = False,
         exclude_secrets: bool = False,
         using_schema: Optional[str] = None,
         database: Optional["Database"] = None,
+        prefix: str = "",
+        old_select_related_value: Optional["Model"] = None,
     ) -> Optional["Model"]:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
@@ -96,6 +97,8 @@ class ModelRowMixin:
                 ][0],
             ):
                 continue
+            _prefix = field_name if not prefix else f"{prefix}__{field_name}"
+
             if remainder:
                 # don't pass table, it is only for the main model_class
                 item[field_name] = await model_class.from_sqla_row(
@@ -104,8 +107,11 @@ class ModelRowMixin:
                     select_related=[remainder],
                     prefetch_related=prefetch_related,
                     exclude_secrets=exclude_secrets,
+                    is_defer_fields=is_defer_fields,
                     using_schema=using_schema,
                     database=database,
+                    prefix=_prefix,
+                    old_select_related_value=item.get(field_name),
                 )
             else:
                 # don't pass table, it is only for the main model_class
@@ -113,9 +119,17 @@ class ModelRowMixin:
                     row,
                     tables_and_models=tables_and_models,
                     exclude_secrets=exclude_secrets,
+                    is_defer_fields=is_defer_fields,
                     using_schema=using_schema,
                     database=database,
+                    prefix=_prefix,
+                    old_select_related_value=item.get(field_name),
                 )
+        # don't overwrite, update with new values and return
+        if old_select_related_value:
+            for k, v in item.items():
+                setattr(old_select_related_value, k, v)
+            return old_select_related_value
         table_columns = tables_and_models[
             cls.meta.tablename if using_schema is None else f"{using_schema}.{cls.meta.tablename}"
         ][0].columns
@@ -163,13 +177,13 @@ class ModelRowMixin:
             item[related] = proxy_model
 
         # Check for the only_fields
-        _is_only = set()
-        if is_only_fields:
-            _is_only = {str(field) for field in (only_fields or row._mapping.keys())}
         # Pull out the regular column values.
         for column in table_columns:
-            # Making sure when a table is reflected, maps the right fields of the ReflectModel
-            if _is_only and column.key not in _is_only:
+            if (
+                only_fields
+                and prefix not in only_fields
+                and (f"{prefix}__{column.key}" if prefix else column.key) not in only_fields
+            ):
                 continue
             if column.key in secret_columns:
                 continue
@@ -184,9 +198,9 @@ class ModelRowMixin:
                     f"{column.table.key.replace('.', '_')}_{column.key}"
                 ]
         model: Model = (
-            cls(**item, __phase__="init_db")  # type: ignore
-            if not exclude_secrets and not is_defer_fields and not _is_only
-            else cls.proxy_model(**item)
+            cls.proxy_model(**item, __phase__="init_db")
+            if exclude_secrets or is_defer_fields or only_fields
+            else cls(**item, __phase__="init_db")  # type: ignore
         )
         # Apply the schema to the model
         model = apply_instance_extras(

@@ -56,7 +56,7 @@ class User(edgy.Model):
 
 
 class UserMarshall(Marshall):
-    marshall_config = ConfigMarshall(model=User, exclude=["name"])
+    marshall_config = ConfigMarshall(model=User, exclude=["name", "id"])
     details: fields.MarshallField = fields.MarshallField(field_type=str, source="details")
     age: fields.MarshallField = fields.MarshallField(field_type=int, source="age")
 

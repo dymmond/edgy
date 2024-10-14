@@ -52,6 +52,9 @@ class ConcreteCompositeField(BaseCompositeField):
         self.model: Optional[Union[type[BaseModel], type[ConditionalRedirect]]] = kwargs.pop(
             "model", None
         )
+        if self.model is not None and issubclass(self.model, BaseModel):
+            kwargs["field_type"] = self.model
+            kwargs["annotation"] = self.model
         for field in inner_fields:
             if isinstance(field, str):
                 self.inner_field_names.append(field)
@@ -73,6 +76,7 @@ class ConcreteCompositeField(BaseCompositeField):
                     field_def.exclude = True
                     self.inner_field_names.append(field_def.name)
                     self.embedded_field_defs[field_def.name] = field_def
+
         return super().__init__(
             owner=owner,
             # this is just a holder for real fields

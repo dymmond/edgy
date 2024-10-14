@@ -28,13 +28,11 @@ class MarshallMeta(ModelMetaclass):
         # TODO: should have correct types
         attrs, model_fields = extract_field_annotations_and_defaults(attrs, BaseMarshallField)
 
-        model_class = super().__new__
-
         parents = [parent for parent in bases if isinstance(parent, MarshallMeta)]
         if not parents:
-            return model_class(cls, name, bases, attrs)
+            return super().__new__(cls, name, bases, attrs)
 
-        model_class: Marshall = model_class(cls, name, bases, attrs)  # type: ignore
+        model_class: Marshall = super().__new__(cls, name, bases, attrs)  # type: ignore
         if name in ("Marshall",):
             return model_class
 
@@ -113,7 +111,9 @@ class MarshallMeta(ModelMetaclass):
         model_class.model_rebuild(force=True)
 
         # Raise for error if any of the required fields is not in the Marshall
-        required_fields: set[str] = {f"'{k}'" for k, v in model.model_fields.items() if not v.null}
+        required_fields: set[str] = {
+            f"'{k}'" for k, v in model.model_fields.items() if v.is_required()
+        }
         if any(value not in model_class.model_fields for value in required_fields):
             fields = ", ".join(sorted(required_fields))
             raise MarshallFieldDefinitionError(

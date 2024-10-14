@@ -1,6 +1,7 @@
 import asyncio
 import copy
 import warnings
+from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Generator, Iterable, Sequence
 from collections.abc import Iterable as CollectionsIterable
 from functools import cached_property
@@ -217,7 +218,9 @@ class BaseQuerySet(
 
     def _build_tables_select_from_relationship(
         self,
-    ) -> tuple[str, dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]], Any]:
+    ) -> tuple[
+        str, dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]], dict[str, set[str]], Any
+    ]:
         """
         Builds the tables relationships and joins.
         When a table contains more than one foreign key pointing to the same
@@ -240,6 +243,7 @@ class BaseQuerySet(
         tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]] = {
             select_from.key: (select_from, self.model_class)
         }
+        prefixes: dict[str, set[str]] = defaultdict(set)
         transitions: dict[tuple[str, str], tuple[Any, set[tuple[str, str]]]] = {}
         transitions_is_full_outer: dict[tuple[str, str], bool] = {}
 
@@ -249,6 +253,7 @@ class BaseQuerySet(
             model_class = queryset.model_class
             former_table = queryset.table
             former_transition = None
+            prefix: str = ""
             model_database: Optional[Database] = queryset.database
             while select_path:
                 field_name = select_path.split("__", 1)[0]
@@ -282,7 +287,7 @@ class BaseQuerySet(
                 if table.key in tables_and_models:
                     table = tables_and_models[table.key][0]
 
-                if foreign_key.is_m2m:
+                if foreign_key.is_m2m and foreign_key.embed_through != "":  # type: ignore
                     # we need to inject the through model for the select
                     model_class = foreign_key.through
                     table = model_class.table_schema(self.active_schema)
@@ -297,6 +302,8 @@ class BaseQuerySet(
                     else:
                         foreign_key = model_class.meta.fields[foreign_key.from_foreign_key]
                         reverse = True
+                prefix = f"{prefix}__{field_name}" if prefix else f"{prefix}"
+                prefixes[table.key].add(prefix)
                 transition_key = (former_table.key, table.key)
                 if transition_key in transitions:
                     # can not provide new informations
@@ -350,7 +357,7 @@ class BaseQuerySet(
                 tables_and_models=tables_and_models,
                 transitions_is_full_outer=transitions_is_full_outer,
             )
-        return maintablekey, tables_and_models, select_from
+        return maintablekey, tables_and_models, prefixes, select_from
 
     @staticmethod
     def _select_from_relationship_clause_generator(
@@ -383,15 +390,15 @@ class BaseQuerySet(
         queryset: BaseQuerySet = self
 
         queryset._validate_only_and_defer()
-        maintable, tables_and_models, select_from = (
+        maintable, tables_and_models, prefixes, select_from = (
             queryset._build_tables_select_from_relationship()
         )
         columns = []
         for tablekey, (table, model_class) in tables_and_models.items():
             if tablekey == maintable:
-                for column in table.columns.values():
+                for column_key, column in table.columns.items():
                     # e.g. reflection has not always a field
-                    field_name = model_class.meta.columns_to_field.get(column.key, column.key)
+                    field_name = model_class.meta.columns_to_field.get(column_key, column_key)
                     if queryset._only and field_name not in queryset._only:
                         continue
                     if queryset._defer and field_name in queryset._defer:
@@ -407,9 +414,22 @@ class BaseQuerySet(
                     columns.append(column)
 
             else:
-                for column in table.columns.values():
+                prefixes_for_table = prefixes[table.key]
+                for column_key, column in table.columns.items():
                     # e.g. reflection has not always a field
-                    field_name = model_class.meta.columns_to_field.get(column.key, column.key)
+                    field_name = model_class.meta.columns_to_field.get(column_key, column_key)
+                    if queryset._only and all(
+                        f"{prefix}" not in queryset._only
+                        and f"{prefix}__{field_name}" not in queryset._only
+                        for prefix in prefixes_for_table
+                    ):
+                        continue
+                    if queryset._defer and any(
+                        f"{prefix}" in queryset._defer
+                        or f"{prefix}__{field_name}" in queryset._defer
+                        for prefix in prefixes_for_table
+                    ):
+                        continue
                     if (
                         queryset._exclude_secrets
                         and field_name in model_class.meta.fields
@@ -573,7 +593,6 @@ class BaseQuerySet(
         extra_attr: str = "",
         raw: bool = False,
     ) -> tuple[EdgyModel, EdgyModel]:
-        is_only_fields = bool(self._only)
         is_defer_fields = bool(self._defer)
         raw_result, result = (
             await self._cache.aget_or_cache_many(
@@ -583,7 +602,6 @@ class BaseQuerySet(
                     _row,
                     tables_and_models=tables_and_models,
                     select_related=self._select_related,
-                    is_only_fields=is_only_fields,
                     only_fields=self._only,
                     is_defer_fields=is_defer_fields,
                     prefetch_related=self._prefetch_related,
@@ -659,7 +677,6 @@ class BaseQuerySet(
         tables_and_models: dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]],
         queryset: "BaseQuerySet",
     ) -> Sequence[tuple[BaseModelType, BaseModelType]]:
-        is_only_fields = bool(queryset._only)
         is_defer_fields = bool(queryset._defer)
         del queryset
         _prefetch_related: list[Prefetch] = []
@@ -724,7 +741,6 @@ class BaseQuerySet(
                     row,
                     tables_and_models=tables_and_models,
                     select_related=self._select_related,
-                    is_only_fields=is_only_fields,
                     only_fields=self._only,
                     is_defer_fields=is_defer_fields,
                     prefetch_related=_prefetch_related,

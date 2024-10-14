@@ -23,6 +23,8 @@ hide:
 
 - `select_related` works across ManyToMany fields.
 - Fix identifying clashing column names in joins, so every model gets its right parameters.
+- Dependency tracking for join, so it doesn't depend on the order of `select_related`.
+-`only` and `defer` work on `select_related`.
 
 
 ## 0.17.4
