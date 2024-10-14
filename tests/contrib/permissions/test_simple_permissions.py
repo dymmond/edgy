@@ -8,9 +8,7 @@ from tests.settings import DATABASE_URL
 pytestmark = pytest.mark.anyio
 
 database = DatabaseTestClient(DATABASE_URL, use_existing=False)
-models = edgy.Registry(
-    database=edgy.Database(database, force_rollback=True), with_content_type=True
-)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 class User(edgy.Model):

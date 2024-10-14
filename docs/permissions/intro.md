@@ -33,3 +33,11 @@ E.g. the field `groups` must be a ManyToMany field which points to `Group` when 
 ```python
 {!> ../docs_src/permissions/quickstart.py !}
 ```
+
+## Advanced
+
+Here an advanced example with all possible fields set.
+
+```python
+{!> ../docs_src/permissions/advanced.py !}
+```

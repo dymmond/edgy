@@ -20,11 +20,23 @@ class User(edgy.Model):
         registry = models
 
 
-class Permission(BasePermission):
+class Group(edgy.Model):
+    name = edgy.fields.CharField(max_length=100)
     users = edgy.fields.ManyToMany("User", embed_through=False)
 
     class Meta:
         registry = models
+
+
+class Permission(BasePermission):
+    users = edgy.fields.ManyToMany("User", embed_through=False)
+    groups = edgy.fields.ManyToMany("Group", embed_through=False)
+    name_model: str = edgy.fields.CharField(max_length=100, null=True)
+    obj = edgy.fields.ForeignKey("ContentType", null=True)
+
+    class Meta:
+        registry = models
+        unique_together = [("name", "name_model", "obj")]
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -44,7 +56,23 @@ async def rollback_transactions():
 
 async def test_querying():
     user = await User.query.create(name="edgy")
-    permission = await Permission.query.create(users=[user], name="view")
+    permission = await Permission.query.create(users=[user], name="view", obj=user.content_type)
     assert await Permission.query.users("view").get() == user
     assert await Permission.query.users("edit").count() == 0
     assert await Permission.query.permissions_of(user).get() == permission
+
+
+async def test_querying_mixed():
+    user = await User.query.create(name="edgy")
+    group = await Group.query.create(name="admin", users=[user])
+    await Permission.query.create(users=[user], name="view")
+    permission2 = await Permission.query.create(groups=[group], name="admin")
+    assert await Permission.query.filter(name="admin").get()
+    permissions = await Permission.query.permissions_of(user)
+    assert len(permissions) == 2
+    permissions = await Permission.query.permissions_of(group)
+    assert permissions == [permission2]
+    assert await Permission.query.users("view").get() == user
+    assert await Permission.query.users("admin").get() == user
+    assert await Permission.query.users("edit").count() == 0
+    assert await Permission.query.permissions_of(user).count() == 2

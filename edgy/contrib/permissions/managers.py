@@ -70,25 +70,15 @@ class PermissionManager(Manager):
             or GroupField.target.meta.fields[self.owner.users_field_group].embed_through is False
             or GroupField.target.meta.fields[self.owner.users_field_group].embed_through
         ), f"{GroupField.target} {self.owner.users_field_group} field need embed_through=foo|False."
-        ModelNameField = self.owner.meta.fields.get("model_name", None)
-        assert (
-            ModelNameField is None
-            or ModelNameField.embed_through is False
-            or ModelNameField.embed_through
-        ), "model_name field need embed_through=foo|False."
+        ModelNameField = self.owner.meta.fields.get("name_model", None)
         ContentTypeField = self.owner.meta.fields.get("obj", None)
-        assert (
-            ContentTypeField is None
-            or ContentTypeField.embed_through is False
-            or ContentTypeField.embed_through
-        ), "obj field need embed_through=foo|False."
         if objects is not None and len(objects) == 0:
             # none
             return cast("QuerySet", UserField.target.query.filter(and_()))
         clauses: list[dict[str, Any]] = [{f"{UserField.reverse_name}__name__in": permissions}]
         if model_names is not None:
             if ModelNameField is not None:
-                clauses[-1][f"{UserField.reverse_name}__model_name__in"] = model_names
+                clauses[-1][f"{UserField.reverse_name}__name_model__in"] = model_names
             elif ContentTypeField is not None:
                 clauses[-1][f"{UserField.reverse_name}__obj__name__in"] = model_names
 
@@ -104,7 +94,7 @@ class PermissionManager(Manager):
             if model_names is not None:
                 if ModelNameField is not None:
                     clauses[-1][
-                        f"{groups_field_user}__{GroupField.reverse_name}__model_name__in"
+                        f"{groups_field_user}__{GroupField.reverse_name}__name_model__in"
                     ] = model_names
                 elif ContentTypeField is not None:
                     clauses[-1][
@@ -150,25 +140,15 @@ class PermissionManager(Manager):
             GroupField.target.meta.fields[self.owner.users_field_group].embed_through is False
             or GroupField.target.meta.fields[self.owner.users_field_group].embed_through
         ), f"{GroupField.target} {self.owner.users_field_group} field need embed_through=foo|False."
-        ModelNameField = self.owner.meta.fields.get("model_name", None)
-        assert (
-            ModelNameField is None
-            or ModelNameField.embed_through is False
-            or ModelNameField.embed_through
-        ), "model_name field need embed_through=foo|False."
+        ModelNameField = self.owner.meta.fields.get("name_model", None)
         ContentTypeField = self.owner.meta.fields.get("obj", None)
-        assert (
-            ContentTypeField is None
-            or ContentTypeField.embed_through is False
-            or ContentTypeField.embed_through
-        ), "obj field need embed_through=foo|False."
         if objects is not None and len(objects) == 0:
             # none
             return cast("QuerySet", GroupField.target.query.filter(and_()))
         clauses: dict[str, Any] = {f"{GroupField.reverse_name}__name__in": permissions}
         if model_names is not None:
             if ModelNameField is not None:
-                clauses[f"{GroupField.reverse_name}__model_name__in"] = model_names
+                clauses[f"{GroupField.reverse_name}__name_model__in"] = model_names
             elif ContentTypeField is not None:
                 clauses[f"{GroupField.reverse_name}__obj__name__in"] = model_names
         query = cast("QuerySet", GroupField.target.query.filter(**clauses))

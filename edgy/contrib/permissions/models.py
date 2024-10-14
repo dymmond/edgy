@@ -8,8 +8,9 @@ from .managers import PermissionManager
 class BasePermission(edgy.Model):
     users_field_group: ClassVar[str] = "users"
     name: str = edgy.fields.CharField(max_length=100, null=False)
-    # model_name: str = edgy.fields.CharField(max_length=100, null=True)
-    # obj = edgy.fields.ForeignKey("ContentType")
+    # model_name would collidate with pydantics private namespace
+    # name_model: str = edgy.fields.CharField(max_length=100, null=True)
+    # obj = edgy.fields.ForeignKey("ContentType", null=True)
     description: Optional[str] = edgy.fields.ComputedField(  # type: ignore
         getter="get_description",
         setter="set_description",
@@ -25,4 +26,4 @@ class BasePermission(edgy.Model):
 
     class Meta:
         abstract = True
-        # unique_together=[(name, model_name, obj)]
+        # unique_together=[(name, name_model, obj)]
