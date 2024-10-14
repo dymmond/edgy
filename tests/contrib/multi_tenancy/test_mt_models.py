@@ -9,7 +9,7 @@ import pytest
 from edgy import Database, Registry
 from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin
-from edgy.core.db import fields
+from edgy.core.db import fields, set_tenant
 from edgy.exceptions import ModelSchemaError
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
@@ -90,3 +90,9 @@ async def test_raises_ModelSchemaError_on_public_schema():
         raised.value.args[0]
         == "Can't update tenant outside it's own schema or the public schema. Current schema is 'public'"
     )
+
+
+def test_deprecated_set_tenant():
+    with pytest.warns(DeprecationWarning):
+        token = set_tenant("foo")
+    token.var.reset(token)

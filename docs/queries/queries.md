@@ -63,6 +63,68 @@ For schema it is valid to use a string for a schema, None for the main schema or
 
 It is the merge of the former methods `using` (with a positional argument) and `using_with_db` which are still valid but deprecated and have usability problems.
 
+
+### Using with `with_schema`
+
+This is an **alternative** to [using](#using) and serves solely as the purpose of avoiding
+writing all the time `Model.query.using(...)`.
+
+You can use `with_schema(...)` to tell the query to always query
+a specific schema within the context, in other words, using the `with_schema()` you don't need to constantly
+write `using(...)`.
+
+Importing is as simple as this:
+
+```python
+from edgy.core.db import with_schema
+```
+
+Let us see an example:
+
+**With the classic .using()**
+
+```python
+# Using the 'main' schema
+
+User.query.using(schema='main').all()
+User.query.using(schema='main').filter(email__icontains="user@example.com")
+User.query.using(schema='main').get(pk=1)
+```
+
+**Using the with_schema**
+
+```python
+# Using the 'main' schema
+with with_schema("main"):
+
+    # Query the 'User' from the 'main' schema
+    User.query.all()
+    User.query.filter(email__icontains="user@example.com")
+    User.query.get(pk=1)
+```
+
+There is also a method called `set_schema` which returns a reset token:
+
+**Using the set_schema**
+
+```python
+# Using the 'main' schema
+token = set_schema("main"):
+
+try:
+    # Query the 'User' from the 'main' schema
+    User.query.all()
+    User.query.filter(email__icontains="user@example.com")
+    User.query.get(pk=1)
+finally:
+    token.var.reset(token)
+```
+
+
+!!! Warning
+    There were 2 old methods: `activate_schema`, `deactivate_schema`.
+    Their use is not recommended as they don't enforce a scope.
+
 ## Load the foreign keys beforehand with select related
 
 Select related is a functionality that *follows the foreign-key relationships* by selecting any

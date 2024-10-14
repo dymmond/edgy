@@ -1,4 +1,5 @@
 import asyncio
+import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Optional, Union
 
@@ -39,7 +40,13 @@ class Schema:
     async def activate_schema_path(
         self, database: Database, schema: str, is_shared: bool = True
     ) -> None:
-        # INSECURE, but not used
+        # INSECURE, but not used by default. Add warning
+        # TODO: remove when there are no users of the method
+        warnings.warn(
+            "`activate_schema_path` is dangerous because the schema is not properly escaped and deprecated.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         path = (
             f"SET search_path TO {schema}, shared;"
             if is_shared

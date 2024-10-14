@@ -6,7 +6,7 @@ from pydantic import __version__
 import edgy
 from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin
-from edgy.core.db.querysets.mixins import activate_schema, deactivate_schema
+from edgy.core.db.querysets.mixins import with_schema
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -78,25 +78,22 @@ async def test_activate_related_tenant():
     tenant = await Tenant.query.create(schema_name="edgy", tenant_name="edgy")
 
     # Activate the schema and query always the tenant set
-    activate_schema(tenant.schema_name)
-    designation = await Designation.query.create(name="admin")
-    module = await AppModule.query.create(name="payroll")
+    with with_schema(tenant.schema_name):
+        designation = await Designation.query.create(name="admin")
+        module = await AppModule.query.create(name="payroll")
 
-    permission = await Permission.query.create(designation=designation, module=module)
+        permission = await Permission.query.create(designation=designation, module=module)
 
-    query = await Permission.query.all()
+        query = await Permission.query.all()
 
-    assert len(query) == 1
-    assert query[0].pk == permission.pk
-
-    # Deactivate the schema and set to None (default)
-    deactivate_schema()
+        assert len(query) == 1
+        assert query[0].pk == permission.pk
 
     query = await Permission.query.all()
 
     assert len(query) == 0
 
-    # Even if the activate_schema is enabled
+    # Even if the with_schema is enabled
     # The use of `using` takes precedence
     query = (
         await Permission.query.using(schema=tenant.schema_name).select_related("designation").all()

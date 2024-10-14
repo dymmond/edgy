@@ -6,7 +6,7 @@ from lilya.types import ASGIApp, Receive, Scope, Send
 from myapp.models import Tenant, TenantUser, User
 
 from edgy import ObjectNotFound
-from edgy.core.db import set_tenant
+from edgy.core.db import with_tenant
 
 
 class TenantMiddleware(MiddlewareProtocol):
@@ -22,7 +22,7 @@ class TenantMiddleware(MiddlewareProtocol):
         and uses it to run the queries against the database records.
 
         If there is a relationship between `User` and `Tenant` in the
-        `TenantUser`, it will use the `set_tenant` to set the global
+        `TenantUser`, it will use the `with_tenant` to set the global
         tenant for the user calling the APIs.
         """
         request = Request(scope=scope, receive=receive, send=send)
@@ -40,5 +40,5 @@ class TenantMiddleware(MiddlewareProtocol):
         except ObjectNotFound:
             tenant = None
 
-        set_tenant(tenant)
-        await self.app(scope, receive, send)
+        with with_tenant(tenant):
+            await self.app(scope, receive, send)

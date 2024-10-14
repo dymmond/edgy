@@ -4,7 +4,7 @@ from esmerald import Request
 from esmerald.protocols.middleware import MiddlewareProtocol
 from lilya.types import ASGIApp, Receive, Scope, Send
 
-from edgy.core.db import set_tenant
+from edgy.core.db import with_tenant
 from edgy.exceptions import ObjectNotFound
 
 
@@ -31,5 +31,5 @@ class TenantMiddleware(MiddlewareProtocol):
         except ObjectNotFound:
             tenant = None
 
-        set_tenant(tenant)
-        await self.app(scope, receive, send)
+        with with_tenant(tenant):
+            await self.app(scope, receive, send)
