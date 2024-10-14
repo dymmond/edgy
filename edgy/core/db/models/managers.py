@@ -76,6 +76,7 @@ class Manager(BaseManager):
             database = self.owner.database
         tenant = get_tenant()
         if tenant:
+            # FIXME: works only on first query
             set_tenant(None)
             return QuerySet(
                 self.owner,

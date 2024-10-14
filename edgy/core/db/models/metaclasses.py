@@ -929,7 +929,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         Retrieve table for schema (nearly the same as build with scheme argument).
         Cache per class via a primitive LRU cache.
         """
-        if schema is None:
+        if schema is None or schema == "":
+            # sqlalchemy uses "" for empty schema
             if update_cache:
                 cls._table = None
             return cls.table

@@ -24,6 +24,7 @@ from edgy.core.db.context_vars import (
     CURRENT_MODEL_INSTANCE,
     CURRENT_PHASE,
     MODEL_GETATTR_BEHAVIOR,
+    get_schema,
 )
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.models.managers import Manager, RedirectManager
@@ -249,7 +250,13 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
     @property
     def table(self) -> sqlalchemy.Table:
         if getattr(self, "_table", None) is None:
-            return cast("sqlalchemy.Table", self.__class__.table)
+            schema = self.__using_schema__
+            if schema is Undefined:
+                schema = get_schema()
+            return cast(
+                "sqlalchemy.Table",
+                self.table_schema(schema),
+            )
         return self._table
 
     @table.setter
