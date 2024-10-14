@@ -19,5 +19,7 @@ class Permission(BasePermission):
         unique_together = [("name",)]
 
 
+user = User.query.create(name="edgy")
 permission = await Permission.query.create(users=[user], name="view")
 assert await Permission.query.users("view").get() == user
+await Permission.query.permissions_of(user)

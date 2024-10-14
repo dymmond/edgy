@@ -66,7 +66,7 @@ It is the merge of the former methods `using` (with a positional argument) and `
 
 ### Using with `with_schema`
 
-This is an **alternative** to [using](#using) and serves solely as the purpose of avoiding
+This is an **alternative** to `[using](#selecting-the-database-and-schema)` and serves solely as the purpose of avoiding
 writing all the time `Model.query.using(...)`.
 
 You can use `with_schema(...)` to tell the query to always query

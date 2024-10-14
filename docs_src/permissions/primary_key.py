@@ -20,14 +20,15 @@ class Group(edgy.Model):
 
 
 class Permission(BasePermission):
+    # overwrite name of BasePermission with a CharField with primary_key=True
+    name: str = edgy.fields.CharField(max_length=100, primary_key=True)
     users = edgy.fields.ManyToMany("User", embed_through=False)
     groups = edgy.fields.ManyToMany("Group", embed_through=False)
-    name_model: str = edgy.fields.CharField(max_length=100, null=True)
-    obj = edgy.fields.ForeignKey("ContentType", null=True)
+    name_model: str = edgy.fields.CharField(max_length=100, null=True, primary_key=True)
+    obj = edgy.fields.ForeignKey("ContentType", null=True, primary_key=True)
 
     class Meta:
         registry = models
-        unique_together = [("name", "name_model", "obj")]
 
 
 user = User.query.create(name="edgy")
