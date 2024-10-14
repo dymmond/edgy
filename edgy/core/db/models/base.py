@@ -37,11 +37,11 @@ from edgy.types import Undefined
 from .types import BaseModelType
 
 if TYPE_CHECKING:
-    from edgy import Model
     from edgy.core.connection.database import Database
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.metaclasses import MetaInfo
+    from edgy.core.db.models.model import Model
     from edgy.core.db.querysets.base import QuerySet
     from edgy.core.signals import Broadcaster
 
@@ -189,7 +189,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         return _copy
 
     @cached_property
-    def proxy_model(self) -> type[BaseModelType]:
+    def proxy_model(self) -> type["Model"]:
         return self.__class__.proxy_model  # type: ignore
 
     @cached_property

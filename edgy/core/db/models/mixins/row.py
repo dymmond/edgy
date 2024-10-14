@@ -198,9 +198,9 @@ class ModelRowMixin:
                     f"{column.table.key.replace('.', '_')}_{column.key}"
                 ]
         model: Model = (
-            cls.proxy_model(**item, __phase__="init_db")
+            cls.proxy_model(**item, __phase__="init_db")  # type: ignore
             if exclude_secrets or is_defer_fields or only_fields
-            else cls(**item, __phase__="init_db")  # type: ignore
+            else cls(**item, __phase__="init_db")
         )
         # Apply the schema to the model
         model = apply_instance_extras(

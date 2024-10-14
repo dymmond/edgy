@@ -962,7 +962,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cast("sqlalchemy.Table", schema_obj)
 
     @property
-    def proxy_model(cls: type["Model"]) -> type["BaseModelType"]:
+    def proxy_model(cls: type["Model"]) -> type["Model"]:
         """
         Returns the proxy_model from the Model when called using the cache.
         """

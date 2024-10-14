@@ -24,7 +24,7 @@ class Prefetch:
         self.to_attr = to_attr
         self.queryset: Optional[QuerySet] = queryset
         self._is_finished = False
-        self._baked_results: dict[str, list(Any)] = defaultdict(list)
+        self._baked_results: dict[tuple[str, ...], list[Any]] = defaultdict(list)
         self._baked = False
 
     async def init_bake(self, model_class: type["Model"]) -> None:
