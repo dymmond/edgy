@@ -399,7 +399,7 @@ def handle_annotations(
 ) -> dict[str, Any]:
     """
     Handles and copies some of the annotations for
-    initialiasation.
+    initialisation.
     """
     for base in bases:
         _handle_annotations(base, base_annotations)
