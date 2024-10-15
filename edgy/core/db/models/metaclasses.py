@@ -5,7 +5,6 @@ import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
 from collections.abc import Sequence
-from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -25,13 +24,11 @@ from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.base import PKField, RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
-from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.models.managers import BaseManager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
-from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.functional import extract_field_annotations_and_defaults
-from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured, TableBuildError
+from edgy.exceptions import ImproperlyConfigured, TableBuildError
 
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
@@ -387,77 +384,6 @@ def get_model_registry(
     return None
 
 
-def _set_related_field(
-    target: type["BaseModelType"],
-    *,
-    foreign_key_name: str,
-    related_name: str,
-    source: type["BaseModelType"],
-    replace_related_field: bool,
-) -> None:
-    if not replace_related_field and related_name in target.meta.fields:
-        # is already correctly set, required for migrate of model_apps with registry set
-        related_field = target.meta.fields[related_name]
-        if (
-            related_field.related_from is source
-            and related_field.foreign_key_name == foreign_key_name
-        ):
-            return
-        raise ForeignKeyBadConfigured(
-            f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
-        )
-
-    related_field = RelatedField(
-        foreign_key_name=foreign_key_name,
-        name=related_name,
-        owner=target,
-        related_from=source,
-    )
-
-    # Set the related name
-    target.meta.fields[related_name] = related_field
-
-
-def _set_related_name_for_foreign_keys(
-    meta: "MetaInfo", model_class: type["BaseModelType"], replace_related_field: bool = False
-) -> None:
-    """
-    Sets the related name for the foreign keys.
-    When a `related_name` is generated, creates a RelatedField from the table pointed
-    from the ForeignKey declaration and the the table declaring it.
-    """
-    if not meta.foreign_key_fields:
-        return
-
-    for name in meta.foreign_key_fields:
-        foreign_key = meta.fields[name]
-        related_name = getattr(foreign_key, "related_name", None)
-        if related_name is False:
-            # skip related_field
-            continue
-
-        if not related_name:
-            if foreign_key.unique:
-                related_name = f"{model_class.__name__.lower()}"
-            else:
-                related_name = f"{model_class.__name__.lower()}s_set"
-
-        foreign_key.related_name = related_name
-        foreign_key.reverse_name = related_name
-
-        related_field_fn = partial(
-            _set_related_field,
-            source=model_class,
-            foreign_key_name=name,
-            related_name=related_name,
-            replace_related_field=replace_related_field,
-        )
-        registry: Registry = foreign_key.target_registry
-        with contextlib.suppress(Exception):
-            registry = cast("Registry", foreign_key.target.registry)
-        registry.register_callback(foreign_key.to, related_field_fn, one_time=True)
-
-
 def _handle_annotations(base: type, base_annotations: dict[str, Any]) -> None:
     for parent in base.__mro__[1:]:
         _handle_annotations(parent, base_annotations)
@@ -807,49 +733,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                 return new_class
         new_class.add_to_registry(meta.registry)
         return new_class
-
-    def add_to_registry(
-        cls: type["BaseModelType"],
-        registry: Registry,
-        name: str = "",
-        database: Union[bool, "Database"] = True,
-    ) -> None:
-        # when called if registry is not set
-        cls.meta.registry = registry
-        if database is True:
-            cls.database = registry.database
-        elif database is not False:
-            cls.database = database
-        meta = cls.meta
-        if name:
-            cls.__name__ = name
-
-        # Making sure it does not generate models if abstract or a proxy
-        if not meta.abstract and not cls.__is_proxy_model__:
-            if getattr(cls, "__reflected__", False):
-                registry.reflected[cls.__name__] = cls
-            else:
-                registry.models[cls.__name__] = cls
-            # after registrating the own model
-            for value in list(meta.fields.values()):
-                if isinstance(value, BaseManyToManyForeignKeyField):
-                    m2m_registry: Registry = value.target_registry
-                    with contextlib.suppress(Exception):
-                        m2m_registry = cast("Registry", value.target.registry)
-
-                    def create_through_model(x: Any, field: "BaseFieldType" = value) -> None:
-                        # we capture with field = ... the variable
-                        field.create_through_model()
-
-                    m2m_registry.register_callback(value.to, create_through_model, one_time=True)
-            # Sets the foreign key fields
-            if meta.foreign_key_fields:
-                _set_related_name_for_foreign_keys(meta, cls)
-            registry.execute_model_callbacks(cls)
-
-        cls.__db_model__ = True
-        # finalize
-        cls.model_rebuild(force=True)
 
     def get_db_schema(cls) -> Union[str, None]:
         """

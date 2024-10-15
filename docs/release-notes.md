@@ -5,6 +5,14 @@ hide:
 
 # Release Notes
 
+## Unreleased
+
+
+### Changed
+
+- Cleanup Model inheritance: Database related stuff is put into a mixin. The customized metaclass is moved from EdgyBaseModel to edgy.Model as well as some db related ClassVars.
+
+
 ## 0.18.0
 
 ### Added

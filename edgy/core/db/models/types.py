@@ -43,7 +43,7 @@ class DescriptiveMeta:
 
 class BaseModelType(ABC):
     """
-    Type of EdgyBaseModel
+    Type of edgy.Model and EdgyBaseModel
     """
 
     columns: ClassVar["sqlalchemy.sql.ColumnCollection"]

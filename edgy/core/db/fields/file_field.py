@@ -78,7 +78,7 @@ class ConcreteFileField(BaseCompositeField):
         value: Any,
     ) -> dict[str, Any]:
         """
-        Inverse of clean. Transforms column(s) to a field for a pydantic model (EdgyBaseModel).
+        Inverse of clean. Transforms column(s) to a field for edgy.Model.
         Validation happens later.
 
         Args:
