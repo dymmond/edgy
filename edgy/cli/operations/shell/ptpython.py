@@ -47,7 +47,7 @@ def get_ptpython(app: typing.Any, registry: Registry, options: typing.Any = None
                 )
 
     except (ModuleNotFoundError, ImportError):
-        error = "You must have IPython installed to run this. Run `pip install edgy[ipython]`"
+        error = "You must have ptpython installed to run this. Run `pip install ptpython"
         printer.write_error(error)
         sys.exit(1)
 
