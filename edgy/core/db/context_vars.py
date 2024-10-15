@@ -54,6 +54,10 @@ def with_tenant(tenant: Union[str, None]) -> None:
     Sets the global tenant for the context of the queries.
     When a global tenant is set the `get_schema` -> `SCHEMA` is ignored.
     """
+    # Why preferring to a set_tenant?
+    # Set_tenant overwrites schema and can lead to hard to debug issues when the scope isn't resetted
+    # while this has a limited scope
+    # set_tenant affects the get_schema method.
     token = TENANT.set(tenant)
     try:
         yield
@@ -71,6 +75,7 @@ def get_schema(check_tenant: bool = True) -> Union[str, None]:
 
 def set_schema(value: Union[str, None]) -> Token:
     """Set the schema and return the token for resetting. Manual way of with_schema."""
+
     return SCHEMA.set(value)
 
 

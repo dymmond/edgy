@@ -26,9 +26,9 @@ def get_application():
     This is optional. The function is only used for organisation purposes.
     """
     build_path()
-    database, registry = get_db_connection()
+    registry = get_db_connection()
 
-    app = Lilya(__name__)
+    app = registry.asgi(Lilya(__name__))
 
     Migrate(app=app, registry=registry)
     return app

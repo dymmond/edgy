@@ -1,6 +1,6 @@
 from esmerald import Esmerald
 
-from edgy import Registry
+from edgy import Registry, Migrate
 
 models = Registry(database="sqlite:///db.sqlite", echo=True)
 
@@ -10,3 +10,5 @@ app = models.asgi(
         routes=[...],
     )
 )
+# monkey-patch app so you can use edgy shell
+Migrate(app, models)
