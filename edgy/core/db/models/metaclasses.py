@@ -280,8 +280,21 @@ class MetaInfo:
 
     @property
     def is_multi(self) -> bool:
-        warnings.warn("Use bool(meta.multi_related) instead", DeprecationWarning, stacklevel=2)
+        warnings.warn(
+            "`is_multi` is deprecated. Use bool(meta.multi_related) instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return bool(self.multi_related)
+
+    @property
+    def parents(self) -> list[Any]:
+        warnings.warn(
+            "`parents` is deprecated and will be removed without replacement.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return [parent for parent in self.model.__bases__ if isinstance(parent, BaseModelMeta)]
 
     def model_dump(self) -> dict[Any, Any]:
         return {k: getattr(self, k, None) for k in self._include_dump}
