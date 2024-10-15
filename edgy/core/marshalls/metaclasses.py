@@ -28,8 +28,9 @@ class MarshallMeta(ModelMetaclass):
         # TODO: should have correct types
         attrs, model_fields = extract_field_annotations_and_defaults(attrs, BaseMarshallField)
 
-        parents = [parent for parent in bases if isinstance(parent, MarshallMeta)]
-        if not parents:
+        has_parents = any(isinstance(parent, MarshallMeta) for parent in bases)
+
+        if not has_parents:
             return super().__new__(cls, name, bases, attrs)
 
         model_class: Marshall = super().__new__(cls, name, bases, attrs)  # type: ignore

@@ -208,7 +208,6 @@ class MetaInfo:
         "tablename",
         "unique_together",
         "indexes",
-        "parents",
         "model",
         "managers",
         "multi_related",
@@ -260,7 +259,6 @@ class MetaInfo:
         self.indexes: Any = getattr(meta, "indexes", None)
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
-        self.parents: list[Any] = [*getattr(meta, "parents", _empty_set)]
         self.fields = {**getattr(meta, "fields", _empty_dict)}  # type: ignore
         self.managers: dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
         self.multi_related: list[str] = [*getattr(meta, "multi_related", _empty_set)]
@@ -536,7 +534,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         base_annotations: dict[str, Any] = {}
         has_explicit_primary_key = False
         is_abstract: bool = getattr(meta_class, "abstract", False)
-        parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
+        has_parents = any(isinstance(parent, BaseModelMeta) for parent in bases)
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
@@ -605,7 +603,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                         if not sub_field.exclude:
                             model_fields[sub_field_name] = sub_field
             # Handle with multiple primary keys and auto generated field if no primary key is provided
-            if not is_abstract and parents and not has_explicit_primary_key:
+            if not is_abstract and has_parents and not has_explicit_primary_key:
                 if "id" not in fields:
                     if attrs.get("__reflected__", False):
                         raise ImproperlyConfigured(
@@ -631,7 +629,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         attrs["meta"] = meta = meta_info_class(
             meta_class,
             fields=fields,
-            parents=parents,
             managers=managers,
         )
         del fields
@@ -660,9 +657,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         new_class = cast(type["Model"], super().__new__(cls, name, bases, attrs, **kwargs))
         meta.model = new_class
-        # Ensure initialization is only performed for subclasses of EdgyBaseModel
-        # (excluding the EdgyBaseModel class itself).
-        if not parents:
+        # Ensure initialization is only performed for subclasses of edgy.Model
+        # (excluding the edgy.Model class itself).
+        if not has_parents:
             return new_class
 
         # Ensure the model_fields are updated to the latest

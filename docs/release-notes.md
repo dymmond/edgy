@@ -8,6 +8,10 @@ hide:
 ## Unreleased
 
 
+### Removed
+
+- `parents` attribute of MetaInfo. There are no users and uses as it only saves the name not the class itself.
+
 ### Changed
 
 - Cleanup Model inheritance: Database related stuff is put into a mixin. The customized metaclass is moved from EdgyBaseModel to edgy.Model as well as some db related ClassVars.
