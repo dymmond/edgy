@@ -484,6 +484,7 @@ The metaclass also calculates following readonly attributes:
 
 Some other interesting attributes are:
 
+- `multi_related` (set[tuple[str, str]]): Holds foreign_keys used by ManyToManyFields when being used as a through model. Is empty for non-through models.
 - `fields` (pseudo dictionary): Holds fields. When setting/deleting fields it updates the attributes.
 - `model` (model_class): This attribute is special in it's way that it is not retrieved from a meta class. It must be explicitly set.
                          This has implications for custom MetaInfo. You either replace the original one by passing meta_info_class as metaclass argument or set it in your overwrite manually.

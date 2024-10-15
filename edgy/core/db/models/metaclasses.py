@@ -238,7 +238,6 @@ class MetaInfo:
             __slots__,
         ),
         "pk",
-        "is_multi",
     )
 
     fields: Fields
@@ -261,7 +260,7 @@ class MetaInfo:
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
         self.fields = {**getattr(meta, "fields", _empty_dict)}  # type: ignore
         self.managers: dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
-        self.multi_related: list[str] = [*getattr(meta, "multi_related", _empty_set)]
+        self.multi_related: set[tuple[str, str]] = {*getattr(meta, "multi_related", _empty_set)}
         self.load_dict(kwargs)
 
     @property
@@ -279,6 +278,7 @@ class MetaInfo:
 
     @property
     def is_multi(self) -> bool:
+        warnings.warn("Use bool(meta.multi_related) instead", DeprecationWarning, stacklevel=2)
         return bool(self.multi_related)
 
     def model_dump(self) -> dict[Any, Any]:
