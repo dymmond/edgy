@@ -72,24 +72,17 @@ class MigrationEnv:
         app = getattr(module, app_name)
         return Scaffold(path=path, app=app)
 
-    def _get_folders(self, path: Path) -> list[str]:
-        """
-        Lists all the folders and checks if there is any file from the DISCOVERY_FILES available
-        """
-        return [directory.path for directory in os.scandir(path) if directory.is_dir()]
-
     def _find_app_in_folder(  # type: ignore
         self, path: Path, cwd: Path
-    ) -> typing.Union[typing.NoReturn, typing.Callable[..., typing.Any], Scaffold, None]:
+    ) -> typing.Union[typing.Callable[..., typing.Any], Scaffold, None]:
         """
         Iterates inside the folder and looks up to the DISCOVERY_FILES.
         """
         for discovery_file in DISCOVERY_FILES:
-            filename = f"{str(path)}/{discovery_file}"
-            if not os.path.exists(filename):
+            file_path = path / discovery_file
+            if not file_path.exists():
                 continue
 
-            file_path = path / discovery_file
             dotted_path = ".".join(file_path.relative_to(cwd).with_suffix("").parts)
 
             # Load file from module
@@ -97,9 +90,7 @@ class MigrationEnv:
 
             # Iterates through the elements of the module.
             for attr, value in module.__dict__.items():
-                if (callable(value) and hasattr(value, EDGY_DB)) or (
-                    callable(value) and hasattr(value, EDGY_EXTRA)
-                ):
+                if callable(value) and (hasattr(value, EDGY_DB) or hasattr(value, EDGY_EXTRA)):
                     app_path = f"{dotted_path}:{attr}"
                     return Scaffold(app=value, path=app_path)
 
@@ -130,9 +121,8 @@ class MigrationEnv:
             return scaffold
 
         # Goes into auto discovery mode for one level, only.
-        folders = self._get_folders(cwd)
 
-        for folder in folders:
+        for folder in cwd.iterdir():
             folder_path = cwd / folder
             scaffold = self._find_app_in_folder(folder_path, cwd)  # type: ignore
 

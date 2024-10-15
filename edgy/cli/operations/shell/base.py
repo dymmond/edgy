@@ -1,3 +1,4 @@
+import asyncio
 import select
 import sys
 from collections.abc import Sequence
@@ -61,12 +62,14 @@ async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) ->
             from edgy.cli.operations.shell.ipython import get_ipython
 
             ipython_shell = get_ipython(app=app, registry=registry)
-            ipython_shell()
+            # it want its own asyncio.run
+            await asyncio.to_thread(ipython_shell)
         else:
             from edgy.cli.operations.shell.ptpython import get_ptpython
 
             ptpython = get_ptpython(app=app, registry=registry)
-            ptpython()
+            # it maybe want its own asyncio.run
+            await asyncio.to_thread(ptpython)
 
 
 def handle_lifespan_events(
