@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import inspect
 import warnings
@@ -45,7 +47,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
 
     model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
-    __proxy_model__: ClassVar[Union[type["Model"], None]] = None
+    __proxy_model__: ClassVar[Union[type[Model], None]] = None
     # is inheriting from a registered model, so the registry is true
     __db_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
@@ -95,7 +97,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
 
     @classmethod
     def transform_input(
-        cls, kwargs: Any, phase: str = "", instance: Optional["BaseModelType"] = None
+        cls, kwargs: Any, phase: str = "", instance: Optional[BaseModelType] = None
     ) -> Any:
         """
         Expand to_models and apply input modifications.
@@ -155,7 +157,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         return self.pkcolumns
 
     @cached_property
-    def proxy_model(self) -> type["Model"]:
+    def proxy_model(self) -> type[Model]:
         return self.__class__.proxy_model  # type: ignore
 
     @property
@@ -194,7 +196,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 )
 
     @property
-    def signals(self) -> "Broadcaster":
+    def signals(self) -> Broadcaster:
         warnings.warn(
             "'signals' has been deprecated, use 'meta.signals' instead.",
             DeprecationWarning,
@@ -203,7 +205,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         return self.meta.signals
 
     @property
-    def fields(self) -> dict[str, "BaseFieldType"]:
+    def fields(self) -> dict[str, BaseFieldType]:
         warnings.warn(
             "'fields' has been deprecated, use 'meta.fields' instead.",
             DeprecationWarning,
@@ -359,8 +361,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         is_update: bool = False,
         is_partial: bool = False,
         phase: str = "",
-        instance: Optional[Union["BaseModelType", "QuerySet"]] = None,
-        model_instance: Optional["BaseModelType"] = None,
+        instance: Optional[Union[BaseModelType, QuerySet]] = None,
+        model_instance: Optional[BaseModelType] = None,
     ) -> dict[str, Any]:
         validated: dict[str, Any] = {}
         token = CURRENT_PHASE.set(phase)

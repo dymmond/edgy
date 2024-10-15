@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import copy
 import inspect
@@ -42,7 +44,7 @@ _empty_set: frozenset[Any] = frozenset()
 class Fields(UserDict, dict[str, BaseFieldType]):
     """Smart wrapper which tries to prevent invalidation as far as possible"""
 
-    def __init__(self, meta: "MetaInfo", data: Optional[dict[str, BaseFieldType]] = None):
+    def __init__(self, meta: MetaInfo, data: Optional[dict[str, BaseFieldType]] = None):
         self.meta = meta
         super().__init__(data)
 
@@ -101,11 +103,11 @@ class Fields(UserDict, dict[str, BaseFieldType]):
 
 
 class FieldToColumns(UserDict, dict[str, Sequence["sqlalchemy.Column"]]):
-    def __init__(self, meta: "MetaInfo"):
+    def __init__(self, meta: MetaInfo):
         self.meta = meta
         super().__init__()
 
-    def __getitem__(self, name: str) -> Sequence["sqlalchemy.Column"]:
+    def __getitem__(self, name: str) -> Sequence[sqlalchemy.Column]:
         if name in self.data:
             return cast(Sequence["sqlalchemy.Column"], self.data[name])
         field = self.meta.fields[name]
@@ -143,7 +145,7 @@ class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
 
 
 class ColumnsToField(UserDict, dict[str, str]):
-    def __init__(self, meta: "MetaInfo"):
+    def __init__(self, meta: MetaInfo):
         self.meta = meta
         self._init = False
         super().__init__()
@@ -350,7 +352,7 @@ class MetaInfo:
             for attr in ("table", "pknames", "pkcolumns", "proxy_model"):
                 getattr(self.model, attr)
 
-    def get_columns_for_name(self, name: str) -> Sequence["sqlalchemy.Column"]:
+    def get_columns_for_name(self, name: str) -> Sequence[sqlalchemy.Column]:
         if name in self.field_to_columns:
             return self.field_to_columns[name]
         elif self.model and name in self.model.table.columns:
@@ -360,7 +362,7 @@ class MetaInfo:
 
 
 def get_model_registry(
-    bases: tuple[type, ...], meta_class: Optional[Union["object", MetaInfo]] = None
+    bases: tuple[type, ...], meta_class: Optional[Union[object, MetaInfo]] = None
 ) -> Optional[Registry]:
     """
     When a registry is missing from the Meta class, it should look up for the bases
@@ -388,7 +390,7 @@ def _handle_annotations(base: type, base_annotations: dict[str, Any]) -> None:
     if hasattr(base, "__init_annotations__") and base.__init_annotations__:
         base_annotations.update(base.__init_annotations__)
     elif hasattr(base, "__annotations__") and base.__annotations__:
-        base_annotations.update(base.__annotations__)
+        base_annotations.update(inspect.get_annotations(base))
 
 
 def handle_annotations(
@@ -645,12 +647,17 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
 
         for k, _ in meta.managers.items():
-            if annotations and k not in annotations:
-                raise ImproperlyConfigured(
-                    f"Managers must be type annotated and '{k}' is not annotated. Managers must be annotated with ClassVar."
-                )
-            if annotations and get_origin(annotations[k]) is not ClassVar:
-                raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
+            if annotations:
+                if k not in annotations:
+                    raise ImproperlyConfigured(
+                        f"Managers must be type annotated and '{k}' is not annotated. Managers must be annotated with ClassVar."
+                    )
+                # evaluate annotation which can be a string reference.
+                # because we really import ClassVar to check against it is safe to assume a ClassVar is available.
+                if isinstance(annotations[k], str):
+                    annotations[k] = eval(annotations[k])
+                if get_origin(annotations[k]) is not ClassVar:
+                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
 
         # Ensure the initialization is only performed for subclasses of EdgyBaseModel
         attrs["__init_annotations__"] = annotations
@@ -748,15 +755,15 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cls.get_db_schema()
 
     @property
-    def database(cls) -> "Database":
+    def database(cls) -> Database:
         return cls._database
 
     @database.setter
-    def database(cls, value: "Database") -> None:
+    def database(cls, value: Database) -> None:
         cls._database = value
 
     @property
-    def table(cls) -> "sqlalchemy.Table":
+    def table(cls) -> sqlalchemy.Table:
         """
         Making sure the tables on inheritance state, creates the new
         one properly.
@@ -819,7 +826,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
     def table_schema(
         cls, schema: Union[str, None] = None, update_cache: bool = False
-    ) -> "sqlalchemy.Table":
+    ) -> sqlalchemy.Table:
         """
         Retrieve table for schema (nearly the same as build with scheme argument).
         Cache per class via a primitive LRU cache.
@@ -842,7 +849,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cast("sqlalchemy.Table", schema_obj)
 
     @property
-    def proxy_model(cls: type["Model"]) -> type["Model"]:
+    def proxy_model(cls: type[Model]) -> type[Model]:
         """
         Returns the proxy_model from the Model when called using the cache.
         """

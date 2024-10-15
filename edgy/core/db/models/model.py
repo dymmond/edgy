@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import inspect
 from typing import ClassVar, cast
@@ -57,7 +59,7 @@ class Model(
         abstract = True
 
     @classmethod
-    def generate_proxy_model(cls) -> type["Model"]:
+    def generate_proxy_model(cls) -> type[Model]:
         """
         Generates a proxy model for each model. This proxy model is a simple
         shallow copy of the original model being generated.
