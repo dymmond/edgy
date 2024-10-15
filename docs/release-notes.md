@@ -5,6 +5,23 @@ hide:
 
 # Release Notes
 
+## Unreleased
+
+
+### Removed
+
+- `parents` attribute of MetaInfo. There are no users and uses as it only saves the name not the class itself.
+
+### Changed
+
+- Cleanup Model inheritance: Database related stuff is put into a mixin. The customized metaclass is moved from EdgyBaseModel to edgy.Model as well as some db related ClassVars.
+- `multi_related` is now a set containing tuples (from_fk, to_fk). This can be used to identify fields used by ManyToMany fields.
+- Deprecate `is_multi`.
+
+### Fixed
+
+- Non-abstract through-models wouldn't be marked as many to many relations.
+
 ## 0.18.0
 
 ### Added

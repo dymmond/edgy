@@ -1,4 +1,5 @@
-import contextlib
+from __future__ import annotations
+
 import copy
 import inspect
 import warnings
@@ -15,7 +16,6 @@ from typing import (
 )
 
 import orjson
-import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
@@ -24,23 +24,15 @@ from edgy.core.db.context_vars import (
     CURRENT_MODEL_INSTANCE,
     CURRENT_PHASE,
     MODEL_GETATTR_BEHAVIOR,
-    get_schema,
 )
-from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.models.managers import Manager, RedirectManager
-from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
 from edgy.core.db.models.model_reference import ModelRef
-from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.utils.sync import run_sync
 from edgy.types import Undefined
 
 from .types import BaseModelType
 
 if TYPE_CHECKING:
-    from edgy.core.connection.database import Database
-    from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
-    from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.db.models.model import Model
     from edgy.core.db.querysets.base import QuerySet
     from edgy.core.signals import Broadcaster
@@ -48,17 +40,14 @@ if TYPE_CHECKING:
 _empty = cast(set[str], frozenset())
 
 
-class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
+class EdgyBaseModel(BaseModel, BaseModelType):
     """
     Base of all Edgy models with the core setup.
     """
 
     model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
-    query: ClassVar[Manager] = Manager()
-    query_related: ClassVar[RedirectManager] = RedirectManager(redirect_name="query")
-    meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True)
-    __proxy_model__: ClassVar[Union[type["Model"], None]] = None
+    __proxy_model__: ClassVar[Union[type[Model], None]] = None
     # is inheriting from a registered model, so the registry is true
     __db_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
@@ -108,7 +97,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
 
     @classmethod
     def transform_input(
-        cls, kwargs: Any, phase: str = "", instance: Optional["BaseModelType"] = None
+        cls, kwargs: Any, phase: str = "", instance: Optional[BaseModelType] = None
     ) -> Any:
         """
         Expand to_models and apply input modifications.
@@ -162,40 +151,14 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
             MODEL_GETATTR_BEHAVIOR.reset(token)
         return f"{self.__class__.__name__}({', '.join(pkl)})"
 
-    @classmethod
-    def copy_edgy_model(
-        cls, registry: Optional["Registry"] = None, name: str = "", **kwargs: Any
-    ) -> type["Model"]:
-        """Copy the model class and optionally add it to another registry."""
-        # removes private pydantic stuff, except the prefixed ones
-        attrs = {
-            key: val
-            for key, val in cls.__dict__.items()
-            if key not in BaseModel.__dict__ or key.startswith("__")
-        }
-        attrs.pop("meta", None)
-        # managers and fields are gone, we have to readd them with the correct data
-        attrs.update(cls.meta.fields)
-        attrs.update(cls.meta.managers)
-        _copy = cast(
-            type["Model"],
-            type(cls.__name__, cls.__bases__, attrs, skip_registry=True, **kwargs),
-        )
-        _copy.meta.model = _copy
-        if name:
-            _copy.__name__ = name
-        if registry is not None:
-            _copy.add_to_registry(registry)
-        return _copy
-
-    @cached_property
-    def proxy_model(self) -> type["Model"]:
-        return self.__class__.proxy_model  # type: ignore
-
     @cached_property
     def identifying_db_fields(self) -> Any:
         """The columns used for loading, can be set per instance defaults to pknames"""
         return self.pkcolumns
+
+    @cached_property
+    def proxy_model(self) -> type[Model]:
+        return self.__class__.proxy_model  # type: ignore
 
     @property
     def can_load(self) -> bool:
@@ -233,7 +196,7 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
                 )
 
     @property
-    def signals(self) -> "Broadcaster":
+    def signals(self) -> Broadcaster:
         warnings.warn(
             "'signals' has been deprecated, use 'meta.signals' instead.",
             DeprecationWarning,
@@ -242,84 +205,13 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         return self.meta.signals
 
     @property
-    def fields(self) -> dict[str, "BaseFieldType"]:
+    def fields(self) -> dict[str, BaseFieldType]:
         warnings.warn(
             "'fields' has been deprecated, use 'meta.fields' instead.",
             DeprecationWarning,
             stacklevel=2,
         )
         return self.meta.fields
-
-    @property
-    def table(self) -> sqlalchemy.Table:
-        if getattr(self, "_table", None) is None:
-            schema = self.__using_schema__
-            if schema is Undefined:
-                schema = get_schema()
-            return cast(
-                "sqlalchemy.Table",
-                self.table_schema(schema),
-            )
-        return self._table
-
-    @table.setter
-    def table(self, value: sqlalchemy.Table) -> None:
-        with contextlib.suppress(AttributeError):
-            del self._pknames
-        with contextlib.suppress(AttributeError):
-            del self._pkcolumns
-        self._table = value
-
-    @property
-    def database(self) -> "Database":
-        if getattr(self, "_database", None) is None:
-            return cast("Database", self.__class__.database)
-        return self._database
-
-    @database.setter
-    def database(self, value: "Database") -> None:
-        self._database = value
-
-    @property
-    def pkcolumns(self) -> Sequence[str]:
-        if self.__dict__.get("_pkcolumns", None) is None:
-            if self.__dict__.get("_table", None) is None:
-                self._pkcolumns: Sequence[str] = cast(Sequence[str], self.__class__.pkcolumns)
-            else:
-                build_pkcolumns(self)
-        return self._pkcolumns
-
-    @property
-    def pknames(self) -> Sequence[str]:
-        if self.__dict__.get("_pknames", None) is None:
-            if self.__dict__.get("_table", None) is None:
-                self._pknames: Sequence[str] = cast(Sequence[str], self.__class__.pknames)
-            else:
-                build_pknames(self)
-        return self._pknames
-
-    def get_columns_for_name(self, name: str) -> Sequence["sqlalchemy.Column"]:
-        table = self.table
-        meta = self.meta
-        if name in meta.field_to_columns:
-            return meta.field_to_columns[name]
-        elif name in table.columns:
-            return (table.columns[name],)
-        else:
-            return cast(Sequence["sqlalchemy.Column"], _empty)
-
-    def identifying_clauses(self) -> list[Any]:
-        clauses: list[Any] = []
-        for field_name in self.identifying_db_fields:
-            field = self.meta.fields.get(field_name)
-            if field is not None:
-                for column, value in field.clean(field_name, self.__dict__[field_name]).items():
-                    clauses.append(getattr(self.table.columns, column) == value)
-            else:
-                clauses.append(
-                    getattr(self.table.columns, field_name) == self.__dict__[field_name]
-                )
-        return clauses
 
     def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> dict[str, Any]:
         """
@@ -415,79 +307,6 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
     def model_dump_json(self, **kwargs: Any) -> str:
         return orjson.dumps(self.model_dump(mode="json", **kwargs)).decode()
 
-    @classmethod
-    def build(
-        cls, schema: Optional[str] = None, metadata: Optional[sqlalchemy.MetaData] = None
-    ) -> sqlalchemy.Table:
-        """
-        Builds the SQLAlchemy table representation from the loaded fields.
-        """
-        tablename: str = cls.meta.tablename
-        registry = cls.meta.registry
-        assert registry is not None, "registry is not set"
-        if metadata is None:
-            metadata = registry.metadata
-        schemes: list[str] = []
-        if schema:
-            schemes.append(schema)
-        schemes.append(registry.db_schema or "")
-
-        unique_together = cls.meta.unique_together
-        index_constraints = cls.meta.indexes
-
-        columns: list[sqlalchemy.Column] = []
-        global_constraints: list[Any] = []
-        for name, field in cls.meta.fields.items():
-            current_columns = field.get_columns(name)
-            columns.extend(current_columns)
-            global_constraints.extend(field.get_global_constraints(name, current_columns, schemes))
-
-        # Handle the uniqueness together
-        uniques = []
-        for unique_index in unique_together or []:
-            unique_constraint = cls._get_unique_constraints(unique_index)
-            uniques.append(unique_constraint)
-
-        # Handle the indexes
-        indexes = []
-        for index_c in index_constraints or []:
-            index = cls._get_indexes(index_c)
-            indexes.append(index)
-        return sqlalchemy.Table(
-            tablename,
-            metadata,
-            *columns,
-            *uniques,
-            *indexes,
-            *global_constraints,
-            extend_existing=True,
-            schema=schema or registry.db_schema,
-        )
-
-    @classmethod
-    def _get_unique_constraints(
-        cls, columns: Union[Sequence, str, sqlalchemy.UniqueConstraint]
-    ) -> Optional[sqlalchemy.UniqueConstraint]:
-        """
-        Returns the unique constraints for the model.
-
-        The columns must be a a list, tuple of strings or a UniqueConstraint object.
-
-        :return: Model UniqueConstraint.
-        """
-        if isinstance(columns, str):
-            return sqlalchemy.UniqueConstraint(columns)
-        elif isinstance(columns, UniqueConstraint):
-            return sqlalchemy.UniqueConstraint(*columns.fields, name=columns.name)
-        return sqlalchemy.UniqueConstraint(*columns)
-
-    @classmethod
-    def _get_indexes(cls, index: Index) -> Optional[sqlalchemy.Index]:
-        """
-        Creates the index based on the Index fields
-        """
-        return sqlalchemy.Index(index.name, *index.fields)
-
     async def execute_pre_save_hooks(
         self, column_values: dict[str, Any], original: dict[str, Any], force_insert: bool
     ) -> dict[str, Any]:
@@ -542,8 +361,8 @@ class EdgyBaseModel(BaseModel, BaseModelType, metaclass=BaseModelMeta):
         is_update: bool = False,
         is_partial: bool = False,
         phase: str = "",
-        instance: Optional[Union["BaseModelType", "QuerySet"]] = None,
-        model_instance: Optional["BaseModelType"] = None,
+        instance: Optional[Union[BaseModelType, QuerySet]] = None,
+        model_instance: Optional[BaseModelType] = None,
     ) -> dict[str, Any]:
         validated: dict[str, Any] = {}
         token = CURRENT_PHASE.set(phase)

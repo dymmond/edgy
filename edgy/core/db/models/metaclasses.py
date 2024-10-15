@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import copy
 import inspect
@@ -5,7 +7,6 @@ import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
 from collections.abc import Sequence
-from functools import partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -25,13 +26,11 @@ from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.base import PKField, RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
-from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.models.managers import BaseManager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
-from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.functional import extract_field_annotations_and_defaults
-from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured, TableBuildError
+from edgy.exceptions import ImproperlyConfigured, TableBuildError
 
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
@@ -45,7 +44,7 @@ _empty_set: frozenset[Any] = frozenset()
 class Fields(UserDict, dict[str, BaseFieldType]):
     """Smart wrapper which tries to prevent invalidation as far as possible"""
 
-    def __init__(self, meta: "MetaInfo", data: Optional[dict[str, BaseFieldType]] = None):
+    def __init__(self, meta: MetaInfo, data: Optional[dict[str, BaseFieldType]] = None):
         self.meta = meta
         super().__init__(data)
 
@@ -104,11 +103,11 @@ class Fields(UserDict, dict[str, BaseFieldType]):
 
 
 class FieldToColumns(UserDict, dict[str, Sequence["sqlalchemy.Column"]]):
-    def __init__(self, meta: "MetaInfo"):
+    def __init__(self, meta: MetaInfo):
         self.meta = meta
         super().__init__()
 
-    def __getitem__(self, name: str) -> Sequence["sqlalchemy.Column"]:
+    def __getitem__(self, name: str) -> Sequence[sqlalchemy.Column]:
         if name in self.data:
             return cast(Sequence["sqlalchemy.Column"], self.data[name])
         field = self.meta.fields[name]
@@ -146,7 +145,7 @@ class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
 
 
 class ColumnsToField(UserDict, dict[str, str]):
-    def __init__(self, meta: "MetaInfo"):
+    def __init__(self, meta: MetaInfo):
         self.meta = meta
         self._init = False
         super().__init__()
@@ -211,7 +210,6 @@ class MetaInfo:
         "tablename",
         "unique_together",
         "indexes",
-        "parents",
         "model",
         "managers",
         "multi_related",
@@ -242,7 +240,6 @@ class MetaInfo:
             __slots__,
         ),
         "pk",
-        "is_multi",
     )
 
     fields: Fields
@@ -263,10 +260,9 @@ class MetaInfo:
         self.indexes: Any = getattr(meta, "indexes", None)
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
-        self.parents: list[Any] = [*getattr(meta, "parents", _empty_set)]
         self.fields = {**getattr(meta, "fields", _empty_dict)}  # type: ignore
         self.managers: dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
-        self.multi_related: list[str] = [*getattr(meta, "multi_related", _empty_set)]
+        self.multi_related: set[tuple[str, str]] = {*getattr(meta, "multi_related", _empty_set)}
         self.load_dict(kwargs)
 
     @property
@@ -284,6 +280,7 @@ class MetaInfo:
 
     @property
     def is_multi(self) -> bool:
+        warnings.warn("Use bool(meta.multi_related) instead", DeprecationWarning, stacklevel=2)
         return bool(self.multi_related)
 
     def model_dump(self) -> dict[Any, Any]:
@@ -355,7 +352,7 @@ class MetaInfo:
             for attr in ("table", "pknames", "pkcolumns", "proxy_model"):
                 getattr(self.model, attr)
 
-    def get_columns_for_name(self, name: str) -> Sequence["sqlalchemy.Column"]:
+    def get_columns_for_name(self, name: str) -> Sequence[sqlalchemy.Column]:
         if name in self.field_to_columns:
             return self.field_to_columns[name]
         elif self.model and name in self.model.table.columns:
@@ -365,7 +362,7 @@ class MetaInfo:
 
 
 def get_model_registry(
-    bases: tuple[type, ...], meta_class: Optional[Union["object", MetaInfo]] = None
+    bases: tuple[type, ...], meta_class: Optional[Union[object, MetaInfo]] = None
 ) -> Optional[Registry]:
     """
     When a registry is missing from the Meta class, it should look up for the bases
@@ -387,83 +384,13 @@ def get_model_registry(
     return None
 
 
-def _set_related_field(
-    target: type["BaseModelType"],
-    *,
-    foreign_key_name: str,
-    related_name: str,
-    source: type["BaseModelType"],
-    replace_related_field: bool,
-) -> None:
-    if not replace_related_field and related_name in target.meta.fields:
-        # is already correctly set, required for migrate of model_apps with registry set
-        related_field = target.meta.fields[related_name]
-        if (
-            related_field.related_from is source
-            and related_field.foreign_key_name == foreign_key_name
-        ):
-            return
-        raise ForeignKeyBadConfigured(
-            f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
-        )
-
-    related_field = RelatedField(
-        foreign_key_name=foreign_key_name,
-        name=related_name,
-        owner=target,
-        related_from=source,
-    )
-
-    # Set the related name
-    target.meta.fields[related_name] = related_field
-
-
-def _set_related_name_for_foreign_keys(
-    meta: "MetaInfo", model_class: type["BaseModelType"], replace_related_field: bool = False
-) -> None:
-    """
-    Sets the related name for the foreign keys.
-    When a `related_name` is generated, creates a RelatedField from the table pointed
-    from the ForeignKey declaration and the the table declaring it.
-    """
-    if not meta.foreign_key_fields:
-        return
-
-    for name in meta.foreign_key_fields:
-        foreign_key = meta.fields[name]
-        related_name = getattr(foreign_key, "related_name", None)
-        if related_name is False:
-            # skip related_field
-            continue
-
-        if not related_name:
-            if foreign_key.unique:
-                related_name = f"{model_class.__name__.lower()}"
-            else:
-                related_name = f"{model_class.__name__.lower()}s_set"
-
-        foreign_key.related_name = related_name
-        foreign_key.reverse_name = related_name
-
-        related_field_fn = partial(
-            _set_related_field,
-            source=model_class,
-            foreign_key_name=name,
-            related_name=related_name,
-            replace_related_field=replace_related_field,
-        )
-        registry: Registry = foreign_key.target_registry
-        with contextlib.suppress(Exception):
-            registry = cast("Registry", foreign_key.target.registry)
-        registry.register_callback(foreign_key.to, related_field_fn, one_time=True)
-
-
 def _handle_annotations(base: type, base_annotations: dict[str, Any]) -> None:
     for parent in base.__mro__[1:]:
         _handle_annotations(parent, base_annotations)
     if hasattr(base, "__init_annotations__") and base.__init_annotations__:
         base_annotations.update(base.__init_annotations__)
     elif hasattr(base, "__annotations__") and base.__annotations__:
+        # python 3.9 has no get_annotations
         base_annotations.update(base.__annotations__)
 
 
@@ -610,7 +537,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         base_annotations: dict[str, Any] = {}
         has_explicit_primary_key = False
         is_abstract: bool = getattr(meta_class, "abstract", False)
-        parents = [parent for parent in bases if isinstance(parent, BaseModelMeta)]
+        has_parents = any(isinstance(parent, BaseModelMeta) for parent in bases)
 
         # Extract the custom Edgy Fields in a pydantic format.
         attrs, model_fields = extract_field_annotations_and_defaults(attrs)
@@ -679,7 +606,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                         if not sub_field.exclude:
                             model_fields[sub_field_name] = sub_field
             # Handle with multiple primary keys and auto generated field if no primary key is provided
-            if not is_abstract and parents and not has_explicit_primary_key:
+            if not is_abstract and has_parents and not has_explicit_primary_key:
                 if "id" not in fields:
                     if attrs.get("__reflected__", False):
                         raise ImproperlyConfigured(
@@ -705,7 +632,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         attrs["meta"] = meta = meta_info_class(
             meta_class,
             fields=fields,
-            parents=parents,
             managers=managers,
         )
         del fields
@@ -722,21 +648,26 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
 
         for k, _ in meta.managers.items():
-            if annotations and k not in annotations:
-                raise ImproperlyConfigured(
-                    f"Managers must be type annotated and '{k}' is not annotated. Managers must be annotated with ClassVar."
-                )
-            if annotations and get_origin(annotations[k]) is not ClassVar:
-                raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
+            if annotations:
+                if k not in annotations:
+                    raise ImproperlyConfigured(
+                        f"Managers must be type annotated and '{k}' is not annotated. Managers must be annotated with ClassVar."
+                    )
+                # evaluate annotation which can be a string reference.
+                # because we really import ClassVar to check against it is safe to assume a ClassVar is available.
+                if isinstance(annotations[k], str):
+                    annotations[k] = eval(annotations[k])
+                if get_origin(annotations[k]) is not ClassVar:
+                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
 
         # Ensure the initialization is only performed for subclasses of EdgyBaseModel
         attrs["__init_annotations__"] = annotations
 
         new_class = cast(type["Model"], super().__new__(cls, name, bases, attrs, **kwargs))
         meta.model = new_class
-        # Ensure initialization is only performed for subclasses of EdgyBaseModel
-        # (excluding the EdgyBaseModel class itself).
-        if not parents:
+        # Ensure initialization is only performed for subclasses of edgy.Model
+        # (excluding the edgy.Model class itself).
+        if not has_parents:
             return new_class
 
         # Ensure the model_fields are updated to the latest
@@ -808,49 +739,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         new_class.add_to_registry(meta.registry)
         return new_class
 
-    def add_to_registry(
-        cls: type["BaseModelType"],
-        registry: Registry,
-        name: str = "",
-        database: Union[bool, "Database"] = True,
-    ) -> None:
-        # when called if registry is not set
-        cls.meta.registry = registry
-        if database is True:
-            cls.database = registry.database
-        elif database is not False:
-            cls.database = database
-        meta = cls.meta
-        if name:
-            cls.__name__ = name
-
-        # Making sure it does not generate models if abstract or a proxy
-        if not meta.abstract and not cls.__is_proxy_model__:
-            if getattr(cls, "__reflected__", False):
-                registry.reflected[cls.__name__] = cls
-            else:
-                registry.models[cls.__name__] = cls
-            # after registrating the own model
-            for value in list(meta.fields.values()):
-                if isinstance(value, BaseManyToManyForeignKeyField):
-                    m2m_registry: Registry = value.target_registry
-                    with contextlib.suppress(Exception):
-                        m2m_registry = cast("Registry", value.target.registry)
-
-                    def create_through_model(x: Any, field: "BaseFieldType" = value) -> None:
-                        # we capture with field = ... the variable
-                        field.create_through_model()
-
-                    m2m_registry.register_callback(value.to, create_through_model, one_time=True)
-            # Sets the foreign key fields
-            if meta.foreign_key_fields:
-                _set_related_name_for_foreign_keys(meta, cls)
-            registry.execute_model_callbacks(cls)
-
-        cls.__db_model__ = True
-        # finalize
-        cls.model_rebuild(force=True)
-
     def get_db_schema(cls) -> Union[str, None]:
         """
         Returns a db_schema from registry if any is passed.
@@ -868,15 +756,15 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cls.get_db_schema()
 
     @property
-    def database(cls) -> "Database":
+    def database(cls) -> Database:
         return cls._database
 
     @database.setter
-    def database(cls, value: "Database") -> None:
+    def database(cls, value: Database) -> None:
         cls._database = value
 
     @property
-    def table(cls) -> "sqlalchemy.Table":
+    def table(cls) -> sqlalchemy.Table:
         """
         Making sure the tables on inheritance state, creates the new
         one properly.
@@ -939,7 +827,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
     def table_schema(
         cls, schema: Union[str, None] = None, update_cache: bool = False
-    ) -> "sqlalchemy.Table":
+    ) -> sqlalchemy.Table:
         """
         Retrieve table for schema (nearly the same as build with scheme argument).
         Cache per class via a primitive LRU cache.
@@ -962,7 +850,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cast("sqlalchemy.Table", schema_obj)
 
     @property
-    def proxy_model(cls: type["Model"]) -> type["Model"]:
+    def proxy_model(cls: type[Model]) -> type[Model]:
         """
         Returns the proxy_model from the Model when called using the cache.
         """

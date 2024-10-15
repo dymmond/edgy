@@ -6,7 +6,6 @@ if TYPE_CHECKING:
     from pydantic import ConfigDict
 
     from edgy.core.db.models import Model
-    from edgy.core.db.models.base import EdgyBaseModel
     from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.db.models.types import BaseModelType
 
@@ -53,7 +52,7 @@ def create_edgy_model(
     return model
 
 
-def generify_model_fields(model: type["EdgyBaseModel"]) -> dict[Any, Any]:
+def generify_model_fields(model: type["BaseModelType"]) -> dict[Any, Any]:
     """
     Makes all fields generic when a partial model is generated or used.
     This also removes any metadata for the field such as validations making
@@ -64,7 +63,7 @@ def generify_model_fields(model: type["EdgyBaseModel"]) -> dict[Any, Any]:
 
     # handle the nested non existing results
     for name, field in model.model_fields.items():
-        field.annotation = Any  # type: ignore
+        field.annotation = Any
         field.null = True
         # set a default to fix is_required
         if field.default is PydanticUndefined:

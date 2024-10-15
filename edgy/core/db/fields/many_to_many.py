@@ -189,6 +189,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                     if not candidate:
                         raise ValueError("no foreign key fo target found")
                     self.to_foreign_key = candidate
+                through.meta.multi_related.add((self.from_foreign_key, self.to_foreign_key))
                 return
         owner_name = self.owner.__name__
         to_name = self.target.__name__
@@ -203,7 +204,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         meta_args = {
             "tablename": tablename,
             "registry": self.owner.meta.registry,
-            "multi_related": [to_name.lower()],
+            "multi_related": {(self.from_foreign_key, self.to_foreign_key)},
         }
         has_pknames = pknames and not pknames.issubset(
             {self.from_foreign_key, self.to_foreign_key}

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
 from typing import (
@@ -43,30 +45,30 @@ class DescriptiveMeta:
 
 class BaseModelType(ABC):
     """
-    Type of EdgyBaseModel
+    Type of edgy.Model and EdgyBaseModel
     """
 
-    columns: ClassVar["sqlalchemy.sql.ColumnCollection"]
-    database: ClassVar["Database"]
-    table: ClassVar["sqlalchemy.Table"]
+    columns: ClassVar[sqlalchemy.sql.ColumnCollection]
+    database: ClassVar[Database]
+    table: ClassVar[sqlalchemy.Table]
     # Primary key columns
     pkcolumns: ClassVar[Sequence[str]]
     # Primary key fields
     pknames: ClassVar[Sequence[str]]
-    query: ClassVar["BaseManager"]
-    query_related: ClassVar["BaseManager"]
-    meta: ClassVar["MetaInfo"]
-    _db_schemas: ClassVar[dict[str, type["BaseModelType"]]]
+    query: ClassVar[BaseManager]
+    query_related: ClassVar[BaseManager]
+    meta: ClassVar[MetaInfo]
+    _db_schemas: ClassVar[dict[str, type[BaseModelType]]]
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
 
-    __parent__: ClassVar[Union[type["BaseModelType"], None]] = None
+    __parent__: ClassVar[Union[type[BaseModelType], None]] = None
     __is_proxy_model__: ClassVar[bool] = False
     __require_model_based_deletion__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
 
     @property
     @abstractmethod
-    def proxy_model(self) -> type["BaseModelType"]: ...
+    def proxy_model(self) -> type[BaseModelType]: ...
 
     @property
     @abstractmethod
@@ -79,11 +81,11 @@ class BaseModelType(ABC):
         """identifying_db_fields are completely specified."""
 
     @abstractmethod
-    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":
+    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
         """Return database transaction for the assigned database."""
 
     @abstractmethod
-    def get_columns_for_name(self, name: str) -> Sequence["sqlalchemy.Column"]:
+    def get_columns_for_name(self, name: str) -> Sequence[sqlalchemy.Column]:
         """Helper for retrieving columns from field name."""
 
     @abstractmethod
@@ -92,7 +94,7 @@ class BaseModelType(ABC):
 
     @classmethod
     @abstractmethod
-    def generate_proxy_model(cls) -> type["BaseModel"]:
+    def generate_proxy_model(cls) -> type[BaseModel]:
         """
         Generates a proxy model for each model. This proxy model is a simple
         shallow copy of the original model being generated.
@@ -113,7 +115,7 @@ class BaseModelType(ABC):
         self,
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], list[str], None] = None,
-    ) -> "BaseModelType":
+    ) -> BaseModelType:
         """Save model"""
 
     @abstractmethod
@@ -142,8 +144,8 @@ class BaseModelType(ABC):
     @classmethod
     @abstractmethod
     def build(
-        cls, schema: Optional[str] = None, metadata: Optional["sqlalchemy.MetaData"] = None
-    ) -> "sqlalchemy.Table":
+        cls, schema: Optional[str] = None, metadata: Optional[sqlalchemy.MetaData] = None
+    ) -> sqlalchemy.Table:
         """
         Builds the SQLAlchemy table representation from the loaded fields.
         """
@@ -170,8 +172,8 @@ class BaseModelType(ABC):
         extracted_values: dict[str, Any],
         is_update: bool = False,
         is_partial: bool = False,
-        instance: Optional[Union["BaseModelType", "QuerySet"]] = None,
-        model_instance: Optional["BaseModelType"] = None,
+        instance: Optional[Union[BaseModelType, QuerySet]] = None,
+        model_instance: Optional[BaseModelType] = None,
     ) -> dict[str, Any]:
         """
         Extracts all the default values from the given fields and returns the raw
