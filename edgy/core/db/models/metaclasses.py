@@ -390,12 +390,9 @@ def get_model_registry(
             return direct_registry
 
     for base in bases:
-        # skip non db models, quick check
-        if not getattr(base, "__db_model__", False):
-            continue
         meta: MetaInfo = getattr(base, "meta", None)
         # now check meta
-        if not meta:
+        if meta is None:
             continue
         found_registry: Union[Registry, None, Literal[False]] = getattr(meta, "registry", None)
 
@@ -744,18 +741,10 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             return new_class
 
         # Now set the registry of models
-        if meta.registry is None and getattr(new_class, "__db_model__", False):
+        if meta.registry is None:
             registry: Union[Registry, None, Literal[False]] = get_model_registry(bases, meta_class)
-
-            if registry is None:
-                raise ImproperlyConfigured(
-                    "Registry for the table not found in the Meta class or any of the superclasses but __db_model__ is True."
-                )
-            meta.registry = registry
+            meta.registry = registry or None
         if not meta.registry:
-            if meta.registry is False:
-                # explicitly disable __db_model__
-                new_class.__db_model__ = False
             new_class.model_rebuild(force=True)
             return new_class
         new_class.add_to_registry(meta.registry)

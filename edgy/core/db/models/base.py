@@ -48,8 +48,6 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     __proxy_model__: ClassVar[Union[type[Model], None]] = None
-    # is inheriting from a registered model, so the registry is set
-    __db_model__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
     __show_pk__: ClassVar[bool] = False
     __using_schema__: Union[str, None, Any] = Undefined

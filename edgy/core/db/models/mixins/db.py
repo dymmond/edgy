@@ -148,7 +148,6 @@ class DatabaseMixin:
                 _set_related_name_for_foreign_keys(meta, cls)
             registry.execute_model_callbacks(cls)
 
-        cls.__db_model__ = True
         # finalize
         cls.model_rebuild(force=True)
 
