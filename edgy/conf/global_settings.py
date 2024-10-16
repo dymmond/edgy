@@ -33,6 +33,3 @@ class EdgySettings(MediaSettings):
     model_config = SettingsConfigDict(extra="allow", ignored_types=(cached_property,))
     ipython_args: list[str] = ["--no-banner"]
     ptpython_config_file: str = "~/.config/ptpython/config.py"
-
-    # General settings
-    dialects: dict[str, str] = {"postgres": "postgres", "postgresql": "postgresql"}

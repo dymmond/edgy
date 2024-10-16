@@ -4,10 +4,6 @@ from typing import Any
 
 import sqlalchemy
 
-from edgy.conf import settings
-
-DIALECTS = {"postgres": "postgres"}
-
 
 class BaseFieldProtocol(sqlalchemy.TypeDecorator):
     """
@@ -38,7 +34,7 @@ class IPAddress(BaseFieldProtocol):
     cache_ok: bool = True
 
     def load_dialect_impl(self, dialect: Any) -> Any:
-        if dialect.name not in settings.dialects:
+        if dialect.name not in {"postgres", "postgresql"}:
             return dialect.type_descriptor(sqlalchemy.CHAR(45))
         return dialect.type_descriptor(sqlalchemy.dialects.postgresql.INET())
 
