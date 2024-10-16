@@ -26,7 +26,7 @@ class ModelRowMixin:
         """Check if a model_class can be loaded from a row for the table."""
 
         return bool(
-            cls.meta.registry is not None
+            cls.meta.registry
             and not cls.meta.abstract
             and all(
                 row._mapping.get(f"{table.key.replace('.', '_')}_{col}") is not None

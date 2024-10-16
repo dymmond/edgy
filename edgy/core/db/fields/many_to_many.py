@@ -158,7 +158,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         pknames = set()
         if self.through:
             if isinstance(self.through, str):
-                assert self.owner.meta.registry is not None, "no registry found"
+                assert self.owner.meta.registry, "no registry found"
                 self.through = self.owner.meta.registry.models[self.through]
             through = self.through
             if through.meta.abstract:
@@ -191,6 +191,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                     self.to_foreign_key = candidate
                 through.meta.multi_related.add((self.from_foreign_key, self.to_foreign_key))
                 return
+        assert self.owner.meta.registry, "no registry set"
         owner_name = self.owner.__name__
         to_name = self.target.__name__
         class_name = f"{owner_name}{to_name}"

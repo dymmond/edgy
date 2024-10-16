@@ -480,7 +480,7 @@ class DatabaseMixin:
         """
         tablename: str = cls.meta.tablename
         registry = cls.meta.registry
-        assert registry is not None, "registry is not set"
+        assert registry, "registry is not set"
         if metadata is None:
             metadata = registry.metadata
         schemes: list[str] = []

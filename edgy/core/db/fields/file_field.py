@@ -93,7 +93,6 @@ class ConcreteFileField(BaseCompositeField):
         if (
             phase in {"post_update", "post_insert"}
             and instance is not None
-            and getattr(instance, "__db_model__", False)
             and isinstance(instance.__dict__.get(self.name), FieldFile)
         ):
             # use old one, when instance is no queryset

@@ -28,7 +28,7 @@ class ReflectedModelMixin:
         The inspect is done in an async manner and reflects the objects from the database.
         """
         registry = cls.meta.registry
-        assert registry is not None, "registry is not set"
+        assert registry, "registry is not set"
         if metadata is None:
             metadata = registry.metadata
         if cls.__using_schema__ is not Undefined:

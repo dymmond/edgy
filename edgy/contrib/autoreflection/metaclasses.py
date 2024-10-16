@@ -86,7 +86,7 @@ class AutoReflectionMeta(BaseModelMeta):
             not skip_registry
             and isinstance(new_model.meta, AutoReflectionMetaInfo)
             and not new_model.meta.abstract
-            and new_model.meta.registry is not None
+            and new_model.meta.registry
         ):
             new_model.meta.registry.pattern_models[new_model.__name__] = new_model
         return new_model

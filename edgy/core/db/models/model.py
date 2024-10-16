@@ -53,7 +53,7 @@ class Model(
 
     query: ClassVar[Manager] = Manager()
     query_related: ClassVar[RedirectManager] = RedirectManager(redirect_name="query")
-    meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True)
+    meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True, registry=False)
 
     class Meta:
         abstract = True
@@ -99,3 +99,4 @@ class ReflectModel(ReflectedModelMixin, Model):
 
     class Meta:
         abstract = True
+        registry = False

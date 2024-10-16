@@ -11,6 +11,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     ClassVar,
+    Literal,
     Optional,
     Union,
     cast,
@@ -254,7 +255,7 @@ class MetaInfo:
         self.abstract: bool = getattr(meta, "abstract", False)
         # for embedding
         self.inherit: bool = getattr(meta, "inherit", True)
-        self.registry: Optional[Registry] = getattr(meta, "registry", None)
+        self.registry: Union[Registry, Literal[False], None] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         self.unique_together: Any = getattr(meta, "unique_together", None)
         self.indexes: Any = getattr(meta, "indexes", None)
@@ -376,21 +377,27 @@ class MetaInfo:
 
 def get_model_registry(
     bases: tuple[type, ...], meta_class: Optional[Union[object, MetaInfo]] = None
-) -> Optional[Registry]:
+) -> Union[Registry, None, Literal[False]]:
     """
     When a registry is missing from the Meta class, it should look up for the bases
     and obtain the first found registry.
     """
     if meta_class is not None:
-        direct_registry: Optional[Registry] = getattr(meta_class, "registry", None)
+        direct_registry: Union[Registry, None, Literal[False]] = getattr(
+            meta_class, "registry", None
+        )
         if direct_registry is not None:
             return direct_registry
 
     for base in bases:
+        # skip non db models, quick check
+        if not getattr(base, "__db_model__", False):
+            continue
         meta: MetaInfo = getattr(base, "meta", None)
+        # now check meta
         if not meta:
             continue
-        found_registry: Optional[Registry] = getattr(meta, "registry", None)
+        found_registry: Union[Registry, None, Literal[False]] = getattr(meta, "registry", None)
 
         if found_registry is not None:
             return found_registry
@@ -732,23 +739,25 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             meta.tablename = tablename
         meta.model = new_class
         if skip_registry:
+            # don't add automatically to registry. Useful for subclasses which modify the registry itself.
             new_class.model_rebuild(force=True)
             return new_class
 
         # Now set the registry of models
-        if meta.registry is None:
-            if getattr(new_class, "__db_model__", False):
-                registry: Optional[Registry] = get_model_registry(bases, meta_class)
+        if meta.registry is None and getattr(new_class, "__db_model__", False):
+            registry: Union[Registry, None, Literal[False]] = get_model_registry(bases, meta_class)
 
-                if registry is None:
-                    raise ImproperlyConfigured(
-                        "Registry for the table not found in the Meta class or any of the superclasses. You must set the registry in the Meta."
-                    )
-                meta.registry = registry
-            else:
-                # is not a db model
-                new_class.model_rebuild(force=True)
-                return new_class
+            if registry is None:
+                raise ImproperlyConfigured(
+                    "Registry for the table not found in the Meta class or any of the superclasses but __db_model__ is True."
+                )
+            meta.registry = registry
+        if not meta.registry:
+            if meta.registry is False:
+                # explicitly disable __db_model__
+                new_class.__db_model__ = False
+            new_class.model_rebuild(force=True)
+            return new_class
         new_class.add_to_registry(meta.registry)
         return new_class
 
