@@ -96,7 +96,7 @@ async def test_select_related_without_relation():
 
     assert len(query) == 2
 
-    query = await Permission.query.select_related(["designation", "module"]).all()
+    query = await Permission.query.select_related("designation", "module").all()
 
     assert len(query) == 2
     assert query[0].pk == permission.pk
