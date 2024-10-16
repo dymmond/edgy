@@ -20,6 +20,7 @@ hide:
 
 - Allow setting registry = False, for disabling retrieving the registry from parents.
 - Removed unecessary warning for ManyToMany.
+- Add warnings for problematic combinations in ForeignKey.
 
 ## 0.18.1
 

@@ -8,7 +8,6 @@ from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.foreign_keys import ForeignKey
 from edgy.core.db.relationships.relation import ManyRelation
-from edgy.core.terminal import Print
 from edgy.core.utils.models import create_edgy_model
 from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
@@ -16,8 +15,6 @@ from edgy.protocols.many_relationship import ManyRelationProtocol
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
-
-terminal = Print()
 
 
 class BaseManyToManyForeignKeyField(BaseForeignKey):
