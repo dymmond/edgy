@@ -20,12 +20,6 @@ if TYPE_CHECKING:
 terminal = Print()
 
 
-def _removeprefixes(text: str, *prefixes: str) -> str:
-    for prefix in prefixes:
-        text = text.removeprefix(prefix)
-    return text
-
-
 class BaseManyToManyForeignKeyField(BaseForeignKey):
     is_m2m: bool = True
 
