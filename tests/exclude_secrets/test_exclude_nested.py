@@ -51,7 +51,7 @@ async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_no
     await Organisation.query.create(user=user)
 
     org_query = await (
-        Organisation.query.select_related(["user__profile"]).exclude_secrets().order_by("id")
+        Organisation.query.select_related("user__profile").exclude_secrets().order_by("id")
     ).as_select()
     org_query_text = str(org_query)
     assert "profiles.name" in org_query_text
@@ -65,9 +65,7 @@ async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_no
     )
     await Organisation.query.create(user=user)
 
-    org_query = (
-        Organisation.query.select_related(["user__profile"]).exclude_secrets().order_by("id")
-    )
+    org_query = Organisation.query.select_related("user__profile").exclude_secrets().order_by("id")
     org = await org_query.last()
 
     assert org.model_dump() == {

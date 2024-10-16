@@ -43,7 +43,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 generic_field = BaseField()
-_empty_set: set[str] = frozenset()
+_empty_set = cast(Sequence[Any], frozenset())
 
 
 def clean_query_kwargs(
@@ -93,23 +93,23 @@ class BaseQuerySet(
         model_class: Union[type[BaseModelType], None] = None,
         *,
         database: Union["Database", None] = None,
-        filter_clauses: Sequence[Any] = _empty_set,
-        select_related: Sequence[str] = _empty_set,
-        prefetch_related: Sequence["Prefetch"] = _empty_set,
+        filter_clauses: Iterable[Any] = _empty_set,
+        select_related: Iterable[str] = _empty_set,
+        prefetch_related: Iterable["Prefetch"] = _empty_set,
         limit_count: Optional[int] = None,
         limit: Optional[int] = None,
         limit_offset: Optional[int] = None,
         offset: Optional[int] = None,
         batch_size: Optional[int] = None,
-        order_by: Sequence[str] = _empty_set,
-        group_by: Sequence[str] = _empty_set,
-        distinct_on: Union[None, Literal[True], Sequence[str]] = None,
-        distinct: Union[None, Literal[True], Sequence[str]] = None,
-        only_fields: Optional[Sequence[str]] = None,
-        only: Sequence[str] = _empty_set,
+        order_by: Iterable[str] = _empty_set,
+        group_by: Iterable[str] = _empty_set,
+        distinct_on: Union[None, Literal[True], Iterable[str]] = None,
+        distinct: Union[None, Literal[True], Iterable[str]] = None,
+        only_fields: Optional[Iterable[str]] = None,
+        only: Iterable[str] = _empty_set,
         defer_fields: Optional[Sequence[str]] = None,
-        defer: Sequence[str] = _empty_set,
-        embed_parent: Optional[tuple[str, str]] = None,
+        defer: Iterable[str] = _empty_set,
+        embed_parent: Optional[tuple[str, Union[str, str]]] = None,
         embed_parent_filters: Optional[tuple[str, str]] = None,
         using_schema: Union[str, None, Any] = Undefined,
         table: Optional[sqlalchemy.Table] = None,
@@ -134,8 +134,8 @@ class BaseQuerySet(
         self._select_related = set(select_related)
         self._prefetch_related = list(prefetch_related)
         self._batch_size = batch_size
-        self._order_by = list(order_by)
-        self._group_by = list(group_by)
+        self._order_by: tuple[str, ...] = tuple(order_by)
+        self._group_by: tuple[str, ...] = tuple(group_by)
         if distinct_on is not None:
             warnings.warn(
                 "`distinct_on` is deprecated use `distinct`", DeprecationWarning, stacklevel=2
@@ -722,7 +722,7 @@ class BaseQuerySet(
             schema = get_schema()
         if schema is None:
             schema = self.model_class.get_db_schema()
-        return schema  # type: ignore
+        return schema
 
     async def _handle_batch(
         self,
@@ -959,8 +959,9 @@ class BaseQuerySet(
                     raw_clause.model_class is queryset.model_class
                 ), f"QuerySet arg has wrong model_class {raw_clause.model_class}"
                 converted_clauses.append(raw_clause.build_where_clause)
-                for related in raw_clause._select_related:
-                    queryset._select_related.add(related)
+                if not queryset._select_related.issuperset(raw_clause._select_related):
+                    queryset._select_related.update(raw_clause._select_related)
+                    queryset._cached_select_related_expression = None
 
             else:
                 converted_clauses.append(raw_clause)
@@ -1216,9 +1217,9 @@ class QuerySet(BaseQuerySet):
 
     def reverse(self) -> "QuerySet":
         queryset: QuerySet = self._clone()
-        queryset._order_by = [
+        queryset._order_by = tuple(
             el[1:] if el.startswith("-") else f"-{el}" for el in queryset._order_by
-        ]
+        )
         return queryset
 
     def limit(self, limit_count: int) -> "QuerySet":
@@ -1237,7 +1238,7 @@ class QuerySet(BaseQuerySet):
         queryset._offset = offset
         return queryset
 
-    def group_by(self, *group_by: Sequence[str]) -> "QuerySet":
+    def group_by(self, *group_by: str) -> "QuerySet":
         """
         Returns the values grouped by the given fields.
         """
@@ -1276,18 +1277,17 @@ class QuerySet(BaseQuerySet):
         queryset._only = only_fields
         return queryset
 
-    def defer(self, *fields: Sequence[str]) -> "QuerySet":
+    def defer(self, *fields: str) -> "QuerySet":
         """
         Returns a list of models with the selected only fields and always the primary
         key.
         """
         queryset: QuerySet = self._clone()
 
-        defer_fields = set(fields)
-        queryset._defer = defer_fields
+        queryset._defer = set(fields)
         return queryset
 
-    def select_related(self, related: Union[str, Sequence[str]]) -> "QuerySet":
+    def select_related(self, *related: str) -> "QuerySet":
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
         related-object data when it executes its query.
@@ -1297,8 +1297,13 @@ class QuerySet(BaseQuerySet):
         later use of foreign-key relationships won't require database queries.
         """
         queryset: QuerySet = self._clone()
-        if isinstance(related, str):
-            related = [related]
+        if len(related) >= 1 and not isinstance(cast(Any, related[0]), str):
+            warnings.warn(
+                "use `select_related` with variadic str arguments instead of a Sequence",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            related = cast(tuple[str, ...], related[0])
         if not self._select_related.issuperset(related):
             queryset._cached_select_related_expression = None
             queryset._select_related.update(related)

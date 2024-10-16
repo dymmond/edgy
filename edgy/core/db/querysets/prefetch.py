@@ -69,6 +69,5 @@ class PrefetchMixin:
         if any(not isinstance(value, Prefetch) for value in prefetch):
             raise QuerySetError("The prefetch_related must have Prefetch type objects only.")
 
-        prefetch = [*self._prefetch_related, *prefetch]  # type: ignore
-        queryset._prefetch_related = prefetch
+        queryset._prefetch_related = [*self._prefetch_related, *prefetch]
         return queryset
