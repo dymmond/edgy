@@ -1,13 +1,6 @@
 from collections.abc import Sequence
 from functools import cached_property
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Literal,
-    Optional,
-    Union,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.context_vars import CURRENT_INSTANCE
@@ -335,11 +328,6 @@ class ManyToManyField(ForeignKeyFieldFactory):
         if embed_through and "__" in embed_through:
             raise FieldDefinitionError('"embed_through" cannot contain "__".')
 
-        for argument in ["null", "on_delete", "on_update"]:
-            if kwargs.get(argument):
-                terminal.write_warning(
-                    f"Declaring `{argument}` on a ManyToMany relationship has no effect."
-                )
         kwargs["null"] = True
         kwargs["on_delete"] = CASCADE
         kwargs["on_update"] = CASCADE
