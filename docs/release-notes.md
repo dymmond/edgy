@@ -9,7 +9,7 @@ hide:
 
 ### Removed
 
-- `__db_model__` is removed. Disabling registry retrieval via False is sufficient.
+- `__db_model__` is removed. Replaced by registry = False.
 
 ### Changed
 
