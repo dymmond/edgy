@@ -171,7 +171,7 @@ class ConcreteFileField(BaseCompositeField):
                 key=field_name,
                 type_=model.column_type,
                 name=column_name,
-                **model.model_dump(by_alias=True, exclude_none=True, exclude=["column_name"]),
+                **model.model_dump(by_alias=True, exclude_none=True, exclude={"column_name"}),
             ),
             sqlalchemy.Column(
                 key=f"{field_name}_storage",
