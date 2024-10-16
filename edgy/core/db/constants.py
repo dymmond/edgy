@@ -1,7 +1,9 @@
 CASCADE = "CASCADE"
 RESTRICT = "RESTRICT"
+DO_NOTHING = "DO NOTHING"
 SET_NULL = "SET NULL"
+SET_DEFAULT = "SET DEFAULT"
+PROTECT = "PROTECT"
 
 
-class ConditionalRedirect(dict):
-    pass
+class ConditionalRedirect(dict): ...

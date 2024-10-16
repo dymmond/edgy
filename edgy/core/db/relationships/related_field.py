@@ -68,13 +68,14 @@ class RelatedField(RelationshipField):
         return {field_name: relation_instance}
 
     def __get__(self, instance: "BaseModelType", owner: Any = None) -> ManyRelationProtocol:
-        if instance:
-            if instance.__dict__.get(self.name, None) is None:
-                instance.__dict__[self.name] = self.get_relation()
-            if instance.__dict__[self.name].instance is None:
-                instance.__dict__[self.name].instance = instance
-            return instance.__dict__[self.name]  # type: ignore
-        raise ValueError("missing instance")
+        if not instance:
+            raise ValueError("missing instance")
+
+        if instance.__dict__.get(self.name, None) is None:
+            instance.__dict__[self.name] = self.get_relation()
+        if instance.__dict__[self.name].instance is None:
+            instance.__dict__[self.name].instance = instance
+        return instance.__dict__[self.name]  # type: ignore
 
     @functools.cached_property
     def foreign_key(self) -> BaseForeignKeyField:

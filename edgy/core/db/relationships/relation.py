@@ -14,20 +14,6 @@ if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
 
 
-def _removeprefix(text: str, prefix: str) -> str:
-    # TODO: replace with removeprefix when python3.9 is minimum
-    if text.startswith(prefix):
-        return text[len(prefix) :]
-    else:
-        return text
-
-
-def _removeprefixes(text: str, *prefixes: str) -> str:
-    for prefix in prefixes:
-        text = _removeprefix(text, prefix)
-    return text
-
-
 class ManyRelation(ManyRelationProtocol):
     """
     When a `related_name` is generated, creates a RelatedField from the table pointed
