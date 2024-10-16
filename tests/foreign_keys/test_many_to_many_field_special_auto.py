@@ -39,17 +39,11 @@ class Album(edgy.Model):
 
 class Studio(edgy.Model):
     name = edgy.CharField(max_length=255)
-    users = edgy.ManyToMany(
-        Üser, through_tablename="foo", to_foreign_key="usr", from_foreign_key="fromage"
-    )
+    users = edgy.ManyToMany(Üser, to_foreign_key="usr", from_foreign_key="fromage")
     albums = edgy.ManyToMany(Album)
 
     class Meta:
         registry = models
-
-
-def test_check_tablename():
-    assert Studio.meta.fields["users"].through.meta.tablename == "foo"
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -59,6 +53,10 @@ async def create_test_database():
         yield
         if not database.drop:
             await models.drop_all()
+
+
+def test_check_tablename():
+    assert Studio.meta.fields["users"].through.meta.tablename == "fromages_usrs"
 
 
 async def test_add_many_to_many():
