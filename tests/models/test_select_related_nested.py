@@ -49,6 +49,7 @@ async def test_nested_with_not_optimal_select_related_exclude_secrets():
     await Organisation.query.create(user=user)
 
     org_query = Organisation.query.exclude_secrets(True)
+    # by default _select_related is a set; for having an arbitary order provide a list
     org_query._select_related = ["user", "user", "user__profile"]
     org = await org_query.last()
 
@@ -66,6 +67,7 @@ async def test_nested_with_not_optimal_select_related_all():
     await Organisation.query.create(user=user)
 
     org_query = Organisation.query.all()
+    # by default _select_related is a set; for having an arbitary order provide a list
     org_query._select_related = ["user", "user", "user__profile"]
     org = await org_query.get()
 
@@ -83,6 +85,7 @@ async def test_nested_with_not_optimal_select_related_all2():
     await Organisation.query.create(user=user)
 
     org_query = Organisation.query.all()
+    # by default _select_related is a set; for having an arbitary order provide a list
     org_query._select_related = ["user__profile", "user", "user"]
     org = await org_query.get()
 
