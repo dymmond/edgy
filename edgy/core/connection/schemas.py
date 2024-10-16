@@ -81,7 +81,7 @@ class Schema:
         def execute_create(connection: sqlalchemy.Connection) -> None:
             try:
                 connection.execute(
-                    sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists)  # type: ignore
+                    sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists)
                 )
             except ProgrammingError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e
@@ -113,7 +113,7 @@ class Schema:
         def execute_drop(connection: sqlalchemy.Connection) -> None:
             try:
                 connection.execute(
-                    sqlalchemy.schema.DropSchema(name=schema, cascade=cascade, if_exists=if_exists)  # type: ignore
+                    sqlalchemy.schema.DropSchema(name=schema, cascade=cascade, if_exists=if_exists)
                 )
             except DBAPIError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e
