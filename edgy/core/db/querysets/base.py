@@ -1019,8 +1019,9 @@ class BaseQuerySet(
             filter_query._cache = self._cache
             return await filter_query._get_raw()
 
-        queryset: BaseQuerySet = self
-        expression, tables_and_models = await queryset.limit(2).as_select_with_tables()
+        queryset: BaseQuerySet = self.limit(2)
+        expression, tables_and_models = await queryset.as_select_with_tables()
+        self._cached_select_related_expression = queryset._cached_select_related_expression
         check_db_connection(queryset.database)
         async with queryset.database as database:
             rows = await database.fetch_all(expression)
@@ -1419,6 +1420,7 @@ class QuerySet(BaseQuerySet):
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
         expression, tables_and_models = await queryset.as_select_with_tables()
+        self._cached_select_related_expression = queryset._cached_select_related_expression
         check_db_connection(queryset.database)
         async with queryset.database as database:
             row = await database.fetch_one(expression, pos=0)
@@ -1439,7 +1441,9 @@ class QuerySet(BaseQuerySet):
         queryset = self
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
-        expression, tables_and_models = await queryset.reverse().as_select_with_tables()
+        queryset = queryset.reverse()
+        expression, tables_and_models = await queryset.as_select_with_tables()
+        self._cached_select_related_expression = queryset._cached_select_related_expression
         check_db_connection(queryset.database)
         async with queryset.database as database:
             row = await database.fetch_one(expression, pos=0)
