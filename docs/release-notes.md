@@ -3,9 +3,14 @@ hide:
   - navigation
 ---
 
+
 # Release Notes
 
 ## 0.18.2
+
+### Added
+
+- New `SET_DEFAULT`, and `PROTECT` to `on_delete` in the ForeignKey.
 
 ### Removed
 
@@ -14,7 +19,7 @@ hide:
 ### Changed
 
 - Allow setting registry = False, for disabling retrieving the registry from parents.
-
+- Removed unecessary warning for ManyToMany.
 
 ## 0.18.1
 
