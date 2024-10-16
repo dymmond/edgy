@@ -1019,23 +1019,20 @@ class BaseQuerySet(
             filter_query._cache = self._cache
             return await filter_query._get_raw()
 
-        queryset: BaseQuerySet = self.limit(2)
-        expression, tables_and_models = await queryset.as_select_with_tables()
-        self._cached_select_related_expression = queryset._cached_select_related_expression
-        check_db_connection(queryset.database)
-        async with queryset.database as database:
-            rows = await database.fetch_all(expression)
+        expression, tables_and_models = await self.as_select_with_tables()
+        check_db_connection(self.database)
+        async with self.database as database:
+            # we want no queryset copy, so use sqlalchemy limit(2)
+            rows = await database.fetch_all(expression.limit(2))
 
         if not rows:
-            queryset._cache_count = 0
+            self._cache_count = 0
             raise ObjectNotFound()
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        queryset._cache_count = 1
+        self._cache_count = 1
 
-        return await queryset._get_or_cache_row(
-            rows[0], tables_and_models, "_cache_first,_cache_last"
-        )
+        return await self._get_or_cache_row(rows[0], tables_and_models, "_cache_first,_cache_last")
 
 
 class QuerySet(BaseQuerySet):
