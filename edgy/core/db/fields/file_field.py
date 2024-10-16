@@ -38,6 +38,7 @@ IGNORED = ["cls", "__class__", "kwargs", "generate_name_fn"]
 
 
 class ConcreteFileField(BaseCompositeField):
+    column_name: str = ""
     multi_process_safe: bool = True
     field_file_class: type[FieldFile]
     _generate_name_fn: Optional[
@@ -164,15 +165,18 @@ class ConcreteFileField(BaseCompositeField):
 
     def get_columns(self, field_name: str) -> Sequence[sqlalchemy.Column]:
         model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
+        column_name = self.column_name or field_name
         return [
             sqlalchemy.Column(
-                field_name,
-                model.column_type,
-                **model.model_dump(by_alias=True, exclude_none=True),
+                key=field_name,
+                type_=model.column_type,
+                name=column_name,
+                **model.model_dump(by_alias=True, exclude_none=True, exclude=["column_name"]),
             ),
             sqlalchemy.Column(
-                f"{field_name}_storage",
-                sqlalchemy.String(length=20, collation=self.column_type.collation),
+                key=f"{field_name}_storage",
+                name=f"{column_name}_storage",
+                type_=sqlalchemy.String(length=20, collation=self.column_type.collation),
                 default=self.storage.name,
             ),
         ]
@@ -181,6 +185,7 @@ class ConcreteFileField(BaseCompositeField):
         self, name: str, fields: dict[str, "BaseFieldType"]
     ) -> dict[str, "BaseFieldType"]:
         retdict: dict[str, Any] = {}
+        column_name = self.column_name or name
         # TODO: use embed_field
         if self.with_size:
             size_name = f"{name}_size"
@@ -191,6 +196,7 @@ class ConcreteFileField(BaseCompositeField):
                     exclude=True,
                     read_only=True,
                     name=size_name,
+                    column_name=f"{column_name}_size",
                     owner=self.owner,
                 )
         if self.with_approval:
@@ -200,7 +206,7 @@ class ConcreteFileField(BaseCompositeField):
                     null=False,
                     default=False,
                     exclude=True,
-                    column_name=f"{name}_ok",
+                    column_name=f"{column_name}_ok",
                     name=approval_name,
                     owner=self.owner,
                 )
@@ -209,7 +215,7 @@ class ConcreteFileField(BaseCompositeField):
             if metadata_name not in fields:
                 retdict[metadata_name] = JSONField(
                     null=False,
-                    column_name=f"{name}_mname",
+                    column_name=f"{column_name}_mname",
                     name=metadata_name,
                     owner=self.owner,
                     default=dict,

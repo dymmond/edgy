@@ -11,6 +11,7 @@ hide:
 ### Added
 
 - New `SET_DEFAULT`, and `PROTECT` to `on_delete` in the ForeignKey.
+- New `through_tablename` parameter for ManyToMany.
 
 ### Removed
 
@@ -25,6 +26,10 @@ hide:
 - Clone QuerySet via `__init__`.
 - Make select_related variadic and deprecate former call taking a Sequence.
 - Improved QuerySet caching.
+
+### Fixed
+
+- Multi-column fields honor now `column_name`. This allows special characters in model names.
 
 ## 0.18.1
 

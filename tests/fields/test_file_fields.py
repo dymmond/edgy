@@ -15,6 +15,13 @@ database = DatabaseTestClient(DATABASE_URL, drop_database=True, use_existing=Fal
 models = edgy.Registry(database=database)
 
 
+class MyModäl(edgy.Model):
+    ä: edgy.files.FieldFile = edgy.fields.FileField(null=True, column_name="a")
+
+    class Meta:
+        registry = models
+
+
 class MyModel(edgy.Model):
     file_field: edgy.files.FieldFile = edgy.fields.FileField(null=True)
     file_field_size: int = edgy.fields.IntegerField(null=True)
@@ -113,6 +120,26 @@ async def test_save_file_create(create_test_database):
     assert os.path.exists(path)
     assert model.file_field.storage.exists(model.file_field.name)
     model.file_field.delete()
+    assert os.path.exists(path)
+    await model.save()
+    assert not os.path.exists(path)
+
+
+async def test_save_file_create_specal(create_test_database):
+    model = await MyModäl.query.create(ä=edgy.files.ContentFile(b"!# /bin/sh", name="foo.sh"))
+    # get cached
+    assert model.__dict__["ä"].__dict__["size"] == 10
+    assert model.ä.size == 10
+    # distro specific
+    assert model.ä.metadata["mime"].endswith("x-sh")
+
+    assert model.ä.approved
+    with model.ä.open() as rob:
+        assert rob.read() == b"!# /bin/sh"
+    path = model.ä.path
+    assert os.path.exists(path)
+    assert model.ä.storage.exists(model.ä.name)
+    model.ä.delete()
     assert os.path.exists(path)
     await model.save()
     assert not os.path.exists(path)

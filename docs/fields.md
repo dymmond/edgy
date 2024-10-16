@@ -20,7 +20,7 @@ Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions
 - `skip_reflection_type_check` -  A boolean. Default False. Skip reflection column type check.
 - `unique` - A boolean. Determine if a unique constraint should be created for the field.
 Check the [unique_together](./models.md#unique-together) for more details.
-- `column_name` - A string. Database name of the column (by default the same as the name)
+- `column_name` - A string. Database name of the column (by default the same as the name).
 - `comment` - A comment to be added with the field in the SQL database.
 - `secret` - A special attribute that allows to call the [exclude_secrets](./queries/secrets.md#exclude-secrets) and avoid
 accidental leakage of sensitive data.
@@ -502,6 +502,7 @@ from `edgy`.
     ```
 * `relation_fn` - Optionally drop a function which returns a Relation for the reverse side. This will be used by the RelatedField (if it is created). Used by the ManyToMany field.
 * `reverse_path_fn` - Optionally drop a function which handles the traversal from the reverse side. Used by the ManyToMany field.
+- `column_name` - A string. Base database name of the column (by default the same as the name). Useful for models with special characters in their name.
 
 
 !!! Note
@@ -568,6 +569,7 @@ class MyModel(edgy.Model):
 * `related_name` - The name to use for the relation from the related object back to this one.
 * `through` - The model to be used for the relationship. Edgy generates the model by default
                 if None is provided or `through` is an abstract model.
+* `through_tablename` - Custom tablename for `through`. E.g. when special characters are used in model names.
 * `embed_through` - When traversing, embed the through object in this attribute. Otherwise it is not accessable from the result.
                       if an empty string was provided, the old behaviour is used to query from the through model as base (default).
                       if False, the base is transformed to the target and source model (full proxying). You cannot select the through model via path traversal anymore (except from the through model itself).
