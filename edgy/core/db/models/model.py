@@ -53,6 +53,7 @@ class Model(
 
     query: ClassVar[Manager] = Manager()
     query_related: ClassVar[RedirectManager] = RedirectManager(redirect_name="query")
+    # registry = False, stops the retrieval of the registry from base classes
     meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True, registry=False)
 
     class Meta:
@@ -99,4 +100,5 @@ class ReflectModel(ReflectedModelMixin, Model):
 
     class Meta:
         abstract = True
+        # registry = False, stops the retrieval of the registry from base classes
         registry = False
