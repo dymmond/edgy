@@ -263,6 +263,11 @@ yourself.
 The way of declaring an abstract model in **Edgy** is by passing `True` to the `abstract`
 attribute in the [meta](#the-meta-class) class.
 
+### Explicitly disable registry registration
+
+Sometimes you want to add a model manually to the registry and not to retrieve a registry by the parents.
+This can be archived by setting Meta registry to False.
+
 #### In a nutshell
 
 In this document we already mentioned abstract models and how to use them but let us use some more

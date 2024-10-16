@@ -423,9 +423,7 @@ class BaseForeignKey(RelationshipField):
     @cached_property
     def target_registry(self) -> "Registry":
         """Registry searched in case to is a string"""
-        assert (
-            self.owner.meta.registry is not None
-        ), "no registry found neither 'target_registry' set"
+        assert self.owner.meta.registry, "no registry found neither 'target_registry' set"
         return self.owner.meta.registry
 
     @property
