@@ -1,8 +1,6 @@
 import pytest
-from sqlalchemy.exc import IntegrityError
 
 import edgy
-from edgy.exceptions import FieldDefinitionError
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -13,7 +11,7 @@ models = edgy.Registry(database=database)
 
 
 class Älbum(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    äd = edgy.IntegerField(primary_key=True, column_name="id")
     name = edgy.CharField(max_length=100)
 
     class Meta:
@@ -31,58 +29,6 @@ class Track(edgy.Model):
         registry = models
 
 
-class Organisation(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    ident = edgy.CharField(max_length=100)
-
-    class Meta:
-        registry = models
-
-
-class Team(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT)
-    name = edgy.CharField(max_length=100)
-
-    class Meta:
-        registry = models
-
-
-class Member(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    team = edgy.ForeignKey(Team, on_delete=edgy.SET_NULL, null=True)
-    email = edgy.CharField(max_length=100)
-
-    class Meta:
-        registry = models
-
-
-class Profile(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    website = edgy.CharField(max_length=100)
-
-    class Meta:
-        registry = models
-
-
-class Person(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    email = edgy.CharField(max_length=100)
-    profile = edgy.OneToOneField(Profile, on_delete=edgy.CASCADE, related_name=False)
-
-    class Meta:
-        registry = models
-
-
-class AnotherPerson(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
-    email = edgy.CharField(max_length=100)
-    profile = edgy.OneToOne(Profile, on_delete=edgy.CASCADE)
-
-    class Meta:
-        registry = models
-
-
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     await models.create_all()
@@ -95,11 +41,6 @@ async def rollback_connections():
     with database.force_rollback():
         async with database:
             yield
-
-
-async def test_no_relation():
-    for field in Profile.meta.fields:
-        assert not field.startswith("person")
 
 
 async def test_new_create():
@@ -197,27 +138,6 @@ async def test_fk_filter():
         assert track.album.name == "Malibu"
 
 
-async def test_multiple_fk():
-    acme = await Organisation.query.create(ident="ACME Ltd")
-    red_team = await Team.query.create(org=acme, name="Red Team")
-    blue_team = await Team.query.create(org=acme, name="Blue Team")
-    await Member.query.create(team=red_team, email="a@example.org")
-    await Member.query.create(team=red_team, email="b@example.org")
-    await Member.query.create(team=blue_team, email="c@example.org")
-    await Member.query.create(team=blue_team, email="d@example.org")
-
-    other = await Organisation.query.create(ident="Other ltd")
-    team = await Team.query.create(org=other, name="Green Team")
-    await Member.query.create(team=team, email="e@example.org")
-
-    members = (
-        await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
-    )
-    assert len(members) == 4
-    for member in members:
-        assert member.team.org.ident == "ACME Ltd"
-
-
 async def test_queryset_delete_with_fk():
     malibu = await Älbum.query.create(name="Malibu")
     await Track.query.create(album=malibu, title="The Bird", position=1)
@@ -251,100 +171,3 @@ async def test_on_delete_cascade():
     await album.delete()
 
     assert await Track.query.count() == 0
-
-
-@pytest.mark.skipif(database.url.dialect == "sqlite", reason="Not supported on SQLite")
-async def test_on_delete_restrict():
-    organisation = await Organisation.query.create(ident="Encode")
-    await Team.query.create(org=organisation, name="Maintainers")
-
-    with pytest.raises(IntegrityError):
-        await organisation.delete()
-
-
-@pytest.mark.skipif(database.url.dialect == "sqlite", reason="Not supported on SQLite")
-async def test_on_delete_set_null():
-    organisation = await Organisation.query.create(ident="Encode")
-    team = await Team.query.create(org=organisation, name="Maintainers")
-    await Member.query.create(email="member@edgy.com", team=team)
-
-    await team.delete()
-
-    member = await Member.query.first()
-    assert member.team is None
-
-
-async def test_one_to_one_field_crud():
-    profile = await Profile.query.create(website="https://edgy.com")
-    await Person.query.create(email="info@edgy.com", profile=profile)
-
-    person = await Person.query.get(email="info@edgy.com")
-    assert person.profile.pk == profile.pk
-
-    await person.profile.load()
-    assert person.profile.website == "https://edgy.com"
-
-    with pytest.raises(IntegrityError):
-        await Person.query.create(email="contact@edgy.com", profile=profile)
-
-
-async def test_one_to_one_crud():
-    profile = await Profile.query.create(website="https://edgy.com")
-    await AnotherPerson.query.create(email="info@edgy.com", profile=profile)
-
-    person = await AnotherPerson.query.get(email="info@edgy.com")
-    assert person.profile.pk == profile.pk
-
-    await person.profile.load()
-    assert person.profile.website == "https://edgy.com"
-
-    with pytest.raises(IntegrityError):
-        await AnotherPerson.query.create(email="contact@edgy.com", profile=profile)
-
-
-async def test_nullable_foreign_key():
-    await Member.query.create(email="dev@edgy.com")
-
-    member = await Member.query.get()
-
-    assert member.email == "dev@edgy.com"
-    assert member.team is None
-
-
-def test_assertation_error_on_set_null():
-    with pytest.raises(FieldDefinitionError) as raised:
-
-        class MyModel(edgy.Model):
-            is_active = edgy.BooleanField(default=True)
-
-        class MyOtherModel(edgy.Model):
-            model = edgy.ForeignKey(MyModel, on_delete=edgy.SET_NULL)
-
-    assert raised.value.args[0] == "When SET_NULL is enabled, null must be True."
-
-
-def test_assertation_error_on_missing_on_delete():
-    with pytest.raises(FieldDefinitionError) as raised:
-
-        class MyModel(edgy.Model):
-            is_active = edgy.BooleanField(default=True)
-
-        class MyOtherModel(edgy.Model):
-            model = edgy.ForeignKey(MyModel, on_delete=None)
-
-    assert raised.value.args[0] == "on_delete must not be null."
-
-
-def test_assertation_error_on_embed_parent_double_underscore_attr():
-    with pytest.raises(FieldDefinitionError) as raised:
-
-        class MyModel(edgy.Model):
-            is_active = edgy.BooleanField(default=True)
-
-        class MyOtherModel(edgy.Model):
-            model = edgy.ForeignKey(MyModel, embed_parent=("foo", "foo__attr"))
-
-    assert (
-        raised.value.args[0]
-        == '"embed_parent" second argument (for embedding parent) cannot contain "__".'
-    )

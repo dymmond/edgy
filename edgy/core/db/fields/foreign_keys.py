@@ -301,7 +301,7 @@ class BaseForeignKeyField(BaseForeignKey):
             fkcolumn = sqlalchemy.Column(
                 key=fkcolumn_name,
                 type_=related_column.type,
-                name=self.get_fk_column_name(name, column_key),
+                name=self.get_fk_column_name(name, related_column.name),
                 primary_key=self.primary_key,
                 autoincrement=False,
                 nullable=related_column.nullable or self.null,
