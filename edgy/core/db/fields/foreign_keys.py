@@ -36,6 +36,8 @@ terminal = Print()
 class BaseForeignKeyField(BaseForeignKey):
     force_cascade_deletion_relation: bool = False
     relation_has_post_delete_callback: bool = False
+    # overwrite for sondercharacters
+    column_name: Optional[str] = None
 
     def __init__(
         self,
@@ -277,6 +279,12 @@ class BaseForeignKeyField(BaseForeignKey):
             return name
         return f"{name}_{fieldname}"
 
+    def get_fk_column_name(self, name: str, fieldname: str) -> str:
+        name = self.column_name or name
+        if len(self.related_columns) == 1:
+            return name
+        return f"{name}_{fieldname}"
+
     def from_fk_field_name(self, name: str, fieldname: str) -> str:
         if len(self.related_columns) == 1:
             return next(iter(self.related_columns.keys()))
@@ -285,14 +293,15 @@ class BaseForeignKeyField(BaseForeignKey):
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         target = self.target
         columns = []
-        for column_name, related_column in self.related_columns.items():
+        for column_key, related_column in self.related_columns.items():
             if related_column is None:
-                related_column = target.table.columns[column_name]
-            fkcolumn_name = self.get_fk_field_name(name, column_name)
+                related_column = target.table.columns[column_key]
+            fkcolumn_name = self.get_fk_field_name(name, column_key)
             # use the related column as reference
             fkcolumn = sqlalchemy.Column(
-                fkcolumn_name,
-                related_column.type,
+                key=fkcolumn_name,
+                type_=related_column.type,
+                name=self.get_fk_column_name(name, related_column.name),
                 primary_key=self.primary_key,
                 autoincrement=False,
                 nullable=related_column.nullable or self.null,

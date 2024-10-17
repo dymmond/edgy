@@ -1,5 +1,4 @@
 import asyncio
-import copy
 import warnings
 from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Generator, Iterable, Sequence
@@ -10,6 +9,7 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Literal,
     Optional,
     Union,
     cast,
@@ -43,6 +43,7 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 generic_field = BaseField()
+_empty_set = cast(Sequence[Any], frozenset())
 
 
 def clean_query_kwargs(
@@ -90,46 +91,89 @@ class BaseQuerySet(
     def __init__(
         self,
         model_class: Union[type[BaseModelType], None] = None,
+        *,
         database: Union["Database", None] = None,
-        filter_clauses: Any = None,
-        select_related: Any = None,
-        prefetch_related: Any = None,
-        limit_count: Any = None,
-        limit_offset: Any = None,
+        filter_clauses: Iterable[Any] = _empty_set,
+        select_related: Iterable[str] = _empty_set,
+        prefetch_related: Iterable["Prefetch"] = _empty_set,
+        limit_count: Optional[int] = None,
+        limit: Optional[int] = None,
+        limit_offset: Optional[int] = None,
+        offset: Optional[int] = None,
         batch_size: Optional[int] = None,
-        order_by: Any = None,
-        group_by: Any = None,
-        distinct_on: Optional[Sequence[str]] = None,
-        only_fields: Any = None,
-        defer_fields: Any = None,
-        embed_parent: Any = None,
-        embed_parent_filters: Any = None,
-        embed_sqla_row: str = "",
-        using_schema: Any = Undefined,
-        table: Any = None,
+        order_by: Iterable[str] = _empty_set,
+        group_by: Iterable[str] = _empty_set,
+        distinct_on: Union[None, Literal[True], Iterable[str]] = None,
+        distinct: Union[None, Literal[True], Iterable[str]] = None,
+        only_fields: Optional[Iterable[str]] = None,
+        only: Iterable[str] = _empty_set,
+        defer_fields: Optional[Sequence[str]] = None,
+        defer: Iterable[str] = _empty_set,
+        embed_parent: Optional[tuple[str, Union[str, str]]] = None,
+        embed_parent_filters: Optional[tuple[str, str]] = None,
+        using_schema: Union[str, None, Any] = Undefined,
+        table: Optional[sqlalchemy.Table] = None,
         exclude_secrets: bool = False,
     ) -> None:
         super().__init__(model_class=model_class)
-        self.filter_clauses = [] if filter_clauses is None else filter_clauses
-        self.or_clauses: Any = []
-        self.limit_count = limit_count
-        self._select_related = set([] if select_related is None else select_related)
-        self._prefetch_related = [] if prefetch_related is None else prefetch_related
-        self._offset = limit_offset
+        self.filter_clauses: list[Any] = list(filter_clauses)
+        self.or_clauses: list[Any] = []
+        if limit_count is not None:
+            warnings.warn(
+                "`limit_count` is deprecated use `limit`", DeprecationWarning, stacklevel=2
+            )
+            limit = limit_count
+        self.limit_count = limit
+        if limit_offset is not None:
+            warnings.warn(
+                "`limit_offset` is deprecated use `limit`", DeprecationWarning, stacklevel=2
+            )
+            offset = limit_offset
+        self._offset = offset
+
+        self._select_related = set(select_related)
+        self._prefetch_related = list(prefetch_related)
         self._batch_size = batch_size
-        self._order_by = [] if order_by is None else order_by
-        self._group_by = [] if group_by is None else group_by
-        self.distinct_on = distinct_on
-        self._only = set([] if only_fields is None else only_fields)
-        self._defer = set([] if defer_fields is None else defer_fields)
+        self._order_by: tuple[str, ...] = tuple(order_by)
+        self._group_by: tuple[str, ...] = tuple(group_by)
+        if distinct_on is not None:
+            warnings.warn(
+                "`distinct_on` is deprecated use `distinct`", DeprecationWarning, stacklevel=2
+            )
+            distinct = distinct_on
+
+        if distinct is True:
+            distinct = _empty_set
+        self.distinct_on = list(distinct) if distinct is not None else None
+        if only_fields is not None:
+            warnings.warn(
+                "`only_fields` is deprecated use `only`", DeprecationWarning, stacklevel=2
+            )
+            only = only_fields
+        self._only = set(only)
+        if defer_fields is not None:
+            warnings.warn(
+                "`defer_fields` is deprecated use `defer`", DeprecationWarning, stacklevel=2
+            )
+            defer = defer_fields
+        self._defer = set(defer)
         self.embed_parent = embed_parent
-        self.using_schema = using_schema
         self.embed_parent_filters = embed_parent_filters
+        self.using_schema = using_schema
         self._exclude_secrets = exclude_secrets
         # cache should not be cloned
         self._cache = QueryModelResultCache(attrs=self.model_class.pkcolumns)
         # is empty
         self._clear_cache(False)
+        # this is not cleared, because the expression is immutable
+        self._cached_select_related_expression: Optional[
+            tuple[
+                str,
+                dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
+                dict[str, set[str]],
+                Any,
+            ]
+        ] = None
         # initialize
         self.active_schema = self.get_schema()
 
@@ -140,16 +184,58 @@ class BaseQuerySet(
         if database is not None:
             self.database = database
 
+    def _clone(self) -> "QuerySet":
+        """
+        Return a copy of the current QuerySet that's ready for another
+        operation.
+        """
+        queryset = self.__class__(
+            self.model_class,
+            database=self.database,
+            filter_clauses=self.filter_clauses,
+            select_related=self._select_related,
+            prefetch_related=self._prefetch_related,
+            limit=self.limit_count,
+            offset=self._offset,
+            batch_size=self._batch_size,
+            order_by=self._order_by,
+            group_by=self._group_by,
+            distinct=self.distinct_on,
+            only=self._only,
+            defer=self._defer,
+            embed_parent=self.embed_parent,
+            embed_parent_filters=self.embed_parent_filters,
+            using_schema=self.using_schema,
+            table=getattr(self, "_table", None),
+            exclude_secrets=self._exclude_secrets,
+        )
+        queryset.or_clauses = list(self.or_clauses)
+        queryset._cached_select_related_expression = self._cached_select_related_expression
+        return cast("QuerySet", queryset)
+
+    def _clear_cache(self, keep_result_cache: bool = False) -> None:
+        if not keep_result_cache:
+            self._cache.clear()
+        self._cached_select_with_tables: Optional[
+            tuple[Any, dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]]
+        ] = None
+        self._cache_count: Optional[int] = None
+        self._cache_first: Optional[tuple[BaseModelType, BaseModelType]] = None
+        self._cache_last: Optional[tuple[BaseModelType, BaseModelType]] = None
+        # fetch all is in cache
+        self._cache_fetch_all: bool = False
+        # get current row during iteration. Used for prefetching.
+        # Bad style but no other way currently possible
+        self._cache_current_row: Optional[sqlalchemy.Row] = None
+
     def _build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
-        order_by = list(map(self._prepare_order_by, order_by))
-        expression = expression.order_by(*order_by)
+        expression = expression.order_by(*(self._prepare_order_by(entry) for entry in order_by))
         return expression
 
     def _build_group_by_expression(self, group_by: Any, expression: Any) -> Any:
         """Builds the group by expression"""
-        group_by = list(map(self._prepare_group_by, group_by))
-        expression = expression.group_by(*group_by)
+        expression = expression.group_by(*(self._prepare_order_by(entry) for entry in group_by))
         return expression
 
     async def _resolve_clause_args(self, args: Any) -> Any:
@@ -236,128 +322,135 @@ class BaseQuerySet(
         # We pop out the transitions so a path is not taken 2 times
 
         # Why left outer join? It is possible and legal for a relation to not exist we check that already in filtering.
-        queryset: BaseQuerySet = self
 
-        select_from = queryset.table
-        maintablekey = select_from.key
-        tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]] = {
-            select_from.key: (select_from, self.model_class)
-        }
-        prefixes: dict[str, set[str]] = defaultdict(set)
-        transitions: dict[tuple[str, str], tuple[Any, set[tuple[str, str]]]] = {}
-        transitions_is_full_outer: dict[tuple[str, str], bool] = {}
+        if self._cached_select_related_expression is None:
+            maintable = self.table
+            select_from = maintable
+            maintablekey = maintable.key
+            tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]] = {
+                select_from.key: (select_from, self.model_class)
+            }
+            prefixes: dict[str, set[str]] = defaultdict(set)
+            transitions: dict[tuple[str, str], tuple[Any, set[tuple[str, str]]]] = {}
+            transitions_is_full_outer: dict[tuple[str, str], bool] = {}
 
-        # Select related
-        for select_path in queryset._select_related:
-            # For m2m relationships
-            model_class = queryset.model_class
-            former_table = queryset.table
-            former_transition = None
-            prefix: str = ""
-            model_database: Optional[Database] = queryset.database
-            while select_path:
-                field_name = select_path.split("__", 1)[0]
-                try:
+            # Select related
+            for select_path in self._select_related:
+                # For m2m relationships
+                model_class = self.model_class
+                former_table = maintable
+                former_transition = None
+                prefix: str = ""
+                model_database: Optional[Database] = self.database
+                while select_path:
+                    field_name = select_path.split("__", 1)[0]
+                    try:
+                        field = model_class.meta.fields[field_name]
+                    except KeyError:
+                        raise QuerySetError(
+                            detail=f'Selected field "{field_name}" does not exist on {model_class}.'
+                        ) from None
                     field = model_class.meta.fields[field_name]
-                except KeyError:
-                    raise QuerySetError(
-                        detail=f'Selected field "{field_name}" does not exist on {model_class}.'
-                    ) from None
-                field = model_class.meta.fields[field_name]
-                if isinstance(field, RelationshipField):
-                    model_class, reverse_part, select_path = field.traverse_field(select_path)
-                else:
-                    raise QuerySetError(
-                        detail=f'Selected field "{field_name}" is not a RelationshipField on {model_class}.'
-                    )
-                if isinstance(field, BaseForeignKey):
-                    foreign_key = field
-                    reverse = False
-                else:
-                    foreign_key = model_class.meta.fields[reverse_part]
-                    reverse = True
-                if foreign_key.is_cross_db(model_database):
-                    raise QuerySetError(
-                        detail=f'Selected model "{field_name}" is on another database.'
-                    )
-                # now use the one of the model_class itself
-                model_database = None
-                table = model_class.table_schema(self.active_schema)
-                # use table from tables_and_models
-                if table.key in tables_and_models:
-                    table = tables_and_models[table.key][0]
-
-                if foreign_key.is_m2m and foreign_key.embed_through != "":  # type: ignore
-                    # we need to inject the through model for the select
-                    model_class = foreign_key.through
-                    table = model_class.table_schema(self.active_schema)
-                    if reverse:
-                        select_path = f"{foreign_key.from_foreign_key}__{select_path}"
+                    if isinstance(field, RelationshipField):
+                        model_class, reverse_part, select_path = field.traverse_field(select_path)
                     else:
-                        select_path = f"{foreign_key.to_foreign_key}__{select_path}"
-                    # if select_path is empty
-                    select_path = select_path.removesuffix("__")
-                    if reverse:
-                        foreign_key = model_class.meta.fields[foreign_key.to_foreign_key]
+                        raise QuerySetError(
+                            detail=f'Selected field "{field_name}" is not a RelationshipField on {model_class}.'
+                        )
+                    if isinstance(field, BaseForeignKey):
+                        foreign_key = field
+                        reverse = False
                     else:
-                        foreign_key = model_class.meta.fields[foreign_key.from_foreign_key]
+                        foreign_key = model_class.meta.fields[reverse_part]
                         reverse = True
-                prefix = f"{prefix}__{field_name}" if prefix else f"{prefix}"
-                prefixes[table.key].add(prefix)
-                transition_key = (former_table.key, table.key)
-                if transition_key in transitions:
-                    # can not provide new informations
+                    if foreign_key.is_cross_db(model_database):
+                        raise QuerySetError(
+                            detail=f'Selected model "{field_name}" is on another database.'
+                        )
+                    # now use the one of the model_class itself
+                    model_database = None
+                    table = model_class.table_schema(self.active_schema)
+                    # use table from tables_and_models
+                    if table.key in tables_and_models:
+                        table = tables_and_models[table.key][0]
+
+                    if foreign_key.is_m2m and foreign_key.embed_through != "":  # type: ignore
+                        # we need to inject the through model for the select
+                        model_class = foreign_key.through
+                        table = model_class.table_schema(self.active_schema)
+                        if reverse:
+                            select_path = f"{foreign_key.from_foreign_key}__{select_path}"
+                        else:
+                            select_path = f"{foreign_key.to_foreign_key}__{select_path}"
+                        # if select_path is empty
+                        select_path = select_path.removesuffix("__")
+                        if reverse:
+                            foreign_key = model_class.meta.fields[foreign_key.to_foreign_key]
+                        else:
+                            foreign_key = model_class.meta.fields[foreign_key.from_foreign_key]
+                            reverse = True
+                    prefix = f"{prefix}__{field_name}" if prefix else f"{prefix}"
+                    prefixes[table.key].add(prefix)
+                    transition_key = (former_table.key, table.key)
+                    if transition_key in transitions:
+                        # can not provide new informations
+                        former_table = table
+                        former_transition = transition_key
+                        continue
+                    and_clause = clauses_mod.and_(
+                        *self._select_from_relationship_clause_generator(
+                            foreign_key, table, reverse, former_table
+                        )
+                    )
+                    if (table.key, former_table.key) in transitions:
+                        _transition_key = (table.key, former_table.key)
+                        # inverted
+                        # only make full outer when not the main query
+                        if former_table.key != maintablekey:
+                            transitions_is_full_outer[_transition_key] = True
+                        transitions[_transition_key] = (
+                            clauses_mod.or_(transitions[_transition_key][0], and_clause),
+                            {*transitions[_transition_key][1], former_transition}
+                            if former_transition
+                            else transitions[_transition_key][1],
+                        )
+                    elif table.key in tables_and_models:
+                        for _transition_key in transitions:
+                            if _transition_key[1] == table.key:
+                                break
+                        else:
+                            # this should never happen
+                            raise Exception("transition not found despite in tables_and_models")
+                        transitions[_transition_key] = (
+                            clauses_mod.or_(and_clause, transitions[_transition_key][0]),
+                            {*transitions[_transition_key][1], former_transition}
+                            if former_transition
+                            else transitions[_transition_key][0],
+                        )
+                    else:
+                        transitions[(former_table.key, table.key)] = (
+                            and_clause,
+                            {former_transition} if former_transition else set(),
+                        )
+                    tables_and_models[table.key] = table, model_class
                     former_table = table
                     former_transition = transition_key
-                    continue
-                and_clause = clauses_mod.and_(
-                    *self._select_from_relationship_clause_generator(
-                        foreign_key, table, reverse, former_table
-                    )
-                )
-                if (table.key, former_table.key) in transitions:
-                    _transition_key = (table.key, former_table.key)
-                    # inverted
-                    # only make full outer when not the main query
-                    if former_table.key != maintablekey:
-                        transitions_is_full_outer[_transition_key] = True
-                    transitions[_transition_key] = (
-                        clauses_mod.or_(transitions[_transition_key][0], and_clause),
-                        {*transitions[_transition_key][1], former_transition}
-                        if former_transition
-                        else transitions[_transition_key][1],
-                    )
-                elif table.key in tables_and_models:
-                    for _transition_key in transitions:
-                        if _transition_key[1] == table.key:
-                            break
-                    else:
-                        # this should never happen
-                        raise Exception("transition not found despite in tables_and_models")
-                    transitions[_transition_key] = (
-                        clauses_mod.or_(and_clause, transitions[_transition_key][0]),
-                        {*transitions[_transition_key][1], former_transition}
-                        if former_transition
-                        else transitions[_transition_key][0],
-                    )
-                else:
-                    transitions[(former_table.key, table.key)] = (
-                        and_clause,
-                        {former_transition} if former_transition else set(),
-                    )
-                tables_and_models[table.key] = table, model_class
-                former_table = table
-                former_transition = transition_key
 
-        while transitions:
-            select_from = self._join_table_helper(
+            while transitions:
+                select_from = self._join_table_helper(
+                    select_from,
+                    next(iter(transitions.keys())),
+                    transitions=transitions,
+                    tables_and_models=tables_and_models,
+                    transitions_is_full_outer=transitions_is_full_outer,
+                )
+            self._cached_select_related_expression = (
+                maintablekey,
+                tables_and_models,
+                prefixes,
                 select_from,
-                next(iter(transitions.keys())),
-                transitions=transitions,
-                tables_and_models=tables_and_models,
-                transitions_is_full_outer=transitions_is_full_outer,
             )
-        return maintablekey, tables_and_models, prefixes, select_from
+        return self._cached_select_related_expression
 
     @staticmethod
     def _select_from_relationship_clause_generator(
@@ -381,7 +474,7 @@ class BaseQuerySet(
         if self._only and self._defer:
             raise QuerySetError("You cannot use .only() and .defer() at the same time.")
 
-    async def as_select_with_tables(
+    async def _as_select_with_tables(
         self,
     ) -> tuple[Any, dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]]]:
         """
@@ -468,6 +561,16 @@ class BaseQuerySet(
             )
         return expression, tables_and_models
 
+    async def as_select_with_tables(
+        self,
+    ) -> tuple[Any, dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]]]:
+        """
+        Builds the query select based on the given parameters and filters.
+        """
+        if self._cached_select_with_tables is None:
+            self._cached_select_with_tables = await self._as_select_with_tables()
+        return self._cached_select_with_tables
+
     async def as_select(
         self,
     ) -> Any:
@@ -478,7 +581,7 @@ class BaseQuerySet(
         kwargs: Any,
     ) -> tuple[list[Any], set[str]]:
         clauses = []
-        select_related = set(self._select_related)
+        select_related: set[str] = set()
 
         # Making sure for queries we use the main class and not the proxy
         # And enable the parent
@@ -493,7 +596,7 @@ class BaseQuerySet(
             model_class, field_name, op, related_str, _, cross_db_remainder = crawl_relationship(
                 self.model_class, key
             )
-            if related_str and related_str:
+            if related_str:
                 select_related.add(related_str)
             field = model_class.meta.fields.get(field_name, generic_field)
             if cross_db_remainder:
@@ -558,11 +661,6 @@ class BaseQuerySet(
         order_col = self.table.columns[order_by]
         return order_col.desc() if reverse else order_col
 
-    def _prepare_group_by(self, group_by: str) -> Any:
-        group_by = group_by.lstrip("-")
-        group_col = self.table.columns[group_by]
-        return group_col
-
     def _prepare_fields_for_distinct(self, distinct_on: str) -> sqlalchemy.Column:
         return self.table.columns[distinct_on]
 
@@ -624,52 +722,7 @@ class BaseQuerySet(
             schema = get_schema()
         if schema is None:
             schema = self.model_class.get_db_schema()
-        return schema  # type: ignore
-
-    def _clone(self) -> "QuerySet":
-        """
-        Return a copy of the current QuerySet that's ready for another
-        operation.
-        """
-        queryset = self.__class__.__new__(self.__class__)
-        queryset.model_class = self.model_class
-        queryset._cache = QueryModelResultCache(attrs=queryset.model_class.pkcolumns)
-        queryset._clear_cache()
-        queryset.using_schema = self.using_schema
-
-        # initialize
-        queryset.active_schema = self.get_schema()
-
-        queryset._table = getattr(self, "_table", None)
-        queryset.filter_clauses = list(self.filter_clauses)
-        queryset.or_clauses = list(self.or_clauses)
-        queryset.limit_count = copy.copy(self.limit_count)
-        queryset._select_related = set(self._select_related)
-        queryset._prefetch_related = copy.copy(self._prefetch_related)
-        queryset._offset = copy.copy(self._offset)
-        queryset._order_by = copy.copy(self._order_by)
-        queryset._group_by = copy.copy(self._group_by)
-        queryset.distinct_on = copy.copy(self.distinct_on)
-        queryset.embed_parent = self.embed_parent
-        queryset.embed_parent_filters = self.embed_parent_filters
-        queryset._batch_size = self._batch_size
-        queryset._only = set(self._only)
-        queryset._defer = set(self._defer)
-        queryset._database = self.database
-        queryset._exclude_secrets = self._exclude_secrets
-        return cast("QuerySet", queryset)
-
-    def _clear_cache(self, keep_result_cache: bool = False) -> None:
-        if not keep_result_cache:
-            self._cache.clear()
-        self._cache_count: Optional[int] = None
-        self._cache_first: Optional[tuple[BaseModelType, BaseModelType]] = None
-        self._cache_last: Optional[tuple[BaseModelType, BaseModelType]] = None
-        # fetch all is in cache
-        self._cache_fetch_all: bool = False
-        # get current row during iteration. Used for prefetching.
-        # Bad style but no other way currently possible
-        self._cache_current_row: Optional[sqlalchemy.Row] = None
+        return schema
 
     async def _handle_batch(
         self,
@@ -868,9 +921,10 @@ class BaseQuerySet(
         ] = []
         for raw_clause in clauses:
             if isinstance(raw_clause, dict):
-                extracted_clauses, queryset._select_related = queryset._kwargs_to_clauses(
-                    kwargs=raw_clause
-                )
+                extracted_clauses, related = queryset._kwargs_to_clauses(kwargs=raw_clause)
+                if not queryset._select_related.issuperset(related):
+                    queryset._select_related.update(related)
+                    queryset._cached_select_related_expression = None
                 if or_ and extracted_clauses:
 
                     async def wrapper_and(
@@ -905,8 +959,9 @@ class BaseQuerySet(
                     raw_clause.model_class is queryset.model_class
                 ), f"QuerySet arg has wrong model_class {raw_clause.model_class}"
                 converted_clauses.append(raw_clause.build_where_clause)
-                for related in raw_clause._select_related:
-                    queryset._select_related.add(related)
+                if not queryset._select_related.issuperset(raw_clause._select_related):
+                    queryset._select_related.update(raw_clause._select_related)
+                    queryset._cached_select_related_expression = None
 
             else:
                 converted_clauses.append(raw_clause)
@@ -964,22 +1019,20 @@ class BaseQuerySet(
             filter_query._cache = self._cache
             return await filter_query._get_raw()
 
-        queryset: BaseQuerySet = self
-        expression, tables_and_models = await queryset.limit(2).as_select_with_tables()
-        check_db_connection(queryset.database)
-        async with queryset.database as database:
-            rows = await database.fetch_all(expression)
+        expression, tables_and_models = await self.as_select_with_tables()
+        check_db_connection(self.database)
+        async with self.database as database:
+            # we want no queryset copy, so use sqlalchemy limit(2)
+            rows = await database.fetch_all(expression.limit(2))
 
         if not rows:
-            queryset._cache_count = 0
+            self._cache_count = 0
             raise ObjectNotFound()
         if len(rows) > 1:
             raise MultipleObjectsReturned()
-        queryset._cache_count = 1
+        self._cache_count = 1
 
-        return await queryset._get_or_cache_row(
-            rows[0], tables_and_models, "_cache_first,_cache_last"
-        )
+        return await self._get_or_cache_row(rows[0], tables_and_models, "_cache_first,_cache_last")
 
 
 class QuerySet(BaseQuerySet):
@@ -1162,9 +1215,9 @@ class QuerySet(BaseQuerySet):
 
     def reverse(self) -> "QuerySet":
         queryset: QuerySet = self._clone()
-        queryset._order_by = [
+        queryset._order_by = tuple(
             el[1:] if el.startswith("-") else f"-{el}" for el in queryset._order_by
-        ]
+        )
         return queryset
 
     def limit(self, limit_count: int) -> "QuerySet":
@@ -1183,7 +1236,7 @@ class QuerySet(BaseQuerySet):
         queryset._offset = offset
         return queryset
 
-    def group_by(self, *group_by: Sequence[str]) -> "QuerySet":
+    def group_by(self, *group_by: str) -> "QuerySet":
         """
         Returns the values grouped by the given fields.
         """
@@ -1191,12 +1244,17 @@ class QuerySet(BaseQuerySet):
         queryset._group_by = group_by
         return queryset
 
-    def distinct(self, *distinct_on: str) -> "QuerySet":
+    def distinct(self, first: Union[bool, str] = True, *distinct_on: str) -> "QuerySet":
         """
         Returns a queryset with distinct results.
         """
         queryset: QuerySet = self._clone()
-        queryset.distinct_on = distinct_on
+        if first is False:
+            queryset.distinct_on = None
+        elif first is True:
+            queryset.distinct_on = []
+        else:
+            queryset.distinct_on = [first, *distinct_on]
         return queryset
 
     def only(self, *fields: str) -> "QuerySet":
@@ -1217,31 +1275,36 @@ class QuerySet(BaseQuerySet):
         queryset._only = only_fields
         return queryset
 
-    def defer(self, *fields: Sequence[str]) -> "QuerySet":
+    def defer(self, *fields: str) -> "QuerySet":
         """
         Returns a list of models with the selected only fields and always the primary
         key.
         """
         queryset: QuerySet = self._clone()
 
-        defer_fields = set(fields)
-        queryset._defer = defer_fields
+        queryset._defer = set(fields)
         return queryset
 
-    def select_related(self, related: Any) -> "QuerySet":
+    def select_related(self, *related: str) -> "QuerySet":
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
         related-object data when it executes its query.
 
         This is a performance booster which results in a single more complex query but means
 
-        later use of foreign-key relationships won’t require database queries.
+        later use of foreign-key relationships won't require database queries.
         """
         queryset: QuerySet = self._clone()
-        if not isinstance(related, (list, tuple)):
-            related = [related]
-
-        queryset._select_related.update(related)
+        if len(related) >= 1 and not isinstance(cast(Any, related[0]), str):
+            warnings.warn(
+                "use `select_related` with variadic str arguments instead of a Sequence",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            related = cast(tuple[str, ...], related[0])
+        if not self._select_related.issuperset(related):
+            queryset._cached_select_related_expression = None
+            queryset._select_related.update(related)
         return queryset
 
     async def values(
@@ -1354,6 +1417,7 @@ class QuerySet(BaseQuerySet):
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
         expression, tables_and_models = await queryset.as_select_with_tables()
+        self._cached_select_related_expression = queryset._cached_select_related_expression
         check_db_connection(queryset.database)
         async with queryset.database as database:
             row = await database.fetch_one(expression, pos=0)
@@ -1374,7 +1438,9 @@ class QuerySet(BaseQuerySet):
         queryset = self
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
-        expression, tables_and_models = await queryset.reverse().as_select_with_tables()
+        queryset = queryset.reverse()
+        expression, tables_and_models = await queryset.as_select_with_tables()
+        self._cached_select_related_expression = queryset._cached_select_related_expression
         check_db_connection(queryset.database)
         async with queryset.database as database:
             row = await database.fetch_one(expression, pos=0)

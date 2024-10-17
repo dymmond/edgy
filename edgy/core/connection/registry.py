@@ -419,7 +419,9 @@ class Registry:
 
     async def drop_all(self, databases: Sequence[Union[str, None]] = (None,)) -> None:
         if self.db_schema:
-            await self.schema.drop_schema(self.db_schema, True, True, databases=databases)
+            await self.schema.drop_schema(
+                self.db_schema, cascade=True, if_exists=True, databases=databases
+            )
         else:
             for database in databases:
                 db = self.database if database is None else self.extra[database]

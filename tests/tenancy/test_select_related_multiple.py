@@ -88,7 +88,7 @@ async def test_select_related_tenant():
 
     query = (
         await Permission.query.using(schema=tenant.schema_name)
-        .select_related(["designation", "module"])
+        .select_related("designation", "module")
         .all()
     )
 

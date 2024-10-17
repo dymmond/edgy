@@ -28,6 +28,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
         through: Union[str, type["BaseModelType"]] = "",
+        through_tablename: str = "",
         embed_through: Union[str, Literal[False]] = "",
         **kwargs: Any,
     ) -> None:
@@ -37,6 +38,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.from_fields = from_fields
         self.from_foreign_key = from_foreign_key
         self.through = through
+        self.through_tablename = through_tablename
         self.embed_through = embed_through
 
     @cached_property
@@ -185,7 +187,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         if not self.to_foreign_key:
             self.to_foreign_key = to_name.lower()
 
-        tablename = f"{owner_name.lower()}s_{to_name}s".lower()
+        tablename = self.through_tablename or f"{self.from_foreign_key}s_{self.to_foreign_key}s"
         meta_args = {
             "tablename": tablename,
             "registry": self.owner.meta.registry,

@@ -6,11 +6,12 @@ hide:
 
 # Release Notes
 
-## 0.18.2
+## 0.19.0
 
 ### Added
 
 - New `SET_DEFAULT`, and `PROTECT` to `on_delete` in the ForeignKey.
+- New `through_tablename` parameter for ManyToMany.
 
 ### Removed
 
@@ -21,6 +22,14 @@ hide:
 - Allow setting registry = False, for disabling retrieving the registry from parents.
 - Removed unecessary warning for ManyToMany.
 - Add warnings for problematic combinations in ForeignKey.
+- Make QuerySet nearly keyword only and deprecate keywords not matching function names.
+- Clone QuerySet via `__init__`.
+- Make select_related variadic and deprecate former call taking a Sequence.
+- Improved QuerySet caching.
+
+### Fixed
+
+- Multi-column fields honor now `column_name`. This allows special characters in model names.
 
 ## 0.18.1
 
