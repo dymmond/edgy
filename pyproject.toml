@@ -64,8 +64,8 @@ keywords = [
 
 [project.urls]
 Homepage = "https://github.com/dymmond/edgy"
-Documentation = "https://edgyorm.tarsild.io"
-Changelog = "https://edgyorm.tarsild.io/release-notes/"
+Documentation = "https://edgy.dymmond.com"
+Changelog = "https://edgy.dymmond.com/release-notes/"
 Funding = "https://github.com/sponsors/tarsil"
 Source = "https://github.com/dymmond/edgy"
 
