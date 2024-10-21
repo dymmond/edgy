@@ -99,7 +99,7 @@ jdbc = ["databasez[jdbc]"]
 all = ["edgy[test,mime,image,postgres,mysql,sqlite,mssql,jdbc]", "ipython", "ptpython"]
 
 [tool.hatch.envs.default]
-dependencies = ["pre-commit>=2.17.0,<4.0.0", "edgy[sqlite]"]
+dependencies = ["pre-commit>=4.0.0,<5.0.0", "edgy[sqlite]"]
 
 [tool.hatch.envs.default.scripts]
 clean_pyc = "find . -type f -name \"*.pyc\" -delete"
@@ -179,7 +179,7 @@ fix = true
 [tool.ruff.lint]
 select = ["E", "W", "F", "C", "B", "I", "UP", "SIM"]
 ignore = ["E501", "B008", "C901", "B026", "SIM115"]
-exclude = ["docs_src/*"]
+exclude = ["docs_src/*", ".pdbrc"]
 
 [tool.ruff.lint.isort]
 known-third-party = ["esmerald", "pydantic", "starlette", "databasez"]
