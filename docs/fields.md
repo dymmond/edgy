@@ -355,6 +355,20 @@ DateTimeField supports int, float, string (isoformat), date object and of course
 !!! Note
     `auto_now` and `auto_now_add` set the `read_only` flag by default. You can explicitly set `read_only` to `False` to be still able to update the field manually.
 
+#### DurationField
+
+```python
+import datetime
+import edgy
+
+
+class MyModel(edgy.Model):
+    worked: datetime.timedelta = edgy.DurationField()
+    ...
+
+```
+
+
 #### DecimalField
 
 ```python
@@ -364,7 +378,6 @@ import edgy
 class MyModel(edgy.Model):
     price: decimal.Decimal = edgy.DecimalField(max_digits=5, decimal_places=2, null=True)
     ...
-
 ```
 
 ##### Parameters

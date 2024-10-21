@@ -13,23 +13,24 @@ from edgy.core.terminal import Print
 printer = Print()
 
 SQL_GENERIC_TYPES = {
-    sqltypes.BigInteger: edgy.BigIntegerField,
-    sqltypes.Integer: edgy.IntegerField,
-    sqltypes.JSON: edgy.JSONField,
-    sqltypes.Date: edgy.DateField,
-    sqltypes.String: edgy.CharField,
-    sqltypes.Unicode: edgy.CharField,
-    sqltypes.BINARY: edgy.BinaryField,
-    sqltypes.Boolean: edgy.BooleanField,
-    sqltypes.Enum: edgy.ChoiceField,
-    sqltypes.DateTime: edgy.DateTimeField,
-    sqltypes.Numeric: edgy.DecimalField,
-    sqltypes.Float: edgy.FloatField,
-    sqltypes.Double: edgy.FloatField,
-    sqltypes.SmallInteger: edgy.SmallIntegerField,
-    sqltypes.Text: edgy.TextField,
-    sqltypes.Time: edgy.TimeField,
-    sqltypes.Uuid: edgy.UUIDField,
+    sqltypes.BigInteger: edgy.fields.BigIntegerField,
+    sqltypes.Integer: edgy.fields.IntegerField,
+    sqltypes.JSON: edgy.fields.JSONField,
+    sqltypes.Date: edgy.fields.DateField,
+    sqltypes.String: edgy.fields.CharField,
+    sqltypes.Unicode: edgy.fields.CharField,
+    sqltypes.LargeBinary: edgy.fields.BinaryField,
+    sqltypes.Boolean: edgy.fields.BooleanField,
+    sqltypes.Enum: edgy.fields.ChoiceField,
+    sqltypes.DateTime: edgy.fields.DateTimeField,
+    sqltypes.Interval: edgy.fields.DurationField,
+    sqltypes.Numeric: edgy.fields.DecimalField,
+    sqltypes.Float: edgy.fields.FloatField,
+    sqltypes.Double: edgy.fields.FloatField,
+    sqltypes.SmallInteger: edgy.fields.SmallIntegerField,
+    sqltypes.Text: edgy.fields.TextField,
+    sqltypes.Time: edgy.fields.TimeField,
+    sqltypes.Uuid: edgy.fields.UUIDField,
 }
 
 DB_MODULE = "edgy"
@@ -185,7 +186,7 @@ class InspectDB:
             field_params["decimal_places"] = real_field.scale
 
         if field_type == "BinaryField":
-            field_params["sql_nullable"] = getattr(real_field, "none_as_null", False)
+            field_params["max_length"] = getattr(real_field, "length", None)
 
         return field_type, field_params
 

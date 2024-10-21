@@ -532,12 +532,22 @@ class DateField(AutoNowMixin, datetime.date):
         return sqlalchemy.Date()
 
 
+class DurationField(FieldFactory, datetime.timedelta):
+    """Representation of a time field"""
+
+    field_type = datetime.timedelta
+
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.Interval()
+
+
 class TimeField(FieldFactory, datetime.time):
     """Representation of a time field"""
 
     field_type = datetime.time
 
-    def __new__(cls, **kwargs: Any) -> BaseFieldType:  # type: ignore
+    def __new__(cls, with_timezone: bool = False, **kwargs: Any) -> BaseFieldType:  # type: ignore
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -573,7 +583,7 @@ class BinaryField(FieldFactory, bytes):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.LargeBinary(kwargs.get("max_length"))
+        return sqlalchemy.LargeBinary(length=kwargs.get("max_length"))
 
 
 class UUIDField(FieldFactory, uuid.UUID):
