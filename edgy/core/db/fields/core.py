@@ -591,7 +591,7 @@ class UUIDField(FieldFactory, uuid.UUID):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.UUID()
+        return sqlalchemy.Uuid(as_uuid=True, native_uuid=True)
 
 
 class ChoiceField(FieldFactory):
