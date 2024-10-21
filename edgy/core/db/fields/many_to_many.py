@@ -219,7 +219,6 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         fields = {
             f"{self.from_foreign_key}": ForeignKey(
                 self.owner,
-                null=True,
                 on_delete=CASCADE,
                 related_name=False,
                 reverse_name=self.name,
@@ -229,7 +228,6 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             ),
             f"{self.to_foreign_key}": ForeignKey(
                 self.target,
-                null=True,
                 on_delete=CASCADE,
                 unique=self.unique,
                 related_name=to_related_name,
