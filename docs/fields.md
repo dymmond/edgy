@@ -585,6 +585,10 @@ class MyModel(edgy.Model):
     create with their primary key constraint and unique_together fallback their own index.
     You should be warned that the same for ForeignKey fields applies here for index, so you most probably don't want to use an index here.
 
+!!! Note
+    By default generated through models are not added to content types. You must either define a registered model or add an explicit `ContentTypeField` to the abstract.
+    You can also modify the through model via the `through` attribute and add a `ContentTypeField` though not recommended.
+
 #### IPAddressField
 
 ```python
