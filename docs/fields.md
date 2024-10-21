@@ -587,7 +587,11 @@ class MyModel(edgy.Model):
 
 !!! Note
     By default generated through models are not added to content types. You must either define a registered model or add an explicit `ContentTypeField` to the abstract.
-    You can also modify the through model via the `through` attribute and add a `ContentTypeField` though not recommended.
+    You can also modify the through model via the `through` attribute and add a `ContentTypeField` to the fields though not recommended (see [customizing fields](#customizing-fields-after-model-initialization)).
+
+```python title="Example for through model with content_type"
+{!> ../docs_src/contenttypes/m2m_with_contenttypes.py !}
+```
 
 #### IPAddressField
 
@@ -1015,8 +1019,8 @@ Dangerous! There can be many side-effects, especcially for non-metafields (have 
 
 If you just want to remove a field ExcludeField or the inherit flags are the ways to go.
 
-Replacing or deleting a field is triggering automatically a required invalidation. But there could be more required by pydantic.
+Adding, replacing or deleting a field is triggering automatically a required invalidation and auto-registers in pydantic model_fields.
 For non-metafields you may need to rebuild the model.
 
 If you want to add/delete a Field dynamically, check `edgy/core/db/models/metaclasses.py` or `edgy/core/connection/registry.py`
-first what is done and don't forget the annotations.
+first what is done. Sometimes you may need to update the annotations.
