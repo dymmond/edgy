@@ -67,7 +67,7 @@ class Migrate(BaseExtra):
         render_as_batch: bool = True,
         **kwargs: Any,
     ) -> None:
-        super().__init__(**kwargs)
+        super().__init__()
 
         self.app = app
         self.configure_callbacks: list[Callable] = []
@@ -95,9 +95,11 @@ class Migrate(BaseExtra):
         self.registry.refresh_metadata()
 
         self.directory = "migrations"
-        self.alembic_ctx_kwargs = kwargs
-        self.alembic_ctx_kwargs["compare_type"] = compare_type
-        self.alembic_ctx_kwargs["render_as_batch"] = render_as_batch
+        self.alembic_ctx_kwargs = {
+            **kwargs,
+            "compare_type": compare_type,
+            "render_as_batch": render_as_batch,
+        }
 
         self.set_edgy_extension(app)
 

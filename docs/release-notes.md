@@ -6,6 +6,14 @@ hide:
 
 # Release Notes
 
+## 0.19.1
+
+### Fixed
+
+- Migration issues with ManyToMany fields.
+- Wrong UUIDField type.
+- Passing options from Migrate to the alembic context.
+
 ## 0.19.0
 
 ### Added

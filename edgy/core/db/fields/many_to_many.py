@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import BaseForeignKey
+from edgy.core.db.fields.exclude_field import ExcludeField
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.foreign_keys import ForeignKey
 from edgy.core.db.relationships.relation import ManyRelation
@@ -190,7 +191,6 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         tablename = self.through_tablename or f"{self.from_foreign_key}s_{self.to_foreign_key}s"
         meta_args = {
             "tablename": tablename,
-            "registry": self.owner.meta.registry,
             "multi_related": {(self.from_foreign_key, self.to_foreign_key)},
         }
         has_pknames = pknames and not pknames.issubset(
@@ -219,7 +219,6 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         fields = {
             f"{self.from_foreign_key}": ForeignKey(
                 self.owner,
-                null=True,
                 on_delete=CASCADE,
                 related_name=False,
                 reverse_name=self.name,
@@ -229,7 +228,6 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             ),
             f"{self.to_foreign_key}": ForeignKey(
                 self.target,
-                null=True,
                 on_delete=CASCADE,
                 unique=self.unique,
                 related_name=to_related_name,
@@ -250,6 +248,11 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             __metadata__=new_meta,
             __bases__=__bases__,
         )
+        if "content_type" not in through_model.meta.fields:
+            through_model.meta.fields["content_type"] = ExcludeField(
+                name="content_type", owner=through_model
+            )
+        through_model.add_to_registry(self.owner.meta.registry)
         self.through = through_model
 
     def to_model(
