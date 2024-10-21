@@ -55,7 +55,7 @@ def test_column_type():
     assert isinstance(BigIntegerField.get_column_type(), sqlalchemy.BigInteger)
     assert isinstance(SmallIntegerField.get_column_type(), sqlalchemy.SmallInteger)
     assert isinstance(DecimalField.get_column_type(), sqlalchemy.Numeric)
-    assert isinstance(UUIDField.get_column_type(), sqlalchemy.UUID)
+    assert isinstance(UUIDField.get_column_type(), sqlalchemy.Uuid)
     assert isinstance(ChoiceField.get_column_type(choices=Choices), sqlalchemy.Enum)
 
 
