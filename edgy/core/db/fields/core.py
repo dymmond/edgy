@@ -287,7 +287,8 @@ class FloatField(FieldFactory, float):
         **kwargs: Any,
     ) -> BaseFieldType:
         # pydantic doesn't support max_digits for float, so rename it
-        column_max_digits = max_digits
+        if max_digits is not None:
+            kwargs.setdefault("precision", max_digits)
         del max_digits
         kwargs = {
             **kwargs,
@@ -296,11 +297,11 @@ class FloatField(FieldFactory, float):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, column_max_digits: Optional[int] = None, **kwargs: Any) -> Any:
-        if column_max_digits is None:
+    def get_column_type(cls, precision: Optional[int] = None, **kwargs: Any) -> Any:
+        if precision is None:
             return sqlalchemy.Float(asdecimal=False)
-        return sqlalchemy.Float(precision=column_max_digits, asdecimal=False).with_variant(
-            oracle.FLOAT(binary_precision=round(column_max_digits / 0.30103), asdecimal=False),  # type: ignore
+        return sqlalchemy.Float(precision=precision, asdecimal=False).with_variant(
+            oracle.FLOAT(binary_precision=round(precision / 0.30103), asdecimal=False),  # type: ignore
             "oracle",
         )
 
