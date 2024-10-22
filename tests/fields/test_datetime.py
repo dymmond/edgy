@@ -14,7 +14,7 @@ pytestmark = pytest.mark.anyio
 
 
 class User(edgy.Model):
-    name: str = edgy.CharField(max_length=255, secret=True)
+    name: str = edgy.CharField(max_length=255)
     created_at: datetime.datetime = edgy.DateTimeField(auto_now_add=True)
     updated_at: datetime.datetime = edgy.DateTimeField(auto_now=True)
 
