@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union, cast
 import pydantic
 import sqlalchemy
 from pydantic import EmailStr
+from sqlalchemy.dialects import oracle
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE, EXPLICIT_SPECIFIED_VALUES
 from edgy.core.db.fields._internal import IPAddress
@@ -278,12 +279,16 @@ class FloatField(FieldFactory, float):
     def __new__(  # type: ignore
         cls,
         *,
+        max_digits: Optional[int] = None,
         ge: Union[int, float, decimal.Decimal, None] = None,
         gt: Union[int, float, decimal.Decimal, None] = None,
         le: Union[int, float, decimal.Decimal, None] = None,
         lt: Union[int, float, decimal.Decimal, None] = None,
         **kwargs: Any,
     ) -> BaseFieldType:
+        # pydantic doesn't support max_digits for float, so rename it
+        column_max_digits = max_digits
+        del max_digits
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
@@ -291,8 +296,13 @@ class FloatField(FieldFactory, float):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Float(asdecimal=False)
+    def get_column_type(cls, column_max_digits: Optional[int] = None, **kwargs: Any) -> Any:
+        if column_max_digits is None:
+            return sqlalchemy.Float(asdecimal=False)
+        return sqlalchemy.Float(precision=column_max_digits, asdecimal=False).with_variant(
+            oracle.FLOAT(binary_precision=round(column_max_digits / 0.30103), asdecimal=False),
+            "oracle",
+        )
 
 
 class BigIntegerField(IntegerField):

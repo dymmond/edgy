@@ -165,6 +165,13 @@ def test_can_create_float_field():
     assert field.null is True
 
 
+def test_can_create_max_digits_float_field():
+    field = FloatField(max_digits=10, null=True)
+
+    assert isinstance(field, BaseField)
+    assert field.column_type.precision == 10
+
+
 def test_can_create_boolean_field():
     field = BooleanField(default=False)
 

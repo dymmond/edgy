@@ -484,7 +484,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             name not in self.__dict__
             and behavior != "passdown"
             and not self._loaded_or_deleted
-            and field is not None
+            and (field is not None or self.__reflected__)
             and name not in self.identifying_db_fields
             and self.can_load
         ):

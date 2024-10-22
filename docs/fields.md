@@ -453,10 +453,13 @@ import edgy
 class MyModel(edgy.Model):
     price: float = edgy.FloatField(null=True)
     ...
-
 ```
 
-Derives from the same as [IntegerField](#integerfield) and validates the decimal float.
+Derives from the same as [IntegerField](#integerfield) and validates the float.
+
+##### Parameters
+
+* `max_digits` - An integer indicating the total maximum digits. In contrast to DecimalField it is database-only and can be used for higher/lower precision fields. Optional.
 
 #### ForeignKey
 
