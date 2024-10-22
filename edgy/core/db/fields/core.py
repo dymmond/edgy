@@ -300,7 +300,7 @@ class FloatField(FieldFactory, float):
         if column_max_digits is None:
             return sqlalchemy.Float(asdecimal=False)
         return sqlalchemy.Float(precision=column_max_digits, asdecimal=False).with_variant(
-            oracle.FLOAT(binary_precision=round(column_max_digits / 0.30103), asdecimal=False),
+            oracle.FLOAT(binary_precision=round(column_max_digits / 0.30103), asdecimal=False),  # type: ignore
             "oracle",
         )
 
