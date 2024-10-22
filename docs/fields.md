@@ -357,17 +357,19 @@ DateTimeField supports int, float, string (isoformat), date object and of course
 
 #### DurationField
 
+A DurationField can save the amount of time of a process. This is useful in case there is no clear start/stop timepoints.
+For example the time worked on a project.
+
+
 ```python
 import datetime
 import edgy
 
-
-class MyModel(edgy.Model):
-    worked: datetime.timedelta = edgy.DurationField()
+class Project(edgy.Model):
+    worked: datetime.timedelta = edgy.DurationField(default=datetime.timedelta())
+    estimated_time: datetime.timedelta = edgy.DurationField()
     ...
-
 ```
-
 
 #### DecimalField
 
