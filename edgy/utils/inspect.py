@@ -13,23 +13,24 @@ from edgy.core.terminal import Print
 printer = Print()
 
 SQL_GENERIC_TYPES = {
-    sqltypes.BigInteger: edgy.BigIntegerField,
-    sqltypes.Integer: edgy.IntegerField,
-    sqltypes.JSON: edgy.JSONField,
-    sqltypes.Date: edgy.DateField,
-    sqltypes.String: edgy.CharField,
-    sqltypes.Unicode: edgy.CharField,
-    sqltypes.BINARY: edgy.BinaryField,
-    sqltypes.Boolean: edgy.BooleanField,
-    sqltypes.Enum: edgy.ChoiceField,
-    sqltypes.DateTime: edgy.DateTimeField,
-    sqltypes.Numeric: edgy.DecimalField,
-    sqltypes.Float: edgy.FloatField,
-    sqltypes.Double: edgy.FloatField,
-    sqltypes.SmallInteger: edgy.SmallIntegerField,
-    sqltypes.Text: edgy.TextField,
-    sqltypes.Time: edgy.TimeField,
-    sqltypes.Uuid: edgy.UUIDField,
+    sqltypes.BigInteger: edgy.fields.BigIntegerField,
+    sqltypes.Integer: edgy.fields.IntegerField,
+    sqltypes.JSON: edgy.fields.JSONField,
+    sqltypes.Date: edgy.fields.DateField,
+    sqltypes.String: edgy.fields.CharField,
+    sqltypes.Unicode: edgy.fields.CharField,
+    sqltypes.LargeBinary: edgy.fields.BinaryField,
+    sqltypes.Boolean: edgy.fields.BooleanField,
+    sqltypes.Enum: edgy.fields.ChoiceField,
+    sqltypes.DateTime: edgy.fields.DateTimeField,
+    sqltypes.Interval: edgy.fields.DurationField,
+    sqltypes.Numeric: edgy.fields.DecimalField,
+    sqltypes.Float: edgy.fields.FloatField,
+    sqltypes.Double: edgy.fields.FloatField,
+    sqltypes.SmallInteger: edgy.fields.SmallIntegerField,
+    sqltypes.Text: edgy.fields.TextField,
+    sqltypes.Time: edgy.fields.TimeField,
+    sqltypes.Uuid: edgy.fields.UUIDField,
 }
 
 DB_MODULE = "edgy"
@@ -51,7 +52,7 @@ class InspectDB:
     Class that builds the inspection of a database.
     """
 
-    def __init__(self, database: str, schema: Optional[str]) -> None:
+    def __init__(self, database: str, schema: Optional[str] = None) -> None:
         """
         Creates an instance of an InspectDB and triggers the proccess.
         """
@@ -184,22 +185,34 @@ class InspectDB:
             field_params["max_digits"] = real_field.precision
             field_params["decimal_places"] = real_field.scale
 
+        if field_type == "FloatField":
+            # Note: precision is maybe set to None when reflecting.
+            precision = getattr(real_field, "precision", None)
+            if precision is None:
+                # Oracle
+                precision = getattr(real_field, "binary_precision", None)
+                if precision is not None:
+                    # invert calculation of binary_precision
+                    precision = round(precision * 0.30103)
+            if precision is not None:
+                field_params["max_digits"] = precision
+
         if field_type == "BinaryField":
-            field_params["sql_nullable"] = getattr(real_field, "none_as_null", False)
+            field_params["max_length"] = getattr(real_field, "length", None)
 
         return field_type, field_params
 
     @classmethod
     def get_meta(
-        cls, table: dict[str, Any], unique_constraints: set[str], _indexes: set[str]
+        cls, table_detail: dict[str, Any], unique_constraints: set[str], _indexes: set[str]
     ) -> NoReturn:
         """
         Produces the Meta class.
         """
         unique_together: list[edgy.UniqueConstraint] = []
         unique_indexes: list[edgy.Index] = []
-        indexes = list(table["indexes"])
-        constraints = list(table["constraints"])
+        indexes = list(table_detail["indexes"])
+        constraints = list(table_detail["constraints"])
 
         # Handle the unique together
         for constraint in constraints:
@@ -225,7 +238,7 @@ class InspectDB:
         meta += [
             "    class Meta:\n",
             "        registry = registry\n",
-            "        tablename = '{}'\n".format(table["tablename"]),
+            "        tablename = '{}'\n".format(table_detail["tablename"]),
         ]
 
         if unique_together:
@@ -241,7 +254,7 @@ class InspectDB:
 
     @classmethod
     def write_output(
-        cls, tables: list[Any], connection_string: str, schema: Union[str, None] = None
+        cls, table_details: list[Any], connection_string: str, schema: Union[str, None] = None
     ) -> NoReturn:
         """
         Writes to stdout and runs some internal validations.
@@ -275,17 +288,17 @@ class InspectDB:
         yield registry
 
         # Start writing the classes
-        for table in tables:
+        for table_detail in table_details:
             unique_constraints: set[str] = set()
             indexes: set[str] = set()
 
             yield "\n"
             yield "\n"
             yield "\n"
-            yield "class {}({}.ReflectModel):\n".format(table["class_name"], DB_MODULE)
+            yield "class {}({}.ReflectModel):\n".format(table_detail["class_name"], DB_MODULE)
             # yield "    ...\n"
 
-            sqla_table: sqlalchemy.Table = table["table"]
+            sqla_table: sqlalchemy.Table = table_detail["table"]
             columns = list(sqla_table.columns)
 
             # Get the column information
@@ -338,4 +351,4 @@ class InspectDB:
                 yield f"    {field_description}"
 
             yield "\n"
-            yield from cls.get_meta(table, unique_constraints, indexes)
+            yield from cls.get_meta(table_detail, unique_constraints, indexes)

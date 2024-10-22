@@ -6,6 +6,19 @@ hide:
 
 # Release Notes
 
+## Unreleased
+
+### Added
+
+- Add DurationField.
+- Allow passing `max_digits` to FloatField.
+
+### Fixed
+
+- Triggering load on non-existent field when reflecting.
+- InspectDB mapping was incorrect.
+
+
 ## 0.19.1
 
 ### Fixed

@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union, cast
 import pydantic
 import sqlalchemy
 from pydantic import EmailStr
+from sqlalchemy.dialects import oracle
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE, EXPLICIT_SPECIFIED_VALUES
 from edgy.core.db.fields._internal import IPAddress
@@ -278,12 +279,17 @@ class FloatField(FieldFactory, float):
     def __new__(  # type: ignore
         cls,
         *,
+        max_digits: Optional[int] = None,
         ge: Union[int, float, decimal.Decimal, None] = None,
         gt: Union[int, float, decimal.Decimal, None] = None,
         le: Union[int, float, decimal.Decimal, None] = None,
         lt: Union[int, float, decimal.Decimal, None] = None,
         **kwargs: Any,
     ) -> BaseFieldType:
+        # pydantic doesn't support max_digits for float, so rename it
+        if max_digits is not None:
+            kwargs.setdefault("precision", max_digits)
+        del max_digits
         kwargs = {
             **kwargs,
             **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
@@ -291,8 +297,13 @@ class FloatField(FieldFactory, float):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.Float(asdecimal=False)
+    def get_column_type(cls, precision: Optional[int] = None, **kwargs: Any) -> Any:
+        if precision is None:
+            return sqlalchemy.Float(asdecimal=False)
+        return sqlalchemy.Float(precision=precision, asdecimal=False).with_variant(
+            oracle.FLOAT(binary_precision=round(precision / 0.30103), asdecimal=False),  # type: ignore
+            "oracle",
+        )
 
 
 class BigIntegerField(IntegerField):
@@ -532,12 +543,22 @@ class DateField(AutoNowMixin, datetime.date):
         return sqlalchemy.Date()
 
 
+class DurationField(FieldFactory, datetime.timedelta):
+    """Representation of a time field"""
+
+    field_type = datetime.timedelta
+
+    @classmethod
+    def get_column_type(cls, **kwargs: Any) -> Any:
+        return sqlalchemy.Interval()
+
+
 class TimeField(FieldFactory, datetime.time):
     """Representation of a time field"""
 
     field_type = datetime.time
 
-    def __new__(cls, **kwargs: Any) -> BaseFieldType:  # type: ignore
+    def __new__(cls, with_timezone: bool = False, **kwargs: Any) -> BaseFieldType:  # type: ignore
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -573,7 +594,7 @@ class BinaryField(FieldFactory, bytes):
 
     @classmethod
     def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.LargeBinary(kwargs.get("max_length"))
+        return sqlalchemy.LargeBinary(length=kwargs.get("max_length"))
 
 
 class UUIDField(FieldFactory, uuid.UUID):

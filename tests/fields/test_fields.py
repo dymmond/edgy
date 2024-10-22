@@ -17,6 +17,7 @@ from edgy.core.db.fields import (
     DateField,
     DateTimeField,
     DecimalField,
+    DurationField,
     FloatField,
     IntegerField,
     JSONField,
@@ -99,6 +100,7 @@ def test_field_annotation(field, annotation):
         (DecimalField(max_digits=20, decimal_places=2, null=False), True),
         (ChoiceField(choices=Choices, null=False), True),
         (RefForeignKey(UserRef), True),
+        (DurationField(), True),
     ],
 )
 def test_field_required(field, is_required):
@@ -122,6 +124,7 @@ def test_field_required(field, is_required):
         (SmallIntegerField(null=True), False),
         (DecimalField(max_digits=20, decimal_places=2, null=True), False),
         (ChoiceField(choices=Choices, null=True), False),
+        (DurationField(null=True), False),
     ],
 )
 def test_field_is_not_required(field, is_required):
@@ -160,6 +163,13 @@ def test_can_create_float_field():
     assert field.minimum == 5
     assert field.maximum == 10
     assert field.null is True
+
+
+def test_can_create_max_digits_float_field():
+    field = FloatField(max_digits=10, null=True)
+
+    assert isinstance(field, BaseField)
+    assert field.column_type.precision == 10
 
 
 def test_can_create_boolean_field():

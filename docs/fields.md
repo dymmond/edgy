@@ -355,6 +355,22 @@ DateTimeField supports int, float, string (isoformat), date object and of course
 !!! Note
     `auto_now` and `auto_now_add` set the `read_only` flag by default. You can explicitly set `read_only` to `False` to be still able to update the field manually.
 
+#### DurationField
+
+A DurationField can save the amount of time of a process. This is useful in case there is no clear start/stop timepoints.
+For example the time worked on a project.
+
+
+```python
+import datetime
+import edgy
+
+class Project(edgy.Model):
+    worked: datetime.timedelta = edgy.DurationField(default=datetime.timedelta())
+    estimated_time: datetime.timedelta = edgy.DurationField()
+    ...
+```
+
 #### DecimalField
 
 ```python
@@ -364,7 +380,6 @@ import edgy
 class MyModel(edgy.Model):
     price: decimal.Decimal = edgy.DecimalField(max_digits=5, decimal_places=2, null=True)
     ...
-
 ```
 
 ##### Parameters
@@ -440,10 +455,15 @@ import edgy
 class MyModel(edgy.Model):
     price: float = edgy.FloatField(null=True)
     ...
-
 ```
 
-Derives from the same as [IntegerField](#integerfield) and validates the decimal float.
+Derives from the same as [IntegerField](#integerfield) and validates the float.
+
+##### Parameters
+
+* `max_digits` - An integer indicating the total maximum digits.
+    In contrast to DecimalField it is database-only and can be used for higher/lower precision fields.
+    It is also available under the name `precision` with a higher priority. Optional.
 
 #### ForeignKey
 
