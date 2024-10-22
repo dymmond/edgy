@@ -91,6 +91,13 @@ To run the linting, use:
 $ hatch fmt
 ```
 
+#### Tests especially wanted
+
+We have still too few tests for multiple registries, databases and reflection. Adding more tests
+would be a good first issue.
+Additionally it would be nice to have more tests for fields in action. E.g. IPAddressField and other dbs
+than postgres.
+
 ### Documentation
 
 Improving the documentation is quite easy and it is placed inside the `edgy/docs` folder.
