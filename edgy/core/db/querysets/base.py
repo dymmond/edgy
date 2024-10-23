@@ -1,6 +1,5 @@
 import asyncio
 import warnings
-from collections import defaultdict
 from collections.abc import AsyncIterator, Awaitable, Generator, Iterable, Sequence
 from collections.abc import Iterable as CollectionsIterable
 from functools import cached_property
@@ -28,7 +27,7 @@ from edgy.core.db.querysets.mixins import QuerySetPropsMixin, TenancyMixin
 from edgy.core.db.querysets.prefetch import Prefetch, PrefetchMixin, check_prefetch_collision
 from edgy.core.db.querysets.types import EdgyEmbedTarget, EdgyModel, QueryType
 from edgy.core.db.relationships.utils import crawl_relationship
-from edgy.core.utils.db import check_db_connection
+from edgy.core.utils.db import check_db_connection, hash_tablekey
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.types import Undefined
@@ -44,6 +43,16 @@ if TYPE_CHECKING:  # pragma: no cover
 
 generic_field = BaseField()
 _empty_set = cast(Sequence[Any], frozenset())
+
+tables_and_models_type = dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]]
+
+
+def get_table_key_or_name(table: Any) -> str:
+    try:
+        return table.key
+    except AttributeError:
+        # alias
+        return table.name
 
 
 def clean_query_kwargs(
@@ -72,9 +81,11 @@ def clean_query_kwargs(
     return new_kwargs
 
 
-async def _parse_clause_arg(arg: Any, instance: "BaseQuerySet") -> Any:
+async def _parse_clause_arg(
+    arg: Any, instance: "BaseQuerySet", tables_and_models: tables_and_models_type
+) -> Any:
     if callable(arg):
-        arg = arg(instance)
+        arg = arg(instance, tables_and_models)
     if isawaitable(arg):
         arg = await arg
     return arg
@@ -118,6 +129,7 @@ class BaseQuerySet(
         super().__init__(model_class=model_class)
         self.filter_clauses: list[Any] = list(filter_clauses)
         self.or_clauses: list[Any] = []
+        self._aliases: dict[str, sqlalchemy.Alias] = {}
         if limit_count is not None:
             warnings.warn(
                 "`limit_count` is deprecated use `limit`", DeprecationWarning, stacklevel=2
@@ -168,10 +180,8 @@ class BaseQuerySet(
         # this is not cleared, because the expression is immutable
         self._cached_select_related_expression: Optional[
             tuple[
-                str,
-                dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
-                dict[str, set[str]],
                 Any,
+                dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
             ]
         ] = None
         # initialize
@@ -209,7 +219,7 @@ class BaseQuerySet(
             table=getattr(self, "_table", None),
             exclude_secrets=self._exclude_secrets,
         )
-        queryset.or_clauses = list(self.or_clauses)
+        queryset.or_clauses.extend(self.or_clauses)
         queryset._cached_select_related_expression = self._cached_select_related_expression
         return cast("QuerySet", queryset)
 
@@ -238,30 +248,52 @@ class BaseQuerySet(
         expression = expression.group_by(*(self._prepare_order_by(entry) for entry in group_by))
         return expression
 
-    async def _resolve_clause_args(self, args: Any) -> Any:
+    async def _resolve_clause_args(
+        self, args: Any, tables_and_models: tables_and_models_type
+    ) -> Any:
         result: list[Any] = []
         for arg in args:
-            result.append(_parse_clause_arg(arg, self))
+            result.append(_parse_clause_arg(arg, self, tables_and_models))
         if self.database.force_rollback:
             return [await el for el in result]
         else:
             return await asyncio.gather(*result)
 
-    async def build_where_clause(self, _: Any = None) -> Any:
+    async def build_where_clause(
+        self, _: Any = None, tables_and_models: Optional[tables_and_models_type] = None
+    ) -> Any:
         """Build a where clause from the filters which can be passed in a where function."""
+        joins = None
+        if tables_and_models is None:
+            joins, tables_and_models = self._build_tables_join_from_relationship()
         # ignored args for passing build_where_clause in filter_clauses
-        where_clause: list[Any] = []
+        where_clauses: list[Any] = []
         if self.or_clauses:
-            or_clauses = await self._resolve_clause_args(self.or_clauses)
-            where_clause.append(
+            or_clauses = await self._resolve_clause_args(self.or_clauses, tables_and_models)
+            where_clauses.append(
                 or_clauses[0] if len(or_clauses) == 1 else clauses_mod.or_(*or_clauses)
             )
 
         if self.filter_clauses:
             # we AND by default
-            where_clause.extend(await self._resolve_clause_args(self.filter_clauses))
+            where_clauses.extend(
+                await self._resolve_clause_args(self.filter_clauses, tables_and_models)
+            )
         # for nicer unpacking
-        return clauses_mod.and_(*where_clause)
+        if joins is None or len(tables_and_models) == 1:
+            return clauses_mod.and_(*where_clauses)
+        expression = sqlalchemy.sql.select().set_label_style(sqlalchemy.LABEL_STYLE_NONE)
+        expression = expression.select_from(joins)
+        return sqlalchemy.sql.exists(
+            expression.where(
+                *where_clauses,
+                *(
+                    getattr(tables_and_models[""][0].c, col).label(f"_subquery_{col}")
+                    == getattr(tables_and_models[""][0].c, col)
+                    for col in tables_and_models[""][1].pkcolumns
+                ),
+            )
+        ).select()
 
     def _build_select_distinct(self, distinct_on: Optional[Sequence[str]], expression: Any) -> Any:
         """Filters selects only specific fields. Leave empty to use simple distinct"""
@@ -277,32 +309,29 @@ class BaseQuerySet(
         join_clause: Any,
         current_transition: tuple[str, str],
         *,
-        transitions: dict[tuple[str, str], tuple[Any, set[tuple[str, str]]]],
+        transitions: dict[tuple[str, str], tuple[Any, Optional[tuple[str, str]], str]],
         tables_and_models: dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]],
-        transitions_is_full_outer: dict[tuple[str, str], bool],
     ) -> Any:
         if current_transition not in transitions:
             return join_clause
         transition_value = transitions.pop(current_transition)
 
-        for dep in transition_value[1]:
+        if transition_value[1] is not None:
             join_clause = cls._join_table_helper(
                 join_clause,
-                dep,
+                transition_value[1],
                 transitions=transitions,
                 tables_and_models=tables_and_models,
-                transitions_is_full_outer=transitions_is_full_outer,
             )
 
         return sqlalchemy.sql.join(
             join_clause,
-            tables_and_models[current_transition[1]][0],
+            tables_and_models[transition_value[2]][0],
             transition_value[0],
             isouter=True,
-            full=transitions_is_full_outer.get(current_transition, False),
         )
 
-    def _build_tables_select_from_relationship(
+    def _build_tables_join_from_relationship(
         self,
     ) -> tuple[
         str, dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]], dict[str, set[str]], Any
@@ -315,7 +344,7 @@ class BaseQuerySet(
         """
 
         # How does this work?
-        # First we build a transitions table with dependencies in case multiple pathes to the same table exist
+        # First we build a transitions table with a dependency, so we find a path
         # Secondly we check if a select_related path is joining a table from the set in an opposite direction
         # If yes, we mark the transition for a full outer join (dangerous, there could be side-effects)
         # At last we iter through the transisitions and build their dependencies first
@@ -326,13 +355,11 @@ class BaseQuerySet(
         if self._cached_select_related_expression is None:
             maintable = self.table
             select_from = maintable
-            maintablekey = maintable.key
-            tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]] = {
-                select_from.key: (select_from, self.model_class)
+            tables_and_models: tables_and_models_type = {"": (select_from, self.model_class)}
+            _select_tables_and_models: tables_and_models_type = {
+                "": (select_from, self.model_class)
             }
-            prefixes: dict[str, set[str]] = defaultdict(set)
-            transitions: dict[tuple[str, str], tuple[Any, set[tuple[str, str]]]] = {}
-            transitions_is_full_outer: dict[tuple[str, str], bool] = {}
+            transitions: dict[tuple[str, str], tuple[Any, Optional[tuple[str, str]], str]] = {}
 
             # Select related
             for select_path in self._select_related:
@@ -341,6 +368,8 @@ class BaseQuerySet(
                 former_table = maintable
                 former_transition = None
                 prefix: str = ""
+                _select_prefix: str = ""
+                injected_prefix: Union[bool, str] = False
                 model_database: Optional[Database] = self.database
                 while select_path:
                     field_name = select_path.split("__", 1)[0]
@@ -369,15 +398,20 @@ class BaseQuerySet(
                         )
                     # now use the one of the model_class itself
                     model_database = None
-                    table = model_class.table_schema(self.active_schema)
-                    # use table from tables_and_models
-                    if table.key in tables_and_models:
-                        table = tables_and_models[table.key][0]
-
+                    if injected_prefix:
+                        injected_prefix = False
+                    else:
+                        prefix = f"{prefix}__{field_name}" if prefix else f"{field_name}"
+                    _select_prefix = (
+                        f"{_select_prefix}__{field_name}" if _select_prefix else f"{field_name}"
+                    )
                     if foreign_key.is_m2m and foreign_key.embed_through != "":  # type: ignore
                         # we need to inject the through model for the select
                         model_class = foreign_key.through
-                        table = model_class.table_schema(self.active_schema)
+                        if foreign_key.embed_through is False:
+                            injected_prefix = True
+                        else:
+                            injected_prefix = f"{prefix}__{foreign_key.embed_through}"
                         if reverse:
                             select_path = f"{foreign_key.from_foreign_key}__{select_path}"
                         else:
@@ -389,9 +423,17 @@ class BaseQuerySet(
                         else:
                             foreign_key = model_class.meta.fields[foreign_key.from_foreign_key]
                             reverse = True
-                    prefix = f"{prefix}__{field_name}" if prefix else f"{prefix}"
-                    prefixes[table.key].add(prefix)
-                    transition_key = (former_table.key, table.key)
+                    if _select_prefix in _select_tables_and_models:
+                        # use prexisting prefix
+                        table = _select_tables_and_models[_select_prefix][0]
+                    else:
+                        table = model_class.table_schema(self.active_schema)
+                        table = table.alias(hash_tablekey(tablekey=table.key, prefix=prefix))
+
+                    transition_key = (
+                        get_table_key_or_name(former_table),
+                        table.name,
+                    )
                     if transition_key in transitions:
                         # can not provide new informations
                         former_table = table
@@ -402,37 +444,19 @@ class BaseQuerySet(
                             foreign_key, table, reverse, former_table
                         )
                     )
-                    if (table.key, former_table.key) in transitions:
-                        _transition_key = (table.key, former_table.key)
-                        # inverted
-                        # only make full outer when not the main query
-                        if former_table.key != maintablekey:
-                            transitions_is_full_outer[_transition_key] = True
-                        transitions[_transition_key] = (
-                            clauses_mod.or_(transitions[_transition_key][0], and_clause),
-                            {*transitions[_transition_key][1], former_transition}
-                            if former_transition
-                            else transitions[_transition_key][1],
-                        )
-                    elif table.key in tables_and_models:
-                        for _transition_key in transitions:
-                            if _transition_key[1] == table.key:
-                                break
-                        else:
-                            # this should never happen
-                            raise Exception("transition not found despite in tables_and_models")
-                        transitions[_transition_key] = (
-                            clauses_mod.or_(and_clause, transitions[_transition_key][0]),
-                            {*transitions[_transition_key][1], former_transition}
-                            if former_transition
-                            else transitions[_transition_key][0],
-                        )
-                    else:
-                        transitions[(former_table.key, table.key)] = (
-                            and_clause,
-                            {former_transition} if former_transition else set(),
-                        )
-                    tables_and_models[table.key] = table, model_class
+                    transitions[transition_key] = (
+                        and_clause,
+                        former_transition,
+                        _select_prefix,
+                    )
+                    if injected_prefix is False:
+                        tables_and_models[prefix] = table, model_class
+                    elif injected_prefix is not True:
+                        # we inject a string
+                        tables_and_models[injected_prefix] = table, model_class
+
+                    # prefix used for select_related
+                    _select_tables_and_models[_select_prefix] = table, model_class
                     former_table = table
                     former_transition = transition_key
 
@@ -441,14 +465,11 @@ class BaseQuerySet(
                     select_from,
                     next(iter(transitions.keys())),
                     transitions=transitions,
-                    tables_and_models=tables_and_models,
-                    transitions_is_full_outer=transitions_is_full_outer,
+                    tables_and_models=_select_tables_and_models,
                 )
             self._cached_select_related_expression = (
-                maintablekey,
-                tables_and_models,
-                prefixes,
                 select_from,
+                tables_and_models,
             )
         return self._cached_select_related_expression
 
@@ -476,94 +497,78 @@ class BaseQuerySet(
 
     async def _as_select_with_tables(
         self,
-    ) -> tuple[Any, dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]]]:
+    ) -> tuple[Any, tables_and_models_type]:
         """
         Builds the query select based on the given parameters and filters.
         """
-        queryset: BaseQuerySet = self
-
-        queryset._validate_only_and_defer()
-        maintable, tables_and_models, prefixes, select_from = (
-            queryset._build_tables_select_from_relationship()
-        )
+        self._validate_only_and_defer()
+        joins, tables_and_models = self._build_tables_join_from_relationship()
         columns = []
-        for tablekey, (table, model_class) in tables_and_models.items():
-            if tablekey == maintable:
+        for prefix, (table, model_class) in tables_and_models.items():
+            if not prefix:
                 for column_key, column in table.columns.items():
                     # e.g. reflection has not always a field
                     field_name = model_class.meta.columns_to_field.get(column_key, column_key)
-                    if queryset._only and field_name not in queryset._only:
+                    if self._only and field_name not in self._only:
                         continue
-                    if queryset._defer and field_name in queryset._defer:
+                    if self._defer and field_name in self._defer:
                         continue
                     if (
-                        queryset._exclude_secrets
+                        self._exclude_secrets
                         and field_name in model_class.meta.fields
                         and model_class.meta.fields[field_name].secret
                     ):
                         continue
-
-                    # columns.append(column.label(f"{table.key.replace(".", "_")}_{column.key}"))
+                    # add without alias
                     columns.append(column)
 
             else:
-                prefixes_for_table = prefixes[table.key]
                 for column_key, column in table.columns.items():
                     # e.g. reflection has not always a field
                     field_name = model_class.meta.columns_to_field.get(column_key, column_key)
-                    if queryset._only and all(
-                        f"{prefix}" not in queryset._only
-                        and f"{prefix}__{field_name}" not in queryset._only
-                        for prefix in prefixes_for_table
+                    if (
+                        self._only
+                        and prefix not in self._only
+                        and f"{prefix}__{field_name}" not in self._only
                     ):
                         continue
-                    if queryset._defer and any(
-                        f"{prefix}" in queryset._defer
-                        or f"{prefix}__{field_name}" in queryset._defer
-                        for prefix in prefixes_for_table
+                    if self._defer and (
+                        prefix in self._defer or f"{prefix}__{field_name}" in self._defer
                     ):
                         continue
                     if (
-                        queryset._exclude_secrets
+                        self._exclude_secrets
                         and field_name in model_class.meta.fields
                         and model_class.meta.fields[field_name].secret
                     ):
                         continue
-                    # columns.append(column.label(f"{table.key.replace(".", "_")}_{column.key}"))
-                    columns.append(column)
+                    # alias has name not a key. The name is fully descriptive
+                    columns.append(column.label(f"{table.name}_{column_key}"))
         assert columns, "no columns specified"
-        # all columns are aliased now
-        expression = sqlalchemy.sql.select(*columns).set_label_style(
-            sqlalchemy.LABEL_STYLE_TABLENAME_PLUS_COL
-        )
-        expression = expression.select_from(select_from)
-        expression = expression.where(await queryset.build_where_clause())
+        # all columns are aliased already
+        expression = sqlalchemy.sql.select(*columns).set_label_style(sqlalchemy.LABEL_STYLE_NONE)
+        expression = expression.select_from(joins)
+        expression = expression.where(await self.build_where_clause(self, tables_and_models))
 
-        if queryset._order_by:
-            expression = queryset._build_order_by_expression(
-                queryset._order_by, expression=expression
-            )
+        if self._order_by:
+            expression = self._build_order_by_expression(self._order_by, expression=expression)
 
-        if queryset.limit_count:
-            expression = expression.limit(queryset.limit_count)
+        if self.limit_count:
+            expression = expression.limit(self.limit_count)
 
-        if queryset._offset:
-            expression = expression.offset(queryset._offset)
+        if self._offset:
+            expression = expression.offset(self._offset)
 
-        if queryset._group_by:
-            expression = queryset._build_group_by_expression(
-                queryset._group_by, expression=expression
-            )
+        if self._group_by:
+            expression = self._build_group_by_expression(self._group_by, expression=expression)
 
-        if queryset.distinct_on is not None:
-            expression = queryset._build_select_distinct(
-                queryset.distinct_on, expression=expression
-            )
+        if self.distinct_on is not None:
+            expression = self._build_select_distinct(self.distinct_on, expression=expression)
         return expression, tables_and_models
 
     async def as_select_with_tables(
         self,
-    ) -> tuple[Any, dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]]]:
+    ) -> tuple[Any, tables_and_models_type]:
         """
         Builds the query select based on the given parameters and filters.
         """
@@ -611,14 +616,15 @@ class BaseQuerySet(
                 # bind local vars
                 async def wrapper(
                     queryset: "QuerySet",
+                    tables_and_models: tables_and_models_type,
+                    *,
                     _field: "BaseFieldType" = field,
                     _sub_query: "QuerySet" = sub_query,
+                    _prefix: str = related_str,
                 ) -> Any:
+                    table = tables_and_models[_prefix][0]
                     fk_tuple = sqlalchemy.tuple_(
-                        *(
-                            getattr(queryset.table.columns, colname)
-                            for colname in _field.get_column_names()
-                        )
+                        *(getattr(table.columns, colname) for colname in _field.get_column_names())
                     )
                     return fk_tuple.in_(await _sub_query)
 
@@ -627,17 +633,21 @@ class BaseQuerySet(
                 # bind local vars
                 async def wrapper(
                     queryset: "QuerySet",
+                    tables_and_models: tables_and_models_type,
+                    *,
                     _field: "BaseFieldType" = field,
                     _value: Any = value,
                     _op: Optional[str] = op,
+                    _prefix: str = related_str,
                 ) -> Any:
-                    _value = _value(queryset)
+                    _value = _value(queryset, tables_and_models)
                     if isawaitable(_value):
                         _value = await _value
+                    table = tables_and_models[_prefix][0]
                     return _field.operator_to_clause(
                         _field.name,
                         _op,
-                        queryset.model_class.table_schema(queryset.active_schema),
+                        table,
                         _value,
                     )
 
@@ -647,11 +657,20 @@ class BaseQuerySet(
                 assert not isinstance(
                     value, BaseModelType
                 ), f"should be parsed in clean: {key}: {value}"
-                clauses.append(
-                    field.operator_to_clause(
-                        field_name, op, model_class.table_schema(self.active_schema), value
-                    )
-                )
+
+                def wrapper(
+                    queryset: "QuerySet",
+                    tables_and_models: tables_and_models_type,
+                    *,
+                    _field: "BaseFieldType" = field,
+                    _value: Any = value,
+                    _op: Optional[str] = op,
+                    _prefix: str = related_str,
+                ) -> Any:
+                    table = tables_and_models[_prefix][0]
+                    return _field.operator_to_clause(_field.name, _op, table, _value)
+
+                clauses.append(wrapper)
 
         return clauses, select_related
 
@@ -929,6 +948,7 @@ class BaseQuerySet(
 
                     async def wrapper_and(
                         queryset: "QuerySet",
+                        tables_and_models: tables_and_models_type,
                         _extracted_clauses: Sequence[
                             Union[
                                 "sqlalchemy.sql.expression.BinaryExpression",
@@ -943,7 +963,11 @@ class BaseQuerySet(
                         ] = extracted_clauses,
                     ) -> Any:
                         return clauses_mod.and_(
-                            *(await self._resolve_clause_args(_extracted_clauses))
+                            *(
+                                await self._resolve_clause_args(
+                                    _extracted_clauses, tables_and_models
+                                )
+                            )
                         )
 
                     if allow_global_or and len(clauses) == 1:
@@ -971,14 +995,22 @@ class BaseQuerySet(
         if exclude:
             op = clauses_mod.and_ if not or_ else clauses_mod.or_
 
-            async def wrapper(queryset: "QuerySet") -> Any:
-                return clauses_mod.not_(op(*(await self._resolve_clause_args(converted_clauses))))
+            async def wrapper(
+                queryset: "QuerySet", tables_and_models: tables_and_models_type
+            ) -> Any:
+                return clauses_mod.not_(
+                    op(*(await self._resolve_clause_args(converted_clauses, tables_and_models)))
+                )
 
             queryset.filter_clauses.append(wrapper)
         elif or_:
 
-            async def wrapper(queryset: "QuerySet") -> Any:
-                return clauses_mod.or_(*(await self._resolve_clause_args(converted_clauses)))
+            async def wrapper(
+                queryset: "QuerySet", tables_and_models: tables_and_models_type
+            ) -> Any:
+                return clauses_mod.or_(
+                    *(await self._resolve_clause_args(converted_clauses, tables_and_models))
+                )
 
             queryset.filter_clauses.append(wrapper)
         else:
@@ -1033,6 +1065,9 @@ class BaseQuerySet(
         self._cache_count = 1
 
         return await self._get_or_cache_row(rows[0], tables_and_models, "_cache_first,_cache_last")
+
+    def __repr__(self) -> str:
+        return f"QuerySet<{self.sql}>"
 
 
 class QuerySet(BaseQuerySet):

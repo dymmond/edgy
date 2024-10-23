@@ -28,10 +28,7 @@ class ModelRowMixin:
         return bool(
             cls.meta.registry
             and not cls.meta.abstract
-            and all(
-                row._mapping.get(f"{table.key.replace('.', '_')}_{col}") is not None
-                for col in cls.pkcolumns
-            )
+            and all(row._mapping.get(f"{table.name}_{col}") is not None for col in cls.pkcolumns)
         )
 
     @classmethod
@@ -87,17 +84,13 @@ class ModelRowMixin:
                     detail=f'Selected field "{field_name}" is not a RelationshipField on {cls}.'
                 ) from None
 
+            _prefix = field_name if not prefix else f"{prefix}__{field_name}"
             # stop selecting when None. Related models are not available.
             if not model_class.can_load_from_row(
                 row,
-                tables_and_models[
-                    model_class.meta.tablename
-                    if using_schema is None
-                    else f"{using_schema}.{model_class.meta.tablename}"
-                ][0],
+                tables_and_models[_prefix][0],
             ):
                 continue
-            _prefix = field_name if not prefix else f"{prefix}__{field_name}"
 
             if remainder:
                 # don't pass table, it is only for the main model_class
@@ -130,9 +123,7 @@ class ModelRowMixin:
             for k, v in item.items():
                 setattr(old_select_related_value, k, v)
             return old_select_related_value
-        table_columns = tables_and_models[
-            cls.meta.tablename if using_schema is None else f"{using_schema}.{cls.meta.tablename}"
-        ][0].columns
+        table_columns = tables_and_models[prefix][0].columns
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
         # This way it is not overritten by any value
@@ -153,12 +144,15 @@ class ModelRowMixin:
             child_item = {}
             for column_name in columns_to_check:
                 column = getattr(table_columns, column_name, None)
-                if (
-                    column is not None
-                    and f"{column.table.key.replace('.', '_')}_{column.key}" in row._mapping
-                ):
+                if column_name is None:
+                    continue
+                columnkeyhash = column_name
+                if prefix:
+                    columnkeyhash = f"{tables_and_models[prefix][0].name}_{column.key}"
+
+                if columnkeyhash in row._mapping:
                     child_item[foreign_key.from_fk_field_name(related, column_name)] = (
-                        row._mapping[f"{column.table.key.replace('.', '_')}_{column.key}"]
+                        row._mapping[columnkeyhash]
                     )
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
@@ -190,13 +184,14 @@ class ModelRowMixin:
             if column.key not in cls.meta.columns_to_field:
                 continue
             # set if not of an foreign key with one column
-            elif (
-                column.key not in item
-                and f"{column.table.key.replace('.', '_')}_{column.key}" in row._mapping
-            ):
-                item[column.key] = row._mapping[
-                    f"{column.table.key.replace('.', '_')}_{column.key}"
-                ]
+            if column.key in item:
+                continue
+            columnkeyhash = column.key
+            if prefix:
+                columnkeyhash = f"{tables_and_models[prefix][0].name}_{columnkeyhash}"
+
+            if columnkeyhash in row._mapping:
+                item[column.key] = row._mapping[columnkeyhash]
         model: Model = (
             cls.proxy_model(**item, __phase__="init_db")  # type: ignore
             if exclude_secrets or is_defer_fields or only_fields
@@ -208,21 +203,13 @@ class ModelRowMixin:
             cls,
             using_schema,
             database=database,
-            table=tables_and_models[
-                cls.meta.tablename
-                if using_schema is None
-                else f"{using_schema}.{cls.meta.tablename}"
-            ][0],
+            table=tables_and_models[prefix][0],
         )
 
         # Handle prefetch related fields.
         await cls.__handle_prefetch_related(
             row=row,
-            table=tables_and_models[
-                cls.meta.tablename
-                if using_schema is None
-                else f"{using_schema}.{cls.meta.tablename}"
-            ][0],
+            table=tables_and_models[prefix][0],
             model=model,
             prefetch_related=prefetch_related,
         )

@@ -99,8 +99,11 @@ class TenancyMixin:
             queryset.database = connection
         if schema is not Undefined:
             queryset.using_schema = schema if schema is not False else Undefined
-            queryset.active_schema = queryset.get_schema()
-            queryset.table = None
+            new_schema = queryset.get_schema()
+            if new_schema != queryset.active_schema:
+                queryset.active_schema = new_schema
+                queryset.table = None
+
         return queryset
 
     def using_with_db(

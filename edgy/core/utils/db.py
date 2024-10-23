@@ -1,4 +1,7 @@
+import base64
+import hashlib
 import warnings
+from functools import lru_cache
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -16,3 +19,20 @@ def check_db_connection(db: "Database") -> None:
             UserWarning,
             stacklevel=2,
         )
+
+
+@lru_cache(512, typed=False)
+def _hash_tablekey(tablekey: str, prefix: str) -> str:
+    tablehash = (
+        base64.urlsafe_b64encode(hashlib.new("md5", f"{tablekey}_{prefix}".encode()).digest())
+        .decode()
+        .rstrip("=")
+    )
+
+    return f"_join_{tablehash}"
+
+
+def hash_tablekey(*, tablekey: str, prefix: str) -> str:
+    if not prefix:
+        return tablekey
+    return _hash_tablekey(tablekey, prefix)
