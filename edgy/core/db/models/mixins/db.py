@@ -3,7 +3,7 @@ import inspect
 import warnings
 from collections.abc import Sequence
 from functools import partial
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 
 import sqlalchemy
 from pydantic import BaseModel
@@ -113,14 +113,19 @@ class DatabaseMixin:
         cls: type["BaseModelType"],
         registry: "Registry",
         name: str = "",
-        database: Union[bool, "Database"] = True,
+        database: Union[bool, "Database", Literal["keep"]] = True,
     ) -> None:
         # when called if registry is not set
         cls.meta.registry = registry
         if database is True:
             cls.database = registry.database
         elif database is not False:
-            cls.database = database
+            if database == "keep":
+                if getattr(cls, "database", None) is None:
+                    cls.database = registry.database
+
+            else:
+                cls.database = database
         meta = cls.meta
         if name:
             cls.__name__ = name
