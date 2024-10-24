@@ -10,7 +10,7 @@ from edgy.core.connection.database import Database
 from edgy.exceptions import SchemaError
 
 if TYPE_CHECKING:
-    from edgy import Database, Registry
+    from edgy import Registry
 
 
 class Schema:
@@ -127,3 +127,25 @@ class Schema:
                 with db.force_rollback(False):
                     ops.append(db.run_sync(execute_drop))
         await asyncio.gather(*ops)
+
+    async def list_schemes_of_db(self, database: Database) -> list[str]:
+        async with database as database:
+            list_schemes: list[str] = []
+
+            def wrapper(connection: sqlalchemy.Connection) -> None:
+                nonlocal list_schemes
+                inspector = sqlalchemy.inspect(connection)
+                list_schemes = inspector.get_schema_names()
+
+            await database.run_sync(wrapper)
+            return list_schemes
+
+    async def get_schemes_tree(self, *, use_id: bool = False) -> dict[Union[str, None], list[str]]:
+        schemes_tree: dict[Union[str, None], list[str]] = {
+            f"{id(self.registry.database)}" if use_id else None: await self.list_schemes_of_db(
+                self.registry.database
+            )
+        }
+        for key, val in self.registry.extra.items():
+            schemes_tree[f"{id(val)}" if use_id else key] = await self.list_schemes_of_db(val)
+        return schemes_tree

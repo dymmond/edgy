@@ -66,3 +66,7 @@ class ASGIHelper:
 
         with suppress(MuteInteruptException):
             await self.app(scope, receive, send)
+
+    def __getattr__(self, key: str) -> Any:
+        # esmerald shim, they extract data directly from app.
+        return getattr(self.app, key)
