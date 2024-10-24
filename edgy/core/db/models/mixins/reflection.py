@@ -30,7 +30,10 @@ class ReflectedModelMixin:
         registry = cls.meta.registry
         assert registry, "registry is not set"
         if metadata is None:
-            metadata = registry.metadata
+            if str(cls.database.url) == str(registry.database.url):
+                metadata = registry.metadata
+            else:
+                metadata = sqlalchemy.MetaData()
         if cls.__using_schema__ is not Undefined:
             schema_name = cls.__using_schema__
         else:

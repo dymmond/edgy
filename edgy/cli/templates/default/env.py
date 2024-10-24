@@ -62,18 +62,14 @@ app: Any = get_app()
 # target_metadata = mymodel.Base.metadata
 config.set_main_option("sqlalchemy.url", get_engine_url())
 
-target_db = getattr(app, EDGY_DB)["migrate"].registry
+extra_metadata = getattr(app, EDGY_DB)["migrate"].extra_metadata
+metadata = getattr(app, EDGY_DB)["migrate"].registry.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
-
-def get_metadata() -> Any:
-    if hasattr(target_db, "metadatas"):
-        return target_db.metadatas[None]
-    return target_db.metadata
 
 
 def run_migrations_offline() -> Any:
@@ -89,7 +85,7 @@ def run_migrations_offline() -> Any:
     script output.
     """
     url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=get_metadata(), literal_binds=True)
+    context.configure(url=url, target_metadata=metadata, literal_binds=True)
 
     with context.begin_transaction():
         context.run_migrations()
@@ -108,7 +104,7 @@ def do_run_migrations(connection: Any) -> Any:
 
     context.configure(
         connection=connection,
-        target_metadata=get_metadata(),
+        target_metadata=metadata,
         process_revision_directives=process_revision_directives,
         **getattr(app, EDGY_DB)["migrate"].kwargs,
     )

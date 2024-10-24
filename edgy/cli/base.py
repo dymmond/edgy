@@ -16,6 +16,8 @@ from edgy.core.extras.base import BaseExtra
 from edgy.utils.compat import is_class_and_subclass
 
 if TYPE_CHECKING:
+    import re
+
     from edgy.core.connection.registry import Registry
 
 alembic_version = tuple(int(v) for v in __alembic_version__.split(".")[0:3])
@@ -65,6 +67,8 @@ class Migrate(BaseExtra):
         model_apps: Union[dict[str, str], tuple[str], list[str], None] = None,
         compare_type: bool = True,
         render_as_batch: bool = True,
+        multi_schema: Union[bool, "re.Pattern", str] = False,
+        ignore_schema_pattern: Union[None, "re.Pattern", str] = "information_schema",
         **kwargs: Any,
     ) -> None:
         super().__init__()
@@ -90,9 +94,11 @@ class Migrate(BaseExtra):
                     stacklevel=2,
                 )
             # proper add to registry
-            value.add_to_registry(self.registry)
+            value.add_to_registry(self.registry, database="keep")
         # we need to ensure initialized metadata
-        self.registry.refresh_metadata()
+        self.extra_metadata = self.registry.refresh_metadata(
+            multi_schema=multi_schema, ignore_schema_pattern=ignore_schema_pattern
+        )
 
         self.directory = "migrations"
         self.alembic_ctx_kwargs = {

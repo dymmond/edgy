@@ -1,5 +1,6 @@
 import asyncio
 import contextlib
+import re
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from functools import cached_property, partial
@@ -23,6 +24,8 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
+from edgy.core.utils.sync import run_sync
+from edgy.types import Undefined
 
 from .asgi import ASGIApp, ASGIHelper
 
@@ -184,16 +187,65 @@ class Registry:
         else:
             raise LookupError(f"Registry doesn't have a {model_name} model.") from None
 
-    def refresh_metadata(self) -> None:
+    def refresh_metadata(
+        self,
+        *,
+        multi_schema: Union[bool, re.Pattern, str] = False,
+        ignore_schema_pattern: Union[None, "re.Pattern", str] = "information_schema",
+    ) -> dict[str, sqlalchemy.MetaData]:
         self.metadata.clear()
+        extra_metadata = {}
+        maindatabase_url = str(self.database.url)
+        if multi_schema is not False:
+            schemes_tree = run_sync(self.schema.get_schemes_tree(use_url=True))
+        if isinstance(multi_schema, str):
+            multi_schema = re.compile(multi_schema)
+        if isinstance(ignore_schema_pattern, str):
+            ignore_schema_pattern = re.compile(ignore_schema_pattern)
         for model_class in self.models.values():
             model_class._table = None
             model_class._db_schemas = {}
-            model_class.table_schema(schema=self.db_schema)
+            url = str(model_class.database.url)
+            if multi_schema is False:
+                if maindatabase_url == url:
+                    # initialize the correct table with metadata
+                    model_class.table  # noqa
+                else:
+                    if url not in extra_metadata:
+                        extra_metadata[url] = sqlalchemy.MetaData()
+                    model_class.build(metadata=extra_metadata[url])
+            else:
+                scheme_tree_object = schemes_tree.get(url)
+                if scheme_tree_object is not None:
+                    for schema in scheme_tree_object[1]:
+                        if multi_schema is not True and multi_schema.match(schema) is None:
+                            continue
+                        if (
+                            ignore_schema_pattern is not None
+                            and ignore_schema_pattern.match(schema) is not None
+                        ):
+                            continue
+                        if not getattr(model_class.meta, "is_tenant", False):
+                            if (
+                                model_class.__using_schema__ is Undefined
+                                or model_class.__using_schema__ is None
+                            ):
+                                if schema != "":
+                                    continue
+                            elif model_class.__using_schema__ != schema:
+                                continue
+                        if maindatabase_url == url:
+                            model_class.table_schema(schema)
+                        else:
+                            if url not in extra_metadata:
+                                extra_metadata[url] = sqlalchemy.MetaData()
+                            model_class.build(schema=schema, metadata=extra_metadata[url])
 
+        # don't initialize to keep the metadata clean
         for model_class in self.reflected.values():
             model_class._table = None
             model_class._db_schemas = {}
+        return extra_metadata
 
     def register_callback(
         self,
@@ -297,6 +349,14 @@ class Registry:
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
         for model_class in self.reflected.values():
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
+
+    def get_tablenames(self) -> set[str]:
+        return_set = set()
+        for model_class in self.models.values():
+            return_set.add(model_class.meta.tablename)
+        for model_class in self.reflected.values():
+            return_set.add(model_class.meta.tablename)
+        return return_set
 
     async def _connect_and_init(self, name: Union[str, None], database: "Database") -> None:
         from edgy.core.db.models.metaclasses import MetaInfo

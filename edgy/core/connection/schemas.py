@@ -10,7 +10,7 @@ from edgy.core.connection.database import Database
 from edgy.exceptions import SchemaError
 
 if TYPE_CHECKING:
-    from edgy import Database, Registry
+    from edgy import Registry
 
 
 class Schema:
@@ -127,3 +127,42 @@ class Schema:
                 with db.force_rollback(False):
                     ops.append(db.run_sync(execute_drop))
         await asyncio.gather(*ops)
+
+    async def get_metadata_of_all_schemes(
+        self, database: Database
+    ) -> tuple[sqlalchemy.MetaData, list[str]]:
+        tablenames = self.registry.get_tablenames()
+
+        async with database as database:
+            list_schemes: list[str] = []
+            metadata = sqlalchemy.MetaData()
+
+            def wrapper(connection: sqlalchemy.Connection) -> None:
+                nonlocal list_schemes
+                inspector = sqlalchemy.inspect(connection)
+                default_schema_name = inspector.default_schema_name
+                list_schemes = [
+                    "" if default_schema_name == schema else schema
+                    for schema in inspector.get_schema_names()
+                ]
+                for schema in list_schemes:
+                    metadata.reflect(
+                        connection, schema=schema, only=lambda name, _: name in tablenames
+                    )
+
+            await database.run_sync(wrapper)
+            return metadata, list_schemes
+
+    async def get_schemes_tree(
+        self, *, use_url: bool = False
+    ) -> dict[Union[str, None], tuple[sqlalchemy.MetaData, list[str]]]:
+        schemes_tree: dict[Union[str, None], tuple[sqlalchemy.MetaData, list[str]]] = {
+            str(self.registry.database.url)
+            if use_url
+            else None: await self.get_metadata_of_all_schemes(self.registry.database)
+        }
+        for key, val in self.registry.extra.items():
+            tree_key = str(val.url) if use_url else key
+            if tree_key not in schemes_tree:
+                schemes_tree[tree_key] = await self.get_metadata_of_all_schemes(val)
+        return schemes_tree

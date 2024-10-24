@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.20.1
+
+### Fixed
+
+- Allow multi-schema migrations.
+
 ## 0.20.0
 
 ### Added

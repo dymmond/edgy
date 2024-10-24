@@ -59,7 +59,7 @@ class Product(TenantModel):
     created_datetime: datetime = fields.DateTimeField(auto_now_add=True)
     updated_datetime: datetime = fields.DateTimeField(auto_now=True)
     updated_date: datetime = fields.DateField(auto_now=True)
-    data: dict[Any, Any] = fields.JSONField(default={})
+    data: dict[Any, Any] = fields.JSONField(default=dict)
     description: str = fields.CharField(null=True, max_length=255)
     huge_number: int = fields.BigIntegerField(default=0)
     price: decimal.Decimal = fields.DecimalField(max_digits=9, decimal_places=2, null=True)
