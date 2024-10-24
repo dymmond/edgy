@@ -189,7 +189,7 @@ class BaseQuerySet(
         """
         queryset = self.__class__(
             self.model_class,
-            database=self.database,
+            database=getattr(self, "_database", None),
             filter_clauses=self.filter_clauses,
             select_related=self._select_related,
             prefetch_related=self._prefetch_related,
@@ -336,9 +336,8 @@ class BaseQuerySet(
         """
 
         # How does this work?
-        # First we build a transitions table with a dependency, so we find a path
-        # Secondly we check if a select_related path is joining a table from the set in an opposite direction
-        # If yes, we mark the transition for a full outer join (dangerous, there could be side-effects)
+        # First we build a transitions tree (maintable is root) by providing optionally a dependency.
+        # Resolving a dependency automatically let's us resolve the tree.
         # At last we iter through the transisitions and build their dependencies first
         # We pop out the transitions so a path is not taken 2 times
 
@@ -362,7 +361,14 @@ class BaseQuerySet(
                 former_table = maintable
                 former_transition = None
                 prefix: str = ""
+                # prefix which expands m2m fields
                 _select_prefix: str = ""
+                # False (default): add prefix regularly.
+                # True: skip adding existing prefix to tables_and_models and skip adding the next field to the
+                #       public prefix.
+                # string: add a custom prefix instead of the calculated one and skip adding the next field to the
+                #         public prefix.
+
                 injected_prefix: Union[bool, str] = False
                 model_database: Optional[Database] = self.database
                 while select_path:
@@ -424,6 +430,8 @@ class BaseQuerySet(
                         table = model_class.table_schema(self.active_schema)
                         table = table.alias(hash_tablekey(tablekey=table.key, prefix=prefix))
 
+                    # it is guranteed that former_table is either root and has a key or is an unique join node
+                    # except there would be a hash collision which is very unlikely
                     transition_key = (get_table_key_or_name(former_table), table.name, field_name)
                     if transition_key in transitions:
                         # can not provide new informations
@@ -1041,14 +1049,16 @@ class QuerySet(BaseQuerySet):
     QuerySet object used for query retrieving. Public interface
     """
 
+    async def _sql_helper(self) -> Any:
+        async with self.database:
+            return (await self.as_select()).compile(
+                self.database.engine, compile_kwargs={"literal_binds": True}
+            )
+
     @cached_property
     def sql(self) -> str:
-        """Get SQL select query as string."""
-        return str(
-            run_sync(self.as_select()).compile(
-                compile_kwargs={"literal_binds": True},
-            )
-        )
+        """Get SQL select query as string with inserted blanks. For debugging only!"""
+        return str(run_sync(self._sql_helper()))
 
     def filter(
         self,

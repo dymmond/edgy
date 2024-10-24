@@ -22,6 +22,7 @@ hide:
 - Breaking: Functions passed to filter functions reveive now a second positional parameter `tables_and_models`.
 - `build_where_clause` conditionally uses a subquery.
 - Rename QueryType to QuerySetType. The old name stays as an alias.
+- The debug property of QuerySet named `sql` inserts now the blanks and uses the dialect.
 
 ### Fixed
 

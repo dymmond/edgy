@@ -251,6 +251,9 @@ class ModelRowMixin:
     ) -> None:
         model_key = ()
         if related._is_finished:
+            # when force_rollback
+            # we can only bake after all rows are retrieved
+            # this is why it is here
             await related.init_bake(type(model))
             model_key = model.create_model_key()
         if model_key in related._baked_results:
