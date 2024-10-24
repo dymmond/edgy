@@ -1097,7 +1097,7 @@ The pendant in a model are `identifying_clauses`.
 query = Model.query.filter(id=1)
 # ensures that the db connection doesn't drop during operation
 async with query.database as database:
-    # when using joins a exist  subquery is generated
+    # when using joins a subquery is generated
     expression = query.table.select().where(await query.build_where_clause())
     # as generic sql
     print(str(expression))
@@ -1123,6 +1123,10 @@ async with model.database as database:
 
 If you want raw sql see the print statements. You most probably want a dialect specific sql string for non-basic
 sql types because otherwise some features are not supported or cause warnings.
+
+## Debugging
+
+QuerySet contains a cached debug property named `sql` which contains the QuerySet as query with inserted blanks.
 
 [model]: ../models.md
 [managers]: ../managers.md
