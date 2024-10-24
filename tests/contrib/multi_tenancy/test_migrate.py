@@ -69,8 +69,31 @@ async def test_migrate_objs_all():
 
     migrate = Migrate(app=app, registry=models, multi_schema=True)
 
-    # public = 2, information_schema = 2, migrate_edgy = 2
-    assert len(migrate.registry.metadata.tables.keys()) == 6
+    assert set(migrate.registry.metadata.tables.keys()) == {
+        "tenants",
+        "migrate_edgy.products",
+        "products",
+    }
+
+
+async def test_migrate_objs_namespace_only():
+    tenant = await Tenant.query.create(
+        schema_name="migrate_edgy",
+        domain_url="https://edgy.dymmond.com",
+        tenant_name="migrate_edgy",
+    )
+    await Tenant.query.create(
+        schema_name="saffier", domain_url="https://saffier.dymmond.com", tenant_name="saffier"
+    )
+
+    assert tenant.schema_name == "migrate_edgy"
+    assert tenant.tenant_name == "migrate_edgy"
+
+    app = Esmerald()
+
+    migrate = Migrate(app=app, registry=models, multi_schema="saffier")
+
+    assert set(migrate.registry.metadata.tables.keys()) == {"saffier.products"}
 
 
 async def test_migrate_objs_few():
@@ -88,6 +111,10 @@ async def test_migrate_objs_few():
 
     app = Esmerald()
 
-    migrate = Migrate(app=app, registry=models, multi_schema="saffier")
+    migrate = Migrate(app=app, registry=models, multi_schema="saffier|^$")
 
-    assert set(migrate.registry.metadata.tables.keys()) == {"saffier.tenants", "saffier.products"}
+    assert set(migrate.registry.metadata.tables.keys()) == {
+        "saffier.products",
+        "products",
+        "tenants",
+    }

@@ -25,6 +25,7 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
 from edgy.core.utils.sync import run_sync
+from edgy.types import Undefined
 
 from .asgi import ASGIApp, ASGIHelper
 
@@ -186,12 +187,19 @@ class Registry:
         else:
             raise LookupError(f"Registry doesn't have a {model_name} model.") from None
 
-    def refresh_metadata(self, *, multi_schema: Union[bool, re.Pattern, str] = False) -> None:
+    def refresh_metadata(
+        self,
+        *,
+        multi_schema: Union[bool, re.Pattern, str] = False,
+        ignore_schema_pattern: Union[None, "re.Pattern", str] = "information_schema",
+    ) -> None:
         self.metadata.clear()
         if multi_schema is not False:
-            schemes_tree = run_sync(self.schema.get_schemes_tree(use_id=True))
+            schemes_tree = run_sync(self.schema.get_schemes_tree(use_url=True))
         if isinstance(multi_schema, str):
             multi_schema = re.compile(multi_schema)
+        if isinstance(ignore_schema_pattern, str):
+            ignore_schema_pattern = re.compile(ignore_schema_pattern)
         for model_class in self.models.values():
             model_class._table = None
             model_class._db_schemas = {}
@@ -199,10 +207,27 @@ class Registry:
                 # initialize the correct table with metadata
                 model_class.table  # noqa
             else:
-                for schema in schemes_tree[f"{id(model_class.database)}"]:
-                    if multi_schema is not True and multi_schema.match(schema) is None:
-                        continue
-                    model_class.table_schema(schema)
+                url = str(model_class.database.url)
+                val = schemes_tree.get(url)
+                if val is not None:
+                    for schema in val[1]:
+                        if multi_schema is not True and multi_schema.match(schema) is None:
+                            continue
+                        if (
+                            ignore_schema_pattern is not None
+                            and ignore_schema_pattern.match(schema) is not None
+                        ):
+                            continue
+                        if not getattr(model_class.meta, "is_tenant", False):
+                            if (
+                                model_class.__using_schema__ is Undefined
+                                or model_class.__using_schema__ is None
+                            ):
+                                if schema != "":
+                                    continue
+                            elif model_class.__using_schema__ != schema:
+                                continue
+                        model_class.table_schema(schema)
 
         # don't initialize to keep the metadata clean
         for model_class in self.reflected.values():
@@ -311,6 +336,14 @@ class Registry:
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
         for model_class in self.reflected.values():
             model_class.meta.invalidate(clear_class_attrs=clear_class_attrs)
+
+    def get_tablenames(self) -> set[str]:
+        return_set = set()
+        for model_class in self.models.values():
+            return_set.add(model_class.meta.tablename)
+        for model_class in self.reflected.values():
+            return_set.add(model_class.meta.tablename)
+        return return_set
 
     async def _connect_and_init(self, name: Union[str, None], database: "Database") -> None:
         from edgy.core.db.models.metaclasses import MetaInfo

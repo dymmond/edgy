@@ -50,6 +50,9 @@ When set to a value different False (the default) models will be migrated in mul
 When setting to True, all found schemes are evaluated. By providing a string or regex, you can filter the schemes via regex. There
 are also other keywords which are passed through the MigrationContext of alembic.
 
+For excluding system schemes there is a second parameter named: `ignore_schema_pattern`. It defaults to `information_schema`.
+Set to `None` to deactivate it.
+
 ## Note
 
 For now, besides the migrations and the shell, Edgy does not offer any extra tools but there are

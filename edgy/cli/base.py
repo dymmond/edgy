@@ -68,6 +68,7 @@ class Migrate(BaseExtra):
         compare_type: bool = True,
         render_as_batch: bool = True,
         multi_schema: Union[bool, "re.Pattern", str] = False,
+        ignore_schema_pattern: Union[None, "re.Pattern", str] = "information_schema",
         **kwargs: Any,
     ) -> None:
         super().__init__()
@@ -95,7 +96,9 @@ class Migrate(BaseExtra):
             # proper add to registry
             value.add_to_registry(self.registry)
         # we need to ensure initialized metadata
-        self.registry.refresh_metadata(multi_schema=multi_schema)
+        self.registry.refresh_metadata(
+            multi_schema=multi_schema, ignore_schema_pattern=ignore_schema_pattern
+        )
 
         self.directory = "migrations"
         self.alembic_ctx_kwargs = {

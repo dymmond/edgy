@@ -128,24 +128,41 @@ class Schema:
                     ops.append(db.run_sync(execute_drop))
         await asyncio.gather(*ops)
 
-    async def list_schemes_of_db(self, database: Database) -> list[str]:
+    async def get_metadata_of_all_schemes(
+        self, database: Database
+    ) -> tuple[sqlalchemy.MetaData, list[str]]:
+        tablenames = self.registry.get_tablenames()
+
         async with database as database:
             list_schemes: list[str] = []
+            metadata = sqlalchemy.MetaData()
 
             def wrapper(connection: sqlalchemy.Connection) -> None:
                 nonlocal list_schemes
                 inspector = sqlalchemy.inspect(connection)
-                list_schemes = inspector.get_schema_names()
+                default_schema_name = inspector.default_schema_name
+                list_schemes = [
+                    "" if default_schema_name == schema else schema
+                    for schema in inspector.get_schema_names()
+                ]
+                for schema in list_schemes:
+                    metadata.reflect(
+                        connection, schema=schema, only=lambda name, _: name in tablenames
+                    )
 
             await database.run_sync(wrapper)
-            return list_schemes
+            return metadata, list_schemes
 
-    async def get_schemes_tree(self, *, use_id: bool = False) -> dict[Union[str, None], list[str]]:
+    async def get_schemes_tree(
+        self, *, use_url: bool = False
+    ) -> dict[Union[str, None], tuple[sqlalchemy.MetaData, list[str]]]:
         schemes_tree: dict[Union[str, None], list[str]] = {
-            f"{id(self.registry.database)}" if use_id else None: await self.list_schemes_of_db(
-                self.registry.database
-            )
+            str(self.registry.database.url)
+            if use_url
+            else None: await self.get_metadata_of_all_schemes(self.registry.database)
         }
         for key, val in self.registry.extra.items():
-            schemes_tree[f"{id(val)}" if use_id else key] = await self.list_schemes_of_db(val)
+            tree_key = str(val.url) if use_url else key
+            if tree_key not in schemes_tree:
+                schemes_tree[tree_key] = await self.get_metadata_of_all_schemes(val)
         return schemes_tree
