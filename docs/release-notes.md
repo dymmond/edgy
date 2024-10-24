@@ -20,7 +20,7 @@ hide:
   The name can be retrieved via `tables_and_models` or using `f"{hash_tablekey(...)}_{column}"`.
 - Breaking: Alter tables_and_models to use the prefix as key with '' for the maintable and model.
 - Breaking: Functions passed to filter functions reveive now a second positional parameter `tables_and_models`.
-- `build_where_clause` conditionally returns exist subquery.
+- `build_where_clause` conditionally uses a subquery.
 - Rename QueryType to QuerySetType. The old name stays as an alias.
 
 ### Fixed
@@ -28,6 +28,7 @@ hide:
 - Triggering load on non-existent field when reflecting.
 - InspectDB mapping was incorrect.
 - Fix query edge cases.
+- Fix using related queries with update/delete.
 
 
 ## 0.19.1

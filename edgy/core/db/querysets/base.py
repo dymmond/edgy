@@ -270,18 +270,24 @@ class BaseQuerySet(
         # for nicer unpacking
         if joins is None or len(tables_and_models) == 1:
             return clauses_mod.and_(*where_clauses)
-        expression = sqlalchemy.sql.select().set_label_style(sqlalchemy.LABEL_STYLE_NONE)
+        expression = sqlalchemy.sql.select(
+            *(
+                getattr(tables_and_models[""][0].c, col)
+                for col in tables_and_models[""][1].pkcolumns
+            ),
+        ).set_label_style(sqlalchemy.LABEL_STYLE_NONE)
+        idtuple = sqlalchemy.tuple_(
+            *(
+                getattr(tables_and_models[""][0].c, col)
+                for col in tables_and_models[""][1].pkcolumns
+            )
+        )
         expression = expression.select_from(joins)
-        return sqlalchemy.sql.exists(
+        return idtuple.in_(
             expression.where(
                 *where_clauses,
-                *(
-                    getattr(tables_and_models[""][0].c, col).label(f"_subquery_{col}")
-                    == getattr(tables_and_models[""][0].c, col)
-                    for col in tables_and_models[""][1].pkcolumns
-                ),
             )
-        ).select()
+        )
 
     def _build_select_distinct(self, distinct_on: Optional[Sequence[str]], expression: Any) -> Any:
         """Filters selects only specific fields. Leave empty to use simple distinct"""
