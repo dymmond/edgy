@@ -200,7 +200,7 @@ class Registry:
                 model_class.table  # noqa
             else:
                 for schema in schemes_tree[f"{id(model_class.database)}"]:
-                    if multi_schema is not True and not multi_schema.match(schema):
+                    if multi_schema is not True and multi_schema.match(schema) is None:
                         continue
                     model_class.table_schema(schema)
 
