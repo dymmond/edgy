@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.models.utils import apply_instance_extras
@@ -275,7 +275,7 @@ class ModelRowMixin:
                 if queryset is None:
                     queryset = crawl_result.model_class.query.all()
 
-                queryset = queryset.select_related(crawl_result.reverse_path)
+                queryset = queryset.select_related(cast(str, crawl_result.reverse_path))
             clause = {
                 f"{crawl_result.reverse_path}__{pkcol}": row._mapping[f"{row_prefix}{pkcol}"]
                 for pkcol in cls.pkcolumns

@@ -6,20 +6,22 @@ hide:
 
 # Release Notes
 
-## Unreleased
+## 0.20.0
 
 ### Added
 
 - Add DurationField.
 - Allow passing `max_digits` to FloatField.
+- Add `local_or` function to QuerySets.
 
 ### Changed
 
-- Only the main table of a queryset is queryable via `model_class.columns.foo == foo`. Joins are now unique.
+- Only the main table of a queryset is queryable via `model_class.columns.foo == foo`. Select related models have now an unique name for their path.
   The name can be retrieved via `tables_and_models` or using `f"{hash_tablekey(...)}_{column}"`.
-- Alter tables_and_models to use the prefix as key.
-- Functions passed to filter functions reveive now the second positional parameter `tables_and_models`.
+- Breaking: Alter tables_and_models to use the prefix as key with '' for the maintable and model.
+- Breaking: Functions passed to filter functions reveive now a second positional parameter `tables_and_models`.
 - `build_where_clause` conditionally returns exist subquery.
+- Rename QueryType to QuerySetType. The old name stays as an alias.
 
 ### Fixed
 

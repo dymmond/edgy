@@ -23,9 +23,6 @@ from edgy.core.db.fields.base import BaseField, BaseForeignKey, RelationshipFiel
 from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
-from edgy.core.db.querysets.mixins import QuerySetPropsMixin, TenancyMixin
-from edgy.core.db.querysets.prefetch import Prefetch, PrefetchMixin, check_prefetch_collision
-from edgy.core.db.querysets.types import EdgyEmbedTarget, EdgyModel, QueryType
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.db import check_db_connection, hash_tablekey
 from edgy.core.utils.sync import run_sync
@@ -33,6 +30,9 @@ from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetErr
 from edgy.types import Undefined
 
 from . import clauses as clauses_mod
+from .mixins import QuerySetPropsMixin, TenancyMixin
+from .prefetch import Prefetch, PrefetchMixin, check_prefetch_collision
+from .types import EdgyEmbedTarget, EdgyModel, QuerySetType, tables_and_models_type
 
 if TYPE_CHECKING:  # pragma: no cover
     from databasez.core.transaction import Transaction
@@ -44,12 +44,10 @@ if TYPE_CHECKING:  # pragma: no cover
 generic_field = BaseField()
 _empty_set = cast(Sequence[Any], frozenset())
 
-tables_and_models_type = dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]]
 
-
-def get_table_key_or_name(table: Any) -> str:
+def get_table_key_or_name(table: Union[sqlalchemy.Table, sqlalchemy.Alias]) -> str:
     try:
-        return table.key
+        return table.key  # type: ignore
     except AttributeError:
         # alias
         return table.name
@@ -81,21 +79,11 @@ def clean_query_kwargs(
     return new_kwargs
 
 
-async def _parse_clause_arg(
-    arg: Any, instance: "BaseQuerySet", tables_and_models: tables_and_models_type
-) -> Any:
-    if callable(arg):
-        arg = arg(instance, tables_and_models)
-    if isawaitable(arg):
-        arg = await arg
-    return arg
-
-
 class BaseQuerySet(
     TenancyMixin,
     QuerySetPropsMixin,
     PrefetchMixin,
-    QueryType,
+    QuerySetType,
 ):
     """Internal definitions for queryset."""
 
@@ -253,7 +241,7 @@ class BaseQuerySet(
     ) -> Any:
         result: list[Any] = []
         for arg in args:
-            result.append(_parse_clause_arg(arg, self, tables_and_models))
+            result.append(clauses_mod.parse_clause_arg(arg, self, tables_and_models))
         if self.database.force_rollback:
             return [await el for el in result]
         else:
@@ -263,7 +251,7 @@ class BaseQuerySet(
         self, _: Any = None, tables_and_models: Optional[tables_and_models_type] = None
     ) -> Any:
         """Build a where clause from the filters which can be passed in a where function."""
-        joins = None
+        joins: Optional[Any] = None
         if tables_and_models is None:
             joins, tables_and_models = self._build_tables_join_from_relationship()
         # ignored args for passing build_where_clause in filter_clauses
@@ -309,7 +297,7 @@ class BaseQuerySet(
         join_clause: Any,
         current_transition: tuple[str, str, str],
         *,
-        transitions: dict[tuple[str, str, str], tuple[Any, Optional[tuple[str, str]], str]],
+        transitions: dict[tuple[str, str, str], tuple[Any, Optional[tuple[str, str, str]], str]],
         tables_and_models: dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]],
     ) -> Any:
         if current_transition not in transitions:
@@ -333,9 +321,7 @@ class BaseQuerySet(
 
     def _build_tables_join_from_relationship(
         self,
-    ) -> tuple[
-        str, dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]], dict[str, set[str]], Any
-    ]:
+    ) -> tuple[Any, tables_and_models_type]:
         """
         Builds the tables relationships and joins.
         When a table contains more than one foreign key pointing to the same
@@ -427,7 +413,7 @@ class BaseQuerySet(
                             reverse = True
                     if _select_prefix in _select_tables_and_models:
                         # use prexisting prefix
-                        table = _select_tables_and_models[_select_prefix][0]
+                        table: Any = _select_tables_and_models[_select_prefix][0]
                     else:
                         table = model_class.table_schema(self.active_schema)
                         table = table.alias(hash_tablekey(tablekey=table.key, prefix=prefix))
@@ -502,7 +488,7 @@ class BaseQuerySet(
         """
         self._validate_only_and_defer()
         joins, tables_and_models = self._build_tables_join_from_relationship()
-        columns = []
+        columns: list[Any] = []
         for prefix, (table, model_class) in tables_and_models.items():
             if not prefix:
                 for column_key, column in table.columns.items():
@@ -628,8 +614,11 @@ class BaseQuerySet(
                     return fk_tuple.in_(await _sub_query)
 
                 clauses.append(wrapper)
-            elif callable(value):
-                # bind local vars
+            else:
+                assert not isinstance(
+                    value, BaseModelType
+                ), f"should be parsed in clean: {key}: {value}"
+
                 async def wrapper(
                     queryset: "QuerySet",
                     tables_and_models: tables_and_models_type,
@@ -639,33 +628,9 @@ class BaseQuerySet(
                     _op: Optional[str] = op,
                     _prefix: str = related_str,
                 ) -> Any:
-                    _value = _value(queryset, tables_and_models)
-                    if isawaitable(_value):
-                        _value = await _value
-                    table = tables_and_models[_prefix][0]
-                    return _field.operator_to_clause(
-                        _field.name,
-                        _op,
-                        table,
-                        _value,
+                    _value = await clauses_mod.parse_clause_arg(
+                        _value, queryset, tables_and_models
                     )
-
-                clauses.append(wrapper)
-
-            else:
-                assert not isinstance(
-                    value, BaseModelType
-                ), f"should be parsed in clean: {key}: {value}"
-
-                def wrapper(
-                    queryset: "QuerySet",
-                    tables_and_models: tables_and_models_type,
-                    *,
-                    _field: "BaseFieldType" = field,
-                    _value: Any = value,
-                    _op: Optional[str] = op,
-                    _prefix: str = related_str,
-                ) -> Any:
                     table = tables_and_models[_prefix][0]
                     return _field.operator_to_clause(_field.name, _op, table, _value)
 
@@ -776,10 +741,10 @@ class BaseQuerySet(
                 for row in batch
             ]
             if prefetch_queryset is None:
-                prefetch_queryset = crawl_result.model_class.query.or_local(*clauses)
+                prefetch_queryset = crawl_result.model_class.query.local_or(*clauses)
             else:
                 # ensure local or
-                prefetch_queryset = prefetch_queryset.or_local(*clauses)
+                prefetch_queryset = prefetch_queryset.local_or(*clauses)
 
             if prefetch_queryset.model_class is self.model_class:
                 # queryset is of this model
@@ -787,13 +752,15 @@ class BaseQuerySet(
                 prefetch_queryset.embed_parent = (prefetch.related_name, "")
             else:
                 # queryset is of the target model
-                prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
+                prefetch_queryset = prefetch_queryset.select_related(
+                    cast(str, crawl_result.reverse_path)
+                )
             new_prefetch = Prefetch(
                 related_name=prefetch.related_name,
                 to_attr=prefetch.to_attr,
                 queryset=prefetch_queryset,
             )
-            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=tables_and_models[''][0], prefix=crawl_result.reverse_path)}_"
+            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=tables_and_models[''][0].key, prefix=cast(str, crawl_result.reverse_path))}_"
             new_prefetch._is_finished = True
             _prefetch_related.append(new_prefetch)
 
@@ -899,7 +866,7 @@ class BaseQuerySet(
             Union[
                 "sqlalchemy.sql.expression.BinaryExpression",
                 Callable[
-                    ["QueryType"],
+                    ["QuerySetType"],
                     Union[
                         "sqlalchemy.sql.expression.BinaryExpression",
                         Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
@@ -923,7 +890,7 @@ class BaseQuerySet(
             Union[
                 sqlalchemy.sql.expression.BinaryExpression,
                 Callable[
-                    [QueryType],
+                    [QuerySetType],
                     Union[
                         sqlalchemy.sql.expression.BinaryExpression,
                         Awaitable[sqlalchemy.sql.expression.BinaryExpression],
@@ -946,7 +913,7 @@ class BaseQuerySet(
                             Union[
                                 "sqlalchemy.sql.expression.BinaryExpression",
                                 Callable[
-                                    ["QueryType"],
+                                    ["QuerySetType"],
                                     Union[
                                         "sqlalchemy.sql.expression.BinaryExpression",
                                         Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
@@ -1082,7 +1049,7 @@ class QuerySet(BaseQuerySet):
         *clauses: Union[
             "sqlalchemy.sql.expression.BinaryExpression",
             Callable[
-                ["QueryType"],
+                ["QuerySetType"],
                 Union[
                     "sqlalchemy.sql.expression.BinaryExpression",
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
@@ -1112,7 +1079,7 @@ class QuerySet(BaseQuerySet):
         *clauses: Union[
             "sqlalchemy.sql.expression.BinaryExpression",
             Callable[
-                ["QueryType"],
+                ["QuerySetType"],
                 Union[
                     "sqlalchemy.sql.expression.BinaryExpression",
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
@@ -1128,12 +1095,12 @@ class QuerySet(BaseQuerySet):
         """
         return self._filter_or_exclude(clauses=clauses, or_=True, kwargs=kwargs)
 
-    def or_local(
+    def local_or(
         self,
         *clauses: Union[
             "sqlalchemy.sql.expression.BinaryExpression",
             Callable[
-                ["QueryType"],
+                ["QuerySetType"],
                 Union[
                     "sqlalchemy.sql.expression.BinaryExpression",
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
@@ -1156,7 +1123,7 @@ class QuerySet(BaseQuerySet):
         *clauses: Union[
             "sqlalchemy.sql.expression.BinaryExpression",
             Callable[
-                ["QueryType"],
+                ["QuerySetType"],
                 Union[
                     "sqlalchemy.sql.expression.BinaryExpression",
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
@@ -1176,7 +1143,7 @@ class QuerySet(BaseQuerySet):
         *clauses: Union[
             "sqlalchemy.sql.expression.BinaryExpression",
             Callable[
-                ["QueryType"],
+                ["QuerySetType"],
                 Union[
                     "sqlalchemy.sql.expression.BinaryExpression",
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
@@ -1197,7 +1164,7 @@ class QuerySet(BaseQuerySet):
         *clauses: Union[
             "sqlalchemy.sql.expression.BinaryExpression",
             Callable[
-                ["QueryType"],
+                ["QuerySetType"],
                 Union[
                     "sqlalchemy.sql.expression.BinaryExpression",
                     Awaitable["sqlalchemy.sql.expression.BinaryExpression"],

@@ -281,7 +281,7 @@ users = await User.query.filter(and_.from_kwargs(User, name="foo", email="foo@ex
 users = await User.query.filter(and_.from_kwargs(User, **my_dict))
 ```
 
-#### Global OR
+#### OR
 
 Edgy QuerySet can do global ORs. This means you can attach new OR clauses also later.
 
@@ -317,7 +317,7 @@ user_query = user_query.or_(user_query, {"email": "outlook"}, {"email": "gmail"}
 users = await user_query
 ```
 
-#### Passing multiple keyword based filters
+##### Passing multiple keyword based filters
 
 You can also passing multiple keyword based filters by providing them as a dictionary
 
@@ -326,7 +326,10 @@ user_query = User.query.or_({"active": True}, {"email": "outlook"}, {"email": "g
 # active users or users with email gmail or outlook are retrieved
 users = await user_query
 ```
+##### Local only OR
 
+If the special mode of or_ is not wanted there is a function named `local_or`. It is similar
+to the or_ function except it doesn't have the global OR mode.
 
 ### Limit
 
