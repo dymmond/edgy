@@ -487,6 +487,7 @@ class DatabaseMixin:
         registry = cls.meta.registry
         assert registry, "registry is not set"
         if metadata is None:
+            assert str(cls.database.url) == str(registry.database.url), "wrong database"
             metadata = registry.metadata
         schemes: list[str] = []
         if schema:

@@ -30,6 +30,7 @@ class ReflectedModelMixin:
         registry = cls.meta.registry
         assert registry, "registry is not set"
         if metadata is None:
+            assert str(cls.database.url) == str(registry.database.url), "wrong database"
             metadata = registry.metadata
         if cls.__using_schema__ is not Undefined:
             schema_name = cls.__using_schema__
