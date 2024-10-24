@@ -156,7 +156,7 @@ class Schema:
     async def get_schemes_tree(
         self, *, use_url: bool = False
     ) -> dict[Union[str, None], tuple[sqlalchemy.MetaData, list[str]]]:
-        schemes_tree: dict[Union[str, None], list[str]] = {
+        schemes_tree: dict[Union[str, None], tuple[sqlalchemy.MetaData, list[str]]] = {
             str(self.registry.database.url)
             if use_url
             else None: await self.get_metadata_of_all_schemes(self.registry.database)

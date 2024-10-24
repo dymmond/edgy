@@ -192,8 +192,10 @@ class Registry:
         *,
         multi_schema: Union[bool, re.Pattern, str] = False,
         ignore_schema_pattern: Union[None, "re.Pattern", str] = "information_schema",
-    ) -> None:
+    ) -> dict[str, sqlalchemy.MetaData]:
         self.metadata.clear()
+        extra_metadata = {}
+        maindatabase_url = str(self.database.url)
         if multi_schema is not False:
             schemes_tree = run_sync(self.schema.get_schemes_tree(use_url=True))
         if isinstance(multi_schema, str):
@@ -203,14 +205,19 @@ class Registry:
         for model_class in self.models.values():
             model_class._table = None
             model_class._db_schemas = {}
+            url = str(model_class.database.url)
             if multi_schema is False:
-                # initialize the correct table with metadata
-                model_class.table  # noqa
+                if maindatabase_url == url:
+                    # initialize the correct table with metadata
+                    model_class.table  # noqa
+                else:
+                    if url not in extra_metadata:
+                        extra_metadata[url] = sqlalchemy.MetaData()
+                    model_class.build(metadata=extra_metadata[url])
             else:
-                url = str(model_class.database.url)
-                val = schemes_tree.get(url)
-                if val is not None:
-                    for schema in val[1]:
+                scheme_tree_object = schemes_tree.get(url)
+                if scheme_tree_object is not None:
+                    for schema in scheme_tree_object[1]:
                         if multi_schema is not True and multi_schema.match(schema) is None:
                             continue
                         if (
@@ -227,12 +234,18 @@ class Registry:
                                     continue
                             elif model_class.__using_schema__ != schema:
                                 continue
-                        model_class.table_schema(schema)
+                        if maindatabase_url == url:
+                            model_class.table_schema(schema)
+                        else:
+                            if url not in extra_metadata:
+                                extra_metadata[url] = sqlalchemy.MetaData()
+                            model_class.build(schema=schema, metadata=extra_metadata[url])
 
         # don't initialize to keep the metadata clean
         for model_class in self.reflected.values():
             model_class._table = None
             model_class._db_schemas = {}
+        return extra_metadata
 
     def register_callback(
         self,

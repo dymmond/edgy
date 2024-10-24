@@ -96,7 +96,7 @@ class Migrate(BaseExtra):
             # proper add to registry
             value.add_to_registry(self.registry)
         # we need to ensure initialized metadata
-        self.registry.refresh_metadata(
+        self.extra_metadata = self.registry.refresh_metadata(
             multi_schema=multi_schema, ignore_schema_pattern=ignore_schema_pattern
         )
 
