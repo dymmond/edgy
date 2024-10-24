@@ -492,8 +492,10 @@ class DatabaseMixin:
         registry = cls.meta.registry
         assert registry, "registry is not set"
         if metadata is None:
-            assert str(cls.database.url) == str(registry.database.url), "wrong database"
-            metadata = registry.metadata
+            if str(cls.database.url) == str(registry.database.url):
+                metadata = registry.metadata
+            else:
+                metadata = sqlalchemy.MetaData()
         schemes: list[str] = []
         if schema:
             schemes.append(schema)
