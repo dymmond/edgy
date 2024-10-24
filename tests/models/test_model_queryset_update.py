@@ -27,7 +27,14 @@ class Product(edgy.Model):
 
     class Meta:
         registry = models
-        name = "products"
+
+
+class ProductTag(edgy.Model):
+    product = edgy.fields.ForeignKey(Product, related_name="tags", null=True)
+    tag = edgy.fields.CharField(max_length=30)
+
+    class Meta:
+        registry = models
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -57,6 +64,18 @@ async def test_queryset_update():
     await Product.query.update(rating=3)
     tie = await Product.query.get(pk=tie.id)
     assert tie.rating == 3
+
+
+async def test_queryset_update_via_related():
+    shirt = await Product.query.create(name="Shirt", rating=5, tags=[ProductTag(tag="foo")])
+    tie = await Product.query.create(name="Tie", rating=4, tags=[ProductTag(tag="faa")])
+    assert tie.rating == 4
+    assert shirt.rating == 5
+    await Product.query.filter(tags__tag="foo").update(rating=1)
+    await tie.load()
+    await shirt.load()
+    assert shirt.rating == 1
+    assert tie.rating == 4
 
 
 async def test_model_update_or_create():

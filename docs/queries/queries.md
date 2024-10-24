@@ -262,6 +262,10 @@ users = await User.query.filter(User.columns.id.in_([1, 2, 3]))
 !!! Warning
     The `columns` refers to the columns of the underlying SQLAlchemy table.
 
+!!! Warning
+    This works only for the main model of a QuerySet. Related are handled via `f"{hash_tablkey(tablekey=model.table.key, prefix=...)}_{columnkey}"`.
+    You can pass the column via `sqlalchemy.column` (lowercase column).
+
 All the operations you would normally do in SQLAlchemy syntax, are allowed here.
 
 ##### Using  `and_` and `or_` with kwargs
@@ -277,7 +281,7 @@ users = await User.query.filter(and_.from_kwargs(User, name="foo", email="foo@ex
 users = await User.query.filter(and_.from_kwargs(User, **my_dict))
 ```
 
-#### Global OR
+#### OR
 
 Edgy QuerySet can do global ORs. This means you can attach new OR clauses also later.
 
@@ -313,7 +317,7 @@ user_query = user_query.or_(user_query, {"email": "outlook"}, {"email": "gmail"}
 users = await user_query
 ```
 
-#### Passing multiple keyword based filters
+##### Passing multiple keyword based filters
 
 You can also passing multiple keyword based filters by providing them as a dictionary
 
@@ -322,7 +326,10 @@ user_query = User.query.or_({"active": True}, {"email": "outlook"}, {"email": "g
 # active users or users with email gmail or outlook are retrieved
 users = await user_query
 ```
+##### Local only OR
 
+If the special mode of or_ is not wanted there is a function named `local_or`. It is similar
+to the or_ function except it doesn't have the global OR mode.
 
 ### Limit
 
@@ -1090,6 +1097,7 @@ The pendant in a model are `identifying_clauses`.
 query = Model.query.filter(id=1)
 # ensures that the db connection doesn't drop during operation
 async with query.database as database:
+    # when using joins a exist  subquery is generated
     expression = query.table.select().where(await query.build_where_clause())
     # as generic sql
     print(str(expression))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from inspect import isawaitable
 from typing import TYPE_CHECKING, Any, Union
 
 import sqlalchemy
@@ -7,6 +8,18 @@ from sqlalchemy import ColumnCollection
 
 if TYPE_CHECKING:
     from edgy.core.db.models import Model
+
+    from .types import QuerySetType, tables_and_models_type
+
+
+async def parse_clause_arg(
+    arg: Any, instance: QuerySetType, tables_and_models: tables_and_models_type
+) -> Any:
+    if callable(arg):
+        arg = arg(instance, tables_and_models)
+    if isawaitable(arg):
+        arg = await arg
+    return arg
 
 
 class _EnhancedClausesHelper:
@@ -20,12 +33,13 @@ class _EnhancedClausesHelper:
         return self.op(*args)
 
     def from_kwargs(
-        self, columns_or_model: Union[Model, ColumnCollection], /, **kwargs: Any
+        self, columns_or_model: Union[Model, ColumnCollection, sqlalchemy.Table], /, **kwargs: Any
     ) -> Any:
+        # inferior to the kwargs parser of QuerySet
         if not isinstance(columns_or_model, ColumnCollection) and hasattr(
             columns_or_model, "columns"
         ):
-            columns_or_model = columns_or_model.table.columns
+            columns_or_model = columns_or_model.columns
         return self.op(*(getattr(columns_or_model, item[0]) == item[1] for item in kwargs.items()))
 
 

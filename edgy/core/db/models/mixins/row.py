@@ -1,6 +1,6 @@
 import asyncio
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.models.utils import apply_instance_extras
@@ -28,10 +28,7 @@ class ModelRowMixin:
         return bool(
             cls.meta.registry
             and not cls.meta.abstract
-            and all(
-                row._mapping.get(f"{table.key.replace('.', '_')}_{col}") is not None
-                for col in cls.pkcolumns
-            )
+            and all(row._mapping.get(f"{table.name}_{col}") is not None for col in cls.pkcolumns)
         )
 
     @classmethod
@@ -87,17 +84,13 @@ class ModelRowMixin:
                     detail=f'Selected field "{field_name}" is not a RelationshipField on {cls}.'
                 ) from None
 
+            _prefix = field_name if not prefix else f"{prefix}__{field_name}"
             # stop selecting when None. Related models are not available.
             if not model_class.can_load_from_row(
                 row,
-                tables_and_models[
-                    model_class.meta.tablename
-                    if using_schema is None
-                    else f"{using_schema}.{model_class.meta.tablename}"
-                ][0],
+                tables_and_models[_prefix][0],
             ):
                 continue
-            _prefix = field_name if not prefix else f"{prefix}__{field_name}"
 
             if remainder:
                 # don't pass table, it is only for the main model_class
@@ -130,9 +123,7 @@ class ModelRowMixin:
             for k, v in item.items():
                 setattr(old_select_related_value, k, v)
             return old_select_related_value
-        table_columns = tables_and_models[
-            cls.meta.tablename if using_schema is None else f"{using_schema}.{cls.meta.tablename}"
-        ][0].columns
+        table_columns = tables_and_models[prefix][0].columns
         # Populate the related names
         # Making sure if the model being queried is not inside a select related
         # This way it is not overritten by any value
@@ -153,12 +144,15 @@ class ModelRowMixin:
             child_item = {}
             for column_name in columns_to_check:
                 column = getattr(table_columns, column_name, None)
-                if (
-                    column is not None
-                    and f"{column.table.key.replace('.', '_')}_{column.key}" in row._mapping
-                ):
+                if column_name is None:
+                    continue
+                columnkeyhash = column_name
+                if prefix:
+                    columnkeyhash = f"{tables_and_models[prefix][0].name}_{column.key}"
+
+                if columnkeyhash in row._mapping:
                     child_item[foreign_key.from_fk_field_name(related, column_name)] = (
-                        row._mapping[f"{column.table.key.replace('.', '_')}_{column.key}"]
+                        row._mapping[columnkeyhash]
                     )
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
@@ -190,13 +184,14 @@ class ModelRowMixin:
             if column.key not in cls.meta.columns_to_field:
                 continue
             # set if not of an foreign key with one column
-            elif (
-                column.key not in item
-                and f"{column.table.key.replace('.', '_')}_{column.key}" in row._mapping
-            ):
-                item[column.key] = row._mapping[
-                    f"{column.table.key.replace('.', '_')}_{column.key}"
-                ]
+            if column.key in item:
+                continue
+            columnkeyhash = column.key
+            if prefix:
+                columnkeyhash = f"{tables_and_models[prefix][0].name}_{columnkeyhash}"
+
+            if columnkeyhash in row._mapping:
+                item[column.key] = row._mapping[columnkeyhash]
         model: Model = (
             cls.proxy_model(**item, __phase__="init_db")  # type: ignore
             if exclude_secrets or is_defer_fields or only_fields
@@ -208,24 +203,18 @@ class ModelRowMixin:
             cls,
             using_schema,
             database=database,
-            table=tables_and_models[
-                cls.meta.tablename
-                if using_schema is None
-                else f"{using_schema}.{cls.meta.tablename}"
-            ][0],
+            table=tables_and_models[prefix][0],
         )
 
-        # Handle prefetch related fields.
-        await cls.__handle_prefetch_related(
-            row=row,
-            table=tables_and_models[
-                cls.meta.tablename
-                if using_schema is None
-                else f"{using_schema}.{cls.meta.tablename}"
-            ][0],
-            model=model,
-            prefetch_related=prefetch_related,
-        )
+        if prefetch_related:
+            # Handle prefetch related fields.
+            await cls.__handle_prefetch_related(
+                row=row,
+                prefix=prefix,
+                model=model,
+                tables_and_models=tables_and_models,
+                prefetch_related=prefetch_related,
+            )
         assert model.pk is not None, model
         return model
 
@@ -243,27 +232,21 @@ class ModelRowMixin:
         return False
 
     @classmethod
-    def create_model_key_from_sqla_row(
-        cls,
-        row: "Row",
-    ) -> tuple:
+    def create_model_key_from_sqla_row(cls, row: "Row", row_prefix: str = "") -> tuple:
         """
         Build a cache key for the model.
         """
         pk_key_list: list[Any] = [cls.__name__]
         for attr in cls.pkcolumns:
-            try:
-                pk_key_list.append(str(row._mapping[getattr(cls.table.columns, attr)]))
-            except KeyError:
-                pk_key_list.append(str(row._mapping[attr]))
+            pk_key_list.append(str(row._mapping[f"{row_prefix}{attr}"]))
         return tuple(pk_key_list)
 
     @classmethod
     async def __set_prefetch(
         cls,
         row: "Row",
-        table: "Table",
         model: "Model",
+        row_prefix: str,
         related: "Prefetch",
     ) -> None:
         model_key = ()
@@ -273,48 +256,39 @@ class ModelRowMixin:
         if model_key in related._baked_results:
             setattr(model, related.to_attr, related._baked_results[model_key])
         else:
-            clauses = []
-            for pkcol in cls.pkcolumns:
-                clauses.append(
-                    getattr(table.columns, pkcol)
-                    == row._mapping[f"{table.key.replace('.', '_')}_{pkcol}"]
+            crawl_result = crawl_relationship(
+                model.__class__, related.related_name, traverse_last=True
+            )
+            if crawl_result.reverse_path is False:
+                QuerySetError(
+                    detail=("Creating a reverse path is not possible, unidirectional fields used.")
+                )
+            if crawl_result.cross_db_remainder:
+                raise NotImplementedError(
+                    "Cannot prefetch from other db yet. Maybe in future this feature will be added."
                 )
             queryset = related.queryset
             if related._is_finished:
                 assert queryset is not None, "Queryset is not set but _is_finished flag"
             else:
                 check_prefetch_collision(model, related)
-                crawl_result = crawl_relationship(
-                    model.__class__, related.related_name, traverse_last=True
-                )
                 if queryset is None:
-                    if crawl_result.reverse_path is False:
-                        queryset = model.__class__.query.all()
-                    else:
-                        queryset = crawl_result.model_class.query.all()
+                    queryset = crawl_result.model_class.query.all()
 
-                if queryset.model_class == model.__class__:
-                    # queryset is of this model
-                    queryset = queryset.select_related(related.related_name)
-                    queryset.embed_parent = (related.related_name, "")
-                elif crawl_result.reverse_path is False:
-                    QuerySetError(
-                        detail=(
-                            f"Creating a reverse path is not possible, unidirectional fields used."
-                            f"You may want to use as queryset a queryset of model class {model!r}."
-                        )
-                    )
-                else:
-                    # queryset is of the target model
-                    queryset = queryset.select_related(crawl_result.reverse_path)
-            setattr(model, related.to_attr, await queryset.filter(*clauses))
+                queryset = queryset.select_related(cast(str, crawl_result.reverse_path))
+            clause = {
+                f"{crawl_result.reverse_path}__{pkcol}": row._mapping[f"{row_prefix}{pkcol}"]
+                for pkcol in cls.pkcolumns
+            }
+            setattr(model, related.to_attr, await queryset.filter(clause))
 
     @classmethod
     async def __handle_prefetch_related(
         cls,
         row: "Row",
-        table: "Table",
         model: "Model",
+        prefix: str,
+        tables_and_models: dict[str, tuple["Table", type["BaseModelType"]]],
         prefetch_related: Sequence["Prefetch"],
     ) -> None:
         """
@@ -331,6 +305,9 @@ class ModelRowMixin:
             # Check for conflicting names
             # Check as early as possible
             check_prefetch_collision(model=model, related=related)
-            queries.append(cls.__set_prefetch(row=row, table=table, model=model, related=related))
+            row_prefix = f"{tables_and_models[prefix].name}_" if prefix else ""
+            queries.append(
+                cls.__set_prefetch(row=row, row_prefix=row_prefix, model=model, related=related)
+            )
         if queries:
             await asyncio.gather(*queries)
