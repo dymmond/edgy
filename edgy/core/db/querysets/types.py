@@ -76,6 +76,26 @@ class QueryType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
         """
 
     @abstractmethod
+    def or_local(
+        self,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+            "QueryType",
+        ],
+        **kwargs: Any,
+    ) -> "QueryType":
+        """
+        Filters the QuerySet by the OR operand.
+        """
+
+    @abstractmethod
     def and_(
         self,
         *clauses: Union[

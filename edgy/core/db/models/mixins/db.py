@@ -236,6 +236,7 @@ class DatabaseMixin:
             return cast(Sequence["sqlalchemy.Column"], _empty)
 
     def identifying_clauses(self) -> list[Any]:
+        # works only if the class of the model is the main class of the queryset
         clauses: list[Any] = []
         for field_name in self.identifying_db_fields:
             field = self.meta.fields.get(field_name)

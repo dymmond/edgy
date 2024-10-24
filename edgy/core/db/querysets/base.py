@@ -307,9 +307,9 @@ class BaseQuerySet(
     def _join_table_helper(
         cls,
         join_clause: Any,
-        current_transition: tuple[str, str],
+        current_transition: tuple[str, str, str],
         *,
-        transitions: dict[tuple[str, str], tuple[Any, Optional[tuple[str, str]], str]],
+        transitions: dict[tuple[str, str, str], tuple[Any, Optional[tuple[str, str]], str]],
         tables_and_models: dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]],
     ) -> Any:
         if current_transition not in transitions:
@@ -359,7 +359,9 @@ class BaseQuerySet(
             _select_tables_and_models: tables_and_models_type = {
                 "": (select_from, self.model_class)
             }
-            transitions: dict[tuple[str, str], tuple[Any, Optional[tuple[str, str]], str]] = {}
+            transitions: dict[
+                tuple[str, str, str], tuple[Any, Optional[tuple[str, str, str]], str]
+            ] = {}
 
             # Select related
             for select_path in self._select_related:
@@ -430,10 +432,7 @@ class BaseQuerySet(
                         table = model_class.table_schema(self.active_schema)
                         table = table.alias(hash_tablekey(tablekey=table.key, prefix=prefix))
 
-                    transition_key = (
-                        get_table_key_or_name(former_table),
-                        table.name,
-                    )
+                    transition_key = (get_table_key_or_name(former_table), table.name, field_name)
                     if transition_key in transitions:
                         # can not provide new informations
                         former_table = table
@@ -753,16 +752,6 @@ class BaseQuerySet(
         del queryset
         _prefetch_related: list[Prefetch] = []
 
-        clauses = []
-        for pkcol in self.model_class.pkcolumns:
-            clauses.append(
-                getattr(self.table.columns, pkcol).in_(
-                    [
-                        row._mapping[f"{self.table.key.replace('.', '_', 1)}_{pkcol}"]
-                        for row in batch
-                    ]
-                )
-            )
         for prefetch in self._prefetch_related:
             check_prefetch_collision(self.model_class, prefetch)  # type: ignore
 
@@ -773,26 +762,29 @@ class BaseQuerySet(
                 raise NotImplementedError(
                     "Cannot prefetch from other db yet. Maybe in future this feature will be added."
                 )
+            if crawl_result.reverse_path is False:
+                QuerySetError(
+                    detail=("Creating a reverse path is not possible, unidirectional fields used.")
+                )
             prefetch_queryset: Optional[QuerySet] = prefetch.queryset
-            if prefetch_queryset is None:
-                if crawl_result.reverse_path is False:
-                    prefetch_queryset = self.model_class.query.filter(*clauses)
-                else:
-                    prefetch_queryset = crawl_result.model_class.query.filter(*clauses)
-            else:
-                prefetch_queryset = prefetch_queryset.filter(*clauses)
 
-            if prefetch_queryset.model_class == self.model_class:
+            clauses = [
+                {
+                    f"{crawl_result.reverse_path}__{pkcol}": row._mapping[pkcol]
+                    for pkcol in self.model_class.pkcolumns
+                }
+                for row in batch
+            ]
+            if prefetch_queryset is None:
+                prefetch_queryset = crawl_result.model_class.query.or_local(*clauses)
+            else:
+                # ensure local or
+                prefetch_queryset = prefetch_queryset.or_local(*clauses)
+
+            if prefetch_queryset.model_class is self.model_class:
                 # queryset is of this model
                 prefetch_queryset = prefetch_queryset.select_related(prefetch.related_name)
                 prefetch_queryset.embed_parent = (prefetch.related_name, "")
-            elif crawl_result.reverse_path is False:
-                QuerySetError(
-                    detail=(
-                        f"Creating a reverse path is not possible, unidirectional fields used."
-                        f"You may want to use as queryset a queryset of model class {self.model_class!r}."
-                    )
-                )
             else:
                 # queryset is of the target model
                 prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
@@ -801,6 +793,7 @@ class BaseQuerySet(
                 to_attr=prefetch.to_attr,
                 queryset=prefetch_queryset,
             )
+            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=tables_and_models[''][0], prefix=crawl_result.reverse_path)}_"
             new_prefetch._is_finished = True
             _prefetch_related.append(new_prefetch)
 
@@ -1078,7 +1071,11 @@ class QuerySet(BaseQuerySet):
     @cached_property
     def sql(self) -> str:
         """Get SQL select query as string."""
-        return str(run_sync(self.as_select()))
+        return str(
+            run_sync(self.as_select()).compile(
+                compile_kwargs={"literal_binds": True},
+            )
+        )
 
     def filter(
         self,
@@ -1130,6 +1127,29 @@ class QuerySet(BaseQuerySet):
         Filters the QuerySet by the OR operand.
         """
         return self._filter_or_exclude(clauses=clauses, or_=True, kwargs=kwargs)
+
+    def or_local(
+        self,
+        *clauses: Union[
+            "sqlalchemy.sql.expression.BinaryExpression",
+            Callable[
+                ["QueryType"],
+                Union[
+                    "sqlalchemy.sql.expression.BinaryExpression",
+                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                ],
+            ],
+            dict[str, Any],
+            "QuerySet",
+        ],
+        **kwargs: Any,
+    ) -> "QuerySet":
+        """
+        Filters the QuerySet by the OR operand.
+        """
+        return self._filter_or_exclude(
+            clauses=clauses, or_=True, kwargs=kwargs, allow_global_or=False
+        )
 
     def and_(
         self,
