@@ -262,6 +262,10 @@ users = await User.query.filter(User.columns.id.in_([1, 2, 3]))
 !!! Warning
     The `columns` refers to the columns of the underlying SQLAlchemy table.
 
+!!! Warning
+    This works only for the main model of a QuerySet. Related are handled via `f"{hash_tablkey(tablekey=model.table.key, prefix=...)}_{columnkey}"`.
+    You can pass the column via `sqlalchemy.column` (lowercase column).
+
 All the operations you would normally do in SQLAlchemy syntax, are allowed here.
 
 ##### Using  `and_` and `or_` with kwargs
@@ -1090,6 +1094,7 @@ The pendant in a model are `identifying_clauses`.
 query = Model.query.filter(id=1)
 # ensures that the db connection doesn't drop during operation
 async with query.database as database:
+    # when using joins a exist  subquery is generated
     expression = query.table.select().where(await query.build_where_clause())
     # as generic sql
     print(str(expression))

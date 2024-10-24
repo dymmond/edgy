@@ -13,10 +13,19 @@ hide:
 - Add DurationField.
 - Allow passing `max_digits` to FloatField.
 
+### Changed
+
+- Only the main table of a queryset is queryable via `model_class.columns.foo == foo`. Joins are now unique.
+  The name can be retrieved via `tables_and_models` or using `f"{hash_tablekey(...)}_{column}"`.
+- Alter tables_and_models to use the prefix as key.
+- Functions passed to filter functions reveive now the second positional parameter `tables_and_models`.
+- `build_where_clause` conditionally returns exist subquery.
+
 ### Fixed
 
 - Triggering load on non-existent field when reflecting.
 - InspectDB mapping was incorrect.
+- Fix query edge cases.
 
 
 ## 0.19.1

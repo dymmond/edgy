@@ -235,14 +235,19 @@ class DatabaseMixin:
         else:
             return cast(Sequence["sqlalchemy.Column"], _empty)
 
-    def identifying_clauses(self) -> list[Any]:
+    def identifying_clauses(self, prefix: str = "") -> list[Any]:
         # works only if the class of the model is the main class of the queryset
+        # TODO: implement prefix handling and return generic column without table attached
+        if prefix:
+            raise NotImplementedError()
         clauses: list[Any] = []
         for field_name in self.identifying_db_fields:
             field = self.meta.fields.get(field_name)
             if field is not None:
-                for column, value in field.clean(field_name, self.__dict__[field_name]).items():
-                    clauses.append(getattr(self.table.columns, column) == value)
+                for column_name, value in field.clean(
+                    field_name, self.__dict__[field_name]
+                ).items():
+                    clauses.append(getattr(self.table.columns, column_name) == value)
             else:
                 clauses.append(
                     getattr(self.table.columns, field_name) == self.__dict__[field_name]
