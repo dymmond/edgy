@@ -10,13 +10,18 @@ hide:
 
 ### Added
 
-- Allow multi schema and db migrations.
+- Allow multi schema and database migrations.
 - `metadata_by_url` dictionary .
 
 ### Changed
 
 - `metadata` of `registry` is now `metadata_by_name`.
 - Rename `hash_tablekey` to `hash_jointablekey` and use faster hash function.
+- Migrate object provides now a function for getting a suitable registry copy for migrations.
+
+### Fixed
+
+- `Migrate` executed `refresh_metadata` everytime causing reflected models to vanish.
 
 ## 0.20.0
 
