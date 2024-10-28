@@ -1,8 +1,10 @@
 import asyncio
 import contextlib
 import re
+import warnings
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
 from typing import (
@@ -33,6 +35,62 @@ if TYPE_CHECKING:
     from edgy.contrib.autoreflection.models import AutoReflectionModel
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
+
+
+class MetaDataDict(defaultdict):
+    def __init__(self, registry: "Registry") -> None:
+        self.registry = registry
+        super().__init__(sqlalchemy.MetaData)
+
+    def __getitem__(self, key: Union[str, None]) -> sqlalchemy.MetaData:
+        if key not in self.registry.extra and key is not None:
+            raise KeyError("Key does not exist")
+        return super().__getitem__(key)
+
+    def get(self, key: str, default: Any = None) -> sqlalchemy.MetaData:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __copy__(self) -> "MetaDataDict":
+        _copy = MetaDataDict(registry=self.registry)
+        for k, v in self.items():
+            _copy[k] = shallow_copy(v)
+        return _copy
+
+    copy = __copy__
+
+
+class MetaDataByUrlDict(dict):
+    def __init__(self, registry: "Registry") -> None:
+        self.registry = registry
+        super().__init__()
+        self.process()
+
+    def process(self) -> Optional[str]:
+        self.clear()
+        self[str(self.registry.database.url)] = None
+        for k, v in self.registry.extra.items():
+            self.setdefault(str(v.url), k)
+
+    def __getitem__(self, key: str) -> sqlalchemy.MetaData:
+        translation_name = super().__getitem__(key)
+        try:
+            return self.registry.metadata_by_name[translation_name]
+        except KeyError as exc:
+            raise Exception("metadata_by_name returned exception") from exc
+
+    def get(self, key: str, default: Any = None) -> sqlalchemy.MetaData:
+        try:
+            return self[key]
+        except KeyError:
+            return default
+
+    def __copy__(self) -> "MetaDataByUrlDict":
+        return MetaDataByUrlDict(registry=self.registry)
+
+    copy = __copy__
 
 
 class Registry:
@@ -77,20 +135,10 @@ class Registry:
         self.extra: Mapping[str, Database] = {
             k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
         }
+        self.metadata_by_url = MetaDataByUrlDict(registry=self)
 
         if with_content_type is not False:
             self._set_content_type(with_content_type)
-
-    @property
-    def metadata(self) -> sqlalchemy.MetaData:
-        if not hasattr(self, "_metadata"):
-            self._metadata = sqlalchemy.MetaData()
-            self.refresh_metadata()
-        return self._metadata
-
-    @metadata.setter
-    def metadata(self, value: sqlalchemy.MetaData) -> None:
-        self._metadata = value
 
     def __copy__(self) -> "Registry":
         _copy = Registry(self.database)
@@ -177,6 +225,29 @@ class Registry:
 
         self.register_callback(None, callback, one_time=False)
 
+    @property
+    def metadata_by_name(self) -> MetaDataDict:
+        if getattr(self, "_metadata_by_name", None) is None:
+            self._metadata_by_name = MetaDataDict(registry=self)
+        return self._metadata_by_name
+
+    @metadata_by_name.setter
+    def metadata_by_name(self, value: MetaDataDict) -> None:
+        metadata_dict = self.metadata_by_name
+        metadata_dict.clear()
+        for k, v in value.items():
+            metadata_dict[k] = v
+        self.metadata_by_url.process()
+
+    @property
+    def metadata(self) -> sqlalchemy.MetaData:
+        warnings.warn(
+            "metadata is deprecated use metadata_by_name or metadata_by_url instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.metadata_by_name[None]
+
     def get_model(self, model_name: str) -> type["BaseModelType"]:
         if model_name in self.models:
             return self.models[model_name]
@@ -190,34 +261,38 @@ class Registry:
     def refresh_metadata(
         self,
         *,
+        update_only: bool = False,
         multi_schema: Union[bool, re.Pattern, str] = False,
         ignore_schema_pattern: Union[None, "re.Pattern", str] = "information_schema",
-    ) -> dict[str, sqlalchemy.MetaData]:
-        self.metadata.clear()
-        extra_metadata = {}
+    ) -> None:
+        if not update_only:
+            for val in self.metadata_by_name.values():
+                val.clear()
         maindatabase_url = str(self.database.url)
         if multi_schema is not False:
-            schemes_tree = run_sync(self.schema.get_schemes_tree(use_url=True))
+            schemes_tree: dict[str, tuple[Optional[str], list[str]]] = {
+                v[0]: (key, v[2])
+                for key, v in run_sync(self.schema.get_schemes_tree(no_reflect=True)).items()
+            }
+        else:
+            schemes_tree = {
+                maindatabase_url: (None, [self.db_schema]),
+                **{str(v.url): (k, [None]) for k, v in self.extra.items()},
+            }
+
         if isinstance(multi_schema, str):
             multi_schema = re.compile(multi_schema)
         if isinstance(ignore_schema_pattern, str):
             ignore_schema_pattern = re.compile(ignore_schema_pattern)
         for model_class in self.models.values():
-            model_class._table = None
-            model_class._db_schemas = {}
+            if not update_only:
+                model_class._table = None
+                model_class._db_schemas = {}
             url = str(model_class.database.url)
-            if multi_schema is False:
-                if maindatabase_url == url:
-                    # initialize the correct table with metadata
-                    model_class.table  # noqa
-                else:
-                    if url not in extra_metadata:
-                        extra_metadata[url] = sqlalchemy.MetaData()
-                    model_class.build(metadata=extra_metadata[url])
-            else:
-                scheme_tree_object = schemes_tree.get(url)
-                if scheme_tree_object is not None:
-                    for schema in scheme_tree_object[1]:
+            if url in schemes_tree:
+                extra_key, schemes = schemes_tree[url]
+                for schema in schemes:
+                    if multi_schema is not False:
                         if multi_schema is not True and multi_schema.match(schema) is None:
                             continue
                         if (
@@ -234,18 +309,13 @@ class Registry:
                                     continue
                             elif model_class.__using_schema__ != schema:
                                 continue
-                        if maindatabase_url == url:
-                            model_class.table_schema(schema)
-                        else:
-                            if url not in extra_metadata:
-                                extra_metadata[url] = sqlalchemy.MetaData()
-                            model_class.build(schema=schema, metadata=extra_metadata[url])
+                    model_class.table_schema(schema=schema, metadata=self.metadata_by_url[url])
 
         # don't initialize to keep the metadata clean
-        for model_class in self.reflected.values():
-            model_class._table = None
-            model_class._db_schemas = {}
-        return extra_metadata
+        if not update_only:
+            for model_class in self.reflected.values():
+                model_class._table = None
+                model_class._db_schemas = {}
 
     def register_callback(
         self,
@@ -464,18 +534,20 @@ class Registry:
     ) -> None:
         # otherwise old references to non-existing tables, fks can lurk around
         if refresh_metadata:
-            self.refresh_metadata()
+            self.refresh_metadata(multi_schema=True)
         if self.db_schema:
             await self.schema.create_schema(
                 self.db_schema, True, True, update_cache=True, databases=databases
             )
         else:
+            # fallback when no schemes are in use. Because not all dbs support schemes
+            # we cannot just use a scheme = ""
             for database in databases:
                 db = self.database if database is None else self.extra[database]
                 # don't warn here about inperformance
                 async with db as db:
                     with db.force_rollback(False):
-                        await db.create_all(self.metadata)
+                        await db.create_all(self.metadata_by_name[database])
 
     async def drop_all(self, databases: Sequence[Union[str, None]] = (None,)) -> None:
         if self.db_schema:
@@ -483,9 +555,11 @@ class Registry:
                 self.db_schema, cascade=True, if_exists=True, databases=databases
             )
         else:
-            for database in databases:
-                db = self.database if database is None else self.extra[database]
+            # fallback when no schemes are in use. Because not all dbs support schemes
+            # we cannot just use a scheme = ""
+            for database_name in databases:
+                db = self.database if database_name is None else self.extra[database_name]
                 # don't warn here about inperformance
                 async with db as db:
                     with db.force_rollback(False):
-                        await db.drop_all(self.metadata)
+                        await db.drop_all(self.metadata_by_name[database_name])

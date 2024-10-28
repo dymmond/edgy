@@ -51,8 +51,9 @@ async def test_migrate_objs_main_only():
     app = Esmerald()
 
     migrate = Migrate(app=app, registry=models)
+    registry = migrate.get_registry_copy()
 
-    assert len(migrate.registry.metadata.tables.keys()) == 2
+    assert len(registry.metadata_by_name[None].tables.keys()) == 2
 
 
 async def test_migrate_objs_all():
@@ -68,8 +69,9 @@ async def test_migrate_objs_all():
     app = Esmerald()
 
     migrate = Migrate(app=app, registry=models, multi_schema=True)
+    registry = migrate.get_registry_copy()
 
-    assert set(migrate.registry.metadata.tables.keys()) == {
+    assert set(registry.metadata_by_name[None].tables.keys()) == {
         "tenants",
         "migrate_edgy.products",
         "products",
@@ -92,8 +94,9 @@ async def test_migrate_objs_namespace_only():
     app = Esmerald()
 
     migrate = Migrate(app=app, registry=models, multi_schema="saffier")
+    registry = migrate.get_registry_copy()
 
-    assert set(migrate.registry.metadata.tables.keys()) == {"saffier.products"}
+    assert set(registry.metadata_by_name[None].tables.keys()) == {"saffier.products"}
 
 
 async def test_migrate_objs_few():
@@ -112,8 +115,9 @@ async def test_migrate_objs_few():
     app = Esmerald()
 
     migrate = Migrate(app=app, registry=models, multi_schema="saffier|^$")
+    registry = migrate.get_registry_copy()
 
-    assert set(migrate.registry.metadata.tables.keys()) == {
+    assert set(registry.metadata_by_name[None].tables.keys()) == {
         "saffier.products",
         "products",
         "tenants",

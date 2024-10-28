@@ -56,8 +56,6 @@ app = get_app()
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
 config.set_main_option("sqlalchemy.url", get_engine_url())
 
 target_db = getattr(app, EDGY_DB)["migrate"].registry
@@ -71,7 +69,7 @@ target_db = getattr(app, EDGY_DB)["migrate"].registry
 def get_metadata():
     if hasattr(target_db, "metadatas"):
         return target_db.metadatas[None]
-    return target_db.metadata
+    return target_db.metadata_by_name[None]
 
 
 def run_migrations_offline():

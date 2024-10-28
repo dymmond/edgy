@@ -8,8 +8,23 @@ from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
-models = edgy.Registry(database=database)
+database = DatabaseTestClient(DATABASE_URL)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
+
+
+@pytest.fixture(autouse=True, scope="module")
+async def create_test_database():
+    async with database:
+        await models.create_all()
+        yield
+        if not database.drop:
+            await models.drop_all()
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def rollback_connections():
+    async with models:
+        yield
 
 
 class Album(edgy.Model):
@@ -80,20 +95,6 @@ class AnotherPerson(edgy.Model):
 
     class Meta:
         registry = models
-
-
-@pytest.fixture(autouse=True, scope="module")
-async def create_test_database():
-    await models.create_all()
-    yield
-    await models.drop_all()
-
-
-@pytest.fixture(autouse=True)
-async def rollback_connections():
-    with database.force_rollback():
-        async with database:
-            yield
 
 
 async def test_no_relation():

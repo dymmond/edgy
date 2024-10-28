@@ -67,7 +67,7 @@ class Schema:
         """
         Creates a model schema if it does not exist.
         """
-        tables: list[sqlalchemy.Table] = []
+        tenant_tables: list[sqlalchemy.Table] = []
         if init_models:
             for model_class in self.registry.models.values():
                 model_class.table_schema(schema=schema, update_cache=update_cache)
@@ -76,27 +76,35 @@ class Schema:
                 model_class.table_schema(schema=schema, update_cache=update_cache)
         elif init_tenant_models:
             for model_class in self.registry.tenant_models.values():
-                tables.append(model_class.table_schema(schema=schema, update_cache=update_cache))
+                tenant_tables.append(
+                    model_class.table_schema(schema=schema, update_cache=update_cache)
+                )
 
-        def execute_create(connection: sqlalchemy.Connection) -> None:
+        def execute_create(connection: sqlalchemy.Connection, name: Optional[str]) -> None:
             try:
                 connection.execute(
                     sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists)
                 )
             except ProgrammingError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e
-            for table in tables:
+            for table in tenant_tables:
                 table.create(connection, checkfirst=if_not_exists)
             if init_models:
-                self.registry.metadata.create_all(connection, checkfirst=if_not_exists)
+                self.registry.metadata_by_name[name].create_all(
+                    connection, checkfirst=if_not_exists
+                )
 
         ops = []
-        for database in databases:
-            db = self.registry.database if database is None else self.registry.extra[database]
+        for database_name in databases:
+            db = (
+                self.registry.database
+                if database_name is None
+                else self.registry.extra[database_name]
+            )
             # don't warn here about inperformance
             async with db as db:
                 with db.force_rollback(False):
-                    ops.append(db.run_sync(execute_create))
+                    ops.append(db.run_sync(execute_create, database_name))
         await asyncio.gather(*ops)
 
     async def drop_schema(
@@ -120,8 +128,12 @@ class Schema:
 
         ops = []
 
-        for database in databases:
-            db = self.registry.database if database is None else self.registry.extra[database]
+        for database_name in databases:
+            db = (
+                self.registry.database
+                if database_name is None
+                else self.registry.extra[database_name]
+            )
             # don't warn here about inperformance
             async with db as db:
                 with db.force_rollback(False):
@@ -129,7 +141,7 @@ class Schema:
         await asyncio.gather(*ops)
 
     async def get_metadata_of_all_schemes(
-        self, database: Database
+        self, database: Database, *, no_reflect: bool = False
     ) -> tuple[sqlalchemy.MetaData, list[str]]:
         tablenames = self.registry.get_tablenames()
 
@@ -145,24 +157,31 @@ class Schema:
                     "" if default_schema_name == schema else schema
                     for schema in inspector.get_schema_names()
                 ]
-                for schema in list_schemes:
-                    metadata.reflect(
-                        connection, schema=schema, only=lambda name, _: name in tablenames
-                    )
+                if not no_reflect:
+                    for schema in list_schemes:
+                        metadata.reflect(
+                            connection, schema=schema, only=lambda name, _: name in tablenames
+                        )
 
             await database.run_sync(wrapper)
             return metadata, list_schemes
 
     async def get_schemes_tree(
-        self, *, use_url: bool = False
-    ) -> dict[Union[str, None], tuple[sqlalchemy.MetaData, list[str]]]:
-        schemes_tree: dict[Union[str, None], tuple[sqlalchemy.MetaData, list[str]]] = {
-            str(self.registry.database.url)
-            if use_url
-            else None: await self.get_metadata_of_all_schemes(self.registry.database)
+        self, *, no_reflect: bool = False
+    ) -> dict[Union[str, None], tuple[str, sqlalchemy.MetaData, list[str]]]:
+        schemes_tree: dict[Union[str, None], tuple[str, sqlalchemy.MetaData, list[str]]] = {
+            None: (
+                str(self.database.url),
+                *(
+                    await self.get_metadata_of_all_schemes(
+                        self.registry.database, no_reflect=no_reflect
+                    )
+                ),
+            )
         }
         for key, val in self.registry.extra.items():
-            tree_key = str(val.url) if use_url else key
-            if tree_key not in schemes_tree:
-                schemes_tree[tree_key] = await self.get_metadata_of_all_schemes(val)
+            schemes_tree[key] = (
+                str(val.url),
+                *(await self.get_metadata_of_all_schemes(val, no_reflect=no_reflect)),
+            )
         return schemes_tree

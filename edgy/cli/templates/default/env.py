@@ -3,7 +3,7 @@ import logging
 import os
 import sys
 from logging.config import fileConfig
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from alembic import context
 from rich.console import Console
@@ -12,6 +12,9 @@ from edgy.cli.constants import APP_PARAMETER, EDGY_DB
 from edgy.cli.env import MigrationEnv
 from edgy.core.connection import Database
 from edgy.exceptions import EdgyException
+
+if TYPE_CHECKING:
+    import sqlalchemy
 
 # The console used for the outputs
 console = Console()
@@ -48,28 +51,36 @@ def get_app() -> Any:
     return app_env.app
 
 
-def get_engine_url() -> str:
-    url: Optional[str] = os.environ.get("EDGY_DATABASE_URL")
-    assert url, '"EDGY_DATABASE_URL" not specified or empty'
-    return url
-
-
 app: Any = get_app()
+
+
+def get_engine_url_and_metadata() -> tuple[str, "sqlalchemy.MetaData"]:
+    url: Optional[str] = os.environ.get("EDGY_DATABASE_URL")
+    _name = None
+    registry = getattr(app, EDGY_DB)["migrate"].get_registry_copy()
+    _metadata = registry.metadata_by_name[None]
+    if not url:
+        db_name: Optional[str] = os.environ.get("EDGY_DATABASE")
+        if db_name:
+            url = str(registry.extras[db_name].url)
+    if not url:
+        url = str(registry.database.url)
+    else:
+        _name, _metadata = registry.metadata_by_url.get(url, _metadata)
+    return url, _metadata
+
 
 # add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-config.set_main_option("sqlalchemy.url", get_engine_url())
+target_url, target_metadata = get_engine_url_and_metadata()
+config.set_main_option("sqlalchemy.url", target_url)
 
-extra_metadata = getattr(app, EDGY_DB)["migrate"].extra_metadata
-metadata = getattr(app, EDGY_DB)["migrate"].registry.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-
 
 
 def run_migrations_offline() -> Any:
@@ -85,7 +96,7 @@ def run_migrations_offline() -> Any:
     script output.
     """
     url = config.get_main_option("sqlalchemy.url")
-    context.configure(url=url, target_metadata=metadata, literal_binds=True)
+    context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
 
     with context.begin_transaction():
         context.run_migrations()
@@ -104,7 +115,7 @@ def do_run_migrations(connection: Any) -> Any:
 
     context.configure(
         connection=connection,
-        target_metadata=metadata,
+        target_metadata=target_metadata,
         process_revision_directives=process_revision_directives,
         **getattr(app, EDGY_DB)["migrate"].kwargs,
     )
@@ -121,9 +132,9 @@ async def run_migrations_online() -> Any:
     and associate a connection with the context.
 
     """
-    # the original script checked for the async compatibilit
+    # the original script checked for the async compatibility
     # we are only compatible with async drivers so just use Database
-    async with Database(get_engine_url()) as database:
+    async with Database(target_url) as database:
         await database.run_sync(do_run_migrations)
 
 

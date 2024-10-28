@@ -113,7 +113,7 @@ class DatabaseMixin:
         cls: type["BaseModelType"],
         registry: "Registry",
         name: str = "",
-        database: Union[bool, "Database", Literal["keep"]] = True,
+        database: Union[bool, "Database", Literal["keep"]] = "keep",
     ) -> None:
         # when called if registry is not set
         cls.meta.registry = registry
@@ -156,6 +156,27 @@ class DatabaseMixin:
         # finalize
         cls.model_rebuild(force=True)
 
+    def get_active_instance_schema(
+        self, check_schema: bool = True, check_tenant: bool = True
+    ) -> Union[str, None]:
+        if self.__using_schema__ is not Undefined:
+            return self.__using_schema__
+        return self.__class__.get_active_class_schema(
+            check_schema=check_schema, check_tenant=check_tenant
+        )
+
+    @classmethod
+    def get_active_class_schema(cls, check_schema: bool = True, check_tenant: bool = True) -> str:
+        if cls.__using_schema__ is not Undefined:
+            return cls.__using_schema__
+        if check_schema:
+            schema = get_schema(check_tenant=check_tenant)
+            if schema is not None:
+                return schema
+        db_schema = cls.get_db_schema()
+        # sometime "" is ok, sometimes not, sqlalchemy logic
+        return db_schema or None
+
     @classmethod
     def copy_edgy_model(
         cls: type["Model"], registry: Optional["Registry"] = None, name: str = "", **kwargs: Any
@@ -185,9 +206,7 @@ class DatabaseMixin:
     @property
     def table(self) -> sqlalchemy.Table:
         if getattr(self, "_table", None) is None:
-            schema = self.__using_schema__
-            if schema is Undefined:
-                schema = get_schema()
+            schema = self.get_active_instance_schema()
             return cast(
                 "sqlalchemy.Table",
                 self.table_schema(schema),
@@ -201,16 +220,6 @@ class DatabaseMixin:
         with contextlib.suppress(AttributeError):
             del self._pkcolumns
         self._table = value
-
-    @property
-    def database(self) -> "Database":
-        if getattr(self, "_database", None) is None:
-            return cast("Database", self.__class__.database)
-        return self._database
-
-    @database.setter
-    def database(self, value: "Database") -> None:
-        self._database = value
 
     @property
     def pkcolumns(self) -> Sequence[str]:
@@ -492,14 +501,14 @@ class DatabaseMixin:
         registry = cls.meta.registry
         assert registry, "registry is not set"
         if metadata is None:
-            if str(cls.database.url) == str(registry.database.url):
-                metadata = registry.metadata
-            else:
-                metadata = sqlalchemy.MetaData()
+            metadata = registry.metadata_by_url[str(cls.database.url)]
         schemes: list[str] = []
         if schema:
             schemes.append(schema)
-        schemes.append(registry.db_schema or "")
+        if cls.__using_schema__ is not Undefined:
+            schemes.append(cls.__using_schema__)
+        db_schema = cls.get_db_schema() or ""
+        schemes.append(db_schema)
 
         unique_together = cls.meta.unique_together
         index_constraints = cls.meta.indexes
@@ -530,7 +539,9 @@ class DatabaseMixin:
             *indexes,
             *global_constraints,
             extend_existing=True,
-            schema=schema or registry.db_schema,
+            schema=schema
+            if schema
+            else cls.get_active_class_schema(check_schema=False, check_tenant=False),
         )
 
     @classmethod

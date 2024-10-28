@@ -101,9 +101,12 @@ async def test_can_reflect_correct_columns():
     assert ReflectedProduct.table.c.uuid.type.as_generic().__class__ == sqlalchemy.Uuid
     assert ReflectedProduct.table.c.duration.type.as_generic().__class__ == sqlalchemy.Interval
     # now the tables should be initialized
-    assert second.metadata.tables["products"].c.uuid.type.as_generic().__class__ == sqlalchemy.Uuid
     assert (
-        second.metadata.tables["products"].c.duration.type.as_generic().__class__
+        second.metadata_by_name[None].tables["products"].c.uuid.type.as_generic().__class__
+        == sqlalchemy.Uuid
+    )
+    assert (
+        second.metadata_by_name[None].tables["products"].c.duration.type.as_generic().__class__
         == sqlalchemy.Interval
     )
 
@@ -123,7 +126,8 @@ async def test_create_correct_inspect_db():
 async def test_create_correct_inspect_db_with_full_info_avail():
     # Here we generate from an original metadata a file
     # this will however not happen often
-    tables, _ = InspectDB.generate_table_information(third.metadata)
+    third.refresh_metadata()
+    tables, _ = InspectDB.generate_table_information(third.metadata_by_name[None])
 
     out = StringIO()
     with redirect_stdout(out):

@@ -32,7 +32,7 @@ class MigrateConfig:
 
     @property
     def metadata(self) -> typing.Any:
-        return self.registry.metadata
+        return self.registry.metadata_by_name[None]
 
 
 class Config(AlembicConfig):
@@ -95,10 +95,8 @@ class Migrate(BaseExtra):
                 )
             # proper add to registry
             value.add_to_registry(self.registry, database="keep")
-        # we need to ensure initialized metadata
-        self.extra_metadata = self.registry.refresh_metadata(
-            multi_schema=multi_schema, ignore_schema_pattern=ignore_schema_pattern
-        )
+        self.multi_schema = multi_schema
+        self.ignore_schema_pattern = ignore_schema_pattern
 
         self.directory = "migrations"
         self.alembic_ctx_kwargs = {
@@ -108,6 +106,14 @@ class Migrate(BaseExtra):
         }
 
         self.set_edgy_extension(app)
+
+    def get_registry_copy(self) -> "Registry":
+        """Get copy with applied restrictions, usable for migrations."""
+        registry = self.registry.__copy__()
+        registry.refresh_metadata(
+            multi_schema=self.multi_schema, ignore_schema_pattern=self.ignore_schema_pattern
+        )
+        return registry
 
     def check_db_models(
         self, model_apps: Union[dict[str, str], tuple[str], list[str]]

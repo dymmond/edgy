@@ -2,12 +2,10 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union, cast
 
 from edgy.core.db.constants import CASCADE
-from edgy.core.db.context_vars import get_schema
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField, ForeignKey
 from edgy.core.db.relationships.relation import SingleRelation
 from edgy.core.terminal import Print
 from edgy.protocols.many_relationship import ManyRelationProtocol
-from edgy.types import Undefined
 
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
@@ -26,10 +24,7 @@ class BaseContentTypeFieldField(BaseForeignKeyField):
         # e.g. default was a Model
         if isinstance(value, (target, target.proxy_model)):
             value.name = self.owner.__name__
-            if instance.__using_schema__ is Undefined:
-                value.schema_name = get_schema()
-            else:
-                value.schema_name = instance.__using_schema__
+            value.schema_name = instance.get_active_instance_schema()
         return await super().pre_save_callback(
             value, original_value, force_insert=force_insert, instance=instance
         )

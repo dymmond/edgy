@@ -6,11 +6,16 @@ hide:
 
 # Release Notes
 
-## 0.20.1
+## 0.21.0
 
-### Fixed
+### Added
 
-- Allow multi-schema migrations.
+- Allow multi schema and db migrations.
+- `metadata_by_url` dictionary .
+
+### Changed
+
+- `metadata` of `registry` is now `metadata_by_name`.
 
 ## 0.20.0
 

@@ -34,7 +34,6 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import ImproperlyConfigured, TableBuildError
 
 if TYPE_CHECKING:
-    from edgy.core.connection.database import Database
     from edgy.core.db.models import Model
     from edgy.core.db.models.types import BaseModelType
 
@@ -766,13 +765,11 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         )
         return cls.get_db_schema()
 
-    @property
-    def database(cls) -> Database:
-        return cls._database
-
-    @database.setter
-    def database(cls, value: Database) -> None:
-        cls._database = value
+    def _build_table(cls, metadata: Optional[sqlalchemy.MetaData] = None):
+        try:
+            cls._table = cls.build(cls.get_db_schema(), metadata=metadata)
+        except AttributeError as exc:
+            raise TableBuildError(exc) from exc
 
     @property
     def table(cls) -> sqlalchemy.Table:
@@ -795,10 +792,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} != {cls.meta.tablename}"
         # fix assigned table
         if table is None or table.name.lower() != cls.meta.tablename:
-            try:
-                cls._table = cls.build(cls.get_db_schema())
-            except AttributeError as exc:
-                raise TableBuildError(exc) from exc
+            cls._build_table()
 
         return cast("sqlalchemy.Table", cls._table)
 
@@ -837,21 +831,26 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return meta.signals
 
     def table_schema(
-        cls, schema: Union[str, None] = None, update_cache: bool = False
+        cls,
+        schema: Union[str, None] = None,
+        *,
+        metadata: Optional[sqlalchemy.MetaData] = None,
+        update_cache: bool = False,
     ) -> sqlalchemy.Table:
         """
         Retrieve table for schema (nearly the same as build with scheme argument).
         Cache per class via a primitive LRU cache.
         """
-        if schema is None or schema == "":
+        if schema is None or (cls.get_db_schema() or "") == schema:
             # sqlalchemy uses "" for empty schema
-            if update_cache:
-                cls._table = None
+            table = getattr(cls, "_table", None)
+            if update_cache or table is None or table.name.lower() != cls.meta.tablename:
+                cls._build_table(metadata=metadata)
             return cls.table
         # remove cache element so the key is reordered
         schema_obj = cls._db_schemas.pop(schema, None)
         if schema_obj is None or update_cache:
-            schema_obj = cls.build(schema=schema)
+            schema_obj = cls.build(schema=schema, metadata=metadata)
         # set element to last
         cls._db_schemas[schema] = schema_obj
         # remove oldest element, when bigger 100

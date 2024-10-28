@@ -107,7 +107,7 @@ class InspectDB:
         models: dict[str, str] = {}
         for key, table in tables_dict.items():
             table_details: dict[str, Any] = {}
-            table_details["tablename"] = key
+            table_details["tablename"] = key.rsplit(".", 1)[-1]
 
             table_name_list: list[str] = key.split(".")
             table_name = table_name_list[1] if len(table_name_list) > 1 else table_name_list[0]
@@ -299,6 +299,8 @@ class InspectDB:
             # yield "    ...\n"
 
             sqla_table: sqlalchemy.Table = table_detail["table"]
+            if sqla_table.schema:
+                yield f'    __using_schema__ = "{sqla_table.schema}"\n'
             columns = list(sqla_table.columns)
 
             # Get the column information
