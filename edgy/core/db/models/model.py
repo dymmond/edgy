@@ -43,7 +43,7 @@ class Model(
         a "users" table for you.
         '''
 
-        id: int = edgy.IntegerField(primary_key=True)
+        id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
         is_active: bool = edgy.BooleanField(default=False)
 
         class Meta:
