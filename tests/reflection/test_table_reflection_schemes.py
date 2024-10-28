@@ -17,6 +17,7 @@ second = edgy.Registry(database=edgy.Database(database, force_rollback=False))
 
 expected_result1 = """
 class Users(edgy.ReflectModel):
+    __using_schema__ = "test"
     name = edgy.CharField(max_length=255, null=False)
     title = edgy.CharField(max_length=255, null=True)
     id = edgy.BigIntegerField(autoincrement=True, null=False, primary_key=True)
@@ -28,6 +29,7 @@ class Users(edgy.ReflectModel):
 
 expected_result2 = """
 class Hubusers(edgy.ReflectModel):
+    __using_schema__ = "test"
     name = edgy.CharField(max_length=255, null=False)
     title = edgy.CharField(max_length=255, null=True)
     description = edgy.CharField(max_length=255, null=True)
@@ -39,7 +41,19 @@ class Hubusers(edgy.ReflectModel):
 """.strip()
 
 
+@pytest.fixture(autouse=True, scope="function")
+async def create_test_database():
+    async with models:
+        await models.schema.create_schema("test", if_not_exists=True)
+        await models.create_all()
+        async with second:
+            yield
+        if not database.drop:
+            await models.drop_all()
+
+
 class User(edgy.Model):
+    __using_schema__ = "test"
     name = edgy.CharField(max_length=255, index=True)
     title = edgy.CharField(max_length=255, null=True)
 
@@ -49,6 +63,7 @@ class User(edgy.Model):
 
 
 class HubUser(edgy.Model):
+    __using_schema__ = "test"
     name = edgy.CharField(max_length=255)
     title = edgy.CharField(max_length=255, null=True)
     description = edgy.CharField(max_length=255, null=True)
@@ -62,6 +77,7 @@ class HubUser(edgy.Model):
 
 
 class ReflectedUser(edgy.ReflectModel):
+    __using_schema__ = "test"
     name = edgy.CharField(max_length=255)
     title = edgy.CharField(max_length=255, null=True)
     description = edgy.CharField(max_length=255, null=True)
@@ -72,22 +88,13 @@ class ReflectedUser(edgy.ReflectModel):
 
 
 class NewReflectedUser(edgy.ReflectModel):
+    __using_schema__ = "test"
     name = edgy.CharField(max_length=255)
     title = edgy.CharField(max_length=255, null=True)
 
     class Meta:
         tablename = "hubusers"
         registry = second
-
-
-@pytest.fixture(autouse=True, scope="function")
-async def create_test_database():
-    async with models:
-        await models.create_all()
-        async with second:
-            yield
-        if not database.drop:
-            await models.drop_all()
 
 
 async def test_can_reflect_existing_table():
@@ -164,7 +171,7 @@ async def test_can_reflect_and_edit_existing_table():
 
 
 async def test_create_correct_inspect_db():
-    inflected = InspectDB(str(models.database.url))
+    inflected = InspectDB(str(models.database.url), schema="test")
     out = StringIO()
     with redirect_stdout(out):
         inflected.inspect()

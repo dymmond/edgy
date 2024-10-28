@@ -6,6 +6,26 @@ hide:
 
 # Release Notes
 
+## 0.21.0
+
+### Added
+
+- Allow multi schema and database migrations.
+- `metadata_by_url` dictionary.
+
+### Changed
+
+- `metadata` of `registry` is now `metadata_by_name`.
+- `hash_tablekey` uses a faster hash function.
+- Migrate object provides now a function for getting a suitable registry copy for migrations.
+- Change license to bsd-3.
+- Proper deprecate unset autoincrement when using it with primary key. The behavior is already deprecated in the documentation.
+
+### Fixed
+
+- `Migrate` executed `refresh_metadata` everytime causing reflected models to vanish.
+- Fix edgy wrapping esmerald with the asgi helper causing esmeralds cli to disappear.
+
 ## 0.20.0
 
 ### Added

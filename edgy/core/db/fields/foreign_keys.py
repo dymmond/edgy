@@ -255,9 +255,9 @@ class BaseForeignKeyField(BaseForeignKey):
 
         if that happens, we need to assure it is small.
         """
-        fk_name = f"fk_{self.owner.meta.tablename}_{self.target.meta.tablename}_{name}"
-        if not len(fk_name) > FK_CHAR_LIMIT:
-            return fk_name
+        fk_name = f"{self.owner.meta.tablename}_{self.target.meta.tablename}_{name}"
+
+        fk_name = f"fk_{fk_name}"
         return fk_name[:FK_CHAR_LIMIT]
 
     def get_fkindex_name(self, name: str) -> str:
@@ -269,9 +269,9 @@ class BaseForeignKeyField(BaseForeignKey):
 
         if that happens, we need to assure it is small.
         """
-        fk_name = f"fkindex_{self.owner.meta.tablename}_{self.target.meta.tablename}_{name}"
-        if not len(fk_name) > FK_CHAR_LIMIT:
-            return fk_name
+        fk_name = f"{self.owner.meta.tablename}_{self.target.meta.tablename}_{name}"
+
+        fk_name = f"fkindex_{fk_name}"
         return fk_name[:FK_CHAR_LIMIT]
 
     def get_fk_field_name(self, name: str, fieldname: str) -> str:
@@ -332,7 +332,7 @@ class BaseForeignKeyField(BaseForeignKey):
             prefix = ""
             for schema in schemes:
                 prefix = f"{schema}.{target.meta.tablename}" if schema else target.meta.tablename
-                if prefix in target.meta.registry.metadata.tables:
+                if prefix in target.meta.registry.metadata_by_url[str(target.database.url)].tables:
                     break
             constraints.append(
                 sqlalchemy.ForeignKeyConstraint(
@@ -349,7 +349,11 @@ class BaseForeignKeyField(BaseForeignKey):
         # set for unique or if index is True
         if self.unique or self.index:
             constraints.append(
-                sqlalchemy.Index(self.get_fkindex_name(name), *columns, unique=self.unique),
+                sqlalchemy.Index(
+                    self.get_fkindex_name(name),
+                    *columns,
+                    unique=self.unique,
+                ),
             )
 
         return constraints

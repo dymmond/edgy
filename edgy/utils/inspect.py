@@ -107,7 +107,7 @@ class InspectDB:
         models: dict[str, str] = {}
         for key, table in tables_dict.items():
             table_details: dict[str, Any] = {}
-            table_details["tablename"] = key
+            table_details["tablename"] = key.rsplit(".", 1)[-1]
 
             table_name_list: list[str] = key.split(".")
             table_name = table_name_list[1] if len(table_name_list) > 1 else table_name_list[0]
@@ -180,6 +180,9 @@ class InspectDB:
         if field_type in {"CharField", "TextField"} and hasattr(real_field, "collation"):  # noqa: SIM102
             if real_field.collation is not None:
                 field_params["collation"] = real_field.collation
+
+        if field_type in {"IntegerField", "SmallIntegerField", "BigIntegerField"}:
+            field_params["autoincrement"] = column.autoincrement
 
         if field_type == "DecimalField":
             field_params["max_digits"] = real_field.precision
@@ -299,6 +302,8 @@ class InspectDB:
             # yield "    ...\n"
 
             sqla_table: sqlalchemy.Table = table_detail["table"]
+            if sqla_table.schema:
+                yield f'    __using_schema__ = "{sqla_table.schema}"\n'
             columns = list(sqla_table.columns)
 
             # Get the column information

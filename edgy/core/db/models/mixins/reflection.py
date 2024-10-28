@@ -5,7 +5,6 @@ from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ImproperlyConfigured
-from edgy.types import Undefined
 
 if TYPE_CHECKING:
     from edgy import Registry
@@ -30,11 +29,8 @@ class ReflectedModelMixin:
         registry = cls.meta.registry
         assert registry, "registry is not set"
         if metadata is None:
-            metadata = registry.metadata
-        if cls.__using_schema__ is not Undefined:
-            schema_name = cls.__using_schema__
-        else:
-            schema_name = schema or registry.db_schema
+            metadata = registry.metadata_by_url[str(cls.database.url)]
+        schema_name = schema or cls.get_active_class_schema()
 
         tablename: str = cast("str", cls.meta.tablename)
         return run_sync(cls.reflect(cls.database, tablename, metadata, schema_name))

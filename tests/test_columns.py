@@ -37,7 +37,7 @@ class Product(edgy.Model):
     created_datetime = fields.DateTimeField(auto_now_add=True, with_timezone=False)
     updated_datetime = fields.DateTimeField(auto_now=True, with_timezone=False)
     updated_date = fields.DateField(auto_now=True)
-    data = fields.JSONField(default={})
+    data = fields.JSONField(default=dict)
     description = fields.CharField(null=True, max_length=255)
     huge_number = fields.BigIntegerField(default=0)
     price = fields.DecimalField(max_digits=9, decimal_places=2, null=True)

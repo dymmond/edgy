@@ -33,7 +33,6 @@ class Member(edgy.Model):
 
 
 class User(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
     name: str = edgy.CharField(max_length=255, null=True)
     member: Member = edgy.ForeignKey(
         Member, on_delete=edgy.SET_NULL, null=True, related_name="users"

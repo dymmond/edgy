@@ -32,6 +32,7 @@ from edgy.types import Undefined
 from .types import BaseModelType
 
 if TYPE_CHECKING:
+    from edgy.core.connection.database import Database
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.model import Model
     from edgy.core.db.querysets.base import QuerySet
@@ -52,6 +53,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     __show_pk__: ClassVar[bool] = False
     __using_schema__: Union[str, None, Any] = Undefined
     # private attribute
+    database: ClassVar[Database] = None
     _loaded_or_deleted: bool = False
 
     def __init__(

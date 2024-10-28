@@ -42,6 +42,17 @@ And that is it, you can use any tool that does not relate with migrations in you
 !!! Warning
     Be aware of the use of this special class in production! It is advised not to use it there.
 
+## Migrate multiple schemes
+
+Migrate has a special parameter named `multi_schema`. It can be a boolean, a string, a regex pattern.
+When set to a value different False (the default) models will be migrated in multiple schemes not only the main schema.
+
+When setting to True, all found schemes are evaluated. By providing a string or regex, you can filter the schemes via regex. There
+are also other keywords which are passed through the MigrationContext of alembic.
+
+For excluding system schemes there is a second parameter named: `ignore_schema_pattern`. It defaults to `information_schema`.
+Set to `None` to deactivate it.
+
 ## Note
 
 For now, besides the migrations and the shell, Edgy does not offer any extra tools but there are

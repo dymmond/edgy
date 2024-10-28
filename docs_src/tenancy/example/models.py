@@ -69,7 +69,6 @@ class Tenant(edgy.Model):
 
 
 class User(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
     name: str = edgy.CharField(max_length=255)
 
     class Meta:
@@ -77,7 +76,6 @@ class User(edgy.Model):
 
 
 class Product(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
     name: str = edgy.CharField(max_length=255)
     user: User = edgy.ForeignKey(User, null=True)
 

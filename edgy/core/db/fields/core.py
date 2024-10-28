@@ -3,6 +3,7 @@ import decimal
 import enum
 import ipaddress
 import uuid
+import warnings
 from collections.abc import Callable, Sequence
 from enum import EnumMeta
 from functools import cached_property, partial
@@ -256,8 +257,20 @@ class IntegerField(FieldFactory, int):
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
         increment_on_save = kwargs.get("increment_on_save", 0)
-        if increment_on_save == 0 and kwargs.get("primary_key", False):
-            kwargs.setdefault("autoincrement", True)
+        if (
+            increment_on_save == 0
+            and kwargs.get("primary_key", False)
+            and "autoincrement" not in kwargs
+        ):
+            warnings.warn(
+                (
+                    "Not setting autoincrement on an Integer field with `primary_key=True` is deprecated."
+                    "We change the default to False in future."
+                ),
+                DeprecationWarning,
+                stacklevel=4,
+            )
+            kwargs["autoincrement"] = True
         if increment_on_save != 0:
             if kwargs.get("autoincrement"):
                 raise FieldDefinitionError(

@@ -6,7 +6,6 @@ models = Registry(database=database)
 
 
 class User(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
     is_active: bool = edgy.BooleanField(default=False)
 
     class Meta:

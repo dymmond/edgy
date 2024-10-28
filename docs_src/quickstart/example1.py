@@ -12,7 +12,6 @@ class User(edgy.Model):
     a "users" table for you.
     """
 
-    id: int = edgy.IntegerField(primary_key=True)
     is_active: bool = edgy.BooleanField(default=False)
 
     class Meta:

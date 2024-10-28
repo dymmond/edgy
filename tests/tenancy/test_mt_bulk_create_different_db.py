@@ -38,7 +38,7 @@ class Product(edgy.Model):
     created_datetime: datetime = fields.DateTimeField(auto_now_add=True)
     updated_datetime: datetime = fields.DateTimeField(auto_now=True)
     updated_date: datetime = fields.DateField(auto_now=True)
-    data: dict[Any, Any] = fields.JSONField(default={})
+    data: dict[Any, Any] = fields.JSONField(default=dict)
     description: str = fields.CharField(null=True, max_length=255)
     huge_number: int = fields.BigIntegerField(default=0)
     price: decimal.Decimal = fields.DecimalField(max_digits=9, decimal_places=2, null=True)
@@ -51,14 +51,16 @@ class Product(edgy.Model):
 
 registry = copy.copy(models)
 registry.database = another_db
+for val in registry.models.values():
+    val.database = another_db
 
 
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     async with models:
         await models.create_all()
-        registry.metadata = models.metadata
-        await registry.create_all(False)
+        registry.metadata_by_name = models.metadata_by_name.copy()
+        await registry.create_all(refresh_metadata=False)
         yield
         if not database.drop:
             await models.drop_all()

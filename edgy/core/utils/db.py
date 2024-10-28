@@ -1,7 +1,7 @@
-import base64
-import hashlib
 import warnings
+from base64 import b32encode
 from functools import lru_cache
+from hashlib import blake2b
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ def check_db_connection(db: "Database") -> None:
 @lru_cache(512, typed=False)
 def _hash_tablekey(tablekey: str, prefix: str) -> str:
     tablehash = (
-        base64.urlsafe_b64encode(hashlib.new("md5", f"{tablekey}_{prefix}".encode()).digest())
+        b32encode(blake2b(f"{tablekey}_{prefix}".encode(), digest_size=16).digest())
         .decode()
         .rstrip("=")
     )
@@ -33,6 +33,10 @@ def _hash_tablekey(tablekey: str, prefix: str) -> str:
 
 
 def hash_tablekey(*, tablekey: str, prefix: str) -> str:
+    """
+    For temporary aliases like joins.
+    Columns can be extracted from joins by adding to the hash `_<column name>`.
+    """
     if not prefix:
         return tablekey
     return _hash_tablekey(tablekey, prefix)
