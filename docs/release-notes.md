@@ -16,12 +16,14 @@ hide:
 ### Changed
 
 - `metadata` of `registry` is now `metadata_by_name`.
-- Rename `hash_tablekey` to `hash_jointablekey` and use faster hash function.
+- `hash_tablekey` uses a faster hash function.
 - Migrate object provides now a function for getting a suitable registry copy for migrations.
+- Change license to bsd-3.
 
 ### Fixed
 
 - `Migrate` executed `refresh_metadata` everytime causing reflected models to vanish.
+- Fix edgy wrapping esmerald with the asgi helper causing esmeralds cli to disappear.
 
 ## 0.20.0
 

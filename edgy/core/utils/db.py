@@ -1,5 +1,7 @@
 import warnings
+from base64 import b32hexencode
 from functools import lru_cache
+from hashlib import blake2b
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -20,15 +22,21 @@ def check_db_connection(db: "Database") -> None:
 
 
 @lru_cache(512, typed=False)
-def _hash_jointablekey(tablekey: str, prefix: str) -> str:
-    tablehash_hex = hex(hash(f"{tablekey}_{prefix}"))
-    tablehash = f"n{tablehash_hex[3:]}" if tablehash_hex[0] == "-" else tablehash_hex[2:]
+def _hash_tablekey(tablekey: str, prefix: str) -> str:
+    tablehash = (
+        b32hexencode(blake2b(f"{tablekey}_{prefix}".encode(), digest_size=16).digest())
+        .decode()
+        .rstrip("=")
+    )
 
     return f"_join_{tablehash}"
 
 
-def hash_jointablekey(*, tablekey: str, prefix: str) -> str:
-    """Only for joins. Not a stable hash."""
+def hash_tablekey(*, tablekey: str, prefix: str) -> str:
+    """
+    For temporary aliases like joins.
+    Columns can be extracted from joins by adding to the hash `_<column name>`.
+    """
     if not prefix:
         return tablekey
-    return _hash_jointablekey(tablekey, prefix)
+    return _hash_tablekey(tablekey, prefix)
