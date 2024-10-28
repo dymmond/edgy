@@ -51,6 +51,20 @@ scenes.
 Edgy models are a bit opinionated when it comes to `ID` and this is to maintain consistency
 within the SQL tables with field names and lookups.
 
+### Special attributes
+
+There are few special attributes which can be set
+
+- `database`: Different database/access current database of model. Should be in registry extra. It is set per instance when using queries.
+- `__using_schema__`: Different schema. The schema must be created first. Default is Undefined. It is set per instance for tenant models.
+- ``
+These attributes work on instances as well as classes.
+
+There are a few more exotic ones:
+
+- `__require_model_based_deletion__`: (Default False): Enforce a deletion in edgy instead of the database (Query iterates through models and deletes each explicitly). This is quite imperformant, so only set it if you really require that the delete method of a model is called.
+- `__reflected__`: Only read but don't set it. It shows if a model has the reflected state.
+
 ### Attention
 
 If no `id` is declared in the model, **Edgy** will automatically generate an `id` of type
@@ -69,13 +83,12 @@ Earlier there were many restrictions. Now they were lifted
 ##### Declaring an IntegerField as primary key without autoincrement set
 
 Because of backward compatibility we set for an IntegerField or BigIntegerField which is declared as primary key
-the autoincrement option to `True`. So you need to explicitly set `autoincrement=False` to turn this off.
+the autoincrement option to `True`. So you still need to explicitly set `autoincrement=False` to turn this off.
 
-This maybe can change and is not always wanted when having e.g. an explicit id or a secondary primary key IntegerField.
+This will change in future. The default will be `False`.
 
-Note: for every model only one IntegerField/BigIntegerField can be set to autoincrement=True
-
-Note: You can also set the field with autoincrement to an explicit value
+!!! Warning
+    For every model only one IntegerField/BigIntegerField can be set to autoincrement=True.
 
 #### What you can do
 
