@@ -181,6 +181,9 @@ class InspectDB:
             if real_field.collation is not None:
                 field_params["collation"] = real_field.collation
 
+        if field_type in {"IntegerField", "SmallIntegerField", "BigIntegerField"}:
+            field_params["autoincrement"] = column.autoincrement
+
         if field_type == "DecimalField":
             field_params["max_digits"] = real_field.precision
             field_params["decimal_places"] = real_field.scale

@@ -19,7 +19,7 @@ expected_result1 = """
 class Users(edgy.ReflectModel):
     name = edgy.CharField(max_length=255, null=False)
     title = edgy.CharField(max_length=255, null=True)
-    id = edgy.BigIntegerField(null=False, primary_key=True)
+    id = edgy.BigIntegerField(autoincrement=True, null=False, primary_key=True)
 
     class Meta:
         registry = registry
@@ -31,7 +31,7 @@ class Hubusers(edgy.ReflectModel):
     name = edgy.CharField(max_length=255, null=False)
     title = edgy.CharField(max_length=255, null=True)
     description = edgy.CharField(max_length=255, null=True)
-    id = edgy.BigIntegerField(null=False, primary_key=True)
+    id = edgy.BigIntegerField(autoincrement=True, null=False, primary_key=True)
 
     class Meta:
         registry = registry

@@ -29,7 +29,7 @@ class Products(edgy.ReflectModel):
     uuid = edgy.UUIDField(null=False)
     duration = edgy.DurationField(null=False)
     extra = edgy.JSONField(null=False)
-    id = edgy.BigIntegerField(null=False, primary_key=True)
+    id = edgy.BigIntegerField(autoincrement=True, null=False, primary_key=True)
 
     class Meta:
         registry = registry
@@ -43,7 +43,7 @@ class Products(edgy.ReflectModel):
     uuid = edgy.UUIDField(null=False)
     duration = edgy.DurationField(null=False)
     extra = edgy.JSONField(null=False)
-    id = edgy.BigIntegerField(null=False, primary_key=True)
+    id = edgy.BigIntegerField(autoincrement=True, null=False, primary_key=True)
 
     class Meta:
         registry = registry
