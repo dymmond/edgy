@@ -19,6 +19,7 @@ hide:
 - `hash_tablekey` uses a faster hash function.
 - Migrate object provides now a function for getting a suitable registry copy for migrations.
 - Change license to bsd-3.
+- Proper deprecate unset autoincrement when using it with primary key. The behavior is already deprecated in the documentation.
 
 ### Fixed
 

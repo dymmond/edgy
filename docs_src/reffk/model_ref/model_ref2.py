@@ -8,7 +8,6 @@ models = Registry(database=database)
 
 
 class Post(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
     comment: str = edgy.TextField()
     created_at: datetime = edgy.DateTimeField(auto_now_add=True)
 

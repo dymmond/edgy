@@ -8,7 +8,6 @@ models = edgy.Registry(database=database)
 
 
 class User(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
     name: str = edgy.CharField(max_length=100)
     email: str = edgy.EmailField(max_length=100)
     language: str = edgy.CharField(max_length=200, null=True)

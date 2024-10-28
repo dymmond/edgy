@@ -10,7 +10,6 @@ class User(edgy.Model):
     The user model representation
     """
 
-    id: int = edgy.IntegerField(primary_key=True)
     name: str = edgy.CharField(max_length=255)
     age: int = edgy.IntegerField(minimum=18)
     is_active: bool = edgy.BooleanField(default=True)

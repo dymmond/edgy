@@ -10,7 +10,6 @@ models = Registry(database=database)
 
 
 class User(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
     name: str = edgy.CharField(max_length=255)
     posts: List["Post"] = edgy.RefForeignKey(PostRef)
 
@@ -19,7 +18,6 @@ class User(edgy.Model):
 
 
 class Post(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
     user: User = edgy.ForeignKey(User)
     comment: str = edgy.TextField()
 
