@@ -24,7 +24,7 @@ from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.relationships.utils import crawl_relationship
-from edgy.core.utils.db import check_db_connection, hash_tablekey
+from edgy.core.utils.db import check_db_connection, hash_jointablekey
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.types import Undefined
@@ -428,7 +428,7 @@ class BaseQuerySet(
                         table: Any = _select_tables_and_models[_select_prefix][0]
                     else:
                         table = model_class.table_schema(self.active_schema)
-                        table = table.alias(hash_tablekey(tablekey=table.key, prefix=prefix))
+                        table = table.alias(hash_jointablekey(tablekey=table.key, prefix=prefix))
 
                     # it is guranteed that former_table is either root and has a key or is an unique join node
                     # except there would be a hash collision which is very unlikely
@@ -774,7 +774,7 @@ class BaseQuerySet(
                 to_attr=prefetch.to_attr,
                 queryset=prefetch_queryset,
             )
-            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=tables_and_models[''][0].key, prefix=cast(str, crawl_result.reverse_path))}_"
+            new_prefetch._bake_prefix = f"{hash_jointablekey(tablekey=tables_and_models[''][0].key, prefix=cast(str, crawl_result.reverse_path))}_"
             new_prefetch._is_finished = True
             _prefetch_related.append(new_prefetch)
 

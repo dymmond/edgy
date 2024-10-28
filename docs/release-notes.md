@@ -16,6 +16,7 @@ hide:
 ### Changed
 
 - `metadata` of `registry` is now `metadata_by_name`.
+- Rename `hash_tablekey` to `hash_jointablekey` and use faster hash function.
 
 ## 0.20.0
 

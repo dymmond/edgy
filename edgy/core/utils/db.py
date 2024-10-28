@@ -20,15 +20,15 @@ def check_db_connection(db: "Database") -> None:
 
 
 @lru_cache(512, typed=False)
-def _hash_tablekey(tablekey: str, prefix: str) -> str:
+def _hash_jointablekey(tablekey: str, prefix: str) -> str:
     tablehash_hex = hex(hash(f"{tablekey}_{prefix}"))
     tablehash = f"n{tablehash_hex[3:]}" if tablehash_hex[0] == "-" else tablehash_hex[2:]
 
     return f"_join_{tablehash}"
 
 
-def hash_tablekey(*, tablekey: str, prefix: str) -> str:
+def hash_jointablekey(*, tablekey: str, prefix: str) -> str:
     """Only for joins. Not a stable hash."""
     if not prefix:
         return tablekey
-    return _hash_tablekey(tablekey, prefix)
+    return _hash_jointablekey(tablekey, prefix)

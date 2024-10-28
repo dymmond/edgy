@@ -3,7 +3,7 @@ import json
 import pytest
 
 import edgy
-from edgy.core.utils.db import hash_tablekey
+from edgy.core.utils.db import hash_jointablekey
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -55,8 +55,10 @@ async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_no
         Organisation.query.select_related("user__profile").exclude_secrets().order_by("id")
     ).as_select()
     org_query_text = str(org_query)
-    assert f"{hash_tablekey(tablekey='profiles', prefix='user__profile')}_name" in org_query_text
-    assert f"{hash_tablekey(tablekey='users', prefix='user')}_name" not in org_query_text
+    assert (
+        f"{hash_jointablekey(tablekey='profiles', prefix='user__profile')}_name" in org_query_text
+    )
+    assert f"{hash_jointablekey(tablekey='users', prefix='user')}_name" not in org_query_text
 
 
 async def test_exclude_secrets_excludes_top_name_equals_to_name_in_foreignkey_not_secret():
