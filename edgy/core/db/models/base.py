@@ -53,7 +53,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     __show_pk__: ClassVar[bool] = False
     __using_schema__: Union[str, None, Any] = Undefined
     # private attribute
-    database: ClassVar[Database] = None  # type: ignore
+    database: ClassVar[Database] = None
     _loaded_or_deleted: bool = False
 
     def __init__(

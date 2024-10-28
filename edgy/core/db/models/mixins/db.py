@@ -160,7 +160,7 @@ class DatabaseMixin:
         self, check_schema: bool = True, check_tenant: bool = True
     ) -> Union[str, None]:
         if self.__using_schema__ is not Undefined:
-            return self.__using_schema__
+            return cast(Union[str, None], self.__using_schema__)
         return self.__class__.get_active_class_schema(
             check_schema=check_schema, check_tenant=check_tenant
         )
@@ -168,12 +168,12 @@ class DatabaseMixin:
     @classmethod
     def get_active_class_schema(cls, check_schema: bool = True, check_tenant: bool = True) -> str:
         if cls.__using_schema__ is not Undefined:
-            return cls.__using_schema__
+            return cast(Union[str, None], cls.__using_schema__)
         if check_schema:
             schema = get_schema(check_tenant=check_tenant)
             if schema is not None:
                 return schema
-        db_schema = cls.get_db_schema()
+        db_schema: Optional[str] = cls.get_db_schema()
         # sometime "" is ok, sometimes not, sqlalchemy logic
         return db_schema or None
 
@@ -570,4 +570,6 @@ class DatabaseMixin:
 
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":
         """Return database transaction for the assigned database"""
-        return self.database.transaction(force_rollback=force_rollback, **kwargs)
+        return cast(
+            "Transaction", self.database.transaction(force_rollback=force_rollback, **kwargs)
+        )

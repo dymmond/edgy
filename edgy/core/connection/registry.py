@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
 
 
-class MetaDataDict(defaultdict):
+class MetaDataDict(defaultdict[str, sqlalchemy.MetaData]):
     def __init__(self, registry: "Registry") -> None:
         self.registry = registry
         super().__init__(sqlalchemy.MetaData)
@@ -68,7 +68,7 @@ class MetaDataByUrlDict(dict):
         super().__init__()
         self.process()
 
-    def process(self) -> Optional[str]:
+    def process(self) -> None:
         self.clear()
         self[str(self.registry.database.url)] = None
         for k, v in self.registry.extra.items():

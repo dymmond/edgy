@@ -765,7 +765,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         )
         return cls.get_db_schema()
 
-    def _build_table(cls, metadata: Optional[sqlalchemy.MetaData] = None):
+    def _build_table(cls, metadata: Optional[sqlalchemy.MetaData] = None) -> None:
         try:
             cls._table = cls.build(cls.get_db_schema(), metadata=metadata)
         except AttributeError as exc:
