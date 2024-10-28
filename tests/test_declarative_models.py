@@ -11,7 +11,7 @@ pytestmark = pytest.mark.anyio
 
 
 class User(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
+    id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     name: str = edgy.CharField(max_length=100, null=True)
     language: str = edgy.CharField(max_length=200, null=True)
 

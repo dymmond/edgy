@@ -37,7 +37,7 @@ class Tenant(TenantMixin):
 
 
 class User(TenantModel):
-    id: int = fields.IntegerField(primary_key=True)
+    id: int = fields.IntegerField(primary_key=True, autoincrement=True)
     name: str = fields.CharField(max_length=255)
 
     class Meta:
@@ -47,7 +47,7 @@ class User(TenantModel):
 
 
 class Product(TenantModel):
-    id: int = fields.IntegerField(primary_key=True)
+    id: int = fields.IntegerField(primary_key=True, autoincrement=True)
     name: str = fields.CharField(max_length=255)
     user: User = fields.ForeignKey(User, null=True)
 

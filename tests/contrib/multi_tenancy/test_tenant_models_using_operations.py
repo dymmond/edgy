@@ -41,7 +41,7 @@ class Tenant(TenantMixin):
 
 
 class User(TenantModel):
-    id: int = fields.IntegerField(primary_key=True)
+    id: int = fields.IntegerField(primary_key=True, autoincrement=True)
     name: str = fields.CharField(max_length=255)
     email: str = fields.EmailField(max_length=255)
 

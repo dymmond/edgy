@@ -13,7 +13,7 @@ models = edgy.Registry(database=database)
 
 
 class Album(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
 
     class Meta:
@@ -22,7 +22,7 @@ class Album(edgy.Model):
 
 
 class Track(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE, related_fields=("name",), index=True)
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()
@@ -32,7 +32,7 @@ class Track(edgy.Model):
 
 
 class Organisation(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     ident = edgy.CharField(max_length=100)
 
     class Meta:
@@ -40,7 +40,7 @@ class Organisation(edgy.Model):
 
 
 class Team(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT, index=True)
     name = edgy.CharField(max_length=100, primary_key=True)
 
@@ -49,7 +49,7 @@ class Team(edgy.Model):
 
 
 class Member(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     team = edgy.ForeignKey(
         Team, on_delete=edgy.SET_NULL, null=True, no_constraint=True, index=True
     )
@@ -60,7 +60,7 @@ class Member(edgy.Model):
 
 
 class Profile(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     website = edgy.CharField(max_length=100)
 
     class Meta:
@@ -68,7 +68,7 @@ class Profile(edgy.Model):
 
 
 class Person(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     email = edgy.CharField(max_length=100)
     profile = edgy.OneToOneField(Profile, on_delete=edgy.CASCADE, index=True)
 
@@ -77,7 +77,7 @@ class Person(edgy.Model):
 
 
 class AnotherPerson(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     email = edgy.CharField(max_length=100)
     profile = edgy.OneToOne(Profile, on_delete=edgy.CASCADE, index=True)
 
