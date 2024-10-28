@@ -11,7 +11,7 @@ hide:
 ### Added
 
 - Allow multi schema and database migrations.
-- `metadata_by_url` dictionary .
+- `metadata_by_url` dictionary.
 
 ### Changed
 
