@@ -1,5 +1,5 @@
 import warnings
-from base64 import b32hexencode
+from base64 import b32encode
 from functools import lru_cache
 from hashlib import blake2b
 from typing import TYPE_CHECKING
@@ -24,7 +24,7 @@ def check_db_connection(db: "Database") -> None:
 @lru_cache(512, typed=False)
 def _hash_tablekey(tablekey: str, prefix: str) -> str:
     tablehash = (
-        b32hexencode(blake2b(f"{tablekey}_{prefix}".encode(), digest_size=16).digest())
+        b32encode(blake2b(f"{tablekey}_{prefix}".encode(), digest_size=16).digest())
         .decode()
         .rstrip("=")
     )
