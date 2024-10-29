@@ -16,7 +16,7 @@ class Address(edgy.Model):
 
 
 class Person(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     email = edgy.CharField(max_length=100)
 
     class Meta:
@@ -24,7 +24,7 @@ class Person(edgy.Model):
 
 
 class Profile(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     website = edgy.CharField(max_length=100)
     address = Address
 

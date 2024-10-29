@@ -11,7 +11,7 @@ models = edgy.Registry(database=database)
 
 
 class User(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
 
     class Meta:

@@ -18,7 +18,7 @@ class Main(edgy.Model):
 
 
 class User(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
     age = edgy.IntegerField(secret=True)
     language = edgy.CharField(max_length=200, null=True, secret=True)

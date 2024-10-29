@@ -19,7 +19,7 @@ class StatusEnum(Enum):
 
 
 class Product(edgy.Model):
-    id: int = fields.IntegerField(primary_key=True)
+    id: int = fields.IntegerField(primary_key=True, autoincrement=True)
     name: str = fields.CharField(max_length=255)
 
     class Meta:

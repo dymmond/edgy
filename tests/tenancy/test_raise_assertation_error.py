@@ -31,7 +31,7 @@ class StatusEnum(Enum):
 
 
 class Product(edgy.Model):
-    id: int = fields.IntegerField(primary_key=True)
+    id: int = fields.IntegerField(primary_key=True, autoincrement=True)
     uuid: UUID = fields.UUIDField(null=True)
     created: datetime = fields.DateTimeField(default=datetime.now)
     created_day: datetime = fields.DateField(default=date.today)

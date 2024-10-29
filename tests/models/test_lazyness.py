@@ -7,7 +7,7 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 class BaseUser(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
+    id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     name: str = edgy.CharField(max_length=100, null=True)
     language: str = edgy.CharField(max_length=200, null=True)
 
@@ -21,7 +21,7 @@ class User(BaseUser):
 
 
 class Product(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
+    id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     name: str = edgy.CharField(max_length=100, null=True)
     rating: int = edgy.IntegerField(minimum=1, maximum=5, default=1)
     in_stock: bool = edgy.BooleanField(default=False)

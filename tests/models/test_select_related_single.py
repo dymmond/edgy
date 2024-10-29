@@ -16,7 +16,7 @@ pydantic_version = __version__[:3]
 
 
 class EdgyTenantBaseModel(edgy.Model):
-    id: int = edgy.IntegerField(primary_key=True)
+    id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
 
     class Meta:
         registry = models

@@ -13,7 +13,7 @@ pytestmark = pytest.mark.anyio
 
 
 class User(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
     language = edgy.CharField(max_length=200, null=True)
     description = edgy.TextField(max_length=5000, null=True)
@@ -23,7 +23,7 @@ class User(edgy.Model):
 
 
 class Organisation(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     ident = edgy.CharField(max_length=100)
 
     class Meta:
@@ -31,7 +31,7 @@ class Organisation(edgy.Model):
 
 
 class Team(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT)
     name = edgy.CharField(max_length=100)
 
@@ -40,7 +40,7 @@ class Team(edgy.Model):
 
 
 class Member(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     team = edgy.ForeignKey(Team, on_delete=edgy.SET_NULL, null=True, related_name="members")
     second_team = edgy.ForeignKey(
         Team, on_delete=edgy.SET_NULL, null=True, related_name="team_members"

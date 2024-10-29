@@ -29,7 +29,7 @@ class BaseModel(edgy.Model):
 
 
 class Product(BaseModel):
-    id = fields.IntegerField(primary_key=True)
+    id = fields.IntegerField(primary_key=True, autoincrement=True)
     uuid = fields.UUIDField(null=True)
     created = fields.DateTimeField(default=datetime.now)
     created_day = fields.DateField(default=date.today)

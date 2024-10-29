@@ -22,7 +22,7 @@ class TrackModelRef(ModelRef):
 
 
 class Album(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
     tracks = edgy.RefForeignKey(TrackModelRef, null=True)
 
@@ -31,7 +31,7 @@ class Album(edgy.Model):
 
 
 class Track(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE)
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()

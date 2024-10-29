@@ -50,7 +50,7 @@ class Tenant(TenantMixin):
 
 
 class Product(TenantModel):
-    id: int = fields.IntegerField(primary_key=True)
+    id: int = fields.IntegerField(primary_key=True, autoincrement=True)
     uuid: UUID = fields.UUIDField(null=True)
     created: datetime = fields.DateTimeField(default=datetime.now)
     created_day: datetime = fields.DateField(default=date.today)

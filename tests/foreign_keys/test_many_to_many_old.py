@@ -20,7 +20,7 @@ class User(edgy.Model):
 
 
 class Track(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()
 
@@ -29,7 +29,7 @@ class Track(edgy.Model):
 
 
 class Album(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
     tracks = edgy.ManyToManyField(Track)
 

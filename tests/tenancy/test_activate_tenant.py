@@ -24,7 +24,7 @@ class Tenant(TenantMixin):
 
 
 class EdgyTenantBaseModel(TenantModel):
-    id: int = edgy.IntegerField(primary_key=True)
+    id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
 
     class Meta:
         is_tenant = True

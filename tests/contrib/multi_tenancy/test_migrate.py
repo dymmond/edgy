@@ -30,7 +30,7 @@ class Tenant(TenantMixin):
 
 
 class Product(TenantModel):
-    id: int = fields.IntegerField(primary_key=True)
+    id: int = fields.IntegerField(primary_key=True, autoincrement=True)
     uuid: UUID = fields.UUIDField(null=True)
 
     class Meta:

@@ -58,13 +58,13 @@ class BaseModelType(ABC):
     query: ClassVar[BaseManager]
     query_related: ClassVar[BaseManager]
     meta: ClassVar[MetaInfo]
-    _db_schemas: ClassVar[dict[str, type[BaseModelType]]]
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
 
     __parent__: ClassVar[Union[type[BaseModelType], None]] = None
     __is_proxy_model__: ClassVar[bool] = False
     __require_model_based_deletion__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
+    _db_schemas: ClassVar[dict[str, type[BaseModelType]]]
 
     @property
     @abstractmethod

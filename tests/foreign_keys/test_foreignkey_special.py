@@ -11,7 +11,7 @@ models = edgy.Registry(database=database)
 
 
 class Älbum(edgy.Model):
-    äd = edgy.IntegerField(primary_key=True, column_name="id")
+    äd = edgy.IntegerField(primary_key=True, autoincrement=True, column_name="id")
     name = edgy.CharField(max_length=100)
 
     class Meta:
@@ -20,7 +20,7 @@ class Älbum(edgy.Model):
 
 
 class Track(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     album = edgy.ForeignKey("Älbum", on_delete=edgy.CASCADE, null=True, column_name="album")
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()

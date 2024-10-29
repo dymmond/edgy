@@ -11,7 +11,7 @@ models = edgy.Registry(database=edgy.Database(database))
 
 
 class Album(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
 
     class Meta:
@@ -19,7 +19,7 @@ class Album(edgy.Model):
 
 
 class Track(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE, related_name="tracks")
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()
@@ -29,7 +29,7 @@ class Track(edgy.Model):
 
 
 class Organisation(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     ident = edgy.CharField(max_length=100)
 
     class Meta:
@@ -37,7 +37,7 @@ class Organisation(edgy.Model):
 
 
 class Team(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT)
     name = edgy.CharField(max_length=100)
 
@@ -46,7 +46,7 @@ class Team(edgy.Model):
 
 
 class Member(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     team = edgy.ForeignKey(Team, on_delete=edgy.SET_NULL, null=True, related_name="members")
     second_team = edgy.ForeignKey(
         Team, on_delete=edgy.SET_NULL, null=True, related_name="team_members"
@@ -59,7 +59,7 @@ class Member(edgy.Model):
 
 
 class User(edgy.Model):
-    id = edgy.IntegerField(primary_key=True)
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=255, null=True)
     member = edgy.ForeignKey(Member, on_delete=edgy.SET_NULL, null=True, related_name="users")
 
