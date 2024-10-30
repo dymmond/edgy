@@ -275,10 +275,10 @@ For this there is an extension of edgy's `and_` and `or_` which takes a model or
 matches kwargs against:
 
 ```python
-users = await User.query.filter(and_.from_kwargs(User, name="foo", email="foo@example.com"))
+users = await User.query.filter(and_.from_kwargs(name="foo", email="foo@example.com"))
 # or
 
-users = await User.query.filter(and_.from_kwargs(User, **my_dict))
+users = await User.query.filter(and_.from_kwargs(**my_dict))
 ```
 
 #### OR
@@ -1126,7 +1126,35 @@ sql types because otherwise some features are not supported or cause warnings.
 
 ## Debugging
 
+### Getting the SQL query
+
 QuerySet contains a cached debug property named `sql` which contains the QuerySet as query with inserted blanks.
+
+### Performance warnings
+
+Edgy issues a `DatabaseNotConnectedWarning` when using edgy without a connected database. To silence it, wrap the affected
+code in a database scope
+
+``` python
+await model.save()
+# becomes
+async with model.database:
+    await model.save()
+```
+
+If the warning is completely unwanted despite the performance impact, you can filter:
+
+``` python
+import warnings
+from edgy.exceptions import DatabaseNotConnectedWarning
+with warnings.catch_warnings(action="ignore", category=DatabaseNotConnectedWarning):
+    await model.save()
+```
+
+It inherits from `UserWarning` so it is possible to filter UserWarnings.
+
+However the silencing way is not recommended.
+
 
 [model]: ../models.md
 [managers]: ../managers.md

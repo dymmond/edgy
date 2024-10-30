@@ -1,7 +1,6 @@
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 
-import sqlalchemy
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.exc import IntegrityError
 
@@ -158,7 +157,7 @@ class ManyRelation(ManyRelationProtocol):
                 f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
             )
         child = cast("BaseModelType", self.expand_relationship(child))
-        count = await child.query.filter(sqlalchemy.and_(*child.identifying_clauses())).count()
+        count = await child.query.filter(*child.identifying_clauses()).count()
         if count == 0:
             raise RelationshipNotFound(
                 detail=f"There is no relationship between '{self.from_foreign_key}' and '{self.to_foreign_key}: {getattr(child,self.to_foreign_key).pk}'."

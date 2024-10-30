@@ -1,4 +1,3 @@
-import asyncio
 import warnings
 from collections.abc import AsyncIterator, Awaitable, Generator, Iterable, Sequence
 from collections.abc import Iterable as CollectionsIterable
@@ -19,7 +18,7 @@ import sqlalchemy
 from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR, get_schema
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields import CharField, TextField
-from edgy.core.db.fields.base import BaseField, BaseForeignKey, RelationshipField
+from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
@@ -41,7 +40,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.fields.types import BaseFieldType
 
 
-generic_field = BaseField()
 _empty_set = cast(Sequence[Any], frozenset())
 
 
@@ -51,32 +49,6 @@ def get_table_key_or_name(table: Union[sqlalchemy.Table, sqlalchemy.Alias]) -> s
     except AttributeError:
         # alias
         return table.name
-
-
-def clean_query_kwargs(
-    model_class: type[BaseModelType],
-    kwargs: dict[str, Any],
-    embed_parent: Optional[tuple[str, str]] = None,
-    model_database: Optional["Database"] = None,
-) -> dict[str, Any]:
-    new_kwargs: dict[str, Any] = {}
-    for key, val in kwargs.items():
-        if embed_parent:
-            if embed_parent[1] and key.startswith(embed_parent[1]):
-                key = key.removeprefix(embed_parent[1]).removeprefix("__")
-            else:
-                key = f"{embed_parent[0]}__{key}"
-        sub_model_class, field_name, _, _, _, cross_db_remainder = crawl_relationship(
-            model_class, key, model_database=model_database
-        )
-        # we preserve the uncleaned argument
-        field = None if cross_db_remainder else sub_model_class.meta.fields.get(field_name)
-        if field is not None and not callable(val):
-            new_kwargs.update(field.clean(key, val, for_query=True))
-        else:
-            new_kwargs[key] = val
-    assert "pk" not in new_kwargs, "pk should be already parsed"
-    return new_kwargs
 
 
 class BaseQuerySet(
@@ -114,6 +86,11 @@ class BaseQuerySet(
         table: Optional[sqlalchemy.Table] = None,
         exclude_secrets: bool = False,
     ) -> None:
+        # Making sure for queries we use the main class and not the proxy
+        # And enable the parent
+        if model_class.__is_proxy_model__:
+            model_class = model_class.__parent__
+
         super().__init__(model_class=model_class)
         self.filter_clauses: list[Any] = list(filter_clauses)
         self.or_clauses: list[Any] = []
@@ -236,17 +213,6 @@ class BaseQuerySet(
         expression = expression.group_by(*(self._prepare_order_by(entry) for entry in group_by))
         return expression
 
-    async def _resolve_clause_args(
-        self, args: Any, tables_and_models: tables_and_models_type
-    ) -> Any:
-        result: list[Any] = []
-        for arg in args:
-            result.append(clauses_mod.parse_clause_arg(arg, self, tables_and_models))
-        if self.database.force_rollback:
-            return [await el for el in result]
-        else:
-            return await asyncio.gather(*result)
-
     async def build_where_clause(
         self, _: Any = None, tables_and_models: Optional[tables_and_models_type] = None
     ) -> Any:
@@ -257,19 +223,22 @@ class BaseQuerySet(
         # ignored args for passing build_where_clause in filter_clauses
         where_clauses: list[Any] = []
         if self.or_clauses:
-            or_clauses = await self._resolve_clause_args(self.or_clauses, tables_and_models)
             where_clauses.append(
-                or_clauses[0] if len(or_clauses) == 1 else clauses_mod.or_(*or_clauses)
+                await clauses_mod.parse_clause_arg(
+                    clauses_mod.or_(*self.or_clauses, no_select_related=True),
+                    self,
+                    tables_and_models,
+                )
             )
 
         if self.filter_clauses:
             # we AND by default
             where_clauses.extend(
-                await self._resolve_clause_args(self.filter_clauses, tables_and_models)
+                await clauses_mod.parse_clause_args(self.filter_clauses, self, tables_and_models)
             )
         # for nicer unpacking
         if joins is None or len(tables_and_models) == 1:
-            return clauses_mod.and_(*where_clauses)
+            return clauses_mod.and_sqlalchemy(*where_clauses)
         expression = sqlalchemy.sql.select(
             *(
                 getattr(tables_and_models[""][0].c, col)
@@ -438,7 +407,7 @@ class BaseQuerySet(
                         former_table = table
                         former_transition = transition_key
                         continue
-                    and_clause = clauses_mod.and_(
+                    and_clause = clauses_mod.and_sqlalchemy(
                         *self._select_from_relationship_clause_generator(
                             foreign_key, table, reverse, former_table
                         )
@@ -586,13 +555,7 @@ class BaseQuerySet(
     ) -> tuple[list[Any], set[str]]:
         clauses = []
         select_related: set[str] = set()
-
-        # Making sure for queries we use the main class and not the proxy
-        # And enable the parent
-        if self.model_class.__is_proxy_model__:
-            self.model_class = self.model_class.__parent__
-
-        cleaned_kwargs = clean_query_kwargs(
+        cleaned_kwargs = clauses_mod.clean_query_kwargs(
             self.model_class, kwargs, self.embed_parent_filters, model_database=self.database
         )
 
@@ -602,9 +565,9 @@ class BaseQuerySet(
             )
             if related_str:
                 select_related.add(related_str)
-            field = model_class.meta.fields.get(field_name, generic_field)
+            field = model_class.meta.fields.get(field_name, clauses_mod.generic_field)
             if cross_db_remainder:
-                assert field is not generic_field
+                assert field is not clauses_mod.generic_field
                 fk_field = cast(BaseForeignKey, field)
                 sub_query = (
                     fk_field.target.query.filter(**{cross_db_remainder: value})
@@ -648,6 +611,7 @@ class BaseQuerySet(
                     table = tables_and_models[_prefix][0]
                     return _field.operator_to_clause(_field.name, _op, table, _value)
 
+                wrapper._edgy_force_callable_queryset_filter = True
                 clauses.append(wrapper)
 
         return clauses, select_related
@@ -833,7 +797,7 @@ class BaseQuerySet(
 
         counter = 0
         last_element: Optional[tuple[BaseModelType, BaseModelType]] = None
-        check_db_connection(queryset.database)
+        check_db_connection(queryset.database, stacklevel=4)
         if fetch_all_at_once:
             async with queryset.database as database:
                 batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
@@ -919,31 +883,7 @@ class BaseQuerySet(
                     queryset._select_related.update(related)
                     queryset._cached_select_related_expression = None
                 if or_ and extracted_clauses:
-
-                    async def wrapper_and(
-                        queryset: "QuerySet",
-                        tables_and_models: tables_and_models_type,
-                        _extracted_clauses: Sequence[
-                            Union[
-                                "sqlalchemy.sql.expression.BinaryExpression",
-                                Callable[
-                                    ["QuerySetType"],
-                                    Union[
-                                        "sqlalchemy.sql.expression.BinaryExpression",
-                                        Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
-                                    ],
-                                ],
-                            ]
-                        ] = extracted_clauses,
-                    ) -> Any:
-                        return clauses_mod.and_(
-                            *(
-                                await self._resolve_clause_args(
-                                    _extracted_clauses, tables_and_models
-                                )
-                            )
-                        )
-
+                    wrapper_and = clauses_mod.and_(*extracted_clauses, no_select_related=True)
                     if allow_global_or and len(clauses) == 1:
                         # add to global or
                         assert not exclude
@@ -960,33 +900,28 @@ class BaseQuerySet(
                 if not queryset._select_related.issuperset(raw_clause._select_related):
                     queryset._select_related.update(raw_clause._select_related)
                     queryset._cached_select_related_expression = None
-
             else:
                 converted_clauses.append(raw_clause)
+                if hasattr(raw_clause, "_edgy_calculate_select_related"):
+                    select_related_calculated = raw_clause._edgy_calculate_select_related(queryset)
+                    if not queryset._select_related.issuperset(select_related_calculated):
+                        queryset._select_related.update(select_related_calculated)
+                        queryset._cached_select_related_expression = None
         if not converted_clauses:
             return queryset
 
         if exclude:
             op = clauses_mod.and_ if not or_ else clauses_mod.or_
 
-            async def wrapper(
-                queryset: "QuerySet", tables_and_models: tables_and_models_type
-            ) -> Any:
-                return clauses_mod.not_(
-                    op(*(await self._resolve_clause_args(converted_clauses, tables_and_models)))
+            queryset.filter_clauses.append(
+                clauses_mod.not_(
+                    op(*converted_clauses, no_select_related=True), no_select_related=True
                 )
-
-            queryset.filter_clauses.append(wrapper)
+            )
         elif or_:
-
-            async def wrapper(
-                queryset: "QuerySet", tables_and_models: tables_and_models_type
-            ) -> Any:
-                return clauses_mod.or_(
-                    *(await self._resolve_clause_args(converted_clauses, tables_and_models))
-                )
-
-            queryset.filter_clauses.append(wrapper)
+            queryset.filter_clauses.append(
+                clauses_mod.or_(*converted_clauses, no_select_related=True)
+            )
         else:
             # default to and
             queryset.filter_clauses.extend(converted_clauses)
@@ -1026,7 +961,7 @@ class BaseQuerySet(
             return await filter_query._get_raw()
 
         expression, tables_and_models = await self.as_select_with_tables()
-        check_db_connection(self.database)
+        check_db_connection(self.database, stacklevel=4)
         async with self.database as database:
             # we want no queryset copy, so use sqlalchemy limit(2)
             rows = await database.fetch_all(expression.limit(2))

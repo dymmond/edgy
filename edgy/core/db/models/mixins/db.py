@@ -209,7 +209,7 @@ class DatabaseMixin:
             schema = self.get_active_instance_schema()
             return cast(
                 "sqlalchemy.Table",
-                self.table_schema(schema),
+                self.__class__.table_schema(schema),
             )
         return self._table
 
@@ -286,7 +286,7 @@ class DatabaseMixin:
         token = CURRENT_INSTANCE.set(self)
         try:
             if column_values and clauses:
-                check_db_connection(self.database)
+                check_db_connection(self.database, stacklevel=4)
                 async with self.database as database, database.transaction():
                     # can update column_values
                     column_values.update(
@@ -393,7 +393,7 @@ class DatabaseMixin:
             instance=self,
             model_instance=self,
         )
-        check_db_connection(self.database)
+        check_db_connection(self.database, stacklevel=4)
         token = CURRENT_INSTANCE.set(self)
         try:
             async with self.database as database, database.transaction():

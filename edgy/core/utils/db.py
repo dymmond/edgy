@@ -4,11 +4,13 @@ from functools import lru_cache
 from hashlib import blake2b
 from typing import TYPE_CHECKING
 
+from edgy.exceptions import DatabaseNotConnectedWarning
+
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
 
 
-def check_db_connection(db: "Database") -> None:
+def check_db_connection(db: "Database", stacklevel: int = 3) -> None:
     if not db.is_connected:
         # with force_rollback the effects are even worse, so fail
         if db.force_rollback:
@@ -16,8 +18,8 @@ def check_db_connection(db: "Database") -> None:
         # db engine will be created and destroyed afterwards
         warnings.warn(
             "Database not connected. Executing operation is inperformant.",
-            UserWarning,
-            stacklevel=2,
+            DatabaseNotConnectedWarning,
+            stacklevel=stacklevel,
         )
 
 

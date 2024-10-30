@@ -6,6 +6,21 @@ hide:
 
 # Release Notes
 
+## 0.21.1
+
+### Changed
+
+- Breaking: from_kwargs doesn't require model or table anymore. It is simply ignored.
+
+### Fixed
+
+- Q, and_, or_ support now complex kwargs like querysets.
+- Failure querying when using proxy model table and kwargs.
+- Proxy and main model use now the same tables.
+  This could have been a problem when filtering against table columns of the proxy table in a query from the main table.
+- Queries operate now always on the main model not the proxy model.
+- Stacklevel of performance warning was wrong.
+
 ## 0.21.0
 
 ### Added
