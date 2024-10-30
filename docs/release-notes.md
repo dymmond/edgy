@@ -10,7 +10,7 @@ hide:
 
 ### Changed
 
-- from_kwargs doesn't require model or table anymore. It is simply ignored.
+- Breaking: from_kwargs doesn't require model or table anymore. It is simply ignored.
 
 ### Fixed
 
@@ -19,6 +19,7 @@ hide:
 - Proxy and main model use now the same tables.
   This could have been a problem when filtering against table columns of the proxy table in a query from the main table.
 - Queries operate now always on the main model not the proxy model.
+- Stacklevel of performance warning was wrong.
 
 ## 0.21.0
 

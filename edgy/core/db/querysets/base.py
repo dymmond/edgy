@@ -797,7 +797,7 @@ class BaseQuerySet(
 
         counter = 0
         last_element: Optional[tuple[BaseModelType, BaseModelType]] = None
-        check_db_connection(queryset.database)
+        check_db_connection(queryset.database, stacklevel=4)
         if fetch_all_at_once:
             async with queryset.database as database:
                 batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
@@ -961,7 +961,7 @@ class BaseQuerySet(
             return await filter_query._get_raw()
 
         expression, tables_and_models = await self.as_select_with_tables()
-        check_db_connection(self.database)
+        check_db_connection(self.database, stacklevel=4)
         async with self.database as database:
             # we want no queryset copy, so use sqlalchemy limit(2)
             rows = await database.fetch_all(expression.limit(2))
