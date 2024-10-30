@@ -87,6 +87,19 @@ async def test_filter_with_or_two_kwargs():
     assert len(results) == 2
 
 
+async def test_filter_with_or_two_kwargs_no_user():
+    await User.query.create(name="Adam", email="edgy@edgy.dev")
+    await User.query.create(name="Edgy", email="edgy2@edgy.dev")
+
+    results = await User.query.filter(or_.from_kwargs(name="Adam", email="edgy2@edgy.dev"))
+
+    assert len(results) == 2
+
+    results = await User.query.filter(or_.from_kwargs(name="Adam", email="edgy2@edgy.dev"))
+
+    assert len(results) == 2
+
+
 async def test_filter_with_or_three():
     await User.query.create(name="Adam")
     user = await User.query.create(name="Edgy", email="edgy@edgy.dev")

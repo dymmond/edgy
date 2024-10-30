@@ -275,10 +275,10 @@ For this there is an extension of edgy's `and_` and `or_` which takes a model or
 matches kwargs against:
 
 ```python
-users = await User.query.filter(and_.from_kwargs(User, name="foo", email="foo@example.com"))
+users = await User.query.filter(and_.from_kwargs(name="foo", email="foo@example.com"))
 # or
 
-users = await User.query.filter(and_.from_kwargs(User, **my_dict))
+users = await User.query.filter(and_.from_kwargs(**my_dict))
 ```
 
 #### OR

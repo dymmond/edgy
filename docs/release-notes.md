@@ -6,6 +6,17 @@ hide:
 
 # Release Notes
 
+## 0.21.1
+
+### Changed
+
+- from_kwargs doesn't require model or table anymore. It is simply ignored.
+
+### Fixed
+
+- Q, and_, or_ support now complex kwargs like querysets.
+- Failure querying when using proxy model table and kwargs.
+
 ## 0.21.0
 
 ### Added

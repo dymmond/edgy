@@ -6,6 +6,7 @@ from typing import (
     Callable,
     Generic,
     Literal,
+    Optional,
     TypeVar,
     Union,
 )
@@ -34,7 +35,9 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
         self.model_class = model_class
 
     @abstractmethod
-    async def build_where_clause(self) -> Any: ...
+    async def build_where_clause(
+        self, _: Any = None, tables_and_models: Optional[tables_and_models_type] = None
+    ) -> Any: ...
 
     @abstractmethod
     def filter(
