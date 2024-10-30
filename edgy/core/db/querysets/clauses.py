@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import warnings
 from collections.abc import Iterable
 from functools import partial
 from inspect import Parameter, Signature, isawaitable
@@ -154,8 +155,15 @@ class _EnhancedClausesHelper:
             )
         return wrapper
 
-    def from_kwargs(self, _: Any = None, **kwargs: Any) -> Any:
+    def from_kwargs(self, _: Any = None, /, **kwargs: Any) -> Any:
         # ignore first parameter for backward compatibility
+        if _ is not None:
+            warnings.warn(
+                "`from_kwargs` doesn't use the passed positional table or model anymore.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
         async def wrapper(
             queryset: QuerySetType, tables_and_models: tables_and_models_type
         ) -> Any:
