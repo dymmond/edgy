@@ -785,7 +785,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         3. If none is passed, defaults to the shared schema of the database connected.
         """
         if cls.__is_proxy_model__:
-            return cls.__parent__.table
+            return cls.__parent__.table  # type: ignore
         if not cls.meta.registry:
             # we cannot set the table without a registry
             # raising is required
@@ -844,7 +844,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         Cache per class via a primitive LRU cache.
         """
         if cls.__is_proxy_model__:
-            return cls.__parent__.table_schema(
+            return cls.__parent__.table_schema(  # type: ignore
                 schema, metadata=metadata, update_cache=update_cache
             )
         if schema is None or (cls.get_db_schema() or "") == schema:
