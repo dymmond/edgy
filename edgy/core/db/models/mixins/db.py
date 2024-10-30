@@ -209,7 +209,7 @@ class DatabaseMixin:
             schema = self.get_active_instance_schema()
             return cast(
                 "sqlalchemy.Table",
-                self.table_schema(schema),
+                self.__class__.table_schema(schema),
             )
         return self._table
 

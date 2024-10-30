@@ -86,15 +86,10 @@ class BaseQuerySet(
         table: Optional[sqlalchemy.Table] = None,
         exclude_secrets: bool = False,
     ) -> None:
-        # FIXME: this breaks if the table of the proxy class is used. So disable it.
-        # we need to make sure the table of the proxy model is the same like the one of the parent model first
-        # as well as the table_schema
-        # it works also without the hack
-        # Original (was broken before the cleanup when not using filter kwargs):
         # Making sure for queries we use the main class and not the proxy
         # And enable the parent
-        # if model_class.__is_proxy_model__:
-        #     model_class = model_class.__parent__
+        if model_class.__is_proxy_model__:
+            model_class = model_class.__parent__
 
         super().__init__(model_class=model_class)
         self.filter_clauses: list[Any] = list(filter_clauses)

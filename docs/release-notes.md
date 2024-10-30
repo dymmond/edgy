@@ -16,6 +16,7 @@ hide:
 
 - Q, and_, or_ support now complex kwargs like querysets.
 - Failure querying when using proxy model table and kwargs.
+- Proxy and main model use same tables.
 
 ## 0.21.0
 
