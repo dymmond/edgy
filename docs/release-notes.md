@@ -16,7 +16,9 @@ hide:
 
 - Q, and_, or_ support now complex kwargs like querysets.
 - Failure querying when using proxy model table and kwargs.
-- Proxy and main model use same tables.
+- Proxy and main model use now the same tables.
+  This could have been a problem when filtering against table columns of the proxy table in a query from the main table.
+- Queries operate now always on the main model not the proxy model.
 
 ## 0.21.0
 
