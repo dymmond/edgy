@@ -703,21 +703,7 @@ Similar to [CharField](#charfield) but has no `max_length` restrictions.
 #### PasswordField
 
 ```python
-import edgy
-import secrets
-
-hasher = Hasher()
-
-class MyModel(edgy.Model):
-    pw: str = edgy.PasswordField(null=False, derive_fn=hasher.derive)
-    token: str = edgy.PasswordField(null=False, default=secrets.token_hex)
-    ...
-
-# we can check if the pw matches by providing a tuple
-obj = await MyModel.query.create(pw=("foobar", "foobar"))
-# now let's check the pw
-hasher.compare_pw(obj.pw, "foobar")
-obj.token == "<token>"
+{!> ../docs_src/permissions/passwordfield_basic.py !}
 ```
 
 Similar to [CharField](#charfield) and it can be used to represent a password text. The secret parameter defaults to `True`.
@@ -730,6 +716,8 @@ Similar to [CharField](#charfield) and it can be used to represent a password te
   whenever a password is manually set. It contains the password in plaintext. After saving/loading the attribute is set to `None`.
 
 Ideally the key derivation function includes the parameters (and derive algorithm) used for deriving in the hash so a compare_pw function can reproduce the result.
+
+For more examples see [Passwords](./permissions/passwords.md).
 
 #### TimeField
 
