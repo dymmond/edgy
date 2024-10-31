@@ -6,6 +6,13 @@ hide:
 
 # Release Notes
 
+## 0.21.2
+
+### Fixed
+
+- Validators were defunct.
+- Enable validators on assignment where possible (proxy model and non-fields are excluded).
+
 ## 0.21.1
 
 ### Changed
