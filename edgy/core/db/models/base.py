@@ -46,7 +46,9 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     Base of all Edgy models with the core setup.
     """
 
-    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
+    model_config = ConfigDict(
+        extra="allow", arbitrary_types_allowed=True, validate_on_assignment=True
+    )
 
     __proxy_model__: ClassVar[Union[type[Model], None]] = None
     __reflected__: ClassVar[bool] = False
@@ -94,6 +96,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         self.__show_pk__ = __show_pk__
         # always set them in __dict__ to prevent __getattr__ loop
         self._loaded_or_deleted = False
+        assert not self.__dict__.get("__pydantic_extra__")
 
     @classmethod
     def transform_input(
@@ -424,8 +427,13 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     field.__set__(self, value)
                 else:
                     for k, v in field.to_model(key, value).items():
-                        # bypass __setattr__ method
-                        object.__setattr__(self, k, v)
+                        if k in self.model_fields:
+                            super().__setattr__(k, v)
+                        else:
+                            # bypass __setattr__ method
+                            object.__setattr__(self, k, v)
+            elif key in self.model_fields:
+                super().__setattr__(key, value)
             else:
                 # bypass __setattr__ method
                 object.__setattr__(self, key, value)
@@ -485,7 +493,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         if (
             name not in self.__dict__
             and behavior != "passdown"
-            and not self._loaded_or_deleted
+            and not self.__dict__.get("_loaded_or_deleted", False)
             and (field is not None or self.__reflected__)
             and name not in self.identifying_db_fields
             and self.can_load
