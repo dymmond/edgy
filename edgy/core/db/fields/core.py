@@ -8,6 +8,7 @@ from collections.abc import Callable, Sequence
 from enum import EnumMeta
 from functools import cached_property, partial
 from re import Pattern
+from secrets import compare_digest
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import pydantic
@@ -674,7 +675,9 @@ class PasswordField(CharField):
         cls, field_obj: BaseFieldType, field_name: str, value: Any, original_fn: Any = None
     ) -> dict[str, Any]:
         if isinstance(value, (tuple, list)):
-            if value[0] != value[1]:
+            # despite an != should not be a problem here, make sure that strange logics
+            # doesn't leak timings of the password
+            if not compare_digest(value[0], value[1]):
                 raise ValueError("Password doesn't match.")
             else:
                 value = value[0]

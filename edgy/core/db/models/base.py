@@ -47,7 +47,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     """
 
     model_config = ConfigDict(
-        extra="allow", arbitrary_types_allowed=True, validate_on_assignment=True
+        extra="allow", arbitrary_types_allowed=True, validate_assignment=True
     )
 
     __proxy_model__: ClassVar[Union[type[Model], None]] = None
@@ -90,8 +90,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
 
         kwargs = self.transform_input(kwargs, phase=__phase__, instance=self)
         super().__init__(**kwargs)
-        # restrict to fields
-        # TODO: maybe replaceable by direct setting kwargs but doesn't work yet
+        # restrict to fields, remove all other cruft
         self.__dict__ = self.setup_model_from_kwargs(kwargs)
         self.__show_pk__ = __show_pk__
         # always set them in __dict__ to prevent __getattr__ loop
@@ -428,14 +427,18 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 else:
                     for k, v in field.to_model(key, value).items():
                         if k in self.model_fields:
+                            # __dict__ is updated and validator is executed
                             super().__setattr__(k, v)
                         else:
                             # bypass __setattr__ method
+                            # ensures, __dict__ is updated
                             object.__setattr__(self, k, v)
             elif key in self.model_fields:
+                # __dict__ is updated and validator is executed
                 super().__setattr__(key, value)
             else:
                 # bypass __setattr__ method
+                # ensures, __dict__ is updated
                 object.__setattr__(self, key, value)
         finally:
             CURRENT_INSTANCE.reset(token)
