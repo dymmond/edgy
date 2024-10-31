@@ -426,14 +426,14 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     field.__set__(self, value)
                 else:
                     for k, v in field.to_model(key, value).items():
-                        if k in self.model_fields:
+                        if not self.__is_proxy_model__ and k in self.model_fields:
                             # __dict__ is updated and validator is executed
                             super().__setattr__(k, v)
                         else:
                             # bypass __setattr__ method
                             # ensures, __dict__ is updated
                             object.__setattr__(self, k, v)
-            elif key in self.model_fields:
+            elif not self.__is_proxy_model__ and key in self.model_fields:
                 # __dict__ is updated and validator is executed
                 super().__setattr__(key, value)
             else:
