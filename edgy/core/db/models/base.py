@@ -46,8 +46,10 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     Base of all Edgy models with the core setup.
     """
 
+    # allow is required for validators to work
+    # validate_ssignment doesn't work yet
     model_config = ConfigDict(
-        extra="allow", arbitrary_types_allowed=True, validate_assignment=True
+        extra="allow", arbitrary_types_allowed=True, validate_assignment=False
     )
 
     __proxy_model__: ClassVar[Union[type[Model], None]] = None
@@ -426,14 +428,22 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     field.__set__(self, value)
                 else:
                     for k, v in field.to_model(key, value).items():
-                        if not self.__is_proxy_model__ and k in self.model_fields:
+                        if (
+                            self.model_config.validate_assignment
+                            and not self.__is_proxy_model__
+                            and k in self.model_fields
+                        ):
                             # __dict__ is updated and validator is executed
                             super().__setattr__(k, v)
                         else:
                             # bypass __setattr__ method
                             # ensures, __dict__ is updated
                             object.__setattr__(self, k, v)
-            elif not self.__is_proxy_model__ and key in self.model_fields:
+            elif (
+                self.model_config.validate_assignment
+                and not self.__is_proxy_model__
+                and key in self.model_fields
+            ):
                 # __dict__ is updated and validator is executed
                 super().__setattr__(key, value)
             else:
