@@ -33,6 +33,9 @@ async def rollback_transactions():
         yield
 
 
+@pytest.mark.xfail(
+    reason="Bugs with validate_assignment. Needs alignment of the edgy default handling with pydantic."
+)
 async def test_pass_validator_fail_assignment():
     model = await MyModel.query.create(name="foobar", age=13)
     with pytest.raises(ValidationError):

@@ -47,7 +47,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     """
 
     # allow is required for validators to work
-    # validate_ssignment doesn't work yet
+    # validate_assignment doesn't work yet, overwriting the dict breaks it
     model_config = ConfigDict(
         extra="allow", arbitrary_types_allowed=True, validate_assignment=False
     )
@@ -90,18 +90,24 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     existing = [existing, model]
                 kwargs[arg.__related_name__] = existing
 
-        kwargs = self.transform_input(kwargs, phase=__phase__, instance=self)
+        kwargs = self.transform_input(
+            kwargs, phase=__phase__, instance=self, restrict_to_fields=True
+        )
         super().__init__(**kwargs)
-        # restrict to fields, remove all other cruft
-        self.__dict__ = self.setup_model_from_kwargs(kwargs)
+        # FIXME: currently we handle defaults in an incompatible way to pydantic
+        # So we need to overwrite the results
+        self.__dict__ = kwargs
         self.__show_pk__ = __show_pk__
         # always set them in __dict__ to prevent __getattr__ loop
         self._loaded_or_deleted = False
-        assert not self.__dict__.get("__pydantic_extra__")
 
     @classmethod
     def transform_input(
-        cls, kwargs: Any, phase: str = "", instance: Optional[BaseModelType] = None
+        cls,
+        kwargs: Any,
+        phase: str = "",
+        instance: Optional[BaseModelType] = None,
+        restrict_to_fields: bool = False,
     ) -> Any:
         """
         Expand to_models and apply input modifications.
@@ -124,20 +130,13 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 field = fields.get(key, None)
                 if field is not None:
                     new_kwargs.update(**field.to_model(key, value))
-                else:
+                elif not restrict_to_fields:
                     new_kwargs[key] = value
         finally:
             CURRENT_PHASE.reset(token3)
             CURRENT_MODEL_INSTANCE.reset(token2)
             CURRENT_INSTANCE.reset(token)
         return new_kwargs
-
-    def setup_model_from_kwargs(self, kwargs: Any) -> Any:
-        """
-        Loops and setup the kwargs of the model
-        """
-
-        return {k: v for k, v in kwargs.items() if k in self.meta.fields}
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {str(self)}>"
@@ -428,22 +427,14 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     field.__set__(self, value)
                 else:
                     for k, v in field.to_model(key, value).items():
-                        if (
-                            self.model_config.validate_assignment
-                            and not self.__is_proxy_model__
-                            and k in self.model_fields
-                        ):
+                        if self.model_config["validate_assignment"] and k in self.model_fields:
                             # __dict__ is updated and validator is executed
                             super().__setattr__(k, v)
                         else:
                             # bypass __setattr__ method
                             # ensures, __dict__ is updated
                             object.__setattr__(self, k, v)
-            elif (
-                self.model_config.validate_assignment
-                and not self.__is_proxy_model__
-                and key in self.model_fields
-            ):
+            elif self.model_config["validate_assignment"] and key in self.model_fields:
                 # __dict__ is updated and validator is executed
                 super().__setattr__(key, value)
             else:

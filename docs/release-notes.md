@@ -12,10 +12,6 @@ hide:
 
 - Validators were defunct.
 
-### Unresolved
-
-- Enable validators on assignment where possible (proxy model and non-fields are excluded).
-
 ## 0.21.1
 
 ### Changed

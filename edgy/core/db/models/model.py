@@ -4,6 +4,8 @@ import copy
 import inspect
 from typing import ClassVar, cast
 
+from pydantic import ConfigDict
+
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
@@ -85,6 +87,9 @@ class Model(
             metadata=cls.meta,
             definitions=fields,
             bases=(MethodHolder,),
+            config=ConfigDict(
+                extra="allow", arbitrary_types_allowed=True, validate_assignment=False
+            ),
         )
 
         proxy_model.build()
