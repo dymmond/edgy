@@ -9,11 +9,11 @@ from enum import EnumMeta
 from functools import cached_property, partial
 from re import Pattern
 from secrets import compare_digest
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Annotated, Any, Optional, Union, cast
 
 import pydantic
 import sqlalchemy
-from pydantic.networks import EmailStr, IPvAnyAddress
+from pydantic.networks import AnyUrl, EmailStr, IPvAnyAddress
 from sqlalchemy.dialects import oracle
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE, EXPLICIT_SPECIFIED_VALUES
@@ -765,13 +765,16 @@ class EmailField(CharField):
         kwargs.setdefault("max_length", 255)
         super().validate(kwargs)
 
+UrlString = Annotated[AnyUrl, pydantic.AfterValidator(lambda v: str(v))]
 
 class URLField(CharField):
-    # FIXME: URLField is not validated
+    field_type = UrlString  # type: ignore
+
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
         kwargs.setdefault("max_length", 255)
         super().validate(kwargs)
+
 
 class IPAddressField(FieldFactory, str):
     field_type = IPvAnyAddress
