@@ -16,6 +16,7 @@ hide:
 ### Changed
 
 - Validate on assignment is enabled.
+- IPAddressField uses now pydantic validation and a simplified TypeDecorator.
 
 ### Fixed
 
