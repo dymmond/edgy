@@ -23,7 +23,6 @@ class _ColumnDefinition:
     autoincrement: bool = False
     index: bool = False
     unique: bool = False
-    default: Any = None
     comment: Optional[str] = None
     server_default: Optional[Any] = None
     server_onupdate: Optional[Any] = None
@@ -47,6 +46,7 @@ class ColumnDefinitionModel(
 
 
 class BaseFieldDefinitions:
+    default: Any = None
     read_only: bool = False
     inject_default_on_partial_update: bool = False
     inherit: bool = True

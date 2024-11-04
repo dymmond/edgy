@@ -112,6 +112,32 @@ class ComputedField(BaseField):
         self.compute_setter(self, instance, value)
 
 
+class PlaceholderField(FieldFactory):
+    """Placeholder field, without db column"""
+
+    def __new__(  # type: ignore
+        cls,
+        *,
+        pydantic_field_type: Any = Any,
+        **kwargs: Any,
+    ) -> BaseFieldType:
+        kwargs.setdefault("exclude", True)
+        return super().__new__(cls, pydantic_field_type=pydantic_field_type, **kwargs)
+
+    def clean(
+        self,
+        name: str,
+        value: Any,
+        for_query: bool = False,
+    ) -> dict[str, Any]:
+        return {}
+
+    @classmethod
+    def get_pydantic_type(cls, **kwargs: Any) -> Any:
+        """Returns the type for pydantic"""
+        return kwargs["pydantic_field_type"]
+
+
 class CharField(FieldFactory, str):
     """String field representation that constructs the Field class and populates the values"""
 
@@ -669,6 +695,30 @@ class PasswordField(CharField):
     ) -> BaseFieldType:
         kwargs.setdefault("keep_original", derive_fn is not None)
         return super().__new__(cls, derive_fn=derive_fn, **kwargs)
+
+    @classmethod
+    def get_embedded_fields(
+        cls,
+        field_obj: BaseFieldType,
+        name: str,
+        fields: dict[str, "BaseFieldType"],
+        original_fn: Any = None,
+    ) -> dict[str, "BaseFieldType"]:
+        retdict = {}
+        # TODO: check if it works in embedded settings or embed_field is required
+        if field_obj.keep_original:
+            original_pw_name = f"{name}_original"
+            if original_pw_name not in fields:
+                retdict[original_pw_name] = PlaceholderField(
+                    pydantic_field_type=str,
+                    null=True,
+                    exclude=True,
+                    read_only=True,
+                    name=original_pw_name,
+                    owner=field_obj.owner,
+                )
+
+        return retdict
 
     @classmethod
     def to_model(

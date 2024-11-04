@@ -49,7 +49,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     # allow is required for validators to work
     # validate_assignment doesn't work yet, overwriting the dict breaks it
     model_config = ConfigDict(
-        extra="allow", arbitrary_types_allowed=True, validate_assignment=False
+        extra="forbid", arbitrary_types_allowed=True, validate_assignment=False
     )
 
     __proxy_model__: ClassVar[Union[type[Model], None]] = None
@@ -90,13 +90,18 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     existing = [existing, model]
                 kwargs[arg.__related_name__] = existing
 
-        kwargs = self.transform_input(
-            kwargs, phase=__phase__, instance=self, restrict_to_fields=True
-        )
+        kwargs = self.transform_input(kwargs, phase=__phase__, instance=self)
         super().__init__(**kwargs)
-        # FIXME: currently we handle defaults in an incompatible way to pydantic
-        # So we need to overwrite the results
-        self.__dict__ = kwargs
+        # move to dict
+        if self.__pydantic_extra__ is not None:
+            # default was triggered
+            self.__dict__.update(self.__pydantic_extra__)
+            self.__pydantic_extra__ = None
+
+        # cleanup fields
+        for field_name in self.meta.fields:
+            if field_name not in kwargs:
+                self.__dict__.pop(field_name, None)
         self.__show_pk__ = __show_pk__
         # always set them in __dict__ to prevent __getattr__ loop
         self._loaded_or_deleted = False
@@ -107,7 +112,6 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         kwargs: Any,
         phase: str = "",
         instance: Optional[BaseModelType] = None,
-        restrict_to_fields: bool = False,
     ) -> Any:
         """
         Expand to_models and apply input modifications.
@@ -130,7 +134,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 field = fields.get(key, None)
                 if field is not None:
                     new_kwargs.update(**field.to_model(key, value))
-                elif not restrict_to_fields:
+                elif cls.__reflected__:
                     new_kwargs[key] = value
         finally:
             CURRENT_PHASE.reset(token3)

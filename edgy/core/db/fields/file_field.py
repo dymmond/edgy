@@ -186,7 +186,7 @@ class ConcreteFileField(BaseCompositeField):
     ) -> dict[str, "BaseFieldType"]:
         retdict: dict[str, Any] = {}
         column_name = self.column_name or name
-        # TODO: use embed_field
+        # TODO: check if it works in embedded settings or embed_field is required
         if self.with_size:
             size_name = f"{name}_size"
             if size_name not in fields:

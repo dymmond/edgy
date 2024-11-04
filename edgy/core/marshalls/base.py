@@ -19,7 +19,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
     """
 
     marshall_config: ClassVar[ConfigMarshall]
-    model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     __show_pk__: ClassVar[bool] = False
     __custom_fields__: ClassVar[dict[str, BaseMarshallField]] = {}

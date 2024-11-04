@@ -88,7 +88,9 @@ class Model(
             definitions=fields,
             bases=(MethodHolder,),
             config=ConfigDict(
-                extra="allow", arbitrary_types_allowed=True, validate_assignment=False
+                extra=cls.model_config["extra"],
+                arbitrary_types_allowed=True,
+                validate_assignment=False,
             ),
         )
 
@@ -102,6 +104,10 @@ class ReflectModel(ReflectedModelMixin, Model):
     Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
     call.
     """
+
+    model_config = ConfigDict(
+        extra="allow", arbitrary_types_allowed=True, validate_assignment=False
+    )
 
     class Meta:
         abstract = True
