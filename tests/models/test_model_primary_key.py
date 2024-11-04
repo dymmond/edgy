@@ -56,7 +56,7 @@ async def test_model_default_primary_key():
 
 
 async def test_model_custom_primary_key():
-    profile = await Profile.query.create(name="Test", language="EN", age=18)
+    profile = await Profile.query.create(language="EN", age=18)
     profiles = await Profile.query.filter()
 
     assert len(profiles) == 1

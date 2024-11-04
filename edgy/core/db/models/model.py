@@ -87,16 +87,17 @@ class Model(
             metadata=cls.meta,
             definitions=fields,
             bases=(MethodHolder,),
-            config=ConfigDict(
-                extra=cls.model_config["extra"],
-                arbitrary_types_allowed=True,
-                validate_assignment=False,
-            ),
         )
 
         proxy_model.build()
         generify_model_fields(cast(type[EdgyBaseModel], proxy_model.model))
         return cast(type[Model], proxy_model.model)
+
+
+class StrictModel(Model):
+    model_config = ConfigDict(
+        extra="forbid", arbitrary_types_allowed=True, validate_assignment=True, strict=True
+    )
 
 
 class ReflectModel(ReflectedModelMixin, Model):
@@ -106,7 +107,7 @@ class ReflectModel(ReflectedModelMixin, Model):
     """
 
     model_config = ConfigDict(
-        extra="allow", arbitrary_types_allowed=True, validate_assignment=False
+        extra="allow", arbitrary_types_allowed=True, validate_assignment=True
     )
 
     class Meta:

@@ -51,6 +51,16 @@ scenes.
 Edgy models are a bit opinionated when it comes to `ID` and this is to maintain consistency
 within the SQL tables with field names and lookups.
 
+### Strict models
+
+Sometimes you want more input validation. E.g. non-existing fields are not just ignored but raise an error
+or the input type is not coerced into the right type but raises an error instead.
+
+For this the `StrictModel` model can be used. Otherwise it behaves like a normal Model.
+
+There is no strict version of a `ReflectModel` because the laxness is required.
+
+
 ### Special attributes
 
 There are few special attributes which can be set

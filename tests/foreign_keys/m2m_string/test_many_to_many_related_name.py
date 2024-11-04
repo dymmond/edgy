@@ -13,9 +13,9 @@ models = edgy.Registry(database=database)
 
 
 class Album(edgy.Model):
-    id = edgy.IntegerField(primary_key=True, autoincrement=True)
-    name = edgy.CharField(max_length=100)
-    tracks = edgy.ManyToMany("Track", related_name="album_tracks", embed_through="embedded")
+    id = edgy.fields.IntegerField(primary_key=True, autoincrement=True)
+    name = edgy.fields.CharField(max_length=100)
+    tracks = edgy.fields.ManyToMany("Track", related_name="album_tracks", embed_through="embedded")
 
     class Meta:
         registry = models

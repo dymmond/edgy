@@ -61,7 +61,7 @@ async def rollback_transactions():
 async def test_model_inheritance():
     await Profile.query.create(name="test", language="EN", age=23)
     await Address.query.create(line_one="teste")
-    contact = await Contact.query.create(name="test2", language="AU", age=25, post_code="line")
+    contact = await Contact.query.create(name="test2", language="AU", post_code="line")
 
     profiles = await Profile.query.all()
     addresses = await Address.query.all()

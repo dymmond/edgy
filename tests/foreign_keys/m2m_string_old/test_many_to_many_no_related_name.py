@@ -21,6 +21,7 @@ class Track(edgy.Model):
 
 class Album(edgy.Model):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
+    name = edgy.CharField(max_length=100)
     tracks = edgy.ManyToMany("Track", related_name=False)
 
     class Meta:

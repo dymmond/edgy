@@ -657,7 +657,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         del is_abstract
 
         if not meta.abstract:
-            # don't add to model_fields
+            # don't add to model_fields, it leads to crashes for unknown reasons
             meta.fields["pk"] = PKField(exclude=True, name="pk", inherit=False)
 
         # Handle annotations

@@ -39,6 +39,7 @@ class ColumnDefinition(_ColumnDefinition):
 class ColumnDefinitionModel(
     _ColumnDefinition, BaseModel, extra="ignore", arbitrary_types_allowed=True
 ):
+    # no default extraction, edgy uses a custom logic
     null: bool = Field(serialization_alias="nullable", default=False)
     column_name: Optional[str] = Field(exclude=True, default=None)
     column_type: Any = Field(exclude=True, default=None)
@@ -46,7 +47,6 @@ class ColumnDefinitionModel(
 
 
 class BaseFieldDefinitions:
-    default: Any = None
     read_only: bool = False
     inject_default_on_partial_update: bool = False
     inherit: bool = True

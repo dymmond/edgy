@@ -61,9 +61,7 @@ async def rollback_transactions():
 async def test_model_inheritance():
     edgy.run_sync(Profile.query.create(name="test", language="EN", age=23))
     edgy.run_sync(Address.query.create(line_one="teste"))
-    contact = edgy.run_sync(
-        Contact.query.create(name="test2", language="AU", age=25, post_code="line")
-    )
+    contact = edgy.run_sync(Contact.query.create(name="test2", language="AU", post_code="line"))
 
     profiles = edgy.run_sync(Profile.query.all())
     addresses = edgy.run_sync(Address.query.all())

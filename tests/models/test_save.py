@@ -98,10 +98,10 @@ async def test_create_model_instance():
     assert last.pk == new_user.pk
 
 
-async def test_create_model_on_set_id_to_none():
+async def test_create_model_on_del_id():
     user = await User.query.create(name="edgy")
 
-    user.id = None
+    del user.id
     user.name = "John"
 
     # Create a new user by saving the model

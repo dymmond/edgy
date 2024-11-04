@@ -295,11 +295,9 @@ class PKField(BaseCompositeField):
     """
 
     def __init__(self, **kwargs: Any) -> None:
-        kwargs["default"] = kwargs["server_default"] = None
+        kwargs["default"] = None
         kwargs["field_type"] = kwargs["annotation"] = Any
-        super().__init__(
-            **kwargs,
-        )
+        super().__init__(**kwargs)
 
     def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[dict[str, Any], Any]:
         pkcolumns = self.owner.pkcolumns

@@ -704,18 +704,21 @@ class PasswordField(CharField):
         fields: dict[str, "BaseFieldType"],
         original_fn: Any = None,
     ) -> dict[str, "BaseFieldType"]:
-        retdict = {}
+        retdict: dict[str, BaseFieldType] = {}
         # TODO: check if it works in embedded settings or embed_field is required
         if field_obj.keep_original:
             original_pw_name = f"{name}_original"
             if original_pw_name not in fields:
-                retdict[original_pw_name] = PlaceholderField(
-                    pydantic_field_type=str,
-                    null=True,
-                    exclude=True,
-                    read_only=True,
-                    name=original_pw_name,
-                    owner=field_obj.owner,
+                retdict[original_pw_name] = cast(
+                    BaseFieldType,
+                    PlaceholderField(
+                        pydantic_field_type=str,
+                        null=True,
+                        exclude=True,
+                        read_only=True,
+                        name=original_pw_name,
+                        owner=field_obj.owner,
+                    ),
                 )
 
         return retdict

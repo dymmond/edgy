@@ -46,10 +46,10 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     Base of all Edgy models with the core setup.
     """
 
-    # allow is required for validators to work
-    # validate_assignment doesn't work yet, overwriting the dict breaks it
+    # when used with marshalls: marshalls can dump unrelated informations which must be ignored
+    # so it isn't possible to use forbid yet, despite it would show bugs in code
     model_config = ConfigDict(
-        extra="forbid", arbitrary_types_allowed=True, validate_assignment=False
+        extra="ignore", arbitrary_types_allowed=True, validate_assignment=True
     )
 
     __proxy_model__: ClassVar[Union[type[Model], None]] = None
@@ -63,6 +63,9 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     def __init__(
         self, *args: Any, __show_pk__: bool = False, __phase__: str = "init", **kwargs: Any
     ) -> None:
+        self.__show_pk__ = __show_pk__
+        # always set them in __dict__ to prevent __getattr__ loop
+        self._loaded_or_deleted = False
         # inject in relation fields anonymous ModelRef (without a Field)
         for arg in args:
             if isinstance(arg, ModelRef):
@@ -92,7 +95,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
 
         kwargs = self.transform_input(kwargs, phase=__phase__, instance=self)
         super().__init__(**kwargs)
-        # move to dict
+        # move to dict (e.g. reflected or subclasses which allow extra attributes)
         if self.__pydantic_extra__ is not None:
             # default was triggered
             self.__dict__.update(self.__pydantic_extra__)
@@ -102,9 +105,6 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         for field_name in self.meta.fields:
             if field_name not in kwargs:
                 self.__dict__.pop(field_name, None)
-        self.__show_pk__ = __show_pk__
-        # always set them in __dict__ to prevent __getattr__ loop
-        self._loaded_or_deleted = False
 
     @classmethod
     def transform_input(
@@ -134,7 +134,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 field = fields.get(key, None)
                 if field is not None:
                     new_kwargs.update(**field.to_model(key, value))
-                elif cls.__reflected__:
+                else:
                     new_kwargs[key] = value
         finally:
             CURRENT_PHASE.reset(token3)
@@ -431,14 +431,14 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     field.__set__(self, value)
                 else:
                     for k, v in field.to_model(key, value).items():
-                        if self.model_config["validate_assignment"] and k in self.model_fields:
+                        if k in self.model_fields:
                             # __dict__ is updated and validator is executed
                             super().__setattr__(k, v)
                         else:
                             # bypass __setattr__ method
                             # ensures, __dict__ is updated
                             object.__setattr__(self, k, v)
-            elif self.model_config["validate_assignment"] and key in self.model_fields:
+            elif key in self.model_fields:
                 # __dict__ is updated and validator is executed
                 super().__setattr__(key, value)
             else:

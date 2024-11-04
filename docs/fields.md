@@ -719,6 +719,18 @@ Ideally the key derivation function includes the parameters (and derive algorith
 
 For more examples see [Passwords](./permissions/passwords.md).
 
+#### PlaceholderField
+
+A field without a column. In some way it behaves like a plain pydantic field with edgy features. It is useful to store user-facing variables, like
+the original password of PasswordField, so it isn't ignored/causes an error when using a `StrictModel`.
+
+Most users will may prefer the ComputedField instead.
+
+##### Parameters
+
+- pydantic_field_type: define the pydantic field type. Optionally.
+
+
 #### TimeField
 
 ```python

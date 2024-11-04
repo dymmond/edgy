@@ -119,8 +119,8 @@ async def test_bulk_update_with_relation():
 
     await Track.query.bulk_create(
         [
-            {"name": "foo", "album": album, "position": 1, "title": "foo"},
-            {"name": "bar", "album": album, "position": 2, "title": "fighters"},
+            {"album": album, "position": 1, "title": "foo"},
+            {"album": album, "position": 2, "title": "fighters"},
         ]
     )
     tracks = await Track.query.all()
