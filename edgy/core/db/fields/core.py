@@ -767,6 +767,7 @@ class EmailField(CharField):
 
 
 class URLField(CharField):
+    # FIXME: URLField is not validated
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
         kwargs.setdefault("max_length", 255)
