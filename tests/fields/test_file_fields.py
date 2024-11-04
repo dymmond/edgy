@@ -15,14 +15,14 @@ database = DatabaseTestClient(DATABASE_URL, drop_database=True, use_existing=Fal
 models = edgy.Registry(database=database)
 
 
-class MyModäl(edgy.Model):
+class MyModäl(edgy.StrictModel):
     ä: edgy.files.FieldFile = edgy.fields.FileField(null=True, column_name="a")
 
     class Meta:
         registry = models
 
 
-class MyModel(edgy.Model):
+class MyModel(edgy.StrictModel):
     file_field: edgy.files.FieldFile = edgy.fields.FileField(null=True)
     file_field_size: int = edgy.fields.IntegerField(null=True)
 
@@ -30,7 +30,7 @@ class MyModel(edgy.Model):
         registry = models
 
 
-class MyModelOverwrittenMetadata(edgy.Model):
+class MyModelOverwrittenMetadata(edgy.StrictModel):
     file_field: edgy.files.FieldFile = edgy.fields.FileField(max_length=80, with_approval=True)
     file_field_metadata: str = edgy.fields.TextField()
 
@@ -38,7 +38,7 @@ class MyModelOverwrittenMetadata(edgy.Model):
         registry = models
 
 
-class MyModelApproval(edgy.Model):
+class MyModelApproval(edgy.StrictModel):
     file_field: edgy.files.FieldFile = edgy.fields.FileField(
         with_approval=True, with_size=False, with_metadata=False
     )

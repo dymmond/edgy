@@ -15,7 +15,7 @@ pytestmark = pytest.mark.anyio
 pydantic_version = __version__[:3]
 
 
-class EdgyTenantBaseModel(edgy.Model):
+class EdgyTenantBaseModel(edgy.StrictModel):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
 
     class Meta:
@@ -23,14 +23,14 @@ class EdgyTenantBaseModel(edgy.Model):
         abstract = True
 
 
-class Profle(edgy.Model):
+class Profle(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
 
     class Meta:
         registry = models
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
     profile: Profle = edgy.ForeignKey(Profle)
 

@@ -10,12 +10,12 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database))
 
 
-class Address(edgy.Model):
+class Address(edgy.StrictModel):
     street = edgy.CharField(max_length=100)
     city = edgy.CharField(max_length=100)
 
 
-class Person(edgy.Model):
+class Person(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     email = edgy.CharField(max_length=100)
 
@@ -23,7 +23,7 @@ class Person(edgy.Model):
         registry = models
 
 
-class Profile(edgy.Model):
+class Profile(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     website = edgy.CharField(max_length=100)
 
@@ -31,7 +31,7 @@ class Profile(edgy.Model):
         registry = models
 
 
-class ProfileHolder(edgy.Model):
+class ProfileHolder(edgy.StrictModel):
     address = Address
     profile = edgy.OneToOneField(
         Profile, on_delete=edgy.CASCADE, embed_parent=("address", "parent")

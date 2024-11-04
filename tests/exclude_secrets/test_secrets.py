@@ -10,14 +10,14 @@ models = edgy.Registry(database=database)
 pytestmark = pytest.mark.anyio
 
 
-class Main(edgy.Model):
+class Main(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
 
     class Meta:
         registry = models
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
     age = edgy.IntegerField(secret=True)

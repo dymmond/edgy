@@ -13,7 +13,7 @@ models = edgy.Registry(database=database)
 BASE_PATH = Path(__file__).absolute().parent.parent.parent
 
 
-class MyModel(edgy.Model):
+class MyModel(edgy.StrictModel):
     ifield: edgy.files.ImageFieldFile = edgy.fields.ImageField(
         with_approval=False,
         null=True,
@@ -26,7 +26,7 @@ class MyModel(edgy.Model):
         registry = models
 
 
-class MyModelApproval(edgy.Model):
+class MyModelApproval(edgy.StrictModel):
     ifield: edgy.files.ImageFieldFile = edgy.fields.ImageField(
         with_approval=True, null=True, image_formats=("JPEG",), approved_image_formats=("PNG",)
     )

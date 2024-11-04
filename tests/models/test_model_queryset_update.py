@@ -10,7 +10,7 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 pytestmark = pytest.mark.anyio
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
     language = edgy.CharField(max_length=200, null=True)
@@ -19,7 +19,7 @@ class User(edgy.Model):
         registry = models
 
 
-class Product(edgy.Model):
+class Product(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
     rating = edgy.IntegerField(minimum=1, maximum=5)
@@ -29,7 +29,7 @@ class Product(edgy.Model):
         registry = models
 
 
-class ProductTag(edgy.Model):
+class ProductTag(edgy.StrictModel):
     product = edgy.fields.ForeignKey(Product, related_name="tags", null=True)
     tag = edgy.fields.CharField(max_length=30)
 

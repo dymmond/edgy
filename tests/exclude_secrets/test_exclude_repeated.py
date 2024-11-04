@@ -12,7 +12,7 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 pytestmark = pytest.mark.anyio
 
 
-class Base(edgy.Model):
+class Base(edgy.StrictModel):
     class Meta:
         abstract = True
         registry = models

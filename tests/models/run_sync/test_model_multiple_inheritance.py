@@ -12,7 +12,7 @@ nother = Registry(database=database)
 pytestmark = pytest.mark.anyio
 
 
-class BaseUser(edgy.Model):
+class BaseUser(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
     language = edgy.CharField(max_length=200, null=True)
 
@@ -28,7 +28,7 @@ class Profile(BaseUser):
         tablename = "profiles"
 
 
-class Address(edgy.Model):
+class Address(edgy.StrictModel):
     line_one = edgy.CharField(max_length=255, null=True)
     post_code = edgy.CharField(max_length=255, null=True)
 

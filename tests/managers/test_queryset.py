@@ -20,7 +20,7 @@ class ActiveManager(Manager):
         return queryset
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
     language = edgy.CharField(max_length=200, null=True)
 
@@ -28,7 +28,7 @@ class User(edgy.Model):
         registry = models
 
 
-class Product(edgy.Model):
+class Product(edgy.StrictModel):
     active: ClassVar[Manager] = ActiveManager()
 
     name = edgy.CharField(max_length=100)

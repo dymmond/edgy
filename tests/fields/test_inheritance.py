@@ -16,7 +16,7 @@ from edgy.core.db.fields import (
     TimeField,
     UUIDField,
 )
-from edgy.core.db.models import Model
+from edgy.core.db.models import StrictModel
 
 
 @pytest.mark.parametrize(
@@ -45,7 +45,7 @@ def test_isinstance_issubclass(field, _class):
 
 
 def test_overwriting_fields_with_fields():
-    class AbstractModel(Model):
+    class AbstractModel(StrictModel):
         first_name: str = CharField(max_length=255)
         last_name: str = CharField(max_length=255)
 
@@ -64,7 +64,7 @@ def test_overwriting_fields_with_fields():
 
 
 def test_deleting_fields():
-    class AbstractModel(Model):
+    class AbstractModel(StrictModel):
         first_name: str = CharField(max_length=255)
         last_name: str = CharField(max_length=255)
 
@@ -103,7 +103,7 @@ def test_mixins_non_inherited():
     class Mixin2:
         field = CharField(max_length=255, inherit=False)
 
-    class AbstractModel(Mixin, Model):
+    class AbstractModel(Mixin, StrictModel):
         pass
 
         class Meta:
@@ -134,7 +134,7 @@ def test_mixins_mixed_inherited():
     class Mixin(Mixin2):
         field = CharField(max_length=255, inherit=False)
 
-    class AbstractModel(Mixin, Model):
+    class AbstractModel(Mixin, StrictModel):
         pass
 
         class Meta:

@@ -12,14 +12,14 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 pytestmark = pytest.mark.anyio
 
 
-class MyWebsite(edgy.Model):
+class MyWebsite(edgy.StrictModel):
     rev: int = edgy.IntegerField(increment_on_save=1, default=0)
 
     class Meta:
         registry = models
 
 
-class MyRevSafe(edgy.Model):
+class MyRevSafe(edgy.StrictModel):
     name = edgy.CharField(max_length=50)
     document: edgy.files.FieldFile = edgy.fields.FileField(null=True)
     id: int = edgy.BigIntegerField(primary_key=True, autoincrement=True)
@@ -29,7 +29,7 @@ class MyRevSafe(edgy.Model):
         registry = models
 
 
-class MyRevUnsafe(edgy.Model):
+class MyRevUnsafe(edgy.StrictModel):
     name = edgy.CharField(max_length=50)
     document: edgy.files.FieldFile = edgy.fields.FileField(null=True)
     id: int = edgy.BigIntegerField(primary_key=True, autoincrement=True)
@@ -39,7 +39,7 @@ class MyRevUnsafe(edgy.Model):
         registry = models
 
 
-class MyCountdown(edgy.Model):
+class MyCountdown(edgy.StrictModel):
     name = edgy.CharField(max_length=50)
     rev: int = edgy.IntegerField(increment_on_save=-1, default=10, read_only=False)
 
@@ -47,7 +47,7 @@ class MyCountdown(edgy.Model):
         registry = models
 
 
-class MyCountdownNoDefault(edgy.Model):
+class MyCountdownNoDefault(edgy.StrictModel):
     name = edgy.CharField(max_length=50)
     rev: int = edgy.IntegerField(increment_on_save=-1, read_only=False)
 

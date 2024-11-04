@@ -13,7 +13,7 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 pytestmark = pytest.mark.anyio
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name: str = edgy.CharField(max_length=255)
     created_at: datetime.datetime = edgy.DateTimeField(auto_now_add=True)
     updated_at: datetime.datetime = edgy.DateTimeField(auto_now=True)

@@ -9,7 +9,7 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
-class MyModel(edgy.Model):
+class MyModel(edgy.StrictModel):
     first_name: str = edgy.CharField(max_length=255, server_default="edgy")
     last_name: str = edgy.CharField(max_length=255, server_default="edge")
 

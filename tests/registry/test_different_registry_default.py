@@ -18,7 +18,7 @@ class StatusEnum(Enum):
     RELEASED = "Released"
 
 
-class Product(edgy.Model):
+class Product(edgy.StrictModel):
     id: int = fields.IntegerField(primary_key=True, autoincrement=True)
     name: str = fields.CharField(max_length=255)
 

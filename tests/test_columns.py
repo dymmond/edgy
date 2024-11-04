@@ -27,7 +27,7 @@ class StatusEnum(Enum):
     RELEASED = "Released"
 
 
-class Product(edgy.Model):
+class Product(edgy.StrictModel):
     id = fields.IntegerField(primary_key=True, autoincrement=True)
     uuid = fields.UUIDField(null=True)
     created = fields.DateTimeField(default=datetime.datetime.now, with_timezone=False)
@@ -48,7 +48,7 @@ class Product(edgy.Model):
         registry = models
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     id = fields.UUIDField(primary_key=True, default=uuid.uuid4)
     name = fields.CharField(null=True, max_length=16)
     email = fields.EmailField(null=True, max_length=256)
@@ -60,7 +60,7 @@ class User(edgy.Model):
         registry = models
 
 
-class Customer(edgy.Model):
+class Customer(edgy.StrictModel):
     name = fields.CharField(null=True, max_length=16)
 
     class Meta:
@@ -151,7 +151,7 @@ async def test_model_crud():
 async def test_both_auto_now_and_auto_now_add_raise_error():
     with pytest.raises(FieldDefinitionError):
 
-        class Product(edgy.Model):
+        class Product(edgy.StrictModel):
             created_datetime = (fields.DateTimeField(auto_now_add=True, auto_now=True),)
 
             class Meta:

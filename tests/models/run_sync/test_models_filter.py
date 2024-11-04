@@ -11,7 +11,7 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 pytestmark = pytest.mark.anyio
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
     language = edgy.CharField(max_length=200, null=True)
 
@@ -19,7 +19,7 @@ class User(edgy.Model):
         registry = models
 
 
-class Product(edgy.Model):
+class Product(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
     rating = edgy.IntegerField(minimum=1, maximum=5)
     in_stock = edgy.BooleanField(default=False)

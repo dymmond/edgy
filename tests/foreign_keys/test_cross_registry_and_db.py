@@ -13,7 +13,7 @@ modelsb = edgy.Registry(database=database2)
 modelsc = edgy.Registry(database=database)
 
 
-class ObjectA(edgy.Model):
+class ObjectA(edgy.StrictModel):
     self_ref = edgy.ForeignKey("ObjectA", on_delete=edgy.CASCADE, null=True)
     c = edgy.ForeignKey("ObjectC", target_registry=modelsc, on_delete=edgy.CASCADE, null=True)
 
@@ -21,14 +21,14 @@ class ObjectA(edgy.Model):
         registry = modelsa
 
 
-class ObjectB(edgy.Model):
+class ObjectB(edgy.StrictModel):
     a = edgy.ForeignKey(ObjectA, on_delete=edgy.CASCADE, null=True)
 
     class Meta:
         registry = modelsb
 
 
-class ObjectC(edgy.Model):
+class ObjectC(edgy.StrictModel):
     b = edgy.ForeignKey(ObjectB, on_delete=edgy.CASCADE, null=True)
 
     class Meta:

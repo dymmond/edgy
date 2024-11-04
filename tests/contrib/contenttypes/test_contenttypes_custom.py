@@ -26,7 +26,7 @@ models = edgy.Registry(
 )
 
 
-class ContentTypeTag(edgy.Model):
+class ContentTypeTag(edgy.StrictModel):
     ctype = edgy.fields.ForeignKey(to="ContentType", related_name="tags", on_delete=edgy.CASCADE)
     tag = edgy.fields.CharField(max_length=50)
 
@@ -36,21 +36,21 @@ class ContentTypeTag(edgy.Model):
         registry = models
 
 
-class Organisation(edgy.Model):
+class Organisation(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100, unique=True)
 
     class Meta:
         registry = models
 
 
-class Company(edgy.Model):
+class Company(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100, unique=True)
 
     class Meta:
         registry = models
 
 
-class Person(edgy.Model):
+class Person(edgy.StrictModel):
     first_name = edgy.fields.CharField(max_length=100)
     last_name = edgy.fields.CharField(max_length=100)
     # to defaults to ContentType

@@ -11,7 +11,7 @@ database = DatabaseTestClient(DATABASE_URL, use_existing=False)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100, unique=True)
 
     class Meta:

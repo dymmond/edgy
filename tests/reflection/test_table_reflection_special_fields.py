@@ -51,7 +51,7 @@ class Products(edgy.ReflectModel):
 """.strip()
 
 
-class Product(edgy.Model):
+class Product(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=255, index=True)
     title = edgy.fields.CharField(max_length=255, null=True)
     price = edgy.fields.FloatField(max_digits=4)
@@ -64,7 +64,7 @@ class Product(edgy.Model):
         indexes = [Index(fields=["name", "title"], name="idx_name_title")]
 
 
-class ProductThird(edgy.Model):
+class ProductThird(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=255, index=True)
     title = edgy.fields.CharField(max_length=255, null=True)
     price = edgy.fields.FloatField(max_digits=4)

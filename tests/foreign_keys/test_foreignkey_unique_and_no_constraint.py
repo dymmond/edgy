@@ -12,7 +12,7 @@ database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 
-class Album(edgy.Model):
+class Album(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
 
@@ -21,7 +21,7 @@ class Album(edgy.Model):
         unique_together = ("id", "name")
 
 
-class Track(edgy.Model):
+class Track(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE, related_fields=("name",), index=True)
     title = edgy.CharField(max_length=100)
@@ -31,7 +31,7 @@ class Track(edgy.Model):
         registry = models
 
 
-class Organisation(edgy.Model):
+class Organisation(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     ident = edgy.CharField(max_length=100)
 
@@ -39,7 +39,7 @@ class Organisation(edgy.Model):
         registry = models
 
 
-class Team(edgy.Model):
+class Team(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT, index=True)
     name = edgy.CharField(max_length=100, primary_key=True)
@@ -48,7 +48,7 @@ class Team(edgy.Model):
         registry = models
 
 
-class Member(edgy.Model):
+class Member(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     team = edgy.ForeignKey(
         Team, on_delete=edgy.SET_NULL, null=True, no_constraint=True, index=True
@@ -59,7 +59,7 @@ class Member(edgy.Model):
         registry = models
 
 
-class Profile(edgy.Model):
+class Profile(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     website = edgy.CharField(max_length=100)
 
@@ -67,7 +67,7 @@ class Profile(edgy.Model):
         registry = models
 
 
-class Person(edgy.Model):
+class Person(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     email = edgy.CharField(max_length=100)
     profile = edgy.OneToOneField(Profile, on_delete=edgy.CASCADE, index=True)
@@ -76,7 +76,7 @@ class Person(edgy.Model):
         registry = models
 
 
-class AnotherPerson(edgy.Model):
+class AnotherPerson(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     email = edgy.CharField(max_length=100)
     profile = edgy.OneToOne(Profile, on_delete=edgy.CASCADE, index=True)
@@ -288,10 +288,10 @@ async def test_nullable_foreign_key():
 def test_assertation_error_on_set_null():
     with pytest.raises(FieldDefinitionError) as raised:
 
-        class MyModel(edgy.Model):
+        class MyModel(edgy.StrictModel):
             is_active = edgy.BooleanField(default=True)
 
-        class MyOtherModel(edgy.Model):
+        class MyOtherModel(edgy.StrictModel):
             model = edgy.ForeignKey(MyModel, on_delete=edgy.SET_NULL)
 
     assert raised.value.args[0] == "When SET_NULL is enabled, null must be True."
@@ -300,10 +300,10 @@ def test_assertation_error_on_set_null():
 def test_assertation_error_on_missing_on_delete():
     with pytest.raises(FieldDefinitionError) as raised:
 
-        class MyModel(edgy.Model):
+        class MyModel(edgy.StrictModel):
             is_active = edgy.BooleanField(default=True)
 
-        class MyOtherModel(edgy.Model):
+        class MyOtherModel(edgy.StrictModel):
             model = edgy.ForeignKey(MyModel, on_delete=None)
 
     assert raised.value.args[0] == "on_delete must not be null."

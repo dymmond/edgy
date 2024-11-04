@@ -34,7 +34,7 @@ class RatingManager(Manager):
         return queryset
 
 
-class BaseModel(edgy.Model):
+class BaseModel(edgy.StrictModel):
     query: ClassVar[Manager] = ObjectsManager()
     languages: ClassVar[Manager] = LanguageManager()
     ratings: ClassVar[Manager] = RatingManager()

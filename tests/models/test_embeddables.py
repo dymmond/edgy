@@ -13,7 +13,7 @@ database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 
-class InheritableModel(edgy.Model):
+class InheritableModel(edgy.StrictModel):
     first_name: str = edgy.CharField(max_length=255)
     last_name: str = edgy.CharField(max_length=255)
 
@@ -27,7 +27,7 @@ class NonInheritableModel(InheritableModel):
         inherit = False
 
 
-class MyModel1(edgy.Model):
+class MyModel1(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True, inherit=False, exclude=True)
     model1: ClassVar[InheritableModel] = InheritableModel
     model2 = NonInheritableModel

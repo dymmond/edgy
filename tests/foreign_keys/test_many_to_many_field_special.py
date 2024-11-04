@@ -10,7 +10,7 @@ database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 
-class Üser(edgy.Model):
+class Üser(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
 
     class Meta:
@@ -18,7 +18,7 @@ class Üser(edgy.Model):
         tablename = "u"
 
 
-class Studio(edgy.Model):
+class Studio(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
     users = edgy.ManyToMany(
         Üser, through_tablename="foo", to_foreign_key="usr", from_foreign_key="fromage"

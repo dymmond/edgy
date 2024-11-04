@@ -24,14 +24,14 @@ class InactiveManager(Manager):
         return queryset
 
 
-class Team(edgy.Model):
+class Team(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
 
     class Meta:
         registry = models
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name: str = edgy.CharField(max_length=255)
     email: str = edgy.EmailField(max_length=70)
     team = edgy.ForeignKey(Team, null=True, related_name="members")

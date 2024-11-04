@@ -10,7 +10,7 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
-class MyModel(edgy.Model):
+class MyModel(edgy.StrictModel):
     name = edgy.fields.CharField(null=False, min_length=5, max_length=10)
     age = edgy.fields.IntegerField(null=False, ge=13)
 

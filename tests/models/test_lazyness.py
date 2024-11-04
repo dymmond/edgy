@@ -6,7 +6,7 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
-class BaseUser(edgy.Model):
+class BaseUser(edgy.StrictModel):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     name: str = edgy.CharField(max_length=100, null=True)
     language: str = edgy.CharField(max_length=200, null=True)
@@ -20,7 +20,7 @@ class User(BaseUser):
         registry = models
 
 
-class Product(edgy.Model):
+class Product(edgy.StrictModel):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     name: str = edgy.CharField(max_length=100, null=True)
     rating: int = edgy.IntegerField(minimum=1, maximum=5, default=1)

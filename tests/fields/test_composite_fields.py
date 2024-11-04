@@ -18,7 +18,7 @@ class PlainModel(BaseModel):
     age: int
 
 
-class MyModel2(edgy.Model):
+class MyModel2(edgy.StrictModel):
     first_name: str = edgy.CharField(max_length=255)
     last_name: str = edgy.CharField(max_length=255, skip_absorption_check=True)
     composite: dict = edgy.CompositeField(inner_fields=["first_name", "last_name"])
@@ -39,7 +39,7 @@ class MyModel2(edgy.Model):
         registry = models
 
 
-class MyModelEmbedded(edgy.Model):
+class MyModelEmbedded(edgy.StrictModel):
     first_name: str = edgy.CharField(max_length=255)
     last_name: str = edgy.CharField(max_length=255, skip_absorption_check=True)
     embedded: dict[str, Any] = edgy.CompositeField(
@@ -55,7 +55,7 @@ class MyModelEmbedded(edgy.Model):
         registry = models
 
 
-class MyModelEmbedded2(edgy.Model):
+class MyModelEmbedded2(edgy.StrictModel):
     first_name: str = edgy.CharField(max_length=255)
     last_name: str = edgy.CharField(max_length=255, skip_absorption_check=True)
     embedded: dict[str, Any] = edgy.CompositeField(
@@ -233,7 +233,7 @@ def test_dump_composite_model():
 
 
 def test_inheritance():
-    class AbstractModel(edgy.Model):
+    class AbstractModel(edgy.StrictModel):
         composite: dict[str, Any] = edgy.CompositeField(
             inner_fields=[
                 ("first_name", edgy.CharField(max_length=255)),

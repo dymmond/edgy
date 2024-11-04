@@ -23,7 +23,7 @@ class StatusEnum(Enum):
     RELEASED = "Released"
 
 
-class BaseModel(edgy.Model):
+class BaseModel(edgy.StrictModel):
     class Meta:
         registry = models
 

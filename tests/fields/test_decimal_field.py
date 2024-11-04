@@ -30,10 +30,12 @@ async def rollback_transactions():
         yield
 
 
-class Employee(edgy.Model):
+class Employee(edgy.StrictModel):
     name: str = fields.CharField(max_length=255, null=True)
     date_of_birth: date = fields.DateField(auto_now=True)
-    salary: decimal.Decimal = fields.DecimalField(max_digits=9, decimal_places=2, null=True)
+    salary: decimal.Decimal = fields.DecimalField(
+        max_digits=9, decimal_places=2, null=True, strict=False
+    )
 
     class Meta:
         registry = models

@@ -28,7 +28,7 @@ class StatusEnum(Enum):
     RELEASED = "Released"
 
 
-class Product(edgy.Model):
+class Product(edgy.StrictModel):
     id: int = fields.IntegerField(primary_key=True, autoincrement=True)
     uuid: UUID = fields.UUIDField(null=True)
     created: datetime = fields.DateTimeField(default=datetime.now)

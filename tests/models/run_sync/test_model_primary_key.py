@@ -14,7 +14,7 @@ nother = Registry(database=database)
 pytestmark = pytest.mark.anyio
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
     language = edgy.CharField(max_length=200, null=True)
 
@@ -22,7 +22,7 @@ class User(edgy.Model):
         registry = models
 
 
-class Profile(edgy.Model):
+class Profile(edgy.StrictModel):
     id = edgy.UUIDField(primary_key=True, default=uuid.uuid4)
     language = edgy.CharField(max_length=200, null=True)
     age = edgy.IntegerField()

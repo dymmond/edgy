@@ -30,7 +30,7 @@ class LanguageManager(Manager):
         return queryset
 
 
-class BaseModel(edgy.Model):
+class BaseModel(edgy.StrictModel):
     query: ClassVar[Manager] = ObjectsManager()
 
     class Meta:
