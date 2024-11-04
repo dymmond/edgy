@@ -23,7 +23,6 @@ class _ColumnDefinition:
     autoincrement: bool = False
     index: bool = False
     unique: bool = False
-    default: Any = None
     comment: Optional[str] = None
     server_default: Optional[Any] = None
     server_onupdate: Optional[Any] = None
@@ -40,6 +39,7 @@ class ColumnDefinition(_ColumnDefinition):
 class ColumnDefinitionModel(
     _ColumnDefinition, BaseModel, extra="ignore", arbitrary_types_allowed=True
 ):
+    # no default extraction, edgy uses a custom logic
     null: bool = Field(serialization_alias="nullable", default=False)
     column_name: Optional[str] = Field(exclude=True, default=None)
     column_type: Any = Field(exclude=True, default=None)

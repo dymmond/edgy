@@ -8,6 +8,7 @@ from collections.abc import Callable, Sequence
 from enum import EnumMeta
 from functools import cached_property, partial
 from re import Pattern
+from secrets import compare_digest
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import pydantic
@@ -109,6 +110,32 @@ class ComputedField(BaseField):
 
     def __set__(self, instance: "BaseModelType", value: Any) -> None:
         self.compute_setter(self, instance, value)
+
+
+class PlaceholderField(FieldFactory):
+    """Placeholder field, without db column"""
+
+    def __new__(  # type: ignore
+        cls,
+        *,
+        pydantic_field_type: Any = Any,
+        **kwargs: Any,
+    ) -> BaseFieldType:
+        kwargs.setdefault("exclude", True)
+        return super().__new__(cls, pydantic_field_type=pydantic_field_type, **kwargs)
+
+    def clean(
+        self,
+        name: str,
+        value: Any,
+        for_query: bool = False,
+    ) -> dict[str, Any]:
+        return {}
+
+    @classmethod
+    def get_pydantic_type(cls, **kwargs: Any) -> Any:
+        """Returns the type for pydantic"""
+        return kwargs["pydantic_field_type"]
 
 
 class CharField(FieldFactory, str):
@@ -670,11 +697,40 @@ class PasswordField(CharField):
         return super().__new__(cls, derive_fn=derive_fn, **kwargs)
 
     @classmethod
+    def get_embedded_fields(
+        cls,
+        field_obj: BaseFieldType,
+        name: str,
+        fields: dict[str, "BaseFieldType"],
+        original_fn: Any = None,
+    ) -> dict[str, "BaseFieldType"]:
+        retdict: dict[str, BaseFieldType] = {}
+        # TODO: check if it works in embedded settings or embed_field is required
+        if field_obj.keep_original:
+            original_pw_name = f"{name}_original"
+            if original_pw_name not in fields:
+                retdict[original_pw_name] = cast(
+                    BaseFieldType,
+                    PlaceholderField(
+                        pydantic_field_type=str,
+                        null=True,
+                        exclude=True,
+                        read_only=True,
+                        name=original_pw_name,
+                        owner=field_obj.owner,
+                    ),
+                )
+
+        return retdict
+
+    @classmethod
     def to_model(
         cls, field_obj: BaseFieldType, field_name: str, value: Any, original_fn: Any = None
     ) -> dict[str, Any]:
         if isinstance(value, (tuple, list)):
-            if value[0] != value[1]:
+            # despite an != should not be a problem here, make sure that strange logics
+            # doesn't leak timings of the password
+            if not compare_digest(value[0], value[1]):
                 raise ValueError("Password doesn't match.")
             else:
                 value = value[0]

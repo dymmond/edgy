@@ -3,6 +3,7 @@ from hashlib import pbkdf2_hmac
 
 import pytest
 import sqlalchemy
+from pydantic import ValidationError, model_validator
 
 import edgy
 from edgy.core.db.fields import (
@@ -25,7 +26,6 @@ class SampleHasher:
 
     def compare_pw(self, hash: str, password: str):
         algo, iterations, _ = hash.split(":", 2)
-        print("pw2", password)
         # this is not secure
         derived = self.derive(password, int(iterations))
         return hash == derived
@@ -37,6 +37,12 @@ hasher = SampleHasher()
 class MyModel(edgy.Model):
     pw = edgy.PasswordField(null=False, derive_fn=hasher.derive)
     token = edgy.PasswordField(null=False, default=secrets.token_hex)
+
+    @model_validator(mode="after")
+    def not_saffier(self) -> str:
+        if self.pw_original == "saffier":
+            raise ValueError("must not be saffier")
+        return self
 
     class Meta:
         registry = models
@@ -81,7 +87,7 @@ def test_can_create_password_field2():
 
 async def test_pw_field_create_pw():
     obj = await MyModel.query.create(pw="test")
-    assert obj.pw != "test"
+    assert not secrets.compare_digest(obj.pw, "test")
     assert hasher.compare_pw(obj.pw, "test")
     obj.pw = "foobar"
     assert obj.pw != "foobar"
@@ -97,7 +103,7 @@ async def test_pw_field_create_pw():
 
 async def test_pw_field_create_token_and_validate():
     obj = await MyModel.query.create(pw="test", token="234")
-    assert obj.token == "234"
+    assert secrets.compare_digest(obj.token, "234")
     obj.pw = ("foobar", "foobar")
     assert obj.pw != "foobar"
     assert obj.pw_original == "foobar"
@@ -108,3 +114,8 @@ async def test_pw_field_create_token_and_validate():
 async def test_pw_field_create_fail():
     with pytest.raises(ValueError):
         await MyModel.query.create(pw=("test", "foobar"))
+
+
+async def test_pw_field_create_fail_validator():
+    with pytest.raises(ValidationError):
+        await MyModel.query.create(pw=("saffier", "saffier"))

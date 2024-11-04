@@ -6,6 +6,22 @@ hide:
 
 # Release Notes
 
+## 0.21.2
+
+### Added
+
+- PlaceholderField.
+- StrictModel which forbids extra attributes.
+
+### Changed
+
+- Validate on assignment is enabled.
+
+### Fixed
+
+- Pydantic validators are fixed. Field based ones as well as model based ones.
+- `__dict__` was wiped out when intializing a model.
+
 ## 0.21.1
 
 ### Changed

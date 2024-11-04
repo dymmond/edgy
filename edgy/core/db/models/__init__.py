@@ -1,4 +1,4 @@
-from .model import Model, ReflectModel
+from .model import Model, ReflectModel, StrictModel
 from .model_reference import ModelRef
 
-__all__ = ["Model", "ModelRef", "ReflectModel"]
+__all__ = ["Model", "StrictModel", "ModelRef", "ReflectModel"]

@@ -94,6 +94,7 @@ class Fields(UserDict, dict[str, BaseFieldType]):
         self.add_field_to_meta(name, value)
         if self.meta.model is not None:
             self.meta.model.model_fields[name] = value  # type: ignore
+            self.meta.model.model_rebuild(force=True)
         self.meta.invalidate(clear_class_attrs=True)
 
     def __delitem__(self, name: str) -> None:
@@ -619,8 +620,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                         # insert as stronger element
                         fieldnames_to_check.appendleft(sub_field_name)
                         fields[sub_field_name] = sub_field
-                        if not sub_field.exclude:
-                            model_fields[sub_field_name] = sub_field
+                        model_fields[sub_field_name] = sub_field
             # Handle with multiple primary keys and auto generated field if no primary key is provided
             if not is_abstract and has_parents and not has_explicit_primary_key:
                 if "id" not in fields:
@@ -657,7 +657,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         del is_abstract
 
         if not meta.abstract:
-            # don't add to model_fields
+            # don't add to model_fields, it leads to crashes for unknown reasons
             meta.fields["pk"] = PKField(exclude=True, name="pk", inherit=False)
 
         # Handle annotations

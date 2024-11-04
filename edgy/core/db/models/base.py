@@ -46,7 +46,11 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     Base of all Edgy models with the core setup.
     """
 
-    model_config = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
+    # when used with marshalls: marshalls can dump unrelated informations which must be ignored
+    # so it isn't possible to use forbid yet, despite it would show bugs in code
+    model_config = ConfigDict(
+        extra="ignore", arbitrary_types_allowed=True, validate_assignment=True
+    )
 
     __proxy_model__: ClassVar[Union[type[Model], None]] = None
     __reflected__: ClassVar[bool] = False
@@ -59,6 +63,9 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     def __init__(
         self, *args: Any, __show_pk__: bool = False, __phase__: str = "init", **kwargs: Any
     ) -> None:
+        self.__show_pk__ = __show_pk__
+        # always set them in __dict__ to prevent __getattr__ loop
+        self._loaded_or_deleted = False
         # inject in relation fields anonymous ModelRef (without a Field)
         for arg in args:
             if isinstance(arg, ModelRef):
@@ -88,16 +95,23 @@ class EdgyBaseModel(BaseModel, BaseModelType):
 
         kwargs = self.transform_input(kwargs, phase=__phase__, instance=self)
         super().__init__(**kwargs)
-        # restrict to fields
-        # TODO: maybe replaceable by direct setting kwargs but doesn't work yet
-        self.__dict__ = self.setup_model_from_kwargs(kwargs)
-        self.__show_pk__ = __show_pk__
-        # always set them in __dict__ to prevent __getattr__ loop
-        self._loaded_or_deleted = False
+        # move to dict (e.g. reflected or subclasses which allow extra attributes)
+        if self.__pydantic_extra__ is not None:
+            # default was triggered
+            self.__dict__.update(self.__pydantic_extra__)
+            self.__pydantic_extra__ = None
+
+        # cleanup fields
+        for field_name in self.meta.fields:
+            if field_name not in kwargs:
+                self.__dict__.pop(field_name, None)
 
     @classmethod
     def transform_input(
-        cls, kwargs: Any, phase: str = "", instance: Optional[BaseModelType] = None
+        cls,
+        kwargs: Any,
+        phase: str = "",
+        instance: Optional[BaseModelType] = None,
     ) -> Any:
         """
         Expand to_models and apply input modifications.
@@ -127,13 +141,6 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             CURRENT_MODEL_INSTANCE.reset(token2)
             CURRENT_INSTANCE.reset(token)
         return new_kwargs
-
-    def setup_model_from_kwargs(self, kwargs: Any) -> Any:
-        """
-        Loops and setup the kwargs of the model
-        """
-
-        return {k: v for k, v in kwargs.items() if k in self.meta.fields}
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}: {str(self)}>"
@@ -424,10 +431,19 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     field.__set__(self, value)
                 else:
                     for k, v in field.to_model(key, value).items():
-                        # bypass __setattr__ method
-                        object.__setattr__(self, k, v)
+                        if k in self.model_fields:
+                            # __dict__ is updated and validator is executed
+                            super().__setattr__(k, v)
+                        else:
+                            # bypass __setattr__ method
+                            # ensures, __dict__ is updated
+                            object.__setattr__(self, k, v)
+            elif key in self.model_fields:
+                # __dict__ is updated and validator is executed
+                super().__setattr__(key, value)
             else:
                 # bypass __setattr__ method
+                # ensures, __dict__ is updated
                 object.__setattr__(self, key, value)
         finally:
             CURRENT_INSTANCE.reset(token)
@@ -485,7 +501,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         if (
             name not in self.__dict__
             and behavior != "passdown"
-            and not self._loaded_or_deleted
+            and not self.__dict__.get("_loaded_or_deleted", False)
             and (field is not None or self.__reflected__)
             and name not in self.identifying_db_fields
             and self.can_load

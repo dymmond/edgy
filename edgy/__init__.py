@@ -27,6 +27,7 @@ from .core.db.fields import (
     IntegerField,
     JSONField,
     PasswordField,
+    PlaceholderField,
     RefForeignKey,
     SmallIntegerField,
     TextField,
@@ -37,7 +38,7 @@ from .core.db.fields import (
 from .core.db.fields.foreign_keys import ForeignKey
 from .core.db.fields.many_to_many import ManyToMany, ManyToManyField
 from .core.db.fields.one_to_one_keys import OneToOne, OneToOneField
-from .core.db.models import Model, ModelRef, ReflectModel
+from .core.db.models import Model, ModelRef, ReflectModel, StrictModel
 from .core.db.models.managers import Manager
 from .core.db.querysets import Prefetch, Q, QuerySet, and_, not_, or_
 from .core.extras import EdgyExtra
@@ -89,9 +90,11 @@ __all__ = [
     "OneToOne",
     "OneToOneField",
     "PasswordField",
+    "PlaceholderField",
     "Prefetch",
     "QuerySet",
     "ReflectModel",
+    "StrictModel",
     "RESTRICT",
     "Registry",
     "SET_NULL",

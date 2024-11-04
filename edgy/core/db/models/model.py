@@ -4,6 +4,8 @@ import copy
 import inspect
 from typing import ClassVar, cast
 
+from pydantic import ConfigDict
+
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.managers import Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
@@ -92,11 +94,21 @@ class Model(
         return cast(type[Model], proxy_model.model)
 
 
+class StrictModel(Model):
+    model_config = ConfigDict(
+        extra="forbid", arbitrary_types_allowed=True, validate_assignment=True, strict=True
+    )
+
+
 class ReflectModel(ReflectedModelMixin, Model):
     """
     Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
     call.
     """
+
+    model_config = ConfigDict(
+        extra="allow", arbitrary_types_allowed=True, validate_assignment=True
+    )
 
     class Meta:
         abstract = True

@@ -42,7 +42,7 @@ async def create_test_database():
 
 
 async def test_nested_with_not_optimal_select_related_exclude_secrets():
-    profile = await Profile.query.create(is_enabled=False, name="edgy")
+    profile = await Profile.query.create(name="edgy")
     user = await User.query.create(
         profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
     )
@@ -62,7 +62,7 @@ async def test_nested_with_not_optimal_select_related_exclude_secrets():
 
 
 async def test_nested_with_not_optimal_select_related_all():
-    profile = await Profile.query.create(is_enabled=False, name="edgy")
+    profile = await Profile.query.create(name="edgy")
     user = await User.query.create(
         profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
     )
@@ -82,7 +82,7 @@ async def test_nested_with_not_optimal_select_related_all():
 
 
 async def test_nested_with_not_optimal_select_related_all2():
-    profile = await Profile.query.create(is_enabled=False, name="edgy")
+    profile = await Profile.query.create(name="edgy")
     user = await User.query.create(
         profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
     )
