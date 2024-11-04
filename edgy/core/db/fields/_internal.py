@@ -1,46 +1,22 @@
 import ipaddress
-from abc import abstractmethod
 from typing import Any
 
 import sqlalchemy
 
 
-class BaseFieldProtocol(sqlalchemy.TypeDecorator):
-    """
-    When implementing a field representation from SQLAlchemy, the protocol will be enforced
-    """
-
-    impl: Any
-    cache_ok: bool
-
-    @abstractmethod
-    def load_dialect_impl(self, dialect: Any) -> Any:
-        raise NotImplementedError("load_dialect_impl must be implemented")
-
-    @abstractmethod
-    def process_bind_param(self, value: Any, dialect: Any) -> Any:
-        raise NotImplementedError("process_bind_param must be implemented")
-
-    @abstractmethod
-    def process_result_value(self, value: Any, dialect: Any) -> Any:
-        """
-        Processes the value coming from the database in a column-row style.
-        """
-        raise NotImplementedError("process_result_value must be implemented")
-
-
-class IPAddress(BaseFieldProtocol):
-    impl: str = sqlalchemy.CHAR  # type: ignore
+class IPAddress(sqlalchemy.TypeDecorator):
+    impl: Any = sqlalchemy.String
     cache_ok: bool = True
 
     def load_dialect_impl(self, dialect: Any) -> Any:
         if dialect.name not in {"postgres", "postgresql"}:
-            return dialect.type_descriptor(sqlalchemy.CHAR(45))
+            return dialect.type_descriptor(sqlalchemy.String(length=45))
         return dialect.type_descriptor(sqlalchemy.dialects.postgresql.INET())
 
     def process_bind_param(self, value: Any, dialect: Any) -> Any:
-        if value is not None:
-            return str(value)
+        if value is None:
+            return value
+        return str(value)
 
     def process_result_value(self, value: Any, dialect: Any) -> Any:
         if value is None:
