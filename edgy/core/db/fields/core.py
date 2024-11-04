@@ -765,7 +765,7 @@ class EmailField(CharField):
         kwargs.setdefault("max_length", 255)
         super().validate(kwargs)
 
-UrlString = Annotated[AnyUrl, pydantic.AfterValidator(lambda v: str(v))]
+UrlString = Annotated[AnyUrl, pydantic.AfterValidator(lambda v: v if v is None else str(v))]
 
 class URLField(CharField):
     field_type = UrlString  # type: ignore
