@@ -142,7 +142,7 @@ async def test_model_crud():
     assert isinstance(user.ipaddress, (ipaddress.IPv4Address, ipaddress.IPv6Address))
     assert user.password == "12345"
 
-    assert user.url == "https://edgy.com"
+    assert user.url == "https://edgy.com/"
     await product.update(data={"foo": 1234})
     assert product.updated_datetime != last_updated_datetime
     assert product.updated_date == last_updated_date
