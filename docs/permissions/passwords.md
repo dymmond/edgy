@@ -34,8 +34,9 @@ A common pattern is to check if the user is able to provide the password 2 times
 This can be automatized via providing a tuple of two string elements.
 If they match the check is assumed to be successful and the password processing is continued otherwise an exception is raised.
 
-Sometimes the password should be checked again before mangling. This can be done via the non-field `<fieldname>_original`.
-It is added by default when providing the `derive_fn` parameter but can be explicitly set via `keep_original`.
+Sometimes the password should be checked again before mangling. This can be done via the `<fieldname>_original` attribute.
+Despite it is a field it is excluded from serialization and has no column, so the password stays secure.
+This field is added by default when providing the `derive_fn` parameter but can be explicitly set via `keep_original`.
 There is one limitation: after a successful `load`, `insert` or `update`, this includes a successful save, the pseudo-field is blanked with
 None. This means a different flow has to be used:
 
