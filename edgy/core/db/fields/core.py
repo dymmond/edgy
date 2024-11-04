@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import pydantic
 import sqlalchemy
-from pydantic.networks import AnyUrl, EmailStr, IPvAnyAddress
+from pydantic.networks import EmailStr, IPvAnyAddress
 from sqlalchemy.dialects import oracle
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE, EXPLICIT_SPECIFIED_VALUES
@@ -767,20 +767,10 @@ class EmailField(CharField):
 
 
 class URLField(CharField):
-    field_type = AnyUrl  # type: ignore
-
-    @classmethod
-    def check(cls, field_obj: BaseFieldType, value: Any, original_fn: Any = None) -> Any:
-        """
-        Runs the checks for the fields being validated. Single Column.
-        """
-        return str(value)
-
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
         kwargs.setdefault("max_length", 255)
         super().validate(kwargs)
-
 
 class IPAddressField(FieldFactory, str):
     field_type = IPvAnyAddress
