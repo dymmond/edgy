@@ -74,8 +74,13 @@ $ hatch run  pre-commit install
 To run the tests, use:
 
 ```shell
+$ ulimit -n 10000
 $ hatch test
 ```
+
+Note: currently we need to increase the file descriptor limit otherwise later tests cannot execute anymore because of missing file descriptors.
+Exact reasons unknown but we may recreate the engine too often and the filedecriptors close too slow.
+This only affects user systems with low file descriptor limits.
 
 To run a single test_script:
 
@@ -90,6 +95,7 @@ To run the linting, use:
 ```shell
 $ hatch fmt
 ```
+
 
 #### Tests especially wanted
 
