@@ -13,7 +13,7 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 pytestmark = pytest.mark.anyio
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     first_name: str = edgy.CharField(max_length=255)
     last_name: str = edgy.CharField(max_length=255, secret=True)
     email: str = edgy.EmailField(max_length=255)
@@ -22,7 +22,7 @@ class User(edgy.Model):
         registry = models
 
 
-class Gratitude(edgy.Model):
+class Gratitude(edgy.StrictModel):
     owner: User = edgy.ForeignKey(User, related_name="gratitude")
     title: str = edgy.CharField(max_length=100)
     description: str = edgy.TextField()

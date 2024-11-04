@@ -10,7 +10,7 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 pytestmark = pytest.mark.anyio
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     name: str = edgy.CharField(max_length=100, null=True)
     language: str = edgy.CharField(max_length=200, null=True)
@@ -19,7 +19,7 @@ class User(edgy.Model):
         registry = models
 
 
-class Profile(edgy.Model):
+class Profile(edgy.StrictModel):
     user: User = edgy.ForeignKey(User)
 
     class Meta:

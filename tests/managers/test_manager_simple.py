@@ -21,7 +21,7 @@ class UserManager(Manager):
         return queryset
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     password: str = edgy.CharField(max_length=128)
     username: str = edgy.CharField(max_length=150, unique=True)
     email: str = edgy.EmailField(max_length=120, unique=True)

@@ -10,7 +10,7 @@ database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 
-class Älbum(edgy.Model):
+class Älbum(edgy.StrictModel):
     äd = edgy.IntegerField(primary_key=True, autoincrement=True, column_name="id")
     name = edgy.CharField(max_length=100)
 
@@ -19,7 +19,7 @@ class Älbum(edgy.Model):
         tablename = "albums"
 
 
-class Track(edgy.Model):
+class Track(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     album = edgy.ForeignKey("Älbum", on_delete=edgy.CASCADE, null=True, column_name="album")
     title = edgy.CharField(max_length=100)

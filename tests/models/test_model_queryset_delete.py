@@ -10,7 +10,7 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 pytestmark = pytest.mark.anyio
 
 
-class Product(edgy.Model):
+class Product(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
     rating = edgy.IntegerField(minimum=1, maximum=5)

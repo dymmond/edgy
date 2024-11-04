@@ -11,7 +11,7 @@ models = Registry(database=database)
 pytestmark = pytest.mark.anyio
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     non_default_id = edgy.BigIntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100, primary_key=True)
     language = edgy.CharField(max_length=200, null=True)

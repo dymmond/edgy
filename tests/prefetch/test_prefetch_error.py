@@ -12,14 +12,14 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
 
     class Meta:
         registry = models
 
 
-class Post(edgy.Model):
+class Post(edgy.StrictModel):
     user = edgy.ForeignKey(User, related_name="posts")
     comment = edgy.CharField(max_length=255)
 
@@ -27,7 +27,7 @@ class Post(edgy.Model):
         registry = models
 
 
-class Article(edgy.Model):
+class Article(edgy.StrictModel):
     user = edgy.ForeignKey(User, related_name="articles")
     content = edgy.CharField(max_length=255)
 

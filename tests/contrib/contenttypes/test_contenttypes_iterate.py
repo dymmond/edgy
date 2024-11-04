@@ -13,7 +13,7 @@ database = DatabaseTestClient(DATABASE_URL, force_rollback=False, full_isolation
 models = edgy.Registry(database=database, with_content_type=True)
 
 
-class ContentTypeTag(edgy.Model):
+class ContentTypeTag(edgy.StrictModel):
     ctype = edgy.fields.ForeignKey(to="ContentType", related_name="tags")
     tag = edgy.fields.CharField(max_length=50)
 
@@ -23,21 +23,21 @@ class ContentTypeTag(edgy.Model):
         registry = models
 
 
-class Organisation(edgy.Model):
+class Organisation(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100, unique=True)
 
     class Meta:
         registry = models
 
 
-class Company(edgy.Model):
+class Company(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100, unique=True)
 
     class Meta:
         registry = models
 
 
-class Person(edgy.Model):
+class Person(edgy.StrictModel):
     first_name = edgy.fields.CharField(max_length=100)
     last_name = edgy.fields.CharField(max_length=100)
     # to defaults to ContentType

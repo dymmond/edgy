@@ -13,7 +13,7 @@ models = edgy.Registry(database)
 pytestmark = pytest.mark.anyio
 
 
-class Base(edgy.Model):
+class Base(edgy.StrictModel):
     class Meta:
         abstract = True
         registry = models

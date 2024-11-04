@@ -15,7 +15,7 @@ pytestmark = pytest.mark.anyio
 pydantic_version = __version__[:3]
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     name: str = edgy.CharField(max_length=100)
     email: str = edgy.EmailField(max_length=100)

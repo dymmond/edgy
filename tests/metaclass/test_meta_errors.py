@@ -14,7 +14,7 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
 
@@ -31,7 +31,7 @@ class ObjectsManager(Manager):
 async def test_improperly_configured_for_primary_key():
     with pytest.raises(ImproperlyConfigured) as raised:
 
-        class BaseModel(edgy.Model):
+        class BaseModel(edgy.StrictModel):
             id = edgy.IntegerField(primary_key=False)
             query: ClassVar[Manager] = ObjectsManager()
             languages: ClassVar[Manager] = ObjectsManager()
@@ -49,7 +49,7 @@ async def test_improperly_configured_for_primary_key():
 async def test_improperly_configured_for_unique_together(_type, value):
     with pytest.raises(ImproperlyConfigured) as raised:
 
-        class BaseModel(edgy.Model):
+        class BaseModel(edgy.StrictModel):
             name = edgy.IntegerField()
             query: ClassVar[Manager] = ObjectsManager()
             languages: ClassVar[Manager] = ObjectsManager()
@@ -76,7 +76,7 @@ async def test_improperly_configured_for_unique_together(_type, value):
 async def test_value_error_for_unique_together(value):
     with pytest.raises(ValueError) as raised:
 
-        class BaseModel(edgy.Model):
+        class BaseModel(edgy.StrictModel):
             name = edgy.IntegerField()
             query: ClassVar[Manager] = ObjectsManager()
             languages: ClassVar[Manager] = ObjectsManager()
@@ -94,7 +94,7 @@ async def test_value_error_for_unique_together(value):
 def test_raises_value_error_on_wrong_type():
     with pytest.raises(ValueError) as raised:
 
-        class User(edgy.Model):
+        class User(edgy.StrictModel):
             name = edgy.CharField(max_length=255)
 
             class Meta:
@@ -109,13 +109,13 @@ def test_raises_ForeignKeyBadConfigured():
 
     with pytest.raises(ForeignKeyBadConfigured) as raised:
 
-        class User(edgy.Model):
+        class User(edgy.StrictModel):
             name = edgy.CharField(max_length=255)
 
             class Meta:
                 registry = models
 
-        class Profile(edgy.Model):
+        class Profile(edgy.StrictModel):
             user = edgy.ForeignKey(User, null=False, on_delete=edgy.CASCADE, related_name=name)
             another_user = edgy.ForeignKey(
                 User, null=False, on_delete=edgy.CASCADE, related_name=name

@@ -15,7 +15,7 @@ models = edgy.Registry(database=database)
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 
-class AppUser(edgy.Model):
+class AppUser(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
 
     class Meta:

@@ -11,7 +11,7 @@ database = edgy.Database(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name = edgy.CharField(max_length=255, index=True)
     title = edgy.CharField(max_length=255, null=True)
 
@@ -20,7 +20,7 @@ class User(edgy.Model):
         indexes = [Index(fields=["name", "title"], name="idx_name_title")]
 
 
-class HubUser(edgy.Model):
+class HubUser(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
     title = edgy.CharField(max_length=255, null=True)
     description = edgy.CharField(max_length=255, null=True)
@@ -33,7 +33,7 @@ class HubUser(edgy.Model):
         ]
 
 
-class Transaction(edgy.Model):
+class Transaction(edgy.StrictModel):
     amount = edgy.DecimalField(max_digits=9, decimal_places=2)
     total = edgy.FloatField()
 

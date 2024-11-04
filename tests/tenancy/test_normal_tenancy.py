@@ -12,7 +12,7 @@ database = edgy.Database(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 
-class Item(edgy.Model):
+class Item(edgy.StrictModel):
     sku: edgy.CharField = edgy.UUIDField(default=uuid4)
     name: edgy.CharField = edgy.CharField(max_length=255)
 

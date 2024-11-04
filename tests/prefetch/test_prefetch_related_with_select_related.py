@@ -11,7 +11,7 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
-class Album(edgy.Model):
+class Album(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
 
@@ -19,7 +19,7 @@ class Album(edgy.Model):
         registry = models
 
 
-class Track(edgy.Model):
+class Track(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE)
     title = edgy.CharField(max_length=100)

@@ -85,7 +85,7 @@ class MultiColumnField(FieldFactory):
         return sqlalchemy.Text(collation=kwargs.get("collation"))
 
 
-class MyModel(edgy.Model):
+class MyModel(edgy.StrictModel):
     multi = MultiColumnField()
 
     class Meta:

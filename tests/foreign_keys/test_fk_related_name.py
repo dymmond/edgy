@@ -10,7 +10,7 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database))
 
 
-class Album(edgy.Model):
+class Album(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
 
@@ -18,7 +18,7 @@ class Album(edgy.Model):
         registry = models
 
 
-class Track(edgy.Model):
+class Track(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE, related_name="tracks")
     title = edgy.CharField(max_length=100)
@@ -28,7 +28,7 @@ class Track(edgy.Model):
         registry = models
 
 
-class Organisation(edgy.Model):
+class Organisation(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     ident = edgy.CharField(max_length=100)
 
@@ -36,7 +36,7 @@ class Organisation(edgy.Model):
         registry = models
 
 
-class Team(edgy.Model):
+class Team(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT)
     name = edgy.CharField(max_length=100)
@@ -45,7 +45,7 @@ class Team(edgy.Model):
         registry = models
 
 
-class Member(edgy.Model):
+class Member(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     team = edgy.ForeignKey(Team, on_delete=edgy.SET_NULL, null=True, related_name="members")
     second_team = edgy.ForeignKey(
@@ -58,7 +58,7 @@ class Member(edgy.Model):
         registry = models
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=255, null=True)
     member = edgy.ForeignKey(Member, on_delete=edgy.SET_NULL, null=True, related_name="users")
@@ -67,7 +67,7 @@ class User(edgy.Model):
         registry = models
 
 
-class Profile(edgy.Model):
+class Profile(edgy.StrictModel):
     user = edgy.ForeignKey(User, on_delete=edgy.CASCADE, null=False, related_name="profiles")
     profile_type = edgy.CharField(max_length=255, null=False)
 

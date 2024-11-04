@@ -12,7 +12,7 @@ models = edgy.Registry(database=database)
 # test lazyness by referencing not yet existing models
 
 
-class Album(edgy.Model):
+class Album(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.fields.CharField(max_length=100)
     tracks = edgy.ManyToMany("Track", related_name=False)
@@ -21,7 +21,7 @@ class Album(edgy.Model):
         registry = models
 
 
-class Track(edgy.Model):
+class Track(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()

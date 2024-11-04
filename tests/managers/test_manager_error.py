@@ -22,7 +22,7 @@ class UserManager(Manager):
 async def test_raise_improperly_configured_on_missing_annotation():
     with pytest.raises(ImproperlyConfigured) as raised:
 
-        class User(edgy.Model):
+        class User(edgy.StrictModel):
             username: str = edgy.CharField(max_length=150)
             is_admin: bool = edgy.BooleanField(default=True)
 
@@ -40,7 +40,7 @@ async def test_raise_improperly_configured_on_missing_annotation():
 async def test_raise_improperly_configured_on_wrong_annotation():
     with pytest.raises(ImproperlyConfigured) as raised:
 
-        class User(edgy.Model):
+        class User(edgy.StrictModel):
             username: str = edgy.CharField(max_length=150)
             is_admin: bool = edgy.BooleanField(default=True)
 

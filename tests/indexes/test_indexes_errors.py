@@ -23,7 +23,7 @@ def get_random_string(length):
 def test_raises_value_error_on_wrong_max_length():
     with pytest.raises(ValueError):
 
-        class User(edgy.Model):
+        class User(edgy.StrictModel):
             name = edgy.CharField(max_length=255)
             title = edgy.CharField(max_length=255)
 
@@ -35,7 +35,7 @@ def test_raises_value_error_on_wrong_max_length():
 def test_raises_value_error_on_wrong_type_passed_fields():
     with pytest.raises(ValueError):
 
-        class User(edgy.Model):
+        class User(edgy.StrictModel):
             name = edgy.CharField(max_length=255)
             title = edgy.CharField(max_length=255)
 

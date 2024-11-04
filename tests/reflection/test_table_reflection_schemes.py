@@ -52,7 +52,7 @@ async def create_test_database():
             await models.drop_all()
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     __using_schema__ = "test"
     name = edgy.CharField(max_length=255, index=True)
     title = edgy.CharField(max_length=255, null=True)
@@ -62,7 +62,7 @@ class User(edgy.Model):
         indexes = [Index(fields=["name", "title"], name="idx_name_title")]
 
 
-class HubUser(edgy.Model):
+class HubUser(edgy.StrictModel):
     __using_schema__ = "test"
     name = edgy.CharField(max_length=255)
     title = edgy.CharField(max_length=255, null=True)

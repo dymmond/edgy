@@ -71,6 +71,18 @@ $ hatch run  pre-commit install
 
 ### Run the tests
 
+First you have to prepare the setup via:
+
+``` shell
+# only once required until stopped or db leftovers clogging up
+$ docker compose up -d
+# required for every terminal session the tests are executed in, except for setups with higher file descriptor limits
+$ ulimit -n 10000
+```
+Note: currently we need to increase the file descriptor limit otherwise later tests cannot execute anymore because of missing file descriptors.
+Exact reasons are unknown but we may recreate the engine too often and the filedecriptors close too slow.
+This only affects user systems with low file descriptor limits.
+
 To run the tests, use:
 
 ```shell
@@ -90,6 +102,7 @@ To run the linting, use:
 ```shell
 $ hatch fmt
 ```
+
 
 #### Tests especially wanted
 

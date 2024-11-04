@@ -11,14 +11,14 @@ database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
 
     class Meta:
         registry = models
 
 
-class Track(edgy.Model):
+class Track(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()
@@ -27,7 +27,7 @@ class Track(edgy.Model):
         registry = models
 
 
-class Album(edgy.Model):
+class Album(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
     tracks = edgy.ManyToMany(Track, embed_through="embedded")
@@ -36,7 +36,7 @@ class Album(edgy.Model):
         registry = models
 
 
-class Studio(edgy.Model):
+class Studio(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
     users = edgy.ManyToMany(User)
     albums = edgy.ManyToMany(Album)
@@ -316,10 +316,10 @@ async def test_related_name_query_returns_nothing():
 def test_assertation_error_on_embed_through_double_underscore_attr():
     with pytest.raises(FieldDefinitionError) as raised:
 
-        class MyModel(edgy.Model):
+        class MyModel(edgy.StrictModel):
             is_active = edgy.BooleanField(default=True)
 
-        class MyOtherModel(edgy.Model):
+        class MyOtherModel(edgy.StrictModel):
             model = edgy.ManyToMany(MyModel, embed_through="foo__attr")
 
     assert raised.value.args[0] == '"embed_through" cannot contain "__".'

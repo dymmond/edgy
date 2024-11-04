@@ -46,7 +46,7 @@ class PostRef(edgy.ModelRef):
         return comment
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name: str = edgy.CharField(max_length=100)
     email: str = edgy.EmailField(max_length=100)
     language: str = edgy.CharField(max_length=200, null=True)
@@ -57,7 +57,7 @@ class User(edgy.Model):
         registry = models
 
 
-class Post(edgy.Model):
+class Post(edgy.StrictModel):
     user = edgy.ForeignKey("User")
     comment = edgy.CharField(max_length=255)
 

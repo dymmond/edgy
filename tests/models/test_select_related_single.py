@@ -15,7 +15,7 @@ pytestmark = pytest.mark.anyio
 pydantic_version = __version__[:3]
 
 
-class EdgyTenantBaseModel(edgy.Model):
+class EdgyTenantBaseModel(edgy.StrictModel):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
 
     class Meta:

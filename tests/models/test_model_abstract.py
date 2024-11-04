@@ -12,7 +12,7 @@ nother = Registry(database=database)
 pytestmark = pytest.mark.anyio
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
     language = edgy.CharField(max_length=200, null=True)
 

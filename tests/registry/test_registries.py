@@ -29,7 +29,7 @@ async def rollback_transactions():
         yield
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name: str = edgy.CharField(max_length=255, null=True)
 
     class Meta:
@@ -37,7 +37,7 @@ class User(edgy.Model):
         tablename = "users"
 
 
-class User2(edgy.Model):
+class User2(edgy.StrictModel):
     name: str = edgy.CharField(max_length=255, null=True)
     database = another_db
 

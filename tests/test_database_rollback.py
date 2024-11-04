@@ -12,7 +12,7 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 # Reference how to use database in tests with rollback
 
 
-class MyModel(edgy.Model):
+class MyModel(edgy.StrictModel):
     pass
 
     class Meta:

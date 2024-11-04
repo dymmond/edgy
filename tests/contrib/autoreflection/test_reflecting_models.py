@@ -10,7 +10,7 @@ database = DatabaseTestClient(DATABASE_URL, use_existing=False)
 source = edgy.Registry(database=database)
 
 
-class Foo(edgy.Model):
+class Foo(edgy.StrictModel):
     a = edgy.CharField(max_length=40)
     b = edgy.CharField(max_length=40, column_name="c", server_default="")
 
@@ -18,14 +18,14 @@ class Foo(edgy.Model):
         registry = source
 
 
-class Bar(edgy.Model):
+class Bar(edgy.StrictModel):
     a = edgy.CharField(max_length=40)
 
     class Meta:
         registry = source
 
 
-class NotFoo(edgy.Model):
+class NotFoo(edgy.StrictModel):
     a = edgy.CharField(max_length=40)
 
     class Meta:

@@ -11,14 +11,14 @@ database = DatabaseTestClient(DATABASE_URL, use_existing=False)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100)
 
     class Meta:
         registry = models
 
 
-class Group(edgy.Model):
+class Group(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100)
     users = edgy.fields.ManyToMany("User", embed_through=False)
 

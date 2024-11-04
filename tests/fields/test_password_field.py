@@ -34,7 +34,7 @@ class SampleHasher:
 hasher = SampleHasher()
 
 
-class MyModel(edgy.Model):
+class MyModel(edgy.StrictModel):
     pw = edgy.PasswordField(null=False, derive_fn=hasher.derive)
     token = edgy.PasswordField(null=False, default=secrets.token_hex)
 

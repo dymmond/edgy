@@ -21,7 +21,7 @@ class TrackModelRef(ModelRef):
     position: int
 
 
-class Album(edgy.Model):
+class Album(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
     tracks = edgy.RefForeignKey(TrackModelRef, null=True)
@@ -30,7 +30,7 @@ class Album(edgy.Model):
         registry = models
 
 
-class Track(edgy.Model):
+class Track(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE)
     title = edgy.CharField(max_length=100)
@@ -45,7 +45,7 @@ class PostRef(ModelRef):
     comment: str
 
 
-class Post(edgy.Model):
+class Post(edgy.StrictModel):
     user = edgy.ForeignKey("User")
     comment = edgy.CharField(max_length=255)
 
@@ -53,7 +53,7 @@ class Post(edgy.Model):
         registry = models
 
 
-class User(edgy.Model):
+class User(edgy.StrictModel):
     name = edgy.CharField(max_length=100, null=True)
     posts = edgy.RefForeignKey(PostRef)
 
@@ -249,7 +249,7 @@ async def test_on_delete_cascade():
 async def test_raises_model_reference_error(to):
     with pytest.raises(ModelReferenceError):
 
-        class User(edgy.Model):
+        class User(edgy.StrictModel):
             name = edgy.CharField(max_length=100)
             users = edgy.RefForeignKey(to, null=True)
 
@@ -278,7 +278,7 @@ async def test_raises_model_reference_error_on_missing__related_name__():
         class PostRef(ModelRef):
             comment: str
 
-        class User(edgy.Model):
+        class User(edgy.StrictModel):
             name = edgy.CharField(max_length=100)
             users = edgy.RefForeignKey(PostRef, null=True)
 
