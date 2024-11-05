@@ -128,12 +128,20 @@ class FieldFactory(metaclass=FieldFactoryMeta):
 
     @classmethod
     def get_constraints(cls, kwargs: dict[str, Any]) -> Sequence[Any]:
-        """Returns the propery column type for the field, None for Metafields"""
+        """
+        Return the constraints for a column.
+
+        It is passed down as field argument/attribute: `contraints`.
+        """
         return []
 
     @classmethod
     def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
-        """Returns the propery column type for the field, None for Metafields"""
+        """
+        Returns column type for the field, None for Metafields..
+
+        It is passed down as field argument/attribute: `contraints`.
+        """
         return None
 
     @classmethod
