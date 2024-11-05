@@ -567,6 +567,8 @@ class DatabaseMixin:
                     cls.meta.field_to_column_names[field] for field in fields.fields
                 ),
                 name=fields.name,
+                deferrable=fields.deferrable,
+                initially=fields.initially,
             )
         return sqlalchemy.UniqueConstraint(
             *chain.from_iterable(cls.meta.field_to_column_names[field] for field in fields)
@@ -579,7 +581,12 @@ class DatabaseMixin:
         """
         return sqlalchemy.Index(
             index.name,
-            *chain.from_iterable(cls.meta.field_to_column_names[field] for field in index.fields),
+            *chain.from_iterable(
+                [field]
+                if isinstance(field, sqlalchemy.TextClause)
+                else cls.meta.field_to_column_names[field]
+                for field in index.fields
+            ),
         )
 
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":

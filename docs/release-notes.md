@@ -12,6 +12,8 @@ hide:
 ### Added
 
 - Global constraints via meta.
+- Allow functional indexes.
+- Expose further parameters for UniqueConstraints.
 
 ### Changes
 

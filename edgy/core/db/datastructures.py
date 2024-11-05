@@ -1,15 +1,10 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Sequence
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    ClassVar,
-    Optional,
-)
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Optional, Union
 
-from pydantic import model_validator
+import sqlalchemy
+from pydantic import ConfigDict, model_validator
 from pydantic.dataclasses import dataclass
 
 if TYPE_CHECKING:
@@ -18,7 +13,7 @@ if TYPE_CHECKING:
 _empty_tuple: tuple[Any, ...] = ()
 
 
-@dataclass
+@dataclass(config=ConfigDict(arbitrary_types_allowed=True))
 class Index:
     """
     Class responsible for handling and declaring the database indexes.
@@ -27,7 +22,7 @@ class Index:
     suffix: str = "idx"
     __max_name_length__: ClassVar[int] = 63
     name: Optional[str] = None
-    fields: Optional[Sequence[str]] = None
+    fields: Optional[Sequence[Union[str, sqlalchemy.TextClause]]] = None
 
     @model_validator(mode="before")
     def validate_data(cls, values: Any) -> Any:
@@ -42,8 +37,10 @@ class Index:
         if not isinstance(fields, (tuple, list)):
             raise ValueError("Index.fields must be a list or a tuple.")
 
-        if fields and not all(isinstance(field, str) for field in fields):
-            raise ValueError("Index.fields must contain only strings with field names.")
+        if fields and not all(isinstance(field, (str, sqlalchemy.TextClause)) for field in fields):
+            raise ValueError(
+                "Index.fields must contain only strings with field names or text() clauses."
+            )
 
         if name is None:
             suffix = values.kwargs.get("suffix", cls.suffix)
@@ -59,6 +56,8 @@ class UniqueConstraint:
 
     fields: list[str]
     name: Optional[str] = None
+    deferrable: Optional[bool] = None
+    initially: Optional[str] = None
     __max_name_length__: ClassVar[int] = 63
 
     @model_validator(mode="before")
