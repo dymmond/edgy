@@ -9,16 +9,15 @@ from enum import EnumMeta
 from functools import cached_property, partial
 from re import Pattern
 from secrets import compare_digest
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Annotated, Any, Optional, Union, cast
 
 import pydantic
 import sqlalchemy
-from pydantic import EmailStr
+from pydantic.networks import AnyUrl, EmailStr, IPvAnyAddress
 from sqlalchemy.dialects import oracle
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE, EXPLICIT_SPECIFIED_VALUES
 from edgy.core.db.fields._internal import IPAddress
-from edgy.core.db.fields._validators import IPV4_REGEX, IPV6_REGEX
 from edgy.core.db.fields.base import BaseField, Field
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.core.db.fields.types import BaseFieldType
@@ -766,8 +765,11 @@ class EmailField(CharField):
         kwargs.setdefault("max_length", 255)
         super().validate(kwargs)
 
+UrlString = Annotated[AnyUrl, pydantic.AfterValidator(lambda v: v if v is None else str(v))]
 
 class URLField(CharField):
+    field_type = UrlString  # type: ignore
+
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
         kwargs.setdefault("max_length", 255)
@@ -775,7 +777,7 @@ class URLField(CharField):
 
 
 class IPAddressField(FieldFactory, str):
-    field_type = Union[ipaddress.IPv4Address, ipaddress.IPv6Address]
+    field_type = IPvAnyAddress
 
     def __new__(  # type: ignore
         cls,
@@ -801,12 +803,6 @@ class IPAddressField(FieldFactory, str):
     def check(cls, field_obj: BaseFieldType, value: Any, original_fn: Any = None) -> Any:
         if cls.is_native_type(value):
             return value
-
-        match_ipv4 = IPV4_REGEX.match(value)
-        match_ipv6 = IPV6_REGEX.match(value)
-
-        if not match_ipv4 and not match_ipv6:  # type: ignore
-            raise ValueError("Must be a valid IP format.")
 
         try:
             return ipaddress.ip_address(value)
