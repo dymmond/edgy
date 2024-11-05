@@ -43,21 +43,21 @@ class UserRef(ModelRef):
 
 
 def test_column_type():
-    assert isinstance(CharField.get_column_type(), sqlalchemy.String)
-    assert isinstance(TextField.get_column_type(), sqlalchemy.String)
-    assert isinstance(FloatField.get_column_type(), sqlalchemy.Float)
-    assert isinstance(BooleanField.get_column_type(), sqlalchemy.Boolean)
-    assert isinstance(DateTimeField.get_column_type(), sqlalchemy.DateTime)
-    assert isinstance(DateField.get_column_type(), sqlalchemy.Date)
-    assert isinstance(TimeField.get_column_type(), sqlalchemy.Time)
-    assert isinstance(JSONField.get_column_type(), sqlalchemy.JSON)
-    assert isinstance(BinaryField.get_column_type(), sqlalchemy.LargeBinary)
-    assert isinstance(IntegerField.get_column_type(), sqlalchemy.Integer)
-    assert isinstance(BigIntegerField.get_column_type(), sqlalchemy.BigInteger)
-    assert isinstance(SmallIntegerField.get_column_type(), sqlalchemy.SmallInteger)
-    assert isinstance(DecimalField.get_column_type(), sqlalchemy.Numeric)
-    assert isinstance(UUIDField.get_column_type(), sqlalchemy.Uuid)
-    assert isinstance(ChoiceField.get_column_type(choices=Choices), sqlalchemy.Enum)
+    assert isinstance(CharField.get_column_type({}), sqlalchemy.String)
+    assert isinstance(TextField.get_column_type({}), sqlalchemy.String)
+    assert isinstance(FloatField.get_column_type({}), sqlalchemy.Float)
+    assert isinstance(BooleanField.get_column_type({}), sqlalchemy.Boolean)
+    assert isinstance(DateTimeField.get_column_type({}), sqlalchemy.DateTime)
+    assert isinstance(DateField.get_column_type({}), sqlalchemy.Date)
+    assert isinstance(TimeField.get_column_type({}), sqlalchemy.Time)
+    assert isinstance(JSONField.get_column_type({}), sqlalchemy.JSON)
+    assert isinstance(BinaryField.get_column_type({}), sqlalchemy.LargeBinary)
+    assert isinstance(IntegerField.get_column_type({}), sqlalchemy.Integer)
+    assert isinstance(BigIntegerField.get_column_type({}), sqlalchemy.BigInteger)
+    assert isinstance(SmallIntegerField.get_column_type({}), sqlalchemy.SmallInteger)
+    assert isinstance(DecimalField.get_column_type({}), sqlalchemy.Numeric)
+    assert isinstance(UUIDField.get_column_type({}), sqlalchemy.Uuid)
+    assert isinstance(ChoiceField.get_column_type({"choices": Choices}), sqlalchemy.Enum)
 
 
 @pytest.mark.parametrize(

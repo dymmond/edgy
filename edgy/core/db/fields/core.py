@@ -132,9 +132,9 @@ class PlaceholderField(FieldFactory):
         return {}
 
     @classmethod
-    def get_pydantic_type(cls, **kwargs: Any) -> Any:
+    def get_pydantic_type(cls, kwargs: dict[str, Any]) -> Any:
         """Returns the type for pydantic"""
-        return kwargs["pydantic_field_type"]
+        return kwargs.pop("pydantic_field_type")
 
 
 class CharField(FieldFactory, str):
@@ -174,7 +174,8 @@ class CharField(FieldFactory, str):
         assert pattern is None or isinstance(pattern, (str, Pattern))
 
     @classmethod
-    def get_column_type(cls, max_length: Optional[int] = None, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
+        max_length: Optional[int] = kwargs.get("max_length")
         return (
             sqlalchemy.Text(collation=kwargs.get("collation"))
             if max_length is None
@@ -277,7 +278,7 @@ class IntegerField(FieldFactory, int):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.Integer()
 
     @classmethod
@@ -336,7 +337,8 @@ class FloatField(FieldFactory, float):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, precision: Optional[int] = None, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
+        precision: Optional[int] = kwargs.get("precision")
         if precision is None:
             return sqlalchemy.Float(asdecimal=False)
         return sqlalchemy.Float(precision=precision, asdecimal=False).with_variant(
@@ -355,7 +357,7 @@ class BigIntegerField(IntegerField):
             kwargs.setdefault("skip_reflection_type_check", True)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         # sqlite special we cannot have a big IntegerField as PK
         if kwargs.get("autoincrement"):
             return sqlalchemy.BigInteger().with_variant(sqlalchemy.Integer, "sqlite")
@@ -366,7 +368,7 @@ class SmallIntegerField(IntegerField):
     """Represents a small integer field"""
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.SmallInteger()
 
 
@@ -392,7 +394,7 @@ class DecimalField(FieldFactory, decimal.Decimal):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.Numeric(
             precision=kwargs.get("max_digits"), scale=kwargs.get("decimal_places"), asdecimal=True
         )
@@ -424,7 +426,7 @@ class BooleanField(FieldFactory, int):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.Boolean()
 
 
@@ -536,7 +538,8 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, with_timezone: bool = True, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
+        with_timezone: bool = kwargs.get("with_timezone", True)
         return sqlalchemy.DateTime(with_timezone)
 
     @classmethod
@@ -578,7 +581,7 @@ class DateField(AutoNowMixin, datetime.date):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.Date()
 
 
@@ -588,7 +591,7 @@ class DurationField(FieldFactory, datetime.timedelta):
     field_type = datetime.timedelta
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.Interval()
 
 
@@ -605,7 +608,7 @@ class TimeField(FieldFactory, datetime.time):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.Time(kwargs.get("with_timezone") or False)
 
 
@@ -615,7 +618,7 @@ class JSONField(FieldFactory, pydantic.Json):  # type: ignore
     field_type = Any
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.JSON()
 
 
@@ -632,7 +635,7 @@ class BinaryField(FieldFactory, bytes):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.LargeBinary(length=kwargs.get("max_length"))
 
 
@@ -650,7 +653,7 @@ class UUIDField(FieldFactory, uuid.UUID):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.Uuid(as_uuid=True, native_uuid=True)
 
 
@@ -677,7 +680,7 @@ class ChoiceField(FieldFactory):
             raise FieldDefinitionError("ChoiceField choices must be an Enum")
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> sqlalchemy.Enum:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> sqlalchemy.Enum:
         choice_class = kwargs.get("choices")
         return sqlalchemy.Enum(choice_class)
 
@@ -765,7 +768,9 @@ class EmailField(CharField):
         kwargs.setdefault("max_length", 255)
         super().validate(kwargs)
 
+
 UrlString = Annotated[AnyUrl, pydantic.AfterValidator(lambda v: v if v is None else str(v))]
+
 
 class URLField(CharField):
     field_type = UrlString  # type: ignore
@@ -791,7 +796,7 @@ class IPAddressField(FieldFactory, str):
         return super().__new__(cls, **kwargs)
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> IPAddress:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> IPAddress:
         return IPAddress()
 
     @staticmethod

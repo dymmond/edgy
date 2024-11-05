@@ -36,7 +36,6 @@ class Computer(edgy.StrictModel):
         registry = models
 
 
-
 async def test_ip_field_full_str():
     computer = Computer(url="http://foo.example.com")
 

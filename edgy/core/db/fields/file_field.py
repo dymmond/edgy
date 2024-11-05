@@ -284,9 +284,12 @@ class FileField(FieldFactory):
                 ) from None
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
-        return sqlalchemy.String(
-            length=kwargs.get("max_length", 255), collation=kwargs.get("collation")
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
+        max_length: Optional[int] = kwargs.get("max_length", 255)
+        return (
+            sqlalchemy.Text(collation=kwargs.get("collation"))
+            if max_length is None
+            else sqlalchemy.String(length=max_length, collation=kwargs.get("collation"))
         )
 
     @classmethod

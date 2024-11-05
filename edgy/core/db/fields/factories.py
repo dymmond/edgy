@@ -67,9 +67,9 @@ class FieldFactory(metaclass=FieldFactoryMeta):
 
     @classmethod
     def build_field(cls, **kwargs: Any) -> BaseFieldType:
-        column_type = cls.get_column_type(**kwargs)
-        pydantic_type = cls.get_pydantic_type(**kwargs)
-        constraints = cls.get_constraints(**kwargs)
+        column_type = cls.get_column_type(kwargs)
+        pydantic_type = cls.get_pydantic_type(kwargs)
+        constraints = cls.get_constraints(kwargs)
 
         new_field = cls._get_field_cls(cls)
 
@@ -127,17 +127,17 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         """
 
     @classmethod
-    def get_constraints(cls, **kwargs: Any) -> Sequence[Any]:
+    def get_constraints(cls, kwargs: dict[str, Any]) -> Sequence[Any]:
         """Returns the propery column type for the field, None for Metafields"""
         return []
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         """Returns the propery column type for the field, None for Metafields"""
         return None
 
     @classmethod
-    def get_pydantic_type(cls, **kwargs: Any) -> Any:
+    def get_pydantic_type(cls, kwargs: dict[str, Any]) -> Any:
         """Returns the type for pydantic"""
         return cls.field_type
 

@@ -81,7 +81,7 @@ class MultiColumnField(FieldFactory):
     field_type = Any
 
     @classmethod
-    def get_column_type(cls, **kwargs: Any) -> Any:
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.Text(collation=kwargs.get("collation"))
 
 

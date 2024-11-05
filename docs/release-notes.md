@@ -6,6 +6,14 @@ hide:
 
 # Release Notes
 
+
+## 0.22.0
+
+### Changes
+
+- Breaking: Factories pass now the kwargs as dict to get_pydantic_type, get_column_type, get_constraints.
+  This allows now modifying the arguments passed down to the field.
+
 ## 0.21.2
 
 ### Added
