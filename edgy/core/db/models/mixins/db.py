@@ -1,8 +1,10 @@
 import contextlib
+import copy
 import inspect
 import warnings
 from collections.abc import Sequence
 from functools import partial
+from itertools import chain
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 
 import sqlalchemy
@@ -514,7 +516,9 @@ class DatabaseMixin:
         index_constraints = cls.meta.indexes
 
         columns: list[sqlalchemy.Column] = []
-        global_constraints: list[Any] = []
+        global_constraints: list[sqlalchemy.Constraint] = [
+            copy.copy(constraint) for constraint in cls.meta.constraints
+        ]
         for name, field in cls.meta.fields.items():
             current_columns = field.get_columns(name)
             columns.extend(current_columns)
@@ -522,13 +526,13 @@ class DatabaseMixin:
 
         # Handle the uniqueness together
         uniques = []
-        for unique_index in unique_together or []:
+        for unique_index in unique_together:
             unique_constraint = cls._get_unique_constraints(unique_index)
             uniques.append(unique_constraint)
 
         # Handle the indexes
         indexes = []
-        for index_c in index_constraints or []:
+        for index_c in index_constraints:
             index = cls._get_indexes(index_c)
             indexes.append(index)
         return sqlalchemy.Table(
@@ -546,7 +550,7 @@ class DatabaseMixin:
 
     @classmethod
     def _get_unique_constraints(
-        cls, columns: Union[Sequence, str, sqlalchemy.UniqueConstraint]
+        cls, fields: Union[Sequence, str, sqlalchemy.UniqueConstraint]
     ) -> Optional[sqlalchemy.UniqueConstraint]:
         """
         Returns the unique constraints for the model.
@@ -555,18 +559,35 @@ class DatabaseMixin:
 
         :return: Model UniqueConstraint.
         """
-        if isinstance(columns, str):
-            return sqlalchemy.UniqueConstraint(columns)
-        elif isinstance(columns, UniqueConstraint):
-            return sqlalchemy.UniqueConstraint(*columns.fields, name=columns.name)
-        return sqlalchemy.UniqueConstraint(*columns)
+        if isinstance(fields, str):
+            return sqlalchemy.UniqueConstraint(*cls.meta.field_to_column_names[fields])
+        elif isinstance(fields, UniqueConstraint):
+            return sqlalchemy.UniqueConstraint(
+                *chain.from_iterable(
+                    cls.meta.field_to_column_names[field] for field in fields.fields
+                ),
+                name=fields.name,
+                deferrable=fields.deferrable,
+                initially=fields.initially,
+            )
+        return sqlalchemy.UniqueConstraint(
+            *chain.from_iterable(cls.meta.field_to_column_names[field] for field in fields)
+        )
 
     @classmethod
     def _get_indexes(cls, index: Index) -> Optional[sqlalchemy.Index]:
         """
         Creates the index based on the Index fields
         """
-        return sqlalchemy.Index(index.name, *index.fields)
+        return sqlalchemy.Index(
+            index.name,
+            *chain.from_iterable(
+                [field]
+                if isinstance(field, sqlalchemy.TextClause)
+                else cls.meta.field_to_column_names[field]
+                for field in index.fields
+            ),
+        )
 
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":
         """Return database transaction for the assigned database"""

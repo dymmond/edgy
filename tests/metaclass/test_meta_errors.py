@@ -45,6 +45,22 @@ async def test_improperly_configured_for_primary_key():
     )
 
 
+@pytest.mark.parametrize("_type,value", [("int", 1), ("dict", {}), ("set", set())])
+async def test_improperly_configured_for_constraints(_type, value):
+    with pytest.raises(ImproperlyConfigured) as raised:
+
+        class BaseModel(edgy.StrictModel):
+            name = edgy.IntegerField()
+            query: ClassVar[Manager] = ObjectsManager()
+            languages: ClassVar[Manager] = ObjectsManager()
+
+            class Meta:
+                registry = models
+                constraints = value
+
+    assert raised.value.args[0] == f"constraints must be a tuple or list. Got {_type} instead."
+
+
 @pytest.mark.parametrize("_type,value", [("int", 1), ("dict", {"name": "test"}), ("set", set())])
 async def test_improperly_configured_for_unique_together(_type, value):
     with pytest.raises(ImproperlyConfigured) as raised:

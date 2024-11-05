@@ -256,7 +256,7 @@ class CompositeField(FieldFactory):
     field_bases = (ConcreteCompositeField,)
 
     @classmethod
-    def get_pydantic_type(cls, **kwargs: Any) -> Any:
+    def get_pydantic_type(cls, kwargs: dict[str, Any]) -> Any:
         """Returns the type for pydantic"""
         if "model" in kwargs:
             return kwargs.get("model")
