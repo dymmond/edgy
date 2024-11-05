@@ -493,6 +493,19 @@ the model field.
 {!> ../docs_src/models/indexes/complex_together.py !}
 ```
 
+### Constraints
+
+Plain sqlalchemy constraints can be passed via the meta.constraints parameter.
+
+This is useful for CheckConstraints (despite pydantic can handle most cases better).
+
+```python hl_lines="17"
+{!> ../docs_src/models/constraints.py !}
+```
+
+!!! Note
+    This operates on column level not on field level. The column key is relevant.
+
 ## Meta info attributes
 
 The metaclass also calculates following readonly attributes:
