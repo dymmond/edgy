@@ -131,7 +131,7 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         """
         Return the constraints for a column.
 
-        It is passed down as field argument/attribute: `contraints`.
+        It is passed down as field argument/attribute: `constraints`.
         """
         return []
 
@@ -140,7 +140,7 @@ class FieldFactory(metaclass=FieldFactoryMeta):
         """
         Returns column type for the field, None for Metafields..
 
-        It is passed down as field argument/attribute: `contraints`.
+        It is passed down as field argument/attribute: `constraints`.
         """
         return None
 

@@ -211,6 +211,7 @@ class MetaInfo:
         "tablename",
         "unique_together",
         "indexes",
+        "constraints",
         "model",
         "managers",
         "multi_related",
@@ -248,6 +249,10 @@ class MetaInfo:
     field_to_column_names: FieldToColumnNames
     columns_to_field: ColumnsToField
 
+    unique_together: list[Union[str, tuple, UniqueConstraint]]
+    indexes: list[Index]
+    constraints: list[sqlalchemy.Constraint]
+
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self._fields_are_initialized = False
         self.model: Optional[type[BaseModelType]] = None
@@ -257,8 +262,14 @@ class MetaInfo:
         self.inherit: bool = getattr(meta, "inherit", True)
         self.registry: Union[Registry, Literal[False], None] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
-        self.unique_together: Any = getattr(meta, "unique_together", None)
-        self.indexes: Any = getattr(meta, "indexes", None)
+        for attr in ["unique_together", "indexes", "constraints"]:
+            attr_val: Any = getattr(meta, attr, [])
+            if not isinstance(attr_val, (list, tuple)):
+                raise ImproperlyConfigured(
+                    f"{attr} must be a tuple or list. Got {type(attr_val).__name__} instead."
+                )
+            setattr(self, attr, list(attr_val))
+
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
         self.fields = {**getattr(meta, "fields", _empty_dict)}  # type: ignore
@@ -698,36 +709,35 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         for value in meta.managers.values():
             value.owner = new_class
 
-        if getattr(meta, "unique_together", None) is not None:
+        if meta.unique_together:
             if meta.abstract:
                 raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
             unique_together = meta.unique_together
-            if not isinstance(unique_together, (list, tuple)):
-                value_type = type(unique_together).__name__
-                raise ImproperlyConfigured(
-                    f"unique_together must be a tuple or list. Got {value_type} instead."
-                )
-            else:
-                for value in unique_together:
-                    if not isinstance(value, (str, tuple, UniqueConstraint)):
-                        raise ValueError(
-                            "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
-                        )
+            for value in unique_together:
+                if not isinstance(value, (str, tuple, UniqueConstraint)):
+                    raise ValueError(
+                        "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
+                    )
 
         # Handle indexes
-        if getattr(meta, "indexes", None) is not None:
+        if meta.indexes:
             if meta.abstract:
                 raise ImproperlyConfigured("indexes cannot be in abstract classes.")
             indexes = meta.indexes
-            if not isinstance(indexes, (list, tuple)):
-                value_type = type(indexes).__name__
-                raise ImproperlyConfigured(
-                    f"indexes must be a tuple or list. Got {value_type} instead."
-                )
-            else:
-                for value in indexes:
-                    if not isinstance(value, Index):
-                        raise ValueError("Meta.indexes must be a list of Index types.")
+            for value in indexes:
+                if not isinstance(value, Index):
+                    raise ValueError("Meta.indexes must be a list of Index types.")
+
+        # Handle constraints
+        if meta.constraints:
+            if meta.abstract:
+                raise ImproperlyConfigured("Constraints cannot be in abstract classes.")
+            constraints = meta.constraints
+            for value in constraints:
+                if not isinstance(value, sqlalchemy.Constraint):
+                    raise ValueError(
+                        "Meta.constraints must be a list of sqlalchemy.Constraint type."
+                    )
 
         # Making sure the tablename is always set if the value is not provided
         if getattr(meta, "tablename", None) is None:

@@ -9,10 +9,18 @@ hide:
 
 ## 0.22.0
 
+### Added
+
+- Global constraints via meta.
+
 ### Changes
 
 - Breaking: Factories pass now the kwargs as dict to get_pydantic_type, get_column_type, get_constraints.
   This allows now modifying the arguments passed down to the field.
+
+### Fixed
+
+- Indexes and unique_together worked only for fields with columns of the same name.
 
 ## 0.21.2
 
