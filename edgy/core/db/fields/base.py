@@ -9,6 +9,7 @@ from typing import (
     Literal,
     Optional,
     Union,
+    cast,
 )
 
 import sqlalchemy
@@ -418,11 +419,18 @@ class BaseForeignKey(RelationshipField):
     # only useful if related_name = False because otherwise it gets overwritten
     reverse_name: str = ""
 
-    @cached_property
+    @property
     def target_registry(self) -> "Registry":
         """Registry searched in case to is a string"""
-        assert self.owner.meta.registry, "no registry found neither 'target_registry' set"
-        return self.owner.meta.registry
+
+        if not hasattr(self, "_target_registry"):
+            assert self.owner.meta.registry, "no registry found neither 'target_registry' set"
+            return self.owner.meta.registry
+        return cast("Registry", self._target_registry)
+
+    @target_registry.setter
+    def target_registry(self, value: Any) -> None:
+        self._target_registry = value
 
     @property
     def target(self) -> Any:

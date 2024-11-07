@@ -14,16 +14,23 @@ hide:
 - Global constraints via meta.
 - Allow functional indexes.
 - Expose further parameters for UniqueConstraints.
+- `no_copy` attribute for fields.
 
 ### Changes
 
 - Breaking: Factories pass now the kwargs as dict to get_pydantic_type, get_column_type, get_constraints.
   This allows now modifying the arguments passed down to the field.
+- Breaking: init_fields_mapping doesn't initializes the field stats anymore.
+- Breaking: model rebuilds are executed lazily when calling init_fields_mapping not when assigning fields manually anymore.
 
 ### Fixed
 
 - Indexes and unique_together worked only for fields with columns of the same name.
 - MigrateConfig has no get_registry_copy.
+- Migrations have duplicate fks and crash.
+- ContentTypes were not copyable.
+- VirtualCascade was not automatically enabled.
+- Improve lazyness by splitting in two variable sets.
 
 ## 0.21.2
 

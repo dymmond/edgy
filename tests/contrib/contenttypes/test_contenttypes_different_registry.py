@@ -4,15 +4,23 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 import edgy
-from edgy.contrib.contenttypes.fields import ContentTypeField
+from edgy.contrib.contenttypes.models import ContentType as _ContentType
 from edgy.testclient import DatabaseTestClient
-from tests.settings import DATABASE_URL
+from tests.settings import DATABASE_ALTERNATIVE_URL, DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
 database = DatabaseTestClient(DATABASE_URL, use_existing=False)
-models = edgy.Registry(
-    database=edgy.Database(database, force_rollback=True), with_content_type=True
+database2 = DatabaseTestClient(DATABASE_ALTERNATIVE_URL, use_existing=False)
+
+
+class ExplicitContentType(_ContentType):
+    class Meta:
+        abstract = True
+
+
+nother = edgy.Registry(
+    database=edgy.Database(database2, force_rollback=True), with_content_type=ExplicitContentType
 )
 
 
@@ -23,7 +31,12 @@ class ContentTypeTag(edgy.StrictModel):
     content_type = edgy.fields.ExcludeField()
 
     class Meta:
-        registry = models
+        registry = nother
+
+
+models = edgy.Registry(
+    database=edgy.Database(database, force_rollback=True), with_content_type=nother.content_type
+)
 
 
 class Organisation(edgy.StrictModel):
@@ -40,46 +53,26 @@ class Company(edgy.StrictModel):
         registry = models
 
 
-class Person(edgy.StrictModel):
-    first_name = edgy.fields.CharField(max_length=100)
-    last_name = edgy.fields.CharField(max_length=100)
-    # to defaults to registry.content_type
-    c = ContentTypeField()
-
-    class Meta:
-        registry = models
-        unique_together = [("first_name", "last_name")]
-
-
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    async with database:
+    async with database, database2:
+        await nother.create_all()
         await models.create_all()
         yield
         if not database.drop:
             await models.drop_all()
+        if not database2.drop:
+            await nother.drop_all()
 
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
-    async with models:
+    async with models, nother:
         yield
 
 
 async def test_registry_sanity():
-    assert models.content_type is models.get_model("ContentType", include_content_type_attr=False)
-    assert Company.meta.fields["content_type"].on_delete == "CASCADE"
-    assert models.get_model("Company") is Company
-    assert models.content_type.meta.fields["reverse_company"].related_from is Company
-    _copy = models.__copy__()
-    assert models.get_model("Company") is Company
-    assert models.content_type.meta.fields["reverse_company"].related_from is Company
-    assert _copy.get_model("Company") is not Company
-    assert _copy.get_model("Company").meta is not Company.meta
-    assert models.content_type is not _copy.content_type
-    assert models.content_type is not _copy.get_model(
-        "ContentType", include_content_type_attr=False
-    )
+    assert models.content_type is nother.get_model("ContentType", include_content_type_attr=False)
 
 
 async def test_default_contenttypes():
@@ -97,8 +90,6 @@ async def test_default_contenttypes():
     # defer
     assert model_after_load.content_type.name == "Company"
     assert await model_after_load.content_type.get_instance() == model1
-    # count
-    assert await models.content_type.query.count() == 2
     # fetch_all
     [await content_type.get_instance() for content_type in await models.content_type.query.all()]
     # iterate
@@ -111,22 +102,10 @@ async def test_default_contenttypes():
     assert await Company.query.get_or_none(name="edgy inc") is None
 
 
-async def test_different_named_contenttypes():
-    model1 = await Person.query.create(first_name="edgy", last_name="foo")
-    with pytest.raises(AttributeError):
-        model1.content_type  # noqa
-    model_after_load = await Person.query.get(id=model1.id)
-    assert model_after_load == model1
-    assert model_after_load.c.id is not None
-    # defer
-    assert model_after_load.c.name == "Person"
-    assert await model_after_load.c.get_instance() == model1
-
-
 async def test_explicit_contenttypes():
-    # no name
+    # no name but still should work
     model1 = await Company.query.create(name="edgy inc", content_type={})
-    # wrong name, should be autocorrected
+    # wrong name type, but should be autocorrected
     model2 = await Organisation.query.create(name="edgy inc", content_type={"name": "Company"})
     assert model1.content_type.id is not None
     assert model1.content_type.name == "Company"
@@ -139,10 +118,7 @@ async def test_explicit_contenttypes():
     assert model_after_load.content_type.id is not None
     # defer
     assert model_after_load.content_type.name == "Company"
-    loaded = await model_after_load.content_type.get_instance()
-    assert loaded == model1
-    # count
-    assert await models.content_type.query.count() == 2
+    assert await model_after_load.content_type.get_instance() == model1
     await models.content_type.query.delete()
     assert await Company.query.get_or_none(name="edgy inc") is None
 

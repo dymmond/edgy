@@ -47,6 +47,7 @@ class ColumnDefinitionModel(
 
 
 class BaseFieldDefinitions:
+    no_copy: bool = False
     read_only: bool = False
     inject_default_on_partial_update: bool = False
     inherit: bool = True

@@ -45,6 +45,8 @@ def test_migrate_without_model_apps():
 
     assert len(models.models) == 3
     assert len(migrate.registry.models) == 3
+    registry = migrate.get_registry_copy()
+    assert len(registry.models) == 3
 
 
 @pytest.mark.parametrize(
@@ -59,9 +61,10 @@ def test_migrate_with_fake_model_apps(model_apps):
     assert len(nother.models) == 0
 
     migrate = Migrate(app=app, registry=nother, model_apps=model_apps)
+    registry = migrate.get_registry_copy()
 
     assert len(nother.models) == 2
-    assert len(migrate.registry.models) == 2
+    assert len(registry.models) == 2
 
 
 @pytest.mark.parametrize(

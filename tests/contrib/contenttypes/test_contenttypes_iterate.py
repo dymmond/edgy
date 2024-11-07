@@ -40,7 +40,7 @@ class Company(edgy.StrictModel):
 class Person(edgy.StrictModel):
     first_name = edgy.fields.CharField(max_length=100)
     last_name = edgy.fields.CharField(max_length=100)
-    # to defaults to ContentType
+    # to defaults to registry.content_type
     c = ContentTypeField()
 
     class Meta:

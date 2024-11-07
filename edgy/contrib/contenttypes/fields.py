@@ -63,10 +63,8 @@ class ContentTypeField(ForeignKey):
         to: Union[type["BaseModelType"], str] = "ContentType",
         on_delete: str = CASCADE,
         no_constraint: bool = False,
-        delete_orphan: bool = True,
-        default: Any = lambda owner: owner.meta.registry.get_model("ContentType")(
-            name=owner.__name__
-        ),
+        remove_referenced: bool = True,
+        default: Any = lambda owner: owner.meta.registry.content_type(name=owner.__name__),
         **kwargs: Any,
     ) -> "BaseFieldType":
         return super().__new__(
@@ -75,7 +73,7 @@ class ContentTypeField(ForeignKey):
             default=default,
             on_delete=on_delete,
             no_constraint=no_constraint,
-            delete_orphan=delete_orphan,
+            remove_referenced=remove_referenced,
             **kwargs,
         )
 

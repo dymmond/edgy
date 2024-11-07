@@ -53,7 +53,7 @@ class Company(edgy.StrictModel):
 class Person(edgy.StrictModel):
     first_name = edgy.fields.CharField(max_length=100)
     last_name = edgy.fields.CharField(max_length=100)
-    # to defaults to ContentType
+    # to defaults to registry.content_type
     c = ContentTypeField()
 
     class Meta:
@@ -77,7 +77,7 @@ async def rollback_transactions():
 
 
 async def test_registry_sanity():
-    assert models.content_type is models.get_model("ContentType")
+    assert models.content_type is models.get_model("ContentType", include_content_type_attr=False)
     assert "custom_field" in models.content_type.meta.fields
 
 
