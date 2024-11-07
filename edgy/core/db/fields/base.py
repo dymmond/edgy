@@ -9,6 +9,7 @@ from typing import (
     Literal,
     Optional,
     Union,
+    cast,
 )
 
 import sqlalchemy
@@ -425,7 +426,7 @@ class BaseForeignKey(RelationshipField):
         if not hasattr(self, "_target_registry"):
             assert self.owner.meta.registry, "no registry found neither 'target_registry' set"
             return self.owner.meta.registry
-        return self._target_registry
+        return cast("Registry", self._target_registry)
 
     @target_registry.setter
     def target_registry(self, value: Any) -> None:

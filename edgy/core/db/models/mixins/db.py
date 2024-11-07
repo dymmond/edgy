@@ -101,7 +101,9 @@ def _set_related_field(
 
 
 def _set_related_name_for_foreign_keys(
-    meta: "MetaInfo", model_class: type["BaseModelType"], replace_related_field: bool = False
+    meta: "MetaInfo",
+    model_class: type["BaseModelType"],
+    replace_related_field: Union[bool, type["BaseModelType"]] = False,
 ) -> None:
     """
     Sets the related name for the foreign keys.

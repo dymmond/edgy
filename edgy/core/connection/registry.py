@@ -3,7 +3,7 @@ import contextlib
 import re
 import warnings
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
@@ -132,7 +132,7 @@ class Registry:
             defaultdict(list)
         )
 
-        self.extra: Mapping[str, Database] = {
+        self.extra: dict[str, Database] = {
             k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
         }
         self.metadata_by_url = MetaDataByUrlDict(registry=self)
@@ -144,13 +144,13 @@ class Registry:
         content_type: Union[bool, type[BaseModelType]] = False
         if self.content_type is not None:
             try:
-                content_type = self.get_model(
+                content_type2 = content_type = self.get_model(
                     "ContentType", include_content_type_attr=False
                 ).copy_edgy_model()
                 # cleanup content_type copy
-                for field_name in list(content_type.meta.fields.keys()):
+                for field_name in list(content_type2.meta.fields.keys()):
                     if field_name.startswith("reverse_"):
-                        del content_type.meta.fields[field_name]
+                        del content_type2.meta.fields[field_name]
             except LookupError:
                 content_type = self.content_type
         _copy = Registry(
