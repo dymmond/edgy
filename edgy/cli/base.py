@@ -34,6 +34,9 @@ class MigrateConfig:
     def metadata(self) -> typing.Any:
         return self.registry.metadata_by_name[None]
 
+    def get_registry_copy(self) -> "Registry":
+        return cast(Registry, self.migrate.get_registry_copy())
+
 
 class Config(AlembicConfig):
     """

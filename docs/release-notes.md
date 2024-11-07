@@ -23,6 +23,7 @@ hide:
 ### Fixed
 
 - Indexes and unique_together worked only for fields with columns of the same name.
+- MigrateConfig has no get_registry_copy.
 
 ## 0.21.2
 
