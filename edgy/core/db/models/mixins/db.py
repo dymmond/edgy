@@ -225,7 +225,9 @@ class DatabaseMixin:
     ) -> type["Model"]:
         """Copy the model class and optionally add it to another registry."""
         # removes private pydantic stuff, except the prefixed ones
-        attrs = {key: val for key, val in cls.__dict__.items() if key not in _removed_copy_keys}
+        attrs = {
+            key: val for key, val in cls.__dict__.items() if key not in cls._removed_copy_keys
+        }
         # managers and fields are gone, we have to readd them with the correct data
         attrs.update(
             (
