@@ -14,6 +14,7 @@ hide:
 - Global constraints via meta.
 - Allow functional indexes.
 - Expose further parameters for UniqueConstraints.
+- `no_copy` attribute for fields.
 
 ### Changes
 
@@ -24,6 +25,9 @@ hide:
 
 - Indexes and unique_together worked only for fields with columns of the same name.
 - MigrateConfig has no get_registry_copy.
+- Migrations have duplicate fks and crash.
+- ContentTypes were not copyable.
+- VirtualCascade was not automatically enabled.
 
 ## 0.21.2
 
