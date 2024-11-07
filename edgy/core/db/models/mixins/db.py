@@ -49,6 +49,7 @@ _removed_copy_keys = {
     "_pknames",
     "_table",
     "_db_schemas",
+    "meta",
 }
 _removed_copy_keys.difference_update(
     {*_EmptyClass.__dict__.keys(), "__annotations__", "__module__"}
@@ -223,15 +224,26 @@ class DatabaseMixin:
         """Copy the model class and optionally add it to another registry."""
         # removes private pydantic stuff, except the prefixed ones
         attrs = {key: val for key, val in cls.__dict__.items() if key not in _removed_copy_keys}
-        attrs.pop("meta", None)
         # managers and fields are gone, we have to readd them with the correct data
-        attrs.update(cls.meta.fields)
+        attrs.update(
+            (
+                (field_name, field)
+                for field_name, field in cls.meta.fields.items()
+                if not field.no_copy
+            )
+        )
         attrs.update(cls.meta.managers)
         _copy = cast(
             type["Model"],
             type(cls.__name__, cls.__bases__, attrs, skip_registry=True, **kwargs),
         )
-        _copy.meta.model = _copy
+        for field_name in _copy.meta.foreign_key_fields:
+            # we need to unreference and check if both models are in the same registry
+            if cls.meta.fields[field_name].target.meta.registry is cls.meta.registry:
+                _copy.meta.fields[field_name].target = cls.meta.fields[field_name].target.__name__
+            else:
+                # otherwise we need to disable backrefs
+                _copy.meta.fields[field_name].target.related_name = False
         if name:
             _copy.__name__ = name
         if registry is not None:

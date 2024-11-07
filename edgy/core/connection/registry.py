@@ -153,8 +153,9 @@ class Registry:
                         del content_type.meta.fields[field_name]
             except LookupError:
                 content_type = self.content_type
-        _copy = Registry(self.database, with_content_type=content_type)
-        _copy.extra.update(self.extra)
+        _copy = Registry(
+            self.database, with_content_type=content_type, schema=self.db_schema, extra=self.extra
+        )
         for i in ["models", "reflected", "tenant_models", "pattern_models"]:
             dict_models = getattr(_copy, i)
             dict_models.update(
@@ -236,6 +237,7 @@ class Registry:
                 "owner": model_class,
                 "to": real_content_type,
                 "no_constraint": real_content_type.no_constraint,
+                "no_copy": True,
             }
             if model_class.meta.registry is not real_content_type.meta.registry:
                 field_args["relation_has_post_delete_callback"] = True

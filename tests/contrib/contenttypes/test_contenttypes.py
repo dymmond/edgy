@@ -69,9 +69,17 @@ async def rollback_transactions():
 async def test_registry_sanity():
     assert models.content_type is models.get_model("ContentType", include_content_type_attr=False)
     assert Company.meta.fields["content_type"].on_delete == "CASCADE"
-    # _copy = models.__copy__()
-    # assert models.content_type is not _copy.content_type
-    # assert models.content_type is not _copy.get_model("ContentType", include_content_type_attr=False)
+    assert models.get_model("Company") is Company
+    assert models.content_type.meta.fields["reverse_company"].related_from is Company
+    _copy = models.__copy__()
+    assert models.get_model("Company") is Company
+    assert models.content_type.meta.fields["reverse_company"].related_from is Company
+    assert _copy.get_model("Company") is not Company
+    assert _copy.get_model("Company").meta is not Company.meta
+    assert models.content_type is not _copy.content_type
+    assert models.content_type is not _copy.get_model(
+        "ContentType", include_content_type_attr=False
+    )
 
 
 async def test_default_contenttypes():
@@ -108,6 +116,7 @@ async def test_different_named_contenttypes():
     with pytest.raises(AttributeError):
         model1.content_type  # noqa
     model_after_load = await Person.query.get(id=model1.id)
+    assert model_after_load == model1
     assert model_after_load.c.id is not None
     # defer
     assert model_after_load.c.name == "Person"

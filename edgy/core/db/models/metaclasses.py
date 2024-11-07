@@ -669,6 +669,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                             primary_key=True,
                             autoincrement=True,
                             inherit=False,
+                            no_copy=True,
                             name="id",
                         )
                 if not isinstance(fields["id"], BaseFieldType) or not fields["id"].primary_key:
@@ -697,7 +698,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         if not meta.abstract:
             # don't add to model_fields, it leads to crashes for unknown reasons
-            meta.fields["pk"] = PKField(exclude=True, name="pk", inherit=False)
+            meta.fields["pk"] = PKField(exclude=True, name="pk", inherit=False, no_copy=True)
 
         # Handle annotations
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
