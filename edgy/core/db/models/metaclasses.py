@@ -25,7 +25,7 @@ from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
-from edgy.core.db.fields.base import PKField, RelationshipField
+from edgy.core.db.fields.base import BaseForeignKey, PKField, RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.models.managers import BaseManager
@@ -49,7 +49,7 @@ class Fields(UserDict, dict[str, BaseFieldType]):
         super().__init__(data)
 
     def add_field_to_meta(self, name: str, field: BaseFieldType) -> None:
-        if not self.meta._fields_are_initialized:
+        if not self.meta._field_stats_are_initialized:
             return
         if hasattr(field, "__get__"):
             self.meta.special_getter_fields.add(name)
@@ -71,7 +71,7 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             self.meta.relationship_fields.add(name)
 
     def discard_field_from_meta(self, name: str) -> None:
-        if self.meta._fields_are_initialized:
+        if self.meta._field_stats_are_initialized:
             for field_attr in _field_sets_to_clear:
                 getattr(self.meta, field_attr).discard(name)
 
@@ -94,13 +94,14 @@ class Fields(UserDict, dict[str, BaseFieldType]):
         self.add_field_to_meta(name, value)
         if self.meta.model is not None:
             self.meta.model.model_fields[name] = value  # type: ignore
-            self.meta.model.model_rebuild(force=True)
-        self.meta.invalidate(clear_class_attrs=True)
+        self.meta.invalidate(invalidate_stats=False)
 
     def __delitem__(self, name: str) -> None:
         if self.data.pop(name, None) is not None:
             self.discard_field_from_meta(name)
-            self.meta.invalidate(clear_class_attrs=True)
+            if self.meta.model is not None:
+                self.meta.model.model_fields.pop(name, None)  # type: ignore
+            self.meta.invalidate(invalidate_stats=False)
 
 
 class FieldToColumns(UserDict, dict[str, Sequence["sqlalchemy.Column"]]):
@@ -182,11 +183,14 @@ class ColumnsToField(UserDict, dict[str, str]):
         return super().__iter__()
 
 
-_trigger_attributes_MetaInfo = {
+_trigger_attributes_fields_MetaInfo = {
     "field_to_columns",
     "field_to_column_names",
-    "foreign_key_fields",
     "columns_to_field",
+}
+
+_trigger_attributes_field_stats_MetaInfo = {
+    "foreign_key_fields",
     "special_getter_fields",
     "input_modifying_fields",
     "post_save_fields",
@@ -197,9 +201,7 @@ _trigger_attributes_MetaInfo = {
     "relationship_fields",
 }
 
-_field_sets_to_clear: set[str] = {
-    attr for attr in _trigger_attributes_MetaInfo if attr.endswith("_fields")
-}
+_field_sets_to_clear: set[str] = _trigger_attributes_field_stats_MetaInfo
 
 
 class MetaInfo:
@@ -229,6 +231,7 @@ class MetaInfo:
         "secret_fields",
         "relationship_fields",
         "_fields_are_initialized",
+        "_field_stats_are_initialized",
     )
     _include_dump = (
         *filter(
@@ -238,6 +241,7 @@ class MetaInfo:
                 "field_to_column_names",
                 "columns_to_field",
                 "_fields_are_initialized",
+                "_field_stats_are_initialized",
             },
             __slots__,
         ),
@@ -255,6 +259,7 @@ class MetaInfo:
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self._fields_are_initialized = False
+        self._field_stats_are_initialized = False
         self.model: Optional[type[BaseModelType]] = None
         #  Difference between meta extraction and kwargs: meta attributes are copied
         self.abstract: bool = getattr(meta, "abstract", False)
@@ -329,11 +334,25 @@ class MetaInfo:
 
     def __getattribute__(self, name: str) -> Any:
         # lazy execute
-        if name in _trigger_attributes_MetaInfo and not self._fields_are_initialized:
+        if name in _trigger_attributes_fields_MetaInfo and not self._fields_are_initialized:
             self.init_fields_mapping()
+        if (
+            name in _trigger_attributes_field_stats_MetaInfo
+            and not self._field_stats_are_initialized
+        ):
+            self.init_field_stats()
         return super().__getattribute__(name)
 
     def init_fields_mapping(self) -> None:
+        # when accessing the secret_fields in model_dump, this is triggered
+        self.field_to_columns = FieldToColumns(self)
+        self.field_to_column_names = FieldToColumnNames(self)
+        self.columns_to_field = ColumnsToField(self)
+        if self.model is not None:
+            self.model.model_rebuild(force=True)
+        self._fields_are_initialized = True
+
+    def init_field_stats(self) -> None:
         self.special_getter_fields: set[str] = set()
         self.excluded_fields: set[str] = set()
         self.secret_fields: set[str] = set()
@@ -343,14 +362,16 @@ class MetaInfo:
         self.post_delete_fields: set[str] = set()
         self.foreign_key_fields: set[str] = set()
         self.relationship_fields: set[str] = set()
-        self.field_to_columns = FieldToColumns(self)
-        self.field_to_column_names = FieldToColumnNames(self)
-        self.columns_to_field = ColumnsToField(self)
-        self._fields_are_initialized = True
+        self._field_stats_are_initialized = True
         for key, field in self.fields.items():
             self.fields.add_field_to_meta(key, field)
 
-    def invalidate(self, clear_class_attrs: bool = True, invalidate_fields: bool = True) -> None:
+    def invalidate(
+        self,
+        clear_class_attrs: bool = True,
+        invalidate_fields: bool = True,
+        invalidate_stats: bool = True,
+    ) -> None:
         if invalidate_fields and self._fields_are_initialized:
             # prevent cycles and mem-leaks
             for attr in (
@@ -361,6 +382,8 @@ class MetaInfo:
                 with contextlib.suppress(AttributeError):
                     delattr(self, attr)
             self._fields_are_initialized = False
+        if invalidate_stats:
+            self._field_stats_are_initialized = False
         if self.model is None:
             return
         if clear_class_attrs:
@@ -371,6 +394,8 @@ class MetaInfo:
     def full_init(self, init_column_mappers: bool = True, init_class_attrs: bool = True) -> None:
         if not self._fields_are_initialized:
             self.init_fields_mapping()
+        if not self._field_stats_are_initialized:
+            self.init_field_stats()
         if init_column_mappers:
             self.columns_to_field.init()
         if init_class_attrs:
@@ -651,8 +676,11 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                         f"Cannot create model {name} without explicit primary key if field 'id' is already present."
                     )
 
-        for field_name in fields:
+        for field_name, field_value in fields.items():
             attrs.pop(field_name, None)
+            # clear cached target
+            if isinstance(field_value, BaseForeignKey):
+                field_value.__dict__.pop("_target", None)
 
         for manager_name in managers:
             attrs.pop(manager_name, None)
@@ -882,7 +910,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         """
         if cls.__is_proxy_model__:
             return cls
-        if cls.__proxy_model__ is None:
+        if getattr(cls, "__proxy_model__", None) is None:
             proxy_model = cls.generate_proxy_model()
             proxy_model.__parent__ = cls
             proxy_model.model_rebuild(force=True)

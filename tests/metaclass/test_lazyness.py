@@ -36,10 +36,16 @@ def test_control_lazyness():
     assert User.meta is models.get_model("User").meta
     # initial
     assert not BaseUser.meta._fields_are_initialized
-    assert User.meta._fields_are_initialized
+    assert not BaseUser.meta._field_stats_are_initialized
+    assert not User.meta._fields_are_initialized
+    assert User.meta._field_stats_are_initialized
     assert "name" not in User.meta.columns_to_field.data
-    assert Product.meta._fields_are_initialized
+    # lazy init
+    assert User.meta._fields_are_initialized
+    assert not Product.meta._fields_are_initialized
     assert "rating" not in Product.meta.columns_to_field.data
+    # lazy init
+    assert Product.meta._fields_are_initialized
 
     # init pk stuff
     assert "id" not in Product.meta.columns_to_field.data

@@ -12,7 +12,7 @@ from typing import (
 import sqlalchemy
 from pydantic import BaseModel
 
-from edgy.core.db.constants import CASCADE, SET_DEFAULT, SET_NULL
+from edgy.core.db.constants import SET_DEFAULT, SET_NULL
 from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
@@ -70,10 +70,6 @@ class BaseForeignKeyField(BaseForeignKey):
             )
         if self.on_delete == SET_NULL and not self.null:
             terminal.write_warning("Declaring on_delete `SET NULL` but null is False.")
-        if self.force_cascade_deletion_relation or (
-            self.on_delete == CASCADE and self.no_constraint
-        ):
-            self.relation_has_post_delete_callback = True
 
     async def _notset_post_delete_callback(self, value: Any, instance: "BaseModelType") -> None:
         value = self.expand_relationship(value)
@@ -104,9 +100,7 @@ class BaseForeignKeyField(BaseForeignKey):
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         if self.relation_fn is not None:
             return self.relation_fn(**kwargs)
-        if self.force_cascade_deletion_relation or (
-            self.on_delete == CASCADE and self.no_constraint
-        ):
+        if self.force_cascade_deletion_relation:
             relation: Any = VirtualCascadeDeletionSingleRelation
         else:
             relation = SingleRelation

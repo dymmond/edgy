@@ -4,25 +4,23 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 import edgy
-from edgy.contrib.contenttypes.fields import ContentTypeField
 from edgy.contrib.contenttypes.models import ContentType as _ContentType
 from edgy.testclient import DatabaseTestClient
-from tests.settings import DATABASE_URL
-
-
-class ExplicitContentType(_ContentType):
-    custom_field = edgy.CharField(max_length=1, null=True)
-    custom_field_non_inherited = edgy.CharField(max_length=1, null=True, inherit=False)
-
-    class Meta:
-        abstract = True
-
+from tests.settings import DATABASE_ALTERNATIVE_URL, DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
 database = DatabaseTestClient(DATABASE_URL, use_existing=False)
-models = edgy.Registry(
-    database=edgy.Database(database, force_rollback=True), with_content_type=ExplicitContentType
+database2 = DatabaseTestClient(DATABASE_ALTERNATIVE_URL, use_existing=False)
+
+
+class ExplicitContentType(_ContentType):
+    class Meta:
+        abstract = True
+
+
+nother = edgy.Registry(
+    database=edgy.Database(database2, force_rollback=True), with_content_type=ExplicitContentType
 )
 
 
@@ -33,7 +31,12 @@ class ContentTypeTag(edgy.StrictModel):
     content_type = edgy.fields.ExcludeField()
 
     class Meta:
-        registry = models
+        registry = nother
+
+
+models = edgy.Registry(
+    database=edgy.Database(database, force_rollback=True), with_content_type=nother.content_type
+)
 
 
 class Organisation(edgy.StrictModel):
@@ -50,35 +53,26 @@ class Company(edgy.StrictModel):
         registry = models
 
 
-class Person(edgy.StrictModel):
-    first_name = edgy.fields.CharField(max_length=100)
-    last_name = edgy.fields.CharField(max_length=100)
-    # to defaults to registry.content_type
-    c = ContentTypeField()
-
-    class Meta:
-        registry = models
-        unique_together = [("first_name", "last_name")]
-
-
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    async with database:
+    async with database, database2:
+        await nother.create_all()
         await models.create_all()
         yield
         if not database.drop:
             await models.drop_all()
+        if not database2.drop:
+            await nother.drop_all()
 
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
-    async with models.database:
+    async with models, nother:
         yield
 
 
 async def test_registry_sanity():
-    assert models.content_type is models.get_model("ContentType", include_content_type_attr=False)
-    assert "custom_field" in models.content_type.meta.fields
+    assert models.content_type is nother.get_model("ContentType", include_content_type_attr=False)
 
 
 async def test_default_contenttypes():

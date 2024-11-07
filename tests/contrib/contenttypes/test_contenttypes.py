@@ -43,7 +43,7 @@ class Company(edgy.StrictModel):
 class Person(edgy.StrictModel):
     first_name = edgy.fields.CharField(max_length=100)
     last_name = edgy.fields.CharField(max_length=100)
-    # to defaults to ContentType
+    # to defaults to registry.content_type
     c = ContentTypeField()
 
     class Meta:
@@ -64,6 +64,14 @@ async def create_test_database():
 async def rollback_transactions():
     async with models:
         yield
+
+
+async def test_registry_sanity():
+    assert models.content_type is models.get_model("ContentType", include_content_type_attr=False)
+    assert Company.meta.fields["content_type"].on_delete == "CASCADE"
+    # _copy = models.__copy__()
+    # assert models.content_type is not _copy.content_type
+    # assert models.content_type is not _copy.get_model("ContentType", include_content_type_attr=False)
 
 
 async def test_default_contenttypes():
@@ -122,7 +130,8 @@ async def test_explicit_contenttypes():
     assert model_after_load.content_type.id is not None
     # defer
     assert model_after_load.content_type.name == "Company"
-    assert await model_after_load.content_type.get_instance() == model1
+    loaded = await model_after_load.content_type.get_instance()
+    assert loaded == model1
     # count
     assert await models.content_type.query.count() == 2
     await models.content_type.query.delete()

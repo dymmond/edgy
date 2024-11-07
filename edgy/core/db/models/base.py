@@ -163,7 +163,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         """The columns used for loading, can be set per instance defaults to pknames"""
         return self.pkcolumns
 
-    @cached_property
+    @property
     def proxy_model(self) -> type[Model]:
         return self.__class__.proxy_model  # type: ignore
 

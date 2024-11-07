@@ -164,7 +164,7 @@ to copy a model class and optionally add it to an other registry.
 
 You can add it to a registry later by using:
 
-`model_class.add_to_registry(registry, name="")`
+`model_class.add_to_registry(registry, name="", database=None, replace_related_field=False)`
 
 In fact the last method is called when the registry parameter of `copy_edgy_model` is not `None`.
 

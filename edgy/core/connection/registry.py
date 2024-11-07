@@ -141,28 +141,36 @@ class Registry:
             self._set_content_type(with_content_type)
 
     def __copy__(self) -> "Registry":
-        _copy = Registry(self.database)
-        _copy.extra = self.extra
-        _copy.models = {key: val.copy_edgy_model(_copy) for key, val in self.models.items()}
-        _copy.reflected = {key: val.copy_edgy_model(_copy) for key, val in self.reflected.items()}
-        _copy.tenant_models = {
-            key: val.copy_edgy_model(_copy) for key, val in self.tenant_models.items()
-        }
-        _copy.pattern_models = {
-            key: val.copy_edgy_model(_copy) for key, val in self.pattern_models.items()
-        }
-        _copy.dbs_reflected = set(self.dbs_reflected)
+        content_type: Union[bool, type[BaseModelType]] = False
         if self.content_type is not None:
             try:
-                _copy.content_type = self.get_model("ContentType")
+                content_type = self.get_model(
+                    "ContentType", include_content_type_attr=False
+                ).copy_edgy_model()
+                # cleanup content_type copy
+                for field_name in list(content_type.meta.fields.keys()):
+                    if field_name.startswith("reverse_"):
+                        del content_type.meta.fields[field_name]
             except LookupError:
-                _copy.content_type = self.content_type
-            # init callbacks
-            _copy._set_content_type(_copy.content_type)
+                content_type = self.content_type
+        _copy = Registry(self.database, with_content_type=content_type)
+        _copy.extra.update(self.extra)
+        for i in ["models", "reflected", "tenant_models", "pattern_models"]:
+            dict_models = getattr(_copy, i)
+            dict_models.update(
+                (
+                    (key, val.copy_edgy_model(_copy))
+                    for key, val in getattr(self, i).items()
+                    if key not in dict_models
+                )
+            )
+        _copy.dbs_reflected = set(self.dbs_reflected)
         return _copy
 
     def _set_content_type(
-        self, with_content_type: Union[Literal[True], type["BaseModelType"]]
+        self,
+        with_content_type: Union[Literal[True], type["BaseModelType"]],
+        old_content_type_to_replace: Optional[type["BaseModelType"]] = None,
     ) -> None:
         from edgy.contrib.contenttypes.fields import BaseContentTypeFieldField, ContentTypeField
         from edgy.contrib.contenttypes.models import ContentType
@@ -197,31 +205,51 @@ class Registry:
             # they are not updated, despite this shouldn't happen anyway
             if issubclass(model_class, ContentType):
                 return
-            # skip if is explicit set
+            # skip if is explicit set or remove when copying
             for field in model_class.meta.fields.values():
                 if isinstance(field, BaseContentTypeFieldField):
+                    if (
+                        old_content_type_to_replace is not None
+                        and field.target is old_content_type_to_replace
+                    ):
+                        field.target_registry = self
+                        field.target = real_content_type
+                        # simply overwrite
+                        real_content_type.meta.fields[field.related_name] = RelatedField(
+                            name=field.related_name,
+                            foreign_key_name=field.name,
+                            related_from=model_class,
+                            owner=real_content_type,
+                        )
                     return
+
             # e.g. exclude field
-            if "content_type" not in model_class.meta.fields:
-                related_name = f"reverse_{model_class.__name__.lower()}"
-                assert (
-                    related_name not in real_content_type.meta.fields
-                ), f"duplicate model name: {model_class.__name__}"
-                model_class.meta.fields["content_type"] = cast(
-                    "BaseFieldType",
-                    ContentTypeField(
-                        name="content_type",
-                        owner=model_class,
-                        to=real_content_type,
-                        no_constraint=real_content_type.no_constraint,
-                    ),
-                )
-                real_content_type.meta.fields[related_name] = RelatedField(
-                    name=related_name,
-                    foreign_key_name="content_type",
-                    related_from=model_class,
-                    owner=real_content_type,
-                )
+            if "content_type" in model_class.meta.fields:
+                return
+            related_name = f"reverse_{model_class.__name__.lower()}"
+            assert (
+                related_name not in real_content_type.meta.fields
+            ), f"duplicate model name: {model_class.__name__}"
+
+            field_args: dict[str, Any] = {
+                "name": "content_type",
+                "owner": model_class,
+                "to": real_content_type,
+                "no_constraint": real_content_type.no_constraint,
+            }
+            if model_class.meta.registry is not real_content_type.meta.registry:
+                field_args["relation_has_post_delete_callback"] = True
+                field_args["force_cascade_deletion_relation"] = True
+            model_class.meta.fields["content_type"] = cast(
+                "BaseFieldType",
+                ContentTypeField(**field_args),
+            )
+            real_content_type.meta.fields[related_name] = RelatedField(
+                name=related_name,
+                foreign_key_name="content_type",
+                related_from=model_class,
+                owner=real_content_type,
+            )
 
         self.register_callback(None, callback, one_time=False)
 
@@ -248,7 +276,15 @@ class Registry:
         )
         return self.metadata_by_name[None]
 
-    def get_model(self, model_name: str) -> type["BaseModelType"]:
+    def get_model(
+        self, model_name: str, *, include_content_type_attr: bool = True
+    ) -> type["BaseModelType"]:
+        if (
+            include_content_type_attr
+            and model_name == "ContentType"
+            and self.content_type is not None
+        ):
+            return self.content_type
         if model_name in self.models:
             return self.models[model_name]
         elif model_name in self.reflected:
