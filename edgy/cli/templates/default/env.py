@@ -57,7 +57,7 @@ app: Any = get_app()
 def get_engine_url_and_metadata() -> tuple[str, "sqlalchemy.MetaData"]:
     url: Optional[str] = os.environ.get("EDGY_DATABASE_URL")
     _name = None
-    registry = getattr(app, EDGY_DB)["migrate"].get_registry_copy()
+    registry = getattr(app, EDGY_DB)["migrate"].migrate.get_registry_copy()
     _metadata = registry.metadata_by_name[None]
     if not url:
         db_name: Optional[str] = os.environ.get("EDGY_DATABASE")
@@ -66,7 +66,7 @@ def get_engine_url_and_metadata() -> tuple[str, "sqlalchemy.MetaData"]:
     if not url:
         url = str(registry.database.url)
     else:
-        _name, _metadata = registry.metadata_by_url.get(url, _metadata)
+        _metadata = registry.metadata_by_url.get(url, _metadata)
     return url, _metadata
 
 
