@@ -7,3 +7,14 @@ PROTECT = "PROTECT"
 
 
 class ConditionalRedirect(dict): ...
+
+
+__all__ = [
+    "CASCADE",
+    "RESTRICT",
+    "DO_NOTHING",
+    "SET_NULL",
+    "SET_DEFAULT",
+    "PROTECT",
+    "ConditionalRedirect",
+]

@@ -1,4 +1,4 @@
-from .database import Database
+from .database import Database, DatabaseURL
 from .registry import Registry
 
-__all__ = ["ConnectionConfig", "Database", "Registry"]
+__all__ = ["Database", "DatabaseURL", "Registry"]

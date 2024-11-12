@@ -10,8 +10,10 @@ from alembic import __version__ as __alembic_version__
 from alembic import command
 from alembic.config import Config as AlembicConfig
 
+import edgy
 from edgy.cli.constants import DEFAULT_TEMPLATE_NAME, EDGY_DB
 from edgy.cli.decorators import catch_errors
+from edgy.conf import settings
 from edgy.core.extras.base import BaseExtra
 from edgy.utils.compat import is_class_and_subclass
 
@@ -98,10 +100,10 @@ class Migrate(BaseExtra):
                 )
             # proper add to registry
             value.add_to_registry(self.registry, database="keep")
-        self.multi_schema = multi_schema
+        #       self.multi_schema = multi_schema
         self.ignore_schema_pattern = ignore_schema_pattern
 
-        self.directory = "migrations"
+        self.directory = settings.migration_directory
         self.alembic_ctx_kwargs = {
             **kwargs,
             "compare_type": compare_type,
@@ -145,9 +147,7 @@ class Migrate(BaseExtra):
         """
         Sets a Edgy dictionary for the app object.
         """
-        migrate = MigrateConfig(self, self.registry, **self.alembic_ctx_kwargs)
-        # bypass __setattr__ method
-        object.__setattr__(app, EDGY_DB, {"migrate": migrate})
+        edgy.monkay.set_instance(self.registry)
 
     def configure(self, f: Callable) -> Any:
         self.configure_callbacks.append(f)
@@ -203,7 +203,7 @@ def list_templates() -> None:
 
 @catch_errors
 def init(
-    app: Optional[typing.Any],
+    app: Optional[typing.Any] = None,
     directory: Optional[str] = None,
     template: Optional[str] = None,
     package: bool = False,

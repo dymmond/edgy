@@ -185,3 +185,6 @@ class Schema:
                 *(await self.get_metadata_of_all_schemes(val, no_reflect=no_reflect)),
             )
         return schemes_tree
+
+
+__all__ = ["Schema"]

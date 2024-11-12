@@ -1,110 +1,158 @@
-__version__ = "0.22.0"
+from __future__ import annotations
 
-from .cli.base import Migrate
-from .conf import settings
-from .conf.global_settings import EdgySettings
-from .core import files
-from .core.connection.database import Database, DatabaseURL
-from .core.connection.registry import Registry
-from .core.db import fields
-from .core.db.constants import CASCADE, RESTRICT, SET_NULL, ConditionalRedirect
-from .core.db.datastructures import Index, UniqueConstraint
-from .core.db.fields import (
-    BigIntegerField,
-    BinaryField,
-    BooleanField,
-    CharField,
-    ChoiceField,
-    CompositeField,
-    ComputedField,
-    DateField,
-    DateTimeField,
-    DecimalField,
-    DurationField,
-    EmailField,
-    ExcludeField,
-    FloatField,
-    IntegerField,
-    JSONField,
-    PasswordField,
-    PlaceholderField,
-    RefForeignKey,
-    SmallIntegerField,
-    TextField,
-    TimeField,
-    URLField,
-    UUIDField,
-)
-from .core.db.fields.foreign_keys import ForeignKey
-from .core.db.fields.many_to_many import ManyToMany, ManyToManyField
-from .core.db.fields.one_to_one_keys import OneToOne, OneToOneField
-from .core.db.models import Model, ModelRef, ReflectModel, StrictModel
-from .core.db.models.managers import Manager
-from .core.db.querysets import Prefetch, Q, QuerySet, and_, not_, or_
-from .core.extras import EdgyExtra
-from .core.signals import Signal
+__version__ = "0.22.0"
+import os
+from importlib import import_module
+from typing import TYPE_CHECKING
+
+from monkay import Monkay
+
 from .core.utils.sync import run_sync
-from .exceptions import MultipleObjectsReturned, ObjectNotFound
+
+if TYPE_CHECKING:
+    from .conf.global_settings import EdgySettings
+    from .core.connection import Database, DatabaseURL, Registry
+    from .core.db.datastructures import Index, UniqueConstraint
+    from .core.db.models import (
+        Manager,
+        Model,
+        ModelRef,
+        RedirectManager,
+        ReflectModel,
+        StrictModel,
+    )
+    from .core.db.querysets import Prefetch, Q, QuerySet, and_, not_, or_
+    from .core.signals import Signal
+    from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
 __all__ = [
+    "monkay",
     "and_",
     "not_",
     "or_",
     "Q",
+    "EdgyExtra",
+    "EdgySettings",
+    "files",
+    "Migrate",
+    "Prefetch",
+    "QuerySet",
+    "Signal",
+    "settings",
+    "run_sync",
+    # index and constraint
+    "Index",
+    "UniqueConstraint",
+    # some exceptions
+    "MultipleObjectsReturned",
+    "ObjectNotFound",
+    # constants
+    "CASCADE",
+    "RESTRICT",
+    "DO_NOTHING",
+    "SET_NULL",
+    "SET_DEFAULT",
+    "PROTECT",
+    "ConditionalRedirect",
+    # models
+    "ReflectModel",
+    "StrictModel",
+    "Model",
+    "ModelRef",
+    "Manager",
+    "RedirectManager",
+    # fields
+    "fields",
     "BigIntegerField",
     "BinaryField",
     "BooleanField",
-    "CASCADE",
-    "ConditionalRedirect",
     "CharField",
     "ChoiceField",
     "ComputedField",
     "CompositeField",
-    "Database",
-    "DatabaseURL",
     "DateField",
     "DateTimeField",
     "DurationField",
     "DecimalField",
-    "EdgyExtra",
-    "EdgySettings",
     "EmailField",
     "ExcludeField",
-    "fields",
-    "files",
     "FloatField",
+    "ImageField",
     "FileField",
     "ForeignKey",
-    "Index",
-    "IntegerField",
-    "JSONField",
-    "RefForeignKey",
-    "Manager",
-    "ManyToMany",
-    "ManyToManyField",
-    "Migrate",
-    "Model",
-    "ModelRef",
-    "MultipleObjectsReturned",
-    "ObjectNotFound",
     "OneToOne",
     "OneToOneField",
     "PasswordField",
     "PlaceholderField",
-    "Prefetch",
-    "QuerySet",
-    "ReflectModel",
-    "StrictModel",
-    "RESTRICT",
-    "Registry",
-    "SET_NULL",
-    "Signal",
     "SmallIntegerField",
     "TextField",
     "TimeField",
     "URLField",
     "UUIDField",
-    "UniqueConstraint",
-    "settings",
-    "run_sync",
+    "ManyToMany",
+    "ManyToManyField",
+    "IntegerField",
+    "JSONField",
+    "RefForeignKey",
+    "IPAddressField",
+    # base connection
+    "Database",
+    "DatabaseURL",
+    "Registry",
 ]
+
+monkay: Monkay[Registry, EdgySettings] = Monkay(
+    globals(),
+    with_extensions=True,
+    with_instance=True,
+    settings_path=os.environ.get("EDGY_SETTINGS_MODULE", "edgy.conf.global_settings.EdgySettings"),
+    settings_extensions_name="extensions",
+    settings_preloads_name="preloads",
+    uncached_imports={"settings"},
+    lazy_imports={
+        "settings": lambda: monkay.settings,
+        "EdgySettings": "edgy.conf.global_settings:EdgySettings",
+        "fields": lambda: import_module("edgy.core.db.fields"),
+        "files": lambda: import_module("edgy.core.files"),
+        "Signal": "edgy.core.signals:Signal",
+        "MultipleObjectsReturned": "edgy.exceptions:MultipleObjectsReturned",
+        "ObjectNotFound": "edgy.exceptions:ObjectNotFound",
+    },
+    deprecated_lazy_imports={
+        "Migrate": {
+            "path": "edgy.cli.base:Migrate",
+            "reason": "Use the monkay based system instead.",
+        },
+        "EdgyExtra": {
+            "path": "edgy.core.extras:EdgyExtra",
+            "reason": "Use the monkay based system instead.",
+        },
+    },
+    skip_all_update=True,
+)
+
+for name in ["Manager", "Model", "ModelRef", "RedirectManager", "ReflectModel", "StrictModel"]:
+    monkay.add_lazy_import(name, f"edgy.core.db.models.{name}")
+for name in ["Database", "DatabaseURL", "Registry"]:
+    monkay.add_lazy_import(name, f"edgy.core.connection.{name}")
+for name in ["Prefetch", "Q", "QuerySet", "and_", "not_", "or_"]:
+    monkay.add_lazy_import(name, f"edgy.core.db.querysets.{name}")
+for name in [
+    "CASCADE",
+    "RESTRICT",
+    "DO_NOTHING",
+    "SET_NULL",
+    "SET_DEFAULT",
+    "PROTECT",
+    "ConditionalRedirect",
+]:
+    monkay.add_lazy_import(name, f"edgy.core.db.constants.{name}")
+
+for name in __all__:
+    if name.endswith("Field") or name in {
+        "OneToOne",
+        "ManyToMany",
+        "ForeignKey",
+        "RefForeignKey",
+    }:
+        monkay.add_lazy_import(name, f"edgy.core.db.fields.{name}")
