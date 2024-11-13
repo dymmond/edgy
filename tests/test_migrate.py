@@ -45,7 +45,11 @@ def test_migrate_without_model_apps():
 
     assert len(models.models) == 3
     assert len(migrate.registry.models) == 3
-    registry = migrate.get_registry_copy()
+    registry = edgy.monkay.instance.registry
+    registry.refresh_metadata(
+        multi_schema=edgy.monkay.settings.multi_schema,
+        ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
+    )
     assert len(registry.models) == 3
 
 
@@ -60,8 +64,12 @@ def test_migrate_with_fake_model_apps(model_apps):
 
     assert len(nother.models) == 0
 
-    migrate = Migrate(app=app, registry=nother, model_apps=model_apps)
-    registry = migrate.get_registry_copy()
+    Migrate(app=app, registry=nother, model_apps=model_apps)
+    registry = edgy.monkay.instance.registry
+    registry.refresh_metadata(
+        multi_schema=edgy.monkay.settings.multi_schema,
+        ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
+    )
 
     assert len(nother.models) == 2
     assert len(registry.models) == 2

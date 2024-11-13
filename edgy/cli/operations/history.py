@@ -1,15 +1,10 @@
 import click
 
 from edgy.cli.base import history as _history
-from edgy.cli.env import MigrationEnv
+from edgy.cli.decorators import add_migration_directory_option
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
+@add_migration_directory_option
 @click.option(
     "-r", "--rev-range", default=None, help="Specify a revision range; format is [start]:[end]"
 )
@@ -21,8 +16,6 @@ from edgy.cli.env import MigrationEnv
     help=("Indicate current version (Alembic 0.9.9 or greater is " "required)"),
 )
 @click.command()
-def history(
-    env: MigrationEnv, directory: str, rev_range: str, verbose: bool, indicate_current: bool
-) -> None:
+def history(rev_range: str, verbose: bool, indicate_current: bool) -> None:
     """List changeset scripts in chronological order."""
-    _history(env.app, directory, rev_range, verbose, indicate_current)
+    _history(rev_range, verbose, indicate_current)

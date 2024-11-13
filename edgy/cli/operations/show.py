@@ -1,17 +1,12 @@
 import click
 
 from edgy.cli.base import show as _show
-from edgy.cli.env import MigrationEnv
+from edgy.cli.decorators import add_migration_directory_option
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
+@add_migration_directory_option
 @click.command()
 @click.argument("revision", default="head")
-def show(env: MigrationEnv, directory: str, revision: str) -> None:
+def show(revision: str) -> None:
     """Show the revision denoted by the given symbol."""
-    _show(env.app, directory, revision)
+    _show(revision)

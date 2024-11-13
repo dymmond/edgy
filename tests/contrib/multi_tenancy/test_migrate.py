@@ -3,6 +3,7 @@ from uuid import UUID
 import pytest
 from esmerald import Esmerald
 
+import edgy
 from edgy import Migrate, Registry
 from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin
@@ -50,9 +51,12 @@ async def test_migrate_objs_main_only():
 
     app = Esmerald()
 
-    migrate = Migrate(app=app, registry=models)
-    registry = migrate.get_registry_copy()
-
+    Migrate(app=app, registry=models)
+    registry = edgy.monkay.instance.registry
+    registry.refresh_metadata(
+        multi_schema=edgy.monkay.settings.multi_schema,
+        ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
+    )
     assert len(registry.metadata_by_name[None].tables.keys()) == 2
 
 
@@ -68,14 +72,19 @@ async def test_migrate_objs_all():
 
     app = Esmerald()
 
-    migrate = Migrate(app=app, registry=models, multi_schema=True)
-    registry = migrate.get_registry_copy()
+    Migrate(app=app, registry=models)
+    with edgy.monkay.with_settings(edgy.monkay.settings.model_copy(update={"multi_schema": True})):
+        registry = edgy.monkay.instance.registry
+        registry.refresh_metadata(
+            multi_schema=edgy.monkay.settings.multi_schema,
+            ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
+        )
 
-    assert set(registry.metadata_by_name[None].tables.keys()) == {
-        "tenants",
-        "migrate_edgy.products",
-        "products",
-    }
+        assert set(registry.metadata_by_name[None].tables.keys()) == {
+            "tenants",
+            "migrate_edgy.products",
+            "products",
+        }
 
 
 async def test_migrate_objs_namespace_only():
@@ -93,10 +102,17 @@ async def test_migrate_objs_namespace_only():
 
     app = Esmerald()
 
-    migrate = Migrate(app=app, registry=models, multi_schema="saffier")
-    registry = migrate.get_registry_copy()
+    Migrate(app=app, registry=models)
+    with edgy.monkay.with_settings(
+        edgy.monkay.settings.model_copy(update={"multi_schema": "saffier"})
+    ):
+        registry = edgy.monkay.instance.registry
+        registry.refresh_metadata(
+            multi_schema=edgy.monkay.settings.multi_schema,
+            ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
+        )
 
-    assert set(registry.metadata_by_name[None].tables.keys()) == {"saffier.products"}
+        assert set(registry.metadata_by_name[None].tables.keys()) == {"saffier.products"}
 
 
 async def test_migrate_objs_few():
@@ -114,11 +130,17 @@ async def test_migrate_objs_few():
 
     app = Esmerald()
 
-    migrate = Migrate(app=app, registry=models, multi_schema="saffier|^$")
-    registry = migrate.get_registry_copy()
-
-    assert set(registry.metadata_by_name[None].tables.keys()) == {
-        "saffier.products",
-        "products",
-        "tenants",
-    }
+    Migrate(app=app, registry=models)
+    with edgy.monkay.with_settings(
+        edgy.monkay.settings.model_copy(update={"multi_schema": "saffier|^$"})
+    ):
+        registry = edgy.monkay.instance.registry
+        registry.refresh_metadata(
+            multi_schema=edgy.monkay.settings.multi_schema,
+            ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
+        )
+        assert set(registry.metadata_by_name[None].tables.keys()) == {
+            "saffier.products",
+            "products",
+            "tenants",
+        }

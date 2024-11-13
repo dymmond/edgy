@@ -1,15 +1,10 @@
 import click
 
 from edgy.cli.base import init as _init
-from edgy.cli.env import MigrationEnv
+from edgy.cli.decorators import add_migration_directory_option
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
+@add_migration_directory_option
 @click.option(
     "-t", "--template", default=None, help=('Repository template to use (default is "flask")')
 )
@@ -19,6 +14,6 @@ from edgy.cli.env import MigrationEnv
     help=("Write empty __init__.py files to the environment and " "version locations"),
 )
 @click.command(name="init")
-def init(env: MigrationEnv, directory: str, template: str, package: bool) -> None:
+def init(template: str, package: bool) -> None:
     """Creates a new migration repository."""
-    _init(env.app, directory, template, package)
+    _init(template, package)

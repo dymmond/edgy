@@ -2,16 +2,17 @@ import asyncio
 import select
 import sys
 from collections.abc import Sequence
-from typing import Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import click
 
-from edgy import Registry
-from edgy.cli.constants import EDGY_DB, EDGY_EXTRA
-from edgy.cli.env import MigrationEnv
+import edgy
 from edgy.cli.operations.shell.enums import ShellOption
 from edgy.core.events import AyncLifespanContextManager
 from edgy.core.utils.sync import run_sync
+
+if TYPE_CHECKING:
+    from edgy.core.connection import Registry
 
 
 @click.option(
@@ -22,20 +23,14 @@ from edgy.core.utils.sync import run_sync
     show_default=True,
 )
 @click.command()
-def shell(env: MigrationEnv, kernel: str) -> None:
+def shell(kernel: str) -> None:
     """
     Starts an interactive ipython shell with all the models
     and important python libraries.
 
     This can be used with a Migration class or with EdgyExtra object lookup.
     """
-    try:
-        # try to retrieve a migration config object from app
-        registry = getattr(env.app, EDGY_DB)["migrate"].registry
-    except AttributeError:
-        # try to retrieve a EDGY_EXTRA config object from app
-        registry = getattr(env.app, EDGY_EXTRA)["extra"].registry
-
+    registry, app = edgy.monkay.instance
     if (
         sys.platform != "win32"
         and not sys.stdin.isatty()
@@ -44,17 +39,17 @@ def shell(env: MigrationEnv, kernel: str) -> None:
         exec(sys.stdin.read(), globals())
         return
 
-    on_startup = getattr(env.app, "on_startup", [])
-    on_shutdown = getattr(env.app, "on_shutdown", [])
-    lifespan = getattr(env.app, "lifespan", None)
+    on_startup = getattr(app, "on_startup", [])
+    on_shutdown = getattr(app, "on_shutdown", [])
+    lifespan = getattr(app, "lifespan", None)
     lifespan = handle_lifespan_events(
         on_startup=on_startup, on_shutdown=on_shutdown, lifespan=lifespan
     )
-    run_sync(run_shell(env.app, lifespan, registry, kernel))
+    run_sync(run_shell(app, lifespan, registry, kernel))
     return None
 
 
-async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) -> None:
+async def run_shell(app: Any, lifespan: Any, registry: "Registry", kernel: str) -> None:
     """Executes the database shell connection"""
 
     async with lifespan(app):

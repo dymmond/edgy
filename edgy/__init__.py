@@ -3,29 +3,36 @@ from __future__ import annotations
 __version__ = "0.22.0"
 import os
 from importlib import import_module
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, NamedTuple, Optional
 
 from monkay import Monkay
 
-from .core.utils.sync import run_sync
+from edgy.conf.global_settings import EdgySettings
+from edgy.core.connection import Database, DatabaseURL, Registry
+from edgy.core.db.models import (
+    Manager,
+    Model,
+    ModelRef,
+    RedirectManager,
+    ReflectModel,
+    StrictModel,
+)
+from edgy.core.db.querysets import Prefetch, Q, QuerySet, and_, not_, or_
+from edgy.core.utils.sync import run_sync
 
 if TYPE_CHECKING:
-    from .conf.global_settings import EdgySettings
-    from .core.connection import Database, DatabaseURL, Registry
     from .core.db.datastructures import Index, UniqueConstraint
-    from .core.db.models import (
-        Manager,
-        Model,
-        ModelRef,
-        RedirectManager,
-        ReflectModel,
-        StrictModel,
-    )
-    from .core.db.querysets import Prefetch, Q, QuerySet, and_, not_, or_
     from .core.signals import Signal
     from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
+
+class Instance(NamedTuple):
+    registry: Registry
+    app: Optional[Any] = None
+
+
 __all__ = [
+    "Instance",
     "monkay",
     "and_",
     "not_",
@@ -101,22 +108,23 @@ __all__ = [
     "Registry",
 ]
 
-monkay: Monkay[Registry, EdgySettings] = Monkay(
+monkay: Monkay[Instance, EdgySettings] = Monkay(
     globals(),
     with_extensions=True,
     with_instance=True,
     settings_path=os.environ.get("EDGY_SETTINGS_MODULE", "edgy.conf.global_settings.EdgySettings"),
-    settings_extensions_name="extensions",
-    settings_preloads_name="preloads",
+    # settings_extensions_name="extensions",
+    # settings_preloads_name="preloads",
     uncached_imports={"settings"},
     lazy_imports={
         "settings": lambda: monkay.settings,
-        "EdgySettings": "edgy.conf.global_settings:EdgySettings",
         "fields": lambda: import_module("edgy.core.db.fields"),
         "files": lambda: import_module("edgy.core.files"),
         "Signal": "edgy.core.signals:Signal",
         "MultipleObjectsReturned": "edgy.exceptions:MultipleObjectsReturned",
         "ObjectNotFound": "edgy.exceptions:ObjectNotFound",
+        "UniqueConstraint": "edgy.core.db.datastructures:UniqueConstraint",
+        "Index": "edgy.core.db.datastructures:Index",
     },
     deprecated_lazy_imports={
         "Migrate": {
@@ -130,13 +138,6 @@ monkay: Monkay[Registry, EdgySettings] = Monkay(
     },
     skip_all_update=True,
 )
-
-for name in ["Manager", "Model", "ModelRef", "RedirectManager", "ReflectModel", "StrictModel"]:
-    monkay.add_lazy_import(name, f"edgy.core.db.models.{name}")
-for name in ["Database", "DatabaseURL", "Registry"]:
-    monkay.add_lazy_import(name, f"edgy.core.connection.{name}")
-for name in ["Prefetch", "Q", "QuerySet", "and_", "not_", "or_"]:
-    monkay.add_lazy_import(name, f"edgy.core.db.querysets.{name}")
 for name in [
     "CASCADE",
     "RESTRICT",
@@ -156,3 +157,5 @@ for name in __all__:
         "RefForeignKey",
     }:
         monkay.add_lazy_import(name, f"edgy.core.db.fields.{name}")
+
+del name

@@ -34,13 +34,12 @@ class MediaSettings(BaseSettings):
 
 
 class MigrationSettings(BaseSettings):
-    multi_schema: list[Union[bool, re.Pattern, str]] | tuple[Union[bool, re.Pattern, str]] = (
-        False,
-    )
-    ignore_schema_pattern: (
-        list[Union[None, re.Pattern, str]] | tuple[Union[None, re.Pattern, str]]
-    ) = ("information_schema",)
-    alembic_ctx_kwargs: dict = {}
+    multi_schema: Union[bool, re.Pattern, str] = False
+    ignore_schema_pattern: Union[None, re.Pattern, str] = "information_schema"
+    alembic_ctx_kwargs: dict = {
+        "compare_type": True,
+        "render_as_batch": True,
+    }
     migration_directory: Union[str, os.PathLike] = Path("migrations/")
 
 

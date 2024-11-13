@@ -1,24 +1,12 @@
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from edgy.cli.constants import EDGY_DB, EDGY_EXTRA
-from edgy.core.extras.base import BaseExtra
-from edgy.core.terminal import Print, Terminal
+import edgy
 
 if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
 
-terminal = Terminal()
-printer = Print()
 
-
-@dataclass
-class Config:
-    app: Any
-    registry: "Registry"
-
-
-class EdgyExtra(BaseExtra):
+class EdgyExtra:
     """
     Shim which can be used for cli applications instead of Migrate.
     """
@@ -35,12 +23,4 @@ class EdgyExtra(BaseExtra):
         """
         Sets a edgy dictionary for the app object.
         """
-        if hasattr(app, EDGY_DB):
-            printer.write_warning(
-                "The application already has a Migrate related configuration with the needed information. EdgyExtra will be ignored and it can be removed."
-            )
-            return
-
-        config = Config(app=app, registry=registry)
-        # bypass __setattr__ method
-        object.__setattr__(app, EDGY_EXTRA, {"extra": config})
+        edgy.monkay.set_instance(edgy.Instance(registry, app))

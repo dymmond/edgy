@@ -1,15 +1,10 @@
 import click
 
 from edgy.cli.base import stamp as _stamp
-from edgy.cli.env import MigrationEnv
+from edgy.cli.decorators import add_migration_directory_option
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
+@add_migration_directory_option
 @click.option(
     "--sql", is_flag=True, help=("Don't emit SQL to database - dump to standard output " "instead")
 )
@@ -18,7 +13,7 @@ from edgy.cli.env import MigrationEnv
 )
 @click.argument("revision", default="head")
 @click.command()
-def stamp(env: MigrationEnv, directory: str, sql: bool, tag: str, revision: str) -> None:
+def stamp(sql: bool, tag: str, revision: str) -> None:
     """'stamp' the revision table with the given revision; don't run any
     migrations"""
-    _stamp(env.app, directory, revision, sql, tag)
+    _stamp(revision, sql, tag)
