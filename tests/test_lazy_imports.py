@@ -5,10 +5,8 @@ def test_lazy_imports():
     missing = edgy.monkay.find_missing(
         all_var=edgy.__all__,
         search_pathes=[
-            ".core.connection.registry",
-            # FIXME: false positives because of re-exports
-            # ".core.connection",
-            # ".core.db.models",
+            ".core.connection",
+            ".core.db.models",
             ".core.db.fields",
             ".core.db.constants",
         ],
