@@ -57,7 +57,7 @@ async def rollback_transactions():
 
 
 async def test_inspect_db():
-    (out, error, ss) = run_cmd("tests.cli.main:app", f"edgy inspectdb --database={DATABASE_URL}")
+    (out, error, ss) = run_cmd("tests.cli.main", f"edgy inspectdb --database={DATABASE_URL}")
 
     out = out.decode("utf8")
 
@@ -69,7 +69,7 @@ async def test_inspect_db():
 
 async def test_inspect_db_with_schema():
     (out, error, ss) = run_cmd(
-        "tests.cli.main:app", f"edgy inspectdb --database={DATABASE_URL} --schema='public'"
+        "tests.cli.main", f"edgy inspectdb --database={DATABASE_URL} --schema='public'"
     )
 
     out = out.decode("utf8")

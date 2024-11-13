@@ -36,15 +36,6 @@ class Config(AlembicConfig):
         package_dir = os.path.abspath(os.path.dirname(__file__))
         return os.path.join(package_dir, "templates")
 
-    def get_prepared_registry(self) -> "Registry":
-        """Get registry with applied restrictions, usable for migrations."""
-        registry = edgy.monkay.instance
-        registry.refresh_metadata(
-            multi_schema=edgy.monkay.settings.multi_schema,
-            ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
-        )
-        return registry
-
     @classmethod
     def get_instance(
         cls,
@@ -53,7 +44,7 @@ class Config(AlembicConfig):
     ) -> Any:
         directory = str(edgy.settings.migration_directory)
         config = cls(os.path.join(directory, "alembic.ini"))
-        config.set_main_option("script_location", directory)
+        config.set_main_option("script_location", str(directory))
 
         if config.cmd_opts is None:
             config.cmd_opts = argparse.Namespace()
@@ -159,14 +150,11 @@ def list_templates() -> None:
 
 @catch_errors
 def init(
-    app: Optional[typing.Any] = None,
-    directory: Optional[str] = None,
     template: Optional[str] = None,
     package: bool = False,
 ) -> None:
     """Creates a new migration folder"""
-    if directory is None:
-        directory = "migrations"
+    directory = str(edgy.monkay.settings.migration_directory)
 
     template_directory = None
 
@@ -277,8 +265,6 @@ def upgrade(
 
 @catch_errors
 def downgrade(
-    app: Optional[typing.Any],
-    directory: Optional[str] = None,
     revision: str = "-1",
     sql: bool = False,
     tag: Optional[str] = None,

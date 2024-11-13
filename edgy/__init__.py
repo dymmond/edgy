@@ -33,6 +33,7 @@ class Instance(NamedTuple):
 
 __all__ = [
     "Instance",
+    "get_migration_prepared_registry",
     "monkay",
     "and_",
     "not_",
@@ -130,10 +131,12 @@ monkay: Monkay[Instance, EdgySettings] = Monkay(
         "Migrate": {
             "path": "edgy.cli.base:Migrate",
             "reason": "Use the monkay based system instead.",
+            "new_attribute": "Instance",
         },
         "EdgyExtra": {
-            "path": "edgy.core.extras:EdgyExtra",
+            "path": "edgy.cli.base:Migrate",
             "reason": "Use the monkay based system instead.",
+            "new_attribute": "Instance",
         },
     },
     skip_all_update=True,
@@ -159,3 +162,16 @@ for name in __all__:
         monkay.add_lazy_import(name, f"edgy.core.db.fields.{name}")
 
 del name
+
+
+def get_migration_prepared_registry() -> Registry:
+    """Get registry with applied restrictions, usable for migrations."""
+    instance = monkay.instance
+    assert instance is not None
+    registry = instance.registry
+    assert registry is not None
+    registry.refresh_metadata(
+        multi_schema=monkay.settings.multi_schema,
+        ignore_schema_pattern=monkay.settings.ignore_schema_pattern,
+    )
+    return registry

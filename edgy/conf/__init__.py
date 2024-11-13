@@ -10,6 +10,6 @@ class SettingsForward:
         return getattr(monkay.settings, name)
 
 
-settings: EdgySettings = SettingsForward()  # types: ignore
+settings: EdgySettings = SettingsForward()  # type: ignore
 
 __all__ = ["settings"]

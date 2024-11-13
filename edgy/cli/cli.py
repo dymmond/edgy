@@ -4,6 +4,7 @@ Client to interact with Edgy models and migrations.
 
 import click
 
+from edgy.cli.decorators import add_app_module_option
 from edgy.cli.operations import (
     check,
     current,
@@ -24,9 +25,9 @@ from edgy.cli.operations import (
 )
 
 
+@add_app_module_option
 @click.group()
-@click.pass_context
-def edgy_cli(ctx: click.Context) -> None:
+def edgy_cli(path: str = "") -> None:
     """Performs database migrations"""
 
 

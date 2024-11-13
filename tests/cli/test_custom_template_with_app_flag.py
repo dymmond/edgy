@@ -56,13 +56,13 @@ async def cleanup_prepare_db():
 
 def test_migrate_upgrade(create_folders):
     asyncio.run(cleanup_prepare_db())
-    (o, e, ss) = run_cmd("tests.cli.main", "edgy init -t ./custom")
+    (o, e, ss) = run_cmd("tests.cli.main", "edgy --app tests.cli.main  init -t ./custom")
     assert ss == 0
 
-    (o, e, ss) = run_cmd("tests.cli.main", "edgy makemigrations")
+    (o, e, ss) = run_cmd("tests.cli.main", "edgy --app tests.cli.main makemigrations")
     assert ss == 0
 
-    (o, e, ss) = run_cmd("tests.cli.main", "edgy migrate")
+    (o, e, ss) = run_cmd("tests.cli.main", "edgy --app tests.cli.main migrate")
     assert ss == 0
 
     with open("migrations/README") as f:

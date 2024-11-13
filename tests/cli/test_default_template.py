@@ -56,7 +56,7 @@ async def cleanup_prepare_db():
 
 def test_migrate_upgrade(create_folders):
     asyncio.run(cleanup_prepare_db())
-    (o, e, ss) = run_cmd("tests.cli.main", "edgy init -t ./custom")
+    (o, e, ss) = run_cmd("tests.cli.main", "edgy init")
     assert ss == 0
 
     (o, e, ss) = run_cmd("tests.cli.main", "edgy makemigrations")
@@ -64,12 +64,3 @@ def test_migrate_upgrade(create_folders):
 
     (o, e, ss) = run_cmd("tests.cli.main", "edgy migrate")
     assert ss == 0
-
-    with open("migrations/README") as f:
-        assert f.readline().strip() == "Custom template"
-    with open("migrations/alembic.ini") as f:
-        assert f.readline().strip() == "# A generic, single database configuration"
-    with open("migrations/env.py") as f:
-        assert f.readline().strip() == "# Custom env template"
-    with open("migrations/script.py.mako") as f:
-        assert f.readline().strip() == "# Custom mako template"

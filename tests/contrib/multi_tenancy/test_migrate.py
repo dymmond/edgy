@@ -52,11 +52,7 @@ async def test_migrate_objs_main_only():
     app = Esmerald()
 
     Migrate(app=app, registry=models)
-    registry = edgy.monkay.instance.registry
-    registry.refresh_metadata(
-        multi_schema=edgy.monkay.settings.multi_schema,
-        ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
-    )
+    registry = edgy.get_migration_prepared_registry()
     assert len(registry.metadata_by_name[None].tables.keys()) == 2
 
 
@@ -74,11 +70,7 @@ async def test_migrate_objs_all():
 
     Migrate(app=app, registry=models)
     with edgy.monkay.with_settings(edgy.monkay.settings.model_copy(update={"multi_schema": True})):
-        registry = edgy.monkay.instance.registry
-        registry.refresh_metadata(
-            multi_schema=edgy.monkay.settings.multi_schema,
-            ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
-        )
+        registry = edgy.get_migration_prepared_registry()
 
         assert set(registry.metadata_by_name[None].tables.keys()) == {
             "tenants",
@@ -106,11 +98,7 @@ async def test_migrate_objs_namespace_only():
     with edgy.monkay.with_settings(
         edgy.monkay.settings.model_copy(update={"multi_schema": "saffier"})
     ):
-        registry = edgy.monkay.instance.registry
-        registry.refresh_metadata(
-            multi_schema=edgy.monkay.settings.multi_schema,
-            ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
-        )
+        registry = edgy.get_migration_prepared_registry()
 
         assert set(registry.metadata_by_name[None].tables.keys()) == {"saffier.products"}
 
@@ -134,11 +122,7 @@ async def test_migrate_objs_few():
     with edgy.monkay.with_settings(
         edgy.monkay.settings.model_copy(update={"multi_schema": "saffier|^$"})
     ):
-        registry = edgy.monkay.instance.registry
-        registry.refresh_metadata(
-            multi_schema=edgy.monkay.settings.multi_schema,
-            ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
-        )
+        registry = edgy.get_migration_prepared_registry()
         assert set(registry.metadata_by_name[None].tables.keys()) == {
             "saffier.products",
             "products",

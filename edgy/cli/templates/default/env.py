@@ -29,16 +29,12 @@ logger = logging.getLogger("alembic.env")
 def get_engine_url_and_metadata() -> tuple[str, "sqlalchemy.MetaData"]:
     url: Optional[str] = os.environ.get("EDGY_DATABASE_URL")
     _name = None
-    registry = edgy.monkay.instance.registry
-    registry.refresh_metadata(
-        multi_schema=edgy.monkay.settings.multi_schema,
-        ignore_schema_pattern=edgy.monkay.settings.ignore_schema_pattern,
-    )
+    registry = edgy.get_migration_prepared_registry()
     _metadata = registry.metadata_by_name[None]
     if not url:
         db_name: Optional[str] = os.environ.get("EDGY_DATABASE")
         if db_name:
-            url = str(registry.extras[db_name].url)
+            url = str(registry.extra[db_name].url)
     if not url:
         url = str(registry.database.url)
     else:
