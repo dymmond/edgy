@@ -86,7 +86,7 @@ $ edgy --app myproject.main:app shell
 **Environment variables**
 
 ```shell
-$ export EDGY_DEFAULT_APP=--app myproject.main:app
+$ export EDGY_DEFAULT_APP=--app myproject.main
 $ edgy shell --kernel ptpython
 ```
 

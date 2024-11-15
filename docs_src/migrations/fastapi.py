@@ -30,7 +30,7 @@ def get_application():
 
     app = registry.asgi(FastAPI(__name__))
 
-    monkay.set_instance(Instance(app=app, registry=registry))
+    monkay.set_instance(Instance(registry=registry, app=app))
     return app
 
 

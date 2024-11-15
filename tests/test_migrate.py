@@ -40,15 +40,26 @@ class Contact(Profile):
 
 
 @pytest.mark.parametrize(
-    "init,deprecated", [("Instance", True), ("Migrate", True), ("EdgyExtra", True)]
+    "instance_wrapper,deprecated", [("Instance", False), ("Migrate", True), ("EdgyExtra", True)]
 )
-def test_migrate_without_model_apps(init, deprecated):
+def test_migrate_without_model_apps(instance_wrapper, deprecated):
     app = Esmerald()
     if deprecated:
         with pytest.warns(DeprecationWarning):
-            migrate = init(app=app, registry=models)
+            migrate = getattr(edgy, instance_wrapper)(app=app, registry=models)
     else:
-        migrate = init(app=app, registry=models)
+        migrate = getattr(edgy, instance_wrapper)(app=app, registry=models)
+        edgy.monkay.set_instance(migrate)
+
+    assert len(models.models) == 3
+    assert len(migrate.registry.models) == 3
+    registry = edgy.get_migration_prepared_registry()
+    assert len(registry.models) == 3
+
+
+def test_migrate_without_model_apps_and_app():
+    migrate = edgy.Instance(registry=models)
+    edgy.monkay.set_instance(migrate)
 
     assert len(models.models) == 3
     assert len(migrate.registry.models) == 3

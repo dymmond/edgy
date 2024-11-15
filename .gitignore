@@ -18,6 +18,7 @@ results/
 site/
 target/
 tests/cli/migrations
+tests/cli/migrations2
 media/
 test_media/
 

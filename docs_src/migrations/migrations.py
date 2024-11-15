@@ -34,7 +34,7 @@ def get_application():
         )
     )
 
-    monkay.set_instance(Instance(app=app, registry=registry))
+    monkay.set_instance(Instance(registry=registry, app=app))
     return app
 
 
