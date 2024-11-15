@@ -5,10 +5,10 @@ import pytest
 import edgy
 from edgy import Instance
 from edgy.contrib.permissions import BasePermission
-from tests.settings import DATABASE_URL
+from tests.settings import TEST_DATABASE
 
 pytestmark = pytest.mark.anyio
-models = edgy.Registry(database=DATABASE_URL, with_content_type=True)
+models = edgy.Registry(database=TEST_DATABASE, with_content_type=True)
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
