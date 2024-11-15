@@ -5,7 +5,7 @@ import edgy
 
 @dataclass
 class Extension(ExtensionProtocol[edgy.Instance, edgy.Registry]):
-    name: str = "hello"
+    name: str = "hard-typed"
 
     def apply(self, monkay_instance: Monkay[edgy.Instance, edgy.Registry]) -> None:
         """Do something here"""
@@ -13,7 +13,7 @@ class Extension(ExtensionProtocol[edgy.Instance, edgy.Registry]):
 
 @dataclass
 class ExtensionLessTyped(ExtensionProtocol):
-    name: str = "hello"
+    name: str = "less-typed"
 
     def apply(self, monkay_instance: Monkay) -> None:
         """Do something here"""

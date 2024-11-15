@@ -113,9 +113,10 @@ monkay: Monkay[Instance, EdgySettings] = Monkay(
     globals(),
     with_extensions=True,
     with_instance=True,
+    # must be at least an empty string to initialize the settings
     settings_path=os.environ.get("EDGY_SETTINGS_MODULE", "edgy.conf.global_settings.EdgySettings"),
-    # settings_extensions_name="extensions",
-    # settings_preloads_name="preloads",
+    settings_extensions_name="extensions",
+    settings_preloads_name="preloads",
     uncached_imports={"settings"},
     lazy_imports={
         "settings": lambda: monkay.settings,
@@ -140,7 +141,10 @@ monkay: Monkay[Instance, EdgySettings] = Monkay(
         },
     },
     skip_all_update=True,
+    evaluate_settings=False,
 )
+# TODO: check for esmerald edgy settings later and init here before evaluating settings
+monkay.evaluate_settings(on_conflict="error")
 for name in [
     "CASCADE",
     "RESTRICT",
