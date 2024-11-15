@@ -113,7 +113,7 @@ nav:
   - Extras:
       - Exceptions: "exceptions.md"
       - Tips and Tricks: "tips-and-tricks.md"
-      - Extras: "extras.md"
+      - Extensions: "extensions.md"
       - Test Client: "test-client.md"
   - API Reference:
       - "references/index.md"
@@ -132,7 +132,7 @@ nav:
       - Schema: "references/schemas.md"
       - Database: "references/database.md"
   - About:
-      - Edgy People: "edgy-people.md"
+      - Edgy Contributors: "edgy-people.md"
       - Contributing: "contributing.md"
       - Sponsorship: "sponsorship.md"
   - Release Notes: "release-notes.md"

@@ -8,7 +8,7 @@ from typing import Any, Optional, TypeVar
 from alembic.util import CommandError
 from loguru import logger
 
-from .constants import APP_PARAMETER, COMMANDS_WITHOUT_APP, DISCOVERY_PRELOADS, EDGY_DISCOVER_APP
+from .constants import APP_PARAMETER, COMMANDS_WITHOUT_APP, DISCOVERY_PRELOADS
 
 T = TypeVar("T")
 
@@ -51,8 +51,6 @@ def add_app_module_option(fn: Any) -> Any:
     def callback(ctx: click.Context, param: str, value: Optional[str]) -> None:
         import edgy
 
-        if edgy.monkay.instance is not None:
-            return
         if ctx.invoked_subcommand in COMMANDS_WITHOUT_APP:
             return
         cwd = Path.cwd()
@@ -61,7 +59,9 @@ def add_app_module_option(fn: Any) -> Any:
             import_module(value)
             if edgy.monkay.instance is None:
                 raise RuntimeError(f'Instance still unset after importing "{value}"')
-        else:
+
+        elif edgy.monkay.instance is None:
+            # skip when already set
             for preload in DISCOVERY_PRELOADS:
                 with suppress(ImportError):
                     import_module(preload)
@@ -79,7 +79,7 @@ def add_app_module_option(fn: Any) -> Any:
         APP_PARAMETER,
         "path",
         help="Module path to the application to generate the migrations.",
-        envvar=EDGY_DISCOVER_APP,
+        envvar="EDGY_DEFAULT_APP",
         default="",
         expose_value=False,
         is_eager=True,

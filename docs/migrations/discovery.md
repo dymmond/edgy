@@ -61,11 +61,15 @@ When no `--app` or no `EDGY_DEFAULT_APP` environment variable is provided, Edgy 
     * **main.py**
     * **app.py**
     * **application.py**
+    * **asgi.py**
+
+    (Or are otherwise importable by python without the .py stem)
 
     !!! Warning
         **If none of these files are found**, Edgy will look **at the first children nodes, only**,
         and repeats the same process. If no files are found then throws an `CommandEnvironmentError`
         exception.
+
 
 * Once one of those files is found, Edgy will check if the instance was set.
 
@@ -160,23 +164,32 @@ We will be also executing the commands inside `myproject`.
 $ edgy init
 ```
 
-Yes! Simply this and because the `--app` or a `EDGY_DEFAULT_APP` was provided, it triggered the
+Yes! Simply this and because not the `--app` or a `EDGY_DEFAULT_APP` was provided nor preloads were found, it triggered the
 auto discovery of the application that contains the edgy information.
 
 Because the application is inside `src/main.py` it will be automatically discovered by Edgy as
 it followed the [discovery pattern](#how-does-it-work).
 
-##### Using the --app or EDGY_DISCOVERY_APP
+##### Using preloads
+
+Edgy has an automatic registration pattern. All what `--app` or `EDGY_DEFAULT_APP` does is to import a file.
+The registration is expected to take place in the module automatically.
+Thanks to Monkay you can also provide such an import path as preload under
+`preloads` in settings.
+When the instance is set in a preloaded file, the auto-discovery is skipped.
+
+
+##### Using the --app or EDGY_DEFAULT_APP
 
 This is the other way to tell Edgy where to find your application. Since the application is
-inside the `src/main.py` we need to provide the proper location is a `<module>:<app>` format.
+inside the `src/main.py` we need to provide the proper location is a `<module>` format.
 
 ###### --app
 
 With the `--app` flag.
 
 ```shell
-$ edgy --app src.main:app init
+$ edgy --app src.main init
 ```
 
 ###### EDGY_DEFAULT_APP

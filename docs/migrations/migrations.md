@@ -72,37 +72,39 @@ This makes Edgy unique and extremely flexible to be used within any of the Frame
 such as [Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic... You choose.
 
 ```python
-from edgy import Migrate
+from edgy import Instance, monkay
+
+monkay.set_instance(Instance(registry=registry, app=None))
 ```
 
 ### Parameters
 
-The parameters availabe when using instantiating a [Migrate](#migration) object are the following:
+The parameters availabe when using instantiating a [Instance](#migration) object are the following:
 
-* **app** - The application instance. Any application you want your migrations to be attached to.
 * **registry** - The registry being used for your models. The registry **must be** an instance
 of `edgy.Registry` or an `AssertationError` is raised.
-* **model_apps** - A dictionary like object containing the string name and the location of the models
-used for inspection.
-* **compare_type** - Flag option that configures the automatic migration generation subsystem
-to detect column type changes.
+* **app** - Optionally an application instance.
 
-    <sup>Default: `True`</sup>
+### Settings
 
-* **render_as_batch** - This option generates migration scripts using batch mode, an operational
-mode that works around limitations of many ALTER commands in the SQLite database by implementing
-a "move and copy" workflow. Enabling this mode should make no difference when working with other
-databases.
+The following settings are available in the main settings object:
 
-    <sup>Default: `True`</sup>
+- multi_schema (bool / regexstring / regexpattern) - Activate multi schema migrations (Default: False).
+- ignore_schema_pattern (None / regexstring / regexpattern) - When using multi schema migrations, ignore following regex pattern (Default "information_schema")
+- alembic_ctx_kwargs (dict) - Extra arguments for alembic. By default:
+  ``` python
+  {
+        "compare_type": True,
+        "render_as_batch": True,
+  }
+  ```
+- migration_directory (str / PathLike) - Migrations directory. Absolute or relative. By default: "migrations".
 
-* **kwargs** - A python dictionary with any context variables to be added to alembic.
 
-    <sup>Default: `None`</sup>
 
 ### How to use it
 
-Using the [Migration](#migration) class is very simple in terms of requirements. In the
+Using the [Instance](#migration) class is very simple in terms of requirements. In the
 [tips and tricks](../tips-and-tricks.md) you can see some examples in terms of using the
 [LRU cache technique](../tips-and-tricks.md#the-lru-cache). If you haven't seen it,
 it is recommended you to have a look.
@@ -215,32 +217,11 @@ There is where your models for the `accounts` application will be placed. Someth
 {!> ../docs_src/migrations/accounts_models.py !}
 ```
 
-Now we want to tell the **Migrate** object to make sure it knows about this.
-
-##### Via dictionary
+Now we want to tell the **Instance** object to make sure it knows about this.
 
 ```python
-{!> ../docs_src/migrations/via_dict.py !}
+{!> ../docs_src/migrations/instance.py !}
 ```
-
-As you can see the `model_apps = {"accounts": "accounts.models"}` was added in a simple fashion.
-Every time you add new model or any changes, it should behave as normal as before with the key difference
-that **now Edgy has a way to know exactly where your models are specifically**.
-
-##### Via tuple
-
-```python
-{!> ../docs_src/migrations/via_tuple.py !}
-```
-
-The same for the tuple. You can simply pass `("accounts.models",)` as the location for the models.
-
-##### Via list
-
-```python
-{!> ../docs_src/migrations/via_list.py !}
-```
-Finally, for the `list`. You can pass `["accounts.models"]` as the location for the models.
 
 ## Generating and working with migrations
 
@@ -327,7 +308,7 @@ $ export EDGY_DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/my_data
 
 Or whatever connection string you are using.
 
-### Initialise the migrations folder
+### Initialize the migrations folder
 
 It is now time to generate the migrations folder. As mentioned before in the
 [environment variables section](#environment-variables), Edgy does need to have the
@@ -335,20 +316,20 @@ It is now time to generate the migrations folder. As mentioned before in the
 our `migrations`.
 
 ```shell
-edgy --app myproject.main:app init
+edgy --app myproject.main init
 ```
 
 What is happenening here? Well, `edgy` is always expecting an `--app` parameter to be
 provided.
 
-This `--app` is the location of your application in `module:app` format and this is because of
+This `--app` is the location of your application in `module_app` format and this is because of
 the fact of being **framework agnostic**.
 
-Edgy needs to know where your application object is located in order to hook it to that same
-application.
+Edgy needs the module automatically setting the instance (see [Connections](connection.md)) to know the registry
+which shall be used as well as the application object.
 
 Remember when it was mentioned that is important the location where you generate the migrations
-folder? Well, this is why, because when you do `my_project.main:app` you are telling that
+folder? Well, this is why, because when you do `my_project.main` you are telling that
 your application is inside the `myproject/main/app.py` and your migration folder should be placed
 **where the command was executed**.
 
@@ -454,7 +435,7 @@ There are many ways of exposing your models of course, so feel free to use any a
 Now it is time to generate the migration.
 
 ```shell
-$ edgy --app my_project.main:app makemigrations
+$ edgy --app my_project.main makemigrations
 ```
 
 Yes, it is this simple 😁
@@ -479,7 +460,7 @@ Your new migration should now be inside `migrations/versions/`. Something like t
 Or you can attach a message your migration that will then added to the file name as well.
 
 ```shell
-$ edgy --app my_project.main:app makemigrations -m "Initial migrations"
+$ edgy --app my_project.main makemigrations -m "Initial migrations"
 ```
 
 ```shell hl_lines="10"
@@ -519,13 +500,13 @@ for any other ORM and when you are happy run the migrations and apply them again
 **Generate new migrations**
 
 ```shell
-$ edgy --app my_project.main:app makemigrations
+$ edgy --app my_project.main makemigrations
 ```
 
 **Apply them to your database**
 
 ```shell
-$ edgy --app my_project.main:app migrate
+$ edgy --app my_project.main migrate
 ```
 
 ### More migration commands

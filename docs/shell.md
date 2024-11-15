@@ -18,9 +18,6 @@ The following examples and explanations will be using the [auto discovery](./mig
 but [--app and environment variables](./migrations/discovery.md#environment-variables) approach but the
 is equally valid and works in the same way.
 
-!!! Tip
-    See the [extras](./extras.md) section after getting familiar with the previous. There offers
-    a way of using the shell without going through the **Migrate** object.
 
 ## How does it work
 
@@ -80,13 +77,13 @@ $ edgy shell --kernel ptpython
 **--app**
 
 ```shell
-$ edgy --app myproject.main:app shell
+$ edgy --app myproject.main shell
 ```
 
 **Environment variables**
 
 ```shell
-$ export EDGY_DEFAULT_APP=--app myproject.main
+$ export EDGY_DEFAULT_APP=myproject.main
 $ edgy shell --kernel ptpython
 ```
 

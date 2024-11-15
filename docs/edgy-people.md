@@ -1,9 +1,8 @@
-# Edgy People
+# Edgy Contributors
 
-## The Special Ones
 
-Currently there are no special ones but we are hoping this will change soon.
+Edgy wouldn't be possible in this way without this people.
 
-## The Legends
+- @kokoserver
 
-Currently there are no legends but we are hoping this will change soon.
+  He provided a lot of valuable bug reports and PRs. Especially related to migrations.

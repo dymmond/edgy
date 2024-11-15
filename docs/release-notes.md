@@ -21,15 +21,17 @@ hide:
 - Breaking: EdgyExtra and Migrate are replaced by `edgy.Instance` but are still available.
 - Breaking: EdgyExtra is provided by the also obsolete Migrate.
 - Breaking: `model_apps` is replaced by `preloads` but still available during the migration time.
+- Breaking:
+  An automatic registration is assumed. See [Connection](connection.md) for examples.
 
 ### Fixed
 
 - Migrations with ManyToMany fields are broken.
-- get_engine_url_and_metadata was broken for some operations (thanks kososerver).
+- get_engine_url_and_metadata was broken for some operations (thanks @kokoserver).
 
-### Unresolved
+### Contributors
 
-- When copying a registry through models aren't copied properly.
+Thanks a lot to @kokoserver. He provided a *lot* of valuable bug reports and PRs.
 
 
 ## 0.22.0
