@@ -2,7 +2,7 @@ import pytest
 from esmerald import Esmerald
 
 import edgy
-from edgy import Migrate, Registry
+from edgy import Registry
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -39,9 +39,16 @@ class Contact(Profile):
         registry = models
 
 
-def test_migrate_without_model_apps():
+@pytest.mark.parametrize(
+    "init,deprecated", [("Instance", True), ("Migrate", True), ("EdgyExtra", True)]
+)
+def test_migrate_without_model_apps(init, deprecated):
     app = Esmerald()
-    migrate = Migrate(app=app, registry=models)
+    if deprecated:
+        with pytest.warns(DeprecationWarning):
+            migrate = init(app=app, registry=models)
+    else:
+        migrate = init(app=app, registry=models)
 
     assert len(models.models) == 3
     assert len(migrate.registry.models) == 3
@@ -60,7 +67,8 @@ def test_migrate_with_fake_model_apps(model_apps):
 
     assert len(nother.models) == 0
 
-    Migrate(app=app, registry=nother, model_apps=model_apps)
+    with pytest.warns(DeprecationWarning):
+        edgy.Migrate(app=app, registry=nother, model_apps=model_apps)
     registry = edgy.get_migration_prepared_registry()
     assert len(nother.models) == 2
     assert len(registry.models) == 2
@@ -77,5 +85,5 @@ def test_raises_assertation_error_on_model_apps(model_apps):
 
     assert len(nother.models) == 0
 
-    with pytest.raises(AssertionError):
-        Migrate(app=app, registry=nother, model_apps=model_apps)
+    with pytest.raises(AssertionError), pytest.warns(DeprecationWarning):
+        edgy.Migrate(app=app, registry=nother, model_apps=model_apps)

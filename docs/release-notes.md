@@ -18,8 +18,9 @@ hide:
 - Rework Migrate system to simply use Monkay instance.
 - Replace `get_registry_copy` by `get_migration_prepared_registry`.
 - Breaking: migration configuration takes place in settings.
-- Breaking: EdgyExtra and Migrate are replaced by `edgy.Instance` but still available.
-- Breaking: `model_apps` is replaced by `preloads`.
+- Breaking: EdgyExtra and Migrate are replaced by `edgy.Instance` but are still available.
+- Breaking: EdgyExtra is provided by the also obsolete Migrate.
+- Breaking: `model_apps` is replaced by `preloads` but still available during the migration time.
 
 ### Fixed
 

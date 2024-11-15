@@ -4,7 +4,7 @@ import pytest
 from esmerald import Esmerald
 
 import edgy
-from edgy import Migrate, Registry
+from edgy import Instance, Registry
 from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.core.db import fields
@@ -51,7 +51,7 @@ async def test_migrate_objs_main_only():
 
     app = Esmerald()
 
-    Migrate(app=app, registry=models)
+    Instance(app=app, registry=models)
     registry = edgy.get_migration_prepared_registry()
     assert len(registry.metadata_by_name[None].tables.keys()) == 2
 
@@ -68,7 +68,7 @@ async def test_migrate_objs_all():
 
     app = Esmerald()
 
-    Migrate(app=app, registry=models)
+    Instance(app=app, registry=models)
     with edgy.monkay.with_settings(edgy.monkay.settings.model_copy(update={"multi_schema": True})):
         registry = edgy.get_migration_prepared_registry()
 
@@ -94,7 +94,7 @@ async def test_migrate_objs_namespace_only():
 
     app = Esmerald()
 
-    Migrate(app=app, registry=models)
+    Instance(app=app, registry=models)
     with edgy.monkay.with_settings(
         edgy.monkay.settings.model_copy(update={"multi_schema": "saffier"})
     ):
@@ -118,7 +118,7 @@ async def test_migrate_objs_few():
 
     app = Esmerald()
 
-    Migrate(app=app, registry=models)
+    Instance(app=app, registry=models)
     with edgy.monkay.with_settings(
         edgy.monkay.settings.model_copy(update={"multi_schema": "saffier|^$"})
     ):
