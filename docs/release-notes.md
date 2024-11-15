@@ -24,6 +24,7 @@ hide:
 ### Fixed
 
 - Migrations with ManyToMany fields are broken.
+- get_engine_url_and_metadata was broken for some operations (thanks kososerver).
 
 ### Unresolved
 

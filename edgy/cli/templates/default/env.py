@@ -38,7 +38,7 @@ def get_engine_url_and_metadata() -> tuple[str, "sqlalchemy.MetaData"]:
     if not url:
         url = str(registry.database.url)
     else:
-        _name, _metadata = registry.metadata_by_url.get(url, _metadata)
+        _metadata = registry.metadata_by_url.get(url, _metadata)
     return url, _metadata
 
 
