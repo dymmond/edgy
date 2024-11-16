@@ -45,7 +45,7 @@ class MigrationSettings(BaseSettings):
 
 class EdgySettings(MediaSettings, MigrationSettings):
     model_config = SettingsConfigDict(extra="allow", ignored_types=(cached_property,))
-    preloads: list[str] | tuple[str, ...] = ()
-    extensions: list[ExtensionProtocol] | tuple[ExtensionProtocol, ...] = ()
-    ipython_args: list[str] | tuple[str, ...] = ("--no-banner",)
+    preloads: Union[list[str], tuple[str, ...]] = ()
+    extensions: Union[list[ExtensionProtocol], tuple[ExtensionProtocol, ...]] = ()
+    ipython_args: Union[list[str], tuple[str, ...]] = ("--no-banner",)
     ptpython_config_file: str = "~/.config/ptpython/config.py"
