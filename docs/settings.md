@@ -44,7 +44,8 @@ has some which are used across the codebase and those can be overriden easily.
 
 ##### Parameters
 
-* **preloads** - List of imports preloaded. Non-existing imports are simply ignored.ng the `edgy shell`.
+* **preloads** - List of imports preloaded. Non-existing imports are simply ignored.
+  Can be used to inject a path to a module in which the instance is set.
 
     <sup>Default: `[]`</sup>
 

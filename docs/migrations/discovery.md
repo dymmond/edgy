@@ -82,7 +82,7 @@ This is the way that Edgy can `auto discover` your application.
 
 ## Environment variables
 
-When generating migrations, Edgy can use 2 variables to detect the right database.
+When generating migrations, Edgy can use two variables to detect the right database.
 
 * **EDGY_DATABASE_URL** - The database url for your database.
 * **EDGY_DATABASE** - The extra database name for your database.
