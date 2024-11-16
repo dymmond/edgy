@@ -46,10 +46,11 @@ has some which are used across the codebase and those can be overriden easily.
 
 * **preloads** - List of imports preloaded. Non-existing imports are simply ignored.
   Can be used to inject a path to a module in which the instance is set.
+  It takes strings in format `module` and `module:fn`. In the later case the function or callable is executed without arguments.
 
     <sup>Default: `[]`</sup>
 
-* **extensions** - List of Monkay extensions for edgy.
+* **extensions** - List of Monkay extensions for edgy. See [Extensions](./extensions.md) for more details. Extensions can of course also preload imports.
 
     <sup>Default: `[]`</sup>
 
