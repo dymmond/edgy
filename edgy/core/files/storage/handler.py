@@ -1,8 +1,9 @@
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union
 
+from monkay import load
+
 from edgy.conf import settings
-from edgy.conf.module_import import import_string
 from edgy.exceptions import InvalidStorageError
 
 if TYPE_CHECKING:
@@ -68,7 +69,7 @@ class StorageHandler:
         options = params.pop("options", {})
 
         try:
-            storage_cls: type[Storage] = import_string(backend)
+            storage_cls: type[Storage] = load(backend)
         except ImportError as e:
             raise InvalidStorageError(f"Could not find backend {backend!r}: {e}") from e
         return storage_cls(**options)

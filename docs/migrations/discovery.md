@@ -61,19 +61,17 @@ When no `--app` or no `EDGY_DEFAULT_APP` environment variable is provided, Edgy 
     * **main.py**
     * **app.py**
     * **application.py**
+    * **asgi.py**
+
+    (Or are otherwise importable by python without the .py stem)
 
     !!! Warning
         **If none of these files are found**, Edgy will look **at the first children nodes, only**,
         and repeats the same process. If no files are found then throws an `CommandEnvironmentError`
         exception.
 
-* Once one of those files is found, Edgy will analised the type of objects contained in the
-module and will check if any of them contains the `Migration` object attached and return it.
 
-* If Edgy understand that none of those objects contain the `Migration`, it will
-do one last attempt and try to find specific function declarations:
-    * **get_application()**
-    * **get_app()**
+* Once one of those files is found, Edgy will check if the instance was set.
 
 This is the way that Edgy can `auto discover` your application.
 
@@ -84,9 +82,12 @@ This is the way that Edgy can `auto discover` your application.
 
 ## Environment variables
 
-When generating migrations, Edgy **expects at least one environment variable to be present**.
+When generating migrations, Edgy can use two variables to detect the right database.
 
 * **EDGY_DATABASE_URL** - The database url for your database.
+* **EDGY_DATABASE** - The extra database name for your database.
+
+By default the default database is used.
 
 The reason for this is because Edgy is agnostic to any framework and this way it makes it easier
 to work with the `migrations`.
@@ -94,22 +95,7 @@ to work with the `migrations`.
 Also, gives a clean design for the time where it is needed to go to production as the procedure is
 very likely to be done using environment variables.
 
-**This variable must be present**. So to save time you can simply do:
-
-```
-$ export EDGY_DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/my_database
-```
-
 Or whatever connection string you are using.
-
-Alternatively, you can simply pass `--app` as a parameter with the location of your application
-instead.
-
-Example:
-
-```shell
-$ edgy --app myproject.main:app init
-```
 
 ## How to use and when to use it
 
@@ -178,23 +164,32 @@ We will be also executing the commands inside `myproject`.
 $ edgy init
 ```
 
-Yes! Simply this and because the `--app` or a `EDGY_DEFAULT_APP` was provided, it triggered the
+Yes! Simply this and because not the `--app` or a `EDGY_DEFAULT_APP` was provided nor preloads were found, it triggered the
 auto discovery of the application that contains the edgy information.
 
 Because the application is inside `src/main.py` it will be automatically discovered by Edgy as
 it followed the [discovery pattern](#how-does-it-work).
 
-##### Using the --app or EDGY_DISCOVERY_APP
+##### Using preloads
+
+Edgy has an automatic registration pattern. All what `--app` or `EDGY_DEFAULT_APP` does is to import a file.
+The registration is expected to take place in the module automatically.
+Thanks to Monkay you can also provide such an import path as preload under
+`preloads` in settings.
+When the instance is set in a preloaded file, the auto-discovery is skipped.
+
+
+##### Using the --app or EDGY_DEFAULT_APP
 
 This is the other way to tell Edgy where to find your application. Since the application is
-inside the `src/main.py` we need to provide the proper location is a `<module>:<app>` format.
+inside the `src/main.py` we need to provide the proper location is a `<module>` format.
 
 ###### --app
 
 With the `--app` flag.
 
 ```shell
-$ edgy --app src.main:app init
+$ edgy --app src.main init
 ```
 
 ###### EDGY_DEFAULT_APP
@@ -204,7 +199,7 @@ With the `EDGY_DEFAULT_APP`.
 Export the env var first:
 
 ```shell
-$ export EDGY_DEFAULT_APP=src.main:app
+$ export EDGY_DEFAULT_APP=src.main
 ```
 
 And then run:
@@ -235,7 +230,7 @@ it triggered the auto discovery of the application.
 With the `--app` flag.
 
 ```shell
-$ edgy --app src.main:app makemigrations
+$ edgy --app src.main makemigrations
 ```
 
 ###### EDGY_DEFAULT_APP
@@ -245,7 +240,7 @@ With the `EDGY_DEFAULT_APP`.
 Export the env var first:
 
 ```shell
-$ export EDGY_DEFAULT_APP=src.main:app
+$ export EDGY_DEFAULT_APP=src.main
 ```
 
 And then run:

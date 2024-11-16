@@ -3,15 +3,10 @@ from typing import Any
 import click
 
 from edgy.cli.base import merge as _merge
-from edgy.cli.env import MigrationEnv
+from edgy.cli.decorators import add_migration_directory_option
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
+@add_migration_directory_option
 @click.option("-m", "--message", default=None, help="Merge revision message")
 @click.option(
     "--branch-label", default=None, help=("Specify a branch label to apply to the new revision")
@@ -21,8 +16,6 @@ from edgy.cli.env import MigrationEnv
 )
 @click.command()
 @click.argument("revisions", nargs=-1)
-def merge(
-    env: MigrationEnv, directory: str, message: str, branch_label: str, rev_id: str, revisions: Any
-) -> None:
+def merge(message: str, branch_label: str, rev_id: str, revisions: Any) -> None:
     """Merge two revisions together, creating a new revision file"""
-    _merge(env.app, directory, revisions, message, branch_label, rev_id)
+    _merge(revisions, message, branch_label, rev_id)

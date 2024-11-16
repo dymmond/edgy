@@ -2,7 +2,7 @@ import pytest
 from esmerald import Esmerald
 
 import edgy
-from edgy import Migrate, Registry
+from edgy import Registry
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -39,13 +39,31 @@ class Contact(Profile):
         registry = models
 
 
-def test_migrate_without_model_apps():
+@pytest.mark.parametrize(
+    "instance_wrapper,deprecated", [("Instance", False), ("Migrate", True), ("EdgyExtra", True)]
+)
+def test_migrate_without_model_apps(instance_wrapper, deprecated):
     app = Esmerald()
-    migrate = Migrate(app=app, registry=models)
+    if deprecated:
+        with pytest.warns(DeprecationWarning):
+            migrate = getattr(edgy, instance_wrapper)(app=app, registry=models)
+    else:
+        migrate = getattr(edgy, instance_wrapper)(app=app, registry=models)
+        edgy.monkay.set_instance(migrate)
 
     assert len(models.models) == 3
     assert len(migrate.registry.models) == 3
-    registry = migrate.get_registry_copy()
+    registry = edgy.get_migration_prepared_registry()
+    assert len(registry.models) == 3
+
+
+def test_migrate_without_model_apps_and_app():
+    migrate = edgy.Instance(registry=models)
+    edgy.monkay.set_instance(migrate)
+
+    assert len(models.models) == 3
+    assert len(migrate.registry.models) == 3
+    registry = edgy.get_migration_prepared_registry()
     assert len(registry.models) == 3
 
 
@@ -60,9 +78,9 @@ def test_migrate_with_fake_model_apps(model_apps):
 
     assert len(nother.models) == 0
 
-    migrate = Migrate(app=app, registry=nother, model_apps=model_apps)
-    registry = migrate.get_registry_copy()
-
+    with pytest.warns(DeprecationWarning):
+        edgy.Migrate(app=app, registry=nother, model_apps=model_apps)
+    registry = edgy.get_migration_prepared_registry()
     assert len(nother.models) == 2
     assert len(registry.models) == 2
 
@@ -78,5 +96,5 @@ def test_raises_assertation_error_on_model_apps(model_apps):
 
     assert len(nother.models) == 0
 
-    with pytest.raises(AssertionError):
-        Migrate(app=app, registry=nother, model_apps=model_apps)
+    with pytest.raises(AssertionError), pytest.warns(DeprecationWarning):
+        edgy.Migrate(app=app, registry=nother, model_apps=model_apps)

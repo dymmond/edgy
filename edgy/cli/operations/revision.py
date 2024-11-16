@@ -1,15 +1,10 @@
 import click
 
 from edgy.cli.base import revision as _revision
-from edgy.cli.env import MigrationEnv
+from edgy.cli.decorators import add_migration_directory_option
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
+@add_migration_directory_option
 @click.option("-m", "--message", default=None, help="Revision message")
 @click.option(
     "--autogenerate",
@@ -41,8 +36,6 @@ from edgy.cli.env import MigrationEnv
 )
 @click.command()
 def revision(
-    env: MigrationEnv,
-    directory: str,
     message: str,
     autogenerate: bool,
     sql: bool,
@@ -54,8 +47,6 @@ def revision(
 ) -> None:
     """Create a new revision file."""
     _revision(
-        env.app,
-        directory,
         message,
         autogenerate,
         sql,

@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING, Any, cast
 
+from monkay import load
 from pydantic._internal._model_construction import ModelMetaclass
 
-from edgy.conf.module_import import import_string
 from edgy.core.db.models.metaclasses import handle_annotations
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
@@ -47,7 +47,7 @@ class MarshallMeta(ModelMetaclass):
         assert model is not None, "'model' must be declared in the 'ConfigMarshall'."
 
         if isinstance(cast(str, model), str):
-            model: Model = import_string(model)  # type: ignore
+            model: Model = load(model)  # type: ignore
             marshall_config["model"] = model
 
         base_fields_include = marshall_config.get("fields", None)

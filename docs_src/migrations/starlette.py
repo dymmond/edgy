@@ -6,7 +6,7 @@ from pathlib import Path
 from lilya.apps import Lilya
 from my_project.utils import get_db_connection
 
-from edgy import Migrate
+from edgy import monkay, Instance
 
 
 def build_path():
@@ -30,7 +30,7 @@ def get_application():
 
     app = registry.asgi(Lilya(__name__))
 
-    Migrate(app=app, registry=registry)
+    monkay.set_instance(Instance(app=app, registry=registry))
     return app
 
 

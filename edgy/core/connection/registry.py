@@ -601,3 +601,6 @@ class Registry:
                 async with db as db:
                     with db.force_rollback(False):
                         await db.drop_all(self.metadata_by_name[database_name])
+
+
+__all__ = ["Registry"]

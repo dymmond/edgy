@@ -1,4 +1,4 @@
-# A generic, single database configuration.
+# A generic database configuration.
 
 [alembic]
 # template used to generate migration files

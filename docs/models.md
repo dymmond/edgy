@@ -60,6 +60,15 @@ For this the `StrictModel` model can be used. Otherwise it behaves like a normal
 
 There is no strict version of a `ReflectModel` because the laxness is required.
 
+### Loading models
+
+You may have the models distributed among multiple files and packages.
+To ensure the models can self-register we need to ensure the files load.
+Previously this was done with `model_apps` in the `Migrate` object but this approach is deprecated and
+didn't allow multiple registries.
+Edgy has now a special setting `preloads` in [Settings](settings.md). Here it is possible to provide the import pathes
+and the corresponding files are loaded.
+It is also possible to point to a function via `module_path:fn` which is executed without argument and expected to load the modules.
 
 ### Special attributes
 
@@ -111,8 +120,6 @@ are applied to any [field](./fields.md) available in **Edgy**.
 ```python hl_lines="11-12"
 {!> ../docs_src/models/declaring_models_pk_no_id.py !}
 ```
-
-Now this works
 
 ##### Multiple primary keys
 
@@ -169,7 +176,7 @@ You can add it to a registry later by using:
 In fact the last method is called when the registry parameter of `copy_edgy_model` is not `None`.
 
 
-## The Meta class
+### The Meta class
 
 When declaring a model, it is **crucial** having the `Meta` class declared. There is where you
 declare the `metadata` needed for your models.

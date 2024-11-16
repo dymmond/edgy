@@ -1,10 +1,4 @@
-EDGY_DISCOVER_APP = "EDGY_DEFAULT_APP"
 DEFAULT_TEMPLATE_NAME = "default"
 APP_PARAMETER = "--app"
-HELP_PARAMETER = "--help"
-DISCOVERY_FILES = ["application.py", "app.py", "main.py"]
-DISCOVERY_FUNCTIONS = ["get_application", "get_app"]
-EDGY_DB = "_edgy_db"
-EDGY_EXTRA = "_edgy_extra"
-EXCLUDED_COMMANDS = ["list-templates", "inspectdb"]
-IGNORE_COMMANDS = ["list-templates"]
+DISCOVERY_PRELOADS = ["application", "app", "main", "asgi"]
+COMMANDS_WITHOUT_APP = ["list-templates", "inspectdb", "init"]

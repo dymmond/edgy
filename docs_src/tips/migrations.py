@@ -10,7 +10,7 @@ from pathlib import Path
 from esmerald import Esmerald, Include
 from my_project.utils import get_db_connection
 
-from edgy.migrations import Migrate
+from edgy import Instance, monkay
 
 
 def build_path():
@@ -38,7 +38,7 @@ def get_application():
         )
     )
 
-    Migrate(app=app, registry=registry)
+    monkay.set_instance(Instance(app=app, registry=registry))
     return app
 
 

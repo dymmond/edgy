@@ -1,9 +1,14 @@
-# Edgy People
+# Edgy Contributors
 
-## The Special Ones
 
-Currently there are no special ones but we are hoping this will change soon.
+Edgy wouldn't be possible in this way without these people.
 
-## The Legends
+- @kokoserver (https://github.com/Kokoserver)
 
-Currently there are no legends but we are hoping this will change soon.
+  He provided a lot of valuable bug reports and PRs. Especially related to migrations.
+
+
+- @devkral (https://github.com/devkral)
+
+  He refactored an reworked edgy nearly completely. Some features he provided are
+  FileFields, Registry hooks, copying models...

@@ -1,8 +1,10 @@
+from inspect import isawaitable
+
 import pytest
 
 import edgy
 from edgy.core.db.datastructures import Index
-from tests.cli.utils import run_cmd
+from tests.cli.utils import arun_cmd, run_cmd
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
@@ -49,15 +51,8 @@ async def create_test_database():
     await models.drop_all()
 
 
-@pytest.fixture(autouse=True)
-async def rollback_transactions():
-    with database.force_rollback():
-        async with database:
-            yield
-
-
 async def test_inspect_db():
-    (out, error, ss) = run_cmd("tests.cli.main:app", f"edgy inspectdb --database={DATABASE_URL}")
+    (out, error, ss) = run_cmd("tests.cli.main", f"edgy inspectdb --database={DATABASE_URL}")
 
     out = out.decode("utf8")
 
@@ -67,10 +62,12 @@ async def test_inspect_db():
     assert ss == 0
 
 
-async def test_inspect_db_with_schema():
-    (out, error, ss) = run_cmd(
-        "tests.cli.main:app", f"edgy inspectdb --database={DATABASE_URL} --schema='public'"
-    )
+@pytest.mark.parametrize("cmd", [run_cmd, arun_cmd], ids=["sync", "async"])
+async def test_inspect_db_with_schema(cmd):
+    result = cmd("tests.cli.main", f"edgy inspectdb --database={DATABASE_URL} --schema='public'")
+    if isawaitable(result):
+        result = await result
+    (out, error, ss) = result
 
     out = out.decode("utf8")
     assert "class Users" in out

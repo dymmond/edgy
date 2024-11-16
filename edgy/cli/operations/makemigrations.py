@@ -7,15 +7,10 @@ from typing import Any
 import click
 
 from edgy.cli.base import migrate as _migrate
-from edgy.cli.env import MigrationEnv
+from edgy.cli.decorators import add_migration_directory_option
 
 
-@click.option(
-    "-d",
-    "--directory",
-    default=None,
-    help=('Migration script directory (default is "migrations")'),
-)
+@add_migration_directory_option
 @click.option("-m", "--message", default=None, help="Revision message")
 @click.option(
     "--sql", is_flag=True, help=("Don't emit SQL to database - dump to standard output " "instead")
@@ -42,8 +37,6 @@ from edgy.cli.env import MigrationEnv
 )
 @click.command()
 def makemigrations(
-    env: MigrationEnv,
-    directory: str,
     message: str,
     sql: bool,
     head: str,
@@ -55,6 +48,4 @@ def makemigrations(
 ) -> None:
     """Autogenerate a new revision file (Alias for
     'revision --autogenerate')"""
-    _migrate(
-        env.app, directory, message, sql, head, splice, branch_label, version_path, rev_id, arg
-    )
+    _migrate(message, sql, head, splice, branch_label, version_path, rev_id, arg)

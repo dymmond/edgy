@@ -25,7 +25,7 @@ widely applied across the system.
 
 #### Custom settings
 
-When creating your own custom settings class, you should inherit from `EdgySettings` which is
+When creating your own custom settings class, you should inherit from `EdgySettings` (or the subclass `TenancySettings` in case of multi tenancy). `EdgySettings` is
 the class responsible for all internal settings of Edgy and those can be extended and overriden
 with ease.
 
@@ -43,6 +43,16 @@ has some which are used across the codebase and those can be overriden easily.
     doing it.
 
 ##### Parameters
+
+* **preloads** - List of imports preloaded. Non-existing imports are simply ignored.
+  Can be used to inject a path to a module in which the instance is set.
+  It takes strings in format `module` and `module:fn`. In the later case the function or callable is executed without arguments.
+
+    <sup>Default: `[]`</sup>
+
+* **extensions** - List of Monkay extensions for edgy. See [Extensions](./extensions.md) for more details. Extensions can of course also preload imports.
+
+    <sup>Default: `[]`</sup>
 
 * **ipython_args** - List of arguments passed to `ipython` when starting the `edgy shell`.
 
@@ -63,6 +73,9 @@ settings should be called like this:
 ```shell
 $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy <COMMAND>
 ```
+
+Optional prequesite: set one of the preload imports to the application path. This way you can skip
+providing the `--app` parameter or providing the `EDGY_DEFAULT_APP`.
 
 Example:
 

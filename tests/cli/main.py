@@ -1,26 +1,42 @@
 import os
 
 import pytest
-from esmerald import Esmerald
 
 import edgy
-from edgy import Migrate
-from edgy.testclient import DatabaseTestClient
-from tests.settings import DATABASE_URL
+from edgy import Instance
+from edgy.contrib.permissions import BasePermission
+from tests.settings import TEST_DATABASE
 
 pytestmark = pytest.mark.anyio
-database = DatabaseTestClient(DATABASE_URL, drop_database=True, test_prefix="test_")
-models = edgy.Registry(database=database)
+models = edgy.Registry(database=TEST_DATABASE, with_content_type=True)
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 
-class AppUser(edgy.StrictModel):
-    name = edgy.CharField(max_length=255)
+class User(edgy.StrictModel):
+    name = edgy.fields.CharField(max_length=100)
 
     class Meta:
         registry = models
 
 
-app = Esmerald(routes=[])
-Migrate(app, registry=models)
+class Group(edgy.StrictModel):
+    name = edgy.fields.CharField(max_length=100)
+    users = edgy.fields.ManyToMany("User", embed_through=False)
+
+    class Meta:
+        registry = models
+
+
+class Permission(BasePermission):
+    users = edgy.fields.ManyToMany("User", embed_through=False)
+    groups = edgy.fields.ManyToMany("Group", embed_through=False)
+    name_model: str = edgy.fields.CharField(max_length=100, null=True)
+    obj = edgy.fields.ForeignKey("ContentType", null=True)
+
+    class Meta:
+        registry = models
+        unique_together = [("name", "name_model", "obj")]
+
+
+edgy.monkay.set_instance(Instance(registry=models))

@@ -1,8 +1,12 @@
+from __future__ import annotations
+
 import os
+import re
 from functools import cached_property
 from pathlib import Path
 from typing import Union
 
+from monkay import ExtensionProtocol
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,7 +33,19 @@ class MediaSettings(BaseSettings):
     }
 
 
-class EdgySettings(MediaSettings):
+class MigrationSettings(BaseSettings):
+    multi_schema: Union[bool, re.Pattern, str] = False
+    ignore_schema_pattern: Union[None, re.Pattern, str] = "information_schema"
+    alembic_ctx_kwargs: dict = {
+        "compare_type": True,
+        "render_as_batch": True,
+    }
+    migration_directory: Union[str, os.PathLike] = Path("migrations/")
+
+
+class EdgySettings(MediaSettings, MigrationSettings):
     model_config = SettingsConfigDict(extra="allow", ignored_types=(cached_property,))
-    ipython_args: list[str] = ["--no-banner"]
+    preloads: Union[list[str], tuple[str, ...]] = ()
+    extensions: Union[list[ExtensionProtocol], tuple[ExtensionProtocol, ...]] = ()
+    ipython_args: Union[list[str], tuple[str, ...]] = ("--no-banner",)
     ptpython_config_file: str = "~/.config/ptpython/config.py"

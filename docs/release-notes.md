@@ -6,6 +6,34 @@ hide:
 
 # Release Notes
 
+## 0.23
+
+### Added
+
+- Extension support via Monkay.
+
+### Changed
+
+- Rework edgy to use Monkay.
+- Rework the migrate and shell system to simply use Monkay instance.
+- Replace `get_registry_copy` by `get_migration_prepared_registry`.
+- Breaking: migration configuration takes place in settings.
+- Breaking: EdgyExtra and Migrate are replaced by `edgy.Instance` but are still available.
+- Breaking: EdgyExtra is provided by the also obsolete Migrate.
+- Breaking: `model_apps` is replaced by `preloads` but still available during the migration time.
+- Breaking:
+  An automatic registration is assumed. See [Connection](connection.md) for examples.
+
+### Fixed
+
+- Migrations with ManyToMany fields are broken.
+- `get_engine_url_and_metadata` was broken for some operations (thanks @kokoserver).
+- IPAddressField was not exposed as edgy.IPAddressField.
+
+### Contributors
+
+Thanks a lot to @kokoserver. He provided a *lot* of valuable bug reports and PRs.
+
 
 ## 0.22.0
 
