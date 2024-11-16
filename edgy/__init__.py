@@ -141,10 +141,7 @@ monkay: Monkay[Instance, EdgySettings] = Monkay(
         },
     },
     skip_all_update=True,
-    evaluate_settings=False,
 )
-# TODO: check for esmerald edgy settings later and init here before evaluating settings
-monkay.evaluate_settings(on_conflict="error")
 for name in [
     "CASCADE",
     "RESTRICT",
