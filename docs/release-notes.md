@@ -6,6 +6,13 @@ hide:
 
 # Release Notes
 
+
+## 0.23.1
+
+### Fixed
+
+- Docs were broken.
+
 ## 0.23.0
 
 ### Added
