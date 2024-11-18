@@ -227,7 +227,7 @@ it triggered the auto discovery of the application.
 
 !!! Note
     There was a change in 0.23.0: the import path must be to a module in which the registration via the `Instance` object is automatically triggered.
-    See [Connection](connection.md).
+    See [Connection](../connection.md).
 
 ###### --app
 

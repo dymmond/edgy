@@ -1,7 +1,7 @@
 # **`ManyToMany`** class
 
 
-::: edgy.ManyToManyField
+::: edgy.fields.ManyToManyField
     options:
         filters:
         - "!^model_config"

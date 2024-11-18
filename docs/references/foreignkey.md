@@ -1,7 +1,7 @@
 # **`ForeignKey`** class
 
 
-::: edgy.ForeignKey
+::: edgy.fields.ForeignKey
     options:
         filters:
         - "!^field_type"

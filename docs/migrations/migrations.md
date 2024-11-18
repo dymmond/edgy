@@ -155,21 +155,6 @@ unique-like parameter that demanded special attention, just the application itse
 
 This means you can plug something else like Quart, Ella or even Sanic... Your pick.
 
-### Using the `model_apps`
-
-Since Edgy is framework agnostic, there is no way sometimes to tell where the models are unless
-you are using them somewhere and this can be annoying if you want to generate migrations and manage
-them without passing the models into the `__init__.py` of a python module
-
-The **Migrate** object allows also to pass an extra parameter called `model_apps`. This is nothing
-more nothing less than the location of the file containing the models used by your same application.
-
-There are **three ways of passing values into the model_apps**.
-
-* Via [dictionary](#via-dictionary).
-* Via [tuple](#via-tuple).
-* Via [list](#via-list).
-
 #### Example
 
 Let us assume we have an application with the following structure.
@@ -220,7 +205,7 @@ There is where your models for the `accounts` application will be placed. Someth
 Now we want to tell the **Instance** object to make sure it knows about this.
 
 ```python
-{!> ../docs_src/migrations/instance.py !}
+{!> ../docs_src/migrations/attaching.py !}
 ```
 
 ## Generating and working with migrations
@@ -325,7 +310,7 @@ provided.
 This `--app` is the location of your application in `module_app` format and this is because of
 the fact of being **framework agnostic**.
 
-Edgy needs the module automatically setting the instance (see [Connections](connection.md)) to know the registry
+Edgy needs the module automatically setting the instance (see [Connections](../connection.md)) to know the registry
 which shall be used as well as the application object.
 
 Remember when it was mentioned that is important the location where you generate the migrations

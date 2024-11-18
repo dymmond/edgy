@@ -7,12 +7,12 @@ They must implement the monkay extension protocol or return as a callable a clas
 This sounds hard but it isn't:
 
 ``` python
-{!> ../docs_src/extensions/settings !}
+{!> ../docs_src/extensions/settings.py !}
 ```
 
 You can also lazily provide them via add_extension (should happen before the instance is set)
 
 
 ``` python
-{!> ../docs_src/extensions/add_extension !}
+{!> ../docs_src/extensions/add_extension.py !}
 ```

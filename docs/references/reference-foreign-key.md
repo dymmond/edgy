@@ -1,7 +1,7 @@
 # **`RefForeignKey`** class
 
 
-::: edgy.RefForeignKey
+::: edgy.fields.RefForeignKey
     options:
         filters:
         - "!^model_config"
