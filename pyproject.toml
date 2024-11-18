@@ -119,7 +119,7 @@ dependencies = [
     "pyyaml>=6.0,<7.0.0",
 ]
 [tool.hatch.envs.docs.scripts]
-build = "mkdocs build"
+build = "mkdocs build {args}"
 serve = "mkdocs serve --dev-addr localhost:8000"
 
 

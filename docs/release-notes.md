@@ -6,6 +6,13 @@ hide:
 
 # Release Notes
 
+
+## 0.23.1
+
+### Fixed
+
+- Docs were broken.
+
 ## 0.23.0
 
 ### Added
@@ -539,7 +546,7 @@ having multiple primary keys (or composed keys) in an Edgy model by [@devkral](h
 
 ### Added
 
-- Support for `list` and `tuples` as a type for [model_apps](./migrations/migrations.md#using-the-model_apps).
+- Support for `list` and `tuples` as a type for [model_apps](./migrations/migrations.md).
 
 ## 0.10.0
 
@@ -548,7 +555,7 @@ having multiple primary keys (or composed keys) in an Edgy model by [@devkral](h
 - Support for `model_apps` inside the `Migrate` object allowing
 global discovery by application. This will make sure all apps will be properly
 inspected.
-- Add documentation about the new [model_apps](./migrations/migrations.md#using-the-model_apps)
+- Add documentation about the new [model_apps](./migrations/migrations.md)
 
 ### Changed
 
