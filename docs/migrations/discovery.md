@@ -225,9 +225,13 @@ it triggered the auto discovery of the application.
 
 ##### Using the --app or EDGY_DISCOVERY_APP
 
+!!! Note
+    There was a change in 0.23.0: the import path must be to a module in which the registration via the `Instance` object is automatically triggered.
+    See [Connection](connection.md).
+
 ###### --app
 
-With the `--app` flag.
+With the `--app` parameter.
 
 ```shell
 $ edgy --app src.main makemigrations

@@ -23,6 +23,7 @@ hide:
 - Breaking: `model_apps` is replaced by `preloads` but still available during the migration time.
 - Breaking:
   An automatic registration is assumed. See [Connection](connection.md) for examples.
+- Breaking: `--app` or `EDGY_DEFAULT_APP` must point to a module which does the self-registration not an app instance anymore.
 
 ### Fixed
 
