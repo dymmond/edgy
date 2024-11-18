@@ -4,21 +4,23 @@ __version__ = "0.23.0"
 from typing import TYPE_CHECKING
 
 from ._monkay import Instance, create_monkay
-from .core.connection import Database, DatabaseURL, Registry
-from .core.db.models import (
-    Manager,
-    Model,
-    ModelRef,
-    RedirectManager,
-    ReflectModel,
-    StrictModel,
-)
-from .core.db.querysets import Prefetch, Q, QuerySet, and_, not_, or_
 from .core.utils.sync import run_sync
 
 if TYPE_CHECKING:
     from .conf.global_settings import EdgySettings
+    from .core import files
+    from .core.connection import Database, DatabaseURL, Registry
+    from .core.db import fields
     from .core.db.datastructures import Index, UniqueConstraint
+    from .core.db.models import (
+        Manager,
+        Model,
+        ModelRef,
+        RedirectManager,
+        ReflectModel,
+        StrictModel,
+    )
+    from .core.db.querysets import Prefetch, Q, QuerySet, and_, not_, or_
     from .core.signals import Signal
     from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
@@ -101,6 +103,8 @@ __all__ = [
     "Registry",
 ]
 monkay = create_monkay(globals(), __all__)
+
+del create_monkay
 
 
 def get_migration_prepared_registry() -> Registry:

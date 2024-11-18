@@ -64,6 +64,15 @@ def create_monkay(global_dict: dict, all_var: list[str]) -> Monkay[Instance, Edg
     ]:
         monkay.add_lazy_import(name, f"edgy.core.db.constants.{name}")
 
+    for name in ["Database", "DatabaseURL", "Registry"]:
+        monkay.add_lazy_import(name, f"edgy.core.connection.{name}")
+
+    for name in ["Prefetch", "Q", "QuerySet", "and_", "not_", "or_"]:
+        monkay.add_lazy_import(name, f"edgy.core.db.querysets.{name}")
+
+    for name in ["Manager", "Model", "ModelRef", "RedirectManager", "ReflectModel", "StrictModel"]:
+        monkay.add_lazy_import(name, f"edgy.core.db.models.{name}")
+
     for name in all_var:
         if name.endswith("Field") or name in {
             "OneToOne",

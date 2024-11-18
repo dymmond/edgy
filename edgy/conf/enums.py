@@ -2,8 +2,8 @@ from enum import Enum
 from warnings import warn
 
 warn(
-    "This module is deprecated. Use `esmerald.conf.EnvironmentType` instead when using Esmerald. "
-    "Otherwise define your own EnvironmentType.",
+    "This module is deprecated. Use `esmerald.conf.EnvironmentType` instead when using Esmerald "
+    "or define otherwise your own EnvironmentType.",
     DeprecationWarning,
     stacklevel=2,
 )

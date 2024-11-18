@@ -15,6 +15,7 @@ hide:
 ### Changed
 
 - Rework edgy to use Monkay.
+- Imports are now lazy.
 - Rework the migrate and shell system to simply use Monkay instance.
 - Replace `get_registry_copy` by `get_migration_prepared_registry`.
 - Breaking: migration configuration takes place in settings.
@@ -24,12 +25,17 @@ hide:
 - Breaking:
   An automatic registration is assumed. See [Connection](connection.md) for examples.
 - Breaking: `--app` or `EDGY_DEFAULT_APP` must point to a module which does the self-registration not an app instance anymore.
+- Deprecate `edgy.conf.enums.EnvironmentType`. Esmeralds `EnvironmentType` or an own definition should be used instead.
 
 ### Fixed
 
 - Migrations with ManyToMany fields are broken.
 - `get_engine_url_and_metadata` was broken for some operations (thanks @kokoserver).
 - IPAddressField was not exposed as edgy.IPAddressField.
+
+### Removed
+
+- `edgy.conf.functional`. It was only used for configuration and is now superseeded by Monkay.
 
 ### Contributors
 
