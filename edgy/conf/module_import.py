@@ -1,5 +1,12 @@
 from importlib import import_module
 from typing import Any
+from warnings import warn
+
+warn(
+    "This module is deprecated. Use `monkay.load` instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 
 def import_string(dotted_path: str) -> Any:

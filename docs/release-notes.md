@@ -26,6 +26,7 @@ hide:
   An automatic registration is assumed. See [Connection](connection.md) for examples.
 - Breaking: `--app` or `EDGY_DEFAULT_APP` must point to a module which does the self-registration not an app instance anymore.
 - Deprecate `edgy.conf.enums.EnvironmentType`. Esmeralds `EnvironmentType` or an own definition should be used instead.
+- Deprecate `edgy.conf.module_import.import_string`. Use `monkay.load` instead.
 
 ### Fixed
 
