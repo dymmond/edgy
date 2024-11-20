@@ -68,7 +68,7 @@ def add_app_module_option(fn: Any) -> Any:
                 if edgy.monkay.instance is not None:
                     return  # type: ignore
             for path in cwd.iterdir():
-                if path.is_dir():
+                if "." not in path.name and path.is_dir():
                     for preload in DISCOVERY_PRELOADS:
                         with suppress(ImportError):
                             import_module(f"{path.name}.{preload}")

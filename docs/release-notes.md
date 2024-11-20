@@ -6,6 +6,11 @@ hide:
 
 # Release Notes
 
+## 0.23.2
+
+### Fixed
+
+- Autodetection of the instance was broken when a directory containing dots is in the folder.
 
 ## 0.23.1
 
