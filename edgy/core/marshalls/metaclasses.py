@@ -1,5 +1,5 @@
 import contextlib
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, Union
 
 from monkay import load
 from pydantic._internal._model_construction import ModelMetaclass
@@ -11,7 +11,7 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import MarshallFieldDefinitionError
 
 if TYPE_CHECKING:
-    from edgy import Model
+    from edgy.core.db.models import Model
     from edgy.core.marshalls import Marshall
 
 
@@ -44,12 +44,14 @@ class MarshallMeta(ModelMetaclass):
             )
 
         # The declared model
-        model: Optional[type[Model]] = marshall_config.get("model", None)
-        assert model is not None, "'model' must be declared in the 'ConfigMarshall'."
+        _model: Union[type[Model], str, None] = marshall_config.get("model", None)
+        assert _model is not None, "'model' must be declared in the 'ConfigMarshall'."
 
-        if isinstance(cast(str, model), str):
-            model: Model = load(model)  # type: ignore
+        if isinstance(_model, str):
+            model: type[Model] = load(_model)
             marshall_config["model"] = model
+        else:
+            model = _model
 
         base_fields_include = marshall_config.get("fields", None)
         base_fields_exclude = marshall_config.get("exclude", None)
