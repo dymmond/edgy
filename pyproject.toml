@@ -126,6 +126,8 @@ serve = "mkdocs serve --dev-addr localhost:8000"
 [tool.hatch.envs.test]
 # required for cli tests and check_types
 features = ["all", "testing"]
+# for typings
+extra-dependencies = ["pydantic>=2.10"]
 
 
 [tool.hatch.envs.test.env-vars]
