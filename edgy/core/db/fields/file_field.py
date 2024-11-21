@@ -32,7 +32,6 @@ from edgy.exceptions import FieldDefinitionError
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
-    from edgy.core.db.querysets import QuerySet
     from edgy.core.files.storage import Storage
 
 IGNORED = ["cls", "__class__", "kwargs", "generate_name_fn"]
@@ -43,7 +42,7 @@ class ConcreteFileField(BaseCompositeField):
     multi_process_safe: bool = True
     field_file_class: type[FieldFile]
     _generate_name_fn: Optional[
-        Callable[[Union["BaseModelType", None, "QuerySet"], Union[File, BinaryIO], str, bool], str]
+        Callable[[Union["BaseModelType", None], Union[File, BinaryIO], str, bool], str]
     ] = None
 
     def modify_input(self, name: str, kwargs: dict[str, Any]) -> None:
@@ -65,7 +64,7 @@ class ConcreteFileField(BaseCompositeField):
 
     def generate_name_fn(
         self,
-        instance: Union["BaseModelType", "QuerySet", None],
+        instance: Union["BaseModelType", None],
         name: str,
         file: Union[File, BinaryIO],
         direct_name: bool,
@@ -92,6 +91,7 @@ class ConcreteFileField(BaseCompositeField):
         """
         phase = CURRENT_PHASE.get()
         instance = CURRENT_INSTANCE.get()
+        model_instance = CURRENT_MODEL_INSTANCE.get()
         if (
             phase in {"post_update", "post_insert"}
             and instance is not None
@@ -133,7 +133,7 @@ class ConcreteFileField(BaseCompositeField):
                     ),
                     multi_process_safe=self.multi_process_safe,
                     change_removes_approval=self.with_approval,
-                    generate_name_fn=partial(self.generate_name_fn, instance),
+                    generate_name_fn=partial(self.generate_name_fn, model_instance),
                 )
             else:
                 if instance is not None and self.name in instance.__dict__:
@@ -144,7 +144,7 @@ class ConcreteFileField(BaseCompositeField):
                     file_instance = self.field_file_class(
                         self,
                         multi_process_safe=self.multi_process_safe,
-                        generate_name_fn=partial(self.generate_name_fn, instance),
+                        generate_name_fn=partial(self.generate_name_fn, model_instance),
                         storage=self.storage,
                         approved=not self.with_approval,
                         change_removes_approval=self.with_approval,
@@ -258,9 +258,7 @@ class FileField(FieldFactory):
         mime_use_magic: bool = False,
         field_file_class: type[FieldFile] = FieldFile,
         generate_name_fn: Optional[
-            Callable[
-                [Union["BaseModelType", None, "QuerySet"], Union[File, BinaryIO], str, bool], str
-            ]
+            Callable[[Union["BaseModelType", None], Union[File, BinaryIO], str, bool], str]
         ] = None,
         **kwargs: Any,
     ) -> "BaseFieldType":
