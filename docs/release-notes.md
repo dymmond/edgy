@@ -11,6 +11,7 @@ hide:
 ### Fixed
 
 - Autodetection of the instance was broken when a directory containing dots is in the folder.
+- Fix compatibility with pydantic 2.10.
 
 ## 0.23.1
 
