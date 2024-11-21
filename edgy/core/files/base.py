@@ -31,6 +31,7 @@ if TYPE_CHECKING:
 
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
+    from edgy.core.db.querysets import QuerySet
 
 
 P = ParamSpec("P")
@@ -271,7 +272,7 @@ class ContentFile(File):
 class FieldFile(File):
     operation: Literal["none", "save", "save_delete", "delete"] = "none"
     old: Optional[tuple["Storage", str, bool]] = None
-    instance: Optional["BaseModelType"] = None
+    instance: Union["BaseModelType", None, "QuerySet"] = None
     # can extract metadata
     approved: bool
     metadata: dict[str, Any]

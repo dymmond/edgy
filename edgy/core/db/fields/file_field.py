@@ -32,6 +32,7 @@ from edgy.exceptions import FieldDefinitionError
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
+    from edgy.core.db.querysets import QuerySet
     from edgy.core.files.storage import Storage
 
 IGNORED = ["cls", "__class__", "kwargs", "generate_name_fn"]
@@ -42,7 +43,7 @@ class ConcreteFileField(BaseCompositeField):
     multi_process_safe: bool = True
     field_file_class: type[FieldFile]
     _generate_name_fn: Optional[
-        Callable[[Optional["BaseModelType"], Union[File, BinaryIO], str, bool], str]
+        Callable[[Union["BaseModelType", None, "QuerySet"], Union[File, BinaryIO], str, bool], str]
     ] = None
 
     def modify_input(self, name: str, kwargs: dict[str, Any]) -> None:
@@ -64,7 +65,7 @@ class ConcreteFileField(BaseCompositeField):
 
     def generate_name_fn(
         self,
-        instance: Optional["BaseModelType"],
+        instance: Union["BaseModelType", "QuerySet", None],
         name: str,
         file: Union[File, BinaryIO],
         direct_name: bool,
@@ -257,7 +258,9 @@ class FileField(FieldFactory):
         mime_use_magic: bool = False,
         field_file_class: type[FieldFile] = FieldFile,
         generate_name_fn: Optional[
-            Callable[[Optional["BaseModelType"], Union[File, BinaryIO], str, bool], str]
+            Callable[
+                [Union["BaseModelType", None, "QuerySet"], Union[File, BinaryIO], str, bool], str
+            ]
         ] = None,
         **kwargs: Any,
     ) -> "BaseFieldType":

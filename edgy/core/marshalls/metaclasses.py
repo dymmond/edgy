@@ -1,5 +1,5 @@
 import contextlib
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any, Union, cast
 
 from monkay import load
 from pydantic._internal._model_construction import ModelMetaclass
@@ -107,7 +107,7 @@ class MarshallMeta(ModelMetaclass):
         model_class.__pydantic_fields__ = model_fields
         # error since pydantic 2.10
         with contextlib.suppress(AttributeError):
-            model_class.model_fields = model_fields
+            model_class.model_fields = model_fields  # type: ignore
 
         # Handle annotations
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
@@ -122,7 +122,7 @@ class MarshallMeta(ModelMetaclass):
         required_fields: set[str] = {
             f"'{k}'" for k, v in model.model_fields.items() if v.is_required()
         }
-        if any(value not in model_class.model_fields for value in required_fields):
+        if any(value not in cast(dict, model_class.model_fields) for value in required_fields):
             fields = ", ".join(sorted(required_fields))
             raise MarshallFieldDefinitionError(
                 f"'{model.__name__}' model requires the following mandatory fields: [{fields}]."

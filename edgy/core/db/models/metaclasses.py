@@ -731,7 +731,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         new_class.__pydantic_fields__ = model_fields
         # error since pydantic 2.10
         with contextlib.suppress(AttributeError):
-            new_class.model_fields = model_fields
+            new_class.model_fields = model_fields  # type: ignore
         new_class._db_schemas = {}
 
         # Set the owner of the field, must be done as early as possible
