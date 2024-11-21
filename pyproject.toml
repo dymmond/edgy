@@ -83,7 +83,7 @@ testing = [
     "pytest-timeout",
     "ipdb",
     "pytest-mock",
-    "mypy[faster-cache]==1.13",
+    "mypy==1.10",
     "httpx",
     "types-orjson==3.6.2",
 ]
