@@ -1,5 +1,4 @@
 import pytest
-from pydantic import __version__
 
 from edgy import Registry, fields
 from edgy.contrib.multi_tenancy import TenantModel
@@ -12,7 +11,6 @@ models = Registry(database=database)
 
 
 pytestmark = pytest.mark.anyio
-pydantic_version = __version__[:3]
 
 
 class Tenant(TenantMixin):

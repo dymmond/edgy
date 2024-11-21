@@ -1,7 +1,6 @@
 from typing import Optional
 
 import pytest
-from pydantic import __version__
 
 import edgy
 from edgy.testclient import DatabaseTestClient
@@ -12,7 +11,6 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 pytestmark = pytest.mark.anyio
-pydantic_version = __version__[:3]
 
 
 class EdgyTenantBaseModel(edgy.StrictModel):

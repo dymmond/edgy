@@ -4,7 +4,6 @@ import pytest
 from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, post
 from httpx import ASGITransport, AsyncClient
-from pydantic import __version__
 
 import edgy
 from edgy.core.marshalls import ConfigMarshall, Marshall
@@ -15,7 +14,6 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 pytestmark = pytest.mark.anyio
-pydantic_version = __version__[:3]
 
 
 @pytest.fixture(autouse=True, scope="module")

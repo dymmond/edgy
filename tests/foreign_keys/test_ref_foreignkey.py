@@ -12,7 +12,8 @@ pytestmark = pytest.mark.anyio
 database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
-pydantic_version = __version__[:3]
+
+pydantic_version = ".".join(__version__.split(".")[:2])
 
 
 class TrackModelRef(ModelRef):
