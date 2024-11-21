@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any, cast
+import contextlib
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 from monkay import load
 from pydantic._internal._model_construction import ModelMetaclass
@@ -33,7 +34,7 @@ class MarshallMeta(ModelMetaclass):
         if not has_parents:
             return super().__new__(cls, name, bases, attrs)
 
-        model_class: Marshall = super().__new__(cls, name, bases, attrs)  # type: ignore
+        model_class: type[Marshall] = super().__new__(cls, name, bases, attrs)
         if name in ("Marshall",):
             return model_class
 
@@ -43,7 +44,7 @@ class MarshallMeta(ModelMetaclass):
             )
 
         # The declared model
-        model: Model = marshall_config.get("model", None)  # type: ignore
+        model: Optional[type[Model]] = marshall_config.get("model", None)
         assert model is not None, "'model' must be declared in the 'ConfigMarshall'."
 
         if isinstance(cast(str, model), str):
@@ -100,7 +101,11 @@ class MarshallMeta(ModelMetaclass):
                     f"Field '{name}' declared but no 'get_{name}' found in '{model_class.__name__}'."
                 )
 
-        model_class.model_fields = base_model_fields
+        # required since pydantic 2.10
+        model_class.__pydantic_fields__ = model_fields
+        # error since pydantic 2.10
+        with contextlib.suppress(AttributeError):
+            model_class.model_fields = model_fields
 
         # Handle annotations
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
