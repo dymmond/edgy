@@ -100,7 +100,7 @@ class RelatedField(RelationshipField):
         return self.foreign_key.reverse_clean(name, value, for_query=for_query)
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}: {self}>"
+        return f"<{type(self).__name__}: {self}>"
 
     def __str__(self) -> str:
         return f"({self.related_to.__name__}={self.related_name})"

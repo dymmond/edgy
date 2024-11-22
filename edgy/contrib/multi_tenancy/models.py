@@ -136,8 +136,8 @@ class DomainMixin(edgy.Model):
             force_insert = force_save
         check_db_connection(self.database)
         async with self.database as database, database.transaction():
-            domains = self.__class__.query.filter(tenant=self.tenant, is_primary=True).exclude(
-                pk=self.pk
+            domains = (
+                type(self).query.filter(tenant=self.tenant, is_primary=True).exclude(pk=self.pk)
             )
 
             exists = await domains.exists()
@@ -205,7 +205,7 @@ class TenantUserMixin(edgy.Model):
         await super().save(*args, **kwargs)
         if self.is_active:
             await (
-                get_model(registry=registry, model_name=self.__class__.__name__)
+                get_model(registry=registry, model_name=type(self).__name__)
                 .query.filter(is_active=True, user=self.user)
                 .exclude(pk=self.pk)
                 .update(is_active=False)

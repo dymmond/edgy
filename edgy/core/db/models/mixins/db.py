@@ -203,7 +203,7 @@ class DatabaseMixin:
     ) -> Union[str, None]:
         if self.__using_schema__ is not Undefined:
             return cast(Union[str, None], self.__using_schema__)
-        return self.__class__.get_active_class_schema(
+        return type(self).get_active_class_schema(
             check_schema=check_schema, check_tenant=check_tenant
         )
 
@@ -261,7 +261,7 @@ class DatabaseMixin:
             schema = self.get_active_instance_schema()
             return cast(
                 "sqlalchemy.Table",
-                self.__class__.table_schema(schema),
+                type(self).table_schema(schema),
             )
         return self._table
 
@@ -277,7 +277,7 @@ class DatabaseMixin:
     def pkcolumns(self) -> Sequence[str]:
         if self.__dict__.get("_pkcolumns", None) is None:
             if self.__dict__.get("_table", None) is None:
-                self._pkcolumns: Sequence[str] = cast(Sequence[str], self.__class__.pkcolumns)
+                self._pkcolumns: Sequence[str] = cast(Sequence[str], type(self).pkcolumns)
             else:
                 build_pkcolumns(self)
         return self._pkcolumns
@@ -286,7 +286,7 @@ class DatabaseMixin:
     def pknames(self) -> Sequence[str]:
         if self.__dict__.get("_pknames", None) is None:
             if self.__dict__.get("_table", None) is None:
-                self._pknames: Sequence[str] = cast(Sequence[str], self.__class__.pknames)
+                self._pknames: Sequence[str] = cast(Sequence[str], type(self).pknames)
             else:
                 build_pknames(self)
         return self._pknames
@@ -511,7 +511,7 @@ class DatabaseMixin:
 
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
-            for pkcolumn in self.__class__.pkcolumns:
+            for pkcolumn in type(self).pkcolumns:
                 # should trigger load in case of identifying_db_fields
                 value = getattr(self, pkcolumn, None)
                 if inspect.isawaitable(value):

@@ -12,8 +12,8 @@ class EdgyException(Exception):
 
     def __repr__(self) -> str:
         if self.detail:
-            return f"{self.__class__.__name__} - {self.detail}"
-        return self.__class__.__name__
+            return f"{type(self).__name__} - {self.detail}"
+        return type(self).__name__
 
     def __str__(self) -> str:
         return "".join(self.args).strip()
