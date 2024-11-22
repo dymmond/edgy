@@ -6,18 +6,20 @@ hide:
 
 # Release Notes
 
-## 0.23.2
+
+## 0.23.3
 
 ### Fixed
 
-- Autodetection of the instance was broken when a directory containing dots is in the folder.
-- Fix compatibility with pydantic 2.10.
+- Version number mismatch.
 
-## 0.23.1
+## 0.23.1 & 0.23.2
 
 ### Fixed
 
 - Docs were broken.
+- Autodetection of the instance was broken when a directory containing dots is in the folder.
+- Fix compatibility with pydantic 2.10.
 
 ## 0.23.0
 
