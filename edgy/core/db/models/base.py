@@ -32,8 +32,6 @@ from edgy.types import Undefined
 from .types import BaseModelType
 
 if TYPE_CHECKING:
-    from pydantic.fields import FieldInfo
-
     from edgy.core.connection.database import Database
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.model import Model
@@ -433,14 +431,14 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     field.__set__(self, value)
                 else:
                     for k, v in field.to_model(key, value).items():
-                        if k in cast(dict[str, "FieldInfo"], self.__class__.model_fields):
+                        if k in type(self).model_fields:
                             # __dict__ is updated and validator is executed
                             super().__setattr__(k, v)
                         else:
                             # bypass __setattr__ method
                             # ensures, __dict__ is updated
                             object.__setattr__(self, k, v)
-            elif key in cast(dict[str, "FieldInfo"], self.__class__.model_fields):
+            elif key in type(self).model_fields:
                 # __dict__ is updated and validator is executed
                 super().__setattr__(key, value)
             else:

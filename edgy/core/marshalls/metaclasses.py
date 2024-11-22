@@ -107,7 +107,7 @@ class MarshallMeta(ModelMetaclass):
         model_class.__pydantic_fields__ = model_fields
         # error since pydantic 2.10
         with contextlib.suppress(AttributeError):
-            model_class.model_fields = model_fields  # type: ignore
+            model_class.model_fields = model_fields
 
         # Handle annotations
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
