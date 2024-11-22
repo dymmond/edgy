@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any, cast
+import contextlib
+from typing import TYPE_CHECKING, Any, Union, cast
 
 from monkay import load
 from pydantic._internal._model_construction import ModelMetaclass
@@ -10,7 +11,7 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import MarshallFieldDefinitionError
 
 if TYPE_CHECKING:
-    from edgy import Model
+    from edgy.core.db.models import Model
     from edgy.core.marshalls import Marshall
 
 
@@ -33,7 +34,7 @@ class MarshallMeta(ModelMetaclass):
         if not has_parents:
             return super().__new__(cls, name, bases, attrs)
 
-        model_class: Marshall = super().__new__(cls, name, bases, attrs)  # type: ignore
+        model_class: type[Marshall] = super().__new__(cls, name, bases, attrs)
         if name in ("Marshall",):
             return model_class
 
@@ -43,12 +44,14 @@ class MarshallMeta(ModelMetaclass):
             )
 
         # The declared model
-        model: Model = marshall_config.get("model", None)  # type: ignore
-        assert model is not None, "'model' must be declared in the 'ConfigMarshall'."
+        _model: Union[type[Model], str, None] = marshall_config.get("model", None)
+        assert _model is not None, "'model' must be declared in the 'ConfigMarshall'."
 
-        if isinstance(cast(str, model), str):
-            model: Model = load(model)  # type: ignore
+        if isinstance(_model, str):
+            model: type[Model] = load(_model)
             marshall_config["model"] = model
+        else:
+            model = _model
 
         base_fields_include = marshall_config.get("fields", None)
         base_fields_exclude = marshall_config.get("exclude", None)
@@ -100,7 +103,11 @@ class MarshallMeta(ModelMetaclass):
                     f"Field '{name}' declared but no 'get_{name}' found in '{model_class.__name__}'."
                 )
 
-        model_class.model_fields = base_model_fields
+        # required since pydantic 2.10
+        model_class.__pydantic_fields__ = model_fields
+        # error since pydantic 2.10
+        with contextlib.suppress(AttributeError):
+            model_class.model_fields = model_fields
 
         # Handle annotations
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
@@ -115,7 +122,7 @@ class MarshallMeta(ModelMetaclass):
         required_fields: set[str] = {
             f"'{k}'" for k, v in model.model_fields.items() if v.is_required()
         }
-        if any(value not in model_class.model_fields for value in required_fields):
+        if any(value not in cast(dict, model_class.model_fields) for value in required_fields):
             fields = ", ".join(sorted(required_fields))
             raise MarshallFieldDefinitionError(
                 f"'{model.__name__}' model requires the following mandatory fields: [{fields}]."

@@ -1,15 +1,9 @@
 from typing import Any
 
-import pytest
-
 import edgy
-from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL)
-models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
-
-pytestmark = pytest.mark.anyio
+models = edgy.Registry(database=DATABASE_URL)
 
 
 class User(edgy.StrictModel):
@@ -52,26 +46,8 @@ class Member(edgy.StrictModel):
         registry = models
 
 
-@pytest.fixture(autouse=True, scope="module")
-async def create_test_database():
-    async with database:
-        await models.create_all()
-        yield
-        if not database.drop:
-            await models.drop_all()
-
-
-@pytest.fixture(autouse=True, scope="function")
-async def rollback_transactions():
-    async with models.database:
-        yield
-
-
-async def test_model_fields_are_different():
-    user = await User.query.create(name="John", language="PT", description="John")
-
-    assert user.model_fields["name"].annotation is str
+def test_model_fields_are_different():
+    # since pydantic 2.10 it is deprecated to access model_fields via instance
     assert User.model_fields["name"].annotation is str
 
-    assert user.proxy_model.model_fields["name"].annotation is Any
     assert User.proxy_model.model_fields["name"].annotation is Any

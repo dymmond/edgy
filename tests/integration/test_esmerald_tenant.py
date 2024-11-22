@@ -7,7 +7,6 @@ from esmerald import Esmerald, Gateway, Request, get
 from esmerald.protocols.middleware import MiddlewareProtocol
 from httpx import ASGITransport, AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
-from pydantic import __version__
 
 from edgy import Registry
 from edgy.contrib.multi_tenancy import TenantModel
@@ -22,7 +21,6 @@ models = Registry(database=database)
 
 
 pytestmark = pytest.mark.anyio
-pydantic_version = __version__[:3]
 
 
 class Tenant(TenantMixin):

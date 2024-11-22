@@ -166,7 +166,7 @@ class ManyRelation(ManyRelationProtocol):
             await child.delete()
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}: {self}>"
+        return f"<{type(self).__name__}: {self}>"
 
     def __str__(self) -> str:
         return f"{self.through.__name__}"
@@ -299,7 +299,7 @@ class SingleRelation(ManyRelationProtocol):
         await child.save(values={self.to_foreign_key: None})
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}: {self}>"
+        return f"<{type(self).__name__}: {self}>"
 
     def __str__(self) -> str:
         return f"{self.to.__name__}"

@@ -199,7 +199,7 @@ class BaseModelType(ABC):
         """
         Returns the name of the class in lowercase.
         """
-        return self.__class__.__name__.lower()
+        return type(self).__name__.lower()
 
     def create_model_key(self) -> tuple:
         """

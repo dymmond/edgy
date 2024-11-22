@@ -14,7 +14,7 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 pytestmark = pytest.mark.anyio
-pydantic_version = __version__[:3]
+pydantic_version = ".".join(__version__.split(".")[:2])
 
 
 @pytest.fixture(autouse=True, scope="module")

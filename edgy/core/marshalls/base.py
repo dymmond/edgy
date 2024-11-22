@@ -125,7 +125,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         """
         fields = MarshallFieldMapping(self)
         # copy fields from model_fields
-        for k, v in self.model_fields.items():
+        for k, v in type(self).model_fields.items():
             fields[k] = v
         return fields
 
@@ -156,7 +156,7 @@ class Marshall(BaseMarshall):
     """
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}: {self}>"
+        return f"<{type(self).__name__}: {self}>"
 
     def __str__(self) -> str:
-        return f"{self.__class__.__name__}()"
+        return f"{type(self).__name__}()"

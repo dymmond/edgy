@@ -143,7 +143,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         return new_kwargs
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__}: {str(self)}>"
+        return f"<{type(self).__name__}: {str(self)}>"
 
     def __str__(self) -> str:
         pkl = []
@@ -156,7 +156,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             pass
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
-        return f"{self.__class__.__name__}({', '.join(pkl)})"
+        return f"{type(self).__name__}({', '.join(pkl)})"
 
     @cached_property
     def identifying_db_fields(self) -> Any:
@@ -165,7 +165,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
 
     @property
     def proxy_model(self) -> type[Model]:
-        return self.__class__.proxy_model  # type: ignore
+        return type(self).proxy_model  # type: ignore
 
     @property
     def can_load(self) -> bool:
@@ -431,14 +431,14 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     field.__set__(self, value)
                 else:
                     for k, v in field.to_model(key, value).items():
-                        if k in self.model_fields:
+                        if k in type(self).model_fields:
                             # __dict__ is updated and validator is executed
                             super().__setattr__(k, v)
                         else:
                             # bypass __setattr__ method
                             # ensures, __dict__ is updated
                             object.__setattr__(self, k, v)
-            elif key in self.model_fields:
+            elif key in type(self).model_fields:
                 # __dict__ is updated and validator is executed
                 super().__setattr__(key, value)
             else:

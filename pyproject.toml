@@ -83,7 +83,8 @@ testing = [
     "pytest-timeout",
     "ipdb",
     "pytest-mock",
-    "mypy==1.10",
+    "mypy==1.10;python_version < '3.10'",
+    "mypy[faster-cache]>=1.13,<2.0; python_version >= '3.10'",
     "httpx",
     "types-orjson==3.6.2",
 ]
@@ -126,6 +127,8 @@ serve = "mkdocs serve --dev-addr localhost:8000"
 [tool.hatch.envs.test]
 # required for cli tests and check_types
 features = ["all", "testing"]
+# for typings
+extra-dependencies = ["pydantic>=2.10.1"]
 
 
 [tool.hatch.envs.test.env-vars]
@@ -134,7 +137,7 @@ EDGY_TESTCLIENT_USE_EXISTING = "true"
 
 
 [tool.hatch.envs.test.scripts]
-check_types = "mypy -p edgy"
+check_types = "mypy -p edgy {args}"
 
 [tool.hatch.envs.hatch-test]
 # needs docker services running
