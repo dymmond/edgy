@@ -325,5 +325,5 @@ In the documentation we go deeper in explanations and examples, this was just to
 
 [edgy]: https://edgy.dymmond.com
 [saffier]: https://saffier.tarsild.io
-[models]: ./docs/models.md
+[models]: https://edgy.dymmond.com/models/
 [alembic]: https://alembic.sqlalchemy.org/en/latest/
