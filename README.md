@@ -103,7 +103,7 @@ Since **Edgy**, like [Saffier][saffier], it is built on the top of
 system running on the top of [Alembic][alembic] but making it a
 lot easier to use and more pleasant for you.
 
-Have a look at the [migrations](./migrations/migrations.md) for more details.
+Have a look at the [migrations](./docs/migrations/migrations.md) for more details.
 
 ## Installation
 
@@ -253,7 +253,7 @@ It does not matter if you type or not, Edgy knows what and how to validate via `
 ## Connect your application
 
 Do you want to have more complex structures and connect to your favourite framework? Have a look
-at [connections](./connection.md) to understand how to do it properly.
+at [connections](./docs/connection.md) to understand how to do it properly.
 
 ## `Esmerald` ecosystem
 
@@ -325,5 +325,5 @@ In the documentation we go deeper in explanations and examples, this was just to
 
 [edgy]: https://edgy.dymmond.com
 [saffier]: https://saffier.tarsild.io
-[models]: ./models.md
+[models]: ./docs/models.md
 [alembic]: https://alembic.sqlalchemy.org/en/latest/
