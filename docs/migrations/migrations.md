@@ -499,7 +499,7 @@ $ edgy --app my_project.main migrate
 There are of course more available commands to you to be used which they can also be accessed
 via `--help` command.
 
-## Edgy admin
+## Edgy commandline
 
 To access the available options of edgy:
 
@@ -550,6 +550,40 @@ Since the alembic names for those two specific operations is not that intuitive,
 into a more friendly and intuitive way.
 
 For those familiar with Django, the names came from those same operations.
+
+## Migrate from flask-migrate
+
+`flask-migrate` was the blueprint for the original `Migrate` object which was the way to enable migrations
+but is deprecated nowadays.
+The new way are the `edgy.Instance` class and the migration settings.
+
+`edgy.Instance` takes as arguments `(registry, app=None)` instead of flask-migrate `Migrate` arguments: `(app, database)`.
+Also settings are not set here anymore, they are set in the edgy settings object.
+
+### Multi-schema migrations
+
+If you want to migrate multiple schemes you just have to turn on `multi_schema` in the [Migration settings](#migration-settings).
+You might want to filter via the schema parameters what schemes should be migrated.
+
+### Multi-database migrations
+
+Currently it is only possible to select the database used for the migration and to overwrite the folder.
+The multi-db migrations of flask are not supported yet in this way.
+But you can script them by calling with different `EDGY_DATABASE` or `EDGY_DATABASE_URL` environment
+variables.
+
+## Migration Settings
+
+Migrations use now the edgy settings. Here are all knobs you need to configure them.
+Basically all settings are in `edgy/conf/global_settings.py`.
+
+Some important settings are:
+
+- `multi_schema` - (Default: False). Include the schemes in the migrations, `True` for all schemes, a regex for some schemes.
+- `ignore_schema_pattern` - (Default: "information_schema"). Exclude patterns for `multi_schema`.
+- `migration_directory` - (Default: "migrations"). Path to the alembic migration folder.
+  This overwritable per command via `-d`, `--directory` parameter.
+- `alembic_ctx_kwargs` - (Default: `{"compare_type": True, "render_as_batch": True}`). Extra arguments for alembic.
 
 ## Very important
 
