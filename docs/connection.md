@@ -70,6 +70,10 @@ is useful because they will be connected/disconnected too.
 
 You can switch to them on the fly via [using](./queries/queries.md#selecting-the-database-and-schema).
 
+## Migrate from flask-migrate
+
+See [Migrations](./migrations/migrations.md#migrate-from-flask-migrate) for more informations.
+
 ## Note
 
 Check the [tips and tricks](./tips-and-tricks.md) and learn how to make your connections even cleaner.

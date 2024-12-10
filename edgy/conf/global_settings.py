@@ -36,11 +36,12 @@ class MediaSettings(BaseSettings):
 class MigrationSettings(BaseSettings):
     multi_schema: Union[bool, re.Pattern, str] = False
     ignore_schema_pattern: Union[None, re.Pattern, str] = "information_schema"
+    migration_directory: Union[str, os.PathLike] = Path("migrations/")
+    # extra keyword arguments to pass to alembic
     alembic_ctx_kwargs: dict = {
         "compare_type": True,
         "render_as_batch": True,
     }
-    migration_directory: Union[str, os.PathLike] = Path("migrations/")
 
 
 class EdgySettings(MediaSettings, MigrationSettings):
