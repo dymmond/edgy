@@ -551,7 +551,12 @@ into a more friendly and intuitive way.
 
 For those familiar with Django, the names came from those same operations.
 
-## Migrate from flask-migrate
+## Multi-database migrations
+
+Edgy added recently support for multi database migrations. You can simply continue using the old style
+single database migrations. Or update your `env.py` and existing migrations for multi-database migrations.
+
+### Migrate from flask-migrate
 
 `flask-migrate` was the blueprint for the original `Migrate` object which was the way to enable migrations
 but is deprecated nowadays.
@@ -560,17 +565,30 @@ The new way are the `edgy.Instance` class and the migration settings.
 `edgy.Instance` takes as arguments `(registry, app=None)` instead of flask-migrate `Migrate` arguments: `(app, database)`.
 Also settings are not set here anymore, they are set in the edgy settings object.
 
-### Multi-schema migrations
+#### Migrate env.py
+
+Let's assume we have flask-migrate with the multiple db feature:
+
+just exchanging the env.py by the default one of edgy should be enough.
+Otherwise we need to adjust the migrations. See below.
+
+### Migrate from single-database migrations
+
+In case you want to use the new edgy multidb migration feature you need to adapt old migrations.
+It is quite easy:
+
+1. Adding an parameter named `engine_name` to the `upgrade`/`downgrade` functions in all migrations which defaults to ''.
+2. Preventing the execution in case the `engine_name` parameter isn't empty.
+
+That is all.
+
+In case of a different default database for old migrations add the database to extra and prevent the execution for all other names
+then the extra name.
+
+## Multi-schema migrations
 
 If you want to migrate multiple schemes you just have to turn on `multi_schema` in the [Migration settings](#migration-settings).
 You might want to filter via the schema parameters what schemes should be migrated.
-
-### Multi-database migrations
-
-Currently it is only possible to select the database used for the migration and to overwrite the folder.
-The multi-db migrations of flask are not supported yet in this way.
-But you can script them by calling with different `EDGY_DATABASE` or `EDGY_DATABASE_URL` environment
-variables.
 
 ## Migration Settings
 

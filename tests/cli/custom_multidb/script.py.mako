@@ -26,7 +26,7 @@ def downgrade(edgy_dbname: str = "") -> None:
 
 <%
     from edgy import monkay
-    db_names = monkay.settings.migrate_dbs
+    db_names = monkay.settings.migrate_databases
 %>
 
 ## generate an "upgrade_<xyz>() / downgrade_<xyz>()" function

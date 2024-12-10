@@ -37,9 +37,12 @@ def iter_databases(registry: Registry) -> Generator[tuple[str, Database, "sqlalc
         except KeyError:
             name = None
     if name is False:
-        yield (None, registry.database, registry.metadata_by_name[None])
-        for name, database in registry.extra.items():
-            yield (name, database, registry.metadata_by_name[name])
+        db_names = edgy.monkay.settings.migrate_databases
+        for name in db_names:
+            if name is None:
+                yield (None, registry.database, registry.metadata_by_name[None])
+            else:
+                yield (name, registry.extra[name], registry.metadata_by_name[name])
     else:
         if url:
             database = Database(url)
