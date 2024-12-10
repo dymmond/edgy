@@ -3,11 +3,13 @@ import os
 import subprocess
 
 
-def run_cmd(app, cmd, with_app_environment=True):
+def run_cmd(app, cmd, with_app_environment=True, extra_env=None):
     env = dict(os.environ)
     env.setdefault("PYTHONPATH", env["PWD"])
     if with_app_environment:
         env["EDGY_DEFAULT_APP"] = app
+    if extra_env:
+        env.update(extra_env)
     cmd = f"hatch --env test run {cmd}"
 
     result = subprocess.run(cmd, capture_output=True, env=env, shell=True)
@@ -17,11 +19,13 @@ def run_cmd(app, cmd, with_app_environment=True):
     return result.stdout, result.stderr, result.returncode
 
 
-async def arun_cmd(app, cmd, with_app_environment=True):
+async def arun_cmd(app, cmd, with_app_environment=True, extra_env=None):
     env = dict(os.environ)
     env.setdefault("PYTHONPATH", env["PWD"])
     if with_app_environment:
         env["EDGY_DEFAULT_APP"] = app
+    if extra_env:
+        env.update(extra_env)
     cmd = f"hatch --env test run {cmd}"
 
     process = await asyncio.create_subprocess_shell(

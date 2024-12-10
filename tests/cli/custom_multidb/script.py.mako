@@ -1,3 +1,4 @@
+# Custom mako template
 """${message}
 
 Revision ID: ${up_revision}

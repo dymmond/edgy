@@ -9,7 +9,7 @@ from esmerald import Esmerald
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.cli.utils import arun_cmd
-from tests.settings import DATABASE_URL
+from tests.settings import DATABASE_ALTERNATIVE_URL, DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
@@ -44,13 +44,25 @@ async def cleanup_prepare_db():
         await conn.execute(sqlalchemy.text("CREATE DATABASE test_edgy"))
 
 
+@pytest.fixture(scope="function", autouse=True)
+async def cleanup_prepare_db2():
+    engine = create_async_engine(DATABASE_ALTERNATIVE_URL, isolation_level="AUTOCOMMIT")
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(sqlalchemy.text("DROP DATABASE test_edgy"))
+    except Exception:
+        pass
+    async with engine.connect() as conn:
+        await conn.execute(sqlalchemy.text("CREATE DATABASE test_edgy"))
+
+
 @pytest.mark.parametrize("app_flag", ["explicit", "explicit_env", "autosearch"])
 @pytest.mark.parametrize("template_type", ["default", "custom"])
 async def test_migrate_upgrade(app_flag, template_type):
     os.chdir(base_path)
     assert not (base_path / "migrations").exists()
     app_param = "--app tests.cli.main " if app_flag == "explicit" else ""
-    template_param = " -t ./custom_singledb" if template_type == "custom" else ""
+    template_param = " -t ./custom_multidb" if template_type == "custom" else ""
     (o, e, ss) = await arun_cmd(
         "tests.cli.main",
         f"edgy {app_param}init{template_param}",
@@ -96,7 +108,7 @@ async def test_different_directory(app_flag, template_type):
     os.chdir(base_path)
     assert not (base_path / "migrations2").exists()
     app_param = "--app tests.cli.main " if app_flag == "explicit" else ""
-    template_param = " -t ./custom_singledb" if template_type == "custom" else ""
+    template_param = " -t ./custom_multidb" if template_type == "custom" else ""
     (o, e, ss) = await arun_cmd(
         "tests.cli.main",
         f"edgy {app_param}init -d migrations2 {template_param}",

@@ -36,6 +36,7 @@ class MediaSettings(BaseSettings):
 class MigrationSettings(BaseSettings):
     multi_schema: Union[bool, re.Pattern, str] = False
     ignore_schema_pattern: Union[None, re.Pattern, str] = "information_schema"
+    migrate_dbs: Union[list[Union[str, None]], tuple[Union[str, None], ...]] = (None,)
     migration_directory: Union[str, os.PathLike] = Path("migrations/")
     # extra keyword arguments to pass to alembic
     alembic_ctx_kwargs: dict = {

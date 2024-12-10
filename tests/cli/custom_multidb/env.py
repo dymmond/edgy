@@ -1,5 +1,4 @@
-# Default env template
-
+# Custom env template
 import asyncio
 import logging
 import os
