@@ -15,12 +15,12 @@ down_revision = ${repr(down_revision)}
 branch_labels = ${repr(branch_labels)}
 depends_on = ${repr(depends_on)}
 
-def upgrade(edgy_dbname: str = "") -> None:
-    globals()[f"upgrade_{edgy_dbname}"]()
+def upgrade(engine_name: str = "") -> None:
+    globals()[f"upgrade_{engine_name}"]()
 
 
-def downgrade(edgy_dbname: str = "") -> None:
-    globals()[f"downgrade_{edgy_dbname}"]()
+def downgrade(engine_name: str = "") -> None:
+    globals()[f"downgrade_{engine_name}"]()
 
 
 <%

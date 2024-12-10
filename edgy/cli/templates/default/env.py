@@ -82,7 +82,8 @@ def run_migrations_offline() -> Any:
         )
 
         with context.begin_transaction():
-            context.run_migrations(edgy_dbname=name or "")
+            # for compatibility with flask migrate multidb kwarg is called engine_name
+            context.run_migrations(engine_name=name or "")
 
 
 def do_run_migrations(connection: Any, name: str, metadata: "sqlalchemy.Metadata") -> Any:
@@ -106,7 +107,8 @@ def do_run_migrations(connection: Any, name: str, metadata: "sqlalchemy.Metadata
     )
 
     with context.begin_transaction():
-        context.run_migrations(edgy_dbname=name or "")
+        # for compatibility with flask migrate multidb kwarg is called engine_name
+        context.run_migrations(engine_name=name or "")
 
 
 async def run_migrations_online() -> Any:
