@@ -10,3 +10,4 @@ DATABASE_ALTERNATIVE_URL = os.environ.get(
 )
 
 TEST_DATABASE = "postgresql+asyncpg://postgres:postgres@localhost:5432/test_edgy"
+TEST_ALTERNATIVE_DATABASE = "postgresql+asyncpg://postgres:postgres@localhost:5433/test_edgy"

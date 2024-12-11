@@ -45,12 +45,15 @@ async def cleanup_prepare_db():
 
 
 @pytest.mark.parametrize("app_flag", ["explicit", "explicit_env", "autosearch"])
-@pytest.mark.parametrize("template_type", ["default", "custom"])
-async def test_migrate_upgrade(app_flag, template_type):
+@pytest.mark.parametrize(
+    "template_param",
+    ["", " -t default", " -t plain", " -t url", " -t ./custom_singledb"],
+    ids=["default_empty", "default", "plain", "url", "custom"],
+)
+async def test_migrate_upgrade(app_flag, template_param):
     os.chdir(base_path)
     assert not (base_path / "migrations").exists()
     app_param = "--app tests.cli.main " if app_flag == "explicit" else ""
-    template_param = " -t ./custom_singledb" if template_type == "custom" else ""
     (o, e, ss) = await arun_cmd(
         "tests.cli.main",
         f"edgy {app_param}init{template_param}",
@@ -72,7 +75,7 @@ async def test_migrate_upgrade(app_flag, template_type):
     )
     assert ss == 0
 
-    if template_type == "custom":
+    if "custom" in template_param:
         with open("migrations/README") as f:
             assert f.readline().strip() == "Custom template"
         with open("migrations/alembic.ini") as f:
@@ -91,18 +94,21 @@ async def test_migrate_upgrade(app_flag, template_type):
 
 
 @pytest.mark.parametrize("app_flag", ["explicit", "explicit_env", "autosearch"])
-@pytest.mark.parametrize("template_type", ["default", "custom"])
-async def test_different_directory(app_flag, template_type):
+@pytest.mark.parametrize(
+    "template_param",
+    ["", " -t default", " -t plain", " -t url", " -t ./custom_singledb"],
+    ids=["default_empty", "default", "plain", "url", "custom"],
+)
+async def test_different_directory(app_flag, template_param):
     os.chdir(base_path)
     assert not (base_path / "migrations2").exists()
     app_param = "--app tests.cli.main " if app_flag == "explicit" else ""
-    template_param = " -t ./custom_singledb" if template_type == "custom" else ""
     (o, e, ss) = await arun_cmd(
         "tests.cli.main",
         f"edgy {app_param}init -d migrations2 {template_param}",
         with_app_environment=app_flag == "explicit_env",
     )
-    if template_type == "custom":
+    if "custom" in template_param:
         with open("migrations2/README") as f:
             assert f.readline().strip() == "Custom template"
         with open("migrations2/alembic.ini") as f:

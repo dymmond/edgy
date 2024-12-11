@@ -56,35 +56,38 @@ async def cleanup_prepare_db2():
         await conn.execute(sqlalchemy.text("CREATE DATABASE test_edgy"))
 
 
-@pytest.mark.parametrize("app_flag", ["explicit", "explicit_env", "autosearch"])
-@pytest.mark.parametrize("template_type", ["default", "custom"])
-async def test_migrate_upgrade(app_flag, template_type):
+@pytest.mark.parametrize("app_flag", ["explicit", "explicit_env"])
+@pytest.mark.parametrize(
+    "template_param",
+    ["", " -t default", " -t plain", " -t url", " -t ./custom_multidb"],
+    ids=["default_empty", "default", "plain", "url", "custom"],
+)
+async def test_migrate_upgrade(app_flag, template_param):
     os.chdir(base_path)
     assert not (base_path / "migrations").exists()
-    app_param = "--app tests.cli.main " if app_flag == "explicit" else ""
-    template_param = " -t ./custom_multidb" if template_type == "custom" else ""
+    app_param = "--app tests.cli.main_multidb " if app_flag == "explicit" else ""
     (o, e, ss) = await arun_cmd(
-        "tests.cli.main",
+        "tests.cli.main_multidb",
         f"edgy {app_param}init{template_param}",
         with_app_environment=app_flag == "explicit_env",
     )
     assert ss == 0
 
     (o, e, ss) = await arun_cmd(
-        "tests.cli.main",
+        "tests.cli.main_multidb",
         f"edgy {app_param}makemigrations",
         with_app_environment=app_flag == "explicit_env",
     )
     assert ss == 0
 
     (o, e, ss) = await arun_cmd(
-        "tests.cli.main",
+        "tests.cli.main_multidb",
         f"edgy {app_param}migrate",
         with_app_environment=app_flag == "explicit_env",
     )
     assert ss == 0
 
-    if template_type == "custom":
+    if "custom" in template_param:
         with open("migrations/README") as f:
             assert f.readline().strip() == "Custom template"
         with open("migrations/alembic.ini") as f:
@@ -102,19 +105,22 @@ async def test_migrate_upgrade(app_flag, template_type):
             assert f.readline().strip() == "# Default env template"
 
 
-@pytest.mark.parametrize("app_flag", ["explicit", "explicit_env", "autosearch"])
-@pytest.mark.parametrize("template_type", ["default", "custom"])
-async def test_different_directory(app_flag, template_type):
+@pytest.mark.parametrize("app_flag", ["explicit", "explicit_env"])
+@pytest.mark.parametrize(
+    "template_param",
+    ["", " -t default", " -t plain", " -t url", " -t ./custom_multidb"],
+    ids=["default_empty", "default", "plain", "url", "custom"],
+)
+async def test_different_directory(app_flag, template_param):
     os.chdir(base_path)
     assert not (base_path / "migrations2").exists()
-    app_param = "--app tests.cli.main " if app_flag == "explicit" else ""
-    template_param = " -t ./custom_multidb" if template_type == "custom" else ""
+    app_param = "--app tests.cli.main_multidb " if app_flag == "explicit" else ""
     (o, e, ss) = await arun_cmd(
-        "tests.cli.main",
+        "tests.cli.main_multidb",
         f"edgy {app_param}init -d migrations2 {template_param}",
         with_app_environment=app_flag == "explicit_env",
     )
-    if template_type == "custom":
+    if "custom" in template_param:
         with open("migrations2/README") as f:
             assert f.readline().strip() == "Custom template"
         with open("migrations2/alembic.ini") as f:

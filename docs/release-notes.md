@@ -6,6 +6,13 @@ hide:
 
 # Release Notes
 
+## 0.24.0
+
+### Added
+
+- True multi-database migrations.
+  You may need to rework your migrations in case you want to use it.
+- Generalized `hash_to_identifier` function.
 
 ## 0.23.3
 

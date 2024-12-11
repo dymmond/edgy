@@ -390,6 +390,36 @@ def get_engine_url():
     You can change the value to whatever you want/need but be careful when doing it as it might
     cause Edgy not to work properly with migrations if this value is not updated properly.
 
+#### Templates
+
+Sometimes you don't want to start with a migration template which uses hashed names for upgrade and downgrade.
+Or you want to use the database url instead for the name generation.
+
+Edgy has different flavors called templates:
+
+- default - (Default) The default template. Uses hashed database names. `env.py` is compatible to flask-migrate multidb migrations.
+- plain - Uses plain database names (means: databases in extra should be identifiers). `env.py` is compatible to flask-migrate multidb migrations.
+- url - Uses database urls instead of names for hashing. `env.py` is NOT compatible to flask-migrate multidb migrations. You need to adapt them.
+
+You can use them with:
+
+```shell
+edgy --app myproject.main init -t plain
+```
+
+or list all available templates with:
+
+```shell
+edgy --app myproject.main list_templates
+```
+
+You can also use templates from the filesystem
+
+```shell title="Example how to use the singledb template from tests"
+edgy --app myproject.main init -t tests/cli/custom_singledb
+```
+Templates are always just the starting point. You most probably want to adapt the result.
+
 ### Generate the first migrations
 
 Now it is time to generate your first migration.
@@ -584,6 +614,21 @@ That is all.
 
 In case of a different default database for old migrations add the database to extra and prevent the execution for all other names
 then the extra name.
+
+**Example**
+
+``` python
+def downgrade():
+    ...
+```
+
+becomes
+
+``` python
+def downgrade(engine_name: str = ""):
+    if engine_name != "": # or dbname you want
+        return
+```
 
 ## Multi-schema migrations
 

@@ -89,7 +89,7 @@ class MetaDataByUrlDict(dict):
 
     def get_name(self, key: str) -> Optional[str]:
         """Return name to url or raise KeyError in case it isn't available."""
-        return super().__getitem__(key)
+        return cast(Optional[str], super().__getitem__(key))
 
     def __copy__(self) -> "MetaDataByUrlDict":
         return MetaDataByUrlDict(registry=self.registry)
