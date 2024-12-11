@@ -29,7 +29,9 @@ fileConfig(config.config_file_name)
 logger = logging.getLogger("alembic.env")
 
 
-def iter_databases(registry: Registry) -> Generator[tuple[str, Database, "sqlalchemy.MetaData"]]:
+def iter_databases(
+    registry: Registry,
+) -> Generator[tuple[str, Database, "sqlalchemy.MetaData"], None, None]:
     url: Optional[str] = os.environ.get("EDGY_DATABASE_URL")
     name: Union[str, Literal[False]] = os.environ.get("EDGY_DATABASE") or False
     if url and not name:
