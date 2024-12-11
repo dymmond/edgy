@@ -79,7 +79,7 @@ def run_migrations_offline() -> Any:
     script output.
     """
     registry = edgy.get_migration_prepared_registry()
-    for name, db, metadata in iter_databases(registry):
+    for _, db, metadata in iter_databases(registry):
         context.configure(
             url=str(db.url),
             target_metadata=metadata,
@@ -88,10 +88,12 @@ def run_migrations_offline() -> Any:
 
         with context.begin_transaction():
             # for compatibility with flask migrate multidb kwarg is called engine_name
-            context.run_migrations(engine_name=name or "")
+            context.run_migrations(url=str(db.url))
 
 
-def do_run_migrations(connection: Any, name: str, metadata: "sqlalchemy.Metadata") -> Any:
+def do_run_migrations(
+    connection: Any, url: str, name: str, metadata: "sqlalchemy.Metadata"
+) -> Any:
     # this callback is used to prevent an auto-migration from being generated
     # when there are no changes to the schema
     # reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html
@@ -118,7 +120,7 @@ def do_run_migrations(connection: Any, name: str, metadata: "sqlalchemy.Metadata
 
     with context.begin_transaction():
         # for compatibility with flask migrate multidb kwarg is called engine_name
-        context.run_migrations(engine_name=name or "")
+        context.run_migrations(url=url)
 
 
 async def run_migrations_online() -> Any:
@@ -135,7 +137,7 @@ async def run_migrations_online() -> Any:
     async with registry:
         for name, db, metadata in iter_databases(registry):
             async with db as database:
-                await database.run_sync(do_run_migrations, name, metadata)
+                await database.run_sync(do_run_migrations, str(db.url), name, metadata)
 
 
 if context.is_offline_mode():

@@ -6,7 +6,7 @@ from edgy.cli.decorators import add_migration_directory_option
 
 @add_migration_directory_option
 @click.option(
-    "-t", "--template", default=None, help=('Repository template to use (default is "flask")')
+    "-t", "--template", default=None, help=('Repository template to use (default is "default")')
 )
 @click.option(
     "--package",

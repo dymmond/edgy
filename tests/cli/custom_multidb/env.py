@@ -1,5 +1,4 @@
-# Default env template
-
+# Custom env template
 import asyncio
 import logging
 import os
@@ -29,9 +28,7 @@ fileConfig(config.config_file_name)
 logger = logging.getLogger("alembic.env")
 
 
-def iter_databases(
-    registry: Registry,
-) -> Generator[tuple[str, Database, "sqlalchemy.MetaData"], None, None]:
+def iter_databases(registry: Registry) -> Generator[tuple[str, Database, "sqlalchemy.MetaData"]]:
     url: Optional[str] = os.environ.get("EDGY_DATABASE_URL")
     name: Union[str, Literal[False]] = os.environ.get("EDGY_DATABASE") or False
     if url and not name:
@@ -87,8 +84,7 @@ def run_migrations_offline() -> Any:
         )
 
         with context.begin_transaction():
-            # for compatibility with flask migrate multidb kwarg is called engine_name
-            context.run_migrations(engine_name=name or "")
+            context.run_migrations(edgy_dbname=name or "")
 
 
 def do_run_migrations(connection: Any, name: str, metadata: "sqlalchemy.Metadata") -> Any:
@@ -117,8 +113,7 @@ def do_run_migrations(connection: Any, name: str, metadata: "sqlalchemy.Metadata
     )
 
     with context.begin_transaction():
-        # for compatibility with flask migrate multidb kwarg is called engine_name
-        context.run_migrations(engine_name=name or "")
+        context.run_migrations(edgy_dbname=name or "")
 
 
 async def run_migrations_online() -> Any:

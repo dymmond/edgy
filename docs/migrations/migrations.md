@@ -390,6 +390,36 @@ def get_engine_url():
     You can change the value to whatever you want/need but be careful when doing it as it might
     cause Edgy not to work properly with migrations if this value is not updated properly.
 
+#### Templates
+
+Sometimes you don't want to start with a migration template which uses hashed names for upgrade and downgrade.
+Or you want to use the database url instead for the name generation.
+
+Edgy has different flavors called templates:
+
+- default - (Default) The default template. Uses hashed database names. `env.py` is compatible to flask-migrate multidb migrations.
+- plain - Uses plain database names (means: databases in extra should be identifiers). `env.py` is compatible to flask-migrate multidb migrations.
+- url - Uses database urls instead of names for hashing. `env.py` is NOT compatible to flask-migrate multidb migrations. You need to adapt them.
+
+You can use them with:
+
+```shell
+edgy --app myproject.main init -t plain
+```
+
+or list all available templates with:
+
+```shell
+edgy --app myproject.main list_templates
+```
+
+You can also use templates from the filesystem
+
+```shell title="Example how to use the singledb template from tests"
+edgy --app myproject.main init -t tests/cli/custom_singledb
+```
+Templates are always just the starting point. You most probably want to adapt the result.
+
 ### Generate the first migrations
 
 Now it is time to generate your first migration.
@@ -551,7 +581,12 @@ into a more friendly and intuitive way.
 
 For those familiar with Django, the names came from those same operations.
 
-## Migrate from flask-migrate
+## Multi-database migrations
+
+Edgy added recently support for multi database migrations. You can simply continue using the old style
+single database migrations. Or update your `env.py` and existing migrations for multi-database migrations.
+
+### Migrate from flask-migrate
 
 `flask-migrate` was the blueprint for the original `Migrate` object which was the way to enable migrations
 but is deprecated nowadays.
@@ -560,17 +595,45 @@ The new way are the `edgy.Instance` class and the migration settings.
 `edgy.Instance` takes as arguments `(registry, app=None)` instead of flask-migrate `Migrate` arguments: `(app, database)`.
 Also settings are not set here anymore, they are set in the edgy settings object.
 
-### Multi-schema migrations
+#### Migrate env.py
+
+Let's assume we have flask-migrate with the multiple db feature:
+
+just exchanging the env.py by the default one of edgy should be enough.
+Otherwise we need to adjust the migrations. See below.
+
+### Migrate from single-database migrations
+
+In case you want to use the new edgy multidb migration feature you need to adapt old migrations.
+It is quite easy:
+
+1. Adding an parameter named `engine_name` to the `upgrade`/`downgrade` functions in all migrations which defaults to ''.
+2. Preventing the execution in case the `engine_name` parameter isn't empty.
+
+That is all.
+
+In case of a different default database for old migrations add the database to extra and prevent the execution for all other names
+then the extra name.
+
+**Example**
+
+``` python
+def downgrade():
+    ...
+```
+
+becomes
+
+``` python
+def downgrade(engine_name: str = ""):
+    if engine_name != "": # or dbname you want
+        return
+```
+
+## Multi-schema migrations
 
 If you want to migrate multiple schemes you just have to turn on `multi_schema` in the [Migration settings](#migration-settings).
 You might want to filter via the schema parameters what schemes should be migrated.
-
-### Multi-database migrations
-
-Currently it is only possible to select the database used for the migration and to overwrite the folder.
-The multi-db migrations of flask are not supported yet in this way.
-But you can script them by calling with different `EDGY_DATABASE` or `EDGY_DATABASE_URL` environment
-variables.
 
 ## Migration Settings
 
@@ -581,6 +644,7 @@ Some important settings are:
 
 - `multi_schema` - (Default: False). Include the schemes in the migrations, `True` for all schemes, a regex for some schemes.
 - `ignore_schema_pattern` - (Default: "information_schema"). Exclude patterns for `multi_schema`.
+- `migrate_databases` - (Default: (None,)) Databases which should be migrated.
 - `migration_directory` - (Default: "migrations"). Path to the alembic migration folder.
   This overwritable per command via `-d`, `--directory` parameter.
 - `alembic_ctx_kwargs` - (Default: `{"compare_type": True, "render_as_batch": True}`). Extra arguments for alembic.
