@@ -16,11 +16,15 @@ branch_labels = ${repr(branch_labels)}
 depends_on = ${repr(depends_on)}
 
 def upgrade(engine_name: str = "") -> None:
-    globals()[f"upgrade_{engine_name}"]()
+    fn = globals().get(f"upgrade_{engine_name}")
+    if fn is not None:
+        fn()
 
 
 def downgrade(engine_name: str = "") -> None:
-    globals()[f"downgrade_{engine_name}"]()
+    fn = globals().get(f"downgrade_{engine_name}")
+    if fn is not None:
+        fn()
 
 
 <%

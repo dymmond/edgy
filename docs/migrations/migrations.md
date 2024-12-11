@@ -599,6 +599,7 @@ Some important settings are:
 
 - `multi_schema` - (Default: False). Include the schemes in the migrations, `True` for all schemes, a regex for some schemes.
 - `ignore_schema_pattern` - (Default: "information_schema"). Exclude patterns for `multi_schema`.
+- `migrate_databases` - (Default: (None,)) Databases which should be migrated.
 - `migration_directory` - (Default: "migrations"). Path to the alembic migration folder.
   This overwritable per command via `-d`, `--directory` parameter.
 - `alembic_ctx_kwargs` - (Default: `{"compare_type": True, "render_as_batch": True}`). Extra arguments for alembic.
