@@ -100,7 +100,12 @@ def do_run_migrations(
     def process_revision_directives(context, revision, directives) -> Any:  # type: ignore
         if getattr(config.cmd_opts, "autogenerate", False):
             script = directives[0]
-            if script.upgrade_ops.is_empty():
+            empty = True
+            for upgrade_ops in script.upgrade_ops_list:
+                if not upgrade_ops.is_empty():
+                    empty = False
+                    break
+            if empty:
                 directives[:] = []
                 console.print("[bright_red]No changes in schema detected.")
 
