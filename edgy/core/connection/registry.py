@@ -88,7 +88,7 @@ class MetaDataByUrlDict(dict):
             return default
 
     def get_name(self, key: str) -> Optional[str]:
-        """Return name to url or raise KeyError in case it isn't available."""
+        """Return name to url or raise a KeyError in case it isn't available."""
         return cast(Optional[str], super().__getitem__(key))
 
     def __copy__(self) -> "MetaDataByUrlDict":
@@ -139,7 +139,9 @@ class Registry:
         self.extra: dict[str, Database] = {
             k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
         }
-        assert all(map(bool, self.extra.keys())), "Invalid extra name"
+        assert all(
+            bool(x) and isinstance(x, str) for x in self.extra
+        ), "Invalid name in extra detected. All names must be non-empty and strings."
         self.metadata_by_url = MetaDataByUrlDict(registry=self)
 
         if with_content_type is not False:

@@ -13,6 +13,11 @@ hide:
 - True multi-database migrations.
   You may need to rework your migrations in case you want to use it.
 - Generalized `hash_to_identifier` function.
+- `get_name` function on `metadata_by_url` dict.
+
+### Changed
+
+- Breaking: empty names are not allowed anymore for extra.
 
 ## 0.23.3
 
