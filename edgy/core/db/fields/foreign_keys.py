@@ -318,6 +318,7 @@ class BaseForeignKeyField(BaseForeignKey):
             # this does not work because fks are checked in metadata
             # this implies is_cross_db and is just a stronger version
             or self.owner.meta.registry is not self.target.meta.registry
+            or self.owner.database is not self.target.database
         )
         if not no_constraint:
             target = self.target

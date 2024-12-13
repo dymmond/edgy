@@ -79,7 +79,9 @@ def run_migrations_offline() -> Any:
     script output.
     """
     registry = edgy.get_migration_prepared_registry()
-    for _, db, metadata in iter_databases(registry):
+    for name, db, metadata in iter_databases(registry):
+        # db is maybe overwritten, so use the original url
+        orig_url = str(registry.database.url) if name is None else str(registry.extra[name].url)
         context.configure(
             url=str(db.url),
             target_metadata=metadata,
@@ -87,12 +89,11 @@ def run_migrations_offline() -> Any:
         )
 
         with context.begin_transaction():
-            # for compatibility with flask migrate multidb kwarg is called engine_name
-            context.run_migrations(url=str(db.url))
+            context.run_migrations(url=orig_url)
 
 
 def do_run_migrations(
-    connection: Any, url: str, name: str, metadata: "sqlalchemy.Metadata"
+    connection: Any, url: str, orig_url: str, name: str, metadata: "sqlalchemy.Metadata"
 ) -> Any:
     # this callback is used to prevent an auto-migration from being generated
     # when there are no changes to the schema
@@ -119,8 +120,7 @@ def do_run_migrations(
     )
 
     with context.begin_transaction():
-        # for compatibility with flask migrate multidb kwarg is called engine_name
-        context.run_migrations(url=url)
+        context.run_migrations(url=orig_url)
 
 
 async def run_migrations_online() -> Any:
@@ -136,8 +136,12 @@ async def run_migrations_online() -> Any:
     registry = edgy.get_migration_prepared_registry()
     async with registry:
         for name, db, metadata in iter_databases(registry):
+            # db is maybe overwritten, so use the original url
+            orig_url = (
+                str(registry.database.url) if name is None else str(registry.extra[name].url)
+            )
             async with db as database:
-                await database.run_sync(do_run_migrations, str(db.url), name, metadata)
+                await database.run_sync(do_run_migrations, str(db.url), orig_url, name, metadata)
 
 
 if context.is_offline_mode():

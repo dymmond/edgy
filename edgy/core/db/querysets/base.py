@@ -1429,20 +1429,22 @@ class QuerySet(BaseQuerySet):
         """
         # for tenancy
         queryset: QuerySet = self._clone()
-        instance = self.model_class(*args, **kwargs)
-        apply_instance_extras(
-            instance,
-            self.model_class,
-            schema=self.using_schema,
-            table=queryset.table,
-            database=queryset.database,
-        )
-        # values=kwargs is required for ensuring all kwargs are seen as explicit kwargs
-        instance = await instance.save(force_insert=True, values=set(kwargs.keys()))
-        result = await self._embed_parent_in_result(instance)
-        self._clear_cache(True)
-        self._cache.update([result])
-        return cast(EdgyEmbedTarget, result[1])
+        check_db_connection(queryset.database)
+        async with queryset.database as database:
+            instance = queryset.model_class(*args, **kwargs)
+            apply_instance_extras(
+                instance,
+                self.model_class,
+                schema=self.using_schema,
+                table=queryset.table,
+                database=database,
+            )
+            # values=kwargs is required for ensuring all kwargs are seen as explicit kwargs
+            instance = await instance.save(force_insert=True, values=set(kwargs.keys()))
+            result = await self._embed_parent_in_result(instance)
+            self._clear_cache(True)
+            self._cache.update([result])
+            return cast(EdgyEmbedTarget, result[1])
 
     async def bulk_create(self, objs: Iterable[Union[dict[str, Any], EdgyModel]]) -> None:
         """

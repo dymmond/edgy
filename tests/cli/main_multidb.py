@@ -9,13 +9,10 @@ from tests.settings import TEST_ALTERNATIVE_DATABASE, TEST_DATABASE
 
 pytestmark = pytest.mark.anyio
 models = edgy.Registry(
-    database=TEST_DATABASE, extra={"another": TEST_ALTERNATIVE_DATABASE}, with_content_type=True
+    database=TEST_DATABASE,
+    extra={"another": TEST_ALTERNATIVE_DATABASE},
+    with_content_type=True,
 )
-another = edgy.Registry(
-    database=TEST_ALTERNATIVE_DATABASE,
-    with_content_type=models.content_type,
-)
-
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 
@@ -46,11 +43,21 @@ class Permission(BasePermission):
 
 
 class Signal(edgy.StrictModel):
-    user = edgy.fields.ForeignKey("User", no_constraint=True)
+    user = edgy.fields.ForeignKey(User, no_constraint=True)
     signal_type = edgy.fields.CharField(max_length=100)
+    database = models.extra["another"]
 
     class Meta:
-        registry = another
+        registry = models
+
+
+class Unrelated(edgy.StrictModel):
+    name = edgy.fields.CharField(max_length=100)
+    database = models.extra["another"]
+    content_type = edgy.fields.ExcludeField()
+
+    class Meta:
+        registry = models
 
 
 edgy.monkay.set_instance(Instance(registry=models))

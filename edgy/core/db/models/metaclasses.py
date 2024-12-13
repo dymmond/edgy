@@ -34,6 +34,7 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import ImproperlyConfigured, TableBuildError
 
 if TYPE_CHECKING:
+    from edgy.core.connection import Database
     from edgy.core.db.models import Model
     from edgy.core.db.models.types import BaseModelType
 
@@ -598,6 +599,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         attrs.pop("_pkcolumns", None)
         attrs.pop("_pknames", None)
         attrs.pop("_table", None)
+        database: Union[Literal["keep"], None, Database, bool] = attrs.pop("database", "keep")
 
         # Extract fields and managers and include them in attrs
         attrs = extract_fields_and_managers(bases, attrs)
@@ -789,7 +791,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         if not meta.registry:
             new_class.model_rebuild(force=True)
             return new_class
-        new_class.add_to_registry(meta.registry)
+        new_class.add_to_registry(meta.registry, database=database)
         return new_class
 
     def get_db_schema(cls) -> Union[str, None]:

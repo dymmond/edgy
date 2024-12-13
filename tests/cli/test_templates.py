@@ -1,19 +1,18 @@
 import contextlib
 import os
 import shutil
+import sys
+from asyncio import run
 from pathlib import Path
 
 import pytest
 import sqlalchemy
-from esmerald import Esmerald
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from tests.cli.utils import arun_cmd
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
-
-app = Esmerald(routes=[])
 
 base_path = Path(os.path.abspath(__file__)).absolute().parent
 
@@ -67,11 +66,20 @@ async def test_migrate_upgrade(app_flag, template_param):
         with_app_environment=app_flag == "explicit_env",
     )
     assert ss == 0
+    assert b"No changes in schema detected" not in o
 
     (o, e, ss) = await arun_cmd(
         "tests.cli.main",
         f"edgy {app_param}migrate",
         with_app_environment=app_flag == "explicit_env",
+    )
+    assert ss == 0
+
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main",
+        f"hatch run python {__file__} test_migrate_upgrade",
+        with_app_environment=False,
+        extra_env={"EDGY_SETTINGS_MODULE": "tests.settings.multidb.TestSettings"},
     )
     assert ss == 0
 
@@ -108,6 +116,14 @@ async def test_different_directory(app_flag, template_param):
         f"edgy {app_param}init -d migrations2 {template_param}",
         with_app_environment=app_flag == "explicit_env",
     )
+
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main",
+        f"edgy {app_param}makemigrations-d migrations2",
+        with_app_environment=app_flag == "explicit_env",
+    )
+    assert ss == 0
+    assert b"No changes in schema detected" not in o
     if "custom" in template_param:
         with open("migrations2/README") as f:
             assert f.readline().strip() == "Custom template"
@@ -124,3 +140,18 @@ async def test_different_directory(app_flag, template_param):
             assert f.readline().strip() == "# A generic database configuration."
         with open("migrations2/env.py") as f:
             assert f.readline().strip() == "# Default env template"
+
+
+async def main():
+    if sys.argv[1] == "test_migrate_upgrade":
+        from tests.cli import main
+
+        async with main.models:
+            user = await main.User.query.create(name="edgy")
+            permission = await main.Permission.query.create(users=[user], name="view")
+            assert await main.Permission.query.users("view").get() == user
+            assert await main.Permission.query.permissions_of(user).get() == permission
+
+
+if __name__ == "__main__":
+    run(main())
