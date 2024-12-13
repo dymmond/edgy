@@ -108,6 +108,10 @@ class ManyRelation(ManyRelationProtocol):
                 )
             self.refs.append(self.expand_relationship(child))
 
+    async def create(self, *args: Any, **kwargs: Any) -> Optional["BaseModelType"]:
+        """Creates and add a child"""
+        return await self.add(self.to(*args, **kwargs))
+
     async def add(self, child: "BaseModelType") -> Optional["BaseModelType"]:
         """
         Adds a child to the model as a list
@@ -263,6 +267,11 @@ class SingleRelation(ManyRelationProtocol):
     async def save_related(self) -> None:
         while self.refs:
             await self.add(self.refs.pop())
+
+    async def create(self, *args: Any, **kwargs: Any) -> Optional["BaseModelType"]:
+        """Creates and add a child"""
+        kwargs[self.to_foreign_key] = self.instance
+        return await self.to.query.create(*args, **kwargs)
 
     async def add(self, child: "BaseModelType") -> Optional["BaseModelType"]:
         """

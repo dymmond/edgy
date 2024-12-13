@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
 
 if TYPE_CHECKING:  # pragma: nocover
     from edgy.core.db.models.types import BaseModelType
@@ -11,6 +11,8 @@ class ManyRelationProtocol(Protocol):
     """Defines the what needs to be implemented when using the ManyRelationProtocol"""
 
     async def save_related(self) -> None: ...
+
+    async def create(self, *args: Any, **kwargs: Any) -> Optional["BaseModelType"]: ...
 
     async def add(self, child: "BaseModelType") -> Optional["BaseModelType"]: ...
 
