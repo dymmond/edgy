@@ -271,7 +271,7 @@ class SingleRelation(ManyRelationProtocol):
     async def create(self, *args: Any, **kwargs: Any) -> Optional["BaseModelType"]:
         """Creates and add a child"""
         kwargs[self.to_foreign_key] = self.instance
-        return await self.to.query.create(*args, **kwargs)
+        return await cast("QuerySet", self.to.query).create(*args, **kwargs)
 
     async def add(self, child: "BaseModelType") -> Optional["BaseModelType"]:
         """
