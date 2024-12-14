@@ -119,7 +119,7 @@ async def test_different_directory(app_flag, template_param):
 
     (o, e, ss) = await arun_cmd(
         "tests.cli.main",
-        f"edgy {app_param}makemigrations-d migrations2",
+        f"edgy {app_param}makemigrations -d migrations2",
         with_app_environment=app_flag == "explicit_env",
     )
     assert ss == 0
