@@ -23,7 +23,7 @@ from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.relationships.utils import crawl_relationship
-from edgy.core.utils.db import check_db_connection, hash_tablekey
+from edgy.core.utils.db import CHECK_DB_CONNECTION_SILENCED, check_db_connection, hash_tablekey
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.types import Undefined
@@ -1430,14 +1430,15 @@ class QuerySet(BaseQuerySet):
         # for tenancy
         queryset: QuerySet = self._clone()
         check_db_connection(queryset.database)
-        async with queryset.database as database:
+        token = CHECK_DB_CONNECTION_SILENCED.set(True)
+        try:
             instance = queryset.model_class(*args, **kwargs)
             apply_instance_extras(
                 instance,
                 self.model_class,
                 schema=self.using_schema,
                 table=queryset.table,
-                database=database,
+                database=queryset.database,
             )
             # values=kwargs is required for ensuring all kwargs are seen as explicit kwargs
             instance = await instance.save(force_insert=True, values=set(kwargs.keys()))
@@ -1445,6 +1446,8 @@ class QuerySet(BaseQuerySet):
             self._clear_cache(True)
             self._cache.update([result])
             return cast(EdgyEmbedTarget, result[1])
+        finally:
+            CHECK_DB_CONNECTION_SILENCED.reset(token)
 
     async def bulk_create(self, objs: Iterable[Union[dict[str, Any], EdgyModel]]) -> None:
         """
