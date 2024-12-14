@@ -5,10 +5,15 @@ Revises: ${down_revision | comma,n}
 Create Date: ${create_date}
 
 """
+from typing import TYPE_CHECKING, Optional
+
 from alembic import op
 import sqlalchemy as sa
 from edgy.utils.hashing import hash_to_identifier
 ${imports if imports else ""}
+
+if TYPE_CHECKING:
+    from edgy.core.connection import DatabaseURL
 
 # revision identifiers, used by Alembic.
 revision = ${repr(up_revision)}
@@ -16,14 +21,16 @@ down_revision = ${repr(down_revision)}
 branch_labels = ${repr(branch_labels)}
 depends_on = ${repr(depends_on)}
 
-def upgrade(url: str = "") -> None:
-    fn = globals().get(f"upgrade_{hash_to_identifier(url)}")
+def upgrade(url: Optional["DatabaseURL"] = None) -> None:
+    urlstring = "" if url is None else f"{url.username}:{url.netloc}"
+    fn = globals().get(f"upgrade_{hash_to_identifier(urlstring)}")
     if fn is not None:
         fn()
 
 
-def downgrade(url: str = "") -> None:
-    fn = globals().get(f"downgrade_{hash_to_identifier(url)}")
+def downgrade(url: Optional["DatabaseURL"] = None) -> None:
+    urlstring = "" if url is None else f"{url.username}:{url.netloc}"
+    fn = globals().get(f"downgrade_{hash_to_identifier(urlstring)}")
     if fn is not None:
         fn()
 
@@ -35,9 +42,10 @@ def downgrade(url: str = "") -> None:
 
     def url_for_name(name):
         if name:
-            return str(monkay.instance.registry.extra[name].url)
+            url = monkay.instance.registry.extra[name].url
         else:
-            return str(monkay.instance.registry.database.url)
+            url = monkay.instance.registry.database.url
+        return f"{url.username}:{url.netloc}"
 %>
 
 ## generate an "upgrade_<xyz>() / downgrade_<xyz>()" function

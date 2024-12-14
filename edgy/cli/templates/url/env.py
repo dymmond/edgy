@@ -11,7 +11,7 @@ from alembic import context
 from rich.console import Console
 
 import edgy
-from edgy.core.connection import Database, Registry
+from edgy.core.connection import Database, DatabaseURL, Registry
 
 if TYPE_CHECKING:
     import sqlalchemy
@@ -81,7 +81,7 @@ def run_migrations_offline() -> Any:
     registry = edgy.get_migration_prepared_registry()
     for name, db, metadata in iter_databases(registry):
         # db is maybe overwritten, so use the original url
-        orig_url = str(registry.database.url) if name is None else str(registry.extra[name].url)
+        orig_url = registry.database.url if name is None else registry.extra[name].url
         context.configure(
             url=str(db.url),
             target_metadata=metadata,
@@ -93,7 +93,7 @@ def run_migrations_offline() -> Any:
 
 
 def do_run_migrations(
-    connection: Any, url: str, orig_url: str, name: str, metadata: "sqlalchemy.Metadata"
+    connection: Any, url: str, orig_url: DatabaseURL, name: str, metadata: "sqlalchemy.Metadata"
 ) -> Any:
     # this callback is used to prevent an auto-migration from being generated
     # when there are no changes to the schema
@@ -137,9 +137,7 @@ async def run_migrations_online() -> Any:
     async with registry:
         for name, db, metadata in iter_databases(registry):
             # db is maybe overwritten, so use the original url
-            orig_url = (
-                str(registry.database.url) if name is None else str(registry.extra[name].url)
-            )
+            orig_url = registry.database.url if name is None else registry.extra[name].url
             async with db as database:
                 await database.run_sync(do_run_migrations, str(db.url), orig_url, name, metadata)
 
