@@ -70,6 +70,18 @@ async def test_add_many_to_many():
     assert len(total_tracks) == 3
 
 
+async def test_create_many_to_many():
+    album = await Album.query.create(name="Malibu")
+
+    await album.tracks.create(title="The Bird", position=1)
+    await album.tracks.create(title="Heart don't stand a chance", position=2)
+    await album.tracks.create(title="The Waters", position=3)
+
+    total_tracks = await album.tracks.all()
+
+    assert len(total_tracks) == 3
+
+
 async def test_add_many_to_many_with_repeated_field():
     track1 = await Track.query.create(title="The Bird", position=1)
     track2 = await Track.query.create(title="Heart don't stand a chance", position=2)

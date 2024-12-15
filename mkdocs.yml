@@ -85,6 +85,7 @@ nav:
           - Queries: "queries/queries.md"
           - Secrets: "queries/secrets.md"
           - Related Name: "queries/related-name.md"
+          - Many-to-One relations: "queries/many-to-one.md"
           - ManyToMany: "queries/many-to-many.md"
           - Prefetch Related: "queries/prefetch.md"
       - Transactions: "transactions.md"

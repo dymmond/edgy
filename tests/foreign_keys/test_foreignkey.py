@@ -129,6 +129,17 @@ async def test_new_create2():
     assert len(tracks) == 2
 
 
+async def test_create_via_relation_create():
+    await Track.query.create(title="The Waters", position=3)
+
+    album = await Album.query.create(name="Malibu")
+    await album.tracks_set.create(title="The Bird", position=1)
+    await album.tracks_set.create(title="Heart don't stand a chance", position=2)
+    tracks = await album.tracks_set.all()
+
+    assert len(tracks) == 2
+
+
 async def test_select_related():
     album = await Album.query.create(name="Malibu")
     await Track.query.create(album=album, title="The Bird", position=1)

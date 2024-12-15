@@ -44,9 +44,10 @@ It is like a virtual path part which can be traversed via the `__` path building
 With the many to many you can perform all the normal operations of searching from normal queries
 to the [related name][related_name] as per normal search.
 
-ManyToMany allows two different methods when using it (the same applies for the reverse side).
+ManyToMany allows three different methods when using it (the same applies for the reverse side).
 
 * `add()` - Adds a record to the ManyToMany.
+* `create()` - Create a new record and add it to the ManyToMany.
 * `remove()` - Removes a record to the ManyToMany.
 
 Let us see how it looks by using the following example.
@@ -65,9 +66,24 @@ green_team = await Team.query.create(name="Green Team")
 organisation = await Organisation.query.create(ident="Acme Ltd")
 
 # Add teams to the organisation
-organisation.teams.add(blue_team)
-organisation.teams.add(green_team)
+await organisation.teams.add(blue_team)
+await organisation.teams.add(green_team)
 ```
+
+#### create()
+
+You can fuse this to:
+
+
+```python hl_lines="4-5"
+organisation = await Organisation.query.create(ident="Acme Ltd")
+
+# Add teams to the organisation
+await organisation.teams.create(name="Blue Team")
+await organisation.teams.create(name="Green Team")
+```
+
+This is also more performant because less transactions are required.
 
 #### remove()
 
@@ -80,13 +96,13 @@ red_team = await Team.query.create(name="Red Team")
 organisation = await Organisation.query.create(ident="Acme Ltd")
 
 # Add teams to organisation
-organisation.teams.add(blue_team)
-organisation.teams.add(green_team)
-organisation.teams.add(red_team)
+await organisation.teams.add(blue_team)
+await organisation.teams.add(green_team)
+await organisation.teams.add(red_team)
 
 # Remove the teams from the organisation
-organisation.teams.remove(red_team)
-organisation.teams.remove(blue_team)
+await organisation.teams.remove(red_team)
+await organisation.teams.remove(blue_team)
 ```
 
 Hint: when unique, remove works also without argument.

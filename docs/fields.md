@@ -499,6 +499,8 @@ The Profile object can be accessed by the `profile` attribute we choosed as seco
 
 When the second parameter is empty, the parent object is not included as attribute.
 
+The reverse end of a `ForeignKey` is a [Many to one relation](./queries/many-to-one.md).
+
 
 ##### Parameters
 
