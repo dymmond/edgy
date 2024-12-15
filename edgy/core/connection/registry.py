@@ -44,7 +44,7 @@ class MetaDataDict(defaultdict[str, sqlalchemy.MetaData]):
 
     def __getitem__(self, key: Union[str, None]) -> sqlalchemy.MetaData:
         if key not in self.registry.extra and key is not None:
-            raise KeyError(f'Extra database "{key}" does not exist')
+            raise KeyError(f'Extra database "{key}" does not exist.')
         return super().__getitem__(key)
 
     def get(self, key: str, default: Any = None) -> sqlalchemy.MetaData:
