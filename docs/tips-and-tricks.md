@@ -62,6 +62,12 @@ the `lru_cache` technique for our `db_connection`.
 This will make sure that from now on you will always use the same connection and registry within
 your appliction by importing the `get_db_connection()` anywhere is needed.
 
+Why don't we use `edgy.monkay.instance.registry` instead? It is a chicken-egg problem:
+
+It is not set before the preloads are executed. You are running into circular import issues.
+
+There is also a second advantage of using the lru cache: you can have multiple registries.
+
 ## Pratical example
 
 Let us now assemble everything and generate an application that will have:

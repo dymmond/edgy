@@ -26,11 +26,12 @@ config: Any = context.config
 # This line sets up loggers basically.
 fileConfig(config.config_file_name)
 logger = logging.getLogger("alembic.env")
+MAIN_DATABASE_NAME: str = " "
 
 
 def iter_databases(registry: Registry) -> Generator[tuple[str, Database, "sqlalchemy.MetaData"]]:
     url: Optional[str] = os.environ.get("EDGY_DATABASE_URL")
-    name: Union[str, Literal[False]] = os.environ.get("EDGY_DATABASE") or False
+    name: Union[str, Literal[False], None] = os.environ.get("EDGY_DATABASE") or False
     if url and not name:
         try:
             name = registry.metadata_by_url.get_name(url)
@@ -44,6 +45,8 @@ def iter_databases(registry: Registry) -> Generator[tuple[str, Database, "sqlalc
             else:
                 yield (name, registry.extra[name], registry.metadata_by_name[name])
     else:
+        if name == MAIN_DATABASE_NAME:
+            name = None
         if url:
             database = Database(url)
         elif name is None:

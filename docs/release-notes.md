@@ -18,7 +18,7 @@ hide:
 
 ### Changed
 
-- Breaking: empty names are not allowed anymore for extra.
+- Breaking: empty names are not allowed anymore for extra. This includes names consisting of spaces.
 
 ### Fixed
 

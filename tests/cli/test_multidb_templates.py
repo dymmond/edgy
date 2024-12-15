@@ -170,7 +170,14 @@ async def test_different_directory(app_flag, template_param):
     [
         {"EDGY_DATABASE": "another"},
         {"EDGY_DATABASE_URL": TEST_DATABASE, "EDGY_DATABASE": "another"},
+        {"EDGY_DATABASE_URL": TEST_ALTERNATIVE_DATABASE, "EDGY_DATABASE": " "},
         {"EDGY_DATABASE_URL": TEST_ALTERNATIVE_DATABASE},
+    ],
+    ids=[
+        "only_another",
+        "only_another_and_custom_url",
+        "only_main_and_custom_url",
+        "retrieve_via_url",
     ],
 )
 @pytest.mark.parametrize(
@@ -247,14 +254,25 @@ async def main():
                     await main.Unrelated.query.create(name="foo")
                 # should fail
                 with pytest.raises(ProgrammingError):
-                    user = await main.User.query.create(name="edgy")
+                    await main.User.query.create(name="edgy")
+        elif os.environ.get("EDGY_DATABASE_URL") and os.environ.get("EDGY_DATABASE") == " ":
+            async with main.models:
+                # othewise content type crash
+                main.models.content_type.database = main.models.extra["another"]
+                await main.User.query.using(database="another").create(name="edgy")
+                # should fail
+                with pytest.raises(ProgrammingError):
+                    await main.User.query.create(name="edgy2")
+                # should fail
+                with pytest.raises(ProgrammingError):
+                    await main.Unrelated.query.create(name="foo")
         elif os.environ.get("EDGY_DATABASE_URL") or os.environ.get("EDGY_DATABASE") == "another":
             # should fail
             with pytest.raises(ProgrammingError):
-                user = await main.User.query.create(name="edgy")
+                await main.User.query.create(name="edgy")
             # should fail
             with pytest.raises(ProgrammingError):
-                user = await main.User.query.using(database="another").create(name="edgy")
+                await main.User.query.using(database="another").create(name="edgy")
             await main.Unrelated.query.create(name="foo")
     elif sys.argv[1] == "test_migrate_upgrade_multidb":
         from tests.cli import main_multidb as main
