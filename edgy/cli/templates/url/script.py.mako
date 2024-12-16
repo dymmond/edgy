@@ -23,6 +23,7 @@ depends_on = ${repr(depends_on)}
 
 def upgrade(url: Optional["DatabaseURL"] = None) -> None:
     urlstring = "" if url is None else f"{url.username}:{url.netloc}"
+    # hash_to_identifier prefixes also with a "_", this matches the function naming with double "_"
     fn = globals().get(f"upgrade_{hash_to_identifier(urlstring)}")
     if fn is not None:
         fn()
@@ -30,6 +31,7 @@ def upgrade(url: Optional["DatabaseURL"] = None) -> None:
 
 def downgrade(url: Optional["DatabaseURL"] = None) -> None:
     urlstring = "" if url is None else f"{url.username}:{url.netloc}"
+    # hash_to_identifier prefixes also with a "_", this matches the function naming with double "_"
     fn = globals().get(f"downgrade_{hash_to_identifier(urlstring)}")
     if fn is not None:
         fn()

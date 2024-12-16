@@ -17,12 +17,14 @@ branch_labels = ${repr(branch_labels)}
 depends_on = ${repr(depends_on)}
 
 def upgrade(engine_name: str = "") -> None:
+    # hash_to_identifier prefixes also with a "_", this matches the function naming with double "_"
     fn = globals().get(f"upgrade_{hash_to_identifier(engine_name)}")
     if fn is not None:
         fn()
 
 
 def downgrade(engine_name: str = "") -> None:
+    # hash_to_identifier prefixes also with a "_", this matches the function naming with double "_"
     fn = globals().get(f"downgrade_{hash_to_identifier(engine_name)}")
     if fn is not None:
         fn()
