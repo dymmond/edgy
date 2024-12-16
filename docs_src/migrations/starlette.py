@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from lilya.apps import Lilya
+from starlette.applications import Starlette
 from my_project.utils import get_db_connection
 
 from edgy import monkay, Instance
@@ -28,7 +28,7 @@ def get_application():
     build_path()
     registry = get_db_connection()
 
-    app = registry.asgi(Lilya(__name__))
+    app = registry.asgi(Starlette())
 
     monkay.set_instance(Instance(app=app, registry=registry))
     return app

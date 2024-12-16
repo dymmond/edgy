@@ -32,7 +32,7 @@ def get_engine_url():
 # for 'autogenerate' support
 config.set_main_option("sqlalchemy.url", get_engine_url())
 
-target_db = edgy.monkay.instance.registry
+target_db = edgy.get_migration_prepared_registry()
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:

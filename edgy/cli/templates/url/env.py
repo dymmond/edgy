@@ -11,7 +11,7 @@ from alembic import context
 from rich.console import Console
 
 import edgy
-from edgy.core.connection import Database, Registry
+from edgy.core.connection import Database, DatabaseURL, Registry
 
 if TYPE_CHECKING:
     import sqlalchemy
@@ -83,6 +83,8 @@ def run_migrations_offline() -> Any:
     """
     registry = edgy.get_migration_prepared_registry()
     for name, db, metadata in iter_databases(registry):
+        # db is maybe overwritten, so use the original url
+        orig_url = registry.database.url if name is None else registry.extra[name].url
         context.configure(
             url=str(db.url),
             target_metadata=metadata,
@@ -90,11 +92,12 @@ def run_migrations_offline() -> Any:
         )
 
         with context.begin_transaction():
-            # for compatibility with flask migrate multidb kwarg is called engine_name
-            context.run_migrations(engine_name=name or "")
+            context.run_migrations(url=orig_url)
 
 
-def do_run_migrations(connection: Any, name: str, metadata: "sqlalchemy.Metadata") -> Any:
+def do_run_migrations(
+    connection: Any, url: str, orig_url: DatabaseURL, name: str, metadata: "sqlalchemy.Metadata"
+) -> Any:
     # this callback is used to prevent an auto-migration from being generated
     # when there are no changes to the schema
     # reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html
@@ -120,8 +123,7 @@ def do_run_migrations(connection: Any, name: str, metadata: "sqlalchemy.Metadata
     )
 
     with context.begin_transaction():
-        # for compatibility with flask migrate multidb kwarg is called engine_name
-        context.run_migrations(engine_name=name or "")
+        context.run_migrations(url=orig_url)
 
 
 async def run_migrations_online() -> Any:
@@ -137,8 +139,10 @@ async def run_migrations_online() -> Any:
     registry = edgy.get_migration_prepared_registry()
     async with registry:
         for name, db, metadata in iter_databases(registry):
+            # db is maybe overwritten, so use the original url
+            orig_url = registry.database.url if name is None else registry.extra[name].url
             async with db as database:
-                await database.run_sync(do_run_migrations, name, metadata)
+                await database.run_sync(do_run_migrations, str(db.url), orig_url, name, metadata)
 
 
 if context.is_offline_mode():

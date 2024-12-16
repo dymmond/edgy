@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-os.environ.setdefault("EDGY_SETTINGS_MODULE", "tests.settings.TestSettings")
+os.environ.setdefault("EDGY_SETTINGS_MODULE", "tests.settings.default.TestSettings")
 
 
 @pytest.fixture(scope="module")

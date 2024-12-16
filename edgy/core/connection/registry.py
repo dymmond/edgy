@@ -44,7 +44,7 @@ class MetaDataDict(defaultdict[str, sqlalchemy.MetaData]):
 
     def __getitem__(self, key: Union[str, None]) -> sqlalchemy.MetaData:
         if key not in self.registry.extra and key is not None:
-            raise KeyError("Key does not exist")
+            raise KeyError(f'Extra database "{key}" does not exist.')
         return super().__getitem__(key)
 
     def get(self, key: str, default: Any = None) -> sqlalchemy.MetaData:
@@ -86,6 +86,10 @@ class MetaDataByUrlDict(dict):
             return self[key]
         except KeyError:
             return default
+
+    def get_name(self, key: str) -> Optional[str]:
+        """Return name to url or raise a KeyError in case it isn't available."""
+        return cast(Optional[str], super().__getitem__(key))
 
     def __copy__(self) -> "MetaDataByUrlDict":
         return MetaDataByUrlDict(registry=self.registry)
@@ -135,10 +139,28 @@ class Registry:
         self.extra: dict[str, Database] = {
             k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
         }
+        # we want to get all problems before failing
+        assert all(
+            [self.extra_name_check(x) for x in self.extra]  # noqa: C419
+        ), "Invalid name in extra detected. See logs for details."
         self.metadata_by_url = MetaDataByUrlDict(registry=self)
 
         if with_content_type is not False:
             self._set_content_type(with_content_type)
+
+    def extra_name_check(self, name: Any) -> bool:
+        if not isinstance(name, str):
+            logger.error(f"Extra database name: {name!r} is not a string.")
+            return False
+        elif not name.strip():
+            logger.error(f'Extra database name: "{name}" is empty.')
+            return False
+
+        if name.strip() != name:
+            logger.warning(
+                f'Extra database name: "{name}" starts or ends with whitespace characters.'
+            )
+        return True
 
     def __copy__(self) -> "Registry":
         content_type: Union[bool, type[BaseModelType]] = False

@@ -6,6 +6,23 @@ hide:
 
 # Release Notes
 
+## 0.24.0
+
+### Added
+
+- True multi-database migrations.
+  You may need to rework your migrations in case you want to use it.
+- Generalized `hash_to_identifier` function.
+- `get_name` function on `metadata_by_url` dict.
+- Differing databases can be passed via `database` attribute on models.
+
+### Changed
+
+- Breaking: empty names are not allowed anymore for extra. This includes names consisting of spaces.
+
+### Fixed
+
+- ForeignKey remote check failed for objects with different database but same registry.
 
 ## 0.23.3
 

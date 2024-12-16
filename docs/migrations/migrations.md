@@ -198,25 +198,22 @@ As you can see, it is quite structured but let us focus specifically on `account
 
 There is where your models for the `accounts` application will be placed. Something like this:
 
-```python
+```python title="myproject/apps/accounts/models.py"
 {!> ../docs_src/migrations/accounts_models.py !}
 ```
 
-Now we want to tell the **Instance** object to make sure it knows about this.
+Now we use `preloads` to load the file containing the models:
 
-```python
+```python title="myproject/configs/settings.py"
 {!> ../docs_src/migrations/attaching.py !}
 ```
+
+It is maybe also required to set the `migrate_databases` in case of extra databases should be used in migrations.
 
 ## Generating and working with migrations
 
 Now this is the juicy part, right? Yes but before jumping right into this, please make sure you
 read properly the [migration](#migration) section and you have everything in place.
-
-**It is recommended that you follow** the [environment variables](#environment-variables)
-suggestions.
-
-This will depend heavily on this and **everything works around the registry**.
 
 Edgy has the internal client that manages and handles the migration process for you in a clean
 fashion and it called `edgy`.
@@ -275,47 +272,46 @@ that same principle.
 
 ### Environment variables
 
-When generating migrations, Edgy **expects at least one environment variable to be present**.
+When generating migrations, Edgy can use following environment variables to modify the migrations.
 
-* **EDGY_DATABASE_URL** - The database url for your database.
+* **EDGY_DATABASE** - Restrict to this database metadata in migrations. Use **one** whitespace for selecting the main database. There is a special mode when used with **EDGY_DATABASE_URL** together.
+* **EDGY_DATABASE_URL** - Has two modes:
+  1. **EDGY_DATABASE** is empty. Here is tried to retrieve the metadata of the database in the registry via the url. When none is matching the default database is used but with the differing url.
+  2. **EDGY_DATABASE** is not empty. Here the metadata of the database of the name is used but with a different URL.
 
-The reason for this is because Edgy is agnostic to any framework and this way it makes it easier
-to work with the `migrations`.
+You most probably won't need the variables. Instead you can use the setting
+[`migrate_databases`](#migration-settings) for selecting the databases.
 
-Also, gives a clean design for the time where it is needed to go to production as the procedure is
-very likely to be done using environment variables.
+!!! Warning
+    Spaces are often not visible. When having **EDGY_DATABASE** in the environment you may have to check carefully if it consist of spaces or other whitespace characters.
 
-**This variable must be present**. So to save time you can simply do:
-
-```
-$ export EDGY_DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/my_database
-```
-
-Or whatever connection string you are using.
+!!! Tip
+    In case you want a different name for the main database than " ", you can change the MAIN_DATABASE_NAME variable in the generated `env.py`.
 
 ### Initialize the migrations folder
 
-It is now time to generate the migrations folder. As mentioned before in the
-[environment variables section](#environment-variables), Edgy does need to have the
-`EDGY_DATABASE_URL` to generate the `migrations` folder. So, without further ado let us generate
+It is now time to generate the migrations folder. So, without further ado let us generate
 our `migrations`.
 
 ```shell
-edgy --app myproject.main init
+# code is in myproject.main
+edgy init
+# or you want to specify an entrypoint module explicit
+# edgy --app myproject.main_test init
 ```
 
-What is happenening here? Well, `edgy` is always expecting an `--app` parameter to be
-provided.
+What is happenening here? The [discovery mechanism](./discovery.md) finds the entrypoint automatically
+but you can also provide it explicit via `--app`.
 
-This `--app` is the location of your application in `module_app` format and this is because of
+The optional `--app` is the location of your application in `module_app` format and this is because of
 the fact of being **framework agnostic**.
 
 Edgy needs the module automatically setting the instance (see [Connections](../connection.md)) to know the registry
 which shall be used as well as the application object.
 
 Remember when it was mentioned that is important the location where you generate the migrations
-folder? Well, this is why, because when you do `my_project.main` you are telling that
-your application is inside the `myproject/main/app.py` and your migration folder should be placed
+folder? Well, this is why, because when you do `my_project.main_test` you are telling that
+your application is inside the `myproject/main_test.py` and your migration folder should be placed
 **where the command was executed**.
 
 In other words, the place you execute the `init` command it will be where the migrations will be
@@ -370,25 +366,35 @@ You have now generated your migrations folder and came with gifts.
 A lot of files were generated automatically for you and they are specially tailored for the needs
 and complexity of **Edgy**.
 
-Do you remember when it was mentioned in the [environment variables](#environment-variables) that
-edgy is expecting the `EDGY_DATABASE_URL` to be available?
+#### Templates
 
-Well, this is another reason, inside the generated `migrations/env.py` the `get_engine_url()` is
-also expecting that value.
+Sometimes you don't want to start with a migration template which uses hashed names for upgrade and downgrade.
+Or you want to use the database url instead for the name generation.
 
-```python title="migrations/env.py"
-# Code above
+Edgy has different flavors called templates:
 
-def get_engine_url():
-    return os.environ.get("EDGY_DATABASE_URL")
+- default - (Default) The default template. Uses hashed database names. `env.py` is compatible to flask-migrate multidb migrations.
+- plain - Uses plain database names (means: databases in extra should be identifiers). `env.py` is compatible to flask-migrate multidb migrations.
+- url - Uses database urls instead of names for hashing. `env.py` is NOT compatible to flask-migrate multidb migrations. You need to adapt them.
 
-# Code below
+You can use them with:
+
+```shell
+edgy init -t plain
 ```
 
-!!! Warning
-    You do not need to use this environment variable. This is the `default` provided by Edgy.
-    You can change the value to whatever you want/need but be careful when doing it as it might
-    cause Edgy not to work properly with migrations if this value is not updated properly.
+or list all available templates with:
+
+```shell
+edgy list_templates
+```
+
+You can also use templates from the filesystem
+
+```shell title="Example how to use the singledb template from tests"
+edgy --app myproject.main init -t tests/cli/custom_singledb
+```
+Templates are always just the starting point. You most probably want to adapt the result.
 
 ### Generate the first migrations
 
@@ -411,16 +417,15 @@ from .models import User
 ```
 
 !!! Note
-    Since Edgy is agnostic to any framework, there aren't automatic mechanisms that detects
-    Edgy models in the same fashion that Django does with the `INSTALLED_APPS`. So this is
-    one way of exposing your models in the application.
+    Since Edgy is agnostic to any framework, it has no hard-coded detection algorithm like Django has
+    with `INSTALLED_APPS`. Instead use the `preloads` feature and imports for loading all models.
 
 There are many ways of exposing your models of course, so feel free to use any approach you want.
 
 Now it is time to generate the migration.
 
 ```shell
-$ edgy --app my_project.main makemigrations
+$ edgy makemigrations
 ```
 
 Yes, it is this simple 😁
@@ -445,7 +450,7 @@ Your new migration should now be inside `migrations/versions/`. Something like t
 Or you can attach a message your migration that will then added to the file name as well.
 
 ```shell
-$ edgy --app my_project.main makemigrations -m "Initial migrations"
+$ edgy makemigrations -m "Initial migrations"
 ```
 
 ```shell hl_lines="10"
@@ -470,7 +475,7 @@ Now comes the easiest part where you need to apply the migrations.
 Simply run:
 
 ```shell
-$ edgy --app my_project.main:app migrate
+$ edgy migrate
 ```
 
 And that is about it 🎉🎉
@@ -485,13 +490,13 @@ for any other ORM and when you are happy run the migrations and apply them again
 **Generate new migrations**
 
 ```shell
-$ edgy --app my_project.main makemigrations
+$ edgy makemigrations
 ```
 
 **Apply them to your database**
 
 ```shell
-$ edgy --app my_project.main migrate
+$ edgy migrate
 ```
 
 ### More migration commands
@@ -551,7 +556,12 @@ into a more friendly and intuitive way.
 
 For those familiar with Django, the names came from those same operations.
 
-## Migrate from flask-migrate
+## Multi-database migrations
+
+Edgy added recently support for multi database migrations. You can simply continue using the old style
+single database migrations. Or update your `env.py` and existing migrations for multi-database migrations.
+
+### Migrate from flask-migrate
 
 `flask-migrate` was the blueprint for the original `Migrate` object which was the way to enable migrations
 but is deprecated nowadays.
@@ -560,17 +570,45 @@ The new way are the `edgy.Instance` class and the migration settings.
 `edgy.Instance` takes as arguments `(registry, app=None)` instead of flask-migrate `Migrate` arguments: `(app, database)`.
 Also settings are not set here anymore, they are set in the edgy settings object.
 
-### Multi-schema migrations
+#### Migrate env.py
+
+Let's assume we have flask-migrate with the multiple db feature:
+
+Just exchanging the env.py by the default one of edgy should be enough.
+Otherwise we need to adjust the migrations. See below.
+
+### Migrate from single-database migrations
+
+In case you want to use the new edgy multidb migration feature you need to adapt old migrations.
+It is quite easy:
+
+1. Adding an parameter named `engine_name` to the `upgrade`/`downgrade` functions in all migrations which defaults to ''.
+2. Preventing the execution in case the `engine_name` parameter isn't empty.
+
+That is all.
+
+In case of a different default database for old migrations add the database to extra and prevent the execution for all other names
+then the extra name.
+
+**Example**
+
+``` python
+def downgrade():
+    ...
+```
+
+becomes
+
+``` python
+def downgrade(engine_name: str = ""):
+    if engine_name != "": # or dbname you want
+        return
+```
+
+## Multi-schema migrations
 
 If you want to migrate multiple schemes you just have to turn on `multi_schema` in the [Migration settings](#migration-settings).
 You might want to filter via the schema parameters what schemes should be migrated.
-
-### Multi-database migrations
-
-Currently it is only possible to select the database used for the migration and to overwrite the folder.
-The multi-db migrations of flask are not supported yet in this way.
-But you can script them by calling with different `EDGY_DATABASE` or `EDGY_DATABASE_URL` environment
-variables.
 
 ## Migration Settings
 
@@ -581,10 +619,7 @@ Some important settings are:
 
 - `multi_schema` - (Default: False). Include the schemes in the migrations, `True` for all schemes, a regex for some schemes.
 - `ignore_schema_pattern` - (Default: "information_schema"). Exclude patterns for `multi_schema`.
+- `migrate_databases` - (Default: (None,)) Databases which should be migrated.
 - `migration_directory` - (Default: "migrations"). Path to the alembic migration folder.
   This overwritable per command via `-d`, `--directory` parameter.
 - `alembic_ctx_kwargs` - (Default: `{"compare_type": True, "render_as_batch": True}`). Extra arguments for alembic.
-
-## Very important
-
-Check the [environment variables](#environment-variables) for more details and making sure you follow the right steps.
