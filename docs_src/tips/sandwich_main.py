@@ -1,3 +1,5 @@
+from importlib import import_module
+
 import edgy
 from esmerald import Esmerald
 
