@@ -12,7 +12,7 @@ def setup():
 def get_application():
     setup()
     registry = edgy.Registry(url=...)
-    # extensions shouldn't applied yet
+    # extensions shouldn't be applied yet
     edgy.monkay.set_instance(edgy.Instance(registry=registry), apply_extensions=False)
     # post loads
     import_module("myproject.models")
