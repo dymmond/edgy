@@ -30,7 +30,7 @@ ${hash_to_identifier_as_string}
 
 
 def upgrade(url: Optional[DatabaseURL] = None) -> None:
-    urlstring = "" if url is None else f"{url.username}:{url.netloc}"
+    urlstring = "" if url is None else f"{url.username}@{url.hostname}:{url.port}/{url.database}"
     # hash_to_identifier adds already an "_"
     fn = globals().get(f"upgrade{hash_to_identifier(urlstring)}")
     if fn is not None:
@@ -38,7 +38,7 @@ def upgrade(url: Optional[DatabaseURL] = None) -> None:
 
 
 def downgrade(url: Optional[DatabaseURL] = None) -> None:
-    urlstring = "" if url is None else f"{url.username}:{url.netloc}"
+    urlstring = "" if url is None else f"{url.username}@{url.hostname}:{url.port}/{url.database}"
     # hash_to_identifier adds already an "_"
     fn = globals().get(f"downgrade{hash_to_identifier(urlstring)}")
     if fn is not None:
@@ -55,7 +55,7 @@ def downgrade(url: Optional[DatabaseURL] = None) -> None:
             url = monkay.instance.registry.extra[name].url
         else:
             url = monkay.instance.registry.database.url
-        return f"{url.username}:{url.netloc}"
+        return f"{url.username}@{url.hostname}:{url.port}/{url.database}"
 %>
 
 ## generate an "upgrade_<xyz>() / downgrade_<xyz>()" function
