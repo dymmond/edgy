@@ -63,9 +63,11 @@ This will make sure that from now on you will always use the same connection and
 your appliction by importing the `get_db_connection()` anywhere is needed.
 
 Note, you cannot do that if `get_db_connection()` is in the same file like the application entrypoint.
-Here you can use a [`edgy.monkay.instance`](#the-edgymonkayinstance-sandwich) sandwich instead.
+Here you can use a [`edgy.monkay.instance`](#excurse-the-edgymonkayinstance-sandwich) sandwich instead.
 
-## The `edgy.monkay.instance` sandwich
+You can also read further the [Practical Example](#practical-example).
+
+## Excurse: The `edgy.monkay.instance` sandwich
 
 If you want to short down the code and concentrate in e.g. `main.py` you can also use manual post loads and do the initialization in
 `get_application` this way:
@@ -87,7 +89,7 @@ this looks like:
 ````
 
 The sandwich way has the disadvantage of having just one registry, while with the lru_cache way you can have many
-registries in parallel and mixed however you like.
+registries in parallel and mix them.
 
 
 ## Practical example
