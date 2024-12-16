@@ -2,6 +2,11 @@ import edgy
 from esmerald import Esmerald
 
 
+def setup():
+    # do preparations
+    ...
+
+
 def get_application():
     setup()
     registry = edgy.Registry(url=...)
@@ -13,3 +18,6 @@ def get_application():
     # now apply the extensions
     edgy.monkay.set_instance(edgy.Instance(registry=registry, app=app))
     return app
+
+
+application = get_application()
