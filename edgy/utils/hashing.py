@@ -1,9 +1,10 @@
+from __future__ import annotations
+
 from base64 import b32encode
 from hashlib import blake2b
-from typing import Union
 
 
-def hash_to_identifier(key: Union[str, bytes]) -> str:
+def hash_to_identifier(key: str | bytes) -> str:
     """
     A generic hasher for keys, which output stays a valid name for python
     and other languages.
@@ -16,4 +17,17 @@ def hash_to_identifier(key: Union[str, bytes]) -> str:
     if isinstance(key, str):
         key = key.encode()
     # prefix with _ for preventing a name starting with a number
+    # Note: the prefixing with underscore is expected by migrations
     return f"_{b32encode(blake2b(key, digest_size=16).digest()).decode().rstrip('=')}"
+
+
+# for migrations
+# needs however either python 3.10 or from __future__ import annotations
+hash_to_identifier_as_string: str = """
+def hash_to_identifier(key: str | bytes) -> str:
+    from base64 import b32encode
+    from hashlib import blake2b
+    if isinstance(key, str):
+        key = key.encode()
+    return f"_{b32encode(blake2b(key, digest_size=16).digest()).decode().rstrip('=')}"
+"""

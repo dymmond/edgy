@@ -5,11 +5,14 @@ Revises: ${down_revision | comma,n}
 Create Date: ${create_date}
 
 """
+<%
+    from edgy.utils.hashing import hash_to_identifier, hash_to_identifier_as_string
+%>
+from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
 from alembic import op
 import sqlalchemy as sa
-from edgy.utils.hashing import hash_to_identifier
 ${imports if imports else ""}
 
 if TYPE_CHECKING:
@@ -21,16 +24,22 @@ down_revision = ${repr(down_revision)}
 branch_labels = ${repr(branch_labels)}
 depends_on = ${repr(depends_on)}
 
+
+${hash_to_identifier_as_string}
+
+
 def upgrade(url: Optional["DatabaseURL"] = None) -> None:
     urlstring = "" if url is None else f"{url.username}:{url.netloc}"
-    fn = globals().get(f"upgrade_{hash_to_identifier(urlstring)}")
+    # hash_to_identifier adds already an "_"
+    fn = globals().get(f"upgrade{hash_to_identifier(urlstring)}")
     if fn is not None:
         fn()
 
 
 def downgrade(url: Optional["DatabaseURL"] = None) -> None:
     urlstring = "" if url is None else f"{url.username}:{url.netloc}"
-    fn = globals().get(f"downgrade_{hash_to_identifier(urlstring)}")
+    # hash_to_identifier adds already an "_"
+    fn = globals().get(f"downgrade{hash_to_identifier(urlstring)}")
     if fn is not None:
         fn()
 
@@ -53,13 +62,13 @@ def downgrade(url: Optional["DatabaseURL"] = None) -> None:
 
 % for db_name in db_names:
 
-def ${f"upgrade_{hash_to_identifier(url_for_name(db_name))}"}():
+def ${f"upgrade{hash_to_identifier(url_for_name(db_name))}"}():
     # Migration of:
     # ${url_for_name(db_name)} (${db_name or 'main database'})
     ${context.get(f"{db_name or ''}_upgrades", "pass")}
 
 
-def ${f"downgrade_{hash_to_identifier(url_for_name(db_name))}"}():
+def ${f"downgrade{hash_to_identifier(url_for_name(db_name))}"}():
     # Migration of:
     # ${url_for_name(db_name)} (${db_name or 'main database'})
     ${context.get(f"{db_name or ''}_downgrades", "pass")}
