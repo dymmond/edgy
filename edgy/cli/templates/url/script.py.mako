@@ -9,6 +9,7 @@ Create Date: ${create_date}
     from edgy.utils.hashing import hash_to_identifier, hash_to_identifier_as_string
 %>
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Optional
 
 from alembic import op
@@ -28,7 +29,7 @@ depends_on = ${repr(depends_on)}
 ${hash_to_identifier_as_string}
 
 
-def upgrade(url: Optional["DatabaseURL"] = None) -> None:
+def upgrade(url: Optional[DatabaseURL] = None) -> None:
     urlstring = "" if url is None else f"{url.username}:{url.netloc}"
     # hash_to_identifier adds already an "_"
     fn = globals().get(f"upgrade{hash_to_identifier(urlstring)}")
@@ -36,7 +37,7 @@ def upgrade(url: Optional["DatabaseURL"] = None) -> None:
         fn()
 
 
-def downgrade(url: Optional["DatabaseURL"] = None) -> None:
+def downgrade(url: Optional[DatabaseURL] = None) -> None:
     urlstring = "" if url is None else f"{url.username}:{url.netloc}"
     # hash_to_identifier adds already an "_"
     fn = globals().get(f"downgrade{hash_to_identifier(urlstring)}")

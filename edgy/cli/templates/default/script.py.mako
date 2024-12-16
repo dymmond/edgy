@@ -9,6 +9,7 @@ Create Date: ${create_date}
     from edgy.utils.hashing import hash_to_identifier, hash_to_identifier_as_string
 %>
 from __future__ import annotations
+
 from alembic import op
 import sqlalchemy as sa
 ${imports if imports else ""}
