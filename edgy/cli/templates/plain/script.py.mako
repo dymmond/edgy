@@ -27,8 +27,6 @@ def downgrade(engine_name: str = "") -> None:
     fn = globals().get(f"downgrade_{engine_name}")
     if fn is not None:
         fn()
-
-
 <%
     from edgy import monkay
     db_names = monkay.settings.migrate_databases

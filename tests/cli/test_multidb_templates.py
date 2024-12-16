@@ -124,6 +124,36 @@ async def test_migrate_upgrade_multidb(app_flag, template_param):
             assert f.readline().strip() == "# Default env template"
 
 
+@pytest.mark.parametrize(
+    "template_param",
+    [" -t default", " -t plain", " -t url"],
+    ids=["default", "plain", "url"],
+)
+async def test_multidb_nonidentifier(template_param):
+    os.chdir(base_path)
+    assert not (base_path / "migrations").exists()
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main_multidb_nonidentifier",
+        f"edgy init{template_param}",
+        with_app_environment=True,
+        extra_env={"EDGY_SETTINGS_MODULE": "tests.settings.multidb_nonidentifier.TestSettings"},
+    )
+    assert ss == 0
+    assert b'Extra database name: "ano ther " starts or ends with whitespace characters.' in e
+
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main_multidb_nonidentifier",
+        "edgy makemigrations",
+        with_app_environment=True,
+        extra_env={"EDGY_SETTINGS_MODULE": "tests.settings.multidb_nonidentifier.TestSettings"},
+    )
+    if "plain" in template_param:
+        assert ss == 1
+    else:
+        assert ss == 0
+        assert b"No changes in schema detected" not in o
+
+
 @pytest.mark.parametrize("app_flag", ["explicit", "explicit_env"])
 @pytest.mark.parametrize(
     "template_param",
