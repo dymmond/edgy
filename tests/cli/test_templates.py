@@ -75,6 +75,11 @@ async def test_migrate_upgrade(app_flag, template_param):
     )
     assert ss == 0
 
+    migrations = list((base_path / "migrations" / "versions").glob("*.py"))
+    assert len(migrations) == 1
+    if "custom" not in template_param and "plain" not in template_param:
+        assert "main database" in migrations[0].read_text()
+
     (o, e, ss) = await arun_cmd(
         "tests.cli.main",
         f"hatch run python {__file__} test_migrate_upgrade",

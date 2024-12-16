@@ -65,13 +65,13 @@ def downgrade(url: Optional[DatabaseURL] = None) -> None:
 
 def ${f"upgrade{hash_to_identifier(url_for_name(db_name))}"}():
     # Migration of:
-    # ${url_for_name(db_name)} (${db_name or 'main database'})
+    # ${url_for_name(db_name)} (${f'"{db_name}"' if db_name else 'main database'})
     ${context.get(f"{db_name or ''}_upgrades", "pass")}
 
 
 def ${f"downgrade{hash_to_identifier(url_for_name(db_name))}"}():
     # Migration of:
-    # ${url_for_name(db_name)} (${db_name or 'main database'})
+    # ${url_for_name(db_name)} (${f'"{db_name}"' if db_name else 'main database'})
     ${context.get(f"{db_name or ''}_downgrades", "pass")}
 
 % endfor

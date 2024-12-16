@@ -85,22 +85,25 @@ The parameters availabe when using instantiating a [Instance](#migration) object
 of `edgy.Registry` or an `AssertationError` is raised.
 * **app** - Optionally an application instance.
 
-### Settings
+## Migration Settings
 
-The following settings are available in the main settings object:
+Migrations use now the edgy settings. Here are all knobs you need to configure them.
+All settings are in `edgy/conf/global_settings.py`.
 
-- multi_schema (bool / regexstring / regexpattern) - Activate multi schema migrations (Default: False).
-- ignore_schema_pattern (None / regexstring / regexpattern) - When using multi schema migrations, ignore following regex pattern (Default "information_schema")
-- alembic_ctx_kwargs (dict) - Extra arguments for alembic. By default:
+Some important settings are:
+
+- `multi_schema` (bool / regexstring / regexpattern) - (Default: False). Activate multi schema migrations. `True` for all schemes, a regex for some schemes.
+- `ignore_schema_pattern`  (None / regexstring / regexpattern) - (Default: "information_schema"). When using multi schema migrations, ignore following regex pattern (Default "information_schema")
+- `migrate_databases` - (Default: (None,)) Databases which should be migrated.
+- `migration_directory` - (Default: "migrations"). Path to the alembic migration folder.
+  This overwritable per command via `-d`, `--directory` parameter.
+- `alembic_ctx_kwargs` (dict) - Extra arguments for alembic. By default:
   ``` python
   {
         "compare_type": True,
         "render_as_batch": True,
   }
   ```
-- migration_directory (str / PathLike) - Migrations directory. Absolute or relative. By default: "migrations".
-
-
 
 ### How to use it
 
@@ -373,9 +376,13 @@ Or you want to use the database url instead for the name generation.
 
 Edgy has different flavors called templates:
 
-- default - (Default) The default template. Uses hashed database names. `env.py` is compatible to flask-migrate multidb migrations.
-- plain - Uses plain database names (means: databases in extra should be identifiers). `env.py` is compatible to flask-migrate multidb migrations.
-- url - Uses database urls instead of names for hashing. `env.py` is NOT compatible to flask-migrate multidb migrations. You need to adapt them.
+- `default` - (Default) The default template. Uses hashed database names. The `env.py` is compatible to flask-migrate multidb migrations.
+- `plain` - Uses plain database names (means: databases in extra should be identifiers). The `env.py` is compatible to flask-migrate multidb migrations.
+  Note: in plain extra names are restricted to python identifiers. Not doing so will crash.
+- `url` - Uses database urls instead of names for hashing. This is for engineers working not local but in a database landscape.
+  The `env.py` is NOT compatible to flask-migrate multidb migrations. You need to adapt them.
+  Note: the extracted url parameters used for hashing are `f"{url.username}@{url.hostname}:{url.port}/{url.database}"`. You may want to remove
+  the username parameter in `script.py.mako` when you want to be able to change the username on the fly.
 
 You can use them with:
 
@@ -609,17 +616,3 @@ def downgrade(engine_name: str = ""):
 
 If you want to migrate multiple schemes you just have to turn on `multi_schema` in the [Migration settings](#migration-settings).
 You might want to filter via the schema parameters what schemes should be migrated.
-
-## Migration Settings
-
-Migrations use now the edgy settings. Here are all knobs you need to configure them.
-Basically all settings are in `edgy/conf/global_settings.py`.
-
-Some important settings are:
-
-- `multi_schema` - (Default: False). Include the schemes in the migrations, `True` for all schemes, a regex for some schemes.
-- `ignore_schema_pattern` - (Default: "information_schema"). Exclude patterns for `multi_schema`.
-- `migrate_databases` - (Default: (None,)) Databases which should be migrated.
-- `migration_directory` - (Default: "migrations"). Path to the alembic migration folder.
-  This overwritable per command via `-d`, `--directory` parameter.
-- `alembic_ctx_kwargs` - (Default: `{"compare_type": True, "render_as_batch": True}`). Extra arguments for alembic.

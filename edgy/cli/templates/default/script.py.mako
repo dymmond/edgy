@@ -34,8 +34,6 @@ def downgrade(engine_name: str = "") -> None:
     fn = globals().get(f"downgrade{hash_to_identifier(engine_name)}")
     if fn is not None:
         fn()
-
-
 <%
     from edgy import monkay
     db_names = monkay.settings.migrate_databases
@@ -48,13 +46,13 @@ def downgrade(engine_name: str = "") -> None:
 
 def ${f"upgrade{hash_to_identifier(db_name or '')}"}():
     # Migration of:
-    # ${db_name or 'main database'}
+    # ${f'"{db_name}"' if db_name else 'main database'}
     ${context.get(f"{db_name or ''}_upgrades", "pass")}
 
 
 def ${f"downgrade{hash_to_identifier(db_name or '')}"}():
     # Migration of:
-    # ${db_name or 'main database'}
+    # ${f'"{db_name}"' if db_name else 'main database'}
     ${context.get(f"{db_name or ''}_downgrades", "pass")}
 
 % endfor
