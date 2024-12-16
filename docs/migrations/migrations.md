@@ -376,9 +376,13 @@ Or you want to use the database url instead for the name generation.
 
 Edgy has different flavors called templates:
 
-- default - (Default) The default template. Uses hashed database names. `env.py` is compatible to flask-migrate multidb migrations.
-- plain - Uses plain database names (means: databases in extra should be identifiers). `env.py` is compatible to flask-migrate multidb migrations.
-- url - Uses database urls instead of names for hashing. `env.py` is NOT compatible to flask-migrate multidb migrations. You need to adapt them.
+- `default` - (Default) The default template. Uses hashed database names. The `env.py` is compatible to flask-migrate multidb migrations.
+- `plain` - Uses plain database names (means: databases in extra should be identifiers). The `env.py` is compatible to flask-migrate multidb migrations.
+  Note: in plain extra names are restricted to python identifiers. Not doing so will crash.
+- `url` - Uses database urls instead of names for hashing. This is for engineers working not local but in a database landscape.
+  The `env.py` is NOT compatible to flask-migrate multidb migrations. You need to adapt them.
+  Note: the extracted url parameters used for hashing are `f"{url.username}@{url.hostname}:{url.port}/{url.database}"`. You may want to remove
+  the username parameter in `script.py.mako` when you want to be able to change the username on the fly.
 
 You can use them with:
 
