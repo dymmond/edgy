@@ -15,6 +15,7 @@ hide:
 - Generalized `hash_to_identifier` function.
 - `get_name` function on `metadata_by_url` dict.
 - Differing databases can be passed via `database` attribute on models.
+- `create` method on relations (reverse side of ForeignKeys and both sides of ManyToMany).
 
 ### Changed
 
