@@ -62,13 +62,35 @@ the `lru_cache` technique for our `db_connection`.
 This will make sure that from now on you will always use the same connection and registry within
 your appliction by importing the `get_db_connection()` anywhere is needed.
 
-Why don't we use `edgy.monkay.instance.registry` instead? It is a chicken-egg problem:
+Note, you cannot do that if `get_db_connection()` is in the same file like the application entrypoint.
+Here you can use a [`edgy.monkay.instance`](#the-edgymonkayinstance-sandwich) sandwich instead.
 
-It is not set before the preloads are executed. You are running into circular import issues.
+## The `edgy.monkay.instance` sandwich
 
-There is also a second advantage of using the lru cache: you can have multiple registries.
+If you want to short down the code and concentrate in e.g. `main.py` you can also use manual post loads and do the initialization in
+`get_application` this way:
 
-## Pratical example
+1. Creating registry.
+2. Assigning the Instance to edgy.instance via set_instance() but without app and skip extensions.
+3. Post loading models.
+4. Creating the main app.
+5. Assigning the Instance to edgy.instance via set_instance() but with app.
+
+this looks like:
+
+```` python title="main.py"
+{!> ../docs_src/tips/sandwich_main.py !}
+````
+
+```` python title="myproject/models.py"
+{!> ../docs_src/tips/sandwich_models.py !}
+````
+
+The sandwich way has the disadvantage of having just one registry, while with the lru_cache way you can have many
+registries in parallel and mixed however you like.
+
+
+## Practical example
 
 Let us now assemble everything and generate an application that will have:
 
