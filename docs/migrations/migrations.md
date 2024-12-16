@@ -85,22 +85,25 @@ The parameters availabe when using instantiating a [Instance](#migration) object
 of `edgy.Registry` or an `AssertationError` is raised.
 * **app** - Optionally an application instance.
 
-### Settings
+## Migration Settings
 
-The following settings are available in the main settings object:
+Migrations use now the edgy settings. Here are all knobs you need to configure them.
+All settings are in `edgy/conf/global_settings.py`.
 
-- multi_schema (bool / regexstring / regexpattern) - Activate multi schema migrations (Default: False).
-- ignore_schema_pattern (None / regexstring / regexpattern) - When using multi schema migrations, ignore following regex pattern (Default "information_schema")
-- alembic_ctx_kwargs (dict) - Extra arguments for alembic. By default:
+Some important settings are:
+
+- `multi_schema` (bool / regexstring / regexpattern) - (Default: False). Activate multi schema migrations. `True` for all schemes, a regex for some schemes.
+- `ignore_schema_pattern`  (None / regexstring / regexpattern) - (Default: "information_schema"). When using multi schema migrations, ignore following regex pattern (Default "information_schema")
+- `migrate_databases` - (Default: (None,)) Databases which should be migrated.
+- `migration_directory` - (Default: "migrations"). Path to the alembic migration folder.
+  This overwritable per command via `-d`, `--directory` parameter.
+- `alembic_ctx_kwargs` (dict) - Extra arguments for alembic. By default:
   ``` python
   {
         "compare_type": True,
         "render_as_batch": True,
   }
   ```
-- migration_directory (str / PathLike) - Migrations directory. Absolute or relative. By default: "migrations".
-
-
 
 ### How to use it
 
@@ -609,17 +612,3 @@ def downgrade(engine_name: str = ""):
 
 If you want to migrate multiple schemes you just have to turn on `multi_schema` in the [Migration settings](#migration-settings).
 You might want to filter via the schema parameters what schemes should be migrated.
-
-## Migration Settings
-
-Migrations use now the edgy settings. Here are all knobs you need to configure them.
-Basically all settings are in `edgy/conf/global_settings.py`.
-
-Some important settings are:
-
-- `multi_schema` - (Default: False). Include the schemes in the migrations, `True` for all schemes, a regex for some schemes.
-- `ignore_schema_pattern` - (Default: "information_schema"). Exclude patterns for `multi_schema`.
-- `migrate_databases` - (Default: (None,)) Databases which should be migrated.
-- `migration_directory` - (Default: "migrations"). Path to the alembic migration folder.
-  This overwritable per command via `-d`, `--directory` parameter.
-- `alembic_ctx_kwargs` - (Default: `{"compare_type": True, "render_as_batch": True}`). Extra arguments for alembic.

@@ -80,6 +80,8 @@ async def test_migrate_upgrade_multidb(app_flag, template_param):
         extra_env={"EDGY_SETTINGS_MODULE": "tests.settings.multidb.TestSettings"},
     )
     assert ss == 0
+    migrations = list((base_path / "migrations" / "versions").glob("*.py"))
+    assert len(migrations) == 0
 
     (o, e, ss) = await arun_cmd(
         "tests.cli.main_multidb",
@@ -105,6 +107,12 @@ async def test_migrate_upgrade_multidb(app_flag, template_param):
         extra_env={"EDGY_SETTINGS_MODULE": "tests.settings.multidb.TestSettings"},
     )
     assert ss == 0
+
+    migrations = list((base_path / "migrations" / "versions").glob("*.py"))
+    assert len(migrations) == 1
+    if "custom" not in template_param and "plain" not in template_param:
+        assert '"another"' in migrations[0].read_text()
+        assert "main database" in migrations[0].read_text()
 
     if "custom" in template_param:
         with open("migrations/README") as f:
@@ -139,6 +147,7 @@ async def test_multidb_nonidentifier(template_param):
         extra_env={"EDGY_SETTINGS_MODULE": "tests.settings.multidb_nonidentifier.TestSettings"},
     )
     assert ss == 0
+    # check if warning appears
     assert b'Extra database name: "ano ther " starts or ends with whitespace characters.' in e
 
     (o, e, ss) = await arun_cmd(
@@ -148,10 +157,14 @@ async def test_multidb_nonidentifier(template_param):
         extra_env={"EDGY_SETTINGS_MODULE": "tests.settings.multidb_nonidentifier.TestSettings"},
     )
     if "plain" in template_param:
+        # this has to break, luckily alembic checks migrations
         assert ss == 1
     else:
         assert ss == 0
         assert b"No changes in schema detected" not in o
+        migrations = list((base_path / "migrations" / "versions").glob("*.py"))
+        assert len(migrations) == 1
+        assert '"ano ther "' in migrations[0].read_text()
 
 
 @pytest.mark.parametrize("app_flag", ["explicit", "explicit_env"])
