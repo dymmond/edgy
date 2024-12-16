@@ -40,10 +40,14 @@ def downgrade(engine_name: str = "") -> None:
 % for db_name in db_names:
 
 def ${f"upgrade_{hash_to_identifier(db_name or '')}"}():
+    # Migration of:
+    # ${db_name or 'main database'}
     ${context.get(f"{db_name or ''}_upgrades", "pass")}
 
 
 def ${f"downgrade_{hash_to_identifier(db_name or '')}"}():
+    # Migration of:
+    # ${db_name or 'main database'}
     ${context.get(f"{db_name or ''}_downgrades", "pass")}
 
 % endfor

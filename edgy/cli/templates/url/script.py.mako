@@ -54,10 +54,14 @@ def downgrade(url: Optional["DatabaseURL"] = None) -> None:
 % for db_name in db_names:
 
 def ${f"upgrade_{hash_to_identifier(url_for_name(db_name))}"}():
+    # Migration of:
+    # ${url_for_name(db_name)} (${db_name or 'main database'})
     ${context.get(f"{db_name or ''}_upgrades", "pass")}
 
 
 def ${f"downgrade_{hash_to_identifier(url_for_name(db_name))}"}():
+    # Migration of:
+    # ${url_for_name(db_name)} (${db_name or 'main database'})
     ${context.get(f"{db_name or ''}_downgrades", "pass")}
 
 % endfor
