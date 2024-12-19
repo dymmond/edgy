@@ -515,6 +515,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     def __eq__(self, other: Any) -> bool:
         # if self.__class__ != other.__class__:
         #     return False
+        if not isinstance(other, EdgyBaseModel):
+            return False
         # somehow meta gets regenerated, so just compare tablename and registry.
         if self.meta.registry is not other.meta.registry:
             return False
