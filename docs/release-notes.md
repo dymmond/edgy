@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.24.1
+
+### Fixed
+
+- Comparation of a model with non-models.
+
 ## 0.24.0
 
 ### Added

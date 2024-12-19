@@ -105,3 +105,12 @@ async def test_model_get():
     same_user = await User.query.get(pk=user.id)
     assert same_user.id == user.id
     assert same_user.pk == user.pk
+
+
+async def test_eq():
+    user = await User.query.create(name="Test")
+    assert user == user
+    assert user != ""
+    assert not user.__eq__("")
+    assert user != User
+    assert not user.__eq__(User)
