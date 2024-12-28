@@ -118,6 +118,8 @@ dependencies = [
     "mkdocs-meta-descriptions-plugin>=2.3.0",
     "mkdocstrings[python]>=0.23.0,<0.30.0",
     "pyyaml>=6.0,<7.0.0",
+    # for signature cleaning
+    "ruff"
 ]
 [tool.hatch.envs.docs.scripts]
 build = "mkdocs build {args}"
