@@ -51,7 +51,7 @@ def add_app_module_option(fn: Any) -> Any:
     def callback(ctx: click.Context, param: str, value: Optional[str]) -> None:
         import edgy
 
-        # before importing anything inject the local path
+        # before importing anything inject the cwd
         cwd = Path.cwd()
         sys.path.insert(0, str(cwd))
         # it is maybe not ready yet. We need to check the apps first.
