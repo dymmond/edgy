@@ -51,13 +51,14 @@ def add_app_module_option(fn: Any) -> Any:
     def callback(ctx: click.Context, param: str, value: Optional[str]) -> None:
         import edgy
 
+        # before importing anything inject the local path
+        cwd = Path.cwd()
+        sys.path.insert(0, str(cwd))
         # it is maybe not ready yet. We need to check the apps first.
         edgy.monkay.evaluate_settings_once()
 
         if ctx.invoked_subcommand in COMMANDS_WITHOUT_APP:
             return
-        cwd = Path.cwd()
-        sys.path.insert(0, str(cwd))
         if value:
             import_module(value)
             if edgy.monkay.instance is None:
