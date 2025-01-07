@@ -54,7 +54,7 @@ def add_app_module_option(fn: Any) -> Any:
         # before importing anything inject the cwd
         cwd = Path.cwd()
         sys.path.insert(0, str(cwd))
-        # it is maybe not ready yet. We need to check the apps first.
+        # try to initialize the config and load preloads if the config is ready
         edgy.monkay.evaluate_settings_once()
 
         if ctx.invoked_subcommand in COMMANDS_WITHOUT_APP:
@@ -65,7 +65,7 @@ def add_app_module_option(fn: Any) -> Any:
                 raise RuntimeError(f'Instance still unset after importing "{value}"')
 
         elif edgy.monkay.instance is None:
-            # skip when already set
+            # skip when already set by a module preloaded
             for preload in DISCOVERY_PRELOADS:
                 with suppress(ImportError):
                     import_module(preload)
