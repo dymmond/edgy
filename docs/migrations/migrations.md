@@ -87,7 +87,7 @@ of `edgy.Registry` or an `AssertationError` is raised.
 
 ## Migration Settings
 
-Migrations use now the edgy settings. Here are all knobs you need to configure them.
+Migrations now use the edgy settings. Here are all the knobs you need to configure them.
 All settings are in `edgy/conf/global_settings.py`.
 
 Some important settings are:
