@@ -119,7 +119,7 @@ Assuming you have a `utils.py` where you place your information about the databa
 
 Something like this:
 
-```python title="my_project/utils.py" hl_lines="6-9"
+```python title="my_project/utils.py" hl_lines="4-9"
 {!> ../docs_src/migrations/lru.py !}
 ```
 
@@ -130,7 +130,7 @@ Now that we have our details about the database and registry, it is time to use 
 
 #### Using Esmerald
 
-```python title="my_project/main.py" hl_lines="9 12 32 38"
+```python title="my_project/main.py" hl_lines="6 36-40 42"
 {!> ../docs_src/migrations/migrations.py !}
 ```
 
@@ -139,7 +139,7 @@ Now that we have our details about the database and registry, it is time to use 
 As mentioned before, Edgy is framework agnostic so you can also use it in your FastAPI
 application.
 
-```python title="my_project/main.py" hl_lines="6 9 29 33"
+```python title="my_project/main.py" hl_lines="6 36 38"
 {!> ../docs_src/migrations/fastapi.py !}
 ```
 
@@ -147,7 +147,7 @@ application.
 
 The same goes for Starlette.
 
-```python title="my_project/main.py" hl_lines="6 9 29 33"
+```python title="my_project/main.py" hl_lines="6 35 37"
 {!> ../docs_src/migrations/starlette.py !}
 ```
 

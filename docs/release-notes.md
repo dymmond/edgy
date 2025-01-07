@@ -13,7 +13,6 @@ hide:
 
 - Try harder to avoid circular imports when providing settings with edgy references.
 
-
 ## 0.24.1
 
 ### Fixed

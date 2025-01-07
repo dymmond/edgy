@@ -21,16 +21,20 @@ def build_path():
 
 def get_application():
     """
-    Encapsulate in methods can be useful for capsulating and delaying imports but is optional.
+    Encapsulating in methods can be useful for controlling the import order but is optional.
     """
     # first call build_path
     build_path()
     # because edgy tries to load settings eagerly
     from edgy import monkay, Instance
 
+    registry = get_db_connection()
+    # ensure the settings are loaded
+    monkay.evaluate_settings_once(ignore_import_errors=False)
+
     app = registry.asgi(Starlette())
 
-    monkay.set_instance(Instance(app=app, registry=registry))
+    monkay.set_instance(Instance(registry=registry, app=app))
     return app
 
 

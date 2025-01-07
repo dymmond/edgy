@@ -27,7 +27,7 @@ def disable_edgy_settings_load():
 
 def get_application():
     """
-    Encapsulate in methods can be useful for capsulating and delaying imports but is optional.
+    Encapsulating in methods can be useful for controlling the import order but is optional.
     """
     # first call build_path
     build_path()
@@ -38,7 +38,7 @@ def get_application():
     from esmerald.conf import settings
 
     monkay.settings = lambda: settings.edgy_settings  # rewire
-    monkay.evaluate_settings_once(ignore_import_errors=False)
+    monkay.evaluate_settings_once(ignore_import_errors=False)  # import manually
 
     # now the project is in the search path and we can import
     from my_project.utils import get_db_connection
