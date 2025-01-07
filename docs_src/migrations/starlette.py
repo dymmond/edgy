@@ -6,8 +6,6 @@ from pathlib import Path
 from starlette.applications import Starlette
 from my_project.utils import get_db_connection
 
-from edgy import monkay, Instance
-
 
 def build_path():
     """
@@ -23,10 +21,12 @@ def build_path():
 
 def get_application():
     """
-    This is optional. The function is only used for organisation purposes.
+    Encapsulate in methods can be useful for capsulating and delaying imports but is optional.
     """
+    # first call build_path
     build_path()
-    registry = get_db_connection()
+    # because edgy tries to load settings eagerly
+    from edgy import monkay, Instance
 
     app = registry.asgi(Starlette())
 

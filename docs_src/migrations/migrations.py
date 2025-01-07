@@ -5,7 +5,6 @@ from pathlib import Path
 
 from my_project.utils import get_db_connection
 
-from edgy import Instance, monkay
 from esmerald import Esmerald, Include
 
 
@@ -23,9 +22,12 @@ def build_path():
 
 def get_application():
     """
-    This is optional. The function is only used for organisation purposes.
+    Encapsulate in methods can be useful for capsulating and delaying imports but is optional.
     """
+    # first call build_path
     build_path()
+    # because edgy tries to load settings eagerly
+
     registry = get_db_connection()
 
     app = registry.asgi(

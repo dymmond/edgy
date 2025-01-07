@@ -26,9 +26,14 @@ def disable_edgy_settings_load():
 
 
 def get_application():
+    """
+    Encapsulate in methods can be useful for capsulating and delaying imports but is optional.
+    """
+    # first call build_path
     build_path()
     # this is optional, for rewiring edgy settings to esmerald settings
     disable_edgy_settings_load()  # disable any settings load
+    # import edgy now
     from edgy import Instance, monkay
     from esmerald.conf import settings
 
