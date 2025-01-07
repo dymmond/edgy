@@ -75,10 +75,6 @@ When no `--app` or no `EDGY_DEFAULT_APP` environment variable is provided, Edgy 
 
 This is the way that Edgy can `auto discover` your application.
 
-!!! Note
-    Flask has a similar pattern for the functions called `create_app`. Edgy doesn't use the
-    `create_app`, instead uses the `get_application` or `get_app` as a pattern as it seems cleaner.
-
 
 ## Environment variables
 

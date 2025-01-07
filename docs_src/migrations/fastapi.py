@@ -6,8 +6,6 @@ from pathlib import Path
 from fastapi import FastAPI
 from my_project.utils import get_db_connection
 
-from edgy import Instance, monkay
-
 
 def build_path():
     """
@@ -23,10 +21,17 @@ def build_path():
 
 def get_application():
     """
-    This is optional. The function is only used for organisation purposes.
+    Encapsulating in methods can be useful for controlling the import order but is optional.
     """
+    # first call build_path
     build_path()
+    # because edgy tries to load settings eagerly
+    from edgy import Instance, monkay
+
     registry = get_db_connection()
+
+    # ensure the settings are loaded
+    monkay.evaluate_settings_once(ignore_import_errors=False)
 
     app = registry.asgi(FastAPI(__name__))
 

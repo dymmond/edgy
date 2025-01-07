@@ -27,16 +27,18 @@ def disable_edgy_settings_load():
 
 def get_application():
     """
-    This is optional. The function is only used for organisation purposes.
+    Encapsulating in methods can be useful for controlling the import order but is optional.
     """
+    # first call build_path
     build_path()
     # this is optional, for rewiring edgy settings to esmerald settings
     disable_edgy_settings_load()  # disable any settings load
+    # import edgy now
     from edgy import Instance, monkay
     from esmerald.conf import settings
 
     monkay.settings = lambda: settings.edgy_settings  # rewire
-    monkay.evaluate_settings()
+    monkay.evaluate_settings_once(ignore_import_errors=False)  # import manually
 
     # now the project is in the search path and we can import
     from my_project.utils import get_db_connection

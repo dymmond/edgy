@@ -7,7 +7,6 @@ import os
 import sys
 
 from esmerald import Esmerald, Include
-from edgy import Instance, monkay
 from my_project.utils import get_db_connection
 
 
@@ -25,10 +24,16 @@ def build_path():
 
 def get_application():
     """
-    This is optional. The function is only used for organisation purposes.
+    Encapsulating in methods can be useful for controlling the import order but is optional.
     """
+    # first call build_path
     build_path()
+    # because edgy tries to load settings eagerly
+    from edgy import monkay, Instance
+
     registry = get_db_connection()
+    # ensure the settings are loaded
+    monkay.evaluate_settings_once(ignore_import_errors=False)
 
     app = registry.asgi(
         Esmerald(

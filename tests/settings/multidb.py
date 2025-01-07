@@ -1,6 +1,6 @@
 from typing import Union
 
-from edgy.conf.global_settings import EdgySettings
+from edgy import EdgySettings
 
 
 class TestSettings(EdgySettings):

@@ -6,8 +6,6 @@ from pathlib import Path
 from esmerald import Esmerald, Include
 from my_project.utils import get_db_connection
 
-from edgy import Instance, monkay
-
 
 def build_path():
     """
@@ -23,8 +21,10 @@ def build_path():
 
 def get_application():
     """
-    This is optional. The function is only used for organisation purposes.
+    Encapsulating in methods can be useful for controlling the import order but is optional.
     """
+    from edgy import Instance, monkay
+
     build_path()
     registry = get_db_connection()
 
