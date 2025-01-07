@@ -24,6 +24,7 @@ from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
 from sqlalchemy.orm import declarative_base as sa_declarative_base
 
+from edgy.conf import evaluate_settings_once_ready
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
 from edgy.core.utils.sync import run_sync
@@ -115,6 +116,7 @@ class Registry:
         extra: Optional[dict[str, Database]] = None,
         **kwargs: Any,
     ) -> None:
+        evaluate_settings_once_ready()
         self.db_schema = schema
         extra = extra or {}
         self.database: Database = (

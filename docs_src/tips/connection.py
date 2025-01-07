@@ -26,9 +26,6 @@ def disable_edgy_settings_load():
 
 
 def get_application():
-    """
-    This is optional. The function is only used for organisation purposes.
-    """
     build_path()
     # this is optional, for rewiring edgy settings to esmerald settings
     disable_edgy_settings_load()  # disable any settings load
@@ -36,7 +33,7 @@ def get_application():
     from esmerald.conf import settings
 
     monkay.settings = lambda: settings.edgy_settings  # rewire
-    monkay.evaluate_settings()
+    monkay.evaluate_settings_once(ignore_import_errors=False)
 
     # now the project is in the search path and we can import
     from my_project.utils import get_db_connection

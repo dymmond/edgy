@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__version__ = "0.24.1"
+__version__ = "0.24.2"
 from typing import TYPE_CHECKING
 
 from ._monkay import Instance, create_monkay
@@ -109,6 +109,8 @@ del create_monkay
 
 def get_migration_prepared_registry(registry: Registry | None = None) -> Registry:
     """Get registry with applied restrictions, usable for migrations."""
+    # ensure settings are ready
+    monkay.evaluate_settings_once(ignore_import_errors=False)
     if registry is None:
         instance = monkay.instance
         assert instance is not None

@@ -50,6 +50,9 @@ def add_app_module_option(fn: Any) -> Any:
 
     def callback(ctx: click.Context, param: str, value: Optional[str]) -> None:
         import edgy
+        from edgy.conf import evaluate_settings_once_ready
+
+        evaluate_settings_once_ready()
 
         if ctx.invoked_subcommand in COMMANDS_WITHOUT_APP:
             return
