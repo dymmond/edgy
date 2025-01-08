@@ -1,3 +1,5 @@
+import warnings
+
 import pytest
 
 import edgy
@@ -60,3 +62,12 @@ async def test_multiple_operations_user_warning():
 
     with pytest.warns(UserWarning):
         await User.query.delete()
+
+
+async def test_no_warning_manual_way():
+    await models.__aenter__()
+    with warnings.catch_warnings(action="error"):
+        await User.query.create(name="Adam", language="EN")
+        await User.query.filter()
+        await User.query.delete()
+    await models.__aexit__()

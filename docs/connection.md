@@ -22,7 +22,7 @@ The common lifecycle events are the following:
 * **on_shutdown**
 * **lifespan**
 
-This document will focus on the two more commonly used, `on_startup` and `on_shutdown`.
+This document will focus on the one more commonly used, `lifespan`.
 
 ## Hooking your database connection into your application
 
@@ -34,7 +34,7 @@ framework.
 
 with the ASGI integration:
 
-```python hl_lines="9"
+```python hl_lines="8-12"
 {!> ../docs_src/connections/asgi.py !}
 ```
 
@@ -58,6 +58,32 @@ Django currently doesn't support the lifespan protocol. So we have a keyword par
 ```python
 {!> ../docs_src/connections/django.py !}
 ```
+
+## Manual integration
+
+The `__aenter__` and `__aexit__` methods support also being called like `connect` and `disconnect`.
+It is however not recommended as contextmanagers have advantages in simpler error handling.
+
+```python
+{!> ../docs_src/connections/manual.py !}
+```
+
+You can use this however for an integration via `on_startup` & `on_shutdown`.
+
+```python
+{!> ../docs_src/connections/manual_esmerald.py !}
+```
+
+## `DatabaseNotConnectedWarning` warning
+
+This warning appears, when an unconnected Database object is used for an operation.
+
+Despite bailing out the warning `DatabaseNotConnectedWarning` is raised.
+You should connect correctly like shown above.
+
+!!! Note
+    When passing Database objects via using, make sure they are connected. They are not necessarily connected
+    when not in extra.
 
 ## Querying other schemas
 
