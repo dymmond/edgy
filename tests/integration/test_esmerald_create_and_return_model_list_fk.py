@@ -96,7 +96,8 @@ def esmerald_client(app) -> Generator:
 
 
 async def test_creates_a_user_raises_value_error(async_client):
-    with warnings.catch_warnings(action="error"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
         data = {
             "name": "Edgy",
             "email": "edgy@esmerald.dev",
@@ -172,7 +173,8 @@ async def test_creates_a_user_warnings(async_client):
 
 
 def test_creates_a_user_sync(esmerald_client):
-    with warnings.catch_warnings(action="error"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
         data = {
             "name": "Edgy",
             "email": "edgy@esmerald.dev",
