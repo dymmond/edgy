@@ -18,7 +18,7 @@ pytestmark = pytest.mark.anyio
 
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
-    async with database:
+    async with models:
         await models.create_all()
         yield
         if not database.drop:

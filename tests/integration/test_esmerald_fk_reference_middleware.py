@@ -19,11 +19,10 @@ pydantic_version = ".".join(__version__.split(".")[:2])
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    async with database:
-        await models.create_all()
-        yield
-        if not database.drop:
-            await models.drop_all()
+    await models.create_all()
+    yield
+    if not database.drop:
+        await models.drop_all()
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -73,8 +72,8 @@ async def create_user(data: User) -> User:
 def app():
     app = Esmerald(
         routes=[Gateway(handler=create_user)],
-        on_startup=[database.connect],
-        on_shutdown=[database.disconnect],
+        on_startup=[models.__aenter__],
+        on_shutdown=[models.__aexit__],
     )
     return app
 

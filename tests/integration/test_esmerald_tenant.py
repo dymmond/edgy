@@ -75,16 +75,15 @@ class TenantMiddleware(MiddlewareProtocol):
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    async with database:
-        await models.create_all()
-        yield
-        if not database.drop:
-            await models.drop_all()
+    await models.create_all()
+    yield
+    if not database.drop:
+        await models.drop_all()
 
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
-    async with models.database:
+    async with models:
         yield
 
 
@@ -113,8 +112,8 @@ def app():
 def another_app():
     app = Esmerald(
         routes=[Gateway("/no-tenant", handler=get_products)],
-        on_startup=[database.connect],
-        on_shutdown=[database.disconnect],
+        on_startup=[models.__aenter__],
+        on_shutdown=[models.__aexit__],
     )
     return app
 

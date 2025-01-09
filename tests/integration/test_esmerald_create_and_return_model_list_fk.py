@@ -1,17 +1,20 @@
-from collections.abc import AsyncGenerator
+import warnings
+from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, post
+from esmerald.testclient import EsmeraldTestClient
 from httpx import ASGITransport, AsyncClient
 from pydantic import __version__, field_validator
 
 import edgy
+from edgy.exceptions import DatabaseNotConnectedWarning
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL)
-models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
+models = edgy.Registry(database=edgy.Database(database, force_rollback=False))
 
 pytestmark = pytest.mark.anyio
 pydantic_version = ".".join(__version__.split(".")[:2])
@@ -19,17 +22,10 @@ pydantic_version = ".".join(__version__.split(".")[:2])
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    async with database:
-        await models.create_all()
-        yield
-        if not database.drop:
-            await models.drop_all()
-
-
-@pytest.fixture(autouse=True, scope="function")
-async def rollback_transactions():
-    async with models.database:
-        yield
+    await models.create_all()
+    yield
+    if not database.drop:
+        await models.drop_all()
 
 
 def blocking_function():
@@ -80,8 +76,8 @@ async def create_user(data: User) -> User:
 def app():
     app = Esmerald(
         routes=[Gateway(handler=create_user)],
-        on_startup=[database.connect],
-        on_shutdown=[database.disconnect],
+        on_startup=[models.__aenter__],
+        on_shutdown=[models.__aexit__],
     )
     return app
 
@@ -93,35 +89,67 @@ async def async_client(app) -> AsyncGenerator:
         yield ac
 
 
+@pytest.fixture()
+def esmerald_client(app) -> Generator:
+    with EsmeraldTestClient(app, base_url="http://test") as ac:
+        yield ac
+
+
 async def test_creates_a_user_raises_value_error(async_client):
-    data = {
-        "name": "Edgy",
-        "email": "edgy@esmerald.dev",
-        "language": "EN",
-        "description": "A description",
-    }
-    response = await async_client.post("/create", json=data)
-    assert response.status_code == 400  # default from Esmerald POST
-    assert response.json() == {
-        "detail": "Validation failed for http://test/create with method POST.",
-        "errors": [
-            {
-                "type": "missing",
-                "loc": ["posts"],
-                "msg": "Field required",
-                "input": {
-                    "name": "Edgy",
-                    "email": "edgy@esmerald.dev",
-                    "language": "EN",
-                    "description": "A description",
-                },
-                "url": f"https://errors.pydantic.dev/{pydantic_version}/v/missing",
-            }
-        ],
-    }
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        data = {
+            "name": "Edgy",
+            "email": "edgy@esmerald.dev",
+            "language": "EN",
+            "description": "A description",
+        }
+        async with models:
+            response = await async_client.post("/create", json=data)
+        assert response.status_code == 400  # default from Esmerald POST
+        assert response.json() == {
+            "detail": "Validation failed for http://test/create with method POST.",
+            "errors": [
+                {
+                    "type": "missing",
+                    "loc": ["posts"],
+                    "msg": "Field required",
+                    "input": {
+                        "name": "Edgy",
+                        "email": "edgy@esmerald.dev",
+                        "language": "EN",
+                        "description": "A description",
+                    },
+                    "url": f"https://errors.pydantic.dev/{pydantic_version}/v/missing",
+                }
+            ],
+        }
 
 
 async def test_creates_a_user(async_client):
+    async with models:
+        data = {
+            "name": "Edgy",
+            "email": "edgy@esmerald.dev",
+            "language": "EN",
+            "description": "A description",
+            "posts": [{"comment": "A comment"}],
+        }
+        response = await async_client.post("/create", json=data)
+        assert response.status_code == 201  # default from Esmerald POST
+        reponse_json = response.json()
+        reponse_json.pop("id")
+        assert reponse_json == {
+            "name": "Edgy",
+            "email": "edgy@esmerald.dev",
+            "language": "EN",
+            "description": "A description",
+            "comment": "A COMMENT",
+            "total_posts": 1,
+        }
+
+
+async def test_creates_a_user_warnings(async_client):
     data = {
         "name": "Edgy",
         "email": "edgy@esmerald.dev",
@@ -129,7 +157,8 @@ async def test_creates_a_user(async_client):
         "description": "A description",
         "posts": [{"comment": "A comment"}],
     }
-    response = await async_client.post("/create", json=data)
+    with pytest.warns(DatabaseNotConnectedWarning):
+        response = await async_client.post("/create", json=data)
     assert response.status_code == 201  # default from Esmerald POST
     reponse_json = response.json()
     reponse_json.pop("id")
@@ -141,3 +170,27 @@ async def test_creates_a_user(async_client):
         "comment": "A COMMENT",
         "total_posts": 1,
     }
+
+
+def test_creates_a_user_sync(esmerald_client):
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        data = {
+            "name": "Edgy",
+            "email": "edgy@esmerald.dev",
+            "language": "EN",
+            "description": "A description",
+            "posts": [{"comment": "A comment"}],
+        }
+        response = esmerald_client.post("/create", json=data)
+        assert response.status_code == 201  # default from Esmerald POST
+        reponse_json = response.json()
+        reponse_json.pop("id")
+        assert reponse_json == {
+            "name": "Edgy",
+            "email": "edgy@esmerald.dev",
+            "language": "EN",
+            "description": "A description",
+            "comment": "A COMMENT",
+            "total_posts": 1,
+        }

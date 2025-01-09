@@ -84,12 +84,10 @@ class TenantMiddleware(MiddlewareProtocol):
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    try:
-        await models.create_all()
-        yield
+    await models.create_all()
+    yield
+    if not database.drop:
         await models.drop_all()
-    except Exception:
-        pytest.skip("No database available")
 
 
 @pytest.fixture(autouse=True)
@@ -114,8 +112,8 @@ def app():
     app = Esmerald(
         routes=[Gateway(handler=get_products)],
         middleware=[TenantMiddleware],
-        on_startup=[database.connect],
-        on_shutdown=[database.disconnect],
+        on_startup=[models.__aenter__],
+        on_shutdown=[models.__aexit__],
     )
     return app
 
