@@ -197,19 +197,20 @@ class DatabaseMixin:
             # supports only up to 3, the last one was added later
             len_args = len(args)
             if len_args >= 4:
-                raise Exception("Not supported, please use keyword arguments")
-            if len_args == 3:
-                kw_args: dict = {
-                    "name": args[0],
-                    "database": args[1],
-                    "replace_related_field": args[2],
-                }
-            elif len_args == 2:
-                kw_args = {"name": args[0], "database": args[1]}
-            elif len_args == 1:
-                kw_args = {"name": args[0]}
-
-            cls.add_to_registry(registry, **kw_args)
+                raise Exception("Not supported, please use keyword arguments.")
+            if len_args >= 1:
+                name = args[0]
+            if len_args >= 2:
+                database = args[1]
+            if len_args >= 3:
+                replace_related_field = args[2]
+            cls.add_to_registry(
+                registry,
+                name=name,
+                database=database,
+                replace_related_field=replace_related_field,
+                replace_related_field_m2m=replace_related_field_m2m,
+            )
             return
         # when called if registry is not set
         cls.meta.registry = registry
