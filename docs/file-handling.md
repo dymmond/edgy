@@ -63,7 +63,7 @@ Setting a file field to None, implicitly deletes the file after saving.
 
 For higher control, the methods of the FieldFile can be used.
 
-!!! Tip:
+!!! Tip
     You may want to set null=True to allow the deletion of the file and having a consistent state afterward.
     However you can circumvent the logic by using `delete` with `instant=True` which disables the transactional
     file handling and just deletes the file and set the name when `null=True` to None.
