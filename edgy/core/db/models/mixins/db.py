@@ -58,12 +58,14 @@ _removed_copy_keys.difference_update(
 
 
 def _check_replace_related_field(
-    replace_related_field: Union[bool, type["BaseModelType"], tuple[type["BaseModelType"], ...]],
+    replace_related_field: Union[
+        bool, type["BaseModelType"], tuple[type["BaseModelType"], ...], list[type["BaseModelType"]]
+    ],
     model: type["BaseModelType"],
 ) -> bool:
     if isinstance(replace_related_field, bool):
         return replace_related_field
-    if not isinstance(replace_related_field, tuple):
+    if not isinstance(replace_related_field, (tuple, list)):
         replace_related_field = (replace_related_field,)
     return any(refmodel is model for refmodel in replace_related_field)
 
@@ -74,7 +76,9 @@ def _set_related_field(
     foreign_key_name: str,
     related_name: str,
     source: type["BaseModelType"],
-    replace_related_field: Union[bool, type["BaseModelType"], tuple[type["BaseModelType"], ...]],
+    replace_related_field: Union[
+        bool, type["BaseModelType"], tuple[type["BaseModelType"], ...], list[type["BaseModelType"]]
+    ],
 ) -> None:
     if replace_related_field is not True and related_name in target.meta.fields:
         # is already correctly set, required for migrate of model_apps with registry set
@@ -115,7 +119,7 @@ def _set_related_name_for_foreign_keys(
     meta: "MetaInfo",
     model_class: type["BaseModelType"],
     replace_related_field: Union[
-        bool, type["BaseModelType"], tuple[type["BaseModelType"], ...]
+        bool, type["BaseModelType"], tuple[type["BaseModelType"], ...], list[type["BaseModelType"]]
     ] = False,
 ) -> None:
     """
@@ -164,16 +168,49 @@ class DatabaseMixin:
     def add_to_registry(
         cls: type["BaseModelType"],
         registry: "Registry",
-        *,
+        *args: Any,
         name: str = "",
         database: Union[bool, "Database", Literal["keep"]] = "keep",
         replace_related_field: Union[
-            bool, type["BaseModelType"], tuple[type["BaseModelType"], ...]
+            bool,
+            type["BaseModelType"],
+            tuple[type["BaseModelType"], ...],
+            list[type["BaseModelType"]],
         ] = False,
         replace_related_field_m2m: Union[
-            bool, type["BaseModelType"], tuple[type["BaseModelType"], ...], None
+            bool,
+            type["BaseModelType"],
+            tuple[type["BaseModelType"], ...],
+            list[type["BaseModelType"]],
+            None,
         ] = None,
     ) -> None:
+        if args:
+            warnings.warn(
+                (
+                    "Positional extra arguments except registry are deprecated for `add_to_registry`. "
+                    "Please provide the arguments as keyword arguments"
+                ),
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            # supports only up to 3, the last one was added later
+            len_args = len(args)
+            if len_args >= 4:
+                raise Exception("Not supported, please use keyword arguments")
+            if len_args == 3:
+                kw_args: dict = {
+                    "name": args[0],
+                    "database": args[1],
+                    "replace_related_field": args[2],
+                }
+            elif len_args == 2:
+                kw_args = {"name": args[0], "database": args[1]}
+            elif len_args == 1:
+                kw_args = {"name": args[0]}
+
+            cls.add_to_registry(registry, **kw_args)
+            return
         # when called if registry is not set
         cls.meta.registry = registry
         if database is True:
@@ -264,15 +301,16 @@ class DatabaseMixin:
             type["Model"],
             type(cls.__name__, cls.__bases__, attrs, skip_registry=True, **kwargs),
         )
-        if getattr(cls, "database", None) is not None:
+        # should also allow masking database with None
+        if hasattr(cls, "database"):
             _copy.database = cls.database
-        targets: list[type[BaseModelType]] = []
+        replaceable_models: list[type[BaseModelType]] = [cls]
         for field_name in list(_copy.meta.fields):
             src_field = cls.meta.fields[field_name]
             if not isinstance(src_field, (BaseManyToManyForeignKeyField, BaseForeignKeyField)):
                 continue
             # we use the target of source
-            targets.append(src_field.target)
+            replaceable_models.append(src_field.target)
 
             if src_field.target_registry is cls.meta.registry:
                 del _copy.meta.fields[field_name].target_registry
@@ -304,7 +342,7 @@ class DatabaseMixin:
             # replace when old class otherwise old references can lead to issues
             _copy.add_to_registry(
                 registry,
-                replace_related_field=(cls, *targets),
+                replace_related_field=replaceable_models,
                 database="keep"
                 if cls.meta.registry is False or cls.database is not cls.meta.registry.database
                 else True,

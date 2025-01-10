@@ -223,7 +223,7 @@ class Registry:
                 __bases__=(with_content_type,),
             )
         elif real_content_type.meta.registry is None:
-            real_content_type.add_to_registry(self, "ContentType")
+            real_content_type.add_to_registry(self, name="ContentType")
         self.content_type = real_content_type
 
         def callback(model_class: type["BaseModelType"]) -> None:

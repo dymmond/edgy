@@ -136,7 +136,10 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self,
         *,
         replace_related_field: Union[
-            bool, type["BaseModelType"], tuple[type["BaseModelType"], ...]
+            bool,
+            type["BaseModelType"],
+            tuple[type["BaseModelType"], ...],
+            list[type["BaseModelType"]],
         ] = False,
     ) -> None:
         """
