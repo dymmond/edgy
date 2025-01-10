@@ -34,6 +34,7 @@ class RelatedField(RelationshipField):
             annotation=Any,
             column_type=None,
             null=True,
+            no_copy=True,
             **kwargs,
         )
         if self.foreign_key.relation_has_post_delete_callback:

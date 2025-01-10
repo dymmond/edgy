@@ -38,7 +38,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.to_foreign_key = to_foreign_key
         self.from_fields = from_fields
         self.from_foreign_key = from_foreign_key
-        self.through = through
+        self.through_original = self.through = through
         self.through_tablename = through_tablename
         self.embed_through = embed_through
 
@@ -132,7 +132,13 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             )
         return self.owner, self.name, path.removeprefix(self.reverse_name).removeprefix("__")
 
-    def create_through_model(self) -> None:
+    def create_through_model(
+        self,
+        *,
+        replace_related_field: Union[
+            bool, type["BaseModelType"], tuple[type["BaseModelType"], ...]
+        ] = False,
+    ) -> None:
         """
         Creates the default empty through model.
 
@@ -144,10 +150,13 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         __bases__: tuple[type[BaseModelType], ...] = ()
         pknames = set()
         if self.through:
-            if isinstance(self.through, str):
-                assert self.owner.meta.registry, "no registry found"
-                self.through = self.owner.meta.registry.models[self.through]
             through = self.through
+            if isinstance(through, str):
+                assert self.owner.meta.registry, "no registry found"
+                try:
+                    through = self.owner.meta.registry.models[through]
+                except KeyError:
+                    through = self.target_registry.models[cast(str, through)]
             if through.meta.abstract:
                 pknames = set(through.pknames)
                 __bases__ = (through,)
@@ -177,7 +186,10 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                         raise ValueError("no foreign key fo target found")
                     self.to_foreign_key = candidate
                 through.meta.multi_related.add((self.from_foreign_key, self.to_foreign_key))
+                self.through = through
                 return
+            self.through = through
+            del through
         assert self.owner.meta.registry, "no registry set"
         owner_name = self.owner.__name__
         to_name = self.target.__name__
@@ -252,7 +264,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             through_model.meta.fields["content_type"] = ExcludeField(
                 name="content_type", owner=through_model
             )
-        through_model.add_to_registry(self.owner.meta.registry)
+        through_model.add_to_registry(
+            self.owner.meta.registry, replace_related_field=replace_related_field
+        )
         self.through = through_model
 
     def to_model(

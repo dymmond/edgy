@@ -18,8 +18,10 @@ from edgy.core.db.context_vars import (
     get_schema,
 )
 from edgy.core.db.datastructures import Index, UniqueConstraint
+from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.models.metaclasses import MetaInfo
+from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.db import check_db_connection
@@ -33,7 +35,6 @@ if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.model import Model
-    from edgy.core.db.models.types import BaseModelType
 
 
 _empty = cast(set[str], frozenset())
@@ -56,13 +57,24 @@ _removed_copy_keys.difference_update(
 )
 
 
+def _check_replace_related_field(
+    replace_related_field: Union[bool, type["BaseModelType"], tuple[type["BaseModelType"], ...]],
+    model: type["BaseModelType"],
+) -> bool:
+    if isinstance(replace_related_field, bool):
+        return replace_related_field
+    if not isinstance(replace_related_field, tuple):
+        replace_related_field = (replace_related_field,)
+    return any(refmodel is model for refmodel in replace_related_field)
+
+
 def _set_related_field(
     target: type["BaseModelType"],
     *,
     foreign_key_name: str,
     related_name: str,
     source: type["BaseModelType"],
-    replace_related_field: Union[bool, type["BaseModelType"]],
+    replace_related_field: Union[bool, type["BaseModelType"], tuple[type["BaseModelType"], ...]],
 ) -> None:
     if replace_related_field is not True and related_name in target.meta.fields:
         # is already correctly set, required for migrate of model_apps with registry set
@@ -73,9 +85,8 @@ def _set_related_field(
         ):
             return
         # required for copying
-        if (
-            related_field.related_from is not replace_related_field
-            or related_field.foreign_key_name != foreign_key_name
+        if related_field.foreign_key_name != foreign_key_name or _check_replace_related_field(
+            replace_related_field, related_field.related_from
         ):
             raise ForeignKeyBadConfigured(
                 f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
@@ -103,7 +114,9 @@ def _set_related_field(
 def _set_related_name_for_foreign_keys(
     meta: "MetaInfo",
     model_class: type["BaseModelType"],
-    replace_related_field: Union[bool, type["BaseModelType"]] = False,
+    replace_related_field: Union[
+        bool, type["BaseModelType"], tuple[type["BaseModelType"], ...]
+    ] = False,
 ) -> None:
     """
     Sets the related name for the foreign keys.
@@ -151,9 +164,15 @@ class DatabaseMixin:
     def add_to_registry(
         cls: type["BaseModelType"],
         registry: "Registry",
+        *,
         name: str = "",
         database: Union[bool, "Database", Literal["keep"]] = "keep",
-        replace_related_field: Union[bool, type["BaseModelType"]] = False,
+        replace_related_field: Union[
+            bool, type["BaseModelType"], tuple[type["BaseModelType"], ...]
+        ] = False,
+        replace_related_field_m2m: Union[
+            bool, type["BaseModelType"], tuple[type["BaseModelType"], ...], None
+        ] = None,
     ) -> None:
         # when called if registry is not set
         cls.meta.registry = registry
@@ -185,7 +204,11 @@ class DatabaseMixin:
 
                     def create_through_model(x: Any, field: "BaseFieldType" = value) -> None:
                         # we capture with field = ... the variable
-                        field.create_through_model()
+                        field.create_through_model(
+                            replace_related_field=replace_related_field_m2m
+                            if replace_related_field_m2m is not None
+                            else replace_related_field
+                        )
 
                     m2m_registry.register_callback(value.to, create_through_model, one_time=True)
             # Sets the foreign key fields
@@ -241,18 +264,48 @@ class DatabaseMixin:
             type["Model"],
             type(cls.__name__, cls.__bases__, attrs, skip_registry=True, **kwargs),
         )
-        for field_name in _copy.meta.foreign_key_fields:
-            # we need to unreference and check if both models are in the same registry
-            if cls.meta.fields[field_name].target.meta.registry is cls.meta.registry:
-                _copy.meta.fields[field_name].target = cls.meta.fields[field_name].target.__name__
+        _copy.database = cls.database
+        targets: list[type[BaseModelType]] = []
+        for field_name in list(_copy.meta.fields):
+            src_field = cls.meta.fields[field_name]
+            if not isinstance(src_field, (BaseManyToManyForeignKeyField, BaseForeignKeyField)):
+                continue
+            # we use the target of source
+            targets.append(src_field.target)
+
+            if src_field.target_registry is cls.meta.registry:
+                del _copy.meta.fields[field_name].target_registry
+            if src_field.target.meta.registry is cls.meta.registry:
+                # we need to unreference and check if both models are in the same registry
+                _copy.meta.fields[field_name].target = src_field.target.__name__
             else:
                 # otherwise we need to disable backrefs
-                _copy.meta.fields[field_name].target.related_name = False
+                _copy.meta.fields[field_name].related_name = False
+
+            if isinstance(src_field, BaseManyToManyForeignKeyField):
+                _copy.meta.fields[field_name].through = src_field.through_original
+                if isinstance(_copy.meta.fields[field_name].through, BaseModelType) and not (
+                    _copy.meta.fields[field_name].through.meta.abstract
+                    or _copy.meta.fields[field_name].through.meta.registry
+                ):
+                    if _copy.meta.fields[field_name].through.meta.registry is cls.meta.registry:
+                        _copy.meta.fields[field_name].through = _copy.meta.fields[
+                            field_name
+                        ].through.__name__
+                    else:
+                        _copy.meta.fields[field_name].through = _copy.meta.fields[
+                            field_name
+                        ].through.copy_edgy_model()
+
         if name:
             _copy.__name__ = name
         if registry is not None:
             # replace when old class otherwise old references can lead to issues
-            _copy.add_to_registry(registry, replace_related_field=cls)
+            _copy.add_to_registry(
+                registry,
+                replace_related_field=(cls, *targets),
+                database="keep" if cls.database is not cls.meta.registry.database else True,
+            )
         return _copy
 
     @property

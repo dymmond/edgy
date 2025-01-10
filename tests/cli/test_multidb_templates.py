@@ -66,8 +66,15 @@ async def cleanup_db():
 @pytest.mark.parametrize("app_flag", ["explicit", "explicit_env"])
 @pytest.mark.parametrize(
     "template_param",
-    ["", " -t default", " -t plain", " -t url", " -t ./custom_multidb"],
-    ids=["default_empty", "default", "plain", "url", "custom"],
+    [
+        "",
+        " -t default",
+        " -t plain",
+        " -t url",
+        " -t ./custom_multidb",
+        " -t ./custom_multidb_copied_registry",
+    ],
+    ids=["default_empty", "default", "plain", "url", "custom", "custom_copied"],
 )
 async def test_migrate_upgrade_multidb(app_flag, template_param):
     os.chdir(base_path)

@@ -20,6 +20,7 @@ def create_edgy_model(
     __bases__: Optional[tuple[type["BaseModelType"], ...]] = None,
     __proxy__: bool = False,
     __pydantic_extra__: Any = None,
+    **kwargs: Any,
 ) -> type["Model"]:
     """
     Generates an `edgy.Model` with all the required definitions to generate the pydantic
@@ -48,7 +49,7 @@ def create_edgy_model(
     if __pydantic_extra__:
         core_definitions.update(**{"__pydantic_extra__": __pydantic_extra__})
 
-    model: type[Model] = type(__name__, __bases__, core_definitions)
+    model: type[Model] = type(__name__, __bases__, core_definitions, **kwargs)
     return model
 
 

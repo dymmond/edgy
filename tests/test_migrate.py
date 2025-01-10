@@ -4,9 +4,10 @@ from esmerald import Esmerald
 import edgy
 from edgy import Registry
 from edgy.testclient import DatabaseTestClient
-from tests.settings import DATABASE_URL
+from tests.settings import DATABASE_ALTERNATIVE_URL, DATABASE_URL
 
 database = DatabaseTestClient(url=DATABASE_URL)
+database2 = DatabaseTestClient(url=DATABASE_ALTERNATIVE_URL)
 models = Registry(database=database)
 nother = Registry(database=database)
 
@@ -34,6 +35,7 @@ class Profile(User):
 class Contact(Profile):
     age = edgy.CharField(max_length=255)
     address = edgy.CharField(max_length=255)
+    database = database2
 
     class Meta:
         registry = models
@@ -55,6 +57,23 @@ def test_migrate_without_model_apps(instance_wrapper, deprecated):
     assert len(migrate.registry.models) == 3
     registry = edgy.get_migration_prepared_registry()
     assert len(registry.models) == 3
+
+    assert registry.get_model("Profile").meta.fields["related"].target is registry.get_model(
+        "Profile"
+    )
+    through = registry.get_model("Profile").meta.fields["related"].through
+    assert through is registry.get_model(through.__name__)
+    assert registry.get_model("Contact").database is database2
+
+    # try copying
+    registry = edgy.get_migration_prepared_registry(registry.__copy__())
+    assert len(registry.models) == 3
+    assert registry.get_model("Profile").meta.fields["related"].target is registry.get_model(
+        "Profile"
+    )
+    through = registry.get_model("Profile").meta.fields["related"].through
+    assert through is registry.get_model(through.__name__)
+    assert registry.get_model("Contact").database is database2
 
 
 def test_migrate_without_model_apps_and_app():

@@ -432,6 +432,11 @@ class BaseForeignKey(RelationshipField):
     def target_registry(self, value: Any) -> None:
         self._target_registry = value
 
+    @target_registry.deleter
+    def target_registry(self) -> None:
+        with contextlib.suppress(AttributeError):
+            delattr(self, "_target_registry")
+
     @property
     def target(self) -> Any:
         """

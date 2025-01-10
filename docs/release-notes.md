@@ -6,6 +6,22 @@ hide:
 
 # Release Notes
 
+## 0.24.3
+
+### Added
+
+- M2M-Field `create_through_model` allows now the keyword only argument `replace_related_field`.
+- `add_to_registry` has now an additional keyword `replace_related_field_m2m` for seperate controlling the `create_through_model` registration logic.
+
+### Changed
+
+- `add_to_registry` has at most one positional argument. Such an interface was intended but not enforced.
+- `create_edgy_model` passes through additional keyword arguments to the edgy model class.
+
+### Fixed
+
+- Copying registries is working now.
+
 
 ## 0.24.2
 
