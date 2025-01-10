@@ -264,7 +264,8 @@ class DatabaseMixin:
             type["Model"],
             type(cls.__name__, cls.__bases__, attrs, skip_registry=True, **kwargs),
         )
-        _copy.database = cls.database
+        if getattr(cls, "database", None) is not None:
+            _copy.database = cls.database
         targets: list[type[BaseModelType]] = []
         for field_name in list(_copy.meta.fields):
             src_field = cls.meta.fields[field_name]
@@ -304,7 +305,9 @@ class DatabaseMixin:
             _copy.add_to_registry(
                 registry,
                 replace_related_field=(cls, *targets),
-                database="keep" if cls.database is not cls.meta.registry.database else True,
+                database="keep"
+                if cls.meta.registry is False or cls.database is not cls.meta.registry.database
+                else True,
             )
         return _copy
 
