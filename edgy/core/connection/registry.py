@@ -3,7 +3,7 @@ import contextlib
 import re
 import warnings
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Container, Sequence
 from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
@@ -302,7 +302,11 @@ class Registry:
         return self.metadata_by_name[None]
 
     def get_model(
-        self, model_name: str, *, include_content_type_attr: bool = True
+        self,
+        model_name: str,
+        *,
+        include_content_type_attr: bool = True,
+        exclude: Container[str] = (),
     ) -> type["BaseModelType"]:
         if (
             include_content_type_attr
@@ -311,6 +315,8 @@ class Registry:
         ):
             return self.content_type
         for model_dict_name in self.model_registry_types:
+            if model_dict_name in exclude:
+                continue
             model_dict: dict = getattr(self, model_dict_name)
             if model_name in model_dict:
                 return cast(type["BaseModelType"], model_dict[model_name])

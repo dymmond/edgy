@@ -173,7 +173,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         __bases__: tuple[type[BaseModelType], ...] = ()
         pknames = set()
         if self.through:
-            through: type[BaseModelType] | str = self.through
+            through = self.through
             if isinstance(through, str):
 
                 def callback(model_class: type["BaseModelType"]) -> None:

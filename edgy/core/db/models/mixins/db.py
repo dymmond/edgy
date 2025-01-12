@@ -28,7 +28,7 @@ from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.db import check_db_connection
 from edgy.core.utils.models import create_edgy_model
-from edgy.exceptions import ForeignKeyBadConfigured, ObjectNotFound
+from edgy.exceptions import ForeignKeyBadConfigured, ModelCollisionError, ObjectNotFound
 from edgy.types import Undefined
 
 if TYPE_CHECKING:
@@ -204,13 +204,17 @@ class DatabaseMixin:
             else:
                 with contextlib.suppress(LookupError):
                     original_model = registry.get_model(
-                        cls.__name__, include_content_type_attr=False
+                        cls.__name__, include_content_type_attr=False, exclude=("tenant_models",)
                     )
                     if on_conflict == "keep":
                         return original_model
                     else:
-                        raise ValueError(
-                            f'Already a model with the same name registered: "{cls.__name__}"'
+                        raise ModelCollisionError(
+                            detail=(
+                                f'A model with the same name is already registered: "{cls.__name__}".\n'
+                                "If this is not a bug, define the behaviour by "
+                                'setting "on_conflict" to either "keep" or "replace".'
+                            )
                         )
             if getattr(cls, "__reflected__", False):
                 registry.reflected[cls.__name__] = cls
