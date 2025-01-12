@@ -180,9 +180,7 @@ class Registry:
                 (
                     (
                         key,
-                        val.copy_edgy_model(
-                            registry=_copy if registry_type in {"models", "reflected"} else None
-                        ),
+                        val.copy_edgy_model(registry=_copy),
                     )
                     for key, val in getattr(self, registry_type).items()
                     if not val.meta.no_copy and key not in dict_models
@@ -531,7 +529,9 @@ class Registry:
                     new_name = pattern_model.meta.template(table)
                     old_model: Optional[type[BaseModelType]] = None
                     with contextlib.suppress(LookupError):
-                        old_model = self.get_model(new_name)
+                        old_model = self.get_model(
+                            new_name, include_content_type_attr=False, exclude=("pattern_models",)
+                        )
                     if old_model is not None:
                         raise Exception(
                             f"Conflicting model: {old_model.__name__} with pattern model: {pattern_model.__name__}"

@@ -9,6 +9,7 @@ from edgy.exceptions import ImproperlyConfigured
 if TYPE_CHECKING:
     from edgy import Registry
     from edgy.core.connection.database import Database
+    from edgy.core.db.models.types import BaseModelType
 
 
 class ReflectedModelMixin:
@@ -18,6 +19,11 @@ class ReflectedModelMixin:
     """
 
     __reflected__: ClassVar[bool] = True
+
+    @classmethod
+    def real_add_to_registry(cls: type["BaseModelType"], **kwargs: Any) -> type["BaseModelType"]:
+        kwargs.setdefault("registry_type_name", "reflected")
+        return cast(type["BaseModelType"], super().real_add_to_registry(**kwargs))
 
     @classmethod
     def build(

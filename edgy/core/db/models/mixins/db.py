@@ -168,12 +168,13 @@ class DatabaseMixin:
     _removed_copy_keys: ClassVar[set[str]] = _removed_copy_keys
 
     @classmethod
-    def add_to_registry(
+    def real_add_to_registry(
         cls: type[BaseModelType],
+        *,
         registry: Registry,
+        registry_type_name: str = "models",
         name: str = "",
         database: Union[bool, Database, Literal["keep"]] = "keep",
-        *,
         replace_related_field: Union[
             bool,
             type[BaseModelType],
@@ -182,6 +183,7 @@ class DatabaseMixin:
         ] = False,
         on_conflict: Literal["keep", "replace", "error"] = "error",
     ) -> type[BaseModelType]:
+        """For customizations."""
         # when called if registry is not set
         cls.meta.registry = registry
         if database is True:
@@ -216,32 +218,56 @@ class DatabaseMixin:
                                 'setting "on_conflict" to either "keep" or "replace".'
                             )
                         )
-            if getattr(cls, "__reflected__", False):
-                registry.reflected[cls.__name__] = cls
-            else:
-                registry.models[cls.__name__] = cls
-            # after registrating the own model
-            for value in list(meta.fields.values()):
-                if isinstance(value, BaseManyToManyForeignKeyField):
-                    m2m_registry: Registry = value.target_registry
-                    with contextlib.suppress(Exception):
-                        m2m_registry = cast("Registry", value.target.registry)
+            if registry_type_name:
+                registry_dict = getattr(registry, registry_type_name)
+                registry_dict[cls.__name__] = cls
+                # after registrating the own model
+                for value in list(meta.fields.values()):
+                    if isinstance(value, BaseManyToManyForeignKeyField):
+                        m2m_registry: Registry = value.target_registry
+                        with contextlib.suppress(Exception):
+                            m2m_registry = cast("Registry", value.target.registry)
 
-                    def create_through_model(x: Any, field: BaseFieldType = value) -> None:
-                        # we capture with field = ... the variable
-                        field.create_through_model(replace_related_field=replace_related_field)
+                        def create_through_model(x: Any, field: BaseFieldType = value) -> None:
+                            # we capture with field = ... the variable
+                            field.create_through_model(replace_related_field=replace_related_field)
 
-                    m2m_registry.register_callback(value.to, create_through_model, one_time=True)
-            # Sets the foreign key fields
-            if meta.foreign_key_fields:
-                _set_related_name_for_foreign_keys(
-                    meta, cls, replace_related_field=replace_related_field
-                )
-            registry.execute_model_callbacks(cls)
+                        m2m_registry.register_callback(
+                            value.to, create_through_model, one_time=True
+                        )
+                # Sets the foreign key fields
+                if meta.foreign_key_fields:
+                    _set_related_name_for_foreign_keys(
+                        meta, cls, replace_related_field=replace_related_field
+                    )
+                registry.execute_model_callbacks(cls)
 
         # finalize
         cls.model_rebuild(force=True)
         return cls
+
+    @classmethod
+    def add_to_registry(
+        cls: type[BaseModelType],
+        registry: Registry,
+        name: str = "",
+        database: Union[bool, Database, Literal["keep"]] = "keep",
+        *,
+        replace_related_field: Union[
+            bool,
+            type[BaseModelType],
+            tuple[type[BaseModelType], ...],
+            list[type[BaseModelType]],
+        ] = False,
+        on_conflict: Literal["keep", "replace", "error"] = "error",
+    ) -> type[BaseModelType]:
+        return cls.real_add_to_registry(
+            registry=registry,
+            name=name,
+            database=database,
+            replace_related_field=replace_related_field,
+            on_conflict=on_conflict,
+        )
 
     def get_active_instance_schema(
         self, check_schema: bool = True, check_tenant: bool = True
@@ -295,6 +321,7 @@ class DatabaseMixin:
             __metadata__=meta_info,
             __bases__=cls.__bases__,
             skip_registry=True,
+            **kwargs,
         )
         # should also allow masking database with None
         if hasattr(cls, "database"):
