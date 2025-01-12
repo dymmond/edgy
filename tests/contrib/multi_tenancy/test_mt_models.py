@@ -71,6 +71,14 @@ class Product(TenantModel):
         is_tenant = True
 
 
+class Cart(TenantModel):
+    products = fields.ManyToMany(Product)
+
+    class Meta:
+        registry = models
+        is_tenant = True
+
+
 async def test_create_a_tenant_schema():
     tenant = await Tenant.query.create(
         schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
@@ -78,6 +86,47 @@ async def test_create_a_tenant_schema():
 
     assert tenant.schema_name == "edgy"
     assert tenant.tenant_name == "edgy"
+
+
+async def test_create_a_tenant_schema_copy():
+    copied = models.__copy__()
+    tenant = await copied.get_model("Tenant").query.create(
+        schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
+    )
+
+    assert tenant.schema_name == "edgy"
+    assert tenant.tenant_name == "edgy"
+    NewProduct = copied.get_model("Product")
+    NewCart = copied.get_model("Cart")
+    assert NewCart.meta.fields["products"].target is NewProduct
+    assert NewCart.meta.fields["products"].through is not Cart.meta.fields["products"].through
+    cart = await NewCart.query.using(schema=tenant.schema_name).create()
+    for i in range(5):
+        await cart.products.add(
+            await NewProduct.query.using(schema=tenant.schema_name).create(name=f"product-{i}")
+        )
+
+    products = await cart.products.using(schema=tenant.schema_name).all()
+    assert len(products) == 5
+
+    total = await NewProduct.query.using(schema=tenant.schema_name).all()
+
+    assert len(total) == 5
+
+    total = await NewProduct.query.all()
+
+    assert len(total) == 0
+
+    for i in range(15):
+        await NewProduct.query.create(name=f"product-{i}")
+
+    total = await NewProduct.query.all()
+
+    assert len(total) == 15
+
+    total = await NewProduct.query.using(schema=tenant.schema_name).all()
+
+    assert len(total) == 5
 
 
 async def test_raises_ModelSchemaError_on_public_schema():

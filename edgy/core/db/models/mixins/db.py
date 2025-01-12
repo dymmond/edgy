@@ -296,7 +296,6 @@ class DatabaseMixin:
         registry: Optional[Registry] = None,
         name: str = "",
         unlink_same_registry: bool = True,
-        meta_info: MetaInfo | None = None,
         on_conflict: Literal["keep", "replace", "error"] = "error",
         **kwargs: Any,
     ) -> type[Model]:
@@ -318,7 +317,7 @@ class DatabaseMixin:
             __name__=name or cls.__name__,
             __module__=cls.__module__,
             __definitions__=attrs,
-            __metadata__=meta_info,
+            __metadata__=cls.meta,
             __bases__=cls.__bases__,
             skip_registry=True,
             **kwargs,
@@ -357,9 +356,9 @@ class DatabaseMixin:
                     # unreference
                     _copy.meta.fields[field_name].through = through_model = _copy.meta.fields[
                         field_name
-                    ].through.copy_edgy_model(
-                        meta_info=MetaInfo(registry=False),
-                    )
+                    ].through.copy_edgy_model()
+                    # we want to set the registry explicit
+                    through_model.meta.registry = False
                     if src_field.from_foreign_key in through_model.meta.fields:
                         # explicit set
                         through_model.meta.fields[src_field.from_foreign_key].target = _copy

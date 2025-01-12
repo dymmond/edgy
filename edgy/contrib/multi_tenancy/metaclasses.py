@@ -51,6 +51,7 @@ class BaseTenantMeta(BaseModelMeta):
         bases: tuple[type, ...],
         attrs: Any,
         on_conflict: Literal["error", "replace", "keep"] = "error",
+        skip_registry: bool = False,
         **kwargs: Any,
     ) -> Any:
         database: Union[Literal["keep"], None, Database, bool] = attrs.get("database", "keep")
@@ -61,7 +62,8 @@ class BaseTenantMeta(BaseModelMeta):
             new_model.meta.is_tenant = _check_model_inherited_tenancy(bases)
 
         if (
-            new_model.meta.registry
+            not skip_registry
+            and new_model.meta.registry
             and not new_model.meta.abstract
             and not new_model.__is_proxy_model__
         ):
