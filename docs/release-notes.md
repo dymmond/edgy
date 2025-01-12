@@ -11,7 +11,6 @@ hide:
 ### Added
 
 - ManyToManyField `create_through_model` method allows now the keyword only argument `replace_related_field`.
-- `add_to_registry` has now an additional keyword-only argument `replace_related_field_m2m` for extra controlling the `create_through_model` registration logic.
 - `add_to_registry` has now an additional keyword-only argument `on_conflict` for controlling what happens when a same named model already exists.
 - Passing a tuple or list of types to `replace_related_field` is now allowed.
 - Add `through_registry` to ManyToMany.

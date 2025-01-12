@@ -171,43 +171,17 @@ class DatabaseMixin:
     def add_to_registry(
         cls: type[BaseModelType],
         registry: Registry,
-        *args: Any,
         name: str = "",
         database: Union[bool, Database, Literal["keep"]] = "keep",
+        *,
         replace_related_field: Union[
             bool,
             type[BaseModelType],
             tuple[type[BaseModelType], ...],
             list[type[BaseModelType]],
         ] = False,
-        replace_related_field_m2m: Union[
-            bool,
-            type[BaseModelType],
-            tuple[type[BaseModelType], ...],
-            list[type[BaseModelType]],
-            None,
-        ] = None,
         on_conflict: Literal["keep", "replace", "error"] = "error",
     ) -> type[BaseModelType]:
-        if args:
-            warnings.warn(
-                (
-                    "Positional extra arguments except registry are deprecated for `add_to_registry`. "
-                    "Please provide the arguments as keyword arguments"
-                ),
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            # supports only up to 3, the last one was added later
-            len_args = len(args)
-            if len_args >= 4:
-                raise Exception("Not supported, please use keyword arguments.")
-            if len_args >= 1:
-                name = args[0]
-            if len_args >= 2:
-                database = args[1]
-            if len_args >= 3:
-                replace_related_field = args[2]
         # when called if registry is not set
         cls.meta.registry = registry
         if database is True:
@@ -251,11 +225,7 @@ class DatabaseMixin:
 
                     def create_through_model(x: Any, field: BaseFieldType = value) -> None:
                         # we capture with field = ... the variable
-                        field.create_through_model(
-                            replace_related_field=replace_related_field_m2m
-                            if replace_related_field_m2m is not None
-                            else replace_related_field
-                        )
+                        field.create_through_model(replace_related_field=replace_related_field)
 
                     m2m_registry.register_callback(value.to, create_through_model, one_time=True)
             # Sets the foreign key fields
@@ -346,6 +316,8 @@ class DatabaseMixin:
 
             if isinstance(src_field, BaseManyToManyForeignKeyField):
                 _copy.meta.fields[field_name].through = src_field.through_original
+                # clear through registry, we need a copy in the new registry
+                del _copy.meta.fields[field_name].through_registry
                 if (
                     isinstance(_copy.meta.fields[field_name].through, type)
                     and issubclass(_copy.meta.fields[field_name].through, BaseModelType)
@@ -356,7 +328,6 @@ class DatabaseMixin:
                         field_name
                     ].through.copy_edgy_model(
                         meta_info=MetaInfo(registry=False),
-                        unlink_same_registry=False,
                     )
                     if src_field.from_foreign_key in through_model.meta.fields:
                         # explicit set
