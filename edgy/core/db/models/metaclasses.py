@@ -585,6 +585,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         attrs: dict[str, Any],
         meta_info_class: type[MetaInfo] = MetaInfo,
         skip_registry: bool = False,
+        on_conflict: Literal["error", "replace", "keep"] = "error",
         **kwargs: Any,
     ) -> Any:
         fields: dict[str, BaseFieldType] = {}
@@ -793,7 +794,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         if not meta.registry:
             new_class.model_rebuild(force=True)
             return new_class
-        new_class.add_to_registry(meta.registry, database=database)
+        new_class.add_to_registry(meta.registry, database=database, on_conflict=on_conflict)
         return new_class
 
     def get_db_schema(cls) -> Union[str, None]:
