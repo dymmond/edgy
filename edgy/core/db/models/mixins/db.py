@@ -229,11 +229,15 @@ class DatabaseMixin:
                 registry.delete_model(cls.__name__)
             else:
                 with contextlib.suppress(LookupError):
-                    original_model = registry.get_model(cls.__name__)
+                    original_model = registry.get_model(
+                        cls.__name__, include_content_type_attr=False
+                    )
                     if on_conflict == "keep":
                         return original_model
                     else:
-                        raise ValueError("Already a model with the same name registered")
+                        raise ValueError(
+                            f'Already a model with the same name registered: "{cls.__name__}"'
+                        )
             if getattr(cls, "__reflected__", False):
                 registry.reflected[cls.__name__] = cls
             else:
@@ -293,6 +297,7 @@ class DatabaseMixin:
         name: str = "",
         unlink_same_registry: bool = True,
         meta_info: MetaInfo | None = None,
+        on_conflict: Literal["keep", "replace", "error"] = "error",
         **kwargs: Any,
     ) -> type[Model]:
         """Copy the model class and optionally add it to another registry."""
@@ -342,7 +347,8 @@ class DatabaseMixin:
             if isinstance(src_field, BaseManyToManyForeignKeyField):
                 _copy.meta.fields[field_name].through = src_field.through_original
                 if (
-                    issubclass(_copy.meta.fields[field_name].through, BaseModelType)
+                    isinstance(_copy.meta.fields[field_name].through, type)
+                    and issubclass(_copy.meta.fields[field_name].through, BaseModelType)
                     and not _copy.meta.fields[field_name].through.meta.abstract
                 ):
                     # unreference
@@ -366,6 +372,7 @@ class DatabaseMixin:
             _copy.add_to_registry(
                 registry,
                 replace_related_field=replaceable_models,
+                on_conflict=on_conflict,
                 database="keep"
                 if cls.meta.registry is False or cls.database is not cls.meta.registry.database
                 else True,

@@ -7,16 +7,7 @@ from collections.abc import Sequence
 from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Literal,
-    Optional,
-    Union,
-    cast,
-    overload,
-)
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, Optional, Union, cast, overload
 
 import sqlalchemy
 from loguru import logger
@@ -103,6 +94,13 @@ class Registry:
     The command center for the models of Edgy.
     """
 
+    model_registry_types: ClassVar[tuple[str, ...]] = (
+        "models",
+        "reflected",
+        "tenant_models",
+        "pattern_models",
+    )
+
     db_schema: Union[str, None] = None
     content_type: Union[type["BaseModelType"], None] = None
     dbs_reflected: set[Union[str, None]]
@@ -170,19 +168,24 @@ class Registry:
             try:
                 content_type = self.get_model(
                     "ContentType", include_content_type_attr=False
-                ).copy_edgy_model(unlink_same_registry=True)
+                ).copy_edgy_model()
             except LookupError:
                 content_type = self.content_type
         _copy = Registry(
             self.database, with_content_type=content_type, schema=self.db_schema, extra=self.extra
         )
-        for i in ["models", "reflected", "tenant_models", "pattern_models"]:
-            dict_models = getattr(_copy, i)
+        for registry_type in self.model_registry_types:
+            dict_models = getattr(_copy, registry_type)
             dict_models.update(
                 (
-                    (key, val.copy_edgy_model(registry=_copy, unlink_same_registry=True))
-                    for key, val in getattr(self, i).items()
-                    if key not in dict_models and not val.meta.no_copy
+                    (
+                        key,
+                        val.copy_edgy_model(
+                            registry=_copy if registry_type in {"models", "reflected"} else None
+                        ),
+                    )
+                    for key, val in getattr(self, registry_type).items()
+                    if not val.meta.no_copy and key not in dict_models
                 )
             )
         _copy.dbs_reflected = set(self.dbs_reflected)
@@ -307,25 +310,18 @@ class Registry:
             and self.content_type is not None
         ):
             return self.content_type
-        if model_name in self.models:
-            return self.models[model_name]
-        elif model_name in self.reflected:
-            return self.reflected[model_name]
-        elif model_name in self.tenant_models:
-            return self.tenant_models[model_name]
-        else:
-            raise LookupError(f"Registry doesn't have a {model_name} model.") from None
+        for model_dict_name in self.model_registry_types:
+            model_dict: dict = getattr(self, model_dict_name)
+            if model_name in model_dict:
+                return cast(type["BaseModelType"], model_dict[model_name])
+        raise LookupError(f'Registry doesn\'t have a "{model_name}" model.') from None
 
     def delete_model(self, model_name: str) -> bool:
-        if model_name in self.models:
-            del self.models[model_name]
-            return True
-        elif model_name in self.reflected:
-            del self.reflected[model_name]
-            return True
-        elif model_name in self.tenant_models:
-            del self.tenant_models[model_name]
-            return True
+        for model_dict_name in self.model_registry_types:
+            model_dict: dict = getattr(self, model_dict_name)
+            if model_name in model_dict:
+                del model_dict[model_name]
+                return True
         return False
 
     def refresh_metadata(
