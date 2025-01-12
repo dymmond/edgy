@@ -4,7 +4,7 @@ import pytest
 
 import edgy
 from edgy import Manager, QuerySet
-from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured
+from edgy.exceptions import ForeignKeyBadConfigured, ImproperlyConfigured, ModelCollisionError
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -120,10 +120,8 @@ def test_raises_value_error_on_wrong_type():
     assert raised.value.args[0] == "Meta.indexes must be a list of Index types."
 
 
-def test_raises_ForeignKeyBadConfigured():
-    name = "profiles"
-
-    with pytest.raises(ForeignKeyBadConfigured) as raised:
+def test_raises_ModelCollisionError():
+    with pytest.raises(ModelCollisionError) as raised:
 
         class User(edgy.StrictModel):
             name = edgy.CharField(max_length=255)
@@ -131,10 +129,35 @@ def test_raises_ForeignKeyBadConfigured():
             class Meta:
                 registry = models
 
+    assert raised.value.args[0] == (
+        'A model with the same name is already registered: "User".\n'
+        'If this is not a bug, define the behaviour by setting "on_conflict" to either "keep" or "replace".'
+    )
+
+
+def test_no_raises_ModelCollisionError():
+    class User(edgy.StrictModel, skip_registry=True):
+        name = edgy.CharField(max_length=255)
+
+        class Meta:
+            registry = models
+
+
+def test_raises_ForeignKeyBadConfigured():
+    name = "profiles"
+
+    with pytest.raises(ForeignKeyBadConfigured) as raised:
+
+        class User2(edgy.StrictModel):
+            name = edgy.CharField(max_length=255)
+
+            class Meta:
+                registry = models
+
         class Profile(edgy.StrictModel):
-            user = edgy.ForeignKey(User, null=False, on_delete=edgy.CASCADE, related_name=name)
+            user = edgy.ForeignKey(User2, null=False, on_delete=edgy.CASCADE, related_name=name)
             another_user = edgy.ForeignKey(
-                User, null=False, on_delete=edgy.CASCADE, related_name=name
+                User2, null=False, on_delete=edgy.CASCADE, related_name=name
             )
 
             class Meta:
