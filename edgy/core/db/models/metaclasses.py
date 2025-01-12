@@ -211,6 +211,7 @@ class MetaInfo:
         "inherit",
         "fields",
         "registry",
+        "no_copy",
         "tablename",
         "unique_together",
         "indexes",
@@ -264,6 +265,7 @@ class MetaInfo:
         self.model: Optional[type[BaseModelType]] = None
         #  Difference between meta extraction and kwargs: meta attributes are copied
         self.abstract: bool = getattr(meta, "abstract", False)
+        self.no_copy: bool = getattr(meta, "no_copy", False)
         # for embedding
         self.inherit: bool = getattr(meta, "inherit", True)
         self.registry: Union[Registry, Literal[False], None] = getattr(meta, "registry", None)
@@ -681,9 +683,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         for field_name, field_value in fields.items():
             attrs.pop(field_name, None)
-            # clear cached target
+            # clear cached target, target is property
             if isinstance(field_value, BaseForeignKey):
-                field_value.__dict__.pop("_target", None)
+                del field_value.target
 
         for manager_name in managers:
             attrs.pop(manager_name, None)

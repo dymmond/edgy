@@ -456,7 +456,8 @@ class BaseForeignKey(RelationshipField):
         self.to = value
 
     @target.deleter
-    def target(self, value: Any) -> None:
+    def target(self) -> None:
+        # clear cache
         with contextlib.suppress(AttributeError):
             delattr(self, "_target")
 

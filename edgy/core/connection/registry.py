@@ -168,13 +168,9 @@ class Registry:
         content_type: Union[bool, type[BaseModelType]] = False
         if self.content_type is not None:
             try:
-                content_type2 = content_type = self.get_model(
+                content_type = self.get_model(
                     "ContentType", include_content_type_attr=False
-                ).copy_edgy_model()
-                # cleanup content_type copy
-                for field_name in list(content_type2.meta.fields.keys()):
-                    if field_name.startswith("reverse_"):
-                        del content_type2.meta.fields[field_name]
+                ).copy_edgy_model(unlink_same_registry=True)
             except LookupError:
                 content_type = self.content_type
         _copy = Registry(
@@ -184,9 +180,9 @@ class Registry:
             dict_models = getattr(_copy, i)
             dict_models.update(
                 (
-                    (key, val.copy_edgy_model(_copy))
+                    (key, val.copy_edgy_model(registry=_copy, unlink_same_registry=True))
                     for key, val in getattr(self, i).items()
-                    if key not in dict_models
+                    if key not in dict_models and not val.meta.no_copy
                 )
             )
         _copy.dbs_reflected = set(self.dbs_reflected)
@@ -252,9 +248,9 @@ class Registry:
             if "content_type" in model_class.meta.fields:
                 return
             related_name = f"reverse_{model_class.__name__.lower()}"
-            assert (
-                related_name not in real_content_type.meta.fields
-            ), f"duplicate model name: {model_class.__name__}"
+            assert related_name not in real_content_type.meta.fields, (
+                f"duplicate model name: {model_class.__name__}"
+            )
 
             field_args: dict[str, Any] = {
                 "name": "content_type",
@@ -319,6 +315,18 @@ class Registry:
             return self.tenant_models[model_name]
         else:
             raise LookupError(f"Registry doesn't have a {model_name} model.") from None
+
+    def delete_model(self, model_name: str) -> bool:
+        if model_name in self.models:
+            del self.models[model_name]
+            return True
+        elif model_name in self.reflected:
+            del self.reflected[model_name]
+            return True
+        elif model_name in self.tenant_models:
+            del self.tenant_models[model_name]
+            return True
+        return False
 
     def refresh_metadata(
         self,
