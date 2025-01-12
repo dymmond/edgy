@@ -58,6 +58,8 @@ async def test_copy_model_abstract(unlink_same_registry):
     through = models2.get_model("Cart").meta.fields["products"].through
     assert through is models2.get_model(through.__name__)
     assert through is not models.get_model(through.__name__)
+    for reg in [models, models2]:
+        assert "ThroughModel" not in reg.models
 
 
 @pytest.mark.parametrize("unlink_same_registry", [True, False])
@@ -110,6 +112,7 @@ async def test_copy_model_concrete_same(unlink_same_registry):
     through = models2.get_model("Cart").meta.fields["products"].through
     assert through is models2.get_model(through.__name__)
     assert through is not models.get_model(through.__name__)
+    assert through.__name__ == "ThroughModel"
 
 
 @pytest.mark.parametrize("unlink_same_registry", [True, False])
@@ -166,3 +169,4 @@ async def test_copy_model_concrete_other(unlink_same_registry):
     through = models2.get_model("Cart").meta.fields["products"].through
     assert through is models2.get_model(through.__name__)
     assert through is not models3.get_model(through.__name__)
+    assert through.__name__ == "ThroughModel"
