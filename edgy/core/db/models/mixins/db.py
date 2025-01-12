@@ -248,7 +248,7 @@ class DatabaseMixin:
 
     @classmethod
     def add_to_registry(
-        cls: type[BaseModelType],
+        cls,
         registry: Registry,
         name: str = "",
         database: Union[bool, Database, Literal["keep"]] = "keep",

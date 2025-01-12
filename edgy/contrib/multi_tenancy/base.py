@@ -21,7 +21,7 @@ class TenantModel(Model, metaclass=BaseTenantMeta):
     meta: ClassVar[TenantMeta] = TenantMeta(None, abstract=True)
 
     @classmethod
-    def real_add_to_registry(cls: type["BaseModelType"], **kwargs: Any) -> type["BaseModelType"]:
+    def real_add_to_registry(cls, **kwargs: Any) -> type["BaseModelType"]:
         result = super().real_add_to_registry(**kwargs)
 
         if (
@@ -30,9 +30,9 @@ class TenantModel(Model, metaclass=BaseTenantMeta):
             and not cls.meta.abstract
             and not cls.__is_proxy_model__
         ):
-            assert (
-                cls.__reflected__ is False
-            ), "Reflected models are not compatible with multi_tenancy"
+            assert cls.__reflected__ is False, (
+                "Reflected models are not compatible with multi_tenancy"
+            )
 
             if not cls.meta.register_default:
                 # remove from models
