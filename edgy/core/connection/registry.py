@@ -539,6 +539,7 @@ class Registry:
                     concrete_reflect_model = pattern_model.copy_edgy_model(
                         name=new_name, meta_info_class=MetaInfo
                     )
+                    concrete_reflect_model.meta.no_copy = True
                     concrete_reflect_model.meta.tablename = table.name
                     concrete_reflect_model.__using_schema__ = table.schema
                     concrete_reflect_model.add_to_registry(self, database=database)
