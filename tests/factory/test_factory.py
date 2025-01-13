@@ -41,8 +41,6 @@ async def create_test_database():
 
 
 def test_can_generate_factory():
-    breakpoint()
-
     class UserFactory(Factory):
         model = User
 
