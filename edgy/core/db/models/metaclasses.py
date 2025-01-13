@@ -789,6 +789,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             registry: Union[Registry, None, Literal[False]] = get_model_registry(bases, meta_class)
             meta.registry = registry or None
         # don't add automatically to registry. Useful for subclasses which modify the registry itself.
+        # `skip_registry="allow_search"` is trueish so it works.
         if not meta.registry or skip_registry:
             new_class.model_rebuild(force=True)
             return new_class
