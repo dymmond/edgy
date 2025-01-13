@@ -786,6 +786,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         meta.model = new_class
         # Now find a registry and add it to the meta. This isn't affected by skip_registry.
         # Use Meta: registry = False for disabling the search.
+        # The registry will be updated by add_to_registry.
         if meta.registry is None:
             registry: Union[Registry, None, Literal[False]] = get_model_registry(bases, meta_class)
             meta.registry = registry or None
