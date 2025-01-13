@@ -784,16 +784,13 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             tablename = f"{name.lower()}s"
             meta.tablename = tablename
         meta.model = new_class
-        if skip_registry:
-            # don't add automatically to registry. Useful for subclasses which modify the registry itself.
-            new_class.model_rebuild(force=True)
-            return new_class
-
-        # Now set the registry of models
+        # Now find a registry and add it to the meta. This isn't affected by skip_registry.
+        # Use Meta: registry = False for disabling the search.
         if meta.registry is None:
             registry: Union[Registry, None, Literal[False]] = get_model_registry(bases, meta_class)
             meta.registry = registry or None
-        if not meta.registry:
+        # don't add automatically to registry. Useful for subclasses which modify the registry itself.
+        if not meta.registry or skip_registry:
             new_class.model_rebuild(force=True)
             return new_class
         new_class.add_to_registry(meta.registry, database=database, on_conflict=on_conflict)
@@ -839,7 +836,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         if not cls.meta.registry:
             # we cannot set the table without a registry
             # raising is required
-            raise AttributeError()
+            raise AttributeError("No registry.")
         table = getattr(cls, "_table", None)
         # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} != {cls.meta.tablename}"
         # fix assigned table
