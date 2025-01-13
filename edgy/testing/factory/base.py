@@ -69,8 +69,8 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             if key in overwrites:
                 values[key] = overwrites[key]
                 continue
-            elif hasattr(self, key):
-                values[key] = getattr(self, key)
+            elif key in self.__kwargs__:
+                values[key] = self.__kwargs__[key]
                 continue
             if key in self.meta.default_parameters:
                 if callable(self.meta.default_parameters[key]):
