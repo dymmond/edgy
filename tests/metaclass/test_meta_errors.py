@@ -135,12 +135,24 @@ def test_raises_ModelCollisionError():
     )
 
 
-def test_no_raises_ModelCollisionError():
-    class User(edgy.StrictModel, skip_registry=True):
+@pytest.mark.parametrize("value", [True, "allow_search"])
+def test_no_raises_ModelCollisionError_and_set_correctly(value):
+    class BaseUser(edgy.StrictModel):
         name = edgy.CharField(max_length=255)
 
         class Meta:
             registry = models
+            abstract = True
+
+    class User(BaseUser, skip_registry=value):
+        pass
+
+    if value is True:
+        assert BaseUser.meta.registry is models
+        assert User.meta.registry is None
+    else:
+        assert BaseUser.meta.registry is models
+        assert User.meta.registry is models
 
 
 def test_raises_ForeignKeyBadConfigured():

@@ -586,7 +586,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         bases: tuple[type, ...],
         attrs: dict[str, Any],
         meta_info_class: type[MetaInfo] = MetaInfo,
-        skip_registry: bool = False,
+        skip_registry: Union[bool, Literal["allow_search"]] = False,
         on_conflict: Literal["error", "replace", "keep"] = "error",
         **kwargs: Any,
     ) -> Any:
@@ -784,10 +784,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             tablename = f"{name.lower()}s"
             meta.tablename = tablename
         meta.model = new_class
-        # Now find a registry and add it to the meta. This isn't affected by skip_registry.
-        # Use Meta: registry = False for disabling the search.
-        # The registry will be updated by add_to_registry.
-        if meta.registry is None:
+        # Now find a registry and add it to the meta.
+        if meta.registry is None and skip_registry is not True:
             registry: Union[Registry, None, Literal[False]] = get_model_registry(bases, meta_class)
             meta.registry = registry or None
         # don't add automatically to registry. Useful for subclasses which modify the registry itself.

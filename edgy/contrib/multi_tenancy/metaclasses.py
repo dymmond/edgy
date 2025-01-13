@@ -51,12 +51,19 @@ class BaseTenantMeta(BaseModelMeta):
         bases: tuple[type, ...],
         attrs: Any,
         on_conflict: Literal["error", "replace", "keep"] = "error",
-        skip_registry: bool = False,
+        skip_registry: Union[bool, Literal["allow_search"]] = False,
+        meta_info_class: type[TenantMeta] = TenantMeta,
         **kwargs: Any,
     ) -> Any:
         database: Union[Literal["keep"], None, Database, bool] = attrs.get("database", "keep")
         new_model = super().__new__(
-            cls, name, bases, attrs, meta_info_class=TenantMeta, skip_registry=True, **kwargs
+            cls,
+            name,
+            bases,
+            attrs,
+            skip_registry="allow_search",
+            meta_info_class=meta_info_class,
+            **kwargs,
         )
         if new_model.meta.is_tenant is None:
             new_model.meta.is_tenant = _check_model_inherited_tenancy(bases)
