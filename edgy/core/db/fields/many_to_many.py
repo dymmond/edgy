@@ -173,7 +173,10 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         from edgy.core.db.models.metaclasses import MetaInfo
 
         __bases__: tuple[type[BaseModelType], ...] = (
-            (TenantModel,) if getattr(self.owner.meta, "is_tenant", False) else ()
+            (TenantModel,)
+            if getattr(self.owner.meta, "is_tenant", False)
+            or getattr(self.target.meta, "is_tenant", False)
+            else ()
         )
         pknames = set()
         if self.through:
@@ -252,7 +255,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             None,
             registry=False,
             no_copy=True,
-            is_tenant=getattr(self.owner.meta, "is_tenant", False),
+            is_tenant=getattr(self.owner.meta, "is_tenant", False)
+            or getattr(self.target.meta, "is_tenant", False),
             register_default=getattr(self.owner.meta, "register_default", False),
             **meta_args,
         )
