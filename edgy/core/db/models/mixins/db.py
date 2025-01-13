@@ -17,6 +17,7 @@ from edgy.core.db.context_vars import (
     CURRENT_INSTANCE,
     EXPLICIT_SPECIFIED_VALUES,
     MODEL_GETATTR_BEHAVIOR,
+    NO_GLOBAL_FIELD_CONSTRAINTS,
     get_schema,
 )
 from edgy.core.db.datastructures import Index, UniqueConstraint
@@ -382,7 +383,7 @@ class DatabaseMixin:
 
     @property
     def table(self) -> sqlalchemy.Table:
-        if getattr(self, "_table", None) is None:
+        if self.__dict__.get("_table", None) is None:
             schema = self.get_active_instance_schema()
             return cast(
                 "sqlalchemy.Table",
@@ -391,12 +392,21 @@ class DatabaseMixin:
         return self._table
 
     @table.setter
-    def table(self, value: sqlalchemy.Table) -> None:
+    def table(self, value: Optional[sqlalchemy.Table]) -> None:
         with contextlib.suppress(AttributeError):
             del self._pknames
         with contextlib.suppress(AttributeError):
             del self._pkcolumns
         self._table = value
+
+    @table.deleter
+    def table(self) -> None:
+        with contextlib.suppress(AttributeError):
+            del self._pknames
+        with contextlib.suppress(AttributeError):
+            del self._pkcolumns
+        with contextlib.suppress(AttributeError):
+            del self._table
 
     @property
     def pkcolumns(self) -> Sequence[str]:
@@ -669,7 +679,9 @@ class DatabaseMixin:
 
     @classmethod
     def build(
-        cls, schema: Optional[str] = None, metadata: Optional[sqlalchemy.MetaData] = None
+        cls,
+        schema: Optional[str] = None,
+        metadata: Optional[sqlalchemy.MetaData] = None,
     ) -> sqlalchemy.Table:
         """
         Builds the SQLAlchemy table representation from the loaded fields.
@@ -697,7 +709,10 @@ class DatabaseMixin:
         for name, field in cls.meta.fields.items():
             current_columns = field.get_columns(name)
             columns.extend(current_columns)
-            global_constraints.extend(field.get_global_constraints(name, current_columns, schemes))
+            if not NO_GLOBAL_FIELD_CONSTRAINTS.get():
+                global_constraints.extend(
+                    field.get_global_constraints(name, current_columns, schemes)
+                )
 
         # Handle the uniqueness together
         uniques = []
@@ -722,6 +737,36 @@ class DatabaseMixin:
             if schema
             else cls.get_active_class_schema(check_schema=False, check_tenant=False),
         )
+
+    @classmethod
+    def add_global_field_constraints(
+        cls,
+        schema: Optional[str] = None,
+        metadata: Optional[sqlalchemy.MetaData] = None,
+    ) -> sqlalchemy.Table:
+        """
+        Add global constraints to table. Required for tenants.
+        """
+        tablename: str = cls.meta.tablename
+        registry = cls.meta.registry
+        assert registry, "registry is not set"
+        if metadata is None:
+            metadata = registry.metadata_by_url[str(cls.database.url)]
+        schemes: list[str] = []
+        if schema:
+            schemes.append(schema)
+        if cls.__using_schema__ is not Undefined:
+            schemes.append(cls.__using_schema__)
+        db_schema = cls.get_db_schema() or ""
+        schemes.append(db_schema)
+        table = metadata.tables[tablename if not schema else f"{schema}.{tablename}"]
+        for name, field in cls.meta.fields.items():
+            current_columns: list[sqlalchemy.Column] = []
+            for column_name in cls.meta.field_to_column_names[name]:
+                current_columns.append(table.columns[column_name])
+            for constraint in field.get_global_constraints(name, current_columns, schemes):
+                table.append_constraint(constraint)
+        return table
 
     @classmethod
     def _get_unique_constraints(

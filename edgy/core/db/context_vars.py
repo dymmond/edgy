@@ -14,6 +14,9 @@ CURRENT_MODEL_INSTANCE: ContextVar[Optional["BaseModelType"]] = ContextVar(
     "CURRENT_MODEL_INSTANCE", default=None
 )
 CURRENT_PHASE: ContextVar[str] = ContextVar("CURRENT_PHASE", default="")
+NO_GLOBAL_FIELD_CONSTRAINTS: ContextVar[bool] = ContextVar(
+    "NO_GLOBAL_FIELD_CONSTRAINTS", default=False
+)
 EXPLICIT_SPECIFIED_VALUES: ContextVar[Optional[set[str]]] = ContextVar(
     "EXPLICIT_SPECIFIED_VALUES", default=None
 )

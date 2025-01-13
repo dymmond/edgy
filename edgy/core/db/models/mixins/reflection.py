@@ -27,7 +27,9 @@ class ReflectedModelMixin:
 
     @classmethod
     def build(
-        cls, schema: Optional[str] = None, metadata: Optional[sqlalchemy.MetaData] = None
+        cls,
+        schema: Optional[str] = None,
+        metadata: Optional[sqlalchemy.MetaData] = None,
     ) -> Any:
         """
         The inspect is done in an async manner and reflects the objects from the database.

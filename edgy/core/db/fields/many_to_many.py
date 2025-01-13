@@ -168,9 +168,13 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         Generates a middle model based on the owner of the field and the field itself and adds
         it to the main registry to make sure it generates the proper models and migrations.
         """
+        from edgy.contrib.multi_tenancy.base import TenantModel
+        from edgy.contrib.multi_tenancy.metaclasses import TenantMeta
         from edgy.core.db.models.metaclasses import MetaInfo
 
-        __bases__: tuple[type[BaseModelType], ...] = ()
+        __bases__: tuple[type[BaseModelType], ...] = (
+            (TenantModel,) if getattr(self.owner.meta, "is_tenant", False) else ()
+        )
         pknames = set()
         if self.through:
             through = self.through
@@ -243,7 +247,15 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         if has_pknames:
             meta_args["unique_together"] = [(self.from_foreign_key, self.to_foreign_key)]
 
-        new_meta: MetaInfo = MetaInfo(None, registry=False, no_copy=True, **meta_args)
+        # TenantMeta is compatible to normal meta
+        new_meta: MetaInfo = TenantMeta(
+            None,
+            registry=False,
+            no_copy=True,
+            is_tenant=getattr(self.owner.meta, "is_tenant", False),
+            register_default=getattr(self.owner.meta, "register_default", False),
+            **meta_args,
+        )
 
         to_related_name: Union[str, Literal[False]]
         if self.related_name is False:

@@ -15,7 +15,7 @@ hide:
   For models this can be passed : `class Foo(edgy.Model, on_conflict="keep"): ...`.
 - Passing a tuple or list of types to `replace_related_field` is now allowed.
 - Add `through_registry` to ManyToMany.
-- Add `no_copy` to MetaInfo.
+- Add `no_copy` to models MetaInfo.
 - Add `ModelCollisionError` exception.
 
 ### Changed
@@ -32,6 +32,7 @@ hide:
 - Fix deleting (clearing cache) of BaseForeignKey target.
 - Creating two models with the same name did lead to silent replacements.
 - Invalidating causes schema errors.
+- ManyToMany and ForeignKey fields in connection with tenancy.
 
 ## 0.24.2
 
