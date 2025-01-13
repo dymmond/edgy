@@ -7,6 +7,7 @@ import sqlalchemy
 from sqlalchemy.exc import DBAPIError, ProgrammingError
 
 from edgy.core.connection.database import Database
+from edgy.core.db.context_vars import NO_GLOBAL_FIELD_CONSTRAINTS
 from edgy.exceptions import SchemaError
 
 if TYPE_CHECKING:
@@ -71,14 +72,16 @@ class Schema:
         if init_models:
             for model_class in self.registry.models.values():
                 model_class.table_schema(schema=schema, update_cache=update_cache)
-        if init_tenant_models and init_models:
+        if init_tenant_models:
+            token = NO_GLOBAL_FIELD_CONSTRAINTS.set(True)
+            try:
+                for model_class in self.registry.tenant_models.values():
+                    tenant_tables.append(model_class.build(schema=schema))
+            finally:
+                NO_GLOBAL_FIELD_CONSTRAINTS.reset(token)
+            # we need two passes
             for model_class in self.registry.tenant_models.values():
-                model_class.table_schema(schema=schema, update_cache=update_cache)
-        elif init_tenant_models:
-            for model_class in self.registry.tenant_models.values():
-                tenant_tables.append(
-                    model_class.table_schema(schema=schema, update_cache=update_cache)
-                )
+                model_class.add_global_field_constraints(schema=schema)
 
         def execute_create(connection: sqlalchemy.Connection, name: Optional[str]) -> None:
             try:
@@ -87,8 +90,10 @@ class Schema:
                 )
             except ProgrammingError as e:
                 raise SchemaError(detail=e.orig.args[0]) from e
-            for table in tenant_tables:
-                table.create(connection, checkfirst=if_not_exists)
+            if tenant_tables:
+                self.registry.metadata_by_name[name].create_all(
+                    connection, checkfirst=if_not_exists, tables=tenant_tables
+                )
             if init_models:
                 self.registry.metadata_by_name[name].create_all(
                     connection, checkfirst=if_not_exists

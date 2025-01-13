@@ -101,6 +101,69 @@ async def test_basic_reflection():
         )
 
 
+async def test_basic_reflection_after_copy():
+    reflected = edgy.Registry(DATABASE_URL)
+
+    class AutoAll(AutoReflectModel):
+        class Meta:
+            registry = reflected
+
+    class AutoNever(AutoReflectModel):
+        non_matching = edgy.CharField(max_length=40)
+
+        class Meta:
+            registry = reflected
+            template = r"AutoNever"
+
+    class AutoNever2(AutoReflectModel):
+        id = edgy.CharField(max_length=40, primary_key=True)
+
+        class Meta:
+            registry = reflected
+            template = r"AutoNever2"
+
+    class AutoNever3(AutoReflectModel):
+        class Meta:
+            registry = reflected
+            template = r"AutoNever3"
+            exclude_pattern = r".*"
+
+    class AutoFoo(AutoReflectModel):
+        class Meta:
+            registry = reflected
+            include_pattern = r"^foos$"
+
+    class AutoBar(AutoReflectModel):
+        class Meta:
+            registry = reflected
+            include_pattern = r"^bars"
+            template = r"{tablename}_{tablename}"
+
+    assert AutoBar.meta.template
+
+    reflected = reflected.__copy__()
+
+    assert len(reflected.reflected) == 0
+    async with reflected:
+        assert (
+            sum(
+                1 for model in reflected.reflected.values() if model.__name__.startswith("AutoAll")
+            )
+            == 3
+        )
+        assert "bars_bars" in reflected.reflected
+        assert "AutoNever" not in reflected.reflected
+        assert "AutoNever2" not in reflected.reflected
+        assert "AutoNever3" not in reflected.reflected
+
+        assert (
+            sum(
+                1 for model in reflected.reflected.values() if model.__name__.startswith("AutoFoo")
+            )
+            == 1
+        )
+
+
 async def test_extra_reflection():
     reflected = edgy.Registry(DATABASE_ALTERNATIVE_URL, extra={"another": DATABASE_URL})
 

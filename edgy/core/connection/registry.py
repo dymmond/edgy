@@ -3,20 +3,11 @@ import contextlib
 import re
 import warnings
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Container, Sequence
 from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Literal,
-    Optional,
-    Union,
-    cast,
-    overload,
-)
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, Optional, Union, cast, overload
 
 import sqlalchemy
 from loguru import logger
@@ -103,6 +94,13 @@ class Registry:
     The command center for the models of Edgy.
     """
 
+    model_registry_types: ClassVar[tuple[str, ...]] = (
+        "models",
+        "reflected",
+        "tenant_models",
+        "pattern_models",
+    )
+
     db_schema: Union[str, None] = None
     content_type: Union[type["BaseModelType"], None] = None
     dbs_reflected: set[Union[str, None]]
@@ -168,25 +166,24 @@ class Registry:
         content_type: Union[bool, type[BaseModelType]] = False
         if self.content_type is not None:
             try:
-                content_type2 = content_type = self.get_model(
+                content_type = self.get_model(
                     "ContentType", include_content_type_attr=False
                 ).copy_edgy_model()
-                # cleanup content_type copy
-                for field_name in list(content_type2.meta.fields.keys()):
-                    if field_name.startswith("reverse_"):
-                        del content_type2.meta.fields[field_name]
             except LookupError:
                 content_type = self.content_type
         _copy = Registry(
             self.database, with_content_type=content_type, schema=self.db_schema, extra=self.extra
         )
-        for i in ["models", "reflected", "tenant_models", "pattern_models"]:
-            dict_models = getattr(_copy, i)
+        for registry_type in self.model_registry_types:
+            dict_models = getattr(_copy, registry_type)
             dict_models.update(
                 (
-                    (key, val.copy_edgy_model(_copy))
-                    for key, val in getattr(self, i).items()
-                    if key not in dict_models
+                    (
+                        key,
+                        val.copy_edgy_model(registry=_copy),
+                    )
+                    for key, val in getattr(self, registry_type).items()
+                    if not val.meta.no_copy and key not in dict_models
                 )
             )
         _copy.dbs_reflected = set(self.dbs_reflected)
@@ -223,7 +220,7 @@ class Registry:
                 __bases__=(with_content_type,),
             )
         elif real_content_type.meta.registry is None:
-            real_content_type.add_to_registry(self, "ContentType")
+            real_content_type.add_to_registry(self, name="ContentType")
         self.content_type = real_content_type
 
         def callback(model_class: type["BaseModelType"]) -> None:
@@ -252,9 +249,9 @@ class Registry:
             if "content_type" in model_class.meta.fields:
                 return
             related_name = f"reverse_{model_class.__name__.lower()}"
-            assert (
-                related_name not in real_content_type.meta.fields
-            ), f"duplicate model name: {model_class.__name__}"
+            assert related_name not in real_content_type.meta.fields, (
+                f"duplicate model name: {model_class.__name__}"
+            )
 
             field_args: dict[str, Any] = {
                 "name": "content_type",
@@ -303,7 +300,11 @@ class Registry:
         return self.metadata_by_name[None]
 
     def get_model(
-        self, model_name: str, *, include_content_type_attr: bool = True
+        self,
+        model_name: str,
+        *,
+        include_content_type_attr: bool = True,
+        exclude: Container[str] = (),
     ) -> type["BaseModelType"]:
         if (
             include_content_type_attr
@@ -311,14 +312,21 @@ class Registry:
             and self.content_type is not None
         ):
             return self.content_type
-        if model_name in self.models:
-            return self.models[model_name]
-        elif model_name in self.reflected:
-            return self.reflected[model_name]
-        elif model_name in self.tenant_models:
-            return self.tenant_models[model_name]
-        else:
-            raise LookupError(f"Registry doesn't have a {model_name} model.") from None
+        for model_dict_name in self.model_registry_types:
+            if model_dict_name in exclude:
+                continue
+            model_dict: dict = getattr(self, model_dict_name)
+            if model_name in model_dict:
+                return cast(type["BaseModelType"], model_dict[model_name])
+        raise LookupError(f'Registry doesn\'t have a "{model_name}" model.') from None
+
+    def delete_model(self, model_name: str) -> bool:
+        for model_dict_name in self.model_registry_types:
+            model_dict: dict = getattr(self, model_dict_name)
+            if model_name in model_dict:
+                del model_dict[model_name]
+                return True
+        return False
 
     def refresh_metadata(
         self,
@@ -521,7 +529,9 @@ class Registry:
                     new_name = pattern_model.meta.template(table)
                     old_model: Optional[type[BaseModelType]] = None
                     with contextlib.suppress(LookupError):
-                        old_model = self.get_model(new_name)
+                        old_model = self.get_model(
+                            new_name, include_content_type_attr=False, exclude=("pattern_models",)
+                        )
                     if old_model is not None:
                         raise Exception(
                             f"Conflicting model: {old_model.__name__} with pattern model: {pattern_model.__name__}"
@@ -529,6 +539,7 @@ class Registry:
                     concrete_reflect_model = pattern_model.copy_edgy_model(
                         name=new_name, meta_info_class=MetaInfo
                     )
+                    concrete_reflect_model.meta.no_copy = True
                     concrete_reflect_model.meta.tablename = table.name
                     concrete_reflect_model.__using_schema__ = table.schema
                     concrete_reflect_model.add_to_registry(self, database=database)

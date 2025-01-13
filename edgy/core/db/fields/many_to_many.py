@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
@@ -14,6 +15,7 @@ from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
+    from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
 
@@ -38,7 +40,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self.to_foreign_key = to_foreign_key
         self.from_fields = from_fields
         self.from_foreign_key = from_foreign_key
-        self.through = through
+        self.through_original = self.through = through
         self.through_tablename = through_tablename
         self.embed_through = embed_through
 
@@ -57,6 +59,24 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         if not self.embed_through:
             return self.reverse_name
         return f"{self.reverse_name}__{self.embed_through}"
+
+    @property
+    def through_registry(self) -> "Registry":
+        """Registry searched in case through is a string"""
+
+        if not hasattr(self, "_through_registry"):
+            assert self.owner.meta.registry, "no registry found neither 'through_registry' set"
+            return self.owner.meta.registry
+        return cast("Registry", self._through_registry)
+
+    @through_registry.setter
+    def through_registry(self, value: Any) -> None:
+        self._through_registry = value
+
+    @through_registry.deleter
+    def through_registry(self) -> None:
+        with contextlib.suppress(AttributeError):
+            delattr(self, "_through_registry")
 
     def clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         if not for_query:
@@ -106,7 +126,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             return (
                 self.target,
                 self.reverse_name,
-                f'{path.removeprefix(self.name).removeprefix("__")}',
+                f"{path.removeprefix(self.name).removeprefix('__')}",
             )
         return self.target, self.reverse_name, path.removeprefix(self.name).removeprefix("__")
 
@@ -128,30 +148,57 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             return (
                 self.owner,
                 self.name,
-                f'{path.removeprefix(self.reverse_name).removeprefix("__")}',
+                f"{path.removeprefix(self.reverse_name).removeprefix('__')}",
             )
         return self.owner, self.name, path.removeprefix(self.reverse_name).removeprefix("__")
 
-    def create_through_model(self) -> None:
+    def create_through_model(
+        self,
+        *,
+        replace_related_field: Union[
+            bool,
+            type["BaseModelType"],
+            tuple[type["BaseModelType"], ...],
+            list[type["BaseModelType"]],
+        ] = False,
+    ) -> None:
         """
         Creates the default empty through model.
 
         Generates a middle model based on the owner of the field and the field itself and adds
         it to the main registry to make sure it generates the proper models and migrations.
         """
+        from edgy.contrib.multi_tenancy.base import TenantModel
+        from edgy.contrib.multi_tenancy.metaclasses import TenantMeta
         from edgy.core.db.models.metaclasses import MetaInfo
 
-        __bases__: tuple[type[BaseModelType], ...] = ()
+        __bases__: tuple[type[BaseModelType], ...] = (
+            (TenantModel,)
+            if getattr(self.owner.meta, "is_tenant", False)
+            or getattr(self.target.meta, "is_tenant", False)
+            else ()
+        )
         pknames = set()
         if self.through:
-            if isinstance(self.through, str):
-                assert self.owner.meta.registry, "no registry found"
-                self.through = self.owner.meta.registry.models[self.through]
             through = self.through
-            if through.meta.abstract:
-                pknames = set(through.pknames)
-                __bases__ = (through,)
-            else:
+            if isinstance(through, str):
+
+                def callback(model_class: type["BaseModelType"]) -> None:
+                    self.through = model_class
+                    self.create_through_model(replace_related_field=replace_related_field)
+
+                self.through_registry.register_callback(through, callback, one_time=True)
+                return
+            if not through.meta.abstract:
+                if not through.meta.registry:
+                    through = cast(
+                        "type[BaseModelType]",
+                        through.add_to_registry(
+                            self.through_registry,
+                            replace_related_field=replace_related_field,
+                            on_conflict="keep",
+                        ),
+                    )
                 if not self.from_foreign_key:
                     candidate = None
                     for field_name in through.meta.foreign_key_fields:
@@ -162,7 +209,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                             else:
                                 candidate = field_name
                     if not candidate:
-                        raise ValueError("no foreign key fo owner found")
+                        raise ValueError("no foreign key to owner found")
                     self.from_foreign_key = candidate
                 if not self.to_foreign_key:
                     candidate = None
@@ -174,10 +221,14 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                             else:
                                 candidate = field_name
                     if not candidate:
-                        raise ValueError("no foreign key fo target found")
+                        raise ValueError("no foreign key to target found")
                     self.to_foreign_key = candidate
                 through.meta.multi_related.add((self.from_foreign_key, self.to_foreign_key))
+                self.through = through
                 return
+            pknames = set(through.pknames)
+            __bases__ = (through,)
+            del through
         assert self.owner.meta.registry, "no registry set"
         owner_name = self.owner.__name__
         to_name = self.target.__name__
@@ -199,7 +250,16 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         if has_pknames:
             meta_args["unique_together"] = [(self.from_foreign_key, self.to_foreign_key)]
 
-        new_meta: MetaInfo = MetaInfo(None, **meta_args)
+        # TenantMeta is compatible to normal meta
+        new_meta: MetaInfo = TenantMeta(
+            None,
+            registry=False,
+            no_copy=True,
+            is_tenant=getattr(self.owner.meta, "is_tenant", False)
+            or getattr(self.target.meta, "is_tenant", False),
+            register_default=getattr(self.owner.meta, "register_default", False),
+            **meta_args,
+        )
 
         to_related_name: Union[str, Literal[False]]
         if self.related_name is False:
@@ -252,8 +312,11 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             through_model.meta.fields["content_type"] = ExcludeField(
                 name="content_type", owner=through_model
             )
-        through_model.add_to_registry(self.owner.meta.registry)
-        self.through = through_model
+        self.through = through_model.add_to_registry(
+            self.through_registry,
+            replace_related_field=replace_related_field,
+            on_conflict="keep",
+        )
 
     def to_model(
         self,

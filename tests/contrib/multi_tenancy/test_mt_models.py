@@ -71,6 +71,14 @@ class Product(TenantModel):
         is_tenant = True
 
 
+class Cart(TenantModel):
+    products = fields.ManyToMany(Product)
+
+    class Meta:
+        registry = models
+        is_tenant = True
+
+
 async def test_create_a_tenant_schema():
     tenant = await Tenant.query.create(
         schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
@@ -78,6 +86,22 @@ async def test_create_a_tenant_schema():
 
     assert tenant.schema_name == "edgy"
     assert tenant.tenant_name == "edgy"
+
+
+async def test_create_a_tenant_schema_copy():
+    copied = models.__copy__()
+    tenant = await copied.get_model("Tenant").query.create(
+        schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
+    )
+
+    assert tenant.schema_name == "edgy"
+    assert tenant.tenant_name == "edgy"
+    NewProduct = copied.get_model("Product")
+    NewCart = copied.get_model("Cart")
+    assert NewCart.meta.fields["products"].target is NewProduct
+    assert NewCart.meta.fields["products"].through is not Cart.meta.fields["products"].through
+    assert hasattr(Cart.meta.fields["products"].through, "_db_schemas")
+    assert hasattr(NewCart.meta.fields["products"].through, "_db_schemas")
 
 
 async def test_raises_ModelSchemaError_on_public_schema():

@@ -60,6 +60,7 @@ For this the `StrictModel` model can be used. Otherwise it behaves like a normal
 
 There is no strict version of a `ReflectModel` because the laxness is required.
 
+
 ### Loading models
 
 You may have the models distributed among multiple files and packages.
@@ -96,6 +97,17 @@ If no `id` is declared in the model, **Edgy** will automatically generate an `id
 ### Restrictions with primary keys
 
 Earlier there were many restrictions. Now they were lifted
+
+### Controlling collision behaviour
+
+Earlier models were simply replaced when defining a model with the same name or adding such.
+
+Now the default is to error when a collision was detected, or in case the `on_conflict` parameter was set, either
+a `replace` or `keep` executed.
+
+``` python
+{!> ../docs_src/models/on_conflict.py !}
+```
 
 #### What you should not do
 
@@ -171,7 +183,7 @@ to copy a model class and optionally add it to an other registry.
 
 You can add it to a registry later by using:
 
-`model_class.add_to_registry(registry, name="", database=None, replace_related_field=False)`
+`model_class.add_to_registry(registry, name="", database=None, replace_related_field=...)`
 
 In fact the last method is called when the registry parameter of `copy_edgy_model` is not `None`.
 

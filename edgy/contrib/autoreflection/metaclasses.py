@@ -69,24 +69,14 @@ class AutoReflectionMeta(BaseModelMeta):
         name: str,
         bases: tuple[type, ...],
         attrs: dict[str, Any],
-        skip_registry: bool = False,
         meta_info_class: type[AutoReflectionMetaInfo] = AutoReflectionMetaInfo,
         **kwargs: Any,
     ) -> Any:
-        new_model = super().__new__(
+        return super().__new__(
             cls,
             name,
             bases,
             attrs,
             meta_info_class=meta_info_class,
-            skip_registry=True,
             **kwargs,
         )
-        if (
-            not skip_registry
-            and isinstance(new_model.meta, AutoReflectionMetaInfo)
-            and not new_model.meta.abstract
-            and new_model.meta.registry
-        ):
-            new_model.meta.registry.pattern_models[new_model.__name__] = new_model
-        return new_model

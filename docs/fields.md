@@ -505,7 +505,7 @@ The reverse end of a `ForeignKey` is a [Many to one relation](./queries/many-to-
 ##### Parameters
 
 * `to` - A string [model](./models.md) name or a class object of that same model.
-* `target_registry` - Registry where the model callback is installed if `to` is a string.
+* `target_registry` - Registry where the model callback is installed if `to` is a string. Defaults to the field owner registry.
 * `related_name` - The name to use for the relation from the related object back to this one. Can be set to `False` to disable a reverse connection.
                      Note: Setting to `False` will also prevent prefetching and reversing via `__`.
                      See also [related_name](./queries/related-name.md) for defaults
@@ -586,11 +586,13 @@ class MyModel(edgy.Model):
 ##### Parameters
 
 * `to` - A string [model](./models.md) name or a class object of that same model.
+* `target_registry` - Registry where the model callback is installed if `to` is a string. Defaults to the field owner registry.
 * `from_fields` - Provide the `related_fields` for the implicitly generated ForeignKey to the owner model.
 * `to_fields` - Provide the `related_fields` for the implicitly generated ForeignKey to the child model.
 * `related_name` - The name to use for the relation from the related object back to this one.
 * `through` - The model to be used for the relationship. Edgy generates the model by default
                 if None is provided or `through` is an abstract model.
+* `through_registry` - Registry where the model callback is installed if `through` is a string or empty. Defaults to the field owner registry.
 * `through_tablename` - Custom tablename for `through`. E.g. when special characters are used in model names.
 * `embed_through` - When traversing, embed the through object in this attribute. Otherwise it is not accessable from the result.
                       if an empty string was provided, the old behaviour is used to query from the through model as base (default).

@@ -211,6 +211,7 @@ class MetaInfo:
         "inherit",
         "fields",
         "registry",
+        "no_copy",
         "tablename",
         "unique_together",
         "indexes",
@@ -264,6 +265,7 @@ class MetaInfo:
         self.model: Optional[type[BaseModelType]] = None
         #  Difference between meta extraction and kwargs: meta attributes are copied
         self.abstract: bool = getattr(meta, "abstract", False)
+        self.no_copy: bool = getattr(meta, "no_copy", False)
         # for embedding
         self.inherit: bool = getattr(meta, "inherit", True)
         self.registry: Union[Registry, Literal[False], None] = getattr(meta, "registry", None)
@@ -388,9 +390,11 @@ class MetaInfo:
         if self.model is None:
             return
         if clear_class_attrs:
-            for attr in ("_table", "_pknames", "_pkcolumns", "_db_schemas", "__proxy_model__"):
+            for attr in ("_table", "_pknames", "_pkcolumns", "__proxy_model__"):
                 with contextlib.suppress(AttributeError):
                     delattr(self.model, attr)
+            # needs an extra invalidation
+            self.model._db_schemas = {}
 
     def full_init(self, init_column_mappers: bool = True, init_class_attrs: bool = True) -> None:
         if not self._fields_are_initialized:
@@ -582,7 +586,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         bases: tuple[type, ...],
         attrs: dict[str, Any],
         meta_info_class: type[MetaInfo] = MetaInfo,
-        skip_registry: bool = False,
+        skip_registry: Union[bool, Literal["allow_search"]] = False,
+        on_conflict: Literal["error", "replace", "keep"] = "error",
         **kwargs: Any,
     ) -> Any:
         fields: dict[str, BaseFieldType] = {}
@@ -681,9 +686,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         for field_name, field_value in fields.items():
             attrs.pop(field_name, None)
-            # clear cached target
+            # clear cached target, target is property
             if isinstance(field_value, BaseForeignKey):
-                field_value.__dict__.pop("_target", None)
+                del field_value.target
 
         for manager_name in managers:
             attrs.pop(manager_name, None)
@@ -727,6 +732,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # (excluding the edgy.Model class itself).
         if not has_parents:
             return new_class
+        new_class._db_schemas = {}
 
         # Ensure the model_fields are updated to the latest
         # required since pydantic 2.10
@@ -734,7 +740,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # error since pydantic 2.10
         with contextlib.suppress(AttributeError):
             new_class.model_fields = model_fields
-        new_class._db_schemas = {}
 
         # Set the owner of the field, must be done as early as possible
         # don't use meta.fields to not trigger the lazy evaluation
@@ -779,19 +784,16 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             tablename = f"{name.lower()}s"
             meta.tablename = tablename
         meta.model = new_class
-        if skip_registry:
-            # don't add automatically to registry. Useful for subclasses which modify the registry itself.
-            new_class.model_rebuild(force=True)
-            return new_class
-
-        # Now set the registry of models
-        if meta.registry is None:
+        # Now find a registry and add it to the meta.
+        if meta.registry is None and skip_registry is not True:
             registry: Union[Registry, None, Literal[False]] = get_model_registry(bases, meta_class)
             meta.registry = registry or None
-        if not meta.registry:
+        # don't add automatically to registry. Useful for subclasses which modify the registry itself.
+        # `skip_registry="allow_search"` is trueish so it works.
+        if not meta.registry or skip_registry:
             new_class.model_rebuild(force=True)
             return new_class
-        new_class.add_to_registry(meta.registry, database=database)
+        new_class.add_to_registry(meta.registry, database=database, on_conflict=on_conflict)
         return new_class
 
     def get_db_schema(cls) -> Union[str, None]:
@@ -834,7 +836,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         if not cls.meta.registry:
             # we cannot set the table without a registry
             # raising is required
-            raise AttributeError()
+            raise AttributeError("No registry.")
         table = getattr(cls, "_table", None)
         # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} != {cls.meta.tablename}"
         # fix assigned table

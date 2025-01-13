@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import copy
 import inspect
@@ -15,15 +17,19 @@ from edgy.core.db.context_vars import (
     CURRENT_INSTANCE,
     EXPLICIT_SPECIFIED_VALUES,
     MODEL_GETATTR_BEHAVIOR,
+    NO_GLOBAL_FIELD_CONSTRAINTS,
     get_schema,
 )
 from edgy.core.db.datastructures import Index, UniqueConstraint
+from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.models.metaclasses import MetaInfo
+from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.db import check_db_connection
-from edgy.exceptions import ForeignKeyBadConfigured, ObjectNotFound
+from edgy.core.utils.models import create_edgy_model
+from edgy.exceptions import ForeignKeyBadConfigured, ModelCollisionError, ObjectNotFound
 from edgy.types import Undefined
 
 if TYPE_CHECKING:
@@ -33,7 +39,6 @@ if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.model import Model
-    from edgy.core.db.models.types import BaseModelType
 
 
 _empty = cast(set[str], frozenset())
@@ -49,6 +54,7 @@ _removed_copy_keys = {
     "_pknames",
     "_table",
     "_db_schemas",
+    "__proxy_model__",
     "meta",
 }
 _removed_copy_keys.difference_update(
@@ -56,13 +62,28 @@ _removed_copy_keys.difference_update(
 )
 
 
+def _check_replace_related_field(
+    replace_related_field: Union[
+        bool, type[BaseModelType], tuple[type[BaseModelType], ...], list[type[BaseModelType]]
+    ],
+    model: type[BaseModelType],
+) -> bool:
+    if isinstance(replace_related_field, bool):
+        return replace_related_field
+    if not isinstance(replace_related_field, (tuple, list)):
+        replace_related_field = (replace_related_field,)
+    return any(refmodel is model for refmodel in replace_related_field)
+
+
 def _set_related_field(
-    target: type["BaseModelType"],
+    target: type[BaseModelType],
     *,
     foreign_key_name: str,
     related_name: str,
-    source: type["BaseModelType"],
-    replace_related_field: Union[bool, type["BaseModelType"]],
+    source: type[BaseModelType],
+    replace_related_field: Union[
+        bool, type[BaseModelType], tuple[type[BaseModelType], ...], list[type[BaseModelType]]
+    ],
 ) -> None:
     if replace_related_field is not True and related_name in target.meta.fields:
         # is already correctly set, required for migrate of model_apps with registry set
@@ -73,9 +94,8 @@ def _set_related_field(
         ):
             return
         # required for copying
-        if (
-            related_field.related_from is not replace_related_field
-            or related_field.foreign_key_name != foreign_key_name
+        if related_field.foreign_key_name != foreign_key_name or _check_replace_related_field(
+            replace_related_field, related_field.related_from
         ):
             raise ForeignKeyBadConfigured(
                 f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
@@ -101,9 +121,11 @@ def _set_related_field(
 
 
 def _set_related_name_for_foreign_keys(
-    meta: "MetaInfo",
-    model_class: type["BaseModelType"],
-    replace_related_field: Union[bool, type["BaseModelType"]] = False,
+    meta: MetaInfo,
+    model_class: type[BaseModelType],
+    replace_related_field: Union[
+        bool, type[BaseModelType], tuple[type[BaseModelType], ...], list[type[BaseModelType]]
+    ] = False,
 ) -> None:
     """
     Sets the related name for the foreign keys.
@@ -148,13 +170,22 @@ class DatabaseMixin:
     _removed_copy_keys: ClassVar[set[str]] = _removed_copy_keys
 
     @classmethod
-    def add_to_registry(
-        cls: type["BaseModelType"],
-        registry: "Registry",
+    def real_add_to_registry(
+        cls: type[BaseModelType],
+        *,
+        registry: Registry,
+        registry_type_name: str = "models",
         name: str = "",
-        database: Union[bool, "Database", Literal["keep"]] = "keep",
-        replace_related_field: Union[bool, type["BaseModelType"]] = False,
-    ) -> None:
+        database: Union[bool, Database, Literal["keep"]] = "keep",
+        replace_related_field: Union[
+            bool,
+            type[BaseModelType],
+            tuple[type[BaseModelType], ...],
+            list[type[BaseModelType]],
+        ] = False,
+        on_conflict: Literal["keep", "replace", "error"] = "error",
+    ) -> type[BaseModelType]:
+        """For customizations."""
         # when called if registry is not set
         cls.meta.registry = registry
         if database is True:
@@ -172,31 +203,73 @@ class DatabaseMixin:
 
         # Making sure it does not generate models if abstract or a proxy
         if not meta.abstract and not cls.__is_proxy_model__:
-            if getattr(cls, "__reflected__", False):
-                registry.reflected[cls.__name__] = cls
+            if on_conflict == "replace":
+                registry.delete_model(cls.__name__)
             else:
-                registry.models[cls.__name__] = cls
-            # after registrating the own model
-            for value in list(meta.fields.values()):
-                if isinstance(value, BaseManyToManyForeignKeyField):
-                    m2m_registry: Registry = value.target_registry
-                    with contextlib.suppress(Exception):
-                        m2m_registry = cast("Registry", value.target.registry)
+                with contextlib.suppress(LookupError):
+                    original_model = registry.get_model(
+                        cls.__name__, include_content_type_attr=False, exclude=("tenant_models",)
+                    )
+                    if on_conflict == "keep":
+                        return original_model
+                    else:
+                        raise ModelCollisionError(
+                            detail=(
+                                f'A model with the same name is already registered: "{cls.__name__}".\n'
+                                "If this is not a bug, define the behaviour by "
+                                'setting "on_conflict" to either "keep" or "replace".'
+                            )
+                        )
+            if registry_type_name:
+                registry_dict = getattr(registry, registry_type_name)
+                registry_dict[cls.__name__] = cls
+                # after registrating the own model
+                for value in list(meta.fields.values()):
+                    if isinstance(value, BaseManyToManyForeignKeyField):
+                        m2m_registry: Registry = value.target_registry
+                        with contextlib.suppress(Exception):
+                            m2m_registry = cast("Registry", value.target.registry)
 
-                    def create_through_model(x: Any, field: "BaseFieldType" = value) -> None:
-                        # we capture with field = ... the variable
-                        field.create_through_model()
+                        def create_through_model(x: Any, field: BaseFieldType = value) -> None:
+                            # we capture with field = ... the variable
+                            field.create_through_model(replace_related_field=replace_related_field)
 
-                    m2m_registry.register_callback(value.to, create_through_model, one_time=True)
-            # Sets the foreign key fields
-            if meta.foreign_key_fields:
-                _set_related_name_for_foreign_keys(
-                    meta, cls, replace_related_field=replace_related_field
-                )
-            registry.execute_model_callbacks(cls)
+                        m2m_registry.register_callback(
+                            value.to, create_through_model, one_time=True
+                        )
+                # Sets the foreign key fields
+                if meta.foreign_key_fields:
+                    _set_related_name_for_foreign_keys(
+                        meta, cls, replace_related_field=replace_related_field
+                    )
+                registry.execute_model_callbacks(cls)
 
         # finalize
         cls.model_rebuild(force=True)
+        return cls
+
+    @classmethod
+    def add_to_registry(
+        cls,
+        registry: Registry,
+        name: str = "",
+        database: Union[bool, Database, Literal["keep"]] = "keep",
+        *,
+        replace_related_field: Union[
+            bool,
+            type[BaseModelType],
+            tuple[type[BaseModelType], ...],
+            list[type[BaseModelType]],
+        ] = False,
+        on_conflict: Literal["keep", "replace", "error"] = "error",
+    ) -> type[BaseModelType]:
+        return cls.real_add_to_registry(
+            registry=registry,
+            name=name,
+            database=database,
+            replace_related_field=replace_related_field,
+            on_conflict=on_conflict,
+        )
 
     def get_active_instance_schema(
         self, check_schema: bool = True, check_tenant: bool = True
@@ -221,8 +294,13 @@ class DatabaseMixin:
 
     @classmethod
     def copy_edgy_model(
-        cls: type["Model"], registry: Optional["Registry"] = None, name: str = "", **kwargs: Any
-    ) -> type["Model"]:
+        cls: type[Model],
+        registry: Optional[Registry] = None,
+        name: str = "",
+        unlink_same_registry: bool = True,
+        on_conflict: Literal["keep", "replace", "error"] = "error",
+        **kwargs: Any,
+    ) -> type[Model]:
         """Copy the model class and optionally add it to another registry."""
         # removes private pydantic stuff, except the prefixed ones
         attrs = {
@@ -237,27 +315,75 @@ class DatabaseMixin:
             )
         )
         attrs.update(cls.meta.managers)
-        _copy = cast(
-            type["Model"],
-            type(cls.__name__, cls.__bases__, attrs, skip_registry=True, **kwargs),
+        _copy = create_edgy_model(
+            __name__=name or cls.__name__,
+            __module__=cls.__module__,
+            __definitions__=attrs,
+            __metadata__=cls.meta,
+            __bases__=cls.__bases__,
+            __type_kwargs__={**kwargs, "skip_registry": True},
         )
-        for field_name in _copy.meta.foreign_key_fields:
-            # we need to unreference and check if both models are in the same registry
-            if cls.meta.fields[field_name].target.meta.registry is cls.meta.registry:
-                _copy.meta.fields[field_name].target = cls.meta.fields[field_name].target.__name__
+        # should also allow masking database with None
+        if hasattr(cls, "database"):
+            _copy.database = cls.database
+        replaceable_models: list[type[BaseModelType]] = [cls]
+        for field_name in list(_copy.meta.fields):
+            src_field = cls.meta.fields.get(field_name)
+            if not isinstance(src_field, BaseForeignKey):
+                continue
+            # we use the target of source
+            replaceable_models.append(src_field.target)
+
+            if src_field.target_registry is cls.meta.registry:
+                # clear target_registry, for obvious registries
+                del _copy.meta.fields[field_name].target_registry
+            if unlink_same_registry and src_field.target_registry is cls.meta.registry:
+                # we need to unreference so the target is retrieved from the new registry
+
+                _copy.meta.fields[field_name].target = src_field.target.__name__
             else:
                 # otherwise we need to disable backrefs
-                _copy.meta.fields[field_name].target.related_name = False
-        if name:
-            _copy.__name__ = name
+                _copy.meta.fields[field_name].related_name = False
+
+            if isinstance(src_field, BaseManyToManyForeignKeyField):
+                _copy.meta.fields[field_name].through = src_field.through_original
+                # clear through registry, we need a copy in the new registry
+                del _copy.meta.fields[field_name].through_registry
+                if (
+                    isinstance(_copy.meta.fields[field_name].through, type)
+                    and issubclass(_copy.meta.fields[field_name].through, BaseModelType)
+                    and not _copy.meta.fields[field_name].through.meta.abstract
+                ):
+                    # unreference
+                    _copy.meta.fields[field_name].through = through_model = _copy.meta.fields[
+                        field_name
+                    ].through.copy_edgy_model()
+                    # we want to set the registry explicit
+                    through_model.meta.registry = False
+                    if src_field.from_foreign_key in through_model.meta.fields:
+                        # explicit set
+                        through_model.meta.fields[src_field.from_foreign_key].target = _copy
+                        through_model.meta.fields[src_field.from_foreign_key].related_name = cast(
+                            BaseManyToManyForeignKeyField,
+                            cast(type[BaseModelType], src_field.through).meta.fields[
+                                src_field.from_foreign_key
+                            ],
+                        ).related_name
         if registry is not None:
             # replace when old class otherwise old references can lead to issues
-            _copy.add_to_registry(registry, replace_related_field=cls)
+            _copy.add_to_registry(
+                registry,
+                replace_related_field=replaceable_models,
+                on_conflict=on_conflict,
+                database="keep"
+                if cls.meta.registry is False or cls.database is not cls.meta.registry.database
+                else True,
+            )
         return _copy
 
     @property
     def table(self) -> sqlalchemy.Table:
-        if getattr(self, "_table", None) is None:
+        if self.__dict__.get("_table", None) is None:
             schema = self.get_active_instance_schema()
             return cast(
                 "sqlalchemy.Table",
@@ -266,12 +392,21 @@ class DatabaseMixin:
         return self._table
 
     @table.setter
-    def table(self, value: sqlalchemy.Table) -> None:
+    def table(self, value: Optional[sqlalchemy.Table]) -> None:
         with contextlib.suppress(AttributeError):
             del self._pknames
         with contextlib.suppress(AttributeError):
             del self._pkcolumns
         self._table = value
+
+    @table.deleter
+    def table(self) -> None:
+        with contextlib.suppress(AttributeError):
+            del self._pknames
+        with contextlib.suppress(AttributeError):
+            del self._pkcolumns
+        with contextlib.suppress(AttributeError):
+            del self._table
 
     @property
     def pkcolumns(self) -> Sequence[str]:
@@ -291,7 +426,7 @@ class DatabaseMixin:
                 build_pknames(self)
         return self._pknames
 
-    def get_columns_for_name(self: "Model", name: str) -> Sequence["sqlalchemy.Column"]:
+    def get_columns_for_name(self: Model, name: str) -> Sequence[sqlalchemy.Column]:
         table = self.table
         meta = self.meta
         if name in meta.field_to_columns:
@@ -320,7 +455,7 @@ class DatabaseMixin:
                 )
         return clauses
 
-    async def _update(self: "Model", **kwargs: Any) -> Any:
+    async def _update(self: Model, **kwargs: Any) -> Any:
         """
         Update operation of the database fields.
         """
@@ -367,7 +502,7 @@ class DatabaseMixin:
             self._loaded_or_deleted = False
         await self.meta.signals.post_update.send_async(self.__class__, instance=self)
 
-    async def update(self: "Model", **kwargs: Any) -> "Model":
+    async def update(self: Model, **kwargs: Any) -> Model:
         token = EXPLICIT_SPECIFIED_VALUES.set(set(kwargs.keys()))
         try:
             await self._update(**kwargs)
@@ -433,7 +568,7 @@ class DatabaseMixin:
         self.__dict__.update(self.transform_input(dict(row._mapping), phase="load", instance=self))
         self._loaded_or_deleted = True
 
-    async def _insert(self: "Model", **kwargs: Any) -> "Model":
+    async def _insert(self: Model, **kwargs: Any) -> Model:
         """
         Performs the save instruction.
         """
@@ -479,11 +614,11 @@ class DatabaseMixin:
         return self
 
     async def save(
-        self: "Model",
+        self: Model,
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], None] = None,
         force_save: Optional[bool] = None,
-    ) -> "Model":
+    ) -> Model:
         """
         Performs a save of a given model instance.
         When creating a user it will make sure it can update existing or
@@ -544,7 +679,9 @@ class DatabaseMixin:
 
     @classmethod
     def build(
-        cls, schema: Optional[str] = None, metadata: Optional[sqlalchemy.MetaData] = None
+        cls,
+        schema: Optional[str] = None,
+        metadata: Optional[sqlalchemy.MetaData] = None,
     ) -> sqlalchemy.Table:
         """
         Builds the SQLAlchemy table representation from the loaded fields.
@@ -572,7 +709,10 @@ class DatabaseMixin:
         for name, field in cls.meta.fields.items():
             current_columns = field.get_columns(name)
             columns.extend(current_columns)
-            global_constraints.extend(field.get_global_constraints(name, current_columns, schemes))
+            if not NO_GLOBAL_FIELD_CONSTRAINTS.get():
+                global_constraints.extend(
+                    field.get_global_constraints(name, current_columns, schemes)
+                )
 
         # Handle the uniqueness together
         uniques = []
@@ -597,6 +737,36 @@ class DatabaseMixin:
             if schema
             else cls.get_active_class_schema(check_schema=False, check_tenant=False),
         )
+
+    @classmethod
+    def add_global_field_constraints(
+        cls,
+        schema: Optional[str] = None,
+        metadata: Optional[sqlalchemy.MetaData] = None,
+    ) -> sqlalchemy.Table:
+        """
+        Add global constraints to table. Required for tenants.
+        """
+        tablename: str = cls.meta.tablename
+        registry = cls.meta.registry
+        assert registry, "registry is not set"
+        if metadata is None:
+            metadata = registry.metadata_by_url[str(cls.database.url)]
+        schemes: list[str] = []
+        if schema:
+            schemes.append(schema)
+        if cls.__using_schema__ is not Undefined:
+            schemes.append(cls.__using_schema__)
+        db_schema = cls.get_db_schema() or ""
+        schemes.append(db_schema)
+        table = metadata.tables[tablename if not schema else f"{schema}.{tablename}"]
+        for name, field in cls.meta.fields.items():
+            current_columns: list[sqlalchemy.Column] = []
+            for column_name in cls.meta.field_to_column_names[name]:
+                current_columns.append(table.columns[column_name])
+            for constraint in field.get_global_constraints(name, current_columns, schemes):
+                table.append_constraint(constraint)
+        return table
 
     @classmethod
     def _get_unique_constraints(
@@ -639,7 +809,7 @@ class DatabaseMixin:
             ),
         )
 
-    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":
+    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
         """Return database transaction for the assigned database"""
         return cast(
             "Transaction", self.database.transaction(force_rollback=force_rollback, **kwargs)

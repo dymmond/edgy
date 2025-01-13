@@ -95,6 +95,8 @@ class ManyRelation(ManyRelationProtocol):
             **{self.from_foreign_key: self.instance, self.to_foreign_key: value}
         )
         instance.identifying_db_fields = [self.from_foreign_key, self.to_foreign_key]  # type: ignore
+        if getattr(through.meta, "is_tenant", False):
+            instance.__using_schema__ = self.instance.get_active_instance_schema()  # type: ignore
         return instance
 
     def stage(self, *children: "BaseModelType") -> None:
@@ -150,9 +152,9 @@ class ManyRelation(ManyRelationProtocol):
                 try:
                     child = await self.get()
                 except ObjectNotFound:
-                    raise RelationshipNotFound(detail="no child found") from None
+                    raise RelationshipNotFound(detail="No child found.") from None
             else:
-                raise RelationshipNotFound(detail="no child specified")
+                raise RelationshipNotFound(detail="No child specified.")
         if not isinstance(
             child,
             (self.to, self.to.proxy_model, self.through, self.through.proxy_model),  # type: ignore
@@ -164,7 +166,7 @@ class ManyRelation(ManyRelationProtocol):
         count = await child.query.filter(*child.identifying_clauses()).count()
         if count == 0:
             raise RelationshipNotFound(
-                detail=f"There is no relationship between '{self.from_foreign_key}' and '{self.to_foreign_key}: {getattr(child,self.to_foreign_key).pk}'."
+                detail=f"There is no relationship between '{self.from_foreign_key}' and '{self.to_foreign_key}: {getattr(child, self.to_foreign_key).pk}'."
             )
         else:
             await child.delete()
@@ -242,6 +244,8 @@ class SingleRelation(ManyRelationProtocol):
             value = {next(iter(related_columns)): value}
         instance = target.proxy_model(**value)
         instance.identifying_db_fields = related_columns  # type: ignore
+        if getattr(target.meta, "is_tenant", False):
+            instance.__using_schema__ = self.instance.get_active_instance_schema()  # type: ignore
         return instance
 
     def stage(self, *children: "BaseModelType") -> None:

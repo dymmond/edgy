@@ -56,6 +56,20 @@ async def test_migrate_objs_main_only():
     assert len(registry.metadata_by_name[None].tables.keys()) == 2
 
 
+async def test_migrate_objs_main_only_after_copy():
+    tenant = await Tenant.query.create(
+        schema_name="migrate_edgy",
+        domain_url="https://edgy.dymmond.com",
+        tenant_name="migrate_edgy",
+    )
+
+    assert tenant.schema_name == "migrate_edgy"
+    assert tenant.tenant_name == "migrate_edgy"
+
+    registry = edgy.get_migration_prepared_registry(models.__copy__())
+    assert len(registry.metadata_by_name[None].tables.keys()) == 2
+
+
 async def test_migrate_objs_all():
     tenant = await Tenant.query.create(
         schema_name="migrate_edgy",
@@ -69,6 +83,27 @@ async def test_migrate_objs_all():
     app = Esmerald()
 
     edgy.monkay.set_instance(Instance(app=app, registry=models))
+    with edgy.monkay.with_settings(edgy.monkay.settings.model_copy(update={"multi_schema": True})):
+        registry = edgy.get_migration_prepared_registry()
+
+        assert set(registry.metadata_by_name[None].tables.keys()) == {
+            "tenants",
+            "migrate_edgy.products",
+            "products",
+        }
+
+
+async def test_migrate_objs_all_after_copy():
+    tenant = await Tenant.query.create(
+        schema_name="migrate_edgy",
+        domain_url="https://edgy.dymmond.com",
+        tenant_name="migrate_edgy",
+    )
+
+    assert tenant.schema_name == "migrate_edgy"
+    assert tenant.tenant_name == "migrate_edgy"
+
+    edgy.monkay.set_instance(Instance(registry=models.__copy__()))
     with edgy.monkay.with_settings(edgy.monkay.settings.model_copy(update={"multi_schema": True})):
         registry = edgy.get_migration_prepared_registry()
 
