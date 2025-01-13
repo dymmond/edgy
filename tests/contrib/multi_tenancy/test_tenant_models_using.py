@@ -52,29 +52,41 @@ class Product(TenantModel):
         is_tenant = True
 
 
-async def test_schema_with_using_in_different_place():
-    tenant = await Tenant.query.create(
+@pytest.mark.parametrize("use_copy", ["false", "instant", "after"])
+async def test_schema_with_using_in_different_place(use_copy):
+    if use_copy == "instant":
+        copied = models.__copy__()
+        NewTenant = copied.get_model("Tenant")
+        NewProduct = copied.get_model("Product")
+    else:
+        NewTenant = Tenant
+        NewProduct = Product
+    tenant = await NewTenant.query.create(
         schema_name="edgy", domain_url="https://edgy.dymmond.com", tenant_name="edgy"
     )
+    if use_copy == "after":
+        copied = models.__copy__()
+        NewTenant = copied.get_model("Tenant")
+        NewProduct = copied.get_model("Product")
     for i in range(5):
-        await Product.query.using(schema=tenant.schema_name).create(name=f"product-{i}")
+        await NewProduct.query.using(schema=tenant.schema_name).create(name=f"product-{i}")
 
-    total = await Product.query.filter().using(schema=tenant.schema_name).all()
+    total = await NewProduct.query.filter().using(schema=tenant.schema_name).all()
 
     assert len(total) == 5
 
-    total = await Product.query.all()
+    total = await NewProduct.query.all()
 
     assert len(total) == 0
 
     for i in range(15):
-        await Product.query.create(name=f"product-{i}")
+        await NewProduct.query.create(name=f"product-{i}")
 
-    total = await Product.query.all()
+    total = await NewProduct.query.all()
 
     assert len(total) == 15
 
-    total = await Product.query.filter().using(schema=tenant.schema_name).all()
+    total = await NewProduct.query.filter().using(schema=tenant.schema_name).all()
 
     assert len(total) == 5
 

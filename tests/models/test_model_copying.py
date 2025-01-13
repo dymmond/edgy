@@ -56,6 +56,7 @@ async def test_copy_model_abstract(unlink_same_registry):
         assert len(models2.models) == 3
 
     through = models2.get_model("Cart").meta.fields["products"].through
+    assert "_db_schemas" in through.__dict__
     assert through is models2.get_model(through.__name__)
     assert through is not models.get_model(through.__name__)
     for reg in [models, models2]:
@@ -110,6 +111,7 @@ async def test_copy_model_concrete_same(unlink_same_registry):
         assert len(models2.models) == 3
 
     through = models2.get_model("Cart").meta.fields["products"].through
+    assert "_db_schemas" in through.__dict__
     assert through is models2.get_model(through.__name__)
     assert through is not models.get_model(through.__name__)
     assert through.__name__ == "ThroughModel"
@@ -167,6 +169,7 @@ async def test_copy_model_concrete_other(unlink_same_registry):
         assert len(models2.models) == 3
 
     through = models2.get_model("Cart").meta.fields["products"].through
+    assert "_db_schemas" in through.__dict__
     assert through is models2.get_model(through.__name__)
     assert through is not models3.get_model(through.__name__)
     assert through.__name__ == "ThroughModel"

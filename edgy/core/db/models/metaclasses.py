@@ -390,9 +390,11 @@ class MetaInfo:
         if self.model is None:
             return
         if clear_class_attrs:
-            for attr in ("_table", "_pknames", "_pkcolumns", "_db_schemas", "__proxy_model__"):
+            for attr in ("_table", "_pknames", "_pkcolumns", "__proxy_model__"):
                 with contextlib.suppress(AttributeError):
                     delattr(self.model, attr)
+            # needs an extra invalidation
+            self.model._db_schemas = {}
 
     def full_init(self, init_column_mappers: bool = True, init_class_attrs: bool = True) -> None:
         if not self._fields_are_initialized:
@@ -730,6 +732,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # (excluding the edgy.Model class itself).
         if not has_parents:
             return new_class
+        new_class._db_schemas = {}
 
         # Ensure the model_fields are updated to the latest
         # required since pydantic 2.10
@@ -737,7 +740,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # error since pydantic 2.10
         with contextlib.suppress(AttributeError):
             new_class.model_fields = model_fields
-        new_class._db_schemas = {}
 
         # Set the owner of the field, must be done as early as possible
         # don't use meta.fields to not trigger the lazy evaluation

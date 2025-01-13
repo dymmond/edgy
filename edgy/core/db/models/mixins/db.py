@@ -53,6 +53,7 @@ _removed_copy_keys = {
     "_pknames",
     "_table",
     "_db_schemas",
+    "__proxy_model__",
     "meta",
 }
 _removed_copy_keys.difference_update(
@@ -319,8 +320,7 @@ class DatabaseMixin:
             __definitions__=attrs,
             __metadata__=cls.meta,
             __bases__=cls.__bases__,
-            skip_registry=True,
-            **kwargs,
+            __type_kwargs__={**kwargs, "skip_registry": True},
         )
         # should also allow masking database with None
         if hasattr(cls, "database"):

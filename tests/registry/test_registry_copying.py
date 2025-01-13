@@ -39,6 +39,7 @@ async def test_copy_registry_abstract():
         "Product"
     )
     through = models_copy.get_model("Cart").meta.fields["products"].through
+    assert "_db_schemas" in through.__dict__
     assert through is models_copy.get_model(through.__name__)
 
 
@@ -93,4 +94,5 @@ async def test_copy_registry_concrete(registry_used):
         "Product"
     )
     through = models_copy.get_model("Cart").meta.fields["products"].through
+    assert "_db_schemas" in through.__dict__
     assert through is models_copy.get_model(through.__name__)
