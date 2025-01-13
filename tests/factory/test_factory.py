@@ -1,8 +1,8 @@
 import pytest
 
 import edgy
-from edgy.testclient import DatabaseTestClient
-from edgy.testclient.factory import Factory
+from edgy.testing import DatabaseTestClient
+from edgy.testing.factory import ModelFactory
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
@@ -41,11 +41,20 @@ async def create_test_database():
 
 
 def test_can_generate_factory():
-    class UserFactory(Factory):
-        model = User
+    class UserFactory(ModelFactory):
+        class Meta:
+            model = User
 
-    assert UserFactory.model == User
     assert UserFactory.meta.model == User
     assert UserFactory.meta.abstract is False
     assert UserFactory.meta.registry == models
-    assert UserFactory.meta.database == database
+
+
+def test_can_build_factory():
+    class UserFactory(ModelFactory):
+        class Meta:
+            model = User
+
+    user = UserFactory().build()
+
+    assert user.database == database
