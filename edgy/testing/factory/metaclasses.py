@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from inspect import getmro
 from typing import TYPE_CHECKING, Any, ClassVar, cast, no_type_check
 
 import monkay
@@ -9,12 +10,15 @@ from edgy.core.db.models import Model
 from edgy.testing.exceptions import InvalidModelError
 from edgy.utils.compat import is_class_and_subclass
 
+from .fields import FactoryField
+
 if TYPE_CHECKING:
     from faker import Faker
 
     from edgy.core.connection import Registry
 
     from .factory import ModelFactory
+    from .types import FactoryCallback
 
 
 # this is not models MetaInfo
@@ -24,7 +28,7 @@ class MetaInfo:
         "abstract",
         "registry",
         "__edgy_fields__",
-        "default_parameters",
+        "fields",
         "faker",
         "mappings",
     )
@@ -34,7 +38,7 @@ class MetaInfo:
     model: Model
     abstract: bool
     registry: Registry
-    mappings: dict[str, Callable[[ModelFactory, Faker, dict], Any]]
+    mappings: dict[str, FactoryCallback]
 
     def __init__(self, *metas: Any, **kwargs: Any) -> None:
         self.abstract: bool = False
@@ -93,7 +97,15 @@ class ModelFactoryMeta(type):
         if not parents:
             return model_class(cls, name, bases, attrs)
         meta_class = attrs.pop("Meta", None)
-        default_parameters: dict[str, dict[str, Any]] = {}
+        fields: dict[str, dict[str, Any]] = {}
+        for base in bases:
+            for sub in getmro(base):
+                meta: Any = getattr(sub, "meta", None)
+                if isinstance(meta, MetaInfo):
+                    for name, field in meta.fields.items():
+                        if field.no_copy:
+                            continue
+                        fields.setdefault(name, field.__copy__())
 
         model: Model | str = getattr(meta_class, "model", None)
         if model is None:
@@ -101,17 +113,6 @@ class ModelFactoryMeta(type):
 
         if isinstance(model, str):
             model = monkay.load(model)
-        for key in model.meta.fields:
-            if key == "meta":
-                continue
-            value: Any = attrs.pop(key, None)
-            if isinstance(value, dict) or callable(value):
-                default_parameter: dict[str, Any] | Callable[[ModelFactory, Faker, dict], Any] = (
-                    value
-                )
-            else:
-                default_parameter = {}
-            default_parameters[key] = default_parameter
 
         # Checks if its a valid Edgy model.
         if not is_class_and_subclass(model, Model):
@@ -123,12 +124,28 @@ class ModelFactoryMeta(type):
             meta_class,
             __edgy_fields__=model.meta.fields,
             model=model,
-            default_parameters=default_parameters,
+            fields=fields,
             faker=faker,
         )
+        for key, value in attrs.items():
+            if key == "meta":
+                continue
+            value: Any = attrs.get(key)
+            if isinstance(value, FactoryField):
+                field: FactoryField = value.__copy__()
+                del attrs[key]
+                field.name = key = value.name or key
+                fields[key] = field
+        for key, edgy_field in model.meta.fields.items():
+            if key not in fields:
+                field = FactoryField(name=key, field_type=edgy_field, no_copy=True)
+                if field.field_type in meta_info.mappings:
+                    fields[key] = field
         attrs["meta"] = meta_info
 
         new_class = cast(type["ModelFactory"], super().__new__(cls, name, bases, attrs, **kwargs))
+        for field in fields.values():
+            field.owner = new_class
         # validate
         new_class().build()
         return new_class

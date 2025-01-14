@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from edgy import Model
@@ -9,6 +8,8 @@ from .metaclasses import ModelFactoryMeta
 
 if TYPE_CHECKING:
     from faker import Faker
+
+    from .types import FactoryCallback
 
 
 class ModelFactory(metaclass=ModelFactoryMeta):
@@ -31,8 +32,8 @@ class ModelFactory(metaclass=ModelFactoryMeta):
     def build(
         self,
         *,
-        parameters: dict[str, dict[str, Any] | Callable[[ModelFactory, Faker, dict], Any]]
-        | None = None,
+        faker: Faker | None = None,
+        parameters: dict[str, dict[str, Any] | FactoryCallback] | None = None,
         overwrites: dict | None = None,
     ) -> Model:
         """
@@ -55,38 +56,23 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         If inserting values in the DB gives a SQL error (for instance for mandatory fields),
         then its ok as it is doing the right thing.
         """
+        if faker is None:
+            faker = self.meta.faker
         if not parameters:
             parameters = {}
         if not overwrites:
             overwrites = {}
         values = {}
-        for key, field in self.edgy_fields.items():
-            if field.exclude:
+        for name, field in self.meta.fields.items():
+            if name in overwrites or name in self.__kwargs__ or field.exclude:
                 continue
-            field_generator: Callable[[ModelFactory, Faker, dict], Any] | None = None
-            field_name = type(field).__name__
-            kwargs = {}
-            if key in overwrites:
-                values[key] = overwrites[key]
-                continue
-            elif key in self.__kwargs__:
-                values[key] = self.__kwargs__[key]
-                continue
-            if key in self.meta.default_parameters:
-                if callable(self.meta.default_parameters[key]):
-                    field_generator = self.meta.default_parameters[key]
-                else:
-                    kwargs = self.meta.default_parameters[key]
-            if key in parameters:
-                if callable(parameters[key]):
-                    field_generator = parameters[key]
-                    kwargs = {}
-                else:
-                    kwargs = parameters[key]
-            if field_generator is None:
-                values[key] = self.meta.mappings[field_name](self, self.meta.faker, kwargs)
+            current_parameters = parameters.get(name)
+            if callable(current_parameters):
+                values[name] = current_parameters(self, faker, field.parameters)
             else:
-                values[key] = field_generator(self, self.meta.faker, kwargs)
+                values[name] = field(faker=faker, parameters=current_parameters)
+        values.update(self.__kwargs__)
+        values.update(overwrites)
 
         result = self.meta.model(**values)
         if getattr(self, "database", None) is not None:
