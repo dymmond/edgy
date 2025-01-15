@@ -50,6 +50,22 @@ class FactoryField:
             self._callback = self.owner.meta.mappings[self.get_field_type()]
         return self._callback
 
+    def get_parameters(
+        self,
+        *,
+        faker: Faker,
+        parameters: FactoryParameters | None = None,
+    ) -> dict[str, Any]:
+        current_parameters: FactoryParameters = {}
+        for parameter_dict in [parameters or {}, self.parameters]:
+            for name, parameter in parameter_dict.items():
+                if name not in current_parameters:
+                    if callable(parameter) and not isclass(parameter):
+                        current_parameters[name] = parameter(self, faker, name)
+                    else:
+                        current_parameters[name] = parameter
+        return current_parameters
+
     @property
     def field_type(self) -> str:
         return self._field_type
@@ -82,13 +98,8 @@ class FactoryField:
             _copy.original_name = self.original_name
         return _copy
 
-    def __call__(self, *, faker: Faker, parameters: FactoryParameters | None = None) -> Any:
-        current_parameters: FactoryParameters = {}
-        if self.parameters:
-            current_parameters.update(self.parameters)
-        if parameters:
-            current_parameters.update(parameters)
-        return self.get_callback()(self, faker, current_parameters)
+    def __call__(self, *, faker: Faker, parameters: FactoryParameters) -> Any:
+        return self.get_callback()(self, faker, parameters)
 
 
 __all__ = ["FactoryField"]

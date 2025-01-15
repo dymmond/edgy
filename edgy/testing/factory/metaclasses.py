@@ -12,6 +12,7 @@ from edgy.testing.exceptions import InvalidModelError
 from edgy.utils.compat import is_class_and_subclass
 
 from .fields import FactoryField
+from .utils import edgy_field_param_extractor
 
 if TYPE_CHECKING:
     from faker import Faker
@@ -71,22 +72,36 @@ def RefForeignKey_callback(field: FactoryField, faker: Faker, kwargs: dict[str, 
 
 
 DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
-    "IntegerField": lambda field, faker, kwargs: faker.random_int(**kwargs),
-    "BigIntegerField": lambda field, faker, kwargs: faker.random_number(**kwargs),
-    "BooleanField": lambda field, faker, kwargs: faker.boolean(**kwargs),
-    "CharField": lambda field, faker, kwargs: faker.name(**kwargs),
-    "DateField": lambda field, faker, kwargs: faker.date(**kwargs),
-    "DateTimeField": lambda field, faker, kwargs: faker.date_time(**kwargs),
-    "DecimalField": lambda field, faker, kwargs: faker.pyfloat(**kwargs),
-    "DurationField": lambda field, faker, kwargs: faker.time(**kwargs),
-    "EmailField": lambda field, faker, kwargs: faker.email(**kwargs),
-    "FloatField": lambda field, faker, kwargs: faker.pyfloat(**kwargs),
-    "IPAddressField": lambda field, faker, kwargs: faker.ipv4(**kwargs),
-    "PasswordField": lambda field, faker, kwargs: faker.ipv4(**kwargs),
-    "SmallIntegerField": lambda field, faker, kwargs: faker.random_int(**kwargs),
-    "TextField": lambda field, faker, kwargs: faker.text(**kwargs),
-    "TimeField": lambda field, faker, kwargs: faker.time(**kwargs),
-    "UUIDField": lambda field, faker, kwargs: faker.uuid4(**kwargs),
+    "IntegerField": edgy_field_param_extractor(
+        "random_int", remapping={"gt": ("min", lambda x: x - 1), "lt": ("max", lambda x: x + 1)}
+    ),
+    "BigIntegerField": edgy_field_param_extractor(
+        "random_number", remapping={"gt": ("min", lambda x: x - 1), "lt": ("max", lambda x: x + 1)}
+    ),
+    "BooleanField": edgy_field_param_extractor("boolean"),
+    "URLField": edgy_field_param_extractor("uri"),
+    # FIXME: find a good integration strategy
+    "ImageField": None,
+    "FileField": None,
+    "ChoiceField": None,
+    "CompositeField": None,
+    "CharField": edgy_field_param_extractor("name"),
+    "DateField": edgy_field_param_extractor("date"),
+    "DateTimeField": edgy_field_param_extractor("date_time"),
+    "DecimalField": edgy_field_param_extractor("pyfloat"),
+    "DurationField": edgy_field_param_extractor("time"),
+    "EmailField": edgy_field_param_extractor("email"),
+    "BinaryField": edgy_field_param_extractor(
+        "binary", remapping={"max_length": ("length", lambda x: x)}
+    ),
+    "FloatField": edgy_field_param_extractor("pyfloat"),
+    "IPAddressField": edgy_field_param_extractor("ipv4"),
+    "PasswordField": edgy_field_param_extractor("ipv4"),
+    "SmallIntegerField": edgy_field_param_extractor("random_int"),
+    "TextField": edgy_field_param_extractor("text"),
+    "TimeField": edgy_field_param_extractor("time"),
+    "UUIDField": edgy_field_param_extractor("uuid4"),
+    "JSONField": edgy_field_param_extractor("json"),
     "ForeignKey": ForeignKey_callback,
     "OneToOneField": ForeignKey_callback,
     "OneToOne": ForeignKey_callback,
@@ -94,6 +109,9 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
     "ManyToMany": ManyToManyField_callback,
     "RefForeignKey": RefForeignKey_callback,
     "PKField": None,
+    "ComputedField": None,
+    "ExcludeField": None,
+    "PlaceholderField": None,
 }
 
 

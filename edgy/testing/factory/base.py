@@ -36,8 +36,8 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         self,
         *,
         faker: Faker | None = None,
-        parameters: dict[str, dict[str, Any] | FactoryCallback] | None = None,
-        overwrites: dict | None = None,
+        parameters: dict[str, dict[str, Any] | FactoryCallback | False] | None = None,
+        overwrites: dict[str, Any] | None = None,
     ) -> Model:
         """
         When this function is called, automacally will perform the
@@ -70,12 +70,27 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             if name in overwrites or name in self.__kwargs__ or field.exclude:
                 continue
             current_parameters_or_callback = parameters.get(name)
+            # exclude field on the fly by passing False in parameters and don't have it in kwargs
+            if current_parameters_or_callback is False:
+                continue
             if callable(current_parameters_or_callback):
-                values[name] = current_parameters_or_callback(field, faker, field.parameters)
+                values[name] = current_parameters_or_callback(
+                    field,
+                    faker,
+                    field.get_parameters(faker=faker),
+                )
             else:
-                values[name] = field(faker=faker, parameters=current_parameters_or_callback)
+                values[name] = field(
+                    faker=faker,
+                    parameters=field.get_parameters(
+                        faker=faker,
+                        parameters=current_parameters_or_callback,
+                    ),
+                )
+
         values.update(self.__kwargs__)
         values.update(overwrites)
+
         result = self.meta.model(**values)
         if getattr(self, "database", None) is not None:
             result.database = self.database

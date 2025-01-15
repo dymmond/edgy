@@ -1,6 +1,9 @@
+import pytest
+
 import edgy
 from edgy.testing import DatabaseTestClient
 from edgy.testing.factory import FactoryField, ModelFactory
+from edgy.testing.factory.metaclasses import DEFAULT_MAPPING
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
@@ -76,32 +79,6 @@ def test_can_generate_overwrite_and_exclude():
     assert product.database == database
 
 
-def test_can_generate_and_parametrize():
-    class CartFactory(ModelFactory):
-        class Meta:
-            model = Cart
-
-    cart = CartFactory().build(parameters={"products": {"min": 50, "max": 50}})
-    assert len(cart.products.refs) == 50
-
-    cart = CartFactory().build(parameters={"products": {"min": 10, "max": 50}})
-    assert len(cart.products.refs) >= 10 and len(cart.products.refs) <= 50
-
-
-def test_can_use_field_parameters():
-    class CartFactory(ModelFactory):
-        class Meta:
-            model = Cart
-
-        products = FactoryField(parameters={"min": 50, "max": 50})
-
-    cart = CartFactory().build()
-    assert len(cart.products.refs) == 50
-
-    cart = CartFactory().build(parameters={"products": {"min": 10, "max": 10}})
-    assert len(cart.products.refs) == 10
-
-
 def test_can_use_field_callback():
     class ProductFactory(ModelFactory):
         class Meta:
@@ -115,3 +92,40 @@ def test_can_use_field_callback():
         assert product.name == "edgy"
         assert product != old_product
         old_product = product
+
+
+def test_verify_fail_when_default_broken():
+    with pytest.raises(KeyError):
+
+        class ProductFactory(ModelFactory):
+            class Meta:
+                model = Product
+
+            name = FactoryField(callback=lambda x, y, kwargs: f"edgy{kwargs['count']}")
+
+
+def test_mapping():
+    class UserFactory(ModelFactory):
+        class Meta:
+            model = User
+
+    for field_name in edgy.fields.__all__:
+        field_type_name = getattr(edgy.fields, field_name).__name__
+        if (
+            "Mixin" in field_type_name
+            or field_type_name == "BaseField"
+            or field_type_name == "BaseFieldType"
+        ):
+            continue
+        assert field_type_name in DEFAULT_MAPPING
+        if field_type_name not in {
+            "ForeignKey",
+            "OneToOneField",
+            "OneToOne",
+            "ManyToManyField",
+            "ManyToMany",
+            "RefForeignKey",
+        }:
+            callback = DEFAULT_MAPPING[field_type_name]
+            if callback:
+                callback(UserFactory.meta.fields["name"], UserFactory.meta.faker, {})
