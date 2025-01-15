@@ -76,7 +76,6 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                 values[name] = field(faker=faker, parameters=current_parameters_or_callback)
         values.update(self.__kwargs__)
         values.update(overwrites)
-
         result = self.meta.model(**values)
         if getattr(self, "database", None) is not None:
             result.database = self.database

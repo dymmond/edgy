@@ -45,28 +45,35 @@ def test_can_generate_factory():
     assert UserFactory.meta.registry == models
 
 
-def test_can_generate_and_overwrite():
+def test_can_generate_overwrite_and_exclude():
     class UserFactory(ModelFactory):
         class Meta:
             model = User
+
+        id = FactoryField(exclude=True)
 
     class ProductFactory(ModelFactory):
         class Meta:
             model = Product
 
+        id = FactoryField(exclude=True)
         name = FactoryField()
 
     user = UserFactory().build()
 
+    assert not hasattr(user, "id")
     assert user.database == database
 
     product = ProductFactory().build()
+    assert not hasattr(product, "id")
     assert product.user is not user
-
-    product = ProductFactory().build(overwrites={"user": user})
-
     assert product.database == database
+
+    product = ProductFactory().build(overwrites={"user": user, "id": 999})
+
+    assert product.id == 999
     assert product.user is user
+    assert product.database == database
 
 
 def test_can_generate_and_parametrize():
