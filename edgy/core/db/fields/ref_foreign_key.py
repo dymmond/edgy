@@ -1,14 +1,11 @@
-import typing
-from inspect import isclass
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
-
-from typing_extensions import get_origin
 
 import edgy
 from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields.base import BaseField
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.exceptions import ModelReferenceError
+from edgy.utils.compat import is_class_and_subclass
 
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
@@ -42,21 +39,8 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
     ) -> Optional["BaseFieldType"]:
         return None
 
-    @classmethod
-    def is_class_and_subclass(cls, value: typing.Any, _type: typing.Any) -> bool:
-        original = get_origin(value)
-        if not original and not isclass(value):
-            return False
-
-        try:
-            if original:
-                return original and issubclass(original, _type)
-            return issubclass(value, _type)
-        except TypeError:
-            return False
-
     def __new__(cls, to: "ModelRef", null: bool = False) -> "BaseFieldType":  # type: ignore
-        if not cls.is_class_and_subclass(to, edgy.ModelRef):
+        if not is_class_and_subclass(to, edgy.ModelRef):
             raise ModelReferenceError(
                 detail="A model reference must be an object of type ModelRef"
             )

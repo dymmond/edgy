@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from inspect import isclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from faker import Faker
+
+    from edgy.core.db.fields.types import BaseFieldType
+    from edgy.core.db.models.metaclasses import MetaInfo as ModelMetaInfo
 
     from .base import ModelFactory
     from .types import FactoryCallback, FactoryFieldType, FactoryParameters
@@ -12,6 +15,9 @@ if TYPE_CHECKING:
 
 class FactoryField:
     owner: ModelFactory
+    original_name: str
+    _field_type: str = ""
+    _callback: FactoryCallback | None = None
 
     def __init__(
         self,
@@ -28,14 +34,38 @@ class FactoryField:
         self.name = name
         self.parameters = parameters or {}
         self.callback = callback
-        if field_type:
-            if not isclass(field_type):
-                field_type = type(field_type)
-            if not isinstance(field_type, str):
-                field_type = field_type.__name__
-        else:
-            field_type = None
-        self.field_type: str | None = field_type
+        self.field_type = field_type  # type: ignore
+
+    def get_field_type(self, *, db_model_meta: ModelMetaInfo | None = None) -> str:
+        if self.field_type:
+            return self.field_type
+        elif db_model_meta is None:
+            db_model_meta = self.owner.meta.model.meta
+        return type(db_model_meta.fields[self.name]).__name__
+
+    def get_callback(self) -> FactoryCallback:
+        if self.callback:
+            return self.callback
+        elif self._callback is None:
+            self._callback = self.owner.meta.mappings[self.get_field_type()]
+        return self._callback
+
+    @property
+    def field_type(self) -> str:
+        return self._field_type
+
+    @field_type.setter
+    def field_type(self, value: FactoryFieldType | None) -> None:
+        if value:
+            if not isinstance(value, str) and not isclass(value):
+                value = cast(type["BaseFieldType"], type(value))
+            if not isinstance(value, str):
+                value = value.__name__
+        self._field_type = cast(str, value or "")
+
+    @field_type.deleter
+    def field_type(self) -> None:
+        self._field_type = ""
 
     def __copy__(self) -> FactoryField:
         _copy = FactoryField(
@@ -43,10 +73,13 @@ class FactoryField:
             no_copy=self.no_copy,
             callback=self.callback,
             parameters=self.parameters.copy(),
-            field_type=self.field_type,
             name=self.name,
+            field_type=self.field_type,
         )
-        _copy.owner = self.owner
+        if hasattr(self, "owner"):
+            _copy.owner = self.owner
+        if hasattr(self, "original_name"):
+            _copy.original_name = self.original_name
         return _copy
 
     def __call__(self, *, faker: Faker, parameters: FactoryParameters | None = None) -> Any:
@@ -55,10 +88,7 @@ class FactoryField:
             current_parameters.update(self.parameters)
         if parameters:
             current_parameters.update(parameters)
-        if self.callback:
-            return self.callback(self.owner, faker, current_parameters)
-        else:
-            return self.owner.meta.mappings[self.field_type](self.owner, faker, current_parameters)
+        return self.get_callback()(self, faker, current_parameters)
 
 
 __all__ = ["FactoryField"]

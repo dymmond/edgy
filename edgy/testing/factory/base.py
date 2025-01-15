@@ -9,6 +9,7 @@ from .metaclasses import ModelFactoryMeta
 if TYPE_CHECKING:
     from faker import Faker
 
+    from .metaclasses import MetaInfo
     from .types import FactoryCallback
 
 
@@ -17,6 +18,8 @@ class ModelFactory(metaclass=ModelFactoryMeta):
     The base that must be subclassed in case of a factory
     that must be generated for a given model.
     """
+
+    meta: MetaInfo
 
     def __init__(self, **kwargs: Any):
         self.__kwargs__ = kwargs
@@ -47,7 +50,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         >>> class UserFactory(ModelFactory):
         ...     class Meta:
         ...         model = User
-        ...     field_parameters: dict = {}
+        ...     name = FactoryField(parameters={"": ""})
 
         >>> user = UserFactory(name='XXX').build()
 
@@ -66,11 +69,11 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         for name, field in self.meta.fields.items():
             if name in overwrites or name in self.__kwargs__ or field.exclude:
                 continue
-            current_parameters = parameters.get(name)
-            if callable(current_parameters):
-                values[name] = current_parameters(self, faker, field.parameters)
+            current_parameters_or_callback = parameters.get(name)
+            if callable(current_parameters_or_callback):
+                values[name] = current_parameters_or_callback(field, faker, field.parameters)
             else:
-                values[name] = field(faker=faker, parameters=current_parameters)
+                values[name] = field(faker=faker, parameters=current_parameters_or_callback)
         values.update(self.__kwargs__)
         values.update(overwrites)
 

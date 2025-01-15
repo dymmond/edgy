@@ -6,8 +6,9 @@ if TYPE_CHECKING:
 
     from edgy.core.db.fields.types import BaseFieldType
 
-    from .base import ModelFactory
+    from .fields import FactoryField
+
 
 FactoryParameters = dict[str, Any]
-FactoryCallback = Callable[[ModelFactory, Faker, FactoryParameters], Any]
+FactoryCallback = Callable[[FactoryField, Faker, FactoryParameters], Any]
 FactoryFieldType = str | BaseFieldType | type[BaseFieldType]

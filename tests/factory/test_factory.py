@@ -1,14 +1,10 @@
-import pytest
-
 import edgy
 from edgy.testing import DatabaseTestClient
-from edgy.testing.factory import ModelFactory
+from edgy.testing.factory import FactoryField, ModelFactory
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
-
-pytestmark = pytest.mark.anyio
 
 
 class User(edgy.StrictModel):
@@ -25,19 +21,18 @@ class Product(edgy.StrictModel):
     name: str = edgy.CharField(max_length=100, null=True)
     rating: int = edgy.IntegerField(minimum=1, maximum=5, default=1)
     in_stock: bool = edgy.BooleanField(default=False)
+    user: User = edgy.fields.ForeignKey(User)
 
     class Meta:
         registry = models
         name = "products"
 
 
-@pytest.fixture(autouse=True, scope="function")
-async def create_test_database():
-    async with database:
-        await models.create_all()
-        yield
-        if not database.drop:
-            await models.drop_all()
+class Cart(edgy.StrictModel):
+    products = edgy.fields.ManyToMany(Product)
+
+    class Meta:
+        registry = models
 
 
 def test_can_generate_factory():
@@ -50,11 +45,66 @@ def test_can_generate_factory():
     assert UserFactory.meta.registry == models
 
 
-def test_can_build_factory():
+def test_can_generate_and_overwrite():
     class UserFactory(ModelFactory):
         class Meta:
             model = User
 
+    class ProductFactory(ModelFactory):
+        class Meta:
+            model = Product
+
+        name = FactoryField()
+
     user = UserFactory().build()
 
     assert user.database == database
+
+    product = ProductFactory().build()
+    assert product.user is not user
+
+    product = ProductFactory().build(overwrites={"user": user})
+
+    assert product.database == database
+    assert product.user is user
+
+
+def test_can_generate_and_parametrize():
+    class CartFactory(ModelFactory):
+        class Meta:
+            model = Cart
+
+    cart = CartFactory().build(parameters={"products": {"min": 50, "max": 50}})
+    assert len(cart.products.refs) == 50
+
+    cart = CartFactory().build(parameters={"products": {"min": 10, "max": 50}})
+    assert len(cart.products.refs) >= 10 and len(cart.products.refs) <= 50
+
+
+def test_can_use_field_parameters():
+    class CartFactory(ModelFactory):
+        class Meta:
+            model = Cart
+
+        products = FactoryField(parameters={"min": 50, "max": 50})
+
+    cart = CartFactory().build()
+    assert len(cart.products.refs) == 50
+
+    cart = CartFactory().build(parameters={"products": {"min": 10, "max": 10}})
+    assert len(cart.products.refs) == 10
+
+
+def test_can_use_field_callback():
+    class ProductFactory(ModelFactory):
+        class Meta:
+            model = Product
+
+        name = FactoryField(callback=lambda x, y, z: "edgy")
+
+    old_product = None
+    for i in range(100):  # noqa
+        product = ProductFactory().build()
+        assert product.name == "edgy"
+        assert product != old_product
+        old_product = product

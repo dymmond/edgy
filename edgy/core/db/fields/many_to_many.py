@@ -1,7 +1,7 @@
 import contextlib
 from collections.abc import Sequence
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, Union, cast
 
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.context_vars import CURRENT_INSTANCE
@@ -371,7 +371,7 @@ class ManyToManyField(ForeignKeyFieldFactory):
         cls,
         to: Union["BaseModelType", str],
         *,
-        through: Optional["BaseModelType"] = None,
+        through: Union[str, type["BaseModelType"]] = "",
         from_fields: Sequence[str] = (),
         to_fields: Sequence[str] = (),
         **kwargs: Any,

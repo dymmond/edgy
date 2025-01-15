@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from inspect import getmro
-from typing import TYPE_CHECKING, Any, ClassVar, cast, no_type_check
+from inspect import getmro, isclass
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import monkay
 
 from edgy.core.db.models import Model
+from edgy.core.terminal import Print
 from edgy.testing.exceptions import InvalidModelError
 from edgy.utils.compat import is_class_and_subclass
 
@@ -17,8 +18,83 @@ if TYPE_CHECKING:
 
     from edgy.core.connection import Registry
 
-    from .factory import ModelFactory
+    from .base import ModelFactory
     from .types import FactoryCallback
+
+
+terminal = Print()
+
+
+def ForeignKey_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
+    from .base import ModelFactory
+
+    class ForeignKeyFactory(ModelFactory):
+        class Meta:
+            model = field.owner.meta.model.meta.fields[field.name].target
+
+    factory = ForeignKeyFactory()
+
+    field.callback = lambda field, faker, kwargs: factory.build(**kwargs)
+    return field.callback(field, faker, kwargs)
+
+
+def ManyToManyField_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
+    from .base import ModelFactory
+
+    class ManyToManyFieldFactory(ModelFactory):
+        class Meta:
+            model = field.owner.meta.model.meta.fields[field.name].target
+
+    factory = ManyToManyFieldFactory()
+
+    field.callback = lambda field, faker, kwargs: [
+        factory.build(parameters=kwargs.get("parameters"), overwrites=kwargs.get("overwrites"))
+        for i in range(faker.random_int(min=kwargs.get("min", 0), max=kwargs.get("max", 100)))
+    ]
+    return field.callback(field, faker, kwargs)
+
+
+def RefForeignKey_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
+    from .base import ModelFactory
+
+    class RefForeignKeyFactory(ModelFactory):
+        class Meta:
+            model = field.owner.meta.model.meta.fields[field.name].to
+
+    factory = RefForeignKeyFactory()
+
+    field.callback = lambda field, faker, kwargs: [
+        factory.build(parameters=kwargs.get("parameters"), overwrites=kwargs.get("overwrites"))
+        for i in range(faker.random_int(min=kwargs.get("min", 0), max=kwargs.get("max", 100)))
+    ]
+    return field.callback(field, faker, kwargs)
+
+
+DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
+    "IntegerField": lambda field, faker, kwargs: faker.random_int(**kwargs),
+    "BigIntegerField": lambda field, faker, kwargs: faker.random_number(**kwargs),
+    "BooleanField": lambda field, faker, kwargs: faker.boolean(**kwargs),
+    "CharField": lambda field, faker, kwargs: faker.name(**kwargs),
+    "DateField": lambda field, faker, kwargs: faker.date(**kwargs),
+    "DateTimeField": lambda field, faker, kwargs: faker.date_time(**kwargs),
+    "DecimalField": lambda field, faker, kwargs: faker.pyfloat(**kwargs),
+    "DurationField": lambda field, faker, kwargs: faker.time(**kwargs),
+    "EmailField": lambda field, faker, kwargs: faker.email(**kwargs),
+    "FloatField": lambda field, faker, kwargs: faker.pyfloat(**kwargs),
+    "IPAddressField": lambda field, faker, kwargs: faker.ipv4(**kwargs),
+    "PasswordField": lambda field, faker, kwargs: faker.ipv4(**kwargs),
+    "SmallIntegerField": lambda field, faker, kwargs: faker.random_int(**kwargs),
+    "TextField": lambda field, faker, kwargs: faker.text(**kwargs),
+    "TimeField": lambda field, faker, kwargs: faker.time(**kwargs),
+    "UUIDField": lambda field, faker, kwargs: faker.uuid4(**kwargs),
+    "ForeignKey": ForeignKey_callback,
+    "OneToOneField": ForeignKey_callback,
+    "OneToOne": ForeignKey_callback,
+    "ManyToManyField": ManyToManyField_callback,
+    "ManyToMany": ManyToManyField_callback,
+    "RefForeignKey": RefForeignKey_callback,
+    "PKField": None,
+}
 
 
 # this is not models MetaInfo
@@ -27,123 +103,142 @@ class MetaInfo:
         "model",
         "abstract",
         "registry",
-        "__edgy_fields__",
         "fields",
         "faker",
         "mappings",
     )
-    __ignore_slots__: ClassVar[set[str]] = {"__edgy_fields__", "model", "faker"}
+    __ignore_slots__: ClassVar[set[str]] = {"fields", "model", "faker", "mappings"}
     __edgy_fields__: dict[str, Any]
     default_parameters: dict[str, dict[str, Any] | Callable[[ModelFactory, Faker, dict], Any]]
-    model: Model
+    model: type[Model]
     abstract: bool
     registry: Registry
-    mappings: dict[str, FactoryCallback]
+    mappings: dict[str, FactoryCallback | None]
 
     def __init__(self, *metas: Any, **kwargs: Any) -> None:
         self.abstract: bool = False
         self.registry: Registry = None
-        self.mappings: dict[str, Callable[[ModelFactory, Faker, dict], Any]] = {
-            "IntegerField": lambda instance, faker, kwargs: faker.random_int(**kwargs),
-            "BigIntegerField": lambda instance, faker, kwargs: faker.random_number(**kwargs),
-            "BooleanField": lambda instance, faker, kwargs: faker.boolean(**kwargs),
-            "CharField": lambda instance, faker, kwargs: faker.name(**kwargs),
-            "DateField": lambda instance, faker, kwargs: faker.date(**kwargs),
-            "DateTimeField": lambda instance, faker, kwargs: faker.date_time(**kwargs),
-            "DecimalField": lambda instance, faker, kwargs: faker.pyfloat(**kwargs),
-            "DurationField": lambda instance, faker, kwargs: faker.time(**kwargs),
-            "EmailField": lambda instance, faker, kwargs: faker.email(**kwargs),
-            "FloatField": lambda instance, faker, kwargs: faker.pyfloat(**kwargs),
-            "IPAddressField": lambda instance, faker, kwargs: faker.ipv4(**kwargs),
-            "PasswordField": lambda instance, faker, kwargs: faker.ipv4(**kwargs),
-            "SmallIntegerField": lambda instance, faker, kwargs: faker.random_int(**kwargs),
-            "TextField": lambda instance, faker, kwargs: faker.text(**kwargs),
-            "TimeField": lambda instance, faker, kwargs: faker.time(**kwargs),
-            "UUIDField": lambda instance, faker, kwargs: faker.uuid4(**kwargs),
-        }
+        self.mappings: dict[str, FactoryCallback | None] = {}
         for meta in metas:
             for slot in self.__slots__:
                 if slot in self.__ignore_slots__:
                     continue
                 value = getattr(meta, slot, None)
                 if value is not None:
-                    if slot == "mappings":
-                        value = value.copy()
                     setattr(self, slot, value)
         for name, value in kwargs.items():
             setattr(self, name, value)
 
 
 class ModelFactoryMeta(type):
-    @no_type_check
     def __new__(
         cls,
-        name,
-        bases,
+        name: str,
+        bases: tuple[type, ...],
         attrs: dict[str, Any],
         meta_info_class: type[MetaInfo] = MetaInfo,
         **kwargs: Any,
-    ):
-        # cls: Model = super().__new__(mcls, name, bases, attrs)
+    ) -> type[ModelFactory]:
+        # has parents
+        if not any(True for parent in bases if isinstance(parent, ModelFactoryMeta)):
+            return super().__new__(cls, name, bases, attrs, **kwargs)  # type: ignore
         try:
             from faker import Faker
         except ImportError:
             raise ImportError("Faker is required for the factory.") from None
         faker = Faker()
-
-        model_class = super().__new__
-
-        parents = [parent for parent in bases if isinstance(parent, ModelFactoryMeta)]
-        if not parents:
-            return model_class(cls, name, bases, attrs)
-        meta_class = attrs.pop("Meta", None)
-        fields: dict[str, dict[str, Any]] = {}
+        meta_class: Any = attrs.pop("Meta", None)
+        fields: dict[str, FactoryField] = {}
+        mappings: dict[str, FactoryCallback] = {}
+        # of the current Meta
+        current_mapping: dict[str, FactoryCallback | None] = (
+            getattr(meta_class, "mappings", None) or {}
+        )
+        for name, mapping in current_mapping:
+            mappings.setdefault(name, mapping)
         for base in bases:
             for sub in getmro(base):
                 meta: Any = getattr(sub, "meta", None)
                 if isinstance(meta, MetaInfo):
+                    for name, mapping in meta.mappings.items():
+                        mappings.setdefault(name, mapping)
                     for name, field in meta.fields.items():
                         if field.no_copy:
                             continue
-                        fields.setdefault(name, field.__copy__())
+                        if not field.callback and field.get_field_type() not in mappings:
+                            terminal.write_warning(
+                                f'Mapping for field type: "{field.get_field_type()}" not found. Skip field: "{field.name}".'
+                                f'\nDiffering ModelFactory field name: "{field.original_name}".'
+                                if field.original_name != field.name
+                                else ""
+                            )
+                        else:
+                            fields.setdefault(name, field.__copy__())
 
-        model: Model | str = getattr(meta_class, "model", None)
-        if model is None:
+        # now add the default mapping
+        for name, mapping in DEFAULT_MAPPING.items():
+            mappings.setdefault(name, mapping)
+
+        db_model: type[Model] | str | None = getattr(meta_class, "model", None)
+        if db_model is None:
             raise InvalidModelError("Model is required for a factory.") from None
 
-        if isinstance(model, str):
-            model = monkay.load(model)
+        if isinstance(db_model, str):
+            db_model = cast(type["Model"], monkay.load(db_model))
 
         # Checks if its a valid Edgy model.
-        if not is_class_and_subclass(model, Model):
-            raise InvalidModelError(f"Class {model.__name__} is not an Edgy model.") from None
+        if not is_class_and_subclass(db_model, Model):
+            db_model_name = db_model.__name__ if isclass(db_model) else type(db_model.__name__)
+            raise InvalidModelError(f"Class {db_model_name} is not an Edgy model.") from None
 
         # Assign the meta and the fields of the meta
         meta_info = meta_info_class(
-            model.meta,
-            meta_class,
-            __edgy_fields__=model.meta.fields,
-            model=model,
-            fields=fields,
-            faker=faker,
+            db_model.meta, meta_class, model=db_model, faker=faker, mappings=mappings
         )
-        for key, value in attrs.items():
+        # update fields
+        for key in list(attrs.keys()):
             if key == "meta":
                 continue
             value: Any = attrs.get(key)
             if isinstance(value, FactoryField):
-                field: FactoryField = value.__copy__()
+                value.original_name = key
                 del attrs[key]
-                field.name = key = value.name or key
-                fields[key] = field
-        for key, edgy_field in model.meta.fields.items():
-            if key not in fields:
-                field = FactoryField(name=key, field_type=edgy_field, no_copy=True)
-                if field.field_type in meta_info.mappings:
-                    fields[key] = field
+                value.name = name = value.name or key
+                if (
+                    not value.callback
+                    and value.get_field_type(db_model_meta=db_model.meta) not in mappings
+                ):
+                    terminal.write_warning(
+                        f'Mapping for field type: "{value.get_field_type(db_model_meta=db_model.meta)}" not found. Skip field: "{value.name}".'
+                        f'\nDiffering ModelFactory field name: "{value.original_name}".'
+                        if value.original_name != value.name
+                        else ""
+                    )
+                else:
+                    fields[name] = value
+        for db_field_name in db_model.meta.fields:
+            if db_field_name not in fields:
+                field = FactoryField(name=db_field_name, no_copy=True)
+                field.original_name = db_field_name
+                field_type = field.get_field_type(db_model_meta=db_model.meta)
+                if field_type not in meta_info.mappings:
+                    terminal.write_warning(
+                        f'Mapping for field type: "{field_type}" not found. Skip field: "{field.name}".'
+                        f'\nDiffering ModelFactory field name: "{field.original_name}".'
+                        if field.original_name != field.name
+                        else ""
+                    )
+                else:
+                    mapping_result = meta_info.mappings.get(field_type)
+                    # ignore None, which can be used to exclude fields
+                    if mapping_result:
+                        fields[field.name] = field
+
+        meta_info.fields = fields
         attrs["meta"] = meta_info
 
         new_class = cast(type["ModelFactory"], super().__new__(cls, name, bases, attrs, **kwargs))
+        # set owner
         for field in fields.values():
             field.owner = new_class
         # validate
