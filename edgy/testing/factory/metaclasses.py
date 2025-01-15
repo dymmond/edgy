@@ -35,7 +35,8 @@ def ForeignKey_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any
 
     factory = ForeignKeyFactory()
 
-    field.callback = lambda field, faker, kwargs: factory.build(**kwargs)
+    # arm callback
+    field.callback = lambda field, faker, k: factory.build(**k)
     return field.callback(field, faker, kwargs)
 
 
@@ -48,9 +49,9 @@ def ManyToManyField_callback(field: FactoryField, faker: Faker, kwargs: dict[str
 
     factory = ManyToManyFieldFactory()
 
-    field.callback = lambda field, faker, kwargs: [
-        factory.build(parameters=kwargs.get("parameters"), overwrites=kwargs.get("overwrites"))
-        for i in range(faker.random_int(min=kwargs.get("min", 0), max=kwargs.get("max", 100)))
+    field.callback = lambda field, faker, k: [
+        factory.build(parameters=k.get("parameters"), overwrites=k.get("overwrites"))
+        for i in range(faker.random_int(min=k.get("min", 0), max=k.get("max", 100)))
     ]
     return field.callback(field, faker, kwargs)
 
@@ -64,9 +65,9 @@ def RefForeignKey_callback(field: FactoryField, faker: Faker, kwargs: dict[str, 
 
     factory = RefForeignKeyFactory()
 
-    field.callback = lambda field, faker, kwargs: [
-        factory.build(parameters=kwargs.get("parameters"), overwrites=kwargs.get("overwrites"))
-        for i in range(faker.random_int(min=kwargs.get("min", 0), max=kwargs.get("max", 100)))
+    field.callback = lambda field, faker, k: [
+        factory.build(parameters=k.get("parameters"), overwrites=kwargs.get("overwrites"))
+        for i in range(faker.random_int(min=k.get("min", 0), max=k.get("max", 100)))
     ]
     return field.callback(field, faker, kwargs)
 

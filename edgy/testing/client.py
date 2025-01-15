@@ -1,10 +1,6 @@
 import os
-from typing import TYPE_CHECKING
 
 from databasez.testclient import DatabaseTestClient as _DatabaseTestClient
-
-if TYPE_CHECKING:
-    pass
 
 default_test_prefix: str = "test_"
 # for allowing empty

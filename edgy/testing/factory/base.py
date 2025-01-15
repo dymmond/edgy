@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from edgy import Model
 
@@ -36,7 +36,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         self,
         *,
         faker: Faker | None = None,
-        parameters: dict[str, dict[str, Any] | FactoryCallback | False] | None = None,
+        parameters: dict[str, dict[str, Any] | FactoryCallback | Literal[False]] | None = None,
         overwrites: dict[str, Any] | None = None,
     ) -> Model:
         """
@@ -50,9 +50,10 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         >>> class UserFactory(ModelFactory):
         ...     class Meta:
         ...         model = User
+        ...
         ...     name = FactoryField(parameters={"": ""})
 
-        >>> user = UserFactory(name='XXX').build()
+        >>> user = UserFactory(name="XXX").build()
 
         The fields that are not provided will be generated using the faker library.
 

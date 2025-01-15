@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from inspect import isclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:
     from faker import Faker
@@ -23,7 +23,7 @@ def edgy_field_param_extractor(
     *,
     remapping: dict[str, tuple[str, Callable[[Any], Any]] | None] | None = None,
     defaults: dict[str, Any | FactoryParameterCallback] | None = None,
-) -> Callable[FactoryCallback, Any]:
+) -> FactoryCallback:
     remapping = remapping or {}
     remapping = {**PYDANTIC_FIELD_PARAMETERS, **remapping}
     if isinstance(factory_fn, str):
@@ -43,7 +43,7 @@ def edgy_field_param_extractor(
                     if callable(value) and not isclass(value):
                         value = value(field, faker, name)
                     kwargs[name] = value
-        return factory_fn(field, faker, kwargs)
+        return cast("FactoryCallback", factory_fn)(field, faker, kwargs)
 
     return mapper_fn
 
@@ -51,10 +51,11 @@ def edgy_field_param_extractor(
 def default_wrapper(
     factory_fn: FactoryCallback | str,
     defaults: dict[str, Any],
-) -> Callable[FactoryCallback, Any | FactoryParameterCallback]:
+) -> FactoryCallback:
     """A simplified edgy_field_param_extractor."""
     if isinstance(factory_fn, str):
-        factory_fn = lambda field, faker, kwargs: getattr(faker, factory_fn)(**kwargs)  # noqa
+        factory_name = factory_fn
+        factory_fn = lambda field, faker, kwargs: getattr(faker, factory_name)(**kwargs)  # noqa
 
     def mapper_fn(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
         for name, value in defaults.items():
