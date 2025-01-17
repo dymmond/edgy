@@ -2,23 +2,17 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Iterable, Sequence
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    ClassVar,
-    Optional,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, Union
 
 if TYPE_CHECKING:
     import sqlalchemy
-    from databasez.core.transaction import Transaction
 
     from edgy.core.connection.database import Database
     from edgy.core.db.models.base import BaseModel
     from edgy.core.db.models.managers import BaseManager
     from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.db.querysets.base import QuerySet
+    from edgy.protocols.transaction_call import TransactionCallProtocol
 
 
 class DescriptiveMeta:
@@ -59,6 +53,7 @@ class BaseModelType(ABC):
     query_related: ClassVar[BaseManager]
     meta: ClassVar[MetaInfo]
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
+    transaction: ClassVar[TransactionCallProtocol]
 
     __parent__: ClassVar[Union[type[BaseModelType], None]] = None
     __is_proxy_model__: ClassVar[bool] = False
@@ -79,10 +74,6 @@ class BaseModelType(ABC):
     @abstractmethod
     def can_load(self) -> bool:
         """identifying_db_fields are completely specified."""
-
-    @abstractmethod
-    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
-        """Return database transaction for the assigned database."""
 
     @abstractmethod
     def get_columns_for_name(self, name: str) -> Sequence[sqlalchemy.Column]:

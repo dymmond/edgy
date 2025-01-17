@@ -169,6 +169,10 @@ def _set_related_name_for_foreign_keys(
 class DatabaseMixin:
     _removed_copy_keys: ClassVar[set[str]] = _removed_copy_keys
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.__dict__["transaction"] = self.not_set_transaction
+
     @classmethod
     def real_add_to_registry(
         cls: type[BaseModelType],
@@ -809,8 +813,14 @@ class DatabaseMixin:
             ),
         )
 
-    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
-        """Return database transaction for the assigned database"""
+    def not_set_transaction(
+        self=None, *, force_rollback: bool = False, **kwargs: Any
+    ) -> Transaction:
+        """
+        Return database transaction for the assigned database.
+
+        This method is automatically assigned to transaction masking the metaclass transaction for instances.
+        """
         return cast(
             "Transaction", self.database.transaction(force_rollback=force_rollback, **kwargs)
         )

@@ -59,6 +59,12 @@ def test_model_class():
     assert isinstance(User.query.meta.fields["name"], Field)
 
 
+def test_transactions():
+    user = User(id=1)
+    User.transaction()
+    user.transaction()
+
+
 def test_model_pk():
     user = User(pk=1)
     assert user.pk == 1
