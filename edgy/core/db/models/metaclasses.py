@@ -34,6 +34,8 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import ImproperlyConfigured, TableBuildError
 
 if TYPE_CHECKING:
+    from databasez.core.transaction import Transaction
+
     from edgy.core.connection import Database
     from edgy.core.db.models import Model
     from edgy.core.db.models.types import BaseModelType
@@ -878,6 +880,12 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         )
         meta: MetaInfo = cls.meta
         return meta.signals
+
+    def transaction(cls, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
+        """Return database transaction for the assigned database"""
+        return cast(
+            "Transaction", cls.database.transaction(force_rollback=force_rollback, **kwargs)
+        )
 
     def table_schema(
         cls,
