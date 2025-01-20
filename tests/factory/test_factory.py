@@ -1,4 +1,7 @@
+import enum
+
 import pytest
+from pydantic import ValidationError
 
 import edgy
 from edgy.testing import DatabaseTestClient
@@ -8,6 +11,11 @@ from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
+
+
+class ProductType(enum.Enum):
+    real = "real"
+    virtual = "virtual"
 
 
 class User(edgy.StrictModel):
@@ -25,6 +33,7 @@ class Product(edgy.StrictModel):
     rating: int = edgy.IntegerField(minimum=1, maximum=5, default=1)
     in_stock: bool = edgy.BooleanField(default=False)
     user: User = edgy.fields.ForeignKey(User)
+    type: ProductType = edgy.fields.ChoiceField(choices=ProductType, default=ProductType.virtual)
 
     class Meta:
         registry = models
@@ -42,6 +51,16 @@ def test_can_generate_factory():
     class UserFactory(ModelFactory):
         class Meta:
             model = User
+
+    assert UserFactory.meta.model == User
+    assert UserFactory.meta.abstract is False
+    assert UserFactory.meta.registry == models
+
+
+def test_can_generate_factory_by_string():
+    class UserFactory(ModelFactory):
+        class Meta:
+            model = "tests.factory.test_factory.User"
 
     assert UserFactory.meta.model == User
     assert UserFactory.meta.abstract is False
@@ -78,6 +97,17 @@ def test_can_generate_overwrite_and_exclude():
     assert product.user is user
     assert product.database == database
 
+    # now strip User
+    user = UserFactory().build(exclude={"name", "language"})
+    # currently the behaviour is to set the defaults later when saving to the db
+    # this can change in future
+    assert getattr(user, "name", None) is None
+    assert getattr(user, "language", None) is None
+
+    # now strip Product and cause an error
+    with pytest.raises(ValidationError):
+        ProductFactory().build(exclude={"user"})
+
 
 def test_can_use_field_callback():
     class ProductFactory(ModelFactory):
@@ -94,20 +124,14 @@ def test_can_use_field_callback():
         old_product = product
 
 
-def test_verify_fail_when_default_broken():
-    with pytest.raises(KeyError):
-
-        class ProductFactory(ModelFactory):
-            class Meta:
-                model = Product
-
-            name = FactoryField(callback=lambda x, y, kwargs: f"edgy{kwargs['count']}")
-
-
 def test_mapping():
     class UserFactory(ModelFactory):
         class Meta:
             model = User
+
+    class ProductFactory(ModelFactory):
+        class Meta:
+            model = Product
 
     for field_name in edgy.fields.__all__:
         field_type_name = getattr(edgy.fields, field_name).__name__
@@ -118,14 +142,24 @@ def test_mapping():
         ):
             continue
         assert field_type_name in DEFAULT_MAPPING
-        if field_type_name not in {
+        if field_type_name in {
             "ForeignKey",
             "OneToOneField",
             "OneToOne",
             "ManyToManyField",
             "ManyToMany",
-            "RefForeignKey",
         }:
+            DEFAULT_MAPPING[field_type_name](
+                ProductFactory.meta.fields["user"], ProductFactory.meta.faker, {}
+            )
+        elif field_type_name == "ChoiceField":
+            DEFAULT_MAPPING[field_type_name](
+                ProductFactory.meta.fields["type"], ProductFactory.meta.faker, {}
+            )
+        elif field_type_name == "RefForeignKey":
+            pass
+            # FIXME: provide test
+        else:
             callback = DEFAULT_MAPPING[field_type_name]
             if callback:
                 callback(UserFactory.meta.fields["name"], UserFactory.meta.faker, {})

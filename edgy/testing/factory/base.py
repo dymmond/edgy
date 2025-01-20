@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal
+from collections.abc import Container
+from typing import TYPE_CHECKING, Any
 
 from edgy import Model
 
@@ -36,8 +37,10 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         self,
         *,
         faker: Faker | None = None,
-        parameters: dict[str, dict[str, Any] | FactoryCallback | Literal[False]] | None = None,
+        parameters: dict[str, dict[str, Any] | FactoryCallback] | None = None,
         overwrites: dict[str, Any] | None = None,
+        exclude: Container[str] = (),
+        save_after: bool = False,
     ) -> Model:
         """
         When this function is called, automacally will perform the
@@ -68,12 +71,9 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             overwrites = {}
         values = {}
         for name, field in self.meta.fields.items():
-            if name in overwrites or name in self.__kwargs__ or field.exclude:
+            if name in overwrites or name in exclude or name in self.__kwargs__ or field.exclude:
                 continue
             current_parameters_or_callback = parameters.get(name)
-            # exclude field on the fly by passing False in parameters and don't have it in kwargs
-            if current_parameters_or_callback is False:
-                continue
             if callable(current_parameters_or_callback):
                 values[name] = current_parameters_or_callback(
                     field,
@@ -97,4 +97,6 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             result.database = self.database
         if getattr(self, "__using_schema__", None) is not None:
             result.__using_schema__ = self.__using_schema__
+        if save_after:
+            return result.save()
         return result

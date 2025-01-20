@@ -12,9 +12,10 @@ if TYPE_CHECKING:
 
 
 PYDANTIC_FIELD_PARAMETERS: dict[str, tuple[str, Callable[[Any], Any]]] = {
-    "ge": ("min", lambda x: x),
-    "le": ("max", lambda x: x),
+    "ge": ("min_value", lambda x: x),
+    "le": ("max_value", lambda x: x),
     "multiple_of": ("step", lambda x: x),
+    "decimal_places": ("right_digits", lambda x: x),
 }
 
 
