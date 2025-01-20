@@ -159,7 +159,14 @@ The parameters are:
 {!> ../docs_src/testing/factory/factory_build.py !}
 ```
 
+### Saving
 
+Saving isn't beem done in build(). It must be done after seperately.
+When requiring saving you should exclude autoincrement fields otherwise strange collissions can start to happen.
+
+```python
+{!> ../docs_src/testing/factory/factory_save.py !}
+```
 
 ## Model Validation
 
