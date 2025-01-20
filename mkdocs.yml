@@ -115,7 +115,7 @@ nav:
       - Exceptions: "exceptions.md"
       - Tips and Tricks: "tips-and-tricks.md"
       - Extensions: "extensions.md"
-    Testing:
+  - Testing:
       - "testing/index.md"
       - Test Client: "testing/test-client.md"
       - Model Factory: "testing/model-factory.md"

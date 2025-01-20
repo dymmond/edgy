@@ -19,14 +19,14 @@ You can reuse the factory instance to produce a lot of models.
 Example:
 
 ```python
-{!> ../../docs_src/testing/factory/factory_basic.py !}
+{!> ../docs_src/testing/factory/factory_basic.py !}
 ```
 
 Now we have a basic working model. Now let's get more complicated. Let's remove the implicit id field via factory fields
 
 
 ```python
-{!> ../../docs_src/testing/factory/factory_fields_exclude.py !}
+{!> ../docs_src/testing/factory/factory_fields_exclude.py !}
 ```
 
 
@@ -42,7 +42,7 @@ When no callback is provided the mappings are used which use the field type name
 E.g. CharFields use the "CharField" mapping.
 
 ```python
-{!> ../../docs_src/testing/factory/factory_parametrize.py !}
+{!> ../docs_src/testing/factory/factory_parametrize.py !}
 ```
 
 ### Setting database and schema
