@@ -82,7 +82,7 @@ Pretty cool, right?
 Nothing like an example to see it in action.
 
 ```python title="tests.py" hl_lines="14"
-{!> ../docs_src/testing/testclient/tests.py !}
+{!> ../../docs_src/testing/testclient/tests.py !}
 ```
 
 #### What is happening

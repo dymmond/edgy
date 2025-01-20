@@ -109,7 +109,7 @@ def BinaryField_callback(field: FactoryField, faker: Faker, kwargs: dict[str, An
     if max_value is None:
         max_value = 1024
     kwargs.setdefault("length", faker.random_int(min=min_value, max=max_value))
-    return faker.image(**kwargs)
+    return faker.binary(**kwargs)
 
 
 def ImageField_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:

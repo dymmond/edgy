@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from edgy.core.db.models.metaclasses import MetaInfo as ModelMetaInfo
 
     from .base import ModelFactory
-    from .types import FactoryCallback, FactoryFieldType, FactoryParameters
+    from .types import FactoryCallback, FactoryFieldType, FactoryParameters, FieldFactoryCallback
 
 
 class FactoryField:
@@ -23,7 +23,7 @@ class FactoryField:
         self,
         *,
         exclude: bool = False,
-        callback: FactoryCallback | None = None,
+        callback: FieldFactoryCallback | None = None,
         parameters: FactoryParameters | None = None,
         field_type: FactoryFieldType | None = None,
         name: str = "",
@@ -33,8 +33,11 @@ class FactoryField:
         self.no_copy = no_copy
         self.name = name
         self.parameters = parameters or {}
-        self.callback = callback
         self.field_type = field_type  # type: ignore
+        if isinstance(callback, str):
+            callback_name = callback
+            callback = lambda field, faker, parameters: getattr(faker, callback_name)(**parameters)  # noqa
+        self.callback = callback
 
     def get_field_type(self, *, db_model_meta: ModelMetaInfo | None = None) -> str:
         if self.field_type:

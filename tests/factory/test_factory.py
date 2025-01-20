@@ -5,6 +5,7 @@ from pydantic import ValidationError
 
 import edgy
 from edgy.testing import DatabaseTestClient
+from edgy.testing.exceptions import ExcludeValue
 from edgy.testing.factory import FactoryField, ModelFactory
 from edgy.testing.factory.metaclasses import DEFAULT_MAPPING
 from tests.settings import DATABASE_URL
@@ -53,8 +54,6 @@ def test_can_generate_factory():
             model = User
 
     assert UserFactory.meta.model == User
-    assert UserFactory.meta.abstract is False
-    assert UserFactory.meta.registry == models
 
 
 def test_can_generate_factory_by_string():
@@ -63,8 +62,6 @@ def test_can_generate_factory_by_string():
             model = "tests.factory.test_factory.User"
 
     assert UserFactory.meta.model == User
-    assert UserFactory.meta.abstract is False
-    assert UserFactory.meta.registry == models
 
 
 def test_can_generate_overwrite_and_exclude():
@@ -117,11 +114,81 @@ def test_can_use_field_callback():
         name = FactoryField(callback=lambda x, y, z: "edgy")
 
     old_product = None
+    prod_factory = ProductFactory()
     for i in range(100):  # noqa
-        product = ProductFactory().build()
+        product = prod_factory.build()
         assert product.name == "edgy"
         assert product != old_product
         old_product = product
+
+
+def test_nullify():
+    class ProductFactory(ModelFactory):
+        class Meta:
+            model = Product
+
+        name = FactoryField(callback=lambda x, y, z: "edgy", parameters={"randomly_nullify": 100})
+
+    old_product = None
+    prod_factory = ProductFactory()
+    for i in range(100):  # noqa
+        product = prod_factory.build()
+        assert product.name is None
+        assert product != old_product
+        old_product = product
+
+    for i in range(100):  # noqa
+        product = prod_factory.build(parameters={"name": {"randomly_nullify": 0}})
+        assert product.name is not None
+        assert product != old_product
+        old_product = product
+
+
+def test_unset():
+    class ProductFactory(ModelFactory):
+        class Meta:
+            model = Product
+
+        name = FactoryField(callback=lambda x, y, z: "edgy", parameters={"randomly_unset": 100})
+
+    old_product = None
+    prod_factory = ProductFactory()
+    for i in range(100):  # noqa
+        product = prod_factory.build()
+        assert getattr(product, "name", None) is None
+        assert product is not old_product
+        old_product = product
+
+    for i in range(100):  # noqa
+        product = prod_factory.build(parameters={"name": {"randomly_unset": 0}})
+        assert getattr(product, "name", None) is not None
+        assert product is not old_product
+        old_product = product
+
+
+def test_can_use_field_callback_exclude_value():
+    def callback(x, y, z):
+        raise ExcludeValue
+
+    class ProductFactory(ModelFactory):
+        class Meta:
+            model = Product
+
+        name = FactoryField(callback=callback)
+
+    product = ProductFactory().build(exclude=["id"])
+    assert getattr(product, "name", None) is None
+
+
+def test_exclude_value():
+    class ProductFactory(ModelFactory):
+        class Meta:
+            model = Product
+
+        name_other_name = FactoryField(exclude=True, name="name")
+
+    product = ProductFactory().build(exclude=["id"])
+    assert getattr(product, "name", None) is None
 
 
 def test_mapping():

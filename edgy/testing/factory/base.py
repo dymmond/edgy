@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from edgy.core.connection import Database
 
     from .metaclasses import MetaInfo
-    from .types import FactoryCallback
+    from .types import FieldFactoryCallback
 
 
 class ModelFactory(metaclass=ModelFactoryMeta):
@@ -57,7 +57,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         self,
         *,
         faker: Faker | None = None,
-        parameters: dict[str, dict[str, Any] | FactoryCallback] | None = None,
+        parameters: dict[str, dict[str, Any] | FieldFactoryCallback] | None = None,
         overwrites: dict[str, Any] | None = None,
         exclude: Container[str] = (),
         database: Database | None | Literal[False] = None,
@@ -103,6 +103,17 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             if name in overwrites or name in exclude or name in self.__kwargs__ or field.exclude:
                 continue
             current_parameters_or_callback = parameters.get(name)
+            if isinstance(current_parameters_or_callback, str):
+                callback_name = current_parameters_or_callback
+
+                def current_parameters_or_callback(
+                    field: FactoryField,
+                    faker: Faker,
+                    params: dict[str, Any],
+                    _callback_name: str = callback_name,
+                ) -> Any:
+                    return getattr(faker, _callback_name)(**params)
+
             try:
                 if callable(current_parameters_or_callback):
                     params = field.get_parameters(faker=faker)
@@ -150,6 +161,8 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         values.update(overwrites)
 
         result = self.meta.model(**values)
+        # we don't want to trigger loads.
+        result._loaded_or_deleted = True
         if database is not None:
             result.database = self.database
         if schema is not None:

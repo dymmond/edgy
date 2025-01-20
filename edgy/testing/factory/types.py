@@ -21,4 +21,5 @@ FactoryParameterCallback = Callable[
 ]
 FactoryParameters = dict[str, Union[Any, FactoryParameterCallback]]
 FactoryCallback = Callable[["FactoryField", "Faker", dict[str, Any]], Any]
+FieldFactoryCallback = Union[FactoryCallback, str]
 FactoryFieldType = Union[str, "BaseFieldType", type["BaseFieldType"]]
