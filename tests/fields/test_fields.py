@@ -296,4 +296,4 @@ def test_can_choice_field():
 
 def test_raise_exception_choice_field():
     with pytest.raises(FieldDefinitionError):
-        ChoiceField()
+        ChoiceField(choices=None)
