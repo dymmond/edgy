@@ -51,7 +51,7 @@ def test_no_model_fails():
 
     with pytest.raises(InvalidModelError):
 
-        class UserFactory(ModelFactory):
+        class UserFactory2(ModelFactory):
             pass
 
 
