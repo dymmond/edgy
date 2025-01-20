@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from edgy.core.files import File
+
 from .utils import edgy_field_param_extractor
 
 if TYPE_CHECKING:
@@ -13,13 +15,13 @@ if TYPE_CHECKING:
     from .types import FactoryCallback
 
 
-def ChoiceField_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
+def ChoiceField_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
     choices: type[enum.Enum] = field.owner.meta.model.meta.fields[field.name].choices
 
     return faker.enum(choices)
 
 
-def ForeignKey_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
+def ForeignKey_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
     from .base import ModelFactory
 
     edgy_field = field.owner.meta.model.meta.fields[field.name]
@@ -37,10 +39,10 @@ def ForeignKey_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any
         return factory.build(faker=faker, **k)
 
     field.callback = callback
-    return field.callback(field, faker, kwargs)
+    return field.callback(field, faker, parameters)
 
 
-def ManyToManyField_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
+def ManyToManyField_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
     from .base import ModelFactory
 
     edgy_field = field.owner.meta.model.meta.fields[field.name]
@@ -64,10 +66,10 @@ def ManyToManyField_callback(field: FactoryField, faker: Faker, kwargs: dict[str
 
     field.callback = callback
 
-    return field.callback(field, faker, kwargs)
+    return field.callback(field, faker, parameters)
 
 
-def RefForeignKey_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
+def RefForeignKey_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
     from .base import ModelFactory
 
     edgy_model_meta = field.owner.meta.model.meta
@@ -97,30 +99,52 @@ def RefForeignKey_callback(field: FactoryField, faker: Faker, kwargs: dict[str, 
 
     field.callback = callback
 
-    return field.callback(field, faker, kwargs)
+    return field.callback(field, faker, parameters)
 
 
-def BinaryField_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
+def BinaryField_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
     edgy_field = field.owner.meta.model.meta.fields[field.name]
-    min_value = getattr(edgy_field, "min_length", None)
+    min_value = parameters.pop("min", None)
+    if min_value is not None:
+        min_value = getattr(edgy_field, "min_length", min_value)
     if min_value is None:
         min_value = 0
-    max_value = getattr(edgy_field, "max_length", None)
+    max_value = parameters.pop("max", None)
+    if max_value is not None:
+        max_value = getattr(edgy_field, "max_length", max_value)
     if max_value is None:
         max_value = 1024
-    kwargs.setdefault("length", faker.random_int(min=min_value, max=max_value))
-    return faker.binary(**kwargs)
+    parameters.setdefault("length", faker.random_int(min=min_value, max=max_value))
+    length = parameters.pop("length")
+    return faker.binary(length)
 
 
-def ImageField_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
-    kwargs.setdefault(
+def FileField_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
+    edgy_field = field.owner.meta.model.meta.fields[field.name]
+    min_value = parameters.pop("min", None)
+    if min_value is not None:
+        min_value = getattr(edgy_field, "min_length", min_value)
+    if min_value is None:
+        min_value = 0
+    max_value = parameters.pop("max", None)
+    if max_value is not None:
+        max_value = getattr(edgy_field, "max_length", max_value)
+    if max_value is None:
+        max_value = 1024
+    parameters.setdefault("length", faker.random_int(min=min_value, max=max_value))
+    length = parameters.pop("length")
+    return File(faker.binary(length), name=faker.file_name(**parameters))
+
+
+def ImageField_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
+    parameters.setdefault(
         "size",
         (
             faker.random_int(min=1, max=1024),
             faker.random_int(min=1, max=1024),
         ),
     )
-    return faker.image(**kwargs)
+    return faker.image(**parameters)
 
 
 DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
@@ -132,7 +156,7 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
         },
     ),
     "BigIntegerField": edgy_field_param_extractor(
-        "random_number",
+        "random_int",
         remapping={
             "gt": ("min", lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) - 1),
             "lt": ("max", lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) + 1),
@@ -176,16 +200,16 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
     "BooleanField": edgy_field_param_extractor("boolean"),
     "URLField": edgy_field_param_extractor("uri"),
     "ImageField": ImageField_callback,
-    "FileField": BinaryField_callback,
+    "FileField": FileField_callback,
     "ChoiceField": ChoiceField_callback,
     "CharField": edgy_field_param_extractor("name"),
     "DateField": edgy_field_param_extractor("date"),
     "DateTimeField": edgy_field_param_extractor("date_time"),
-    "DurationField": edgy_field_param_extractor("time"),
+    "DurationField": edgy_field_param_extractor("time_delta"),
     "EmailField": edgy_field_param_extractor("email"),
     "BinaryField": BinaryField_callback,
     "IPAddressField": edgy_field_param_extractor("ipv4"),
-    "PasswordField": edgy_field_param_extractor("ipv4"),
+    "PasswordField": edgy_field_param_extractor("password"),
     "TextField": edgy_field_param_extractor(
         "text",
         remapping={

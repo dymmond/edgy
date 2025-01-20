@@ -14,8 +14,8 @@ if TYPE_CHECKING:
 
 
 EDGY_FIELD_PARAMETERS: dict[str, tuple[str, Callable[[BaseFieldType, str, Faker], Any]]] = {
-    "ge": ("min_value", lambda field, attr_name, faker: getattr(field, attr_name)),
-    "le": ("max_value", lambda field, attr_name, faker: getattr(field, attr_name)),
+    "ge": ("min", lambda field, attr_name, faker: getattr(field, attr_name)),
+    "le": ("max", lambda field, attr_name, faker: getattr(field, attr_name)),
     "multiple_of": ("step", lambda field, attr_name, faker: getattr(field, attr_name)),
     "decimal_places": ("right_digits", lambda field, attr_name, faker: getattr(field, attr_name)),
 }

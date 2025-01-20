@@ -45,6 +45,23 @@ E.g. CharFields use the "CharField" mapping.
 {!> ../docs_src/testing/factory/factory_parametrize.py !}
 ```
 
+You can also overwrite field_type on FactoryField base. This can be used to parametrize
+field differently e.g. ImageFields like a FileField or a CharField like PasswordField.
+
+```python
+{!> ../docs_src/testing/factory/factory_field_overwrite.py !}
+```
+
+In case you want to overwrite a mapping completely for all subclasses you can use the Meta `mappings` attribute.
+
+```python
+{!> ../docs_src/testing/factory/factory_mapping.py !}
+```
+
+Setting a mapping to `None` will disable a stubbing by default.
+You will need to re-enable via setting the mapping in a subclass to a mapping function.
+
+
 ### Setting database and schema
 
 By default the database and schema of the model is used unchanged. You can however provide an other database or schema than the default by defining

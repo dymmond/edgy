@@ -39,6 +39,7 @@ hide:
 - ManyToMany and ForeignKey fields didn't worked when referencing tenant models.
 - ManyToMany fields didn't worked when specified on tenant models.
 - Fix transaction method to work on instance and class.
+- Fix missing file conversion in File. Move from ContentFile.
 
 ### BREAKING
 

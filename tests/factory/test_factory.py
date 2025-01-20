@@ -97,7 +97,6 @@ def test_can_generate_overwrite_and_exclude():
     # now strip User
     user = UserFactory().build(exclude={"name", "language"})
     # currently the behaviour is to set the defaults later when saving to the db
-    # this can change in future
     assert getattr(user, "name", None) is None
     assert getattr(user, "language", None) is None
 

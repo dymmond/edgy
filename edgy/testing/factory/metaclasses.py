@@ -69,7 +69,7 @@ class ModelFactoryMeta(type):
         current_mapping: dict[str, FactoryCallback | None] = (
             getattr(meta_class, "mappings", None) or {}
         )
-        for name, mapping in current_mapping:
+        for name, mapping in current_mapping.items():
             mappings.setdefault(name, mapping)
         for base in bases:
             for sub in getmro(base):
