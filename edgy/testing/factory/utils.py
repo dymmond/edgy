@@ -7,26 +7,29 @@ from typing import TYPE_CHECKING, Any, cast
 if TYPE_CHECKING:
     from faker import Faker
 
+    from edgy.core.db.fields.types import BaseFieldType
+
     from .fields import FactoryField
     from .types import FactoryCallback, FactoryParameterCallback
 
 
-PYDANTIC_FIELD_PARAMETERS: dict[str, tuple[str, Callable[[Any], Any]]] = {
-    "ge": ("min_value", lambda x: x),
-    "le": ("max_value", lambda x: x),
-    "multiple_of": ("step", lambda x: x),
-    "decimal_places": ("right_digits", lambda x: x),
+EDGY_FIELD_PARAMETERS: dict[str, tuple[str, Callable[[BaseFieldType, str, Faker], Any]]] = {
+    "ge": ("min_value", lambda field, attr_name, faker: getattr(field, attr_name)),
+    "le": ("max_value", lambda field, attr_name, faker: getattr(field, attr_name)),
+    "multiple_of": ("step", lambda field, attr_name, faker: getattr(field, attr_name)),
+    "decimal_places": ("right_digits", lambda field, attr_name, faker: getattr(field, attr_name)),
 }
 
 
 def edgy_field_param_extractor(
     factory_fn: FactoryCallback | str,
     *,
-    remapping: dict[str, tuple[str, Callable[[Any], Any]] | None] | None = None,
+    remapping: dict[str, tuple[str, Callable[[BaseFieldType, str, Faker], Any]] | None]
+    | None = None,
     defaults: dict[str, Any | FactoryParameterCallback] | None = None,
 ) -> FactoryCallback:
     remapping = remapping or {}
-    remapping = {**PYDANTIC_FIELD_PARAMETERS, **remapping}
+    remapping = {**EDGY_FIELD_PARAMETERS, **remapping}
     if isinstance(factory_fn, str):
         factory_name = factory_fn
         factory_fn = lambda field, faker, kwargs: getattr(faker, factory_name)(**kwargs)  # noqa
@@ -37,7 +40,7 @@ def edgy_field_param_extractor(
             if mapper is None:
                 continue
             if getattr(edgy_field, attr, None) is not None:
-                kwargs.setdefault(mapper[0], mapper[1](getattr(edgy_field, attr)))
+                kwargs.setdefault(mapper[0], mapper[1](edgy_field, attr, faker))
         if defaults:
             for name, value in defaults.items():
                 if name not in kwargs:

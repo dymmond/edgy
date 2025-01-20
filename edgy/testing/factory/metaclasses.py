@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 from inspect import getmro, isclass
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import monkay
 from pydantic import ValidationError
@@ -13,15 +12,9 @@ from edgy.testing.exceptions import InvalidModelError
 from edgy.utils.compat import is_class_and_subclass
 
 from .fields import FactoryField
-from .utils import edgy_field_param_extractor
+from .mappings import DEFAULT_MAPPING
 
 if TYPE_CHECKING:
-    import enum
-
-    from faker import Faker
-
-    from edgy.core.connection import Registry
-
     from .base import ModelFactory
     from .types import FactoryCallback
 
@@ -29,151 +22,24 @@ if TYPE_CHECKING:
 terminal = Print()
 
 
-def ChoiceField_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
-    choices: enum.Enum = field.owner.meta.model.meta.fields[field.name].choices
-
-    return faker.enum(choices)
-
-
-def ForeignKey_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
-    from .base import ModelFactory
-
-    class ForeignKeyFactory(ModelFactory):
-        class Meta:
-            model = field.owner.meta.model.meta.fields[field.name].target
-
-    factory = ForeignKeyFactory()
-
-    # arm callback
-    field.callback = lambda field, faker, k: factory.build(**k)
-    return field.callback(field, faker, kwargs)
-
-
-def ManyToManyField_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
-    from .base import ModelFactory
-
-    class ManyToManyFieldFactory(ModelFactory):
-        class Meta:
-            model = field.owner.meta.model.meta.fields[field.name].target
-
-    factory = ManyToManyFieldFactory()
-
-    field.callback = lambda field, faker, k: [
-        factory.build(parameters=k.get("parameters"), overwrites=k.get("overwrites"))
-        for i in range(faker.random_int(min=k.get("min", 0), max=k.get("max", 100)))
-    ]
-    return field.callback(field, faker, kwargs)
-
-
-def RefForeignKey_callback(field: FactoryField, faker: Faker, kwargs: dict[str, Any]) -> Any:
-    from .base import ModelFactory
-
-    class RefForeignKeyFactory(ModelFactory):
-        class Meta:
-            model = field.owner.meta.model.meta.fields[field.name].to
-
-    factory = RefForeignKeyFactory()
-
-    field.callback = lambda field, faker, k: [
-        factory.build(parameters=k.get("parameters"), overwrites=kwargs.get("overwrites"))
-        for i in range(faker.random_int(min=k.get("min", 0), max=k.get("max", 100)))
-    ]
-    return field.callback(field, faker, kwargs)
-
-
-DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
-    "IntegerField": edgy_field_param_extractor(
-        "random_int", remapping={"gt": ("min", lambda x: x - 1), "lt": ("max", lambda x: x + 1)}
-    ),
-    "BigIntegerField": edgy_field_param_extractor(
-        "random_number", remapping={"gt": ("min", lambda x: x - 1), "lt": ("max", lambda x: x + 1)}
-    ),
-    "SmallIntegerField": edgy_field_param_extractor(
-        "random_int", remapping={"gt": ("min", lambda x: x - 1), "lt": ("max", lambda x: x + 1)}
-    ),
-    "DecimalField": edgy_field_param_extractor(
-        "pydecimal",
-        remapping={
-            # TODO: find better definition
-            "gt": ("min", lambda x: x - 0.0000000001),
-            "lt": ("max", lambda x: x + 0.0000000001),
-        },
-    ),
-    "FloatField": edgy_field_param_extractor(
-        "pyfloat",
-        remapping={
-            # TODO: find better definition
-            "gt": ("min", lambda x: x - 0.0000000001),
-            "lt": ("max", lambda x: x + 0.0000000001),
-        },
-    ),
-    "BooleanField": edgy_field_param_extractor("boolean"),
-    "URLField": edgy_field_param_extractor("uri"),
-    "ImageField": edgy_field_param_extractor(
-        "binary", remapping={"max_length": ("length", lambda x: x)}
-    ),
-    "FileField": edgy_field_param_extractor("binary"),
-    "ChoiceField": ChoiceField_callback,
-    "CharField": edgy_field_param_extractor("name"),
-    "DateField": edgy_field_param_extractor("date"),
-    "DateTimeField": edgy_field_param_extractor("date_time"),
-    "DurationField": edgy_field_param_extractor("time"),
-    "EmailField": edgy_field_param_extractor("email"),
-    "BinaryField": edgy_field_param_extractor(
-        "binary", remapping={"max_length": ("length", lambda x: x)}
-    ),
-    "IPAddressField": edgy_field_param_extractor("ipv4"),
-    "PasswordField": edgy_field_param_extractor("ipv4"),
-    "TextField": edgy_field_param_extractor("text"),
-    "TimeField": edgy_field_param_extractor("time"),
-    "UUIDField": edgy_field_param_extractor("uuid4"),
-    "JSONField": edgy_field_param_extractor("json"),
-    "ForeignKey": ForeignKey_callback,
-    "OneToOneField": ForeignKey_callback,
-    "OneToOne": ForeignKey_callback,
-    "ManyToManyField": ManyToManyField_callback,
-    "ManyToMany": ManyToManyField_callback,
-    "RefForeignKey": RefForeignKey_callback,
-    # special fields without mapping, they need a custom user defined logic
-    "CompositeField": None,
-    "ComputedField": None,
-    "PKField": None,
-    # can't hold a value
-    "ExcludeField": None,
-    # private. Used by other fields to save a private value.
-    "PlaceholderField": None,
-}
-
-
 # this is not models MetaInfo
 class MetaInfo:
     __slots__ = (
         "model",
-        "abstract",
-        "registry",
         "fields",
         "faker",
         "mappings",
     )
-    __ignore_slots__: ClassVar[set[str]] = {"fields", "model", "faker", "mappings"}
-    __edgy_fields__: dict[str, Any]
-    default_parameters: dict[str, dict[str, Any] | Callable[[ModelFactory, Faker, dict], Any]]
     model: type[Model]
-    abstract: bool
-    registry: Registry
     mappings: dict[str, FactoryCallback | None]
 
-    def __init__(self, *metas: Any, **kwargs: Any) -> None:
-        self.abstract: bool = False
-        self.registry: Registry = None
+    def __init__(self, meta: Any = None, **kwargs: Any) -> None:
+        self.fields: dict[str, FactoryField] = {}
         self.mappings: dict[str, FactoryCallback | None] = {}
-        for meta in metas:
-            for slot in self.__slots__:
-                if slot in self.__ignore_slots__:
-                    continue
-                value = getattr(meta, slot, None)
-                if value is not None:
-                    setattr(self, slot, value)
+        for slot in self.__slots__:
+            value = getattr(meta, slot, None)
+            if value is not None:
+                setattr(self, slot, value)
         for name, value in kwargs.items():
             setattr(self, name, value)
 
@@ -194,7 +60,7 @@ class ModelFactoryMeta(type):
         try:
             from faker import Faker
         except ImportError:
-            raise ImportError("Faker is required for the factory.") from None
+            raise ImportError('"Faker" is required for the ModelFactory.') from None
         faker = Faker()
         meta_class: Any = attrs.pop("Meta", None)
         fields: dict[str, FactoryField] = {}
@@ -241,9 +107,7 @@ class ModelFactoryMeta(type):
             raise InvalidModelError(f"Class {db_model_name} is not an Edgy model.") from None
 
         # Assign the meta and the fields of the meta
-        meta_info = meta_info_class(
-            db_model.meta, meta_class, model=db_model, faker=faker, mappings=mappings
-        )
+        meta_info = meta_info_class(model=db_model, faker=faker, mappings=mappings)
         # update fields
         for key in list(attrs.keys()):
             if key == "meta":
@@ -293,7 +157,7 @@ class ModelFactoryMeta(type):
         # validate
         if model_validation != "none":
             try:
-                new_class().build(save_after=False)
+                new_class().build()
             except ValidationError as exc:
                 if model_validation == "pedantic":
                     raise exc

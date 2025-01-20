@@ -54,7 +54,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
     @classmethod
     async def post_save_callback(
         cls,
-        obj: "BaseFieldType",
+        field_obj: "BaseFieldType",
         value: Optional[list],
         instance: "BaseModelType",
         force_insert: bool,
@@ -62,8 +62,9 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
     ) -> None:
         if not value:
             return
+        model_ref = field_obj.to
 
-        relation_field = instance.meta.fields[obj.to.__related_name__]
+        relation_field = instance.meta.fields[model_ref.__related_name__]
         extra_params = {}
         try:
             # m2m or foreign key
@@ -74,11 +75,11 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         if not relation_field.is_m2m:
             # sometimes the foreign key is required, so set it already
             extra_params[relation_field.foreign_key.name] = instance
-        relation = getattr(instance, obj.to.__related_name__)
+        relation = getattr(instance, model_ref.__related_name__)
         while value:
             instance_or_dict: Union[dict, ModelRef] = value.pop()
             if isinstance(instance_or_dict, dict):
-                instance_or_dict = obj.to(**instance_or_dict)
+                instance_or_dict = model_ref(**instance_or_dict)
             model = target_model_class(
                 **cast("ModelRef", instance_or_dict).model_dump(exclude={"__related_name__"}),
                 **extra_params,

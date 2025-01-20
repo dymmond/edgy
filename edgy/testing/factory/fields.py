@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 
 class FactoryField:
-    owner: ModelFactory
+    owner: type[ModelFactory]
     original_name: str
     _field_type: str = ""
     _callback: FactoryCallback | None = None
