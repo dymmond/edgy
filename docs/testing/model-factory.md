@@ -61,6 +61,12 @@ In case you want to overwrite a mapping completely for all subclasses you can us
 Setting a mapping to `None` will disable a stubbing by default.
 You will need to re-enable via setting the mapping in a subclass to a mapping function.
 
+```python
+{!> ../docs_src/testing/factory/factory_mapping2.py !}
+```
+
+!!! Tip
+    You can name a FactoryField differently and provide the name parameter explicitly. This way it is possible to workaround occluded fields.
 
 ### Setting database and schema
 
@@ -114,6 +120,21 @@ To exclude a field there are 3 ways
 - Add the field name to the exclude parameter of build.
 - Raise `edgy.testing.exceptions.ExcludeValue` in a callback.
 
+Let's revisit one of the first examples. Here the id field is excluded by a different named FactoryField.
+```python
+{!> ../docs_src/testing/factory/factory_fields_exclude.py !}
+```
+
+Note however that the FactoryField can only be overwritten by its provided name or in case it is unset its implicit name.
+When multiple fields have the same name, the last found in the same class is overwritting the other.
+
+Otherwise the mro order is used.
+
+Here an example using both other ways:
+
+```python
+{!> ../docs_src/testing/factory/factory_exclude.py !}
+```
 
 ## Build
 
@@ -133,9 +154,12 @@ The parameters are:
 - schema (str | None | False):  Use a different schema. When `None` pick the one of the ModelFactory if available, then fallback to the model.
   When `False`, just use the one of the model.
 
-## Mappings
 
-Mappings are inherited from the parents. The more recent mapping definition for a field type wins.
+```python
+{!> ../docs_src/testing/factory/factory_build.py !}
+```
+
+
 
 ## Model Validation
 

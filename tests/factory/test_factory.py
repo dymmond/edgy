@@ -166,7 +166,7 @@ def test_unset():
 
 
 def test_can_use_field_callback_exclude_value():
-    def callback(x, y, z):
+    def callback(field_instance, faker, parameters):
         raise ExcludeValue
 
     class ProductFactory(ModelFactory):

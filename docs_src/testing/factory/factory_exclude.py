@@ -2,9 +2,15 @@ import enum
 
 
 import edgy
+from edgy.testing.exceptions import ExcludeValue
 from edgy.testing.factory import ModelFactory, FactoryField
 
+test_database = DatabaseTestClient(...)
 models = edgy.Registry(database=...)
+
+
+def callback(field_instance, faker, parameters):
+    raise ExcludeValue
 
 
 class User(edgy.Model):
@@ -19,11 +25,9 @@ class UserFactory(ModelFactory):
     class Meta:
         model = User
 
-    language = FactoryField(callback="language_code")
+    language = FactoryField(callback=callback)
 
 
-user_factory = UserFactory(language="eng")
+user_factory = UserFactory()
 
-user_model_instance = user_factory.build()
-# provide the name edgy
-user_model_instance_with_name_edgy = user_factory.build(overwrites={"name": "edgy"})
+user_model_instance = user_factory.build(exclude={"name"})

@@ -173,7 +173,10 @@ This is inperformant! We have the size field.
 Instead of iterating through the objects, we just sum up the sizes in db per table via the sum operator
 
 
-TODO: Example
+```python
+{!> ../docs_src/fields/files/file_with_size.py !}
+```
+
 
 
 ### Metadata

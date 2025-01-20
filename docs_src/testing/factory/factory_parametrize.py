@@ -1,8 +1,8 @@
-import enum
-
+from typing import Any
 
 import edgy
 from edgy.testing.factory import ModelFactory, FactoryField
+from faker import Faker
 
 test_database = DatabaseTestClient(...)
 models = edgy.Registry(database=...)
@@ -16,6 +16,10 @@ class User(edgy.Model):
         registry = models
 
 
+def name_callback(field_instance: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
+    return f"{parameters['first_name']} {parameters['last_name']}"
+
+
 class UserFactory(ModelFactory):
     class Meta:
         model = User
@@ -25,9 +29,7 @@ class UserFactory(ModelFactory):
         callback=lambda field_instance, faker, parameters: faker.language_code(**parameters)
     )
     name = FactoryField(
-        callback=lambda field_instance,
-        faker,
-        parameters: f"{parameters['first_name']} {parameters['last_name']}",
+        callback=name_callback,
         parameters={
             "first_name": lambda field_instance, faker, parameters: faker.first_name(),
             "last_name": lambda field_instance, faker, parameters: faker.last_name(),
