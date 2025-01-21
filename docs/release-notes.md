@@ -40,6 +40,7 @@ hide:
 - ManyToMany fields didn't worked when specified on tenant models.
 - Fix transaction method to work on instance and class.
 - Fix missing file conversion in File. Move from ContentFile.
+- Fix mypy crashing after the cache was build (cause ChoiceField annotation).
 
 ### BREAKING
 
