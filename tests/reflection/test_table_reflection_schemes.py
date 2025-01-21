@@ -132,15 +132,6 @@ async def test_can_reflect_existing_table_with_not_all_fields_and_create_record(
     assert user.name == "Test2"
     assert user.description is None
 
-    users = await NewReflectedUser.query.defer("description").all()
-
-    assert len(users) == 2
-
-    user = users[1]
-
-    assert user.name == "Test2"
-    assert "description" not in user.__dict__
-
 
 async def test_can_reflect_and_edit_existing_table():
     await HubUser.query.create(name="Test", title="a title", description="desc")

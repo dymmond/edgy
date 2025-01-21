@@ -98,6 +98,16 @@ async def test_can_reflect_existing_table():
     assert len(users) == 1
 
 
+async def test_can_defer_loading():
+    await HubUser.query.create(name="Test", title="a title", description="desc")
+
+    user = await ReflectedUser.query.defer("description").get()
+
+    assert "description" not in user.__dict__
+    assert user.description == "desc"
+    assert "description" in user.__dict__
+
+
 async def test_can_reflect_existing_table_with_not_all_fields():
     await HubUser.query.create(name="Test", title="a title", description="desc")
 
@@ -114,6 +124,7 @@ async def test_can_reflect_existing_table_with_not_all_fields_and_create_record(
 
     assert len(users) == 1
 
+    # description is not a field and won't be serialized
     await NewReflectedUser.query.create(name="Test2", title="A new title", description="lol")
 
     users = await HubUser.query.all()
@@ -123,16 +134,8 @@ async def test_can_reflect_existing_table_with_not_all_fields_and_create_record(
     user = users[1]
 
     assert user.name == "Test2"
+    # not a reflected field so kept unset
     assert user.description is None
-
-    users = await NewReflectedUser.query.defer("description").all()
-
-    assert len(users) == 2
-
-    user = users[1]
-
-    assert user.name == "Test2"
-    assert "description" not in user.__dict__
 
 
 async def test_can_reflect_and_edit_existing_table():
