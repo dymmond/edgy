@@ -58,7 +58,7 @@ class ManyRelation(ManyRelationProtocol):
         queryset = queryset.filter(**{self.from_foreign_key: query})
         # now set embed_parent
         queryset.embed_parent = (self.to_foreign_key, self.embed_through or "")
-        if self.embed_through:
+        if self.embed_through != "":
             queryset.embed_parent_filters = queryset.embed_parent
         return queryset
 

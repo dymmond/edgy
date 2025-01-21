@@ -29,6 +29,7 @@ hide:
 - Instead of silent replacing models with the same `__name__` now an error is raised.
 - `skip_registry` has now also an allowed literal value: `"allow_search"`. It enables the search of the registry but doesn't register the model.
 - Move `testclient` to `testing` but keep a forward reference.
+- Change the default for ManyToMany `embed_through` from "" to `False` which affected traversing ManyToMany.
 
 ### Fixed
 
@@ -41,11 +42,16 @@ hide:
 - Fix transaction method to work on instance and class.
 - Fix missing file conversion in File. Move from ContentFile.
 - Fix mypy crashing after the cache was build (cause ChoiceField annotation).
+- Fix handling unknown fields via the generic_field.
+- Sanify default for embed_through which affected traversing ManyToMany.
+  It defaulted to the backward compatible "" which requires the user to traverse the m2m model first.
 
 ### BREAKING
 
 - Instead of silent replacing models with the same `__name__` now an error is raised.
 - The return value of `add_to_registry` changed. If you customize the function you need to return now the actual model added to the registry.
+- The default for ManyToMany `embed_through` changed from "" to `False` which affected traversing ManyToMany. For keeping the old behaviour pass:
+  `embed_through=""`.
 
 ## 0.24.2
 

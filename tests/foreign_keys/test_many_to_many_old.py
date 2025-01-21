@@ -31,7 +31,7 @@ class Track(edgy.StrictModel):
 class Album(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
-    tracks = edgy.ManyToManyField(Track)
+    tracks = edgy.ManyToManyField(Track, embed_through="")
 
     class Meta:
         registry = models
@@ -39,8 +39,8 @@ class Album(edgy.StrictModel):
 
 class Studio(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
-    users = edgy.ManyToManyField(User)
-    albums = edgy.ManyToManyField(Album)
+    users = edgy.ManyToManyField(User, embed_through="")
+    albums = edgy.ManyToManyField(Album, embed_through="")
 
     class Meta:
         registry = models
