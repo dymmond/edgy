@@ -56,6 +56,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     __reflected__: ClassVar[bool] = False
     __show_pk__: ClassVar[bool] = False
     __using_schema__: Union[str, None, Any] = Undefined
+    __no_load_trigger_attrs__: ClassVar[set[str]] = _empty
     # private attribute
     database: ClassVar[Database] = None
     _loaded_or_deleted: bool = False
@@ -66,6 +67,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         self.__show_pk__ = __show_pk__
         # always set them in __dict__ to prevent __getattr__ loop
         self._loaded_or_deleted = False
+        # per instance it is a mutable set with pk added
+        self.__no_load_trigger_attrs__ = {*type(self).__no_load_trigger_attrs__}
         # inject in relation fields anonymous ModelRef (without a Field)
         for arg in args:
             if isinstance(arg, ModelRef):
@@ -95,6 +98,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
 
         kwargs = self.transform_input(kwargs, phase=__phase__, instance=self)
         super().__init__(**kwargs)
+        # per instance it is a mutable set
+        self.__no_load_trigger_attrs__ = set(type(self).__no_load_trigger_attrs__)
         # move to dict (e.g. reflected or subclasses which allow extra attributes)
         if self.__pydantic_extra__ is not None:
             # default was triggered
@@ -501,8 +506,12 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         if (
             name not in self.__dict__
             and behavior != "passdown"
+            # is already loaded
             and not self.__dict__.get("_loaded_or_deleted", False)
+            # only load when it is a field except for reflected
             and (field is not None or self.__reflected__)
+            # exclude attr names from triggering load
+            and name not in self.__dict__.get("__no_load_trigger_attrs__", _empty)
             and name not in self.identifying_db_fields
             and self.can_load
         ):

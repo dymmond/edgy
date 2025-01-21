@@ -43,4 +43,6 @@ async def test_exclude_secrets_query():
         profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
     )
 
-    await User.query.exclude_secrets().get()
+    user = await User.query.exclude_secrets().get()
+    assert not hasattr(user, "password")
+    assert not hasattr(user.profile, "is_enabled")

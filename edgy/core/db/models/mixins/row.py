@@ -167,6 +167,8 @@ class ModelRowMixin:
                 database=proxy_database,
             )
             proxy_model.identifying_db_fields = foreign_key.related_columns
+            if exclude_secrets:
+                proxy_model.__no_load_trigger_attrs__.update(model_related.meta.secret_fields)
 
             item[related] = proxy_model
 
@@ -197,6 +199,12 @@ class ModelRowMixin:
             if exclude_secrets or is_defer_fields or only_fields
             else cls(**item, __phase__="init_db")
         )
+        # mark a model as completely loaded when no deferred is active
+        if not is_defer_fields and not only_fields:
+            model._loaded_or_deleted = True
+        # hard exclude secrets from triggering load
+        if exclude_secrets:
+            model.__no_load_trigger_attrs__.update(cls.meta.secret_fields)
         # Apply the schema to the model
         model = apply_instance_extras(
             model,
