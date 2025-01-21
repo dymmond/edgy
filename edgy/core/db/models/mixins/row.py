@@ -174,6 +174,7 @@ class ModelRowMixin:
 
         # Check for the only_fields
         # Pull out the regular column values.
+        class_columns = cls.table.columns
         for column in table_columns:
             if (
                 only_fields
@@ -183,7 +184,8 @@ class ModelRowMixin:
                 continue
             if column.key in secret_columns:
                 continue
-            if column.key not in cls.meta.columns_to_field:
+            if column.key not in class_columns:
+                # for supporting reflected we cannot use columns_to_field
                 continue
             # set if not of an foreign key with one column
             if column.key in item:
