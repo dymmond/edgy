@@ -132,7 +132,7 @@ async def test_can_reflect_existing_table_with_not_all_fields_and_create_record(
     assert user.name == "Test2"
     assert user.description is None
 
-    users = await NewReflectedUser.query.all()
+    users = await NewReflectedUser.query.defer("description").all()
 
     assert len(users) == 2
 
