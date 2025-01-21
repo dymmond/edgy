@@ -112,13 +112,10 @@ def test_can_use_field_callback():
 
         name = FactoryField(callback=lambda x, y, z: "edgy")
 
-    old_product = None
     prod_factory = ProductFactory()
     for i in range(100):  # noqa
         product = prod_factory.build()
         assert product.name == "edgy"
-        assert product != old_product
-        old_product = product
 
 
 def test_nullify():
@@ -133,13 +130,15 @@ def test_nullify():
     for i in range(100):  # noqa
         product = prod_factory.build()
         assert product.name is None
-        assert product != old_product
+        # randomness can produce collisions, so use is
+        assert product is not old_product
         old_product = product
 
     for i in range(100):  # noqa
         product = prod_factory.build(parameters={"name": {"randomly_nullify": 0}})
         assert product.name is not None
-        assert product != old_product
+        # randomness can produce collisions, so use is
+        assert product is not old_product
         old_product = product
 
 
@@ -155,12 +154,14 @@ def test_unset():
     for i in range(100):  # noqa
         product = prod_factory.build()
         assert getattr(product, "name", None) is None
+        # randomness can produce collisions, so use is
         assert product is not old_product
         old_product = product
 
     for i in range(100):  # noqa
         product = prod_factory.build(parameters={"name": {"randomly_unset": 0}})
         assert getattr(product, "name", None) is not None
+        # randomness can produce collisions, so use is
         assert product is not old_product
         old_product = product
 

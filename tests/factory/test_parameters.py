@@ -96,6 +96,7 @@ def test_can_use_field_callback_with_params():
     for i in range(100):  # noqa
         product = ProductFactory().build(parameters={"name": {"count": i}})
         assert product.name == f"edgy{i}"
+        # here the name parameter is counted up, check that the name also counts up
         assert product != old_product
         old_product = product
 
