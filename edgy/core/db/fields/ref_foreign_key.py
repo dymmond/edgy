@@ -1,14 +1,11 @@
-import typing
-from inspect import isclass
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
-
-from typing_extensions import get_origin
 
 import edgy
 from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields.base import BaseField
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.exceptions import ModelReferenceError
+from edgy.utils.compat import is_class_and_subclass
 
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
@@ -42,21 +39,8 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
     ) -> Optional["BaseFieldType"]:
         return None
 
-    @classmethod
-    def is_class_and_subclass(cls, value: typing.Any, _type: typing.Any) -> bool:
-        original = get_origin(value)
-        if not original and not isclass(value):
-            return False
-
-        try:
-            if original:
-                return original and issubclass(original, _type)
-            return issubclass(value, _type)
-        except TypeError:
-            return False
-
     def __new__(cls, to: "ModelRef", null: bool = False) -> "BaseFieldType":  # type: ignore
-        if not cls.is_class_and_subclass(to, edgy.ModelRef):
+        if not is_class_and_subclass(to, edgy.ModelRef):
             raise ModelReferenceError(
                 detail="A model reference must be an object of type ModelRef"
             )
@@ -70,7 +54,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
     @classmethod
     async def post_save_callback(
         cls,
-        obj: "BaseFieldType",
+        field_obj: "BaseFieldType",
         value: Optional[list],
         instance: "BaseModelType",
         force_insert: bool,
@@ -78,8 +62,9 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
     ) -> None:
         if not value:
             return
+        model_ref = field_obj.to
 
-        relation_field = instance.meta.fields[obj.to.__related_name__]
+        relation_field = instance.meta.fields[model_ref.__related_name__]
         extra_params = {}
         try:
             # m2m or foreign key
@@ -90,11 +75,11 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         if not relation_field.is_m2m:
             # sometimes the foreign key is required, so set it already
             extra_params[relation_field.foreign_key.name] = instance
-        relation = getattr(instance, obj.to.__related_name__)
+        relation = getattr(instance, model_ref.__related_name__)
         while value:
             instance_or_dict: Union[dict, ModelRef] = value.pop()
             if isinstance(instance_or_dict, dict):
-                instance_or_dict = obj.to(**instance_or_dict)
+                instance_or_dict = model_ref(**instance_or_dict)
             model = target_model_class(
                 **cast("ModelRef", instance_or_dict).model_dump(exclude={"__related_name__"}),
                 **extra_params,

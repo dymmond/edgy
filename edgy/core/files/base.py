@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import sys
 from collections.abc import Generator, Sequence
@@ -36,7 +38,7 @@ if TYPE_CHECKING:
 P = ParamSpec("P")
 
 
-def _get_storage(storage: str) -> "Storage":
+def _get_storage(storage: str) -> Storage:
     from .storage import storages
 
     return storages[storage]
@@ -45,16 +47,20 @@ def _get_storage(storage: str) -> "Storage":
 class File:
     name: str
     file: Optional[BinaryIO]
-    storage: "Storage"
+    storage: Storage
     DEFAULT_CHUNK_SIZE: ClassVar[int] = 64 * 2**10
     mode: str = "rb"
 
     def __init__(
         self,
-        file: Optional[BinaryIO] = None,
+        file: Union[BinaryIO, bytes, None, File] = None,
         name: str = "",
-        storage: Union["Storage", str, None] = None,
+        storage: Union[Storage, str, None] = None,
     ) -> None:
+        if isinstance(file, File):
+            file = file.open("rb").file
+        elif isinstance(file, bytes):
+            file = BytesIO(file)
         self.file = file
         if not storage:
             storage = "default"
@@ -71,7 +77,7 @@ class File:
         if hasattr(file, "mode"):
             self.mode = file.mode
 
-    def __eq__(self, other: Union[str, "File"]) -> bool:
+    def __eq__(self, other: Union[str, File]) -> bool:
         if hasattr(other, "name"):
             return self.name == other.name
         return self.name == other
@@ -167,14 +173,14 @@ class File:
 
         return self.size > chunk_size
 
-    def __enter__(self) -> "File":
+    def __enter__(self) -> File:
         assert self.file is not None, "File is closed"
         return self
 
     def __exit__(self, exc_type: Exception, exc_value: Any, tb: Any) -> None:
         self.close()
 
-    def open(self, mode: Union[str, None] = None) -> "File":
+    def open(self, mode: Union[str, None] = None) -> File:
         """
         Open the file with the specified mode.
 
@@ -259,7 +265,7 @@ class ContentFile(File):
     def __str__(self) -> str:
         return "Raw content"
 
-    def open(self, mode: Union[str, Any] = None) -> "ContentFile":
+    def open(self, mode: Union[str, Any] = None) -> ContentFile:
         self.file.seek(0)
         return self
 
@@ -270,19 +276,19 @@ class ContentFile(File):
 
 class FieldFile(File):
     operation: Literal["none", "save", "save_delete", "delete"] = "none"
-    old: Optional[tuple["Storage", str, bool]] = None
-    instance: Union["BaseModelType", None] = None
+    old: Optional[tuple[Storage, str, bool]] = None
+    instance: Union[BaseModelType, None] = None
     # can extract metadata
     approved: bool
     metadata: dict[str, Any]
 
     def __init__(
         self,
-        field: "BaseFieldType",
+        field: BaseFieldType,
         content: Union[BinaryIO, bytes, None, File] = None,
         name: str = "",
         size: Optional[int] = None,
-        storage: Union["Storage", str, None] = None,
+        storage: Union[Storage, str, None] = None,
         generate_name_fn: Optional[Callable[[str, Union[BinaryIO, File], bool], str]] = None,
         metadata: Optional[dict[str, Any]] = None,
         multi_process_safe: bool = True,
@@ -290,10 +296,6 @@ class FieldFile(File):
         # only usable with correct approval handling
         change_removes_approval: bool = False,
     ) -> None:
-        if isinstance(content, File):
-            content = content.open("rb").file
-        elif isinstance(content, bytes):
-            content = BytesIO(content)
         super().__init__(content, name=name, storage=storage)
         self.field = field
         self.generate_name_fn = generate_name_fn
@@ -349,7 +351,7 @@ class FieldFile(File):
         delete_old: bool = True,
         multi_process_safe: Optional[bool] = None,
         approved: Optional[bool] = None,
-        storage: Optional["Storage"] = None,
+        storage: Optional[Storage] = None,
         overwrite: bool = False,
     ) -> None:
         """
@@ -459,7 +461,7 @@ class FieldFile(File):
 
 
 class ImageFieldFile(FieldFile):
-    def open_image(self) -> "ImageFile":
+    def open_image(self) -> ImageFile:
         from PIL import Image
 
         allowed_formats: Optional[Sequence[str]] = getattr(self.field, "image_formats", ())

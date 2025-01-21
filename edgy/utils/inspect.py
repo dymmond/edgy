@@ -8,9 +8,6 @@ from sqlalchemy.sql import schema, sqltypes
 
 import edgy
 from edgy import Database, run_sync
-from edgy.core.terminal import Print
-
-printer = Print()
 
 SQL_GENERIC_TYPES = {
     sqltypes.BigInteger: edgy.fields.BigIntegerField,
@@ -275,8 +272,7 @@ class InspectDB:
             "to the desired behavior.\n"
         )
         yield (
-            "# Feel free to rename the models, but don't rename tablename values or "
-            "field names.\n"
+            "# Feel free to rename the models, but don't rename tablename values or field names.\n"
         )
         yield (
             f"# The generated models do not manage migrations. Those are handled by `{DB_MODULE}.Model`.\n"

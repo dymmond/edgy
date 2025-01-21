@@ -4,7 +4,7 @@ import enum
 import ipaddress
 import uuid
 import warnings
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from enum import EnumMeta
 from functools import cached_property, partial
 from re import Pattern
@@ -664,7 +664,7 @@ class ChoiceField(FieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        choices: Optional[Sequence[Union[tuple[str, str], tuple[str, int]]]] = None,
+        choices: enum.Enum,
         **kwargs: Any,
     ) -> BaseFieldType:
         kwargs = {

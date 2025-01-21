@@ -74,7 +74,7 @@ edgy = "edgy.__main__:run_cli"
 [project.optional-dependencies]
 
 # we need it anyway in databasez
-test = ["sqlalchemy_utils>=0.41.1"]
+test = ["faker>=33.3.1", "sqlalchemy_utils>=0.41.1"]
 testing = [
     "anyio>=4.0.0,<5",
     "asyncpg>=0.27.0,<1",
@@ -96,7 +96,11 @@ sqlite = ["databasez[sqlite]"]
 mssql = ["databasez[aioodbc]"]
 jdbc = ["databasez[jdbc]"]
 # all except testing
-all = ["edgy[test,mime,image,postgres,mysql,sqlite,mssql,jdbc]", "ipython", "ptpython"]
+all = [
+    "edgy[test,mime,image,postgres,mysql,sqlite,mssql,jdbc]",
+    "ipython",
+    "ptpython",
+]
 
 [tool.hatch.envs.default]
 dependencies = ["pre-commit>=4.0.0,<5.0.0", "edgy[sqlite]"]
@@ -119,7 +123,7 @@ dependencies = [
     "mkdocstrings[python]>=0.23.0,<0.30.0",
     "pyyaml>=6.0,<7.0.0",
     # for signature cleaning
-    "ruff"
+    "ruff",
 ]
 [tool.hatch.envs.docs.scripts]
 build = "mkdocs build {args}"
@@ -128,17 +132,17 @@ serve = "mkdocs serve --dev-addr localhost:8000"
 
 [tool.hatch.envs.test]
 # required for cli tests and check_types
-features = ["all", "testing"]
+features = ["all", "testing", "test"]
 # for typings
 extra-dependencies = ["pydantic>=2.10.1"]
-
 
 [tool.hatch.envs.test.env-vars]
 EDGY_TESTCLIENT_TEST_PREFIX = ""
 EDGY_TESTCLIENT_USE_EXISTING = "true"
 
-
 [tool.hatch.envs.test.scripts]
+test = "hatch test -- {args}"
+test_man = "hatch test -- {args} -s -vv"
 check_types = "mypy -p edgy {args}"
 
 [tool.hatch.envs.hatch-test]
@@ -156,9 +160,7 @@ path = "edgy/__init__.py"
 
 
 [tool.mypy]
-plugins = [
-  "pydantic.mypy"
-]
+plugins = ["pydantic.mypy"]
 strict = true
 warn_unused_configs = true
 warn_unreachable = true
@@ -189,7 +191,6 @@ exclude = ["docs_src/*", ".pdbrc"]
 known-third-party = ["esmerald", "pydantic", "starlette", "databasez"]
 
 
-
 [tool.ruff.lint.pyupgrade]
 keep-runtime-typing = true
 
@@ -204,12 +205,7 @@ ignore_missing_imports = true
 check_untyped_defs = true
 
 [[tool.mypy.overrides]]
-module = [
-    "sqlalchemy.*",
-    "asyncpg",
-    "alembic",
-    "ptpython.*",
-]
+module = ["sqlalchemy.*", "asyncpg", "alembic", "ptpython.*"]
 ignore_missing_imports = true
 ignore_errors = true
 
@@ -219,7 +215,11 @@ ignore_errors = true
 
 [tool.pytest.ini_options]
 timeout = 30
-addopts = ["--strict-config", "--strict-markers", "--pdbcls=IPython.terminal.debugger:Pdb"]
+addopts = [
+    "--strict-config",
+    "--strict-markers",
+    "--pdbcls=IPython.terminal.debugger:Pdb",
+]
 xfail_strict = true
 junit_family = "xunit2"
 
