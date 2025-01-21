@@ -105,6 +105,16 @@ async def test_can_reflect_existing_table():
     assert len(users) == 1
 
 
+async def test_can_defer_loading():
+    await HubUser.query.create(name="Test", title="a title", description="desc")
+
+    user = await ReflectedUser.query.defer("description").get()
+
+    assert "description" not in user.__dict__
+    assert user.description == "desc"
+    assert "description" in user.__dict__
+
+
 async def test_can_reflect_existing_table_with_not_all_fields():
     await HubUser.query.create(name="Test", title="a title", description="desc")
 
