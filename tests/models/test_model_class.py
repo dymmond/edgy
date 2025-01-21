@@ -65,6 +65,13 @@ def test_transactions():
     user.transaction()
 
 
+def test_deferred_loading():
+    user = User(id=1)
+    assert user._loaded_or_deleted is False
+    user.identifying_db_fields  # noqa
+    assert user._loaded_or_deleted is False
+
+
 def test_model_pk():
     user = User(pk=1)
     assert user.pk == 1
@@ -83,10 +90,12 @@ async def test_model_crud():
     assert users == [user]
 
     lookup = await User.query.get()
+    assert lookup._loaded_or_deleted is True
     assert lookup == user
 
     await user.update(name="Jane")
     users = await User.query.all()
+    assert users[0]._loaded_or_deleted is True
     assert user.name == "Jane"
     assert user.pk is not None
     assert users == [user]

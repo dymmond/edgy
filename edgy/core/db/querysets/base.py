@@ -592,9 +592,9 @@ class BaseQuerySet(
 
                 clauses.append(wrapper)
             else:
-                assert not isinstance(
-                    value, BaseModelType
-                ), f"should be parsed in clean: {key}: {value}"
+                assert not isinstance(value, BaseModelType), (
+                    f"should be parsed in clean: {key}: {value}"
+                )
 
                 async def wrapper(
                     queryset: "QuerySet",
@@ -604,12 +604,14 @@ class BaseQuerySet(
                     _value: Any = value,
                     _op: Optional[str] = op,
                     _prefix: str = related_str,
+                    # generic field has no field name
+                    _field_name: str = field_name,
                 ) -> Any:
                     _value = await clauses_mod.parse_clause_arg(
                         _value, queryset, tables_and_models
                     )
                     table = tables_and_models[_prefix][0]
-                    return _field.operator_to_clause(_field.name, _op, table, _value)
+                    return _field.operator_to_clause(_field_name, _op, table, _value)
 
                 wrapper._edgy_force_callable_queryset_filter = True
                 clauses.append(wrapper)
@@ -893,9 +895,9 @@ class BaseQuerySet(
                 else:
                     converted_clauses.extend(extracted_clauses)
             elif isinstance(raw_clause, QuerySet):
-                assert (
-                    raw_clause.model_class is queryset.model_class
-                ), f"QuerySet arg has wrong model_class {raw_clause.model_class}"
+                assert raw_clause.model_class is queryset.model_class, (
+                    f"QuerySet arg has wrong model_class {raw_clause.model_class}"
+                )
                 converted_clauses.append(raw_clause.build_where_clause)
                 if not queryset._select_related.issuperset(raw_clause._select_related):
                     queryset._select_related.update(raw_clause._select_related)

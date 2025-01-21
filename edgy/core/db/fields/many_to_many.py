@@ -32,7 +32,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         from_foreign_key: str = "",
         through: Union[str, type["BaseModelType"]] = "",
         through_tablename: str = "",
-        embed_through: Union[str, Literal[False]] = "",
+        embed_through: Union[str, Literal[False]] = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
