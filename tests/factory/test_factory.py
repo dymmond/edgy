@@ -19,10 +19,15 @@ class ProductType(enum.Enum):
     virtual = "virtual"
 
 
+class ProductRef(edgy.ModelRef):
+    __related_name__ = "products_set"
+
+
 class User(edgy.StrictModel):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     name: str = edgy.CharField(max_length=100, null=True)
     language: str = edgy.CharField(max_length=200, null=True)
+    product_ref = edgy.fields.RefForeignKey(ProductRef, null=True)
 
     class Meta:
         registry = models
@@ -69,7 +74,7 @@ def test_can_generate_overwrite_and_exclude():
         class Meta:
             model = User
 
-        id = FactoryField(exclude=True)
+        product_ref = FactoryField(exclude=True)
 
     class ProductFactory(ModelFactory):
         class Meta:
@@ -80,7 +85,7 @@ def test_can_generate_overwrite_and_exclude():
 
     user = UserFactory().build()
 
-    assert not hasattr(user, "id")
+    assert not hasattr(user, "product_ref")
     assert user.database == database
 
     product = ProductFactory().build()
@@ -103,6 +108,35 @@ def test_can_generate_overwrite_and_exclude():
     # now strip Product and cause an error
     with pytest.raises(ValidationError):
         ProductFactory().build(exclude={"user"})
+
+
+def test_exclude_autoincrement_factory():
+    class UserFactory(ModelFactory):
+        class Meta:
+            model = "tests.factory.test_factory.User"
+
+        exclude_autoincrement = True
+        product_ref = FactoryField(exclude=True)
+
+    user = UserFactory().build()
+
+    assert not hasattr(user, "id")
+    assert not hasattr(user, "product_ref")
+
+
+def test_exclude_autoincrement_build():
+    class UserFactory(ModelFactory):
+        class Meta:
+            model = "tests.factory.test_factory.User"
+
+        product_ref = FactoryField(exclude=True)
+
+    user_factory = UserFactory()
+    user = user_factory.build()
+
+    assert hasattr(user, "id")
+    user = user_factory.build(exclude_autoincrement=True)
+    assert not hasattr(user, "id")
 
 
 def test_can_use_field_callback():
@@ -224,8 +258,9 @@ def test_mapping():
                 ProductFactory.meta.fields["type"], ProductFactory.meta.faker, {}
             )
         elif field_type_name == "RefForeignKey":
-            pass
-            # FIXME: provide test
+            DEFAULT_MAPPING[field_type_name](
+                UserFactory.meta.fields["product_ref"], ProductFactory.meta.faker, {}
+            )
         else:
             callback = DEFAULT_MAPPING[field_type_name]
             if callback:

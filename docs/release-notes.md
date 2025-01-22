@@ -6,6 +6,31 @@ hide:
 
 # Release Notes
 
+## 0.25.1
+
+### Added
+
+- Add `exclude_autoincrement` parameter/class attribute to ModelFactory.
+- Add `build_values` method to ModelFactory. It can be used to extract the values without a model.
+
+### Changed
+
+- The Relation mappings doesn't set the autoincrement id anymore.
+- Relationship fields of auto generated ModelFactories of ForeignKey, ... are now excluded when not parametrized.
+  This way large trees are avoided.
+- Reduce the amount of generated related models to max 10 by default.
+- Make `to_factory_field` and `to_list_factory_field` a method instead a classmethod.
+  Otherwise they are quite limited.
+- `to_list_factory_field` honors the min and max parameter specified by parameters.
+  It defaults however to the provided min and max parameters.
+- RefForeignKey has now an extra subclass of BaseField. This way the exclusion of works reliable.
+
+### Fixed
+
+- ModelFactory was prone to run in infinite recursions.
+- The RefForeignKey field was not working correctly.
+
+
 ## 0.25.0
 
 ### Added

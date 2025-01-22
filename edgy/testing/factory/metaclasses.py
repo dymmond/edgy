@@ -47,7 +47,7 @@ class MetaInfo:
 class ModelFactoryMeta(type):
     def __new__(
         cls,
-        name: str,
+        factory_name: str,
         bases: tuple[type, ...],
         attrs: dict[str, Any],
         meta_info_class: type[MetaInfo] = MetaInfo,
@@ -56,7 +56,7 @@ class ModelFactoryMeta(type):
     ) -> type[ModelFactory]:
         # has parents
         if not any(True for parent in bases if isinstance(parent, ModelFactoryMeta)):
-            return super().__new__(cls, name, bases, attrs, **kwargs)  # type: ignore
+            return super().__new__(cls, factory_name, bases, attrs, **kwargs)  # type: ignore
         try:
             from faker import Faker
         except ImportError:
@@ -116,7 +116,7 @@ class ModelFactoryMeta(type):
             if isinstance(value, FactoryField):
                 value.original_name = key
                 del attrs[key]
-                value.name = name = value.name or key
+                value.name = field_name = value.name or key
                 if (
                     not value.callback
                     and value.get_field_type(db_model_meta=db_model.meta) not in mappings
@@ -128,7 +128,7 @@ class ModelFactoryMeta(type):
                         else ""
                     )
                 else:
-                    fields[name] = value
+                    fields[field_name] = value
         for db_field_name in db_model.meta.fields:
             if db_field_name not in fields:
                 field = FactoryField(name=db_field_name, no_copy=True)
@@ -150,7 +150,9 @@ class ModelFactoryMeta(type):
         meta_info.fields = fields
         attrs["meta"] = meta_info
 
-        new_class = cast(type["ModelFactory"], super().__new__(cls, name, bases, attrs, **kwargs))
+        new_class = cast(
+            type["ModelFactory"], super().__new__(cls, factory_name, bases, attrs, **kwargs)
+        )
         # set owner
         for field in fields.values():
             field.owner = new_class
@@ -164,5 +166,7 @@ class ModelFactoryMeta(type):
             except Exception as exc:
                 if model_validation == "error" or model_validation == "pedantic":
                     raise exc
-                terminal.write_warning(f'Could not build a sample model instance: "{exc!r}".')
+                terminal.write_warning(
+                    f'"{factory_name}" failed producing a valid sample model: "{exc!r}".'
+                )
         return new_class

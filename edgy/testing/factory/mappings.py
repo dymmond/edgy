@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
+from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.files import File
 
-from .utils import edgy_field_param_extractor
+from .utils import edgy_field_param_extractor, remove_unparametrized_relationship_fields
 
 if TYPE_CHECKING:
     import enum
@@ -25,17 +26,17 @@ def ForeignKey_callback(field: FactoryField, faker: Faker, parameters: dict[str,
     from .base import ModelFactory
 
     edgy_field = field.owner.meta.model.meta.fields[field.name]
+    target = edgy_field.target
 
-    class ForeignKeyFactory(ModelFactory):
+    class ForeignKeyFactory(ModelFactory, model_validation="none"):
         class Meta:
-            model = edgy_field.target
+            model = target
 
     factory = ForeignKeyFactory()
 
     # arm callback
     def callback(field: FactoryField, faker: Faker, k: dict[str, Any]) -> Any:
-        k["exclude"] = {*(k.get("exclude") or []), edgy_field.related_name}  # type: ignore
-        k["exclude"].discard(False)
+        remove_unparametrized_relationship_fields(target, k, {edgy_field.related_name})
         return factory.build(faker=faker, **k)
 
     field.callback = callback
@@ -46,19 +47,21 @@ def ManyToManyField_callback(field: FactoryField, faker: Faker, parameters: dict
     from .base import ModelFactory
 
     edgy_field = field.owner.meta.model.meta.fields[field.name]
+    target = edgy_field.target
 
-    class ManyToManyFieldFactory(ModelFactory):
+    class ManyToManyFieldFactory(ModelFactory, model_validation="none"):
         class Meta:
-            model = edgy_field.target
+            model = target
+
+        exclude_autoincrement = True
 
     factory = ManyToManyFieldFactory()
 
     # arm callback
     def callback(field: FactoryField, faker: Faker, k: dict[str, Any]) -> Any:
-        k["exclude"] = {*(k.get("exclude") or []), edgy_field.related_name}  # type: ignore
-        k["exclude"].discard(False)
+        remove_unparametrized_relationship_fields(target, k, {edgy_field.related_name})
         min_value = k.pop("min", 0)
-        max_value = k.pop("max", 100)
+        max_value = k.pop("max", 10)
         return [
             factory.build(faker=faker, **k)
             for i in range(faker.random_int(min=min_value, max=max_value))
@@ -72,13 +75,23 @@ def ManyToManyField_callback(field: FactoryField, faker: Faker, parameters: dict
 def RefForeignKey_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
     from .base import ModelFactory
 
-    edgy_model_meta = field.owner.meta.model.meta
+    edgy_model = field.owner.meta.model
+    edgy_model_meta = edgy_model.meta
     model_ref = edgy_model_meta.fields[field.name].to
     edgy_field = edgy_model_meta.fields[model_ref.__related_name__]
 
-    class RefForeignKeyFactory(ModelFactory):
+    if isinstance(edgy_field, RelatedField):
+        factory_model = edgy_field.related_from
+        field_excluded: str | Literal[False] = edgy_field.foreign_key_name
+    else:
+        factory_model = edgy_field.target
+        field_excluded = edgy_field.related_name
+
+    class RefForeignKeyFactory(ModelFactory, model_validation="none"):
         class Meta:
-            model = edgy_field.target
+            model = factory_model
+
+        exclude_autoincrement = True
 
     factory = RefForeignKeyFactory()
     model_ref_exclude: set[str] = set()
@@ -88,12 +101,11 @@ def RefForeignKey_callback(field: FactoryField, faker: Faker, parameters: dict[s
             model_ref_exclude.add(field_name)
 
     def callback(field: FactoryField, faker: Faker, k: dict[str, Any]) -> Any:
-        k["exclude"] = {*(k.get("exclude") or []), edgy_field.related_name}  # type: ignore
-        k["exclude"].discard(False)
+        remove_unparametrized_relationship_fields(factory_model, k, {field_excluded})
         min_value = k.pop("min", 0)
-        max_value = k.pop("max", 100)
+        max_value = k.pop("max", 10)
         return [
-            model_ref(**factory.build(faker=faker, **k).model_dump(exclude=model_ref_exclude))
+            model_ref(**factory.build_values(faker=faker, **k))
             for i in range(faker.random_int(min=min_value, max=max_value))
         ]
 
@@ -232,7 +244,7 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
     "CompositeField": None,
     "ComputedField": None,
     "PKField": None,
-    # Is only a backreference. Certainly not wanted except explicit specified.
+    # Is only a backreference. Certainly not wanted except explicit specified. Leads to loopbacks when autobuild
     "RelatedField": None,
     # can't hold a value
     "ExcludeField": None,
