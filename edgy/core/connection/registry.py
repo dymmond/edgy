@@ -3,7 +3,7 @@ import contextlib
 import re
 import warnings
 from collections import defaultdict
-from collections.abc import Container, Sequence
+from collections.abc import Container, Generator, Sequence
 from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
@@ -18,7 +18,7 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 from edgy.conf import evaluate_settings_once_ready
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
-from edgy.core.utils.sync import run_sync
+from edgy.core.utils.sync import current_eventloop_and_registry, run_sync
 from edgy.types import Undefined
 
 from .asgi import ASGIApp, ASGIHelper
@@ -249,9 +249,9 @@ class Registry:
             if "content_type" in model_class.meta.fields:
                 return
             related_name = f"reverse_{model_class.__name__.lower()}"
-            assert (
-                related_name not in real_content_type.meta.fields
-            ), f"duplicate model name: {model_class.__name__}"
+            assert related_name not in real_content_type.meta.fields, (
+                f"duplicate model name: {model_class.__name__}"
+            )
 
             field_args: dict[str, Any] = {
                 "name": "content_type",
@@ -577,6 +577,53 @@ class Registry:
         for value in self.extra.values():
             ops.append(value.disconnect())
         await asyncio.gather(*ops)
+
+    @contextlib.contextmanager
+    def with_loop(self, loop: asyncio.AbstractEventLoop) -> Generator["Registry", None, None]:
+        token = current_eventloop_and_registry.set((loop, self, False))
+        try:
+            yield self.__enter__()
+        finally:
+            current_eventloop_and_registry.reset(token)
+
+    def __enter__(self) -> "Registry":
+        _loop = current_eventloop_and_registry.get()
+        try:
+            loop = asyncio.get_running_loop()
+            # when in async context we don't create a loop
+        except RuntimeError:
+            # also when called recursively and current_eventloop_and_registry is available
+            _loop = current_eventloop_and_registry.get()
+            if _loop is None:
+                loop = asyncio.new_event_loop()
+                current_eventloop_and_registry.set((loop, self, True))
+            else:
+                loop = _loop[0]
+        return run_sync(self.__aenter__(), loop=loop)
+
+    def __exit__(
+        self,
+        exc_type: Optional[type[BaseException]] = None,
+        exc_value: Optional[BaseException] = None,
+        traceback: Optional[TracebackType] = None,
+        *,
+        loop: Optional[asyncio.AbstractEventLoop] = None,
+    ) -> None:
+        _loop = current_eventloop_and_registry.get()
+        if loop is None:
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                if _loop is not None:
+                    loop = _loop[0]
+        try:
+            return run_sync(self.__aexit__(exc_type, exc_value, traceback))
+        finally:
+            if _loop and _loop[1] is self:
+                current_eventloop_and_registry.set(None)
+                if _loop[2]:
+                    _loop[0].run_until_complete(_loop[0].shutdown_asyncgens())
+                    _loop[0].close()
 
     @overload
     def asgi(

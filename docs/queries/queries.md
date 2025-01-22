@@ -1045,19 +1045,44 @@ Let us see some examples.
 **Async mode**
 
 ```python
-await User.query.all()
-await User.query.filter(name__icontains="example")
-await User.query.create(name="Edgy")
+async with registry:
+    await User.query.all()
+    await User.query.filter(name__icontains="example")
+    await User.query.create(name="Edgy")
 ```
 
 **With run_sync**
 
 ```python
 from edgy import run_sync
+with registry:
+    run_sync(User.query.all())
+    run_sync(User.query.filter(name__icontains="example"))
+    run_sync(User.query.create(name="Edgy"))
+```
 
-run_sync(User.query.all())
-run_sync(User.query.filter(name__icontains="example"))
-run_sync(User.query.create(name="Edgy"))
+**With run_sync and existing loop**
+
+```python
+from edgy import run_sync
+with registry.with_loop(loop):
+    run_sync(User.query.all())
+    run_sync(User.query.filter(name__icontains="example"))
+    run_sync(User.query.create(name="Edgy"))
+```
+
+**With run_sync and a wrapper method**
+
+```python
+from edgy import run_sync
+async main():
+    async with registry:
+        await User.query.all()
+        await User.query.filter(name__icontains="example")
+        await User.query.create(name="Edgy")
+run_sync(main)
+# or
+# asyncio.run(main)
 ```
 
 And that is it! You can now run all queries synchronously within any framework, literally.
