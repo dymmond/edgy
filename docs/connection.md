@@ -45,6 +45,12 @@ Or doing it manually (that applies to every framework):
 {!> ../docs_src/connections/simple.py !}
 ```
 
+Or just as an async contexmanager
+
+```python
+{!> ../docs_src/connections/asynccontextmanager.py !}
+```
+
 And that is pretty much this. Once the connection is hooked into your application lifecycle.
 Otherwise you will get warnings about decreased performance because the databasez backend is not connected and will be
 reininitialized for each operation.
@@ -80,10 +86,38 @@ This warning appears, when an unconnected Database object is used for an operati
 
 Despite bailing out the warning `DatabaseNotConnectedWarning` is raised.
 You should connect correctly like shown above.
+In sync environments it is a bit trickier.
 
 !!! Note
     When passing Database objects via using, make sure they are connected. They are not necessarily connected
     when not in extra.
+
+## Integration in sync environments
+
+When the framework is sync by default and no async loop is active we can fallback to `run_sync`.
+It is required to build an async evnironment via the `with_async_env` method of registry. Otherwise
+we run in bad performance problems and have `DatabaseNotConnectedWarning` warnings.
+`run_sync` calls **must** happen within the scope of `with_async_env`. `with_async_env` is reentrant and has an optional loop parameter.
+
+```python
+{!> ../docs_src/connections/contextmanager.py !}
+```
+To keep the loop alive for performance reasons we can either wrap the server worker loop or in case of
+a single-threaded server the server loop which runs the application. As an alternative you can also keep the asyncio eventloop alive.
+This is easier for sync first frameworks like flask.
+Here an example which is even multithreading save.
+
+```python
+{!> ../docs_src/connections/contextmanager_with_loop.py !}
+```
+
+That was complicated, huh? Let's unroll it in a simpler example with explicit loop cleanup.
+
+
+```python
+{!> ../docs_src/connections/contextmanager_with_loop_and_cleanup.py !}
+```
+
 
 ## Querying other schemas
 

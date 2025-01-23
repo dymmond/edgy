@@ -1,9 +1,14 @@
 import asyncio
 import weakref
 from collections.abc import Awaitable
-from contextvars import copy_context
+from contextvars import ContextVar, copy_context
 from threading import Event, Thread
 from typing import Any, Optional
+
+# for registry with
+current_eventloop: ContextVar[Optional[asyncio.AbstractEventLoop]] = ContextVar(
+    "current_eventloop", default=None
+)
 
 
 async def _coro_helper(awaitable: Awaitable, timeout: Optional[float]) -> Any:
@@ -54,18 +59,27 @@ def get_subloop(loop: asyncio.AbstractEventLoop) -> asyncio.AbstractEventLoop:
     return sub_loop
 
 
-def run_sync(awaitable: Awaitable, timeout: Optional[float] = None) -> Any:
+def run_sync(
+    awaitable: Awaitable,
+    timeout: Optional[float] = None,
+    *,
+    loop: Optional[asyncio.AbstractEventLoop] = None,
+) -> Any:
     """
     Runs the queries in sync mode
     """
-    loop = None
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        loop = None
+    if loop is None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            # in sync contexts there is no asyncio.get_running_loop()
+            loop = current_eventloop.get()
 
     if loop is None:
         return asyncio.run(_coro_helper(awaitable, timeout))
+    elif not loop.is_closed() and not loop.is_running():
+        # re-use an idling loop
+        return loop.run_until_complete(_coro_helper(awaitable, timeout))
     else:
         ctx = copy_context()
         # the context of the coro seems to be switched correctly

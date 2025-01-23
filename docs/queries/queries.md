@@ -1053,14 +1053,13 @@ await User.query.create(name="Edgy")
 **With run_sync**
 
 ```python
-from edgy import run_sync
-
 run_sync(User.query.all())
 run_sync(User.query.filter(name__icontains="example"))
 run_sync(User.query.create(name="Edgy"))
 ```
 
-And that is it! You can now run all queries synchronously within any framework, literally.
+And that is it! You can now run all queries synchronously within any framework. You still have to connect
+the Registry with its dbs first via `async with registry: ...` or in sync-frameworks with `with registry.with_async_env(): ...`.
 
 ## Cross database queries
 

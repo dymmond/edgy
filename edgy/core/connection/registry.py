@@ -3,7 +3,7 @@ import contextlib
 import re
 import warnings
 from collections import defaultdict
-from collections.abc import Container, Sequence
+from collections.abc import Container, Generator, Sequence
 from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
@@ -18,7 +18,7 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 from edgy.conf import evaluate_settings_once_ready
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
-from edgy.core.utils.sync import run_sync
+from edgy.core.utils.sync import current_eventloop, run_sync
 from edgy.types import Undefined
 
 from .asgi import ASGIApp, ASGIHelper
@@ -249,9 +249,9 @@ class Registry:
             if "content_type" in model_class.meta.fields:
                 return
             related_name = f"reverse_{model_class.__name__.lower()}"
-            assert (
-                related_name not in real_content_type.meta.fields
-            ), f"duplicate model name: {model_class.__name__}"
+            assert related_name not in real_content_type.meta.fields, (
+                f"duplicate model name: {model_class.__name__}"
+            )
 
             field_args: dict[str, Any] = {
                 "name": "content_type",
@@ -577,6 +577,32 @@ class Registry:
         for value in self.extra.values():
             ops.append(value.disconnect())
         await asyncio.gather(*ops)
+
+    @contextlib.contextmanager
+    def with_async_env(
+        self, loop: Optional[asyncio.AbstractEventLoop] = None
+    ) -> Generator["Registry", None, None]:
+        close: bool = False
+        if loop is None:
+            try:
+                loop = asyncio.get_running_loop()
+                # when in async context we don't create a loop
+            except RuntimeError:
+                # also when called recursively and current_eventloop is available
+                loop = current_eventloop.get()
+                if loop is None:
+                    loop = asyncio.new_event_loop()
+                    close = True
+
+        token = current_eventloop.set(loop)
+        try:
+            yield run_sync(self.__aenter__(), loop=loop)
+        finally:
+            run_sync(self.__aexit__(), loop=loop)
+            current_eventloop.reset(token)
+            if close:
+                loop.run_until_complete(loop.shutdown_asyncgens())
+                loop.close()
 
     @overload
     def asgi(
