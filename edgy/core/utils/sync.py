@@ -29,7 +29,7 @@ async def _startup(old_loop: asyncio.AbstractEventLoop, is_initialized: Event) -
     is_initialized.set()
     # poll old loop
     while True:
-        if old_loop.is_running():
+        if not old_loop.is_closed():
             await asyncio.sleep(0.5)
         else:
             break
