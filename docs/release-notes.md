@@ -12,6 +12,8 @@ hide:
 
 - Add `exclude_autoincrement` parameter/class attribute to ModelFactory.
 - Add `build_values` method to ModelFactory. It can be used to extract the values without a model.
+- Make Registry initialization compatible with sync contexts via `with_async_env(loop=None)` method.
+- `run_sync` has now an optional loop parameter.
 
 ### Changed
 
@@ -24,6 +26,8 @@ hide:
 - `to_list_factory_field` honors the min and max parameter specified by parameters.
   It defaults however to the provided min and max parameters.
 - RefForeignKey has now an extra subclass of BaseField. This way the exclusion of works reliable.
+- `run_sync` reuses idling loops.
+- `run_sync` uses the loop set by the Registry contextmanager `with_async_env`.
 
 ### Fixed
 

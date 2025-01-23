@@ -3,15 +3,11 @@ import weakref
 from collections.abc import Awaitable
 from contextvars import ContextVar, copy_context
 from threading import Event, Thread
-from typing import TYPE_CHECKING, Any, Optional
-
-if TYPE_CHECKING:
-    from edgy.core.connection.registry import Registry
-
+from typing import Any, Optional
 
 # for registry with
-current_eventloop_and_registry: ContextVar[tuple[asyncio.AbstractEventLoop, "Registry", bool]] = (
-    ContextVar("current_eventloop_and_registry", default=None)
+current_eventloop: ContextVar[Optional[asyncio.AbstractEventLoop]] = ContextVar(
+    "current_eventloop", default=None
 )
 
 
@@ -77,9 +73,7 @@ def run_sync(
             loop = asyncio.get_running_loop()
         except RuntimeError:
             # in sync contexts there is no asyncio.get_running_loop()
-            _loop = current_eventloop_and_registry.get()
-            if _loop is not None:
-                loop = _loop[0]
+            loop = current_eventloop.get()
 
     if loop is None:
         return asyncio.run(_coro_helper(awaitable, timeout))
