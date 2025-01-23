@@ -27,6 +27,13 @@ async def _startup(old_loop: asyncio.AbstractEventLoop, is_initialized: Event) -
     weakref.finalize(old_loop, new_loop.stop)
     weak_subloop_map[old_loop] = new_loop
     is_initialized.set()
+    # poll old loop
+    while True:
+        if old_loop.is_running():
+            await asyncio.sleep(0.5)
+        else:
+            break
+    new_loop.stop()
 
 
 def _init_thread(old_loop: asyncio.AbstractEventLoop, is_initialized: Event) -> None:
@@ -43,8 +50,10 @@ def _init_thread(old_loop: asyncio.AbstractEventLoop, is_initialized: Event) -> 
             is_initialized.clear()
         loop.run_until_complete(loop.shutdown_asyncgens())
     finally:
+        weak_subloop_map.pop(loop, None)
         del task
         loop.close()
+        del loop
 
 
 def get_subloop(loop: asyncio.AbstractEventLoop) -> asyncio.AbstractEventLoop:

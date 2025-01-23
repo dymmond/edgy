@@ -6,6 +6,13 @@ hide:
 
 # Release Notes
 
+## 0.25.2
+
+### Fixed
+
+- Cleanup of event-loops and threads in run_sync.
+
+
 ## 0.25.1
 
 ### Added
