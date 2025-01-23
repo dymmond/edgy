@@ -72,6 +72,7 @@ nav:
   - Home: "index.md"
   - Edgy: "edgy.md"
   - Core:
+      - Connection: "connection.md"
       - Models: "models.md"
       - Declarative Models: "declarative-models.md"
       - Reflection:
@@ -94,7 +95,6 @@ nav:
       - Relationships: "relationships.md"
       - Reference ForeignKey: "reference-foreignkey.md"
       - Marshalls: "marshalls.md"
-      - Connection: "connection.md"
       - ContentTypes:
           - Introduction: "contenttypes/intro.md"
           - ContentTags - or how to replace elastic search: "contenttypes/replace-elasticsearch.md"
