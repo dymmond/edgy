@@ -29,7 +29,6 @@ class Product(edgy.StrictModel):
 
     class Meta:
         registry = models
-        name = "products"
 
 
 class Cart(edgy.StrictModel):
@@ -80,7 +79,8 @@ def test_verify_warns_when_default_broken(capsys):
 
     captured = capsys.readouterr()
     assert (
-        captured.out.strip() == """Could not build a sample model instance: "KeyError('count')"."""
+        captured.out.strip()
+        == """"ProductFactory" failed producing a valid sample model: "KeyError('count')"."""
     )
 
 

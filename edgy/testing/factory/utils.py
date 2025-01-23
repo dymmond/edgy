@@ -1,13 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from inspect import isclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
+
+from edgy.core.db.fields.base import RelationshipField
+from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKey
 
 if TYPE_CHECKING:
     from faker import Faker
 
     from edgy.core.db.fields.types import BaseFieldType
+    from edgy.core.db.models.types import BaseModelType
 
     from .fields import FactoryField
     from .types import FactoryCallback, FactoryParameterCallback
@@ -19,6 +23,26 @@ EDGY_FIELD_PARAMETERS: dict[str, tuple[str, Callable[[BaseFieldType, str, Faker]
     "multiple_of": ("step", lambda field, attr_name, faker: getattr(field, attr_name)),
     "decimal_places": ("right_digits", lambda field, attr_name, faker: getattr(field, attr_name)),
 }
+
+
+def remove_unparametrized_relationship_fields(
+    model: type[BaseModelType],
+    kwargs: dict[str, Any],
+    extra_exclude: Collection[str | Literal[False]] = (),
+) -> None:
+    parameters: dict[str, dict[str, Any]] = kwargs.get("parameters") or {}
+    excluded: set[str | Literal[False]] = {*(kwargs.get("exclude") or []), *extra_exclude}
+    # cleanup related_name False
+    excluded.discard(False)
+
+    for field_name, field in model.meta.fields.items():
+        if (
+            isinstance(field, (RelationshipField, BaseRefForeignKey))
+            and field_name not in parameters
+            and field.has_default()
+        ):
+            excluded.add(field_name)
+    kwargs["exclude"] = excluded
 
 
 def edgy_field_param_extractor(

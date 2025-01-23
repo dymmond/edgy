@@ -7,10 +7,16 @@ database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
 models = edgy.Registry(database=database)
 
 
+class ProductRef(edgy.ModelRef):
+    __related_name__ = "products_set"
+    id: int = -10000
+
+
 class User(edgy.StrictModel):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     name: str = edgy.CharField(max_length=100, null=True)
     language: str = edgy.CharField(max_length=200, null=True)
+    product_ref = edgy.fields.RefForeignKey(ProductRef)
 
     class Meta:
         registry = models
@@ -25,7 +31,6 @@ class Product(edgy.StrictModel):
 
     class Meta:
         registry = models
-        name = "products"
 
 
 class Cart(edgy.StrictModel):
@@ -64,9 +69,36 @@ def test_can_generate_and_parametrize():
 
     cart = CartFactory().build(parameters={"products": {"min": 50, "max": 50}})
     assert len(cart.products.refs) == 50
+    assert not hasattr(cart.products.refs[0].product, "id")
 
-    cart = CartFactory().build(parameters={"products": {"min": 10, "max": 50}})
+    cart = CartFactory().build(
+        parameters={"products": {"min": 10, "max": 50, "exclude_autoincrement": False}}
+    )
     assert len(cart.products.refs) >= 10 and len(cart.products.refs) <= 50
+    assert cart.products.refs[0].product.id is not None
+
+
+def test_can_generate_and_parametrize_model_refs():
+    class UserFactory(ModelFactory):
+        class Meta:
+            model = User
+
+    user = UserFactory().build(parameters={"product_ref": {"min": 50, "max": 50}})
+    assert len(user.product_ref) == 50
+    assert user.product_ref[0].id == -10000
+
+    user = UserFactory().build(
+        parameters={
+            "product_ref": {
+                "min": 10,
+                "max": 10,
+                "exclude_autoincrement": False,
+                "parameters": {"id": {"min": 199, "max": 199}},
+            }
+        }
+    )
+    assert len(user.product_ref) == 10
+    assert user.product_ref[0].id == 199
 
 
 def test_can_use_field_parameters():

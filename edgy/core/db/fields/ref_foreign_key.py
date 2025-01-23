@@ -13,9 +13,12 @@ if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
 
 
+class BaseRefForeignKey(BaseField): ...
+
+
 class RefForeignKey(ForeignKeyFieldFactory, list):
     field_type = list
-    field_bases = (BaseField,)
+    field_bases = (BaseRefForeignKey,)
 
     @classmethod
     def modify_input(
