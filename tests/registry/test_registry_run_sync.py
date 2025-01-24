@@ -1,8 +1,11 @@
 import asyncio
+import gc
+import time
 
 import pytest
 
 import edgy
+from edgy.core.utils.sync import weak_subloop_map
 from edgy.testing.client import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -51,3 +54,28 @@ def test_run_sync_lifecyle_with_idle_loop():
     loop.close()
     with pytest.raises(RuntimeError):
         asyncio.get_running_loop()
+
+
+async def check_is_value(value):
+    assert len(weak_subloop_map) == value
+
+
+async def check_is_value_sub(value):
+    edgy.run_sync(check_is_value(value + 1))
+
+
+def test_stack():
+    gc.collect()
+    time.sleep(1)
+
+    initial = len(weak_subloop_map)
+    loop = asyncio.new_event_loop()
+    with models.with_async_env(loop):
+        assert initial == len(weak_subloop_map)
+        edgy.run_sync(check_is_value(initial))
+        edgy.run_sync(check_is_value_sub(initial))
+    loop.close()
+    del loop
+    gc.collect()
+    time.sleep(1)
+    assert initial == len(weak_subloop_map)

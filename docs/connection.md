@@ -118,6 +118,24 @@ That was complicated, huh? Let's unroll it in a simpler example with explicit lo
 {!> ../docs_src/connections/contextmanager_with_loop_and_cleanup.py !}
 ```
 
+Note: `with_async_env` also calls `__aenter__` and `__aexit__` internally. So the database is connected during the
+with scope spanned by `with_async_env`.
+
+## `run_sync` function
+
+`run_sync` needs a bit more explaination. On the one hand it hooks into the async environment
+spawned by `with_async_env`. On the other hand it prefers checking for an active running loop (except if an explicit loop was provided).
+If an active loop was found, a subloop is spawned which is only torn down when the found loop (or explicit provided loop) was collected.
+When an idling loop was found, it will be reused, instead of creating a subloop.
+
+What is a subloop?
+
+A subloop is an eventloop running in an extra thread. This enables us to run multiple eventloops simultanously.
+They are removed when the parent eventloop is garbage collected.
+
+However given that the eventloops are quite sticky despite they should have been garbage collected
+we additionally poll if the old loop had stopped.
+
 
 ## Querying other schemas
 
