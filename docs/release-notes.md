@@ -11,7 +11,8 @@ hide:
 ### Fixed
 
 - Cleanup of event-loops and threads in run_sync.
-
+- Fix running shell with auto reflected models.
+- Fix `DatabaseNotConnectedWarning` in shell.
 
 ## 0.25.1
 
