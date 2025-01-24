@@ -120,6 +120,9 @@ That was complicated, huh? Let's unroll it in a simpler example with explicit lo
 
 Note: `with_async_env` also calls `__aenter__` and `__aexit__` internally. So the database is connected during the
 with scope spanned by `with_async_env`.
+This means you can use `run_sync` as well as running commands in another loop via e.g. asyncio.run.
+Everything **just** works without raising the `DatabaseNotConnectedWarning`.
+This for example used for `edgy shell`.
 
 ## `run_sync` function
 
@@ -135,7 +138,6 @@ They are removed when the parent eventloop is garbage collected.
 
 However given that the eventloops are quite sticky despite they should have been garbage collected
 we additionally poll if the old loop had stopped.
-
 
 ## Querying other schemas
 
