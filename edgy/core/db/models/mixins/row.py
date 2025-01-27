@@ -178,6 +178,13 @@ class ModelRowMixin:
                     if isinstance(reference_source_child, dict) or not reference_source_child:
                         continue
                     extra_no_trigger_child.add(reference_target_child)
+                    if isinstance(reference_source_child, str):
+                        reference_source_child_parts = reference_source_child.rsplit("__", 1)
+                        if (
+                            len(reference_source_child_parts) == 2
+                            and reference_source_child_parts[0] in tables_and_models
+                        ):
+                            reference_source_child = f"{tables_and_models[reference_source_child_parts[0]][0].name}_{reference_source_child_parts[1]}"
                     child_item[reference_target_child] = row._mapping[reference_source_child]
 
             # Make sure we generate a temporary reduced model
@@ -226,6 +233,14 @@ class ModelRowMixin:
         for reference_target_main, reference_source_main in _reference_select.items():
             if isinstance(reference_source_main, dict) or not reference_source_main:
                 continue
+
+            if isinstance(reference_source_main, str):
+                reference_source_main_parts = reference_source_main.rsplit("__", 1)
+                if (
+                    len(reference_source_main_parts) == 2
+                    and reference_source_main_parts[0] in tables_and_models
+                ):
+                    reference_source_main = f"{tables_and_models[reference_source_main_parts[0]][0].name}_{reference_source_main_parts[1]}"
             # overwrite
             item[reference_target_main] = row._mapping[reference_source_main]
         model: Model = (

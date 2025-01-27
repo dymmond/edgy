@@ -424,6 +424,14 @@ Or adding more operations on the top
 profiles = await Profile.query.select_related("user").filter(email__icontains="foo").limit(2)
 ```
 
+### `extra_select` & `reference_select` (annotate)
+
+Sometimes you just want inject a subquery or to annotate the existing query with a result. Something you can do in
+django via `annotate` or `alias`.
+Here we want more freedom and more control instead of automatically generated subqueries so we use two parameters/functions.
+
+More information about how to use both are in [Annotate](./annotate.md).
+
 ## Returning results
 
 ### All
@@ -1083,7 +1091,6 @@ This works for edgy style as well as SQLALchemy style queries.
 Note: sqlalchemy provides a similar functionality which does not take an argument. Also it is sync only.
 It is called lambda statement.
 
-
 ## Raw database queries
 
 Sometimes it is necessary to skip all edgy query modifications and issue raw queries.
@@ -1125,35 +1132,9 @@ sql types because otherwise some features are not supported or cause warnings.
 
 ## Debugging
 
-### Getting the SQL query
+A guide how to debug is in [Debugging](../debugging.md).
 
-QuerySet contains a cached debug property named `sql` which contains the QuerySet as query with inserted blanks.
-
-### Performance warnings
-
-Edgy issues a `DatabaseNotConnectedWarning` when using edgy without a connected database. To silence it, wrap the affected
-code in a database scope
-
-``` python
-await model.save()
-# becomes
-async with model.database:
-    await model.save()
-```
-
-If the warning is completely unwanted despite the performance impact, you can filter:
-
-``` python
-import warnings
-from edgy.exceptions import DatabaseNotConnectedWarning
-with warnings.catch_warnings(action="ignore", category=DatabaseNotConnectedWarning):
-    await model.save()
-```
-
-It inherits from `UserWarning` so it is possible to filter UserWarnings.
-
-However the silencing way is not recommended.
-
+Most relevant is the `sql` debug property, which echos the whole query as string.
 
 [model]: ../models.md
 [managers]: ../managers.md

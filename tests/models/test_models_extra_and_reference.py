@@ -5,6 +5,7 @@ import sqlalchemy
 from sqlalchemy import exc, func
 
 import edgy
+from edgy.core.utils.db import hash_tablekey
 from edgy.testing.client import DatabaseTestClient
 from edgy.testing.factory import FactoryField, ModelFactory
 from tests.settings import DATABASE_URL
@@ -89,6 +90,21 @@ async def test_basic_referencing_relaxed_related():
         assert profile.profile.profile_name == profile.name
 
 
+async def test_annotate_parent_manual():
+    table_prefix = hash_tablekey(tablekey=User.table.key, prefix="user")
+    for profile in await Profile.query.select_related("user").reference_select(
+        {"user_name": f"{table_prefix}_name"}
+    ):
+        assert profile.user_name == profile.user.name
+
+
+async def test_annotate_parent():
+    for profile in await Profile.query.select_related("user").reference_select(
+        {"user_name": "user__name"}
+    ):
+        assert profile.user_name == profile.user.name
+
+
 async def test_basic_referencing_relaxed_fk():
     for profile in await SuperProfile.query.reference_select(
         {"profile": {"profile_name": "name"}}
@@ -122,6 +138,16 @@ async def test_counting():
             sqlalchemy.select(func.count(User.table.c.id).label("total_number")).subquery()
         ).reference_select({"total_number": "total_number"}):
             assert profile.total_number == 10
+
+
+async def test_counting_query():
+    for profile in await Profile.query.extra_select(
+        func.count()
+        .select()
+        .select_from((await User.query.as_select()).subquery())
+        .label("total_number")
+    ).reference_select({"total_number": "total_number"}):
+        assert profile.total_number == 10
 
 
 async def test_summing():
