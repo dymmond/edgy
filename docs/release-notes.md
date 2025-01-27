@@ -6,13 +6,26 @@ hide:
 
 # Release Notes
 
-## 0.25.2
+## 0.26
+
+### Added
+
+- `__drop_extra_kwargs__` parameter for Models which drops extra kwargs instead passing down. Required for mashalling StrictModel.
+- `reference_select` parameter in QuerySet.
+- `extra_select` parameter in QuerySet for creating extra select clauses which can be referenced.
+
+### Changed
+
+- Model allows now like ReflectModel arbitary arguments. Required for `reference_select`.
 
 ### Fixed
 
 - Cleanup of event-loops and threads in run_sync.
 - Fix running shell with auto reflected models.
 - Fix `DatabaseNotConnectedWarning` in shell.
+- Usage of StrictModels in Mashalls.
+- Different autoincrement field in Marshalls than `id`.
+- Fix Marshall required check.
 
 ## 0.25.1
 

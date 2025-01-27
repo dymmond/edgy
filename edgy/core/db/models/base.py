@@ -46,10 +46,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     Base of all Edgy models with the core setup.
     """
 
-    # when used with marshalls: marshalls can dump unrelated informations which must be ignored
-    # so it isn't possible to use forbid yet, despite it would show bugs in code
     model_config = ConfigDict(
-        extra="ignore", arbitrary_types_allowed=True, validate_assignment=True
+        extra="allow", arbitrary_types_allowed=True, validate_assignment=True
     )
 
     __proxy_model__: ClassVar[Union[type[Model], None]] = None
@@ -62,13 +60,19 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     _loaded_or_deleted: bool = False
 
     def __init__(
-        self, *args: Any, __show_pk__: bool = False, __phase__: str = "init", **kwargs: Any
+        self,
+        *args: Any,
+        __show_pk__: bool = False,
+        __phase__: str = "init",
+        __drop_extra_kwargs__: bool = False,
+        **kwargs: Any,
     ) -> None:
         self.__show_pk__ = __show_pk__
         # always set them in __dict__ to prevent __getattr__ loop
         self._loaded_or_deleted = False
         # per instance it is a mutable set with pk added
-        self.__no_load_trigger_attrs__ = {*type(self).__no_load_trigger_attrs__}
+        __no_load_trigger_attrs__ = {*type(self).__no_load_trigger_attrs__}
+        self.__no_load_trigger_attrs__ = __no_load_trigger_attrs__
         # inject in relation fields anonymous ModelRef (without a Field)
         for arg in args:
             if isinstance(arg, ModelRef):
@@ -96,10 +100,11 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     existing = [existing, model]
                 kwargs[arg.__related_name__] = existing
 
-        kwargs = self.transform_input(kwargs, phase=__phase__, instance=self)
+        kwargs = self.transform_input(
+            kwargs, phase=__phase__, instance=self, drop_extra_kwargs=__drop_extra_kwargs__
+        )
         super().__init__(**kwargs)
-        # per instance it is a mutable set
-        self.__no_load_trigger_attrs__ = set(type(self).__no_load_trigger_attrs__)
+        self.__no_load_trigger_attrs__ = __no_load_trigger_attrs__
         # move to dict (e.g. reflected or subclasses which allow extra attributes)
         if self.__pydantic_extra__ is not None:
             # default was triggered
@@ -114,15 +119,17 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     @classmethod
     def transform_input(
         cls,
-        kwargs: Any,
+        kwargs: dict[str, Any],
         phase: str = "",
         instance: Optional[BaseModelType] = None,
+        drop_extra_kwargs: bool = False,
     ) -> Any:
         """
         Expand to_models and apply input modifications.
         """
 
-        kwargs = {**kwargs}
+        # for input modification create a copy
+        kwargs = kwargs.copy()
         new_kwargs: dict[str, Any] = {}
 
         fields = cls.meta.fields
@@ -139,7 +146,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 field = fields.get(key, None)
                 if field is not None:
                     new_kwargs.update(**field.to_model(key, value))
-                else:
+                elif not drop_extra_kwargs:
                     new_kwargs[key] = value
         finally:
             CURRENT_PHASE.reset(token3)
@@ -294,12 +301,12 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     include=sub_include, exclude=sub_exclude, mode=mode, **kwargs
                 )
             else:
-                assert sub_include is None, (
-                    "sub include filters for CompositeField specified, but no Pydantic model is set"
-                )
-                assert sub_exclude is None, (
-                    "sub exclude filters for CompositeField specified, but no Pydantic model is set"
-                )
+                assert (
+                    sub_include is None
+                ), "sub include filters for CompositeField specified, but no Pydantic model is set"
+                assert (
+                    sub_exclude is None
+                ), "sub exclude filters for CompositeField specified, but no Pydantic model is set"
                 if mode == "json" and not getattr(field, "unsafe_json_serialization", False):
                     # skip field if it isn't a BaseModel and the mode is json and unsafe_json_serialization is not set
                     # currently unsafe_json_serialization exists only on CompositeFields

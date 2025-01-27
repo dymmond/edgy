@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from pydantic import BaseModel, ConfigDict
 
@@ -35,9 +35,13 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         Returns:
             Model or None: The assembled model instance, or None if the assembly fails.
         """
-        data = self.model_dump(exclude={"id"})
+        column = cast(Model, self.marshall_config["model"]).table.autoincrement_column
+        exclude: set[str] = set()
+        if column is not None:
+            exclude.add(column.key)
+        data = self.model_dump(exclude=exclude)
         data["__show_pk__"] = self.__show_pk__
-        instance: Model = self.marshall_config["model"](**data)  # type: ignore
+        instance: Model = self.marshall_config["model"](**data, __drop_extra_kwargs__=True)  # type: ignore
         self._resolve_serializer(instance=instance)
         return instance
 

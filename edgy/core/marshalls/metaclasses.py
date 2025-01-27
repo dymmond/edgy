@@ -120,10 +120,11 @@ class MarshallMeta(ModelMetaclass):
 
         # Raise for error if any of the required fields is not in the Marshall
         required_fields: set[str] = {
-            f"'{k}'" for k, v in model.model_fields.items() if v.is_required()
+            f"{k}" for k, v in model.model_fields.items() if v.is_required()
         }
-        if any(value not in cast(dict, model_class.model_fields) for value in required_fields):
-            fields = ", ".join(sorted(required_fields))
+        model_fields = model_class.model_fields
+        if any(value not in cast(dict, model_fields) for value in required_fields):
+            fields = ", ".join(f"'{x}'" for x in sorted(required_fields))
             raise MarshallFieldDefinitionError(
                 f"'{model.__name__}' model requires the following mandatory fields: [{fields}]."
             )

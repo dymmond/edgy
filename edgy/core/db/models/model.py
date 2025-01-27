@@ -60,6 +60,8 @@ class Model(
 
     class Meta:
         abstract = True
+        # registry = False, stops the retrieval of the registry from base classes
+        registry = False
 
     @classmethod
     def generate_proxy_model(cls) -> type[Model]:
@@ -99,16 +101,17 @@ class StrictModel(Model):
         extra="forbid", arbitrary_types_allowed=True, validate_assignment=True, strict=True
     )
 
+    class Meta:
+        abstract = True
+        # registry = False, stops the retrieval of the registry from base classes
+        registry = False
+
 
 class ReflectModel(ReflectedModelMixin, Model):
     """
     Reflect on async engines is not yet supported, therefore, we need to make a sync_engine
     call.
     """
-
-    model_config = ConfigDict(
-        extra="allow", arbitrary_types_allowed=True, validate_assignment=True
-    )
 
     class Meta:
         abstract = True

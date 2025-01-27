@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Optional, cast
@@ -12,8 +14,10 @@ if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy import Table
     from sqlalchemy.engine.result import Row
 
-    from edgy import Database, Model
+    from edgy.core.connection import Database
+    from edgy.core.db.models.model import Model
     from edgy.core.db.models.types import BaseModelType
+    from edgy.core.db.querysets.types import reference_select_type
 
 
 class ModelRowMixin:
@@ -22,7 +26,7 @@ class ModelRowMixin:
     """
 
     @classmethod
-    def can_load_from_row(cls: type["Model"], row: "Row", table: "Table") -> bool:
+    def can_load_from_row(cls: type[Model], row: Row, table: Table) -> bool:
         """Check if a model_class can be loaded from a row for the table."""
 
         return bool(
@@ -33,20 +37,21 @@ class ModelRowMixin:
 
     @classmethod
     async def from_sqla_row(
-        cls: type["Model"],
-        row: "Row",
+        cls: type[Model],
+        row: Row,
         # contain the mappings used for select
-        tables_and_models: dict[str, tuple["Table", type["BaseModelType"]]],
+        tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
         select_related: Optional[Sequence[Any]] = None,
-        prefetch_related: Optional[Sequence["Prefetch"]] = None,
+        prefetch_related: Optional[Sequence[Prefetch]] = None,
         only_fields: Sequence[str] = None,
         is_defer_fields: bool = False,
         exclude_secrets: bool = False,
         using_schema: Optional[str] = None,
-        database: Optional["Database"] = None,
+        database: Optional[Database] = None,
         prefix: str = "",
-        old_select_related_value: Optional["Model"] = None,
-    ) -> Optional["Model"]:
+        old_select_related_value: Optional[Model] = None,
+        reference_select: Optional[reference_select_type] = None,
+    ) -> Optional[Model]:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
 
@@ -61,6 +66,9 @@ class ModelRowMixin:
 
         :return: Model class.
         """
+        _reference_select: reference_select_type = (
+            reference_select if reference_select is not None else {}
+        )
         item: dict[str, Any] = {}
         select_related = select_related or []
         prefetch_related = prefetch_related or []
@@ -91,6 +99,9 @@ class ModelRowMixin:
                 tables_and_models[_prefix][0],
             ):
                 continue
+            reference_select_sub = _reference_select.get(field_name)
+            if not isinstance(reference_select_sub, dict):
+                reference_select_sub = {}
 
             if remainder:
                 # don't pass table, it is only for the main model_class
@@ -105,6 +116,7 @@ class ModelRowMixin:
                     database=database,
                     prefix=_prefix,
                     old_select_related_value=item.get(field_name),
+                    reference_select=reference_select_sub,
                 )
             else:
                 # don't pass table, it is only for the main model_class
@@ -117,6 +129,7 @@ class ModelRowMixin:
                     database=database,
                     prefix=_prefix,
                     old_select_related_value=item.get(field_name),
+                    reference_select=reference_select_sub,
                 )
         # don't overwrite, update with new values and return
         if old_select_related_value:
@@ -154,6 +167,19 @@ class ModelRowMixin:
                     child_item[foreign_key.from_fk_field_name(related, column_name)] = (
                         row._mapping[columnkeyhash]
                     )
+
+            reference_select_child = _reference_select.get(related)
+            extra_no_trigger_child: set[str] = set()
+            if isinstance(reference_select_child, dict):
+                for (
+                    reference_target_child,
+                    reference_source_child,
+                ) in cast("reference_select_type", reference_select_child).items():
+                    if isinstance(reference_source_child, dict) or not reference_source_child:
+                        continue
+                    extra_no_trigger_child.add(reference_target_child)
+                    child_item[reference_target_child] = row._mapping[reference_source_child]
+
             # Make sure we generate a temporary reduced model
             # For the related fields. We simply chnage the structure of the model
             # and rebuild it with the new fields.
@@ -167,6 +193,7 @@ class ModelRowMixin:
                 database=proxy_database,
             )
             proxy_model.identifying_db_fields = foreign_key.related_columns
+            proxy_model.__no_load_trigger_attrs__.update(extra_no_trigger_child)
             if exclude_secrets:
                 proxy_model.__no_load_trigger_attrs__.update(model_related.meta.secret_fields)
 
@@ -196,6 +223,11 @@ class ModelRowMixin:
 
             if columnkeyhash in row._mapping:
                 item[column.key] = row._mapping[columnkeyhash]
+        for reference_target_main, reference_source_main in _reference_select.items():
+            if isinstance(reference_source_main, dict) or not reference_source_main:
+                continue
+            # overwrite
+            item[reference_target_main] = row._mapping[reference_source_main]
         model: Model = (
             cls.proxy_model(**item, __phase__="init_db")  # type: ignore
             if exclude_secrets or is_defer_fields or only_fields
@@ -242,7 +274,7 @@ class ModelRowMixin:
         return False
 
     @classmethod
-    def create_model_key_from_sqla_row(cls, row: "Row", row_prefix: str = "") -> tuple:
+    def create_model_key_from_sqla_row(cls, row: Row, row_prefix: str = "") -> tuple:
         """
         Build a cache key for the model.
         """
@@ -254,10 +286,10 @@ class ModelRowMixin:
     @classmethod
     async def __set_prefetch(
         cls,
-        row: "Row",
-        model: "Model",
+        row: Row,
+        model: Model,
         row_prefix: str,
-        related: "Prefetch",
+        related: Prefetch,
     ) -> None:
         model_key = ()
         if related._is_finished:
@@ -298,11 +330,11 @@ class ModelRowMixin:
     @classmethod
     async def __handle_prefetch_related(
         cls,
-        row: "Row",
-        model: "Model",
+        row: Row,
+        model: Model,
         prefix: str,
-        tables_and_models: dict[str, tuple["Table", type["BaseModelType"]]],
-        prefetch_related: Sequence["Prefetch"],
+        tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
+        prefetch_related: Sequence[Prefetch],
     ) -> None:
         """
         Handles any prefetch related scenario from the model.
