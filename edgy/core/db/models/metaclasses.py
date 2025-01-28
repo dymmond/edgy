@@ -7,6 +7,7 @@ import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
 from collections.abc import Sequence
+from contextvars import ContextVar
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -43,6 +44,8 @@ if TYPE_CHECKING:
 
 _empty_dict: dict[str, Any] = {}
 _empty_set: frozenset[Any] = frozenset()
+
+_seen_table_names: ContextVar[set[str]] = ContextVar("_seen_table_names", default=None)
 
 
 class Fields(UserDict, dict[str, BaseFieldType]):
@@ -203,7 +206,6 @@ _trigger_attributes_field_stats_MetaInfo = {
     "post_delete_fields",
     "excluded_fields",
     "secret_fields",
-    # not used here in code but usefully for third-party code
     "relationship_fields",
     "ref_foreign_key_fields",
 }
@@ -239,6 +241,7 @@ class MetaInfo:
         "secret_fields",
         "relationship_fields",
         "ref_foreign_key_fields",
+        "_needs_special_serialization",
         "_fields_are_initialized",
         "_field_stats_are_initialized",
     )
@@ -295,6 +298,36 @@ class MetaInfo:
     @property
     def pk(self) -> Optional[PKField]:
         return cast(Optional[PKField], self.fields.get("pk"))
+
+    @property
+    def needs_special_serialization(self) -> bool:
+        if getattr(self, "_needs_special_serialization", None) is None:
+            _needs_special_serialization: bool = any(
+                not self.fields[field_name].exclude for field_name in self.special_getter_fields
+            )
+            if not _needs_special_serialization:
+                names = _seen_table_names.get()
+                token = None
+                if names is None:
+                    names = set()
+                    token = _seen_table_names.set(names)
+                try:
+                    for field_name in self.foreign_key_fields:
+                        field = cast(BaseForeignKeyField, self.fields[field_name])
+                        if field.target.table.key in names:
+                            continue
+                        else:
+                            names.add(field.target.table.key)
+                        if field.target.meta.needs_special_serialization:
+                            _needs_special_serialization = True
+                            break
+                finally:
+                    if token is not None:
+                        _seen_table_names.reset(token)
+
+            self._needs_special_serialization = _needs_special_serialization
+
+        return self._needs_special_serialization
 
     @property
     def fields_mapping(self) -> dict[str, BaseFieldType]:
@@ -363,6 +396,7 @@ class MetaInfo:
         self._fields_are_initialized = True
 
     def init_field_stats(self) -> None:
+        self._needs_special_serialization = None
         self.special_getter_fields: set[str] = set()
         self.excluded_fields: set[str] = set()
         self.secret_fields: set[str] = set()
@@ -395,6 +429,7 @@ class MetaInfo:
             self._fields_are_initialized = False
         if invalidate_stats:
             self._field_stats_are_initialized = False
+            self._needs_special_serialization = None
         if self.model is None:
             return
         if clear_class_attrs:

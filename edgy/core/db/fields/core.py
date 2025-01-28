@@ -44,7 +44,7 @@ class ComputedField(BaseField):
         ] = None,
         **kwargs: Any,
     ) -> None:
-        kwargs["exclude"] = True
+        kwargs.setdefault("exclude", True)
         kwargs["null"] = True
         kwargs["primary_key"] = False
         kwargs["field_type"] = kwargs["annotation"] = Any

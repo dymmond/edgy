@@ -18,6 +18,8 @@ class Base(edgy.StrictModel):
 
 class Profile(Base):
     name: str = edgy.CharField(max_length=1000)
+    # by default excluded
+    computed = edgy.fields.ComputedField(lambda field, model_instance, model_class: "foo")
 
 
 class User(Base):

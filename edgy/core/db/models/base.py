@@ -271,8 +271,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             # when excluded we don't need to consider to add a second pass.
             if field_name in initial_full_field_exclude or field.exclude:
                 continue
-            # we exclude special models from the default serialization by pydantic
-            if field.target.meta.foreign_key_fields or field.target.meta.special_getter_fields:
+            if field.target.meta.needs_special_serialization:
                 exclude_passed[field_name] = True
                 need_second_pass.add(field_name)
         include: Union[set[str], dict[str, Any], None] = kwargs.pop("include", None)
@@ -290,7 +289,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     or field_name in include
                 ):
                     continue
-                field: BaseFieldType = self.meta.fields[field_name]
+                field = self.meta.fields[field_name]
                 try:
                     retval = getattr(self, field_name)
                 except AttributeError:

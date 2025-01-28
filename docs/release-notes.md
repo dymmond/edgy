@@ -30,6 +30,7 @@ hide:
 - Fix Marshall required check.
 - Fix ReflectModel with exclude_secrets.
 - Fix non-edgy-fields were stripped instead kept.
+- Allow ComputedFields being part of a serialization.
 
 ## 0.25.1
 
