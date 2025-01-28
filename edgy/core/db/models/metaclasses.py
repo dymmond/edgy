@@ -27,6 +27,7 @@ from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.base import BaseForeignKey, PKField, RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
+from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKey
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.models.managers import BaseManager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
@@ -72,6 +73,8 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             self.meta.foreign_key_fields.add(name)
         if isinstance(field, RelationshipField):
             self.meta.relationship_fields.add(name)
+        if isinstance(field, BaseRefForeignKey):
+            self.meta.ref_foreign_key_fields.add(name)
 
     def discard_field_from_meta(self, name: str) -> None:
         if self.meta._field_stats_are_initialized:
@@ -202,6 +205,7 @@ _trigger_attributes_field_stats_MetaInfo = {
     "secret_fields",
     # not used here in code but usefully for third-party code
     "relationship_fields",
+    "ref_foreign_key_fields",
 }
 
 _field_sets_to_clear: set[str] = _trigger_attributes_field_stats_MetaInfo
@@ -234,6 +238,7 @@ class MetaInfo:
         "excluded_fields",
         "secret_fields",
         "relationship_fields",
+        "ref_foreign_key_fields",
         "_fields_are_initialized",
         "_field_stats_are_initialized",
     )
@@ -367,6 +372,7 @@ class MetaInfo:
         self.post_delete_fields: set[str] = set()
         self.foreign_key_fields: set[str] = set()
         self.relationship_fields: set[str] = set()
+        self.ref_foreign_key_fields: set[str] = set()
         self._field_stats_are_initialized = True
         for key, field in self.fields.items():
             self.fields.add_field_to_meta(key, field)
@@ -736,12 +742,14 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             return new_class
         new_class._db_schemas = {}
 
-        # Ensure the model_fields are updated to the latest
-        # required since pydantic 2.10
-        new_class.__pydantic_fields__ = model_fields
-        # error since pydantic 2.10
-        with contextlib.suppress(AttributeError):
-            new_class.model_fields = model_fields
+        model_fields_on_class = getattr(new_class, "__pydantic_fields__", None)
+        if model_fields_on_class is None:
+            model_fields_on_class = new_class.model_fields
+        for key in list(model_fields_on_class.keys()):
+            model_field_on_class = model_fields_on_class[key]
+            if isinstance(model_field_on_class, BaseFieldType):
+                del model_fields_on_class[key]
+        model_fields_on_class.update(model_fields)
 
         # Set the owner of the field, must be done as early as possible
         # don't use meta.fields to not trigger the lazy evaluation
