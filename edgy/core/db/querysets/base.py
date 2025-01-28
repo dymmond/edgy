@@ -1,6 +1,7 @@
+from __future__ import annotations
+
 import warnings
 from collections.abc import AsyncIterator, Awaitable, Generator, Iterable, Sequence
-from collections.abc import Iterable as CollectionsIterable
 from functools import cached_property
 from inspect import isawaitable
 from typing import (
@@ -31,7 +32,13 @@ from edgy.types import Undefined
 from . import clauses as clauses_mod
 from .mixins import QuerySetPropsMixin, TenancyMixin
 from .prefetch import Prefetch, PrefetchMixin, check_prefetch_collision
-from .types import EdgyEmbedTarget, EdgyModel, QuerySetType, tables_and_models_type
+from .types import (
+    EdgyEmbedTarget,
+    EdgyModel,
+    QuerySetType,
+    reference_select_type,
+    tables_and_models_type,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     from databasez.core.transaction import Transaction
@@ -63,10 +70,10 @@ class BaseQuerySet(
         self,
         model_class: Union[type[BaseModelType], None] = None,
         *,
-        database: Union["Database", None] = None,
+        database: Union[Database, None] = None,
         filter_clauses: Iterable[Any] = _empty_set,
         select_related: Iterable[str] = _empty_set,
-        prefetch_related: Iterable["Prefetch"] = _empty_set,
+        prefetch_related: Iterable[Prefetch] = _empty_set,
         limit_count: Optional[int] = None,
         limit: Optional[int] = None,
         limit_offset: Optional[int] = None,
@@ -85,6 +92,8 @@ class BaseQuerySet(
         using_schema: Union[str, None, Any] = Undefined,
         table: Optional[sqlalchemy.Table] = None,
         exclude_secrets: bool = False,
+        extra_select: Optional[Iterable[sqlalchemy.expression.ClauseElement]] = None,
+        reference_select: Optional[reference_select_type] = None,
     ) -> None:
         # Making sure for queries we use the main class and not the proxy
         # And enable the parent
@@ -137,6 +146,10 @@ class BaseQuerySet(
         self.embed_parent = embed_parent
         self.embed_parent_filters = embed_parent_filters
         self.using_schema = using_schema
+        self._extra_select = list(extra_select) if extra_select is not None else []
+        self._reference_select = (
+            reference_select.copy() if isinstance(reference_select, dict) else {}
+        )
         self._exclude_secrets = exclude_secrets
         # cache should not be cloned
         self._cache = QueryModelResultCache(attrs=self.model_class.pkcolumns)
@@ -159,7 +172,7 @@ class BaseQuerySet(
         if database is not None:
             self.database = database
 
-    def _clone(self) -> "QuerySet":
+    def _clone(self) -> QuerySet:
         """
         Return a copy of the current QuerySet that's ready for another
         operation.
@@ -183,6 +196,8 @@ class BaseQuerySet(
             using_schema=self.using_schema,
             table=getattr(self, "_table", None),
             exclude_secrets=self._exclude_secrets,
+            reference_select=self._reference_select,
+            extra_select=self._extra_select,
         )
         queryset.or_clauses.extend(self.or_clauses)
         queryset._cached_select_related_expression = self._cached_select_related_expression
@@ -273,7 +288,7 @@ class BaseQuerySet(
         current_transition: tuple[str, str, str],
         *,
         transitions: dict[tuple[str, str, str], tuple[Any, Optional[tuple[str, str, str]], str]],
-        tables_and_models: dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]],
+        tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
     ) -> Any:
         if current_transition not in transitions:
             return join_clause
@@ -471,7 +486,7 @@ class BaseQuerySet(
         """
         self._validate_only_and_defer()
         joins, tables_and_models = self._build_tables_join_from_relationship()
-        columns: list[Any] = []
+        columns_and_extra: list[Any] = [*self._extra_select]
         for prefix, (table, model_class) in tables_and_models.items():
             if not prefix:
                 for column_key, column in table.columns.items():
@@ -488,7 +503,7 @@ class BaseQuerySet(
                     ):
                         continue
                     # add without alias
-                    columns.append(column)
+                    columns_and_extra.append(column)
 
             else:
                 for column_key, column in table.columns.items():
@@ -511,10 +526,12 @@ class BaseQuerySet(
                     ):
                         continue
                     # alias has name not a key. The name is fully descriptive
-                    columns.append(column.label(f"{table.name}_{column_key}"))
-        assert columns, "no columns specified"
+                    columns_and_extra.append(column.label(f"{table.name}_{column_key}"))
+        assert columns_and_extra, "no columns or extra_select specified"
         # all columns are aliased already
-        expression = sqlalchemy.sql.select(*columns).set_label_style(sqlalchemy.LABEL_STYLE_NONE)
+        expression = sqlalchemy.sql.select(*columns_and_extra).set_label_style(
+            sqlalchemy.LABEL_STYLE_NONE
+        )
         expression = expression.select_from(joins)
         expression = expression.where(await self.build_where_clause(self, tables_and_models))
 
@@ -577,11 +594,11 @@ class BaseQuerySet(
 
                 # bind local vars
                 async def wrapper(
-                    queryset: "QuerySet",
+                    queryset: QuerySet,
                     tables_and_models: tables_and_models_type,
                     *,
-                    _field: "BaseFieldType" = field,
-                    _sub_query: "QuerySet" = sub_query,
+                    _field: BaseFieldType = field,
+                    _sub_query: QuerySet = sub_query,
                     _prefix: str = related_str,
                 ) -> Any:
                     table = tables_and_models[_prefix][0]
@@ -592,15 +609,15 @@ class BaseQuerySet(
 
                 clauses.append(wrapper)
             else:
-                assert not isinstance(value, BaseModelType), (
-                    f"should be parsed in clean: {key}: {value}"
-                )
+                assert not isinstance(
+                    value, BaseModelType
+                ), f"should be parsed in clean: {key}: {value}"
 
                 async def wrapper(
-                    queryset: "QuerySet",
+                    queryset: QuerySet,
                     tables_and_models: tables_and_models_type,
                     *,
-                    _field: "BaseFieldType" = field,
+                    _field: BaseFieldType = field,
                     _value: Any = value,
                     _op: Optional[str] = op,
                     _prefix: str = related_str,
@@ -650,7 +667,7 @@ class BaseQuerySet(
     async def _get_or_cache_row(
         self,
         row: Any,
-        tables_and_models: dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]],
+        tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
         extra_attr: str = "",
         raw: bool = False,
     ) -> tuple[EdgyModel, EdgyModel]:
@@ -669,6 +686,7 @@ class BaseQuerySet(
                     exclude_secrets=self._exclude_secrets,
                     using_schema=self.active_schema,
                     database=self.database,
+                    reference_select=self._reference_select,
                 ),
                 transform_fn=self._embed_parent_in_result,
             )
@@ -690,8 +708,8 @@ class BaseQuerySet(
     async def _handle_batch(
         self,
         batch: Sequence[sqlalchemy.Row],
-        tables_and_models: dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]],
-        queryset: "BaseQuerySet",
+        tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
+        queryset: BaseQuerySet,
     ) -> Sequence[tuple[BaseModelType, BaseModelType]]:
         is_defer_fields = bool(queryset._defer)
         del queryset
@@ -759,6 +777,7 @@ class BaseQuerySet(
                     exclude_secrets=self._exclude_secrets,
                     using_schema=self.active_schema,
                     database=self.database,
+                    reference_select=self._reference_select,
                 ),
                 transform_fn=self._embed_parent_in_result,
             ),
@@ -844,22 +863,22 @@ class BaseQuerySet(
         kwargs: Any,
         clauses: Sequence[
             Union[
-                "sqlalchemy.sql.expression.BinaryExpression",
+                sqlalchemy.sql.expression.BinaryExpression,
                 Callable[
-                    ["QuerySetType"],
+                    [QuerySetType],
                     Union[
-                        "sqlalchemy.sql.expression.BinaryExpression",
-                        Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                        sqlalchemy.sql.expression.BinaryExpression,
+                        Awaitable[sqlalchemy.sql.expression.BinaryExpression],
                     ],
                 ],
                 dict[str, Any],
-                "QuerySet",
+                QuerySet,
             ]
         ],
         exclude: bool = False,
         or_: bool = False,
         allow_global_or: bool = True,
-    ) -> "QuerySet":
+    ) -> QuerySet:
         """
         Filters or excludes a given clause for a specific QuerySet.
         """
@@ -895,9 +914,9 @@ class BaseQuerySet(
                 else:
                     converted_clauses.extend(extracted_clauses)
             elif isinstance(raw_clause, QuerySet):
-                assert raw_clause.model_class is queryset.model_class, (
-                    f"QuerySet arg has wrong model_class {raw_clause.model_class}"
-                )
+                assert (
+                    raw_clause.model_class is queryset.model_class
+                ), f"QuerySet arg has wrong model_class {raw_clause.model_class}"
                 converted_clauses.append(raw_clause.build_where_clause)
                 if not queryset._select_related.issuperset(raw_clause._select_related):
                     queryset._select_related.update(raw_clause._select_related)
@@ -1000,25 +1019,25 @@ class QuerySet(BaseQuerySet):
     def filter(
         self,
         *clauses: Union[
-            "sqlalchemy.sql.expression.BinaryExpression",
+            sqlalchemy.sql.expression.BinaryExpression,
             Callable[
-                ["QuerySetType"],
+                [QuerySetType],
                 Union[
-                    "sqlalchemy.sql.expression.BinaryExpression",
-                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                    sqlalchemy.sql.expression.BinaryExpression,
+                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
                 ],
             ],
             dict[str, Any],
-            "QuerySet",
+            QuerySet,
         ],
         **kwargs: Any,
-    ) -> "QuerySet":
+    ) -> QuerySet:
         """
         Filters the QuerySet by the given kwargs and clauses.
         """
         return self._filter_or_exclude(clauses=clauses, kwargs=kwargs)
 
-    def all(self, clear_cache: bool = False) -> "QuerySet":
+    def all(self, clear_cache: bool = False) -> QuerySet:
         """
         Returns a cloned query with empty cache. Optionally just clear the cache and return the same query.
         """
@@ -1030,19 +1049,19 @@ class QuerySet(BaseQuerySet):
     def or_(
         self,
         *clauses: Union[
-            "sqlalchemy.sql.expression.BinaryExpression",
+            sqlalchemy.sql.expression.BinaryExpression,
             Callable[
-                ["QuerySetType"],
+                [QuerySetType],
                 Union[
-                    "sqlalchemy.sql.expression.BinaryExpression",
-                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                    sqlalchemy.sql.expression.BinaryExpression,
+                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
                 ],
             ],
             dict[str, Any],
-            "QuerySet",
+            QuerySet,
         ],
         **kwargs: Any,
-    ) -> "QuerySet":
+    ) -> QuerySet:
         """
         Filters the QuerySet by the OR operand.
         """
@@ -1051,19 +1070,19 @@ class QuerySet(BaseQuerySet):
     def local_or(
         self,
         *clauses: Union[
-            "sqlalchemy.sql.expression.BinaryExpression",
+            sqlalchemy.sql.expression.BinaryExpression,
             Callable[
-                ["QuerySetType"],
+                [QuerySetType],
                 Union[
-                    "sqlalchemy.sql.expression.BinaryExpression",
-                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                    sqlalchemy.sql.expression.BinaryExpression,
+                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
                 ],
             ],
             dict[str, Any],
-            "QuerySet",
+            QuerySet,
         ],
         **kwargs: Any,
-    ) -> "QuerySet":
+    ) -> QuerySet:
         """
         Filters the QuerySet by the OR operand.
         """
@@ -1074,18 +1093,18 @@ class QuerySet(BaseQuerySet):
     def and_(
         self,
         *clauses: Union[
-            "sqlalchemy.sql.expression.BinaryExpression",
+            sqlalchemy.sql.expression.BinaryExpression,
             Callable[
-                ["QuerySetType"],
+                [QuerySetType],
                 Union[
-                    "sqlalchemy.sql.expression.BinaryExpression",
-                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                    sqlalchemy.sql.expression.BinaryExpression,
+                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
                 ],
             ],
             dict[str, Any],
         ],
         **kwargs: Any,
-    ) -> "QuerySet":
+    ) -> QuerySet:
         """
         Filters the QuerySet by the AND operand. Alias of filter.
         """
@@ -1094,19 +1113,19 @@ class QuerySet(BaseQuerySet):
     def not_(
         self,
         *clauses: Union[
-            "sqlalchemy.sql.expression.BinaryExpression",
+            sqlalchemy.sql.expression.BinaryExpression,
             Callable[
-                ["QuerySetType"],
+                [QuerySetType],
                 Union[
-                    "sqlalchemy.sql.expression.BinaryExpression",
-                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                    sqlalchemy.sql.expression.BinaryExpression,
+                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
                 ],
             ],
             dict[str, Any],
-            "QuerySet",
+            QuerySet,
         ],
         **kwargs: Any,
-    ) -> "QuerySet":
+    ) -> QuerySet:
         """
         Filters the QuerySet by the NOT operand. Alias of exclude.
         """
@@ -1115,19 +1134,19 @@ class QuerySet(BaseQuerySet):
     def exclude(
         self,
         *clauses: Union[
-            "sqlalchemy.sql.expression.BinaryExpression",
+            sqlalchemy.sql.expression.BinaryExpression,
             Callable[
-                ["QuerySetType"],
+                [QuerySetType],
                 Union[
-                    "sqlalchemy.sql.expression.BinaryExpression",
-                    Awaitable["sqlalchemy.sql.expression.BinaryExpression"],
+                    sqlalchemy.sql.expression.BinaryExpression,
+                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
                 ],
             ],
             dict[str, Any],
-            "QuerySet",
+            QuerySet,
         ],
         **kwargs: Any,
-    ) -> "QuerySet":
+    ) -> QuerySet:
         """
         Exactly the same as the filter but for the exclude.
         """
@@ -1136,7 +1155,7 @@ class QuerySet(BaseQuerySet):
     def exclude_secrets(
         self,
         exclude_secrets: bool = True,
-    ) -> "QuerySet":
+    ) -> QuerySet:
         """
         Excludes any field that contains the `secret=True` declared from being leaked.
         """
@@ -1144,10 +1163,23 @@ class QuerySet(BaseQuerySet):
         queryset._exclude_secrets = exclude_secrets
         return queryset
 
+    def extra_select(
+        self,
+        *extra: sqlalchemy.expression.ColumnClause,
+    ) -> QuerySetType:
+        queryset = self._clone()
+        queryset._extra_select.extend(extra)
+        return queryset
+
+    def reference_select(self, references: reference_select_type) -> QuerySetType:
+        queryset = self._clone()
+        queryset._reference_select.update(references)
+        return queryset
+
     def batch_size(
         self,
         batch_size: Optional[int] = None,
-    ) -> "QuerySet":
+    ) -> QuerySet:
         """
         Set batch/chunk size. Used for iterate
         """
@@ -1155,7 +1187,7 @@ class QuerySet(BaseQuerySet):
         queryset._batch_size = batch_size
         return queryset
 
-    def lookup(self, term: Any) -> "QuerySet":
+    def lookup(self, term: Any) -> QuerySet:
         """
         Broader way of searching for a given term
         """
@@ -1180,7 +1212,7 @@ class QuerySet(BaseQuerySet):
 
         return queryset
 
-    def order_by(self, *order_by: str) -> "QuerySet":
+    def order_by(self, *order_by: str) -> QuerySet:
         """
         Returns a QuerySet ordered by the given fields.
         """
@@ -1188,14 +1220,14 @@ class QuerySet(BaseQuerySet):
         queryset._order_by = order_by
         return queryset
 
-    def reverse(self) -> "QuerySet":
+    def reverse(self) -> QuerySet:
         queryset: QuerySet = self._clone()
         queryset._order_by = tuple(
             el[1:] if el.startswith("-") else f"-{el}" for el in queryset._order_by
         )
         return queryset
 
-    def limit(self, limit_count: int) -> "QuerySet":
+    def limit(self, limit_count: int) -> QuerySet:
         """
         Returns a QuerySet limited by.
         """
@@ -1203,7 +1235,7 @@ class QuerySet(BaseQuerySet):
         queryset.limit_count = limit_count
         return queryset
 
-    def offset(self, offset: int) -> "QuerySet":
+    def offset(self, offset: int) -> QuerySet:
         """
         Returns a Queryset limited by the offset.
         """
@@ -1211,7 +1243,7 @@ class QuerySet(BaseQuerySet):
         queryset._offset = offset
         return queryset
 
-    def group_by(self, *group_by: str) -> "QuerySet":
+    def group_by(self, *group_by: str) -> QuerySet:
         """
         Returns the values grouped by the given fields.
         """
@@ -1219,7 +1251,7 @@ class QuerySet(BaseQuerySet):
         queryset._group_by = group_by
         return queryset
 
-    def distinct(self, first: Union[bool, str] = True, *distinct_on: str) -> "QuerySet":
+    def distinct(self, first: Union[bool, str] = True, *distinct_on: str) -> QuerySet:
         """
         Returns a queryset with distinct results.
         """
@@ -1232,7 +1264,7 @@ class QuerySet(BaseQuerySet):
             queryset.distinct_on = [first, *distinct_on]
         return queryset
 
-    def only(self, *fields: str) -> "QuerySet":
+    def only(self, *fields: str) -> QuerySet:
         """
         Returns a list of models with the selected only fields and always the primary
         key.
@@ -1250,7 +1282,7 @@ class QuerySet(BaseQuerySet):
         queryset._only = only_fields
         return queryset
 
-    def defer(self, *fields: str) -> "QuerySet":
+    def defer(self, *fields: str) -> QuerySet:
         """
         Returns a list of models with the selected only fields and always the primary
         key.
@@ -1260,7 +1292,7 @@ class QuerySet(BaseQuerySet):
         queryset._defer = set(fields)
         return queryset
 
-    def select_related(self, *related: str) -> "QuerySet":
+    def select_related(self, *related: str) -> QuerySet:
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
         related-object data when it executes its query.
@@ -1297,7 +1329,7 @@ class QuerySet(BaseQuerySet):
 
         rows: list[BaseModelType] = await self
 
-        if fields is not None and not isinstance(fields, CollectionsIterable):
+        if fields is not None and not isinstance(fields, Iterable):
             raise QuerySetError(detail="Fields must be a suitable sequence of strings or unset.")
 
         if not fields:
@@ -1699,7 +1731,7 @@ class QuerySet(BaseQuerySet):
             raise ValueError("'obj' must be a model or reflect model instance.") from None
         return await self.exists(**query)
 
-    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> "Transaction":
+    def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
         """Return database transaction for the assigned database."""
         return self.database.transaction(force_rollback=force_rollback, **kwargs)
 

@@ -1,3 +1,4 @@
+import contextlib
 from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic_core import PydanticUndefined
@@ -67,7 +68,9 @@ def generify_model_fields(model: type["BaseModelType"]) -> dict[Any, Any]:
     # handle the nested non existing results
     for name, field in model.model_fields.items():
         field.annotation = Any
-        field.null = True
+        # only valid for edgy fields
+        with contextlib.suppress(AttributeError):
+            field.null = True
         # set a default to fix is_required
         if field.default is PydanticUndefined:
             field.default = None

@@ -12,12 +12,40 @@ When dropped to 0 the database is uninitialized and drops the connections.
 There is no problem re-opening the database but it is imperformant and can have side-effects especcially with the `DatabaseTestClient`.
 For this the `DatabaseNotConnectedWarning` warning exist.
 
-## `DatabaseNotConnectedWarning` warning
+
+### Getting the SQL query
+
+QuerySet contains a cached debug property named `sql` which contains the QuerySet as query with inserted blanks.
+
+### Performance warnings (`DatabaseNotConnectedWarning`)
 
 The most common warning in edgy is probably the `DatabaseNotConnectedWarning` warning.
 
 It is deliberate and shall guide the user to improve his code so he doesn't throws away engines unneccessarily.
 Also it could lead in test environments to hard to debug errors because of a missing database (drop_database parameter).
+
+Edgy issues a `DatabaseNotConnectedWarning` when using edgy without a connected database. To silence it, wrap the affected
+code in a database scope
+
+``` python
+await model.save()
+# becomes
+async with model.database:
+    await model.save()
+```
+
+If the warning is completely unwanted despite the performance impact, you can filter:
+
+``` python
+import warnings
+from edgy.exceptions import DatabaseNotConnectedWarning
+with warnings.catch_warnings(action="ignore", category=DatabaseNotConnectedWarning):
+    await model.save()
+```
+
+It inherits from `UserWarning` so it is possible to filter UserWarnings.
+
+However the silencing way is not recommended.
 
 ## Many connections
 

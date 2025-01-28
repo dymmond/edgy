@@ -61,6 +61,26 @@ async def test_nested_with_not_optimal_select_related_exclude_secrets():
     }
 
 
+async def test_nested_with_not_optimal_select_related_defer():
+    profile = await Profile.query.create(name="edgy")
+    user = await User.query.create(
+        profile=profile, email="user@dev.com", password="dasrq3213", name="edgy"
+    )
+    await Organisation.query.create(user=user)
+
+    org_query = Organisation.query.defer("name")
+    # by default _select_related is a set; for having an arbitary order provide a list
+    org_query._select_related = ["user", "user", "user__profile"]
+    assert org_query._cached_select_related_expression is None
+    org = await org_query.last()
+    assert org_query._cached_select_related_expression is not None
+
+    assert org.model_dump() == {
+        "user": {"id": 1, "profile": {"id": 1, "name": "edgy"}, "email": "user@dev.com"},
+        "id": 1,
+    }
+
+
 async def test_nested_with_not_optimal_select_related_all():
     profile = await Profile.query.create(name="edgy")
     user = await User.query.create(
