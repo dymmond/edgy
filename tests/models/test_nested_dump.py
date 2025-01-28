@@ -27,6 +27,7 @@ class Profile(Base):
     name: str = edgy.CharField(max_length=1000)
     # by default excluded
     computed = edgy.fields.ComputedField(callback, exclude=False, secret=True)
+    m2m = edgy.fields.ManyToMany("Profile")
 
 
 class User(Base):
