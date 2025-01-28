@@ -6,6 +6,16 @@ hide:
 
 # Release Notes
 
+## 0.26.1
+
+### Added
+
+- Add PGArrayField.
+
+### Changed
+
+- Reorganize fields. Make more lazy.
+
 ## 0.26.0
 
 ### Added
