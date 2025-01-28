@@ -11,7 +11,7 @@ class BasePermission(edgy.Model):
     # model_name would collidate with pydantics private namespace
     # name_model: str = edgy.fields.CharField(max_length=100, null=True)
     # obj = edgy.fields.ForeignKey("ContentType", null=True)
-    description: Optional[str] = edgy.fields.ComputedField(  # type: ignore
+    description: Optional[str] = edgy.fields.ComputedField(
         getter="get_description",
         setter="set_description",
         # default to name

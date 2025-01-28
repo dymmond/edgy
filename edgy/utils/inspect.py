@@ -47,7 +47,7 @@ def func_accepts_kwargs(func: Callable) -> bool:
 
 
 class RawRepr:
-    def __init__(self, inp: Any) -> str:
+    def __init__(self, inp: str) -> None:
         self.inp = inp
 
     def __repr__(self) -> str:
