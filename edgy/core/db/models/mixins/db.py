@@ -528,11 +528,13 @@ class DatabaseMixin:
                     try:
                         field_value = getattr(self, field_name)
                     except AttributeError:
+                        # already deleted
                         continue
                     if inspect.isawaitable(field_value):
                         try:
                             field_value = await field_value
                         except AttributeError:
+                            # already deleted
                             continue
                     field_values[field_name] = field_value
             finally:

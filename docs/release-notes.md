@@ -17,6 +17,7 @@ hide:
 ### Changed
 
 - Model allows now like ReflectModel arbitary arguments. Required for `reference_select`.
+- Use a partly copied model as ProxyModel. This ensures that the logic of ReflectField still works.
 
 ### Fixed
 
@@ -26,6 +27,7 @@ hide:
 - Usage of StrictModels in Mashalls.
 - Different autoincrement field in Marshalls than `id`.
 - Fix Marshall required check.
+- Fix ReflectModel with exclude_secrets.
 
 ## 0.25.1
 

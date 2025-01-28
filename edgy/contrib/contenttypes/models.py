@@ -33,11 +33,10 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
     async def delete(
         self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
     ) -> None:
+        await super().delete(skip_post_delete_hooks=skip_post_delete_hooks)
+        if remove_referenced_call:
+            return
         reverse_name = f"reverse_{self.name.lower()}"
         referenced_obs = cast("QuerySet", getattr(self, reverse_name))
-        await super().delete(skip_post_delete_hooks=skip_post_delete_hooks)
-        if (
-            not remove_referenced_call
-            and self.meta.fields[reverse_name].foreign_key.force_cascade_deletion_relation
-        ):
+        if self.meta.fields[reverse_name].foreign_key.force_cascade_deletion_relation:
             await referenced_obs.using(schema=self.schema_name).delete()

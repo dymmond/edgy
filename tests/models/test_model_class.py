@@ -6,7 +6,7 @@ from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
+database = DatabaseTestClient(DATABASE_URL, force_rollback=False)
 models = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
@@ -34,11 +34,11 @@ class Product(edgy.StrictModel):
 
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
-    async with database:
-        await models.create_all()
+    await models.create_all()
+    async with models:
         yield
-        if not database.drop:
-            await models.drop_all()
+    if not database.drop:
+        await models.drop_all()
 
 
 def test_model_class():
