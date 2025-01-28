@@ -388,6 +388,7 @@ class ManyToManyField(ForeignKeyFieldFactory):
             raise FieldDefinitionError('"embed_through" cannot contain "__".')
 
         kwargs["null"] = True
+        kwargs["exclude"] = True
         kwargs["on_delete"] = CASCADE
         kwargs["on_update"] = CASCADE
 
