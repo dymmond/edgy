@@ -396,7 +396,6 @@ class MetaInfo:
         self._fields_are_initialized = True
 
     def init_field_stats(self) -> None:
-        self._needs_special_serialization = None
         self.special_getter_fields: set[str] = set()
         self.excluded_fields: set[str] = set()
         self.secret_fields: set[str] = set()
@@ -429,7 +428,9 @@ class MetaInfo:
             self._fields_are_initialized = False
         if invalidate_stats:
             self._field_stats_are_initialized = False
-            self._needs_special_serialization = None
+        if invalidate_fields or invalidate_stats:
+            with contextlib.suppress(AttributeError):
+                delattr(self, "_needs_special_serialization")
         if self.model is None:
             return
         if clear_class_attrs:
@@ -747,8 +748,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         del is_abstract
 
         if not meta.abstract:
-            # don't add to model_fields, it leads to crashes for unknown reasons
-            meta.fields["pk"] = PKField(exclude=True, name="pk", inherit=False, no_copy=True)
+            model_fields["pk"] = meta.fields["pk"] = PKField(
+                exclude=True, name="pk", inherit=False, no_copy=True
+            )
 
         # Handle annotations
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)

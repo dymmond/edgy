@@ -307,12 +307,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                         include=sub_include, exclude=sub_exclude, mode=mode, **kwargs
                     )
                 else:
-                    assert sub_include is None, (
-                        "sub include filters for CompositeField specified, but no Pydantic model is set"
-                    )
-                    assert sub_exclude is None, (
-                        "sub exclude filters for CompositeField specified, but no Pydantic model is set"
-                    )
+                    assert sub_include is None, "sub include filters for no pydantic model"
+                    assert sub_exclude is None, "sub exclude filters for no pydantic model"
                     if mode == "json" and not getattr(field, "unsafe_json_serialization", False):
                         # skip field if it isn't a BaseModel and the mode is json and
                         # unsafe_json_serialization is not set
