@@ -99,11 +99,11 @@ async def test_creates_a_user_raises_value_error(async_client):
         "detail": "Validation failed for http://test/create with method POST.",
         "errors": [
             {
-                "type": "list_type",
+                "type": "item_type",
                 "loc": ["posts"],
                 "msg": "Input should be a valid list",
                 "input": {"comment": "A comment"},
-                "url": f"https://errors.pydantic.dev/{pydantic_version}/v/list_type",
+                "url": f"https://errors.pydantic.dev/{pydantic_version}/v/item_type",
             }
         ],
     }

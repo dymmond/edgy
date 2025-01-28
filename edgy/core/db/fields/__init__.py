@@ -8,7 +8,6 @@ from .types import BaseFieldType
 if TYPE_CHECKING:
     from .composite_field import CompositeField
     from .core import (
-        AutoNowMixin,  # noqa
         BigIntegerField,
         BinaryField,
         BooleanField,
@@ -75,6 +74,7 @@ __all__ = [
     "TimeField",
     "URLField",
     "UUIDField",
+    "PGArrayField",
 ]
 
 Monkay(
@@ -112,6 +112,7 @@ Monkay(
         "TimeField": ".core.TimeField",
         "URLField": ".core.URLField",
         "UUIDField": ".core.UUIDField",
+        "PGArrayField": ".postgres.PGArrayField",
     },
     deprecated_lazy_imports={
         "AutoNowMixin": {

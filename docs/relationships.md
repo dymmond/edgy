@@ -3,8 +3,8 @@
 Creating relationships in **Edgy** is as simple as importing the fields and apply them into
 the models.
 
-There are currently two types, the [ForeignKey](./fields.md#foreignkey)
-and the [OneToOne](./fields.md#onetoone).
+There are currently two types, the [ForeignKey](./fields/index.md#foreignkey)
+and the [OneToOne](./fields/index.md#onetoone).
 
 When declaring a foreign key, you can pass the value in two ways, as a string or as a model
 object. Internally **Edgy** lookups up inside the [registry](./models.md#registry) and maps
@@ -124,7 +124,7 @@ print(profile.user.first_name) # "Foo"
 
 ## ForeignKey constraints
 
-As mentioned in the [foreign key field](./fields.md#foreignkey), you can specify constraints in
+As mentioned in the [foreign key field](./fields/index.md#foreignkey), you can specify constraints in
 a foreign key.
 
 The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported

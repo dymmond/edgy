@@ -5,7 +5,7 @@ For such patterns there is a primititive named PasswordField.
 
 ## PasswordField
 
-We have a field named [PasswordField](../fields.md#passwordfield). It contains an interfacing
+We have a field named [PasswordField](../fields/index.md#passwordfield). It contains an interfacing
 parameter for a password hasher named `derive_fn`, which mangles a user provided password.
 
 ```python

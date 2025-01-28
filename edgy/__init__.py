@@ -97,6 +97,7 @@ __all__ = [
     "JSONField",
     "RefForeignKey",
     "IPAddressField",
+    "PGArrayField",
     # base connection
     "Database",
     "DatabaseURL",
