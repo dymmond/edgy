@@ -56,3 +56,5 @@ async def test_transactions_fn(force_rollback):
         async with models:
             user = await User.query.create(name="edgy")
             await transaction_method(user)
+            await user.load()
+            assert user.name == "edgy"
