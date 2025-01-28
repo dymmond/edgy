@@ -55,8 +55,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     __show_pk__: ClassVar[bool] = False
     __using_schema__: Union[str, None, Any] = Undefined
     __no_load_trigger_attrs__: ClassVar[set[str]] = _empty
-    # private attribute
     database: ClassVar[Database] = None
+    # private attribute
     _loaded_or_deleted: bool = False
 
     def __init__(
@@ -242,85 +242,86 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             show_pk: bool - Enforces showing the primary key in the model_dump.
         """
         # we want a copy
-        exclude: Union[set[str], dict[str, Any], None] = kwargs.pop("exclude", None)
-        if exclude is None:
-            initial_full_field_exclude = _empty
-            # must be writable
-            exclude = set()
-        elif isinstance(exclude, dict):
-            initial_full_field_exclude = {k for k, v in exclude.items() if v is True}
-            exclude = copy.copy(exclude)
+        _exclude: Union[set[str], dict[str, Any], None] = kwargs.pop("exclude", None)
+        if _exclude is None:
+            initial_full_field_exclude: set[str] = _empty
+            # must be a writable dict
+            exclude_passed: dict[str, Any] = {}
+            exclude_second_pass: dict[str, Any] = {}
+        elif isinstance(_exclude, dict):
+            initial_full_field_exclude = {k for k, v in _exclude.items() if v is True}
+            exclude_passed = copy.copy(_exclude)
+            exclude_second_pass = _exclude
         else:
-            initial_full_field_exclude = set(exclude)
-            exclude = copy.copy(initial_full_field_exclude)
+            initial_full_field_exclude = set(_exclude)
+            exclude_passed = {field_name: True for field_name in initial_full_field_exclude}
+            exclude_second_pass = exclude_passed.copy()
 
-        if isinstance(exclude, dict):
-            # exclude __show_pk__ attribute from showing up
-            exclude["__show_pk__"] = True
-            for field_name in self.meta.excluded_fields:
-                exclude[field_name] = True
-        else:
-            exclude.update(self.meta.special_getter_fields)
-            exclude.update(self.meta.excluded_fields)
-            # exclude __show_pk__ attribute from showing up
-            exclude.add("__show_pk__")
+        need_second_pass: set[str] = set()
+        for field_name in self.meta.special_getter_fields:
+            exclude_passed[field_name] = True
+            if (
+                field_name != "pk"
+                and field_name not in initial_full_field_exclude
+                and not self.meta.fields[field_name].exclude
+            ):
+                need_second_pass.add(field_name)
+        for field_name in self.meta.foreign_key_fields:
+            field = self.meta.fields[field_name]
+            # when excluded we don't need to consider to add a second pass.
+            if field_name in initial_full_field_exclude or field.exclude:
+                continue
+            if field.target.meta.needs_special_serialization:
+                exclude_passed[field_name] = True
+                need_second_pass.add(field_name)
         include: Union[set[str], dict[str, Any], None] = kwargs.pop("include", None)
         mode: Union[Literal["json", "python"], str] = kwargs.pop("mode", "python")
 
         should_show_pk = self.__show_pk__ if show_pk is None else show_pk
-        model = super().model_dump(exclude=exclude, include=include, mode=mode, **kwargs)
-        # Workaround for metafields, computed field logic introduces many problems
-        # so reimplement the logic here
-        for field_name in self.meta.special_getter_fields:
-            if field_name == "pk":
-                continue
-            if not should_show_pk or field_name not in self.pknames:
-                if field_name in initial_full_field_exclude:
+        model = super().model_dump(exclude=exclude_passed, include=include, mode=mode, **kwargs)
+        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+        try:
+            for field_name in need_second_pass:
+                # include or pkname (if should_show_pk)
+                if not (
+                    (should_show_pk and field_name in self.pknames)
+                    or include is None
+                    or field_name in include
+                ):
                     continue
-                if include is not None and field_name not in include:
+                field = self.meta.fields[field_name]
+                try:
+                    retval = getattr(self, field_name)
+                except AttributeError:
                     continue
-                if getattr(field_name, "exclude", False):
-                    continue
-            field: BaseFieldType = self.meta.fields[field_name]
-            try:
-                retval = field.__get__(self, self.__class__)
-            except AttributeError:
-                continue
-            sub_include = None
-            if isinstance(include, dict):
-                sub_include = include.get(field_name, None)
-                if sub_include is True:
-                    sub_include = None
-            sub_exclude = None
-            if isinstance(exclude, dict):
-                sub_exclude = exclude.get(field_name, None)
-                if sub_exclude is True:
-                    sub_exclude = None
-            if isinstance(retval, BaseModel):
-                retval = retval.model_dump(
-                    include=sub_include, exclude=sub_exclude, mode=mode, **kwargs
-                )
-            else:
-                assert (
-                    sub_include is None
-                ), "sub include filters for CompositeField specified, but no Pydantic model is set"
-                assert (
-                    sub_exclude is None
-                ), "sub exclude filters for CompositeField specified, but no Pydantic model is set"
-                if mode == "json" and not getattr(field, "unsafe_json_serialization", False):
-                    # skip field if it isn't a BaseModel and the mode is json and unsafe_json_serialization is not set
-                    # currently unsafe_json_serialization exists only on CompositeFields
-                    continue
-            alias: str = field_name
-            if getattr(field, "serialization_alias", None):
-                alias = cast(str, field.serialization_alias)
-            elif getattr(field, "alias", None):
-                alias = field.alias
-            model[alias] = retval
-        # proxyModel? cause excluded fields to reappear
-        # TODO: find a better bugfix
-        for excluded_field in self.meta.excluded_fields:
-            model.pop(excluded_field, None)
+                sub_include = None
+                if isinstance(include, dict):
+                    sub_include = include.get(field_name, None)
+                    if sub_include is True:
+                        sub_include = None
+                sub_exclude = exclude_second_pass.get(field_name, None)
+                assert sub_exclude is not True, "field should have been excluded"
+                # for e.g. CompositeFields which generate via __get__
+                if isinstance(retval, BaseModel):
+                    retval = retval.model_dump(
+                        include=sub_include, exclude=sub_exclude, mode=mode, **kwargs
+                    )
+                else:
+                    assert sub_include is None, "sub include filters for no pydantic model"
+                    assert sub_exclude is None, "sub exclude filters for no pydantic model"
+                    if mode == "json" and not getattr(field, "unsafe_json_serialization", False):
+                        # skip field if it isn't a BaseModel and the mode is json and
+                        # unsafe_json_serialization is not set
+                        # currently unsafe_json_serialization exists only on CompositeFields
+                        continue
+                alias: str = field_name
+                if getattr(field, "serialization_alias", None):
+                    alias = cast(str, field.serialization_alias)
+                elif getattr(field, "alias", None):
+                    alias = field.alias
+                model[alias] = retval
+        finally:
+            MODEL_GETATTR_BEHAVIOR.reset(token)
         return model
 
     def model_dump_json(self, **kwargs: Any) -> str:

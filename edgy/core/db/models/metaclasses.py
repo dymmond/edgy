@@ -7,6 +7,7 @@ import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
 from collections.abc import Sequence
+from contextvars import ContextVar
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -27,6 +28,7 @@ from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.base import BaseForeignKey, PKField, RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
+from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKey
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.models.managers import BaseManager
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
@@ -42,6 +44,8 @@ if TYPE_CHECKING:
 
 _empty_dict: dict[str, Any] = {}
 _empty_set: frozenset[Any] = frozenset()
+
+_seen_table_names: ContextVar[set[str]] = ContextVar("_seen_table_names", default=None)
 
 
 class Fields(UserDict, dict[str, BaseFieldType]):
@@ -72,6 +76,8 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             self.meta.foreign_key_fields.add(name)
         if isinstance(field, RelationshipField):
             self.meta.relationship_fields.add(name)
+        if isinstance(field, BaseRefForeignKey):
+            self.meta.ref_foreign_key_fields.add(name)
 
     def discard_field_from_meta(self, name: str) -> None:
         if self.meta._field_stats_are_initialized:
@@ -200,8 +206,8 @@ _trigger_attributes_field_stats_MetaInfo = {
     "post_delete_fields",
     "excluded_fields",
     "secret_fields",
-    # not used here in code but usefully for third-party code
     "relationship_fields",
+    "ref_foreign_key_fields",
 }
 
 _field_sets_to_clear: set[str] = _trigger_attributes_field_stats_MetaInfo
@@ -234,6 +240,8 @@ class MetaInfo:
         "excluded_fields",
         "secret_fields",
         "relationship_fields",
+        "ref_foreign_key_fields",
+        "_needs_special_serialization",
         "_fields_are_initialized",
         "_field_stats_are_initialized",
     )
@@ -290,6 +298,36 @@ class MetaInfo:
     @property
     def pk(self) -> Optional[PKField]:
         return cast(Optional[PKField], self.fields.get("pk"))
+
+    @property
+    def needs_special_serialization(self) -> bool:
+        if getattr(self, "_needs_special_serialization", None) is None:
+            _needs_special_serialization: bool = any(
+                not self.fields[field_name].exclude for field_name in self.special_getter_fields
+            )
+            if not _needs_special_serialization:
+                names = _seen_table_names.get()
+                token = None
+                if names is None:
+                    names = set()
+                    token = _seen_table_names.set(names)
+                try:
+                    for field_name in self.foreign_key_fields:
+                        field = cast(BaseForeignKeyField, self.fields[field_name])
+                        if field.target.table.key in names:
+                            continue
+                        else:
+                            names.add(field.target.table.key)
+                        if field.target.meta.needs_special_serialization:
+                            _needs_special_serialization = True
+                            break
+                finally:
+                    if token is not None:
+                        _seen_table_names.reset(token)
+
+            self._needs_special_serialization = _needs_special_serialization
+
+        return self._needs_special_serialization
 
     @property
     def fields_mapping(self) -> dict[str, BaseFieldType]:
@@ -367,6 +405,7 @@ class MetaInfo:
         self.post_delete_fields: set[str] = set()
         self.foreign_key_fields: set[str] = set()
         self.relationship_fields: set[str] = set()
+        self.ref_foreign_key_fields: set[str] = set()
         self._field_stats_are_initialized = True
         for key, field in self.fields.items():
             self.fields.add_field_to_meta(key, field)
@@ -389,6 +428,9 @@ class MetaInfo:
             self._fields_are_initialized = False
         if invalidate_stats:
             self._field_stats_are_initialized = False
+        if invalidate_fields or invalidate_stats:
+            with contextlib.suppress(AttributeError):
+                delattr(self, "_needs_special_serialization")
         if self.model is None:
             return
         if clear_class_attrs:
@@ -706,8 +748,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         del is_abstract
 
         if not meta.abstract:
-            # don't add to model_fields, it leads to crashes for unknown reasons
-            meta.fields["pk"] = PKField(exclude=True, name="pk", inherit=False, no_copy=True)
+            model_fields["pk"] = meta.fields["pk"] = PKField(
+                exclude=True, name="pk", inherit=False, no_copy=True
+            )
 
         # Handle annotations
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
@@ -736,12 +779,14 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             return new_class
         new_class._db_schemas = {}
 
-        # Ensure the model_fields are updated to the latest
-        # required since pydantic 2.10
-        new_class.__pydantic_fields__ = model_fields
-        # error since pydantic 2.10
-        with contextlib.suppress(AttributeError):
-            new_class.model_fields = model_fields
+        model_fields_on_class = getattr(new_class, "__pydantic_fields__", None)
+        if model_fields_on_class is None:
+            model_fields_on_class = new_class.model_fields
+        for key in list(model_fields_on_class.keys()):
+            model_field_on_class = model_fields_on_class[key]
+            if isinstance(model_field_on_class, BaseFieldType):
+                del model_fields_on_class[key]
+        model_fields_on_class.update(model_fields)
 
         # Set the owner of the field, must be done as early as possible
         # don't use meta.fields to not trigger the lazy evaluation

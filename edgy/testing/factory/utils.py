@@ -2,10 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Callable, Collection
 from inspect import isclass
+from itertools import chain
 from typing import TYPE_CHECKING, Any, Literal, cast
-
-from edgy.core.db.fields.base import RelationshipField
-from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKey
 
 if TYPE_CHECKING:
     from faker import Faker
@@ -30,17 +28,15 @@ def remove_unparametrized_relationship_fields(
     kwargs: dict[str, Any],
     extra_exclude: Collection[str | Literal[False]] = (),
 ) -> None:
+    """Here are RefForeignKeys included despite they are not in relationship_fields."""
     parameters: dict[str, dict[str, Any]] = kwargs.get("parameters") or {}
     excluded: set[str | Literal[False]] = {*(kwargs.get("exclude") or []), *extra_exclude}
     # cleanup related_name False
     excluded.discard(False)
 
-    for field_name, field in model.meta.fields.items():
-        if (
-            isinstance(field, (RelationshipField, BaseRefForeignKey))
-            and field_name not in parameters
-            and field.has_default()
-        ):
+    for field_name in chain(model.meta.relationship_fields, model.meta.ref_foreign_key_fields):
+        field = model.meta.fields[field_name]
+        if field_name not in parameters and field.has_default():
             excluded.add(field_name)
     kwargs["exclude"] = excluded
 

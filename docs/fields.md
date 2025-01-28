@@ -287,7 +287,30 @@ class BasePermission(edgy.Model):
 - getter (Optional) -String to classmethod/staticmethod or a callable. Getter which is used to provide a value in model_dump or on direct access to the field.
 - setter (Optional) -String to classmethod/staticmethod or a callable. Setter which is executed when assigning a value to the field. If not provided assignments are simply dismissed.
 - fallback_getter (Optional) -Callable. Is used as fallback when the getter was not found. Useful for inheritance so subclasses can provide a getter but works also without.
+- exclude (False) - By default ComputedField are excluded from serialization.
 
+##### Secret
+
+Secret ComputedFields need some adjustments
+
+```python
+import edgy
+
+class BasePermission(edgy.Model):
+    name: str = edgy.fields.CharField(max_length=100, null=False)
+    description: Optional[str] = edgy.fields.ComputedField(
+        getter="get_description",  # uses the getter classmethod/staticmethod of the class/subclass
+        secret=True,
+        exclude=False
+    )
+    @classmethod
+    def get_description(cls, field, instance, owner=None) -> str:
+        # fields get added here when secrets are excluded. We can leverage this in
+        # case __no_trigger_load_attrs__ isn't pre-filled with the field name.
+        if field.name in instance.__no_trigger_load_attrs__:
+            raise AttributeError()
+        return instance.name
+```
 
 #### DateField
 

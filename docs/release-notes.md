@@ -13,6 +13,7 @@ hide:
 - `__drop_extra_kwargs__` parameter for Models which drops extra kwargs instead passing down. Required for mashalling StrictModel.
 - `reference_select` parameter in QuerySet.
 - `extra_select` parameter in QuerySet for creating extra select clauses which can be referenced.
+- `ref_foreign_key_fields` in meta.
 
 ### Changed
 
@@ -28,6 +29,8 @@ hide:
 - Different autoincrement field in Marshalls than `id`.
 - Fix Marshall required check.
 - Fix ReflectModel with exclude_secrets.
+- Fix non-edgy-fields were stripped instead kept.
+- Allow ComputedFields being part of a serialization.
 
 ## 0.25.1
 
