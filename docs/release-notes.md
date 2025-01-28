@@ -6,7 +6,7 @@ hide:
 
 # Release Notes
 
-## 0.26
+## 0.26.0
 
 ### Added
 
