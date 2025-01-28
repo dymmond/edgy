@@ -29,7 +29,16 @@ async def create_test_database():
 
 @User.transaction(force_rollback=True)
 async def transaction_method(user):
+    assert user.name == "edgy"
     await user.save(values={"name": "edgy2"})
+    assert user.name == "edgy2"
+
+
+@User.transaction(force_rollback=True)
+async def transaction_method2(user):
+    assert user.name == "edgy"
+    user.name = "edgy2"
+    await user.save()
     assert user.name == "edgy2"
 
 
@@ -51,10 +60,41 @@ async def test_transactions(force_rollback):
 
 
 @pytest.mark.parametrize("force_rollback", [True, False])
-async def test_transactions_fn(force_rollback):
+async def test_transactions_defer(force_rollback):
     with database.force_rollback(force_rollback):
         async with models:
             user = await User.query.create(name="edgy")
-            await transaction_method(user)
+            async with User.transaction(force_rollback=True):
+                user = await User.query.defer("name").get()
+                await user.save(values={"name": "edgy2"})
+                assert user.name == "edgy2"
+            async with User.transaction(force_rollback=True):
+                user = await User.query.defer("name").get()
+                assert user.name == "edgy"
+                user.name = "edgy2"
+                await user.save()
+                assert user.name == "edgy2"
+            await user.load()
+            assert user.name == "edgy"
+
+
+@pytest.mark.parametrize("method", [transaction_method, transaction_method2])
+@pytest.mark.parametrize("force_rollback", [True, False])
+async def test_transactions_fn(force_rollback, method):
+    with database.force_rollback(force_rollback):
+        async with models:
+            user = await User.query.create(name="edgy")
+            await method(user)
+            await user.load()
+            assert user.name == "edgy"
+
+
+@pytest.mark.parametrize("method", [transaction_method, transaction_method2])
+@pytest.mark.parametrize("force_rollback", [True, False])
+async def test_transactions_fn_defer(force_rollback, method):
+    with database.force_rollback(force_rollback):
+        async with models:
+            user = await User.query.create(name="edgy")
+            await method(await User.query.defer("name").get())
             await user.load()
             assert user.name == "edgy"
