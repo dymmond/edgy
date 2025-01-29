@@ -29,6 +29,7 @@ class Products(edgy.ReflectModel):
     uuid = edgy.UUIDField(null=False)
     duration = edgy.DurationField(null=False)
     extra = edgy.JSONField(null=False)
+    array = edgy.PGArrayField(item_type=sqlalchemy.sql.sqltypes.VARCHAR, null=False)
     id = edgy.BigIntegerField(autoincrement=True, null=False, primary_key=True)
 
     class Meta:
@@ -58,6 +59,7 @@ class Product(edgy.StrictModel):
     uuid = edgy.fields.UUIDField(default=uuid4)
     duration = edgy.fields.DurationField()
     extra = edgy.fields.JSONField(default=dict)
+    array = edgy.fields.PGArrayField(sqlalchemy.String(), default=list)
 
     class Meta:
         registry = models

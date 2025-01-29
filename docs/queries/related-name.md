@@ -195,5 +195,5 @@ This of course in production wouldn't make too much sense to have the models des
 but this shows how deep you can go with the related names reverse queries.
 
 [relationships]: ../relationships.md
-[fields]: ../fields.md
-[foreign_keys]: ../fields.md#foreignkey
+[fields]: ../fields/index.md
+[foreign_keys]: ../fields/index.md#foreignkey

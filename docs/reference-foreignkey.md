@@ -5,7 +5,7 @@ the documentation!
 
 ## What is a Reference ForeignKey
 
-Well for start it is not a normal [ForeignKey](./fields.md#foreignkey). The reason why calling
+Well for start it is not a normal [ForeignKey](./fields/index.md#foreignkey). The reason why calling
 **RefForeignKey** it is because of its own unique type of functionality and what it can provide
 when it comes to **insert** records in the database.
 
@@ -340,7 +340,7 @@ type, it will raise a `ValidationError`, something similar to this:
 
 ```json
 {
-    "type": "list_type",
+    "type": "item_type",
     "loc": ["posts"],
     "msg": "Input should be a valid list",
     "input": {"comment": "A comment"},

@@ -3,7 +3,7 @@
 Was there a time where you wished you could have a way of querying the database and not returning
 some sentive data without the hassle of filtering all over the codebase? Well, say no more.
 
-The `secret` is a special attribute of the [fields](../fields.md) that is available on each field
+The `secret` is a special attribute of the [fields](../fields/index.md) that is available on each field
 that basically if set to `True` and using the `exclude_secrets` will make sure it will never
 return any sensitive data.
 

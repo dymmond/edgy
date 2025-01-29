@@ -4,30 +4,32 @@ from typing import Any, Callable, NoReturn, Optional, Union
 
 import sqlalchemy
 from loguru import logger
+from monkay import load
 from sqlalchemy.sql import schema, sqltypes
 
 import edgy
 from edgy import Database, run_sync
 
 SQL_GENERIC_TYPES = {
-    sqltypes.BigInteger: edgy.fields.BigIntegerField,
-    sqltypes.Integer: edgy.fields.IntegerField,
-    sqltypes.JSON: edgy.fields.JSONField,
-    sqltypes.Date: edgy.fields.DateField,
-    sqltypes.String: edgy.fields.CharField,
-    sqltypes.Unicode: edgy.fields.CharField,
-    sqltypes.LargeBinary: edgy.fields.BinaryField,
-    sqltypes.Boolean: edgy.fields.BooleanField,
-    sqltypes.Enum: edgy.fields.ChoiceField,
-    sqltypes.DateTime: edgy.fields.DateTimeField,
-    sqltypes.Interval: edgy.fields.DurationField,
-    sqltypes.Numeric: edgy.fields.DecimalField,
-    sqltypes.Float: edgy.fields.FloatField,
-    sqltypes.Double: edgy.fields.FloatField,
-    sqltypes.SmallInteger: edgy.fields.SmallIntegerField,
-    sqltypes.Text: edgy.fields.TextField,
-    sqltypes.Time: edgy.fields.TimeField,
-    sqltypes.Uuid: edgy.fields.UUIDField,
+    sqltypes.BigInteger: "edgy.core.db.fields.BigIntegerField",
+    sqltypes.Integer: "edgy.core.db.fields.IntegerField",
+    sqltypes.JSON: "edgy.core.db.fields.JSONField",
+    sqltypes.Date: "edgy.core.db.fields.DateField",
+    sqltypes.String: "edgy.core.db.fields.CharField",
+    sqltypes.Unicode: "edgy.core.db.fields.CharField",
+    sqltypes.LargeBinary: "edgy.core.db.fields.BinaryField",
+    sqltypes.Boolean: "edgy.core.db.fields.BooleanField",
+    sqltypes.Enum: "edgy.core.db.fields.ChoiceField",
+    sqltypes.DateTime: "edgy.core.db.fields.DateTimeField",
+    sqltypes.Interval: "edgy.core.db.fields.DurationField",
+    sqltypes.Numeric: "edgy.core.db.fields.DecimalField",
+    sqltypes.Float: "edgy.core.db.fields.FloatField",
+    sqltypes.Double: "edgy.core.db.fields.FloatField",
+    sqltypes.SmallInteger: "edgy.core.db.fields.SmallIntegerField",
+    sqltypes.Text: "edgy.core.db.fields.TextField",
+    sqltypes.Time: "edgy.core.db.fields.TimeField",
+    sqltypes.Uuid: "edgy.core.db.fields.UUIDField",
+    sqlalchemy.ARRAY: "edgy.core.db.fields.PGArrayField",
 }
 
 DB_MODULE = "edgy"
@@ -42,6 +44,14 @@ def func_accepts_kwargs(func: Callable) -> bool:
         for param in inspect.signature(func).parameters.values()
         if param.kind == param.VAR_KEYWORD
     )
+
+
+class RawRepr:
+    def __init__(self, inp: str) -> None:
+        self.inp = inp
+
+    def __repr__(self) -> str:
+        return self.inp
 
 
 class InspectDB:
@@ -162,7 +172,8 @@ class InspectDB:
             real_field = "TextField"
 
         try:
-            field_type = SQL_GENERIC_TYPES[type(real_field)].__name__
+            _field_type = SQL_GENERIC_TYPES[type(real_field)]
+            field_type = load(_field_type).__name__
         except KeyError:
             logger.info(
                 f"Unable to understand the field type for `{column.name}`, defaulting to TextField."
@@ -170,6 +181,12 @@ class InspectDB:
             field_type = "TextField"
 
         field_params: dict[str, Any] = {}
+
+        if field_type == "PGArrayField":
+            # use the original instead of the generic
+            item_type = column.type.item_type
+            item_type_class = type(item_type)
+            field_params["item_type"] = RawRepr(f"{item_type_class.__module__}.{item_type}")
 
         if field_type == "CharField":
             field_params["max_length"] = real_field.length
@@ -268,7 +285,7 @@ class InspectDB:
         yield "#   * Rearrange models' order.\n"
         yield "#   * Make sure each model has one field with primary_key=True.\n"
         yield (
-            "#   * Make sure each ForeignKey and OneToOne has `on_delete` set "
+            "#   * Make sure each ForeignKey and OneToOne has `on_delete` set"
             "to the desired behavior.\n"
         )
         yield (
@@ -278,8 +295,9 @@ class InspectDB:
             f"# The generated models do not manage migrations. Those are handled by `{DB_MODULE}.Model`.\n"
         )
         yield f"# The automatic generated models will be subclassed as `{DB_MODULE}.ReflectModel`.\n\n\n"
-        yield f"import {DB_MODULE} \n"
-        yield f"from {DB_MODULE} import UniqueConstraint, Index \n"
+        yield "import sqlalchemy\n"
+        yield f"import {DB_MODULE}\n"
+        yield f"from {DB_MODULE} import UniqueConstraint, Index\n"
 
         yield "\n"
         yield "\n"

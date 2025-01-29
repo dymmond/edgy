@@ -241,6 +241,7 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
     "ManyToMany": ManyToManyField_callback,
     "RefForeignKey": RefForeignKey_callback,
     # special fields without mapping, they need a custom user defined logic
+    "PGArrayField": None,
     "CompositeField": None,
     "ComputedField": None,
     "PKField": None,

@@ -6,6 +6,16 @@ hide:
 
 # Release Notes
 
+## 0.26.1
+
+### Added
+
+- Add PGArrayField.
+
+### Changed
+
+- Reorganize fields. Make more lazy.
+
 ## 0.26.0
 
 ### Added
@@ -639,8 +649,8 @@ with with_schema("foo"):
 ### Changed
 
 - ForeignKeys use now global constraints and indexes.
-- Breaking: clean has now the argument to_query. See [Custom Fields](./fields.md#custom-fields).
-- Breaking: ManyToMany doesn't have a RelatedField on owner anymore and uses proxying. See [ManyToMany](./fields.md#manytomany).
+- Breaking: clean has now the argument to_query. See [Custom Fields](./fields/index.md#custom-fields).
+- Breaking: ManyToMany doesn't have a RelatedField on owner anymore and uses proxying. See [ManyToMany](./fields/index.md#manytomany).
 - Breaking: use singular related_name for unique ForeignKeys (or OneToOne). See [related_name](./queries/related-name.md)
 - MetaInfo (meta) is now partly lazy.
 - `pk` is now a PKField (a variant of the BaseCompositeField).
@@ -672,7 +682,7 @@ deadlocks.
 ### Added
 
 - Support for [Marshall](./marshalls.md) allowing custom serialization of an Edgy model by [@tarsil](https://github.com/tarsil).
-- Support for the new [CompositeField](./fields.md#compositefield) enhancing the ability of
+- Support for the new [CompositeField](./fields/index.md#compositefield) enhancing the ability of
 having multiple primary keys (or composed keys) in an Edgy model by [@devkral](https://github.com/devkral).
 - Support for the `Q` queryset clause by [@devkral](https://github.com/devkral).
 

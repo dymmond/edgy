@@ -11,7 +11,6 @@ def test_lazy_imports():
             ".core.db.constants",
         ],
     )
-    missing.pop("edgy.core.db.fields.AutoNowMixin")
     missing.pop("edgy.core.db.fields.BaseField")
     missing.pop("edgy.core.db.fields.BaseFieldType")
     assert not missing

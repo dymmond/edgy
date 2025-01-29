@@ -30,7 +30,7 @@ Models also doubles as embeddable; they can be used as a field template with opt
 ## Declaring models
 
 When declaring models by simply inheriting from `edgy.Model` object and define the attributes
-using the edgy [Fields](./fields.md).
+using the edgy [Fields](./fields/index.md).
 
 For each model defined you also need to set **one** mandatory field, the `registry` which is also
 an instance of `Registry` from Edgy.
@@ -124,7 +124,7 @@ This will change in future. The default will be `False`.
 #### What you can do
 
 The examples
-are applied to any [field](./fields.md) available in **Edgy**.
+are applied to any [field](./fields/index.md) available in **Edgy**.
 
 
 ##### Declaring a model primary key different from ID
@@ -139,8 +139,8 @@ This is novel and maybe a bit buggy in combination with ForeignKeys.
 
 ##### Declaring a model with ID and without default and autoincrement
 
-When declaring an `id`, unless the field type is [IntegerField](./fields.md#integerfield) or
-[BigIntegerField](./fields.md#bigintegerfield), you have to provide the primary key when creating the object.
+When declaring an `id`, unless the field type is [IntegerField](./fields/index.md#integerfield) or
+[BigIntegerField](./fields/index.md#bigintegerfield), you have to provide the primary key when creating the object.
 
 ```python hl_lines="9"
 {!> ../docs_src/models/pk_no_default.py !}
@@ -149,7 +149,7 @@ When declaring an `id`, unless the field type is [IntegerField](./fields.md#inte
 ##### Declaring a model primary key with different field type
 
 This is for an explicit `primary_key` that you don't want to be the default, for example, a
-[UUIDField](./fields.md#uuidfield).
+[UUIDField](./fields/index.md#uuidfield).
 
 ```python hl_lines="11"
 {!> ../docs_src/models/pk_with_default.py !}
@@ -362,7 +362,7 @@ Let us see some examples.
 #### Simple unique together
 
 The simplest and cleanest way of declaring a unique together. There are actually **two** ways of
-declaring this simple **unique**. Via [edgy field](./fields.md) directly or via
+declaring this simple **unique**. Via [edgy field](./fields/index.md) directly or via
 `unique_together` in the [meta](#the-meta-class) class.
 
 ##### Within the edgy field
@@ -392,7 +392,7 @@ If none of these values are provided, it will raise a `ValueError`.
 #### Complex unique together
 
 Now, we all know that using simple uniques is easier if automatically declared within the
-[edgy field](./fields.md) an using the [meta](#the-meta-class) for only one field is overkill.
+[edgy field](./fields/index.md) an using the [meta](#the-meta-class) for only one field is overkill.
 
 You take advantage of the `unique_together` when something more complex is needed and not limited
 to one database field only.

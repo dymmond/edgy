@@ -12,17 +12,17 @@ supported in **all field types**.
     The data types are also very familiar for those with experience with Django model fields.
 
 - `primary_key` - A boolean. Determine if a column is primary key.
-Check the [primary_key](./models.md#restrictions-with-primary-keys) restrictions with Edgy.
+Check the [primary_key](../models.md#restrictions-with-primary-keys) restrictions with Edgy.
 - `exclude` - An bool indicating if the field is included in model_dump
 - `index` - A boolean. Determine if a database index should be created.
 - `inherit` - A boolean. Determine if a field can be inherited in submodels. Default is True. It is used by PKField, RelatedField and the injected ID Field.
 - `skip_absorption_check` - A boolean. Default False. Dangerous option! By default when defining a CompositeField with embedded fields and the `absorb_existing_fields` option it is checked that the field type of the absorbed field is compatible with the field type of the embedded field. This option skips the check.
 - `skip_reflection_type_check` -  A boolean. Default False. Skip reflection column type check.
 - `unique` - A boolean. Determine if a unique constraint should be created for the field.
-Check the [unique_together](./models.md#unique-together) for more details.
+Check the [unique_together](../models.md#unique-together) for more details.
 - `column_name` - A string. Database name of the column (by default the same as the name).
 - `comment` - A comment to be added with the field in the SQL database.
-- `secret` - A special attribute that allows to call the [exclude_secrets](./queries/secrets.md#exclude-secrets) and avoid
+- `secret` - A special attribute that allows to call the [exclude_secrets](../queries/secrets.md#exclude-secrets) and avoid
 accidental leakage of sensitive data.
 
 All fields are required unless one of the following is set:
@@ -463,11 +463,11 @@ obj.email = "foo@example.com"
 
 #### FileField
 
-See [FileField](file-handling.md#filefield).
+See [FileField](../file-handling.md#filefield).
 
 #### ImageField
 
-See [ImageField](file-handling.md#imagefield).
+See [ImageField](../file-handling.md#imagefield).
 
 #### FloatField
 
@@ -522,16 +522,16 @@ The Profile object can be accessed by the `profile` attribute we choosed as seco
 
 When the second parameter is empty, the parent object is not included as attribute.
 
-The reverse end of a `ForeignKey` is a [Many to one relation](./queries/many-to-one.md).
+The reverse end of a `ForeignKey` is a [Many to one relation](../queries/many-to-one.md).
 
 
 ##### Parameters
 
-* `to` - A string [model](./models.md) name or a class object of that same model.
+* `to` - A string [model](../models.md) name or a class object of that same model.
 * `target_registry` - Registry where the model callback is installed if `to` is a string. Defaults to the field owner registry.
 * `related_name` - The name to use for the relation from the related object back to this one. Can be set to `False` to disable a reverse connection.
                      Note: Setting to `False` will also prevent prefetching and reversing via `__`.
-                     See also [related_name](./queries/related-name.md) for defaults
+                     See also [related_name](../queries/related-name.md) for defaults
 * `related_fields` - The columns or fields to use for the foreign key. If unset or empty, the primary key(s) are used.
 * `embed_parent` (to_attr, as_attr) - When accessing the reverse relation part, return to_attr instead and embed the parent object in as_attr (when as_attr is not empty). Default None (which disables it). For to_attr (first argument) deeply nested models can be selected via `__`.
 * `no_constraint` - Skip creating a constraint. Note: if set and index=True an index will be created instead.
@@ -579,7 +579,7 @@ from `edgy`.
 from edgy import RefForeignKey
 ```
 
-This is unique to **Edgy** and has [dedicated place](./reference-foreignkey.md) in the documentation
+This is unique to **Edgy** and has [dedicated place](../reference-foreignkey.md) in the documentation
 just to explain what it is and how to use it.
 
 #### ManyToMany
@@ -608,7 +608,7 @@ class MyModel(edgy.Model):
 
 ##### Parameters
 
-* `to` - A string [model](./models.md) name or a class object of that same model.
+* `to` - A string [model](../models.md) name or a class object of that same model.
 * `target_registry` - Registry where the model callback is installed if `to` is a string. Defaults to the field owner registry.
 * `from_fields` - Provide the `related_fields` for the implicitly generated ForeignKey to the owner model.
 * `to_fields` - Provide the `related_fields` for the implicitly generated ForeignKey to the child model.
@@ -744,7 +744,7 @@ Similar to [CharField](#charfield) and it can be used to represent a password te
 
 Ideally the key derivation function includes the parameters (and derive algorithm) used for deriving in the hash so a compare_pw function can reproduce the result.
 
-For more examples see [Passwords](./permissions/passwords.md).
+For more examples see [Passwords](../permissions/passwords.md).
 
 #### PlaceholderField
 
@@ -920,6 +920,10 @@ async def main():
     obj = await MyModel.query.create(counter=50)
     # obj.counter == 50
 ```
+
+## Postgresql special fields
+
+See [Postgresql fields](postgres.md).
 
 ## Custom Fields
 

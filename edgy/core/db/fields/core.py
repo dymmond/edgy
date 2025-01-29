@@ -6,135 +6,32 @@ import uuid
 import warnings
 from collections.abc import Callable
 from enum import EnumMeta
-from functools import cached_property, partial
 from re import Pattern
 from secrets import compare_digest
 from typing import TYPE_CHECKING, Annotated, Any, Optional, Union, cast
 
 import pydantic
 import sqlalchemy
+from monkay import Monkay
 from pydantic.networks import AnyUrl, EmailStr, IPvAnyAddress
 from sqlalchemy.dialects import oracle
 
-from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE, EXPLICIT_SPECIFIED_VALUES
+from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields._internal import IPAddress
-from edgy.core.db.fields.base import BaseField, Field
+from edgy.core.db.fields.base import Field
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.exceptions import FieldDefinitionError
 
+from .mixins import AutoNowMixin as _AutoNowMixin
+from .mixins import IncrementOnSaveBaseField, TimezonedField
+from .place_holder_field import PlaceholderField as _PlaceholderField
+
 if TYPE_CHECKING:
     import zoneinfo
 
-    from edgy.core.db.models.types import BaseModelType
-
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
-
-
-class ComputedField(BaseField):
-    def __init__(
-        self,
-        getter: Union[
-            Callable[[BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any], str
-        ],
-        setter: Union[Callable[[BaseFieldType, "BaseModelType", Any], None], str, None] = None,
-        fallback_getter: Optional[
-            Callable[[BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any]
-        ] = None,
-        **kwargs: Any,
-    ) -> None:
-        kwargs.setdefault("exclude", True)
-        kwargs["null"] = True
-        kwargs["primary_key"] = False
-        kwargs["field_type"] = kwargs["annotation"] = Any
-        self.getter = getter
-        self.fallback_getter = fallback_getter
-        self.setter = setter
-        super().__init__(
-            **kwargs,
-        )
-
-    @cached_property
-    def compute_getter(
-        self,
-    ) -> Callable[[BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any]:
-        if isinstance(self.getter, str):
-            fn = cast(
-                Optional[
-                    Callable[
-                        [BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any
-                    ]
-                ],
-                getattr(self.owner, self.getter, None),
-            )
-        else:
-            fn = self.getter
-        if fn is None and self.fallback_getter is not None:
-            fn = self.fallback_getter
-        if fn is None:
-            raise ValueError(f"No getter found for attribute: {self.getter}.")
-        return fn
-
-    @cached_property
-    def compute_setter(self) -> Callable[[BaseFieldType, "BaseModelType", Any], None]:
-        if isinstance(self.setter, str):
-            fn = cast(
-                Optional[Callable[[BaseFieldType, "BaseModelType", Any], None]],
-                getattr(self.owner, self.setter, None),
-            )
-        else:
-            fn = self.setter
-        if fn is None:
-            return lambda instance, name, value: None
-        return fn
-
-    def to_model(
-        self,
-        field_name: str,
-        value: Any,
-    ) -> dict[str, Any]:
-        return {}
-
-    def clean(
-        self,
-        name: str,
-        value: Any,
-        for_query: bool = False,
-    ) -> dict[str, Any]:
-        return {}
-
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Any:
-        return self.compute_getter(self, instance, owner)
-
-    def __set__(self, instance: "BaseModelType", value: Any) -> None:
-        self.compute_setter(self, instance, value)
-
-
-class PlaceholderField(FieldFactory):
-    """Placeholder field, without db column"""
-
-    def __new__(  # type: ignore
-        cls,
-        *,
-        pydantic_field_type: Any = Any,
-        **kwargs: Any,
-    ) -> BaseFieldType:
-        kwargs.setdefault("exclude", True)
-        return super().__new__(cls, pydantic_field_type=pydantic_field_type, **kwargs)
-
-    def clean(
-        self,
-        name: str,
-        value: Any,
-        for_query: bool = False,
-    ) -> dict[str, Any]:
-        return {}
-
-    @classmethod
-    def get_pydantic_type(cls, kwargs: dict[str, Any]) -> Any:
-        """Returns the type for pydantic"""
-        return kwargs.pop("pydantic_field_type")
 
 
 class CharField(FieldFactory, str):
@@ -190,66 +87,6 @@ class TextField(CharField):
     def validate(cls, kwargs: dict[str, Any]) -> None:
         kwargs.setdefault("max_length", None)
         super().validate(kwargs)
-
-
-class IncrementOnSaveBaseField(Field):
-    increment_on_save: int = 0
-
-    def __init__(self, **kwargs: Any) -> None:
-        super().__init__(
-            **kwargs,
-        )
-        if self.increment_on_save != 0:
-            self.pre_save_callback = self._notset_pre_save_callback
-
-    async def _notset_pre_save_callback(
-        self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
-    ) -> dict[str, Any]:
-        explicit_values = EXPLICIT_SPECIFIED_VALUES.get()
-        if explicit_values is not None and self.name in explicit_values:
-            return {}
-        model_or_query = CURRENT_INSTANCE.get()
-
-        if force_insert:
-            if original_value is None:
-                return {self.name: self.get_default_value()}
-            else:
-                return {self.name: value + self.increment_on_save}
-        elif not self.primary_key:
-            # update path
-            return {
-                self.name: (
-                    model_or_query if model_or_query is not None else instance
-                ).table.columns[self.name]
-                + self.increment_on_save
-            }
-        else:
-            # update path
-            return {}
-
-    def get_default_values(
-        self,
-        field_name: str,
-        cleaned_data: dict[str, Any],
-    ) -> dict[str, Any]:
-        if self.increment_on_save != 0:
-            phase = CURRENT_PHASE.get()
-            if phase in "prepare_update":
-                return {field_name: None}
-        return super().get_default_values(field_name, cleaned_data)
-
-    def to_model(
-        self,
-        field_name: str,
-        value: Any,
-    ) -> dict[str, Any]:
-        phase = CURRENT_PHASE.get()
-        instance = CURRENT_INSTANCE.get()
-        if self.increment_on_save != 0 and not self.primary_key and phase == "post_update":
-            # a bit dirty but works
-            instance.__dict__.pop(field_name, None)
-            return {}
-        return super().to_model(field_name, value)
 
 
 class IntegerField(FieldFactory, int):
@@ -430,91 +267,7 @@ class BooleanField(FieldFactory, int):
         return sqlalchemy.Boolean()
 
 
-class TimezonedField:
-    default_timezone: Optional["zoneinfo.ZoneInfo"]
-    force_timezone: Optional["zoneinfo.ZoneInfo"]
-    remove_timezone: bool
-
-    def _convert_datetime(
-        self, value: datetime.datetime
-    ) -> Union[datetime.datetime, datetime.date]:
-        if value.tzinfo is None and self.default_timezone is not None:
-            value = value.replace(tzinfo=self.default_timezone)
-        if self.force_timezone is not None and value.tzinfo != self.force_timezone:
-            if value.tzinfo is None:
-                value = value.replace(tzinfo=self.force_timezone)
-            else:
-                value = value.astimezone(self.force_timezone)
-        if self.remove_timezone:
-            value = value.replace(tzinfo=None)
-        if self.field_type is datetime.date:
-            return value.date()
-        return value
-
-    def check(self, value: Any) -> Optional[Union[datetime.datetime, datetime.date]]:
-        if value is None:
-            return None
-        elif isinstance(value, datetime.datetime):
-            return self._convert_datetime(value)
-        elif isinstance(value, (int, float)):
-            return self._convert_datetime(
-                datetime.datetime.fromtimestamp(value, self.default_timezone)
-            )
-        elif isinstance(value, str):
-            return self._convert_datetime(datetime.datetime.fromisoformat(value))
-        elif isinstance(value, datetime.date):
-            # datetime is subclass, so check datetime first
-
-            # don't touch dates when DateField
-            if self.field_type is datetime.date:
-                return value
-            return self._convert_datetime(
-                datetime.datetime(year=value.year, month=value.month, day=value.day)
-            )
-        else:
-            raise ValueError(f"Invalid type detected: {type(value)}")
-
-    def to_model(
-        self,
-        field_name: str,
-        value: Any,
-    ) -> dict[str, Optional[Union[datetime.datetime, datetime.date]]]:
-        """
-        Convert input object to datetime
-        """
-        return {field_name: self.check(value)}
-
-    def get_default_value(self) -> Any:
-        return self.check(super().get_default_value())
-
-
-class AutoNowMixin(FieldFactory):
-    def __new__(  # type: ignore
-        cls,
-        *,
-        auto_now: Optional[bool] = False,
-        auto_now_add: Optional[bool] = False,
-        default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
-        **kwargs: Any,
-    ) -> BaseFieldType:
-        if auto_now_add and auto_now:
-            raise FieldDefinitionError("'auto_now' and 'auto_now_add' cannot be both True")
-
-        if auto_now_add or auto_now:
-            kwargs.setdefault("read_only", True)
-            kwargs["inject_default_on_partial_update"] = auto_now
-
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-        if auto_now_add or auto_now:
-            # date.today cannot handle timezone so use alway datetime and convert back to date
-            kwargs["default"] = partial(datetime.datetime.now, default_timezone)
-        return super().__new__(cls, **kwargs)
-
-
-class DateTimeField(AutoNowMixin, datetime.datetime):
+class DateTimeField(_AutoNowMixin, datetime.datetime):
     """Representation of a datetime field"""
 
     field_type = datetime.datetime
@@ -556,7 +309,7 @@ class DateTimeField(AutoNowMixin, datetime.datetime):
         return original_fn(field_name, cleaned_data)
 
 
-class DateField(AutoNowMixin, datetime.date):
+class DateField(_AutoNowMixin, datetime.date):
     """Representation of a date field"""
 
     field_type = datetime.date
@@ -713,7 +466,7 @@ class PasswordField(CharField):
             if original_pw_name not in fields:
                 retdict[original_pw_name] = cast(
                     BaseFieldType,
-                    PlaceholderField(
+                    _PlaceholderField(
                         pydantic_field_type=str,
                         null=True,
                         exclude=True,
@@ -813,3 +566,25 @@ class IPAddressField(FieldFactory, str):
             return ipaddress.ip_address(value)
         except ValueError:
             raise ValueError("Must be a real IP.")  # noqa
+
+
+Monkay(
+    globals(),
+    deprecated_lazy_imports={
+        "ComputedField": {
+            "path": ".computed_field.ComputedField",
+            "reason": "The import path changed.",
+            "new_attribute": "edgy.core.db.fields.ComputedField",
+        },
+        "PlaceholderField": {
+            "path": lambda: _PlaceholderField,
+            "reason": "The import path changed.",
+            "new_attribute": "edgy.core.db.fields.PlaceholderField",
+        },
+        "AutoNowMixin": {
+            "path": lambda: _AutoNowMixin,
+            "reason": "We export mixins now from edgy.core.db.fields.mixins.",
+            "new_attribute": "edgy.core.db.fields.mixins.AutoNowMixin",
+        },
+    },
+)

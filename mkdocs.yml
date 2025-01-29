@@ -80,7 +80,9 @@ nav:
           - Automatic Reflection: "reflection/autoreflection.md"
       - Embedding: "embedding.md"
       - Managers: "managers.md"
-      - Fields: "fields.md"
+      - Fields:
+          - "fields/index.md"
+          - Postgresql fields: "fields/postgres.md"
       - File Handling: "file-handling.md"
       - Queries:
           - Queries: "queries/queries.md"

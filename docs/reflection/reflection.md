@@ -74,7 +74,7 @@ Example:
 
 ## Fields
 
-The fields should be declared as per normal [fields](../fields.md) that represents the columns from
+The fields should be declared as per normal [fields](../fields/index.md) that represents the columns from
 the reflected database table or view.
 
 Example:
