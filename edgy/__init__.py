@@ -12,6 +12,43 @@ if TYPE_CHECKING:
     from .core.connection import Database, DatabaseURL, Registry
     from .core.db import fields
     from .core.db.datastructures import Index, UniqueConstraint
+
+    # for type checking import all fields
+    from .core.db.fields import (
+        BigIntegerField,
+        BinaryField,
+        BooleanField,
+        CharField,
+        ChoiceField,
+        CompositeField,
+        ComputedField,
+        DateField,
+        DateTimeField,
+        DecimalField,
+        DurationField,
+        EmailField,
+        ExcludeField,
+        FileField,
+        FloatField,
+        ForeignKey,
+        ImageField,
+        IntegerField,
+        IPAddressField,
+        JSONField,
+        ManyToMany,
+        ManyToManyField,
+        OneToOne,
+        OneToOneField,
+        PasswordField,
+        PGArrayField,
+        PlaceholderField,
+        RefForeignKey,
+        SmallIntegerField,
+        TextField,
+        TimeField,
+        URLField,
+        UUIDField,
+    )
     from .core.db.models import (
         Manager,
         Model,
