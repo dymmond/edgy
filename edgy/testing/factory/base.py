@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
-from edgy import Model
+from edgy import Model, run_sync
 
 from ..exceptions import ExcludeValue
 from .fields import FactoryField
