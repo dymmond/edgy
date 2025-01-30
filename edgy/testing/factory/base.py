@@ -150,12 +150,16 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         exclude_autoincrement: bool | None = None,
         database: Database | None | Literal[False] = None,
         schema: str | None | Literal[False] = None,
+        save: bool = True,
     ) -> Model:
         """
         When this function is called, automacally will perform the
         generation of the model with the fake data using the
         meta.model.query(**self.fields) where the self.fields needs to be the
         data generated based on the model fields declared in the model.
+
+        This function also performs in a sync manner this like one
+        and automatically saves the model in the database.
 
         In the end it would be something like:
 
@@ -194,4 +198,57 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             result.database = self.database
         if schema is not None:
             result.__using_schema__ = schema
+
+        if save:
+            run_sync(result.save(force_save=True))
+        return result
+
+    async def async_build(
+        self,
+        *,
+        faker: Faker | None = None,
+        parameters: dict[str, dict[str, Any] | FieldFactoryCallback] | None = None,
+        overwrites: dict[str, Any] | None = None,
+        exclude: Collection[str] = (),
+        exclude_autoincrement: bool | None = None,
+        database: Database | None | Literal[False] = None,
+        schema: str | None | Literal[False] = None,
+        save: bool = True,
+    ) -> Model:
+        """
+        When this function is called, automacally will perform the
+        generation of the model with the fake data using the
+        meta.model.query(**self.fields) where the self.fields needs to be the
+        data generated based on the model fields declared in the model.
+
+        This function also performs in a async manner this like one
+        and automatically saves the model in the database.
+
+        In the end it would be something like:
+
+        >>> class UserFactory(ModelFactory):
+        ...     class Meta:
+        ...         model = User
+        ...
+        ...     name = FactoryField(parameters={"": ""})
+
+        >>> user = UserFactory(name="XXX").build()
+
+        The fields that are not provided will be generated using the faker library.
+
+        """
+
+        result = self.build(
+            faker=faker,
+            parameters=parameters,
+            overwrites=overwrites,
+            exclude=exclude,
+            exclude_autoincrement=exclude_autoincrement,
+            database=database,
+            schema=schema,
+            save=False,
+        )
+
+        if save:
+            await result.save(force_save=True)
         return result
