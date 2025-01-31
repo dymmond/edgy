@@ -27,7 +27,7 @@ def get_application():
     # extensions shouldn't be applied yet
     edgy.monkay.set_instance(edgy.Instance(registry=registry), apply_extensions=False)
     # load extensions and preloads
-    # not evaluate_settings_once because maybe some preloads weren't resolved
+    # not evaluate_settings because maybe some preloads weren't resolved
     monkay.evaluate_settings(on_conflict="keep")
     app = Esmerald()
     # now apply the extensions

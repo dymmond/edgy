@@ -21,8 +21,8 @@ def handle_request():
 
 def get_application():
     app = ...
-    # check if settings are loaded
-    monkay.evaluate_settings_once(ignore_import_errors=False)
+    # load settings
+    monkay.evaluate_settings(ignore_import_errors=False)
     # monkey-patch app so you can use edgy shell
     monkay.set_instance(Instance(registry=registry, app=app))
     return app

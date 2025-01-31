@@ -81,5 +81,4 @@ def create_monkay(global_dict: dict, all_var: list[str]) -> Monkay[Instance, Edg
             "RefForeignKey",
         }:
             monkay.add_lazy_import(name, f"edgy.core.db.fields.{name}")
-
     return monkay

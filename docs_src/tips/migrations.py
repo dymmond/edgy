@@ -33,7 +33,7 @@ def get_application():
 
     registry = get_db_connection()
     # ensure the settings are loaded
-    monkay.evaluate_settings_once(ignore_import_errors=False)
+    monkay.evaluate_settings(ignore_import_errors=False)
 
     app = registry.asgi(
         Esmerald(
