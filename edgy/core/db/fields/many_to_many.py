@@ -232,14 +232,16 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         assert self.owner.meta.registry, "no registry set"
         owner_name = self.owner.__name__
         to_name = self.target.__name__
-        class_name = f"{owner_name}{to_name}"
+
+        class_name = f"{owner_name}{self.name.capitalize()}{to_name}"
+
         if not self.from_foreign_key:
             self.from_foreign_key = owner_name.lower()
 
         if not self.to_foreign_key:
             self.to_foreign_key = to_name.lower()
 
-        tablename = self.through_tablename or f"{self.from_foreign_key}s_{self.to_foreign_key}s"
+        tablename = self.through_tablename or f"{self.from_foreign_key}s_{self.name}_{self.to_foreign_key}s"
         meta_args = {
             "tablename": tablename,
             "multi_related": {(self.from_foreign_key, self.to_foreign_key)},
