@@ -148,7 +148,7 @@ del create_monkay
 def get_migration_prepared_registry(registry: Registry | None = None) -> Registry:
     """Get registry with applied restrictions, usable for migrations."""
     # ensure settings are ready
-    monkay.evaluate_settings_once(ignore_import_errors=False)
+    monkay.evaluate_settings(ignore_import_errors=False)
     if registry is None:
         instance = monkay.instance
         assert instance is not None

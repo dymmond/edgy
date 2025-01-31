@@ -38,7 +38,7 @@ def get_application():
     from esmerald.conf import settings
 
     monkay.settings = lambda: settings.edgy_settings  # rewire
-    monkay.evaluate_settings_once(ignore_import_errors=False)  # import manually
+    monkay.evaluate_settings(ignore_import_errors=False)  # import manually
 
     # now the project is in the search path and we can import
     from my_project.utils import get_db_connection

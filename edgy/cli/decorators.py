@@ -55,7 +55,7 @@ def add_app_module_option(fn: Any) -> Any:
         cwd = Path.cwd()
         sys.path.insert(0, str(cwd))
         # try to initialize the config and load preloads if the config is ready
-        edgy.monkay.evaluate_settings_once()
+        edgy.monkay.evaluate_settings()
 
         if ctx.invoked_subcommand in COMMANDS_WITHOUT_APP:
             return

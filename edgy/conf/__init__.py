@@ -13,7 +13,7 @@ if TYPE_CHECKING:
 def get_edgy_monkay() -> Monkay[Instance, EdgySettings]:
     from edgy import monkay
 
-    monkay.evaluate_settings_once(on_conflict="error", ignore_import_errors=False)
+    monkay.evaluate_settings(on_conflict="error", ignore_import_errors=False)
 
     return monkay
 
