@@ -13,7 +13,7 @@ services:
     command: >-
         --jit=false
     ports:
-        - "127.0.0.1:5432:5432"
+      - "127.0.0.1:5432:5432"
 
   edgy_alt:
     restart: always
