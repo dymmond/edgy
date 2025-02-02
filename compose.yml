@@ -12,8 +12,8 @@ services:
       # - ./create_db.sh:/docker-entrypoint-initdb.d/create_db.sh
     command: >-
         --jit=false
-    # ports:
-    #   - "127.0.0.1:5432:5432"
+    ports:
+        - "127.0.0.1:5432:5432"
 
   edgy_alt:
     restart: always
