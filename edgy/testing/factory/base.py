@@ -73,8 +73,10 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         Returns:
             Any: The processed default values.
         """
+        from edgy.testing.factory import SubFactory
+        
         for field, value in self.__defaults__.items():
-            if isinstance(value, monkay.load("edgy.testing.factory.SubFactory")):
+            if isinstance(value, SubFactory):
                 value = value.build()
                 self.__defaults__[field] = value
             elif field in self.__kwargs__:  # pragma: no cover
