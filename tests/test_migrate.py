@@ -26,7 +26,7 @@ class User(edgy.StrictModel):
 class Profile(User):
     age = edgy.IntegerField()
     parent = edgy.ForeignKey("Profile", null=True, inherit=False)
-    related = edgy.ManyToMany("Profile", inherit=False)
+    related = edgy.ManyToMany("Profile", inherit=False, through_tablename=edgy.NEW_M2M_NAMING)
 
     class Meta:
         registry = models

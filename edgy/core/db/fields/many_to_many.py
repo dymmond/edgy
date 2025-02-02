@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal, Union, cast
 
-from edgy.core.db.constants import CASCADE
+from edgy.core.db.constants import CASCADE, NEW_M2M_NAMING, OLD_M2M_NAMING
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.exclude_field import ExcludeField
@@ -19,6 +19,9 @@ if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
 
+M2M_TABLE_NAME_LIMIT = 64
+CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
+
 
 class BaseManyToManyForeignKeyField(BaseForeignKey):
     is_m2m: bool = True
@@ -31,7 +34,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
         through: Union[str, type["BaseModelType"]] = "",
-        through_tablename: str = "",
+        through_tablename: Union[str, type[OLD_M2M_NAMING], type[NEW_M2M_NAMING]],
         embed_through: Union[str, Literal[False]] = False,
         **kwargs: Any,
     ) -> None:
@@ -231,17 +234,25 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             del through
         assert self.owner.meta.registry, "no registry set"
         owner_name = self.owner.__name__
-        to_name = self.target.__name__
+        target_name = self.target.__name__
 
-        class_name = f"{owner_name}{self.name.capitalize()}{to_name}"
+        class_name = f"{owner_name}{self.name.capitalize()}Through"
 
         if not self.from_foreign_key:
             self.from_foreign_key = owner_name.lower()
 
         if not self.to_foreign_key:
-            self.to_foreign_key = to_name.lower()
+            self.to_foreign_key = target_name.lower()
 
-        tablename = self.through_tablename or f"{self.from_foreign_key}s_{self.name}_{self.to_foreign_key}s"
+        if self.through_tablename is OLD_M2M_NAMING:
+            tablename: str = f"{self.from_foreign_key}s_{self.to_foreign_key}s"
+        elif self.through_tablename is NEW_M2M_NAMING:
+            tablename = class_name.lower()[:M2M_TABLE_NAME_LIMIT]
+        else:
+            tablename = (
+                cast(str, self.through_tablename).format(field=self)[:M2M_TABLE_NAME_LIMIT].lower()
+            )
+
         meta_args = {
             "tablename": tablename,
             "multi_related": {(self.from_foreign_key, self.to_foreign_key)},
@@ -270,10 +281,11 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             to_related_name = f"{self.related_name}"
             self.reverse_name = to_related_name
         else:
+            related_class_name = f"{owner_name}{target_name}"
             if self.unique:
-                to_related_name = f"{to_name.lower()}_{class_name.lower()}"
+                to_related_name = f"{target_name}_{related_class_name}".lower()
             else:
-                to_related_name = f"{to_name.lower()}_{class_name.lower()}s_set"
+                to_related_name = f"{target_name}_{related_class_name}s_set".lower()
             self.reverse_name = to_related_name
 
         # in any way m2m fields will have an index (either by unique_together or by their primary key constraint)
@@ -373,13 +385,22 @@ class ManyToManyField(ForeignKeyFieldFactory):
         cls,
         to: Union["BaseModelType", str],
         *,
-        through: Union[str, type["BaseModelType"]] = "",
-        from_fields: Sequence[str] = (),
         to_fields: Sequence[str] = (),
+        to_foreign_key: str = "",
+        from_fields: Sequence[str] = (),
+        from_foreign_key: str = "",
+        through: Union[str, type["BaseModelType"]] = "",
+        through_tablename: Union[str, type[OLD_M2M_NAMING], type[NEW_M2M_NAMING]] = "",
+        embed_through: Union[str, Literal[False]] = False,
         **kwargs: Any,
     ) -> "BaseFieldType":
+        kwargs = {
+            **kwargs,
+            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
+        }
         return super().__new__(
-            cls, to=to, through=through, from_fields=from_fields, to_fields=to_fields, **kwargs
+            cls,
+            **kwargs,
         )
 
     @classmethod
@@ -393,6 +414,17 @@ class ManyToManyField(ForeignKeyFieldFactory):
         kwargs["exclude"] = True
         kwargs["on_delete"] = CASCADE
         kwargs["on_update"] = CASCADE
+        through_tablename: Union[str, type[OLD_M2M_NAMING], type[NEW_M2M_NAMING]] = kwargs.get(
+            "through_tablename"
+        )
+        if not through_tablename or (
+            not isinstance(through_tablename, str)
+            and through_tablename is not OLD_M2M_NAMING
+            and through_tablename is not NEW_M2M_NAMING
+        ):
+            raise FieldDefinitionError(
+                '"through_tablename" must be set to either OLD_M2M_NAMING, NEW_M2M_NAMING or a non-empty string.'
+            )
 
 
 ManyToMany = ManyToManyField

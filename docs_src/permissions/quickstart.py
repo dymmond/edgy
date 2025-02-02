@@ -12,7 +12,9 @@ class User(edgy.Model):
 
 
 class Permission(BasePermission):
-    users = edgy.fields.ManyToMany("User", embed_through=False)
+    users = edgy.fields.ManyToMany(
+        "User", embed_through=False, through_tablename=edgy.NEW_M2M_NAMING
+    )
 
     class Meta:
         registry = models

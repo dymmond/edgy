@@ -11,6 +11,17 @@ if TYPE_CHECKING:
     from .core import files
     from .core.connection import Database, DatabaseURL, Registry
     from .core.db import fields
+    from .core.db.constants import (
+        CASCADE,
+        DO_NOTHING,
+        NEW_M2M_NAMING,
+        OLD_M2M_NAMING,
+        PROTECT,
+        RESTRICT,
+        SET_DEFAULT,
+        SET_NULL,
+        ConditionalRedirect,
+    )
     from .core.db.datastructures import Index, UniqueConstraint
 
     # for type checking import all fields
@@ -92,6 +103,8 @@ __all__ = [
     "SET_NULL",
     "SET_DEFAULT",
     "PROTECT",
+    "NEW_M2M_NAMING",
+    "OLD_M2M_NAMING",
     "ConditionalRedirect",
     # models
     "ReflectModel",

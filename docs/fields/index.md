@@ -609,6 +609,11 @@ class MyModel(edgy.Model):
 ##### Parameters
 
 * `to` - A string [model](../models.md) name or a class object of that same model.
+* `through_tablename` - Custom tablename for `through`. E.g. when special characters are used in model names. It has two special options `edgy.OLD_M2M_NAMING` and `edgy.NEW_M2M_NAMING`.
+  It is **required** to either set an explicit name or one of the both options.
+  When migrating from pre 0.27.0 edgy versions you should pass either `edgy.OLD_M2M_NAMING` or the tablename or rename the table of the through model in an alembic migration.
+  Otherwise data loss is possible. The same is true if you use edgy and saffier on the same tables. You need in case `edgy.OLD_M2M_NAMING`.
+  For new projects and new ManyFields the `edgy.NEW_M2M_NAMING` option or a tablename is recommended as you don't have.
 * `target_registry` - Registry where the model callback is installed if `to` is a string. Defaults to the field owner registry.
 * `from_fields` - Provide the `related_fields` for the implicitly generated ForeignKey to the owner model.
 * `to_fields` - Provide the `related_fields` for the implicitly generated ForeignKey to the child model.
@@ -616,16 +621,26 @@ class MyModel(edgy.Model):
 * `through` - The model to be used for the relationship. Edgy generates the model by default
                 if None is provided or `through` is an abstract model.
 * `through_registry` - Registry where the model callback is installed if `through` is a string or empty. Defaults to the field owner registry.
-* `through_tablename` - Custom tablename for `through`. E.g. when special characters are used in model names.
 * `embed_through` - When traversing, embed the through object in this attribute. Otherwise it is not accessable from the result.
                       if an empty string was provided, the old behaviour is used to query from the through model as base.
                       if False (the new default), the base is transformed to the target and source model (full proxying). You cannot select the through model via path traversal anymore (except from the through model itself).
                       If not an empty string, the same behaviour like with False applies except that you can select the through model fields via path traversal with the provided name.
 
+!!! Warning
+    If `through_tablename` is set to `edgy.OLD_M2M_NAMING` you won't be able to have multiple relations from the same source model to the same target model.
+    You can however pass for additional ManyToMany the `edgy.NEW_M2M_NAMING` or a string so it works.
+    This allows updating old codebases.
+
+!!! Warning
+    If `through_tablename` is not set correctly or changed data-loss is possible. When changing it is **your** responsibility to move the
+    table either via migration or by hand.
 
 !!! Note
     If `through` is an abstract model it will be used as a template (a new model is generated with through as base).
 
+!!! Tip
+    When providing a string as `through_tablename`, you have string formatting active. The field itself is injected as field.
+    The resulting name is lowercased and cut on 64 chars.
 
 !!! Note
     The index parameter is passed through to the ForeignKey fields but is not required. The intern ForeignKey fields
@@ -639,6 +654,20 @@ class MyModel(edgy.Model):
 ```python title="Example for through model with content_type"
 {!> ../docs_src/contenttypes/m2m_with_contenttypes.py !}
 ```
+
+##### Migration from edgy pre 0.27.0
+
+Because of a flaw in the naming schema colliding table names were possible in edgy `<0.27.0`. For mitigation
+we introduced a new one which output different names.
+Alembic however is not capable to detect the renames and will drop the old table and create a new one.
+Similar is the behavior in case no migrations are used: programs with old tablenames will just fail.
+This includes scenarios where `edgy` and `saffier` are running in a mixed environment and operate on the same tables.
+
+To prevent these scenarios, we made the `through_tablename` parameter mandatory. Here you have to select for **every**
+`ManyToManyField` which naming schema to use. For **existing** ManyToMany fields you should choose: `edgy.OLD_M2M_NAMING` except you plan
+to rename the through model table. You can also set explicitly an tablename, this is fine too.
+For new `ManyToManyField` you should choose `edgy.NEW_M2M_NAMING` or an other tablename.
+
 
 #### IPAddressField
 

@@ -6,6 +6,12 @@ SET_DEFAULT = "SET DEFAULT"
 PROTECT = "PROTECT"
 
 
+class OLD_M2M_NAMING: ...
+
+
+class NEW_M2M_NAMING: ...
+
+
 class ConditionalRedirect(dict): ...
 
 

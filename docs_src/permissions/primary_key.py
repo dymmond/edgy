@@ -13,7 +13,9 @@ class User(edgy.Model):
 
 class Group(edgy.Model):
     name = edgy.fields.CharField(max_length=100)
-    users = edgy.fields.ManyToMany("User", embed_through=False)
+    users = edgy.fields.ManyToMany(
+        "User", embed_through=False, through_tablename=edgy.NEW_M2M_NAMING
+    )
 
     class Meta:
         registry = models
@@ -22,8 +24,12 @@ class Group(edgy.Model):
 class Permission(BasePermission):
     # overwrite name of BasePermission with a CharField with primary_key=True
     name: str = edgy.fields.CharField(max_length=100, primary_key=True)
-    users = edgy.fields.ManyToMany("User", embed_through=False)
-    groups = edgy.fields.ManyToMany("Group", embed_through=False)
+    users = edgy.fields.ManyToMany(
+        "User", embed_through=False, through_tablename=edgy.NEW_M2M_NAMING
+    )
+    groups = edgy.fields.ManyToMany(
+        "Group", embed_through=False, through_tablename=edgy.NEW_M2M_NAMING
+    )
     name_model: str = edgy.fields.CharField(max_length=100, null=True, primary_key=True)
     obj = edgy.fields.ForeignKey("ContentType", null=True, primary_key=True)
 

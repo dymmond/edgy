@@ -6,7 +6,7 @@ from uuid import UUID
 
 import pytest
 
-from edgy import Database, Registry
+from edgy import NEW_M2M_NAMING, Database, Registry
 from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin
 from edgy.core.db import fields, set_tenant
@@ -72,7 +72,7 @@ class Product(TenantModel):
 
 
 class Cart(TenantModel):
-    products = fields.ManyToMany(Product)
+    products = fields.ManyToMany(Product, through_tablename=NEW_M2M_NAMING)
 
     class Meta:
         registry = models

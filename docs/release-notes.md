@@ -6,6 +6,29 @@ hide:
 
 # Release Notes
 
+## 0.27.0
+
+### Changed
+
+- Added a new table naming schema for through models of ManyToMany fields. This requires however setting
+  an explicit table naming schema via the `through_tablename` parameter.
+- When `through_tablename` is a string, it is formatted with the field injected as field in the context.
+
+### Fixed
+
+- Multiple ManyFields from the same model to the same target model. Note: this is unrelated to `related_name`, setting the
+  the `related_name` would not help.
+
+### BREAKING
+
+For now ManyToMany fields **must** explicitly have a `through_tablename` parameter in which
+the table naming schema for the through model is selected.
+For existing ManyToMany fields you should pass `edgy.OLD_M2M_NAMING"` so migrations doesn't drop the tables,
+for new ManyToMany fields `edgy.NEW_M2M_NAMING"` which prevents clashes of through model names.
+You may can also rename the through model table via migration and use the `edgy.NEW_M2M_NAMING"`
+or simply use a non-empty string for the `through_tablename` parameter.
+
+
 ## 0.26.1
 
 ### Added
