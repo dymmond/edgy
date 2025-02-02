@@ -219,3 +219,67 @@ You have following options:
 - `warn`: Warn for unsound factory/model definitions which produce other errors than pydantic validation errors. Default.
 - `error`: Same as warn but reraise the exception instead of a warning.
 - `pedantic`: Raise even for pydantic validation errors.
+
+
+## SubFactory
+
+This is a special object that allows you to reuse factories previously created without any issues or concerns.
+
+Imagine the following:
+
+```python
+class UserFactory(ModelFactory):
+    class Meta:
+        model = User
+
+    name = "John Doe"
+    language = "en"
+
+
+class ProductFactory(ModelFactory):
+    class Meta:
+        model = Product
+
+    name = "Product 1"
+    rating = 5
+    in_stock = True
+    user = SubFactory("accounts.tests.factories.UserFactory")
+
+
+class ItemFactory(ModelFactory):
+    class Meta:
+        model = Item
+
+    product = SubFactory("products.tests..ProductFactory")
+```
+
+Did you see? With this SubFactory object, we can simply apply factories as a `string` with the location of the factory
+or passing the object directly, like the following:
+
+```python
+class UserFactory(ModelFactory):
+    class Meta:
+        model = User
+
+    name = "John Doe"
+    language = "en"
+
+
+class ProductFactory(ModelFactory):
+    class Meta:
+        model = Product
+
+    name = "Product 1"
+    rating = 5
+    in_stock = True
+    user = SubFactory(UserFactory)
+
+
+class ItemFactory(ModelFactory):
+    class Meta:
+        model = Item
+
+    product = SubFactory(ProductFactory)
+```
+
+If the values are not supplied, Edgy takes care of generate them for you automatically anyway.

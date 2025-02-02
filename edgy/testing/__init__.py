@@ -1,12 +1,12 @@
 from monkay import Monkay
 
-__all__ = ["DatabaseTestClient", "Factory"]
+__all__ = ["DatabaseTestClient", "ModelFactory", "SubFactory"]
 
 
 Monkay(
     globals(),
     lazy_imports={
-        "Factory": ".factory.Factory",
+        "ModelFactory": ".factory.ModelFactory",
         "DatabaseTestClient": ".client.DatabaseTestClient",
     },
 )

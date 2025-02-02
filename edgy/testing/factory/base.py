@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Collection
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
+import monkay
+
 from edgy.core.utils.sync import run_sync
 
 from ..exceptions import ExcludeValue
@@ -29,6 +31,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
 
     meta: ClassVar[MetaInfo]
     exclude_autoincrement: ClassVar[bool] = True
+    __defaults__: ClassVar[dict[str, Any]] = {}
 
     def __init__(self, **kwargs: Any):
         self.__kwargs__ = kwargs
@@ -58,6 +61,27 @@ class ModelFactory(metaclass=ModelFactoryMeta):
 
         return FactoryField(callback=callback)
 
+    def handle_factory_defaults(self) -> Any:
+        """
+        Processes the default values for the factory fields.
+        Iterates through the `__defaults__` dictionary, and for each field:
+
+        - If the value is an instance of `edgy.testing.factory.SubFactory`,
+        it builds the value and updates the dictionary.
+        - Otherwise, it retains the original value in the dictionary.
+
+        Returns:
+            Any: The processed default values.
+        """
+        for field, value in self.__defaults__.items():
+            if isinstance(value, monkay.load("edgy.testing.factory.SubFactory")):
+                value = value.build()
+                self.__defaults__[field] = value
+            elif field in self.__kwargs__:  # pragma: no cover
+                self.__defaults__[field] = self.__kwargs__[field]
+            else:
+                self.__defaults__[field] = value
+
     def build_values(
         self,
         *,
@@ -79,6 +103,10 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             column = self.meta.model.table.autoincrement_column
             if column is not None:
                 exclude = {*exclude, column.key}
+
+        if self.__defaults__:
+            self.handle_factory_defaults()
+            overwrites.update(self.__defaults__)
 
         values: dict[str, Any] = {}
         for name, field in self.meta.fields.items():

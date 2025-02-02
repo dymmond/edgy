@@ -6,6 +6,13 @@ hide:
 
 # Release Notes
 
+### 0.27.1
+
+### Added
+
+- `SubFactory` in the model factory helpers allowing to import ModelFactory objects from
+  other parts of the codebase and apply them directly as dependencies.
+
 ## 0.27.0
 
 ### Changed
@@ -27,7 +34,6 @@ For existing ManyToMany fields you should pass `edgy.OLD_M2M_NAMING"` so migrati
 for new ManyToMany fields `edgy.NEW_M2M_NAMING"` which prevents clashes of through model names.
 You may can also rename the through model table via migration and use the `edgy.NEW_M2M_NAMING"`
 or simply use a non-empty string for the `through_tablename` parameter.
-
 
 ## 0.26.1
 
