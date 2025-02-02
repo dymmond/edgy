@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Collection
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
-from edgy import Model, run_sync
+from edgy.core.utils.sync import run_sync
 
 from ..exceptions import ExcludeValue
 from .fields import FactoryField
@@ -12,6 +12,7 @@ from .metaclasses import ModelFactoryMeta
 if TYPE_CHECKING:
     from faker import Faker
 
+    from edgy import Model
     from edgy.core.connection import Database
 
     from .metaclasses import MetaInfo
@@ -176,7 +177,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             kwargs = {
                 **{k: v for k, v in locals().items() if k not in DEFAULTS_WITH_SAVE},
             }
-            return run_sync(self.build_and_save(**kwargs))
+            return cast("Model", run_sync(self.build_and_save(**kwargs)))
 
         if database is None:
             database = getattr(self, "database", None)
