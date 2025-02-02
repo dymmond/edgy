@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from typing import TYPE_CHECKING, Any, ClassVar, Literal
 
-from edgy import Model
+from edgy import Model, run_sync
 
 from ..exceptions import ExcludeValue
 from .fields import FactoryField
@@ -17,6 +17,8 @@ if TYPE_CHECKING:
     from .metaclasses import MetaInfo
     from .types import FieldFactoryCallback
 
+DEFAULTS_WITH_SAVE = frozenset(["self", "class", "__class__", "kwargs", "save"])
+
 
 class ModelFactory(metaclass=ModelFactoryMeta):
     """
@@ -25,7 +27,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
     """
 
     meta: ClassVar[MetaInfo]
-    exclude_autoincrement: ClassVar[bool] = False
+    exclude_autoincrement: ClassVar[bool] = True
 
     def __init__(self, **kwargs: Any):
         self.__kwargs__ = kwargs
@@ -150,11 +152,12 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         exclude_autoincrement: bool | None = None,
         database: Database | None | Literal[False] = None,
         schema: str | None | Literal[False] = None,
+        save: bool = False,
     ) -> Model:
         """
         When this function is called, automacally will perform the
         generation of the model with the fake data using the
-        meta.model.query(**self.fields) where the self.fields needs to be the
+        meta.model(**self.fields) where the self.fields needs to be the
         data generated based on the model fields declared in the model.
 
         In the end it would be something like:
@@ -163,13 +166,17 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         ...     class Meta:
         ...         model = User
         ...
-        ...     name = FactoryField(parameters={"": ""})
+        ...     name = FactoryField(callback="female_name")
 
         >>> user = UserFactory(name="XXX").build()
 
         The fields that are not provided will be generated using the faker library.
-
         """
+        if save:
+            kwargs = {
+                **{k: v for k, v in locals().items() if k not in DEFAULTS_WITH_SAVE},
+            }
+            return run_sync(self.build_and_save(**kwargs))
 
         if database is None:
             database = getattr(self, "database", None)
@@ -195,3 +202,36 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         if schema is not None:
             result.__using_schema__ = schema
         return result
+
+    async def build_and_save(
+        self,
+        *,
+        faker: Faker | None = None,
+        parameters: dict[str, dict[str, Any] | FieldFactoryCallback] | None = None,
+        overwrites: dict[str, Any] | None = None,
+        exclude: Collection[str] = (),
+        exclude_autoincrement: bool | None = None,
+        database: Database | None | Literal[False] = None,
+        schema: str | None | Literal[False] = None,
+    ) -> Model:
+        """
+        When this function is called, automacally will perform the
+        generation of the model with the fake data using the
+        meta.model.query.model(**self.fields).save() where the self.fields needs to be the
+        data generated based on the model fields declared in the model.
+
+        In the end it would be something like:
+
+        >>> class UserFactory(ModelFactory):
+        ...     class Meta:
+        ...         model = User
+
+        >>> user = await UserFactory(name="XXX").build_and_save()
+
+        The fields that are not provided will be generated using the faker library.
+        This function is the recommended way of creating a model instance which is saved in the database
+        """
+        kwargs = {
+            **{k: v for k, v in locals().items() if k not in DEFAULTS_WITH_SAVE},
+        }
+        return await self.build(**kwargs, save=False).save()

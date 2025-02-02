@@ -1,6 +1,3 @@
-import enum
-
-
 import edgy
 from edgy.testing.factory import ModelFactory, FactoryField
 
@@ -21,10 +18,11 @@ class UserFactory(ModelFactory):
         model = User
 
     language = FactoryField(callback="language_code")
-    exclude_autoincrement = True
+    exclude_autoincrement = False
 
 
 user_factory = UserFactory()
 
 user_model = user_factory.build()
-assert not hasattr(user_model, "id")
+# now the id field is stubbed
+assert hasattr(user_model, "id")

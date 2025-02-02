@@ -1,7 +1,8 @@
 site_name: Edgy
 site_description: 🔥 The perfect ORM to work with complex databases 🔥.
 site_url: https://edgy.dymmond.com
-
+watch:
+  - docs_src
 theme:
   name: "material"
   custom_dir: docs/overrides

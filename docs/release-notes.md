@@ -11,10 +11,15 @@ hide:
 ### Added
 
 - Add PGArrayField.
+- Add `build_and_save(...)` build variant to ModelFactory.
+- Add `build(save=True)` to ModelFactory.
 
 ### Changed
 
 - Reorganize fields. Make more lazy.
+- Make models, querysets imports in `__init__.py` lazy so circular dependency errors arise no more.
+- Change in ModelFactory the default of `exclude_autoincrement` from `False` to `True`.
+  There is a strong demand in having save ready models.
 
 ## 0.26.0
 

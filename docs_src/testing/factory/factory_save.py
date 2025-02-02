@@ -1,6 +1,3 @@
-import enum
-
-
 import edgy
 from edgy.testing.factory import ModelFactory, FactoryField
 
@@ -20,28 +17,11 @@ class UserFactory(ModelFactory):
         model = User
 
     language = FactoryField(callback="language_code")
-    # disable the implicit id field
-    disable_id = FactoryField(exclude=True, name="id")
-
-
-# you can also build an autosave factory which saves after building
-class UserAutoSaveFactory(UserFactory):
-    class Meta:
-        model = User
-
-    language = FactoryField(callback="language_code")
-
-    @classmethod
-    def build(cls, **kwargs):
-        return edgy.run_sync(super().build(**kwargs).save)
 
 
 user_factory = UserFactory(language="eng")
 
-user_model_instance = user_factory.build()
+user_model_instance = await user_factory.build_and_save()
 
-edgy.run_sync(user_model_instance.save())
-
-# or the UserAutoSaveFactory
-
-UserAutoSaveFactory(language="en").build()
+# or sync
+user_model_instance = user_factory.build(save=True)

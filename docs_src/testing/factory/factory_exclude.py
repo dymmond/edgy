@@ -1,6 +1,3 @@
-import enum
-
-
 import edgy
 from edgy.testing.exceptions import ExcludeValue
 from edgy.testing.factory import ModelFactory, FactoryField

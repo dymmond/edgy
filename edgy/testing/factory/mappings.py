@@ -53,8 +53,6 @@ def ManyToManyField_callback(field: FactoryField, faker: Faker, parameters: dict
         class Meta:
             model = target
 
-        exclude_autoincrement = True
-
     factory = ManyToManyFieldFactory()
 
     # arm callback
@@ -90,8 +88,6 @@ def RefForeignKey_callback(field: FactoryField, faker: Faker, parameters: dict[s
     class RefForeignKeyFactory(ModelFactory, model_validation="none"):
         class Meta:
             model = factory_model
-
-        exclude_autoincrement = True
 
     factory = RefForeignKeyFactory()
     model_ref_exclude: set[str] = set()
