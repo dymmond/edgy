@@ -1,6 +1,3 @@
-import enum
-
-
 import edgy
 from edgy.testing.client import DatabaseTestClient
 from edgy.testing.factory import ModelFactory, FactoryField

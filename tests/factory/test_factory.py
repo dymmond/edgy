@@ -80,7 +80,6 @@ def test_can_generate_overwrite_and_exclude():
         class Meta:
             model = Product
 
-        id = FactoryField(exclude=True)
         name = FactoryField()
 
     user = UserFactory().build()
@@ -115,12 +114,12 @@ def test_exclude_autoincrement_factory():
         class Meta:
             model = "tests.factory.test_factory.User"
 
-        exclude_autoincrement = True
+        exclude_autoincrement = False
         product_ref = FactoryField(exclude=True)
 
     user = UserFactory().build()
 
-    assert not hasattr(user, "id")
+    assert hasattr(user, "id")
     assert not hasattr(user, "product_ref")
 
 
@@ -134,9 +133,9 @@ def test_exclude_autoincrement_build():
     user_factory = UserFactory()
     user = user_factory.build()
 
-    assert hasattr(user, "id")
-    user = user_factory.build(exclude_autoincrement=True)
     assert not hasattr(user, "id")
+    user = user_factory.build(exclude_autoincrement=False)
+    assert hasattr(user, "id")
 
 
 def test_can_use_field_callback():

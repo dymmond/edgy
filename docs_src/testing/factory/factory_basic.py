@@ -1,6 +1,3 @@
-import enum
-
-
 import edgy
 from edgy.testing.factory import ModelFactory, FactoryField
 
@@ -27,3 +24,7 @@ user_factory = UserFactory(language="eng")
 user_model_instance = user_factory.build()
 # provide the name edgy
 user_model_instance_with_name_edgy = user_factory.build(overwrites={"name": "edgy"})
+# with saving
+user_model_instance = user_factory.build(save=True)
+# or the async variant
+user_model_instance = edgy.run_sync(user_factory.build_and_save())

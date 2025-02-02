@@ -1,6 +1,3 @@
-import enum
-
-
 import edgy
 from edgy.testing.factory import ModelFactory, FactoryField
 
@@ -21,10 +18,12 @@ class UserFactory(ModelFactory):
         model = User
 
     language = FactoryField(callback="language_code")
-    # disable the implicit id field
-    disable_id = FactoryField(exclude=True, name="id")
+    # remove the name field
+    no_name = FactoryField(exclude=True, name="name")
 
 
 user_factory = UserFactory()
 
-user_model = user_factory.build()
+user_model_instance = user_factory.build()
+# you can however provide it explicit
+user_model_instance_with_name = UserFactory(name="edgy").build()

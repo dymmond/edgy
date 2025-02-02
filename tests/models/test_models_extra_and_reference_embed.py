@@ -41,7 +41,6 @@ class UserFactory(ModelFactory):
     class Meta:
         model = User
 
-    exclude_autoincrement = True
     name = FactoryField(callback="name")
 
 
@@ -49,7 +48,6 @@ class ProfileFactory(ModelFactory):
     class Meta:
         model = Profile
 
-    exclude_autoincrement = True
     name = FactoryField(callback="name")
     user = UserFactory(number=10).to_factory_field()
 
@@ -58,7 +56,6 @@ class SuperProfileFactory(ModelFactory):
     class Meta:
         model = SuperProfile
 
-    exclude_autoincrement = True
     name = FactoryField(callback="name")
     profile = ProfileFactory().to_factory_field()
 

@@ -1,6 +1,3 @@
-import enum
-
-
 import edgy
 from edgy.testing.factory.mappings import DEFAULT_MAPPING
 from edgy.testing.factory import ModelFactory, FactoryField
