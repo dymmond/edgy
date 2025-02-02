@@ -220,7 +220,6 @@ You have following options:
 - `error`: Same as warn but reraise the exception instead of a warning.
 - `pedantic`: Raise even for pydantic validation errors.
 
-
 ## SubFactory
 
 This is a special object that allows you to reuse factories previously created without any issues or concerns.
