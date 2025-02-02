@@ -119,11 +119,11 @@ async def test_override_fields():
 
 
 async def test_save_in_db():
-    user = UserFactory(name="Edgy").build(save=True)
-    product = ProductFactory(name="Product 2", rating=3, user=user, in_stock=False).build(
-        save=True
-    )
-    item = ItemFactory(product=product).build(save=True)
+    user = await UserFactory(name="Edgy").build_and_save()
+    product = await ProductFactory(
+        name="Product 2", rating=3, user=user, in_stock=False
+    ).build_and_save()
+    item = await ItemFactory(product=product).build_and_save()
 
     assert product.user.id == user.id
     assert item.product.id == product.id
