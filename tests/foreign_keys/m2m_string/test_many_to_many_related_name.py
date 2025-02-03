@@ -15,7 +15,12 @@ models = edgy.Registry(database=database)
 class Album(edgy.StrictModel):
     id = edgy.fields.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.fields.CharField(max_length=100)
-    tracks = edgy.fields.ManyToMany("Track", related_name="album_tracks", embed_through="embedded")
+    tracks = edgy.fields.ManyToMany(
+        "Track",
+        related_name="album_tracks",
+        embed_through="embedded",
+        through_tablename=edgy.NEW_M2M_NAMING,
+    )
 
     class Meta:
         registry = models
@@ -23,8 +28,18 @@ class Album(edgy.StrictModel):
 
 class Studio(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
-    users = edgy.ManyToMany("User", related_name="studio_users", embed_through="embedded")
-    albums = edgy.ManyToMany("Album", related_name="studio_albums", embed_through="embedded")
+    users = edgy.ManyToMany(
+        "User",
+        related_name="studio_users",
+        embed_through="embedded",
+        through_tablename=edgy.NEW_M2M_NAMING,
+    )
+    albums = edgy.ManyToMany(
+        "Album",
+        related_name="studio_albums",
+        embed_through="embedded",
+        through_tablename=edgy.NEW_M2M_NAMING,
+    )
 
     class Meta:
         registry = models

@@ -23,7 +23,9 @@ async def test_copy_model_abstract(unlink_same_registry):
             abstract = True
 
     class Cart(edgy.StrictModel):
-        products = edgy.fields.ManyToMany(to=Product, through=ThroughModel)
+        products = edgy.fields.ManyToMany(
+            to=Product, through=ThroughModel, through_tablename=edgy.NEW_M2M_NAMING
+        )
 
         class Meta:
             registry = models
@@ -80,7 +82,9 @@ async def test_copy_model_concrete_same(unlink_same_registry):
             registry = models
 
     class Cart(edgy.StrictModel):
-        products = edgy.fields.ManyToMany(to=Product, through=ThroughModel)
+        products = edgy.fields.ManyToMany(
+            to=Product, through=ThroughModel, through_tablename=edgy.NEW_M2M_NAMING
+        )
 
         class Meta:
             registry = models
@@ -135,7 +139,9 @@ async def test_copy_model_concrete_other(unlink_same_registry):
             registry = models3
 
     class Cart(edgy.StrictModel):
-        products = edgy.fields.ManyToMany(to=Product, through=ThroughModel)
+        products = edgy.fields.ManyToMany(
+            to=Product, through=ThroughModel, through_tablename=edgy.NEW_M2M_NAMING
+        )
 
         class Meta:
             registry = models

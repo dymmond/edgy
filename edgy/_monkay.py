@@ -60,6 +60,8 @@ def create_monkay(global_dict: dict, all_var: list[str]) -> Monkay[Instance, Edg
         "SET_NULL",
         "SET_DEFAULT",
         "PROTECT",
+        "NEW_M2M_NAMING",
+        "OLD_M2M_NAMING",
         "ConditionalRedirect",
     ]:
         monkay.add_lazy_import(name, f"edgy.core.db.constants.{name}")

@@ -30,7 +30,7 @@ class Track(edgy.StrictModel):
 class Album(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
-    tracks = edgy.ManyToManyField("Track", embed_through="")
+    tracks = edgy.ManyToManyField("Track", embed_through="", through_tablename=edgy.NEW_M2M_NAMING)
 
     class Meta:
         registry = models
@@ -38,8 +38,8 @@ class Album(edgy.StrictModel):
 
 class Studio(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
-    users = edgy.ManyToManyField("User", embed_through="")
-    albums = edgy.ManyToManyField("Album", embed_through="")
+    users = edgy.ManyToManyField("User", embed_through="", through_tablename=edgy.NEW_M2M_NAMING)
+    albums = edgy.ManyToManyField("Album", embed_through="", through_tablename=edgy.NEW_M2M_NAMING)
 
     class Meta:
         registry = models
@@ -154,7 +154,7 @@ async def test_raises_RelationshipIncompatible():
     with pytest.raises(RelationshipIncompatible) as raised:
         await album.tracks.add(user)
 
-    assert raised.value.args[0] == "The child is not from the types 'Track', 'AlbumTrack'."
+    assert raised.value.args[0] == "The child is not from the types 'Track', 'AlbumTracksThrough'."
 
 
 async def test_raises_RelationshipNotFound():

@@ -16,7 +16,9 @@ class Team(edgy.Model):
 
 class Organisation(edgy.Model):
     ident: str = edgy.CharField(max_length=100)
-    teams: List[Team] = edgy.ManyToManyField(Team, related_name="organisation_teams")
+    teams: List[Team] = edgy.ManyToManyField(
+        Team, related_name="organisation_teams", through_tablename=edgy.NEW_M2M_NAMING
+    )
 
     class Meta:
         registry = models

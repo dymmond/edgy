@@ -15,7 +15,7 @@ models = edgy.Registry(database=database)
 class Album(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.fields.CharField(max_length=100)
-    tracks = edgy.ManyToMany("Track", related_name=False)
+    tracks = edgy.ManyToMany("Track", related_name=False, through_tablename=edgy.NEW_M2M_NAMING)
 
     class Meta:
         registry = models

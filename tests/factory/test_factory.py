@@ -47,7 +47,7 @@ class Product(edgy.StrictModel):
 
 
 class Cart(edgy.StrictModel):
-    products = edgy.fields.ManyToMany(Product)
+    products = edgy.fields.ManyToMany(Product, through_tablename=edgy.NEW_M2M_NAMING)
 
     class Meta:
         registry = models

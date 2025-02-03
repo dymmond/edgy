@@ -28,7 +28,7 @@ class Profile(Base):
     # by default excluded
     computed = edgy.fields.ComputedField(callback, exclude=False, secret=True)
     # should be always excluded otherwise we end up with a relationship in a model_dump
-    m2m = edgy.fields.ManyToMany("Profile")
+    m2m = edgy.fields.ManyToMany("Profile", through_tablename=edgy.NEW_M2M_NAMING)
 
 
 class User(Base):

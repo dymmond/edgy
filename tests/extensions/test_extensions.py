@@ -25,7 +25,7 @@ class PermissionExtension:
                 registry = value.instance.registry
 
         class Permission(BasePermission):
-            users = edgy.fields.ManyToMany("User", embed_through=False)
+            users = edgy.fields.ManyToMany("User", through_tablename=edgy.NEW_M2M_NAMING)
 
             class Meta:
                 registry = value.instance.registry

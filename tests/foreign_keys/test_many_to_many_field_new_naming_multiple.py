@@ -22,9 +22,11 @@ class Studio(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
     users = edgy.ManyToMany(
         Üser,
-        to_foreign_key="usr",
-        from_foreign_key="fromage",
-        through_tablename=edgy.OLD_M2M_NAMING,
+        through_tablename=edgy.NEW_M2M_NAMING,
+    )
+    admins = edgy.ManyToMany(
+        Üser,
+        through_tablename=edgy.NEW_M2M_NAMING,
     )
 
     class Meta:
@@ -32,7 +34,8 @@ class Studio(edgy.StrictModel):
 
 
 def test_check_tablename():
-    assert Studio.meta.fields["users"].through.meta.tablename == "fromages_usrs"
+    assert Studio.meta.fields["users"].through.meta.tablename == "studiousersthrough"
+    assert Studio.meta.fields["admins"].through.meta.tablename == "studioadminsthrough"
 
 
 @pytest.fixture(autouse=True, scope="function")
@@ -54,6 +57,7 @@ async def test_many_to_many_many_fields():
     # Add users and albums to studio
     await studio.users.add(user1)
     await studio.users.add(user2)
+    await studio.admins.add(user2)
     await studio.users.add(user3)
 
     # Start querying
@@ -64,3 +68,7 @@ async def test_many_to_many_many_fields():
     assert total_users[0].pk == user1.pk
     assert total_users[1].pk == user2.pk
     assert total_users[2].pk == user3.pk
+
+    total_admins = await studio.admins.all()
+    assert len(total_admins) == 1
+    assert total_admins[0].pk == user2.pk
