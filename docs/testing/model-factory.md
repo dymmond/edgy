@@ -3,7 +3,7 @@
 A ModelFactory is a faker based model stub generator.
 
 In the first step, building the factory class, you can define via `FactoryField`s customizations of the parameters passed
-for the fakers for the model.
+for the fakers for the model. You can also define defaults by just providing attributes which match the field name of the underlying model.
 
 The second step, is making a factory instance. Here can values be passed which should be used for the model. They are baked in
 the factory instance. But you are able to overwrite them in the last step or to exclude them.
