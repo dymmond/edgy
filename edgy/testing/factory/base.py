@@ -35,7 +35,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         self.__kwargs__ = kwargs
         for key, value in self.__defaults__.items():
             if key not in self.__kwargs__:
-                self.__defaults__[key] = value
+                self.__kwargs__[key] = value
 
     @property
     def edgy_fields(self) -> dict[str, Any]:
@@ -72,7 +72,6 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         exclude_autoincrement: bool | None = None,
     ) -> dict:
         """Underlying function to build the values which are passed into the model as kwargs"""
-        from edgy.testing.factory import SubFactory
 
         # hierarchy: parameters < exclude < defaults < kwargs < overwrites
         # when using to_field the same applies to the factory used for this
@@ -151,12 +150,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                     values[name] = field(faker=faker, parameters=params)
             except ExcludeValue:
                 ...
-        for k, v in kwargs.items():
-            if isinstance(v, SubFactory):
-                values[k] = v.build()
-            else:
-                values[k] = v
-
+        values.update(kwargs)
         return values
 
     def build(

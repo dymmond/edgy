@@ -282,3 +282,4 @@ class ItemFactory(ModelFactory):
 ```
 
 If the values are not supplied, Edgy takes care of generate them for you automatically anyway.
+For multiple values e.g. ManyToMany you can use ListSubFactory.

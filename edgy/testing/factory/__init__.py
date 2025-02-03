@@ -1,5 +1,5 @@
 from .base import ModelFactory
 from .fields import FactoryField
-from .subfactory import SubFactory
+from .subfactory import ListSubFactory, SubFactory
 
-__all__ = ["ModelFactory", "FactoryField", "SubFactory"]
+__all__ = ["ModelFactory", "FactoryField", "ListSubFactory", "SubFactory"]
