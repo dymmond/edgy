@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 
 class FactoryField:
     owner: type[ModelFactory]
+    parameters: FactoryParameters
+    no_copy: bool
     original_name: str
     _field_type: str = ""
     _callback: FactoryCallback | None = None

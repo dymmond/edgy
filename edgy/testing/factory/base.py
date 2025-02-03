@@ -82,6 +82,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             parameters = {}
         if not overwrites:
             overwrites = {}
+        # calculate the effective exclude_autoincrement value
         if exclude_autoincrement is None:
             exclude_autoincrement = self.exclude_autoincrement
         if exclude_autoincrement:
@@ -93,10 +94,12 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         kwargs.update(overwrites)
 
         values: dict[str, Any] = {}
+        # when a field is found (include subfactory pullin)
         for name, field in self.meta.fields.items():
             if name in kwargs or name in exclude or field.exclude:
                 continue
             current_parameters_or_callback = parameters.get(name)
+            # case 1: is string => make a faker callback
             if isinstance(current_parameters_or_callback, str):
                 callback_name = current_parameters_or_callback
 
@@ -109,8 +112,10 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                     return getattr(faker, _callback_name)(**params)
 
             try:
+                # case 2: callable (also from case 1): execute it with the parameters from the field
                 if callable(current_parameters_or_callback):
                     params = field.get_parameters(faker=faker)
+                    # special options: can simulate unset or None
                     randomly_unset = params.pop("randomly_unset", None)
                     if randomly_unset is not None and randomly_unset is not False:
                         if randomly_unset is True:
@@ -130,10 +135,13 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                         params,
                     )
                 else:
+                    # case 3: parameters are a dict: merge the parameters with the ones of the field
+                    #         and execute the field callback (can be also from mappings)
                     params = field.get_parameters(
                         faker=faker,
                         parameters=current_parameters_or_callback,
                     )
+                    # special options: can simulate unset or None
                     randomly_unset = params.pop("randomly_unset", None)
                     if randomly_unset is not None and randomly_unset is not False:
                         if randomly_unset is True:

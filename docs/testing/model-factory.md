@@ -272,6 +272,7 @@ class ProductFactory(ModelFactory):
     rating = 5
     in_stock = True
     user = SubFactory(UserFactory)
+    user.parameters["randomly_nullify"] = True
 
 
 class ItemFactory(ModelFactory):
@@ -279,7 +280,14 @@ class ItemFactory(ModelFactory):
         model = Item
 
     product = SubFactory(ProductFactory)
+    product.parameters["randomly_nullify"] = True
 ```
 
 If the values are not supplied, Edgy takes care of generate them for you automatically anyway.
 For multiple values e.g. ManyToMany you can use ListSubFactory.
+
+You can even parametrize them given that they are FactoryFields.
+
+!!! Tip
+    Effectively SubFactories are a nice wrapper around `to_factory_field` and `to_list_factory_field` which can pull in
+    from other files.
