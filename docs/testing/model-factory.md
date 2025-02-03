@@ -3,7 +3,7 @@
 A ModelFactory is a faker based model stub generator.
 
 In the first step, building the factory class, you can define via `FactoryField`s customizations of the parameters passed
-for the fakers for the model.
+for the fakers for the model. You can also define defaults by just providing attributes which match the field name of the underlying model.
 
 The second step, is making a factory instance. Here can values be passed which should be used for the model. They are baked in
 the factory instance. But you are able to overwrite them in the last step or to exclude them.
@@ -219,3 +219,75 @@ You have following options:
 - `warn`: Warn for unsound factory/model definitions which produce other errors than pydantic validation errors. Default.
 - `error`: Same as warn but reraise the exception instead of a warning.
 - `pedantic`: Raise even for pydantic validation errors.
+
+## SubFactory
+
+This is a special object that allows you to reuse factories previously created without any issues or concerns.
+
+Imagine the following:
+
+```python
+class UserFactory(ModelFactory):
+    class Meta:
+        model = User
+
+    name = "John Doe"
+    language = "en"
+
+
+class ProductFactory(ModelFactory):
+    class Meta:
+        model = Product
+
+    name = "Product 1"
+    rating = 5
+    in_stock = True
+    user = SubFactory("accounts.tests.factories.UserFactory")
+
+
+class ItemFactory(ModelFactory):
+    class Meta:
+        model = Item
+
+    product = SubFactory("products.tests.ProductFactory")
+```
+
+Did you see? With this SubFactory object, we can simply apply factories as a `string` with the location of the factory
+or passing the object directly, like the following:
+
+```python
+class UserFactory(ModelFactory):
+    class Meta:
+        model = User
+
+    name = "John Doe"
+    language = "en"
+
+
+class ProductFactory(ModelFactory):
+    class Meta:
+        model = Product
+
+    name = "Product 1"
+    rating = 5
+    in_stock = True
+    user = SubFactory(UserFactory)
+    user.parameters["randomly_nullify"] = True
+
+
+class ItemFactory(ModelFactory):
+    class Meta:
+        model = Item
+
+    product = SubFactory(ProductFactory)
+    product.parameters["randomly_nullify"] = True
+```
+
+If the values are not supplied, Edgy takes care of generate them for you automatically anyway.
+For multiple values e.g. ManyToMany you can use ListSubFactory.
+
+You can even parametrize them given that they are FactoryFields.
+
+!!! Tip
+    Effectively SubFactories are a nice wrapper around `to_factory_field` and `to_list_factory_field` which can pull in
+    from other files.

@@ -29,9 +29,13 @@ class ModelFactory(metaclass=ModelFactoryMeta):
 
     meta: ClassVar[MetaInfo]
     exclude_autoincrement: ClassVar[bool] = True
+    __defaults__: ClassVar[dict[str, Any]] = {}
 
     def __init__(self, **kwargs: Any):
         self.__kwargs__ = kwargs
+        for key, value in self.__defaults__.items():
+            if key not in self.__kwargs__:
+                self.__kwargs__[key] = value
 
     @property
     def edgy_fields(self) -> dict[str, Any]:
@@ -67,12 +71,18 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         exclude: Collection[str] = (),
         exclude_autoincrement: bool | None = None,
     ) -> dict:
+        """Underlying function to build the values which are passed into the model as kwargs"""
+
+        # hierarchy: parameters < exclude < defaults < kwargs < overwrites
+        # when using to_field the same applies to the factory used for this
+
         if faker is None:
             faker = self.meta.faker
         if not parameters:
             parameters = {}
         if not overwrites:
             overwrites = {}
+        # calculate the effective exclude_autoincrement value
         if exclude_autoincrement is None:
             exclude_autoincrement = self.exclude_autoincrement
         if exclude_autoincrement:
@@ -80,11 +90,16 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             if column is not None:
                 exclude = {*exclude, column.key}
 
+        kwargs = self.__kwargs__.copy()
+        kwargs.update(overwrites)
+
         values: dict[str, Any] = {}
+        # when a field is found (include subfactory pullin)
         for name, field in self.meta.fields.items():
-            if name in overwrites or name in exclude or name in self.__kwargs__ or field.exclude:
+            if name in kwargs or name in exclude or field.exclude:
                 continue
             current_parameters_or_callback = parameters.get(name)
+            # case 1: is string => make a faker callback
             if isinstance(current_parameters_or_callback, str):
                 callback_name = current_parameters_or_callback
 
@@ -97,8 +112,10 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                     return getattr(faker, _callback_name)(**params)
 
             try:
+                # case 2: callable (also from case 1): execute it with the parameters from the field
                 if callable(current_parameters_or_callback):
                     params = field.get_parameters(faker=faker)
+                    # special options: can simulate unset or None
                     randomly_unset = params.pop("randomly_unset", None)
                     if randomly_unset is not None and randomly_unset is not False:
                         if randomly_unset is True:
@@ -118,10 +135,13 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                         params,
                     )
                 else:
+                    # case 3: parameters are a dict: merge the parameters with the ones of the field
+                    #         and execute the field callback (can be also from mappings)
                     params = field.get_parameters(
                         faker=faker,
                         parameters=current_parameters_or_callback,
                     )
+                    # special options: can simulate unset or None
                     randomly_unset = params.pop("randomly_unset", None)
                     if randomly_unset is not None and randomly_unset is not False:
                         if randomly_unset is True:
@@ -138,9 +158,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                     values[name] = field(faker=faker, parameters=params)
             except ExcludeValue:
                 ...
-
-        values.update(self.__kwargs__)
-        values.update(overwrites)
+        values.update(kwargs)
         return values
 
     def build(

@@ -108,9 +108,11 @@ class ModelFactoryMeta(type):
 
         # Assign the meta and the fields of the meta
         meta_info = meta_info_class(model=db_model, faker=faker, mappings=mappings)
-        # update fields
+
+        defaults: dict[str, Any] = {}
+        # update fields and collect defaults (values matching to parameters)
         for key in list(attrs.keys()):
-            if key == "meta":
+            if key == "meta" or key == "exclude_autoincrement":
                 continue
             value: Any = attrs.get(key)
             if isinstance(value, FactoryField):
@@ -129,6 +131,9 @@ class ModelFactoryMeta(type):
                     )
                 else:
                     fields[field_name] = value
+            elif key in db_model.meta.fields:
+                defaults[key] = value
+
         for db_field_name in db_model.meta.fields:
             if db_field_name not in fields:
                 field = FactoryField(name=db_field_name, no_copy=True)
@@ -153,9 +158,13 @@ class ModelFactoryMeta(type):
         new_class = cast(
             type["ModelFactory"], super().__new__(cls, factory_name, bases, attrs, **kwargs)
         )
+        # add the defaults
+        new_class.__defaults__ = defaults
+
         # set owner
         for field in fields.values():
             field.owner = new_class
+
         # validate
         if model_validation != "none":
             try:
