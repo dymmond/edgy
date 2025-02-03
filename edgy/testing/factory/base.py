@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections.abc import Collection
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
-import monkay
-
 from edgy.core.utils.sync import run_sync
 
 from ..exceptions import ExcludeValue
@@ -35,6 +33,9 @@ class ModelFactory(metaclass=ModelFactoryMeta):
 
     def __init__(self, **kwargs: Any):
         self.__kwargs__ = kwargs
+        for key, value in self.__defaults__.items():
+            if key not in self.__kwargs__:
+                self.__defaults__[key] = value
 
     @property
     def edgy_fields(self) -> dict[str, Any]:
@@ -61,29 +62,6 @@ class ModelFactory(metaclass=ModelFactoryMeta):
 
         return FactoryField(callback=callback)
 
-    def handle_factory_defaults(self) -> Any:
-        """
-        Processes the default values for the factory fields.
-        Iterates through the `__defaults__` dictionary, and for each field:
-
-        - If the value is an instance of `edgy.testing.factory.SubFactory`,
-        it builds the value and updates the dictionary.
-        - Otherwise, it retains the original value in the dictionary.
-
-        Returns:
-            Any: The processed default values.
-        """
-        from edgy.testing.factory import SubFactory
-        
-        for field, value in self.__defaults__.items():
-            if isinstance(value, SubFactory):
-                value = value.build()
-                self.__defaults__[field] = value
-            elif field in self.__kwargs__:  # pragma: no cover
-                self.__defaults__[field] = self.__kwargs__[field]
-            else:
-                self.__defaults__[field] = value
-
     def build_values(
         self,
         *,
@@ -93,6 +71,12 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         exclude: Collection[str] = (),
         exclude_autoincrement: bool | None = None,
     ) -> dict:
+        """Underlying function to build the values which are passed into the model as kwargs"""
+        from edgy.testing.factory import SubFactory
+
+        # hierarchy: parameters < exclude < defaults < kwargs < overwrites
+        # when using to_field the same applies to the factory used for this
+
         if faker is None:
             faker = self.meta.faker
         if not parameters:
@@ -106,13 +90,12 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             if column is not None:
                 exclude = {*exclude, column.key}
 
-        if self.__defaults__:
-            self.handle_factory_defaults()
-            overwrites.update(self.__defaults__)
+        kwargs = self.__kwargs__.copy()
+        kwargs.update(overwrites)
 
         values: dict[str, Any] = {}
         for name, field in self.meta.fields.items():
-            if name in overwrites or name in exclude or name in self.__kwargs__ or field.exclude:
+            if name in kwargs or name in exclude or field.exclude:
                 continue
             current_parameters_or_callback = parameters.get(name)
             if isinstance(current_parameters_or_callback, str):
@@ -168,9 +151,12 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                     values[name] = field(faker=faker, parameters=params)
             except ExcludeValue:
                 ...
+        for k, v in kwargs.items():
+            if isinstance(v, SubFactory):
+                values[k] = v.build()
+            else:
+                values[k] = v
 
-        values.update(self.__kwargs__)
-        values.update(overwrites)
         return values
 
     def build(

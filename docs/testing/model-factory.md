@@ -249,7 +249,7 @@ class ItemFactory(ModelFactory):
     class Meta:
         model = Item
 
-    product = SubFactory("products.tests..ProductFactory")
+    product = SubFactory("products.tests.ProductFactory")
 ```
 
 Did you see? With this SubFactory object, we can simply apply factories as a `string` with the location of the factory
