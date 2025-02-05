@@ -383,6 +383,7 @@ Edgy has different flavors called templates:
   The `env.py` is NOT compatible to flask-migrate multidb migrations. You need to adapt them.
   Note: the extracted url parameters used for hashing are `f"{url.username}@{url.hostname}:{url.port}/{url.database}"`. You may want to remove
   the username parameter in `script.py.mako` when you want to be able to change the username on the fly.
+- `sequencial` - Uses a sequence of numbers for the migration files, when a migration is generated it should look like: `0001_<SOMETHING>`, `0002_<SOMETHING>` and so on.
 
 You can use them with:
 
