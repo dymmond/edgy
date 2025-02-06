@@ -179,6 +179,40 @@ def test_sequences_even():
     assert product.user.name == "name-4"
 
 
+def test_sequences_odd():
+    class UserFactory(ModelFactory):
+        class Meta:
+            model = User
+
+        name = FactoryField(
+            callback=lambda field, context, parameters: f"name-{field.inc_callcount()}"
+        )
+        product_ref = FactoryField(exclude=True)
+
+    class ProductFactory(ModelFactory):
+        class Meta:
+            model = Product
+
+        user = UserFactory().to_factory_field()
+
+    UserFactory.meta.fields["name"].inc_callcount(
+        amount=-1, callcounts=UserFactory.meta.callcounts
+    )
+    UserFactory.meta.fields["name"].inc_callcount(
+        amount=-1, callcounts=ProductFactory.meta.callcounts
+    )
+    user = UserFactory().build()
+    assert user.name == "name-1"
+    user = UserFactory().build()
+    assert user.name == "name-3"
+
+    # use the callcounts of the main factory
+    product = ProductFactory().build()
+    assert product.user.name == "name-1"
+    product = ProductFactory().build()
+    assert product.user.name == "name-3"
+
+
 def test_exclude_autoincrement_build():
     class UserFactory(ModelFactory):
         class Meta:

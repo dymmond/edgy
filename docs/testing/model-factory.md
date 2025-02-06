@@ -215,10 +215,21 @@ If you only want even numbers you can also use `inc_callcount` which advances th
 {!> ../docs_src/testing/factory/sequences_even.py !}
 ```
 
-!!! Tip
-    Only the callcounts of the main factories meta are used by default. SubFactories use also the callcounts of the main factory.
-    You can however drop in a dict in the build* method and it is used instead.
-    This can be useful if you want to have a global call count or don't want the counter advance.
+Wanting odd sequences is a bit more difficult. Here we have to manipulate the callcounter before entering a context.
+This can be archived by passing `callcounts` explicitly to `inc_callcount`. Otherwise the not yet existing context is tried
+to be used.
+
+```python
+{!> ../docs_src/testing/factory/sequences_odd.py !}
+```
+
+What happens when we use a [SubFactory](#subfactory)? Only the callcounts of the entrypoint Factory increase.
+You can also pass exclicitly a callcounts dict which will be increased.
+Here we see how to pass the callcounts of a different factory.
+
+```python
+{!> ../docs_src/testing/factory/sequences_subfactory.py !}
+```
 
 ## Build & build_and_save
 

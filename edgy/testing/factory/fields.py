@@ -111,11 +111,13 @@ class FactoryField:
             _copy.original_name = self.original_name
         return _copy
 
-    def inc_callcount(self) -> int:
-        context = model_factory_context.get()
-        count = context["callcounts"].setdefault(id(self), 0)
-        count += 1
-        context["callcounts"][id(self)] = count
+    def inc_callcount(self, *, amount: int = 1, callcounts: dict[int, int] | None = None) -> int:
+        if callcounts is None:
+            context = model_factory_context.get()
+            callcounts = context["callcounts"]
+        count = callcounts.setdefault(id(self), 0)
+        count += amount
+        callcounts[id(self)] = count
         return count
 
     def get_callcount(self) -> int:
