@@ -78,7 +78,9 @@ Known items are:
 - `faker`: The faker instance.
 - `exclude_autoincrement`: The current value of `exclude_autoincrement`. It is used in sub-factories.
 - `depth`: The current depth.
-- `callcounts`: Don't use directly. Use `field.get_callcount()`.or `field.inc_callcount()` to artifically increase the callcount.
+- `callcounts`: Don't use directly. Use `field.get_callcount()` to get.or `field.inc_callcount()` to artifically manipulate the callcount.
+
+You can however save arbitary items here. They should not collide with the known items, so think of non-colliding names to future proof the code.
 
 ### Saving
 
