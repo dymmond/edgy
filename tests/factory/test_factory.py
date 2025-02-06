@@ -6,7 +6,8 @@ from pydantic import ValidationError
 import edgy
 from edgy.testing import DatabaseTestClient
 from edgy.testing.exceptions import ExcludeValue
-from edgy.testing.factory import FactoryField, ModelFactory, ModelFactoryContext
+from edgy.testing.factory import FactoryField, ModelFactory
+from edgy.testing.factory.base import ModelFactoryContextImplementation
 from edgy.testing.factory.metaclasses import DEFAULT_MAPPING
 from tests.settings import DATABASE_URL
 
@@ -341,27 +342,33 @@ def test_mapping():
         }:
             DEFAULT_MAPPING[field_type_name](
                 ProductFactory.meta.fields["user"],
-                ModelFactoryContext(
+                ModelFactoryContextImplementation(
                     faker=ProductFactory.meta.faker,
                     exclude_autoincrement=ProductFactory.exclude_autoincrement,
+                    depth=0,
+                    callcounts={},
                 ),
                 {},
             )
         elif field_type_name == "ChoiceField":
             DEFAULT_MAPPING[field_type_name](
                 ProductFactory.meta.fields["type"],
-                ModelFactoryContext(
+                ModelFactoryContextImplementation(
                     faker=ProductFactory.meta.faker,
                     exclude_autoincrement=ProductFactory.exclude_autoincrement,
+                    depth=0,
+                    callcounts={},
                 ),
                 {},
             )
         elif field_type_name == "RefForeignKey":
             DEFAULT_MAPPING[field_type_name](
                 UserFactory.meta.fields["product_ref"],
-                ModelFactoryContext(
+                ModelFactoryContextImplementation(
                     faker=UserFactory.meta.faker,
                     exclude_autoincrement=UserFactory.exclude_autoincrement,
+                    depth=0,
+                    callcounts={},
                 ),
                 {},
             )
@@ -370,9 +377,11 @@ def test_mapping():
             if callback:
                 callback(
                     UserFactory.meta.fields["name"],
-                    ModelFactoryContext(
+                    ModelFactoryContextImplementation(
                         faker=UserFactory.meta.faker,
                         exclude_autoincrement=UserFactory.exclude_autoincrement,
+                        depth=0,
+                        callcounts={},
                     ),
                     {},
                 )
