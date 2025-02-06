@@ -32,6 +32,7 @@ Now we have a basic working model. Now let's get more complicated. Let's remove 
     Every Factory class has an own internal faker instance. If you require a separate faker you have to provide it in the build method
     as `faker` keyword parameter.
 
+
 ## Parametrize
 
 For customization you have two options: provide parameters to the corresponding faker method or to provide an own callable which can also receive parameters.
@@ -65,6 +66,19 @@ You will need to re-enable via setting the mapping in a subclass to a mapping fu
 
 !!! Tip
     You can name a FactoryField differently and provide the name parameter explicitly. This way it is possible to workaround occluded fields.
+
+### ModelFactoryContext
+
+`ModelFactoryContext` is now replacing the `faker` argument. It is compatible to faker and you can keep the old syntax with Faker.
+This magic works by forwarding `__getattr__` accesses to the internal faker instance.
+You can access vars in context via `__getitem__` so both ways of calling doesn't interfere.
+
+Known items are:
+
+- `faker`: The faker instance.
+- `exclude_autoincrement`: The current value of `exclude_autoincrement`. It is used in sub-factories.
+- `depth`: The current depth.
+- `callcounts`: Don't use directly. Use `field.get_callcount()`.or `field.inc_callcount()` to artifically increase the callcount.
 
 ### Saving
 
@@ -178,6 +192,21 @@ Here an example using both other ways:
 {!> ../docs_src/testing/factory/factory_exclude.py !}
 ```
 
+### Sequences
+
+Sometimes you want to have increasing sequences. This can be archived by using the callcounts.
+Every field has a method named `get_callcount()` which returns the current amount of calls.
+By default it starts with 1. First field call = 1.
+
+!!! Tip
+    Only the callcounts of the main factories meta are used by default. SubFactories use also the callcounts of the main factory.
+    You can however drop in a dict in the build* method and it is used instead.
+    This can be useful if you want to have a global call count or don't want the counter advance.
+
+#### Resetting sequences
+
+For resetting the sequences, simply call `Factory.meta.callcounts.clear()` of the main factory.
+
 ## Build & build_and_save
 
 The central method for factories are `build(...)` and `build_and_save(...)` for saving after. It generates the model instance.
@@ -197,6 +226,7 @@ The parameters are:
   When `False`, just use the one of the model.
 - **exclude_autoincrement** (None | bool): Auto-exclude the column with the `autoincrement` flag set. This is normally the injected id field.
 - **save** (Bool, only build): Save synchronously the model. It is a shortcut for `run_sync(factory_instance.build_and_save(...))`. By default `False`.
+- **callcounts** (dict): Provide a different dict where the callcounts are saved. Useful for resetting.
 
 ```python
 {!> ../docs_src/testing/factory/factory_build.py !}

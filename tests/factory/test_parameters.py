@@ -61,6 +61,27 @@ def test_parametrize_factory():
     assert len(user.language) <= 3
     assert user.name == "edgy edgy"
 
+def test_parametrize_factory_context():
+    class UserFactory(ModelFactory):
+        class Meta:
+            model = User
+
+        language = FactoryField(callback="language_code")
+        name = FactoryField(
+            callback=lambda field_instance,
+            context,
+            parameters: f"{parameters['first_name']} {parameters['last_name']}",
+            parameters={
+                "first_name": lambda field_instance, context, parameters: context["faker"].name(),
+                "last_name": lambda field_instance, context, parameters: context["faker"].name(),
+            },
+        )
+
+    UserFactory().build()
+    user = UserFactory().build(parameters={"name": {"first_name": "edgy", "last_name": "edgy"}})
+    assert len(user.language) <= 3
+    assert user.name == "edgy edgy"
+
 
 def test_can_generate_and_parametrize():
     class CartFactory(ModelFactory):

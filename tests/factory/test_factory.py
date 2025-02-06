@@ -6,7 +6,7 @@ from pydantic import ValidationError
 import edgy
 from edgy.testing import DatabaseTestClient
 from edgy.testing.exceptions import ExcludeValue
-from edgy.testing.factory import FactoryField, ModelFactory
+from edgy.testing.factory import FactoryField, ModelFactory, ModelFactoryContext
 from edgy.testing.factory.metaclasses import DEFAULT_MAPPING
 from tests.settings import DATABASE_URL
 
@@ -123,6 +123,34 @@ def test_exclude_autoincrement_factory():
     assert not hasattr(user, "product_ref")
 
 
+def test_sequences():
+    class UserFactory(ModelFactory):
+        class Meta:
+            model = User
+
+        name = FactoryField(
+            callback=lambda field, context, parameters: f"name-{field.get_callcount()}"
+        )
+        product_ref = FactoryField(exclude=True)
+
+    class ProductFactory(ModelFactory):
+        class Meta:
+            model = Product
+
+        user = UserFactory().to_factory_field()
+
+    user = UserFactory().build()
+    assert user.name == "name-1"
+    user = UserFactory().build()
+    assert user.name == "name-2"
+
+    # use the callcounts of the main factory
+    product = ProductFactory().build()
+    assert product.user.name == "name-1"
+    product = ProductFactory().build()
+    assert product.user.name == "name-2"
+
+
 def test_exclude_autoincrement_build():
     class UserFactory(ModelFactory):
         class Meta:
@@ -200,7 +228,7 @@ def test_unset():
 
 
 def test_can_use_field_callback_exclude_value():
-    def callback(field_instance, faker, parameters):
+    def callback(field_instance, context, parameters):
         raise ExcludeValue
 
     class ProductFactory(ModelFactory):
@@ -250,17 +278,39 @@ def test_mapping():
             "ManyToMany",
         }:
             DEFAULT_MAPPING[field_type_name](
-                ProductFactory.meta.fields["user"], ProductFactory.meta.faker, {}
+                ProductFactory.meta.fields["user"],
+                ModelFactoryContext(
+                    faker=ProductFactory.meta.faker,
+                    exclude_autoincrement=ProductFactory.exclude_autoincrement,
+                ),
+                {},
             )
         elif field_type_name == "ChoiceField":
             DEFAULT_MAPPING[field_type_name](
-                ProductFactory.meta.fields["type"], ProductFactory.meta.faker, {}
+                ProductFactory.meta.fields["type"],
+                ModelFactoryContext(
+                    faker=ProductFactory.meta.faker,
+                    exclude_autoincrement=ProductFactory.exclude_autoincrement,
+                ),
+                {},
             )
         elif field_type_name == "RefForeignKey":
             DEFAULT_MAPPING[field_type_name](
-                UserFactory.meta.fields["product_ref"], ProductFactory.meta.faker, {}
+                UserFactory.meta.fields["product_ref"],
+                ModelFactoryContext(
+                    faker=UserFactory.meta.faker,
+                    exclude_autoincrement=UserFactory.exclude_autoincrement,
+                ),
+                {},
             )
         else:
             callback = DEFAULT_MAPPING[field_type_name]
             if callback:
-                callback(UserFactory.meta.fields["name"], UserFactory.meta.faker, {})
+                callback(
+                    UserFactory.meta.fields["name"],
+                    ModelFactoryContext(
+                        faker=UserFactory.meta.faker,
+                        exclude_autoincrement=UserFactory.exclude_autoincrement,
+                    ),
+                    {},
+                )

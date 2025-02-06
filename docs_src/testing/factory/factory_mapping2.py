@@ -7,8 +7,8 @@ models = edgy.Registry(database=...)
 
 
 # the true user password simulator
-def PasswordField_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
-    return faker.random_element(["company", "password123", "querty", "asdfg"])
+def PasswordField_callback(field: FactoryField, context, parameters: dict[str, Any]) -> Any:
+    return context["faker"].random_element(["company", "password123", "querty", "asdfg"])
 
 
 class User(edgy.Model):
