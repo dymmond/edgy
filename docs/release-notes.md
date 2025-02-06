@@ -12,6 +12,7 @@ hide:
 
 - `SubFactory` in the model factory helpers allowing to import ModelFactory objects from
   other parts of the codebase and apply them directly as dependencies.
+- New `template` to `edgy init` migrations for [sequencial](./migrations/migrations.md#templates) migration file names.
 
 ## 0.27.0
 

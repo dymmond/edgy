@@ -18,7 +18,8 @@ class MediaSettings(BaseSettings):
     file_upload_temp_dir: Union[str, None] = None
     file_upload_permissions: Union[int, None] = 0o644
     file_upload_directory_permissions: Union[int, None] = None
-    # don't allow overwriting the project files by default, set to media
+
+    # Don't allow overwriting the project files by default, set to media
     media_root: Union[str, os.PathLike] = Path("media/")
     media_url: str = ""
 
@@ -27,9 +28,6 @@ class MediaSettings(BaseSettings):
         "default": {
             "backend": "edgy.core.files.storage.filesystem.FileSystemStorage",
         },
-        # "staticfiles": {
-        #     "storage": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        # },
     }
 
 
@@ -38,7 +36,8 @@ class MigrationSettings(BaseSettings):
     ignore_schema_pattern: Union[None, re.Pattern, str] = "information_schema"
     migrate_databases: Union[list[Union[str, None]], tuple[Union[str, None], ...]] = (None,)
     migration_directory: Union[str, os.PathLike] = Path("migrations/")
-    # extra keyword arguments to pass to alembic
+
+    # Extra keyword arguments to pass to alembic
     alembic_ctx_kwargs: dict = {
         "compare_type": True,
         "render_as_batch": True,

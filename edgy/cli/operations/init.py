@@ -11,7 +11,7 @@ from edgy.cli.decorators import add_migration_directory_option
 @click.option(
     "--package",
     is_flag=True,
-    help=("Write empty __init__.py files to the environment and " "version locations"),
+    help=("Write empty __init__.py files to the environment and version locations"),
 )
 @click.command(name="init")
 def init(template: str, package: bool) -> None:

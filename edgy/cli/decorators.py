@@ -3,7 +3,7 @@ from contextlib import suppress
 from functools import wraps
 from importlib import import_module
 from pathlib import Path
-from typing import Any, Optional, TypeVar
+from typing import Any, NoReturn, Optional, TypeVar
 
 from alembic.util import CommandError
 from loguru import logger
@@ -15,7 +15,7 @@ T = TypeVar("T")
 
 def catch_errors(fn: T) -> T:
     @wraps(fn)  # type: ignore
-    def wrap(*args: Any, **kwargs: Any) -> T:
+    def wrap(*args: Any, **kwargs: Any) -> NoReturn:
         try:
             fn(*args, **kwargs)  # type: ignore
         except (CommandError, RuntimeError) as exc:
