@@ -198,14 +198,27 @@ Sometimes you want to have increasing sequences. This can be archived by using t
 Every field has a method named `get_callcount()` which returns the current amount of calls.
 By default it starts with 1. First field call = 1.
 
+#### Resetting sequences
+
+For resetting the sequences, simply call `Factory.meta.callcounts.clear()` of the main factory or of the passed dict object.
+You can also use throw away dicts as callcounts for archiving the reset.
+
+#### Examples
+
+```python
+{!> ../docs_src/testing/factory/sequences.py !}
+```
+
+If you only want even numbers you can also use `inc_callcount` which advances the callcount by two:
+
+```python
+{!> ../docs_src/testing/factory/sequences_even.py !}
+```
+
 !!! Tip
     Only the callcounts of the main factories meta are used by default. SubFactories use also the callcounts of the main factory.
     You can however drop in a dict in the build* method and it is used instead.
     This can be useful if you want to have a global call count or don't want the counter advance.
-
-#### Resetting sequences
-
-For resetting the sequences, simply call `Factory.meta.callcounts.clear()` of the main factory.
 
 ## Build & build_and_save
 
@@ -246,9 +259,12 @@ class UserFactory(ModelFactory, model_validation="none"):
 You have following options:
 
 - `none`: No implicit validation.
-- `warn`: Warn for unsound factory/model definitions which produce other errors than pydantic validation errors. Default.
+- `warn`: Warn for unsound factory/model definitions which produce other errors than pydantic validation errors. The default.
 - `error`: Same as warn but reraise the exception instead of a warning.
 - `pedantic`: Raise even for pydantic validation errors.
+
+!!! Note
+    The validation doesn't increase the callcount of sequences.
 
 ## SubFactory
 
