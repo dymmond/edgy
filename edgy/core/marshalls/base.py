@@ -24,8 +24,10 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
     __show_pk__: ClassVar[bool] = False
     __custom_fields__: ClassVar[dict[str, BaseMarshallField]] = {}
 
-    def __init__(self, /, **data: Any) -> None:
-        super().__init__(**data)
+    def __init__(self, /, **kwargs: Any) -> None:
+        _context = kwargs.pop("context", {})
+        super().__init__(**kwargs)
+        self._context = _context
         self._instance: Model = self._setup()
 
     def _setup(self) -> "Model":
@@ -53,6 +55,10 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
     @instance.setter
     def instance(self, value: "Model") -> None:
         self._instance = value
+
+    @property
+    def context(self) -> dict:
+        return getattr(self, "_context", {})
 
     def _resolve_serializer(self, instance: "Model") -> "BaseMarshall":
         """
