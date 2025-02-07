@@ -1,7 +1,7 @@
 from typing import Any
 
 import edgy
-from edgy.testing.factory import ModelFactory, FactoryField
+from edgy.testing.factory import ModelFactory, FactoryField, ModelFactoryContext
 from faker import Faker
 
 test_database = DatabaseTestClient(...)
@@ -16,7 +16,9 @@ class User(edgy.Model):
         registry = models
 
 
-def name_callback(field_instance: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
+def name_callback(
+    field_instance: FactoryField, context: ModelFactoryContext, parameters: dict[str, Any]
+) -> Any:
     return f"{parameters['first_name']} {parameters['last_name']}"
 
 
@@ -26,13 +28,16 @@ class UserFactory(ModelFactory):
 
     # strings are an abbrevation for faker methods
     language = FactoryField(
-        callback=lambda field_instance, faker, parameters: faker.language_code(**parameters)
+        callback=lambda field_instance, context, parameters: context["faker"].language_code(
+            **parameters
+        )
     )
     name = FactoryField(
         callback=name_callback,
+        # a ModelFactoryContext forwards to faker, so you can pretend it is a faker instance
         parameters={
-            "first_name": lambda field_instance, faker, parameters: faker.first_name(),
-            "last_name": lambda field_instance, faker, parameters: faker.last_name(),
+            "first_name": lambda field_instance, fake_faker, parameters: fake_faker.first_name(),
+            "last_name": lambda field_instance, fake_faker, parameters: fake_faker.last_name(),
         },
     )
 

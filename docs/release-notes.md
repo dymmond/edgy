@@ -13,6 +13,15 @@ hide:
 - `SubFactory` in the model factory helpers allowing to import ModelFactory objects from
   other parts of the codebase and apply them directly as dependencies.
 - New `template` to `edgy init` migrations for [sequencial](./migrations/migrations.md#templates) migration file names.
+- Sequences like calls for ModelFactory.
+
+### Changed
+
+- The faker argument was switched out to `context`. The `context` parameter however behaves like a faker instance.
+
+### Fixed
+
+- `exclude_autoincrement` argument applies now also for the sub-factories. Previously we would have need to provide the parameters.
 
 ## 0.27.0
 

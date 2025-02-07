@@ -32,6 +32,7 @@ Now we have a basic working model. Now let's get more complicated. Let's remove 
     Every Factory class has an own internal faker instance. If you require a separate faker you have to provide it in the build method
     as `faker` keyword parameter.
 
+
 ## Parametrize
 
 For customization you have two options: provide parameters to the corresponding faker method or to provide an own callable which can also receive parameters.
@@ -65,6 +66,21 @@ You will need to re-enable via setting the mapping in a subclass to a mapping fu
 
 !!! Tip
     You can name a FactoryField differently and provide the name parameter explicitly. This way it is possible to workaround occluded fields.
+
+### ModelFactoryContext
+
+`ModelFactoryContext` is now replacing the `faker` argument. It is compatible to faker and you can keep the old syntax with Faker.
+This magic works by forwarding `__getattr__` accesses to the internal faker instance.
+You can access vars in context via `__getitem__` so both ways of calling doesn't interfere.
+
+Known items are:
+
+- `faker`: The faker instance.
+- `exclude_autoincrement`: The current value of `exclude_autoincrement`. It is used in sub-factories.
+- `depth`: The current depth.
+- `callcounts`: Don't use directly. Use `field.get_callcount()` to get.or `field.inc_callcount()` to artifically manipulate the callcount.
+
+You can however save arbitary items here. They should not collide with the known items, so think of non-colliding names to future proof the code.
 
 ### Saving
 
@@ -178,6 +194,45 @@ Here an example using both other ways:
 {!> ../docs_src/testing/factory/factory_exclude.py !}
 ```
 
+### Sequences
+
+Sometimes you want to have increasing sequences. This can be archived by using the callcounts.
+Every field has a method named `get_callcount()` which returns the current amount of calls.
+By default it starts with 1. First field call = 1.
+
+#### Resetting sequences
+
+For resetting the sequences, simply call `Factory.meta.callcounts.clear()` of the main factory or of the passed dict object.
+You can also use throw away dicts as callcounts for archiving the reset.
+
+#### Examples
+
+```python
+{!> ../docs_src/testing/factory/sequences.py !}
+```
+
+If you only want even numbers you can also use `inc_callcount` which advances the callcount by two:
+
+```python
+{!> ../docs_src/testing/factory/sequences_even.py !}
+```
+
+Wanting odd sequences is a bit more difficult. Here we have to manipulate the callcounter before entering a context.
+This can be archived by passing `callcounts` explicitly to `inc_callcount`. Otherwise the not yet existing context is tried
+to be used.
+
+```python
+{!> ../docs_src/testing/factory/sequences_odd.py !}
+```
+
+What happens when we use a [SubFactory](#subfactory)? Only the callcounts of the entrypoint Factory increase.
+You can also pass exclicitly a callcounts dict which will be increased.
+Here we see how to pass the callcounts of a different factory.
+
+```python
+{!> ../docs_src/testing/factory/sequences_subfactory.py !}
+```
+
 ## Build & build_and_save
 
 The central method for factories are `build(...)` and `build_and_save(...)` for saving after. It generates the model instance.
@@ -197,6 +252,7 @@ The parameters are:
   When `False`, just use the one of the model.
 - **exclude_autoincrement** (None | bool): Auto-exclude the column with the `autoincrement` flag set. This is normally the injected id field.
 - **save** (Bool, only build): Save synchronously the model. It is a shortcut for `run_sync(factory_instance.build_and_save(...))`. By default `False`.
+- **callcounts** (dict): Provide a different dict where the callcounts are saved. Useful for resetting.
 
 ```python
 {!> ../docs_src/testing/factory/factory_build.py !}
@@ -216,9 +272,12 @@ class UserFactory(ModelFactory, model_validation="none"):
 You have following options:
 
 - `none`: No implicit validation.
-- `warn`: Warn for unsound factory/model definitions which produce other errors than pydantic validation errors. Default.
+- `warn`: Warn for unsound factory/model definitions which produce other errors than pydantic validation errors. The default.
 - `error`: Same as warn but reraise the exception instead of a warning.
 - `pedantic`: Raise even for pydantic validation errors.
+
+!!! Note
+    The validation doesn't increase the callcount of sequences.
 
 ## SubFactory
 
