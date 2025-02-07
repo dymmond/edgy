@@ -6,7 +6,7 @@ test_database = DatabaseTestClient(...)
 models = edgy.Registry(database=...)
 
 
-def callback(field_instance, faker, parameters):
+def callback(field_instance, context, parameters):
     raise ExcludeValue
 
 

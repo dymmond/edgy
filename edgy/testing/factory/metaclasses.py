@@ -24,18 +24,14 @@ terminal = Print()
 
 # this is not models MetaInfo
 class MetaInfo:
-    __slots__ = (
-        "model",
-        "fields",
-        "faker",
-        "mappings",
-    )
+    __slots__ = ("model", "fields", "faker", "mappings", "callcounts")
     model: type[Model]
     mappings: dict[str, FactoryCallback | None]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self.fields: dict[str, FactoryField] = {}
         self.mappings: dict[str, FactoryCallback | None] = {}
+        self.callcounts: dict[int, int] = {}
         for slot in self.__slots__:
             value = getattr(meta, slot, None)
             if value is not None:
@@ -168,7 +164,8 @@ class ModelFactoryMeta(type):
         # validate
         if model_validation != "none":
             try:
-                new_class().build()
+                # we don't want to updat ethe counts yet
+                new_class().build(callcounts={})
             except ValidationError as exc:
                 if model_validation == "pedantic":
                     raise exc

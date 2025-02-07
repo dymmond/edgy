@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 from edgy.core.utils.sync import run_sync
 
 from ..exceptions import ExcludeValue
+from .context_vars import model_factory_context
 from .fields import FactoryField
 from .metaclasses import ModelFactoryMeta
 
@@ -16,9 +17,17 @@ if TYPE_CHECKING:
     from edgy.core.connection import Database
 
     from .metaclasses import MetaInfo
-    from .types import FieldFactoryCallback
+    from .types import FieldFactoryCallback, ModelFactoryContext
 
 DEFAULTS_WITH_SAVE = frozenset(["self", "class", "__class__", "kwargs", "save"])
+
+
+class ModelFactoryContextImplementation(dict):
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self["faker"], name)
+
+    def copy(self) -> ModelFactoryContextImplementation:
+        return ModelFactoryContextImplementation(self)
 
 
 class ModelFactory(metaclass=ModelFactoryMeta):
@@ -47,17 +56,17 @@ class ModelFactory(metaclass=ModelFactoryMeta):
 
     def to_factory_field(self) -> FactoryField:
         """For e.g. ForeignKey provide an instance."""
-        return FactoryField(callback=lambda field, faker, k: self.build(faker=faker, **k))
+        return FactoryField(callback=lambda field, context, k: self.build(**k))
 
     def to_list_factory_field(self, *, min: int = 0, max: int = 10) -> FactoryField:
         """For e.g. RefForeignKey, RelatedField provide an instance list."""
 
-        def callback(field: FactoryField, faker: Faker, k: dict[str, Any]) -> Any:
+        def callback(field: FactoryField, context: ModelFactoryContext, k: dict[str, Any]) -> Any:
             min_value = k.pop("min", min)
             max_value = k.pop("max", max)
             return [
-                self.build(faker=faker, **k)
-                for i in range(faker.random_int(min=min_value, max=max_value))
+                self.build(**k)
+                for i in range(context["faker"].random_int(min=min_value, max=max_value))
             ]
 
         return FactoryField(callback=callback)
@@ -70,21 +79,27 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         overwrites: dict[str, Any] | None = None,
         exclude: Collection[str] = (),
         exclude_autoincrement: bool | None = None,
+        callcounts: dict[int, int] | None = None,
     ) -> dict:
         """Underlying function to build the values which are passed into the model as kwargs"""
 
         # hierarchy: parameters < exclude < defaults < kwargs < overwrites
         # when using to_field the same applies to the factory used for this
+        context = model_factory_context.get(None)
 
+        if callcounts is None:
+            callcounts = context["callcounts"] if context else self.meta.callcounts
         if faker is None:
-            faker = self.meta.faker
+            faker = context["faker"] if context else self.meta.faker
         if not parameters:
             parameters = {}
         if not overwrites:
             overwrites = {}
         # calculate the effective exclude_autoincrement value
         if exclude_autoincrement is None:
-            exclude_autoincrement = self.exclude_autoincrement
+            exclude_autoincrement = (
+                context["exclude_autoincrement"] if context else self.exclude_autoincrement
+            )
         if exclude_autoincrement:
             column = self.meta.model.table.autoincrement_column
             if column is not None:
@@ -94,71 +109,91 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         kwargs.update(overwrites)
 
         values: dict[str, Any] = {}
-        # when a field is found (include subfactory pullin)
-        for name, field in self.meta.fields.items():
-            if name in kwargs or name in exclude or field.exclude:
-                continue
-            current_parameters_or_callback = parameters.get(name)
-            # case 1: is string => make a faker callback
-            if isinstance(current_parameters_or_callback, str):
-                callback_name = current_parameters_or_callback
+        if context is None:
+            context = cast(
+                "ModelFactoryContext",
+                ModelFactoryContextImplementation(
+                    faker=faker,
+                    exclude_autoincrement=exclude_autoincrement,
+                    depth=0,
+                    callcounts=callcounts,
+                ),
+            )
+            token = model_factory_context.set(context)
+        else:
+            context = context.copy()
+            context["depth"] += 1
+            token = model_factory_context.set(context)
+        try:
+            # when a field is found (include subfactory pullin)
+            for name, field in self.meta.fields.items():
+                if name in kwargs or name in exclude or field.exclude:
+                    continue
+                current_parameters_or_callback = parameters.get(name)
+                # case 1: is string => make a faker callback
+                if isinstance(current_parameters_or_callback, str):
+                    callback_name = current_parameters_or_callback
 
-                def current_parameters_or_callback(
-                    field: FactoryField,
-                    faker: Faker,
-                    params: dict[str, Any],
-                    _callback_name: str = callback_name,
-                ) -> Any:
-                    return getattr(faker, _callback_name)(**params)
+                    def current_parameters_or_callback(
+                        field: FactoryField,
+                        context: ModelFactoryContext,
+                        params: dict[str, Any],
+                        _callback_name: str = callback_name,
+                    ) -> Any:
+                        return getattr(context["faker"], _callback_name)(**params)
 
-            try:
-                # case 2: callable (also from case 1): execute it with the parameters from the field
-                if callable(current_parameters_or_callback):
-                    params = field.get_parameters(faker=faker)
-                    # special options: can simulate unset or None
-                    randomly_unset = params.pop("randomly_unset", None)
-                    if randomly_unset is not None and randomly_unset is not False:
-                        if randomly_unset is True:
-                            randomly_unset = 50
-                        if faker.pybool(randomly_unset):
-                            raise ExcludeValue
-                    randomly_nullify = params.pop("randomly_nullify", None)
-                    if randomly_nullify is not None and randomly_nullify is not False:
-                        if randomly_nullify is True:
-                            randomly_nullify = 50
-                        if faker.pybool(randomly_nullify):
-                            values[name] = None
-                            continue
-                    values[name] = current_parameters_or_callback(
-                        field,
-                        faker,
-                        params,
-                    )
-                else:
-                    # case 3: parameters are a dict: merge the parameters with the ones of the field
-                    #         and execute the field callback (can be also from mappings)
-                    params = field.get_parameters(
-                        faker=faker,
-                        parameters=current_parameters_or_callback,
-                    )
-                    # special options: can simulate unset or None
-                    randomly_unset = params.pop("randomly_unset", None)
-                    if randomly_unset is not None and randomly_unset is not False:
-                        if randomly_unset is True:
-                            randomly_unset = 50
-                        if faker.pybool(randomly_unset):
-                            raise ExcludeValue
-                    randomly_nullify = params.pop("randomly_nullify", None)
-                    if randomly_nullify is not None and randomly_nullify is not False:
-                        if randomly_nullify is True:
-                            randomly_nullify = 50
-                        if faker.pybool(randomly_nullify):
-                            values[name] = None
-                            continue
-                    values[name] = field(faker=faker, parameters=params)
-            except ExcludeValue:
-                ...
-        values.update(kwargs)
+                try:
+                    # case 2: callable (also from case 1): execute it with the parameters from the field
+                    if callable(current_parameters_or_callback):
+                        params = field.get_parameters(context=context)
+                        # special options: can simulate unset or None
+                        randomly_unset = params.pop("randomly_unset", None)
+                        if randomly_unset is not None and randomly_unset is not False:
+                            if randomly_unset is True:
+                                randomly_unset = 50
+                            if faker.pybool(randomly_unset):
+                                raise ExcludeValue
+                        randomly_nullify = params.pop("randomly_nullify", None)
+                        if randomly_nullify is not None and randomly_nullify is not False:
+                            if randomly_nullify is True:
+                                randomly_nullify = 50
+                            if faker.pybool(randomly_nullify):
+                                values[name] = None
+                                continue
+                        field.inc_callcount()
+                        values[name] = current_parameters_or_callback(
+                            field,
+                            context,
+                            params,
+                        )
+                    else:
+                        # case 3: parameters are a dict: merge the parameters with the ones of the field
+                        #         and execute the field callback (can be also from mappings)
+                        params = field.get_parameters(
+                            context=context,
+                            parameters=current_parameters_or_callback,
+                        )
+                        # special options: can simulate unset or None
+                        randomly_unset = params.pop("randomly_unset", None)
+                        if randomly_unset is not None and randomly_unset is not False:
+                            if randomly_unset is True:
+                                randomly_unset = 50
+                            if faker.pybool(randomly_unset):
+                                raise ExcludeValue
+                        randomly_nullify = params.pop("randomly_nullify", None)
+                        if randomly_nullify is not None and randomly_nullify is not False:
+                            if randomly_nullify is True:
+                                randomly_nullify = 50
+                            if faker.pybool(randomly_nullify):
+                                values[name] = None
+                                continue
+                        field.inc_callcount()
+                        values[name] = field(context=context, parameters=params)
+                except ExcludeValue:
+                    ...
+            values.update(kwargs)
+        finally:
+            model_factory_context.reset(token)
         return values
 
     def build(
@@ -172,6 +207,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         database: Database | None | Literal[False] = None,
         schema: str | None | Literal[False] = None,
         save: bool = False,
+        callcounts: dict[int, int] | None = None,
     ) -> Model:
         """
         When this function is called, automacally will perform the
@@ -212,6 +248,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                 overwrites=overwrites,
                 exclude=exclude,
                 exclude_autoincrement=exclude_autoincrement,
+                callcounts=callcounts,
             )
         )
         # we don't want to trigger loads.
@@ -232,6 +269,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         exclude_autoincrement: bool | None = None,
         database: Database | None | Literal[False] = None,
         schema: str | None | Literal[False] = None,
+        callcounts: dict[int, int] | None = None,
     ) -> Model:
         """
         When this function is called, automacally will perform the

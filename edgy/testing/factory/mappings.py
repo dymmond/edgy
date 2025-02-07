@@ -10,19 +10,21 @@ from .utils import edgy_field_param_extractor, remove_unparametrized_relationshi
 if TYPE_CHECKING:
     import enum
 
-    from faker import Faker
-
     from .fields import FactoryField
-    from .types import FactoryCallback
+    from .types import FactoryCallback, ModelFactoryContext
 
 
-def ChoiceField_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
+def ChoiceField_callback(
+    field: FactoryField, context: ModelFactoryContext, parameters: dict[str, Any]
+) -> Any:
     choices: type[enum.Enum] = field.owner.meta.model.meta.fields[field.name].choices
 
-    return faker.enum(choices)
+    return context["faker"].enum(choices)
 
 
-def ForeignKey_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
+def ForeignKey_callback(
+    field: FactoryField, context: ModelFactoryContext, parameters: dict[str, Any]
+) -> Any:
     from .base import ModelFactory
 
     edgy_field = field.owner.meta.model.meta.fields[field.name]
@@ -35,15 +37,17 @@ def ForeignKey_callback(field: FactoryField, faker: Faker, parameters: dict[str,
     factory = ForeignKeyFactory()
 
     # arm callback
-    def callback(field: FactoryField, faker: Faker, k: dict[str, Any]) -> Any:
+    def callback(field: FactoryField, context: ModelFactoryContext, k: dict[str, Any]) -> Any:
         remove_unparametrized_relationship_fields(target, k, {edgy_field.related_name})
-        return factory.build(faker=faker, **k)
+        return factory.build(**k)
 
     field.callback = callback
-    return field.callback(field, faker, parameters)
+    return field.callback(field, context, parameters)
 
 
-def ManyToManyField_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
+def ManyToManyField_callback(
+    field: FactoryField, context: ModelFactoryContext, parameters: dict[str, Any]
+) -> Any:
     from .base import ModelFactory
 
     edgy_field = field.owner.meta.model.meta.fields[field.name]
@@ -56,21 +60,23 @@ def ManyToManyField_callback(field: FactoryField, faker: Faker, parameters: dict
     factory = ManyToManyFieldFactory()
 
     # arm callback
-    def callback(field: FactoryField, faker: Faker, k: dict[str, Any]) -> Any:
+    def callback(field: FactoryField, context: ModelFactoryContext, k: dict[str, Any]) -> Any:
         remove_unparametrized_relationship_fields(target, k, {edgy_field.related_name})
         min_value = k.pop("min", 0)
         max_value = k.pop("max", 10)
         return [
-            factory.build(faker=faker, **k)
-            for i in range(faker.random_int(min=min_value, max=max_value))
+            factory.build(**k)
+            for i in range(context["faker"].random_int(min=min_value, max=max_value))
         ]
 
     field.callback = callback
 
-    return field.callback(field, faker, parameters)
+    return field.callback(field, context, parameters)
 
 
-def RefForeignKey_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
+def RefForeignKey_callback(
+    field: FactoryField, context: ModelFactoryContext, parameters: dict[str, Any]
+) -> Any:
     from .base import ModelFactory
 
     edgy_model = field.owner.meta.model
@@ -96,21 +102,23 @@ def RefForeignKey_callback(field: FactoryField, faker: Faker, parameters: dict[s
         if field_name not in model_fields:
             model_ref_exclude.add(field_name)
 
-    def callback(field: FactoryField, faker: Faker, k: dict[str, Any]) -> Any:
+    def callback(field: FactoryField, context: ModelFactoryContext, k: dict[str, Any]) -> Any:
         remove_unparametrized_relationship_fields(factory_model, k, {field_excluded})
         min_value = k.pop("min", 0)
         max_value = k.pop("max", 10)
         return [
-            model_ref(**factory.build_values(faker=faker, **k))
-            for i in range(faker.random_int(min=min_value, max=max_value))
+            model_ref(**factory.build_values(**k))
+            for i in range(context["faker"].random_int(min=min_value, max=max_value))
         ]
 
     field.callback = callback
 
-    return field.callback(field, faker, parameters)
+    return field.callback(field, context, parameters)
 
 
-def BinaryField_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
+def BinaryField_callback(
+    field: FactoryField, context: ModelFactoryContext, parameters: dict[str, Any]
+) -> Any:
     edgy_field = field.owner.meta.model.meta.fields[field.name]
     min_value = parameters.pop("min", None)
     if min_value is not None:
@@ -122,12 +130,14 @@ def BinaryField_callback(field: FactoryField, faker: Faker, parameters: dict[str
         max_value = getattr(edgy_field, "max_length", max_value)
     if max_value is None:
         max_value = 1024
-    parameters.setdefault("length", faker.random_int(min=min_value, max=max_value))
+    parameters.setdefault("length", context["faker"].random_int(min=min_value, max=max_value))
     length = parameters.pop("length")
-    return faker.binary(length)
+    return context["faker"].binary(length)
 
 
-def FileField_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
+def FileField_callback(
+    field: FactoryField, context: ModelFactoryContext, parameters: dict[str, Any]
+) -> Any:
     edgy_field = field.owner.meta.model.meta.fields[field.name]
     min_value = parameters.pop("min", None)
     if min_value is not None:
@@ -139,42 +149,62 @@ def FileField_callback(field: FactoryField, faker: Faker, parameters: dict[str, 
         max_value = getattr(edgy_field, "max_length", max_value)
     if max_value is None:
         max_value = 1024
-    parameters.setdefault("length", faker.random_int(min=min_value, max=max_value))
+    parameters.setdefault("length", context["faker"].random_int(min=min_value, max=max_value))
     length = parameters.pop("length")
-    return File(faker.binary(length), name=faker.file_name(**parameters))
+    return File(context["faker"].binary(length), name=context["faker"].file_name(**parameters))
 
 
-def ImageField_callback(field: FactoryField, faker: Faker, parameters: dict[str, Any]) -> Any:
+def ImageField_callback(
+    field: FactoryField, context: ModelFactoryContext, parameters: dict[str, Any]
+) -> Any:
     parameters.setdefault(
         "size",
         (
-            faker.random_int(min=1, max=1024),
-            faker.random_int(min=1, max=1024),
+            context["faker"].random_int(min=1, max=1024),
+            context["faker"].random_int(min=1, max=1024),
         ),
     )
-    return faker.image(**parameters)
+    return context["faker"].image(**parameters)
 
 
 DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
     "IntegerField": edgy_field_param_extractor(
         "random_int",
         remapping={
-            "gt": ("min", lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) - 1),
-            "lt": ("max", lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) + 1),
+            "gt": (
+                "min",
+                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name) - 1,
+            ),
+            "lt": (
+                "max",
+                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name) + 1,
+            ),
         },
     ),
     "BigIntegerField": edgy_field_param_extractor(
         "random_int",
         remapping={
-            "gt": ("min", lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) - 1),
-            "lt": ("max", lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) + 1),
+            "gt": (
+                "min",
+                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name) - 1,
+            ),
+            "lt": (
+                "max",
+                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name) + 1,
+            ),
         },
     ),
     "SmallIntegerField": edgy_field_param_extractor(
         "random_int",
         remapping={
-            "gt": ("min", lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) - 1),
-            "lt": ("max", lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) + 1),
+            "gt": (
+                "min",
+                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name) - 1,
+            ),
+            "lt": (
+                "max",
+                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name) + 1,
+            ),
         },
     ),
     "DecimalField": edgy_field_param_extractor(
@@ -183,11 +213,13 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
             # TODO: find better definition
             "gt": (
                 "min",
-                lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) - 0.0000000001,
+                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name)
+                - 0.0000000001,
             ),
             "lt": (
                 "max",
-                lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) + 0.0000000001,
+                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name)
+                + 0.0000000001,
             ),
         },
     ),
@@ -197,11 +229,13 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
             # TODO: find better definition
             "gt": (
                 "min",
-                lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) - 0.0000000001,
+                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name)
+                - 0.0000000001,
             ),
             "lt": (
                 "max",
-                lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name) + 0.0000000001,
+                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name)
+                + 0.0000000001,
             ),
         },
     ),
@@ -223,7 +257,7 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
         remapping={
             "max_length": (
                 "max_nb_chars",
-                lambda edgy_field, attr_name, faker: getattr(edgy_field, attr_name),
+                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name),
             ),
         },
     ),
