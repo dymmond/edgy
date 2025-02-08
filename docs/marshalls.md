@@ -173,6 +173,7 @@ the remaining object, functions, attributes and operations, are.
 ```
 
 ## Including additional context
+
 In certain scenarios, it is necessary to provide additional context to the marshall. Additional context can be provided by passing a context argument when instantiating the marshall.
 
 **Example**
