@@ -14,6 +14,7 @@ hide:
   other parts of the codebase and apply them directly as dependencies.
 - New `template` to `edgy init` migrations for [sequencial](./migrations/migrations.md#templates) migration file names.
 - Sequences like calls for ModelFactory.
+- `context` as new parameter to the Marshalls.
 
 ### Changed
 
