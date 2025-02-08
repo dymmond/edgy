@@ -172,6 +172,36 @@ the remaining object, functions, attributes and operations, are.
 {!> ../docs_src/marshalls/method_field.py !}
 ```
 
+## Including additional context
+
+In certain scenarios, it is necessary to provide additional context to the marshall. Additional context can be provided by passing a context argument when instantiating the marshall.
+
+**Example**
+
+```python
+class UserMarshall(Marshall):
+    marshall_config: ConfigMarshall = ConfigMarshall(model=User, fields=["name", "email"],)
+    additional_context: fields.MarshallMethodField = fields.MarshallMethodField(field_type=dict[str, Any])
+
+    def get_additional_context(self, instance: edgy.Model) -> dict[str, Any]:
+        return self.context
+
+
+data = {"name": "Edgy", "email": "edgy@example.com"}
+marshall = UserMarshall(**data, context={"foo": "bar"})
+marshall.model_dump()
+```
+
+And the result will be:
+
+```json
+{
+    "name": "Edgy",
+    "email": "edgy@example.com",
+    "additional_context": {"foo": "bar"}
+}
+```
+
 ## `save()`
 
 Since the [Marshall](#marshall) is also a Pydantic base model, the same as Edgy, there may be some
