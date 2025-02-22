@@ -1,6 +1,5 @@
 import edgy
 
-from pydantic import ValidationError
 from argon2 import PasswordHasher
 
 hasher = PasswordHasher()
