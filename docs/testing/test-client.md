@@ -1,23 +1,16 @@
-# Test Client
+# Test Client: Streamlining Database Testing in Edgy
 
-I'm sure that you already faced the problem with testing your database anmd thinking about a way
-of making sure the tests against models would land in a specific targeted database instead of the
-one used for development, right?
+Have you ever struggled with testing your database interactions, ensuring your model tests target a specific test database instead of your development database? This is a common challenge, often requiring significant setup. Edgy addresses this with its built-in `DatabaseTestClient`, simplifying your database testing workflow.
 
-Well, at least I did and it is annoying the amount of setup required to make it happen and for that
-reason, Edgy provides you already one client that exctly that job for you.
+Before proceeding, ensure you have the Edgy test client installed with the necessary dependencies:
 
-Before continuing, make sure you have the Edgy test client installed with the needed
-requirements.
-
-```
+```bash
 $ pip install edgy[test]
 ```
 
 ## DatabaseTestClient
 
-This is the client you have been waiting for. This object does a lot of magic for you and will
-help you manage those stubborn tests that should land on a `test_` database.
+The `DatabaseTestClient` is designed to streamline database testing, automating the creation and management of test databases.
 
 ```python
 from edgy.testclient import DatabaseTestClient
@@ -25,73 +18,62 @@ from edgy.testclient import DatabaseTestClient
 
 ### Parameters
 
-* **url** - The database url for your database. This can be in a string format or in a
-`databases.DatabaseURL`.
+* **url**: The database URL, either as a string or a `databases.DatabaseURL` object.
 
     ```python
     from databases import DatabaseURL
     ```
 
-* **force_rollback** - This will ensure that all database connections are run within a transaction
-that rollbacks once the database is disconnected.
+* **force_rollback**: Ensures all database operations are executed within a transaction that rolls back upon disconnection.
 
     <sup>Default: `False`</sup>
 
-* **lazy_setup** - This sets up the db first up on connect not in init.
+* **lazy_setup**: Sets up the database on the first connection, rather than during initialization.
 
     <sup>Default: `True`</sup>
 
-
-* **use_existing** - Uses the existing `test_` database if previously created and not dropped.
-
-    <sup>Default: `False`</sup>
-
-* **drop_database** - Ensures that after the tests, the database is dropped.
+* **use_existing**: Uses an existing test database if it was previously created and not dropped.
 
     <sup>Default: `False`</sup>
 
-* **test_prefix** - Allow a custom test prefix or leave empty to use the url instead without changes.
+* **drop_database**: Drops the test database after the tests have completed.
+
+    <sup>Default: `False`</sup>
+
+* **test_prefix**: Allows a custom test database prefix. Leave empty to use the URL's database name with a default prefix.
 
     <sup>Default: `testclient_default_test_prefix` (defaults to `test_`)</sup>
 
-### Configuration via Environment
+### Configuration via Environment Variables
 
-Most parameters defaults can be changed via capitalized environment names with `EDGY_TESTCLIENT_`.
+Most default parameters can be overridden using capitalized environment variables prefixed with `EDGY_TESTCLIENT_`.
 
-E.g. `EDGY_TESTCLIENT_DEFAULT_PREFIX=foobar` or `EDGY_TESTCLIENT_FORCE_ROLLBACK=true`.
+For example: `EDGY_TESTCLIENT_DEFAULT_PREFIX=foobar` or `EDGY_TESTCLIENT_FORCE_ROLLBACK=true`.
 
-This is used for the tests.
+This is particularly useful for configuring tests in CI/CD environments.
 
-### How to use it
+### Usage
 
-This is the easiest part because is already very familiar with the `Database` used by Edgy. In
-fact, this is an extension of that same object with a lot of testing flavours.
+The `DatabaseTestClient` is designed to be familiar to users of Edgy's `Database` object, as it extends its functionality with testing-specific features.
 
-Let us assume you have a database url like this following:
+Consider a database URL like this:
 
-```shell
+```bash
 DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:5432/my_db"
 ```
 
-We know the database is called `my_db`, right?
+In this case, the database name is `my_db`. When using the `DatabaseTestClient`, it automatically targets a test database named `test_my_db`.
 
-When using the `DatabaseTestClient`, the client will ensure the tests will land on a `test_my_db`.
-
-Pretty cool, right?
-
-Nothing like an example to see it in action.
+Here's an example of how to use it in a test:
 
 ```python title="tests.py" hl_lines="14"
 {!> ../docs_src/testing/testclient/tests.py !}
 ```
 
-#### What is happening
+#### Explanation
 
-Well, this is rather complex test and actually a real one from Edgy and what you can see is
-that is using the `DatabaseTestClient` which means the tests against models, fields or whatever
-database operation you want will be on a `test_` database.
+This example demonstrates a test using `DatabaseTestClient`. The client ensures that all database operations within the test are performed on a separate test database, `test_my_db` in this case.
 
-But you can see a `drop_database=True`, so what is that?
+The `drop_database=True` parameter ensures that the test database is deleted after the tests have finished running, preventing the accumulation of test databases.
 
-Well `drop_database=True` means that by the end of the tests finish running, drops the database
-into oblivion.
+This approach provides a clean and isolated testing environment, ensuring that your tests do not interfere with your development or production databases.

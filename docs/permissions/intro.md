@@ -1,96 +1,93 @@
-# Permissions
+# Permissions in Edgy
 
-Handling permissions is one of the fundamental needs in the database world. Some approaches rely on database users, but this method lacks portability and the flexibility of managing users as a standard database table.
+Managing permissions is a crucial aspect of database-driven applications. Edgy provides a flexible and portable way to handle permissions, using database tables rather than relying solely on database users.
 
 ## Permission Objects
 
+Edgy's permission system is designed to accommodate various permission structures. Here's a breakdown of the key components:
+
 ### Users
 
-Users serve as the primary entry point in most applications. Permissions require a user-related class, which is referenced via a ManyToMany field named `users`.
+Users are the central entities in most applications. Permissions are typically associated with users through a ManyToMany field named `users`.
 
 ### Groups
 
-Groups help organize permissions into sets that can be applied to users. In the permission model, groups are optional. When used, the permission object must include a ManyToMany field named `groups`.
+Groups allow you to organize permissions into sets that can be assigned to users. This feature is optional, but if used, the permission model must include a ManyToMany field named `groups`.
 
 ### Model Names
 
-Model names serve as scope limiters for permissions. Instead of granting users unrestricted access, they can be restricted to specific models, such as blogs. Like groups, this feature is optional.
+Model names provide a way to scope permissions to specific models (e.g., blogs, articles). This feature is optional and is enabled by including a `CharField` or `TextField` named `name_model`.
 
-Model names are enabled using a `CharField` or `TextField` named `name_model`. This naming convention is necessary because Pydantic reserves the `model_` prefix. If you only require object-specific permissions and do not want an additional field, you can check model names against objects instead.
+**Note:** The `model_` prefix is reserved by Pydantic, so `name_model` is used instead. If you only need object-specific permissions, you can check model names against objects directly.
 
 ### Objects
 
-Permissions can be assigned directly to specific object instances via ContentTypes, enabling per-object permissions. This feature is optional. However, if `name_model` is not specified, permissions are checked against `model_names` in the ContentType.
+Permissions can be assigned to specific object instances using ContentTypes, enabling per-object permissions. This is an optional feature. If `name_model` is not specified, permissions are checked against `model_names` in the ContentType.
 
-To enable this feature, include a `ForeignKey` named `obj` pointing to ContentType.
+To enable this, include a `ForeignKey` named `obj` that points to ContentType.
 
 ## Usage
 
-Permission models automatically detect their available features. This is why certain field names are strictly enforced.
+Edgy's permission models automatically detect the features you've enabled based on the presence of specific fields. This is why strict field naming conventions are important.
 
-There are three additional manager methods:
+Edgy provides three additional manager methods for working with permissions:
 
-- `permissions_of(sources)`
-- `users(...)`
-- `groups(...)`
+-   `permissions_of(sources)`
+-   `users(...)`
+-   `groups(...)`
 
 ### Parameters for `users` and `groups`
 
-Except for `permissions`, all parameters are optional:
+The `users` and `groups` methods accept the following parameters (except for `permissions`, all are optional):
 
-- `permissions` (str | Sequence[str]) – The names of the permissions.
-- `model_names` (str | Sequence[str] | None) – Model names, available only if `name_model` or `obj` is present.
-- `objects` (Object | Sequence[Object] | None) – Objects associated with permissions.
-- `include_null_model_name` (bool, default: True) – When `model_names` is not `None`, automatically adds a check for a `null` model name.
-- `include_null_object` (bool, default: True) – When `objects` is not `None`, automatically adds a check for a `null` model name.
+-   `permissions` (str | Sequence[str]): The names of the permissions to check.
+-   `model_names` (str | Sequence[str] | None): Model names, used if `name_model` or `obj` is present.
+-   `objects` (Object | Sequence[Object] | None): Objects associated with the permissions.
+-   `include_null_model_name` (bool, default: True): Automatically includes a check for a `null` model name when `model_names` is not `None`.
+-   `include_null_object` (bool, default: True): Automatically includes a check for a `null` object when `objects` is not `None`.
 
 ### Why Include `include_null_model_name` and `include_null_object`?
 
-If you want to broaden the scope of a permission, you can set `obj` or `name_model` to `None`, effectively untethering the permission from specific objects or models.
+Setting `obj` or `name_model` to `None` allows you to broaden the scope of a permission, making it applicable to all objects or models.
 
-## Quickstart
+## Quickstart Example
+
+Here's a basic example of a permission model:
 
 ```python
 {!> ../docs_src/permissions/quickstart.py !}
 ```
 
-Although not strictly necessary, it is recommended to use `unique_together` for the fields that identify a Permission.
+It's recommended to use `unique_together` for the fields that uniquely identify a permission.
 
-## Advanced
+## Advanced Example
 
-Here is an advanced example with all possible fields configured.
+This example demonstrates a permission model with all possible fields configured:
 
 ```python
 {!> ../docs_src/permissions/advanced.py !}
 ```
 
-## Advanced with primary keys
+## Advanced Example with Primary Keys
 
-Edgy has highly flexible overwrite logic. Instead of using `unique_together`, the following code can be used:
+Edgy's flexible overwrite logic allows you to use primary keys instead of `unique_together`:
 
 ```python
 {!> ../docs_src/permissions/primary_key.py !}
 ```
 
-However, permissions cannot change their scope this way, and there is a slight overhead since primary keys are used for foreign keys.
+Using primary keys in this way prevents permissions from changing their scope and introduces a slight overhead due to the use of primary keys as foreign keys.
 
 Alternatively, you can overwrite `name` with a primary key field, which removes the implicit ID.
 
-## Pratical example
+## Practical Example: Automating Permission Management
 
-This is for explanatory reasons and the code **must** be changed to fit your needs, so let us simply imagine
-we want to build a `Permission` object class that manages the `assign_permissions` for you.
-
-You could do something like this:
+This example demonstrates how to create a `Permission` object class that automates permission assignment.
 
 ```python
 {!> ../docs_src/permissions/example.py !}
 ```
 
-The above example doesn't mean you should blindly copy but offers a simple idea how you could automate
-your permissions by unifying in one place.
+This example shows how to automate permission management by consolidating permission-related logic in a single class. This allows you to create, manage, and revoke permissions efficiently.
 
-This allows you to create permissions in bulk or simply simple permissions as well as revoke them
-if necessary.
-
-Do you need this? Probably not but its just an example.
+**Note:** This example is for illustrative purposes and should be adapted to fit your specific application requirements.

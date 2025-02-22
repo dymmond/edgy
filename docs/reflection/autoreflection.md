@@ -1,102 +1,89 @@
 # Automatic Reflection
 
-Let's reflect reflection:
+Automatic reflection in Edgy allows you to dynamically generate models from existing database tables. This is particularly useful for creating procedural interfaces or integrating with legacy databases.
 
-we can reflect tables from database in a model. The next step is to retrieve the tables
-and create reflection models from it automatically. This can be useful to create interfaces procedural.
-
-For doing so we have selections via Pattern Models:
-
-They contain a Meta with the regex attribute and generate via the template string or function a new ReflectionModel:
-
+Edgy provides `AutoReflectModel` to automate this process, using pattern matching to select tables and customizable templates to generate model names.
 
 ```python
 from edgy.contrib.autoreflection import AutoReflectModel
 
 class Reflected(AutoReflectModel):
     class Meta:
-        include_pattern = ".*"  # regex or string, default .*. Matches against the tablename
-        exclude_pattern = None  # regex or string, default None (disabled). Matches against the tablename
-        template = "{modelname}{tablename}"  # string or function with arguments tablename, modelname, tablekey
-        databases = (None,)  # Restrict reflection to databases. None: main database of registry, string extra databases of registry
-        schemes = (None,) # Which schemes to checks
+        include_pattern = ".*"  # Regex or string, matches table names (default: ".*")
+        exclude_pattern = None  # Regex or string, excludes table names (default: None)
+        template = "{modelname}{tablename}"  # String or function for model name generation
+        databases = (None,)  # Databases to reflect (None: main database, string: extra database)
+        schemes = (None,) # Schemes to check for tables.
 ```
 
-Note: when a reflected model is generated the meta is switched in the copy to a regular MetaInfo.
+When a reflected model is generated, its `Meta` class is converted to a regular `MetaInfo`.
 
-## Meta parameters
+## Meta Parameters Explained
 
-Note: we use the table name not the table key.
+Understanding the `Meta` parameters is crucial for effective automatic reflection.
 
-What is the difference:
+**Key Concepts:**
 
-table name: `tablename`
-table key: `schema.tablename`
+* **Table Name:** The actual name of the table in the database.
+* **Table Key:** The fully qualified name of the table, including the schema (e.g., `schema.tablename`).
 
-That is because edgy handle schemes a little bit different:
+Edgy handles schemas differently, allowing a model to exist in multiple schemas, with explicit schema selection during queries.
 
-In edgy a model can exist in multiple schemes and the scheme is explicit selected.
+### Inclusion & Exclusion Patterns
 
-### Inclusion & Exclusion patterns
+These parameters use regular expressions to filter tables for reflection.
 
-Here we can specify patterns against which a regex is checked. By default the `include_pattern` is set to
-`.*` which matches all tablenames and the `exclude_pattern` is disabled.
-
-The `include_pattern` will convert all falsy values to the match all, while the exclude_pattern will be really disabled.
+* **`include_pattern`:** Matches table names to include. Defaults to `.*` (all tables). Falsy values are converted to the match-all pattern.
+* **`exclude_pattern`:** Matches table names to exclude. Defaults to `None` (disabled).
 
 ### Template
 
-Can be a function which takes the tablename as parameter and is required to return a string.
+The `template` parameter controls how model names are generated. It can be:
 
-Or it can be a format string with the possible parameters:
-
-- tablename: the name of the table
-- tablekey: the key (name with scheme) of the table
-- modelname: the model name
+* **A function:** Takes the table name as an argument and returns a string.
+* **A format string:** Uses placeholders like `{tablename}`, `{tablekey}`, and `{modelname}`.
 
 ### Databases
 
-In the registry you specify a main database (which is here None) and via the extra dictionary multiple named databases.
-The extra databases can be selected via their name while the main can be selected by `None`.
+The `databases` parameter specifies which databases to reflect.
 
-This controls from which database the models are reflected. This is useful to extract data from other databases and to use it in the main application.
+* **`None`:** The main database defined in the registry.
+* **String:** The name of an extra database defined in the registry's `extra` dictionary.
 
-By default the autoreflection only uses the main databases.
-
+By default, only the main database is reflected.
 
 ### Schemes
 
-This parameter is providing the schemes which should be scanned for models.
+The `schemes` parameter specifies which database schemas to scan for tables.
 
-This parameter is required when the models which should be reflected are in a different schema.
+This is required when the tables to be reflected are located in a schema other than the default.
 
+## Examples: Practical Applications of Automatic Reflection
 
-## Examples
+Let's explore some practical examples of how automatic reflection can be used.
 
-### Procedural interface
+### Procedural Interface Generation
 
-To build an application there is also a data driven approach. Instead of defining relations and fields by hand
-they are all automatically generated.
+Imagine you need to create an application with a data-driven approach, where models are generated automatically from existing tables.
 
-For creating the tables we can use:
+First, create the tables using:
 
 ```python title="source.py"
 {!> ../docs_src/reflection/autoreflection/datadriven_source.py !}
 ```
 
-Then we can reflect:
+Then, reflect the tables into models:
 
 ```python title="procedural.py"
 {!> ../docs_src/reflection/autoreflection/datadriven.py !}
 ```
 
+### Integrating with Legacy Databases
 
-### Legacy databases
-
-
-Suppose you have a new modern database, a legacy database and an ancient database which very few capabilities from which both you need data.
-In the legacy and ancient database, you are only allowed to update some specific fields.
+Suppose you have a modern database, a legacy database, and an ancient database. You need to access data from all three, but you're only allowed to update specific fields in the legacy and ancient databases.
 
 ```python title="legacy.py"
 {!> ../docs_src/reflection/autoreflection/legacy.py !}
 ```
+
+In this example, `LegacyModel` and `AncientModel` are automatically generated from the legacy and ancient databases, allowing you to access their data while adhering to their update restrictions.

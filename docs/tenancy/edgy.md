@@ -1,55 +1,42 @@
 # Tenancy
 
-Sometimes you might want to query a different database or schema because might be convenient to
-get data from two different sources.
+In scenarios where you need to query data from different databases or schemas, Edgy provides robust support for multi-tenancy. This is useful when data is segregated for different users or purposes.
 
-Querying two different databases or schemas its not so uncommon as you might think and to this
-we can sometimes refer to **multi-tenancy** or simply two different data sources.
+## What is Multi-Tenancy?
 
-## What is multi-tenancy
+Multi-tenancy architectures commonly fall into three categories:
 
-When implementing multi tenancy architecture there are many factors to consider and there are three common ways:
+1.  **Shared Schemas:** All user data resides in a single schema, differentiated by unique IDs. This approach may have limitations with data privacy regulations like GDPR.
+2.  **Shared Database, Different Schemas:** User data is separated into distinct schemas within the same database.
+3.  **Different Databases:** User data is stored in completely separate databases.
 
-1. **Shared schemas** - The data of all users are shared within the same schema and filtered by common IDs or whatever that is unique to the platform.
-This is not so great for GDPR (Europe) or similar in different countries.
-2. **Shared database, different Schemas** - The user's data is split by different schemas but live on the same database.
-3. **Different databases** - The user's data or any data live on different databases.
+Edgy offers three primary methods for implementing multi-tenancy:
 
-Edgy has three different ways of achieving this in a simple and clean fashion.
+1.  [Using](#using) in the queryset.
+2.  [Using with Database](#using-with-database) in the queryset.
+3.  [With Tenant](#set-tenant) for global tenant context.
 
-1. Using the [using](#using) in the queryset.
-2. Using the [using_with_db](#what-is-multi-tenancy) in the queryset.
-3. Using the [with_tenant](#set-tenant) as global.
+Edgy also provides helpers for managing schemas, as described in the [Schemas section of the Registry documentation][schemas].
 
-You can also use the [Edgy helpers for schemas][schemas] if you need to use it.
+### Schema Creation
 
-### The schema creation
-
-Edgy by default provides a functionality that allows the creation of schemas in an easy way by
-calling `create_schema` in the tenancy module.
+Edgy simplifies schema creation with the `create_schema` utility function:
 
 ```python
 from edgy.core.tenancy.utils import create_schema
 ```
 
-This function is very powerful and yet simple to use and allows the creation of schemas based
-on a given registry.
-
-This means, if you have different registries pointing to different databases, you only need to
-provide the `registry` instance and some extra parameters to generate a brand new schema.
+This function allows you to create schemas based on a given registry, enabling schema creation across different databases.
 
 #### Parameters
 
-* **registry** - An instance of a [Registry](../registry.md).
-* **schema_name** - The name for the new schema.
-* **models** - Optional dictionary containing the name of the Edgy Model as key and the model
-class as value. The reason for being optional its because if not provided, it will generate the
-tables from the `models` of the `registry` object. This allows the flexibility of you manipulating
-what tables should be passed into the new schema.
-* **if_not_exists** - If True, the schema will be created only if it does not already exist. Defaults to False.
-* **should_create_tables** - If True, tables will be created within the new schema. Defaults to False.
+* **registry:** An instance of a [Registry](../registry.md).
+* **schema_name:** The name of the new schema.
+* **models:** An optional dictionary mapping Edgy model names to model classes. If not provided, tables are generated from the registry's models.
+* **if_not_exists:** If `True`, the schema is created only if it doesn't exist. Defaults to `False`.
+* **should_create_tables:** If `True`, tables are created within the new schema. Defaults to `False`.
 
-**Example**
+**Example:**
 
 ```python
 import edgy
@@ -69,192 +56,124 @@ await create_schema(
 
 ### Using
 
-This is probably the one that is more commonly used and probably the one you will be using more
-often when querying different schemas or databases.
+The `using` method allows you to specify a schema for a specific query, overriding the default schema set in the registry.
 
-The using is simply an instruction telling to ***use this schema*** to query the data instead of
-the default set in the [registry][registry].
+**Parameters:**
 
-**Parameters**:
+* **schema:** A string representing the schema name.
 
-* **schema** - A string parameter with the name of the schema to query.
-
-The syntax is quite simple.
+**Syntax:**
 
 ```python
 <Model>.query.using(schema=<SCHEMA-NAME>).all()
 ```
 
-This is not limited to the `all()` at all, you can use any of the available [query types](../queries/queries.md)
-as well.
+This method can be used with any query type, not just `all()`.
 
-#### Example
+**Example:**
 
-Let us assume we have two different schemas inside the same database and those schemas have a table
-called `User`.
-
-* The schema `default` - The one that is automatically used if no schema is specified in the [registry][registry].
-* The schema `other` - The one we also want to query.
+Consider two schemas, `default` and `other`, each containing a `User` table.
 
 ```python
 {!> ../docs_src/tenancy/using/schemas.py !}
 ```
 
-Now we want to query the users from each schema.
-
-**Querying the default**
-
-As per normal approach, the query looks like this.
+**Querying the default schema:**
 
 ```python
 User.query.all()
 ```
 
-**Querying the main**
-
-Query the users table from the `main` schema.
+**Querying the `main` schema:**
 
 ```python
 User.query.using(schema='main').all()
 ```
 
-And that is it, really. Using its a simple shortcut that allows querying different schemas
-without a lot of boilerplate.
+### Using with Database
 
-### Using with database
-
-Now here it is where the things get interesting. What if you need/want to query a schema but from
-a different database instead? Well, that is possible with the use of the `using_with_db`.
+The `using_with_db` method allows you to query a schema in a different database.
 
 {!> ../docs_src/shared/extra.md !}
 
+### Set Tenant
 
-### Set tenant
-
-This is another way to create a global `tenant` for your application. Instead if [using](#using) or
-[using_with_db](#using-with-database) you simply want to make sure that in your application you
-want every request for a specific `tenant` to always hit their corresponding tenant data.
-
-This is specially useful for multi-tenant applications where your tenant users will only see their
-own data.
-
-To use the `with_tenant` you can import it via:
+The `with_tenant` context manager sets a global tenant context for your application, ensuring all queries within the context target the specified tenant's data.
 
 ```python
 from edgy.core.db import with_tenant
 ```
 
 !!! Tip
-    Use the `with_tenant` in things like application middlewares or interceptors, right before
-    reaching the API.
+    Use `with_tenant` in middleware or interceptors to set the tenant context before API requests.
 
 !!! Warning
-    There is a function named `set_tenant`. Because it doesn't set the scope correctly its use is not recommended and it is deprecated.
+    The `set_tenant` function is deprecated and should not be used.
 
-#### Practical case
+#### Practical Case
 
-The `with_tenant` can be somehow confusing without a proper example so let us run one 😁.
+Let's illustrate `with_tenant` with an Esmerald application example.
 
-As usual, for this example [Esmerald][esmerald] will be used. This can be applied to any framework
-of your choice of course.
+**Building:**
 
-**What are we building**:
-
-- [Models](#models) - Some models that will help us out mapping a user with a tenant.
-- [Middleware](#middleware) - Intercept the request and **set the corresponding tenant**.
-- [API](#api) - The API that returns the data for a given tenant.
+* [Models](#models): Define models for tenants, users, and products.
+* [Middleware](#middleware): Intercept requests and set the tenant context.
+* [API](#api): Create an API to retrieve tenant-specific data.
 
 ##### Models
 
-Let us start with some models where we have a `Tenant`, a `User` model as well as a `Product`
-where we will be adding some data for different tenants.
-
-The `TenantUser` model will serve as the link between a database schema (tenant) and the `User`.
-
-We will want to exclude some models from being created in every schema. The `Tenant` on save it will
-generate the `schema` for a user in the database and it will automatically generate the database
-models.
-
-!!! Warning
-    This is for explanation purposes, just do in the way you see fit.
+Define models to represent tenants, users, and products:
 
 ```python
 {!> ../docs_src/tenancy/example/models.py !}
 ```
 
-This is a lot to unwrap is it? Well, that was explained [before](#models) at the top and this is just
-the declaration of the models for some general purposes.
+The `TenantUser` model links database schemas to users.
 
-###### Generate example data
+##### Generate Example Data
 
-Now it is time to generate some example data and populate the tables previously created.
+Populate the tables with example data:
 
 ```python
 {!> ../docs_src/tenancy/example/data.py !}
 ```
 
-We now have `models` and mock data for those. You will realise that we created a `user` inside the
-`shared` database (no schema associated) and one specifically inside the newly `edgy` schema.
-
 ##### Middleware
 
-It is time to create a [middleware][middleware] that will take advantage of our new models and
-tenants and **set the tenant** automatically.
-
-The middleware will receive some headers with the tenant information and it will lookup if the
-tenant exist.
-
-!!! Danger
-    Do not use this example in production, the way it is done it is not safe. A real lookup example
-    would need more validations besides a direct headers check.
+Create middleware to intercept requests and set the tenant context:
 
 ```python hl_lines="7 29 34"
 {!> ../docs_src/tenancy/example/middleware.py !}
 ```
 
-Now this is getting somewhere! As you could now see, this is where we take advantage of the
-[with_tenant](#set-tenant).
-
-In the middleware, the tenant is intercepted and all the calls in the API will now query **only**
-the tenant data, which means that **there is no need for `using` or `using_with_db` anymore**.
+The `with_tenant` context manager sets the tenant context for all API calls.
 
 ##### API
 
-Now it is time to simply create the API that will read the [created products](#generate-example-data)
-from the database and assemble everything.
-
-This will create an [Esmerald][esmerald] application, assemble the `routes` and add the
-[middleware](#middleware) created in the previous step.
+Create an Esmerald API to retrieve product data:
 
 ```python hl_lines="25"
 {!> ../docs_src/tenancy/example/api.py !}
 ```
 
-###### Query the API
+##### Query the API
 
-If you query the API, you should have similar results to this:
+Querying the API should return data corresponding to the specified tenant:
 
 ```python
 {!> ../docs_src/tenancy/example/query.py !}
 ```
 
-The [data generated](#generate-example-data) for each schema (`shared` and `edgy`) should match
-the response total returned.
+##### Tenant Only Models
 
-
-###### Tenant only models
-
-By default a table will be generated for the non-tenancy db schema. If you don't want this,
-you can set the flag in the meta of the tenant model `register_default` to False.
+To prevent models from being created in the non-tenant schema, set `register_default` to `False` in the model's Meta.
 
 ##### Notes
 
-As you could see in the previous step-by=step example, using the [with_tenant](#set-tenant) can be
-extremely useful mostrly for those large scale applications where multi-tenancy is a **must** so
-you can actually take advantage of this.
+The `with_tenant` context manager is particularly useful for large-scale multi-tenant applications, simplifying tenant data management.
 
 [registry]: ../registry.md
 [schemas]: ../registry.md#schemas
 [using_with_db_registry]: ../registry.md#extra
-[esmerald]: https://esmerald.dev
-[middleware]: https://esmerald.dev/middleware
+[esmerald]: [https://esmerald.dev](https://esmerald.dev)
+[middleware]: [https://esmerald.dev/middleware](https://esmerald.dev/middleware)

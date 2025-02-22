@@ -1,70 +1,55 @@
 # Reflection
 
-When working for a big project, sometimes new, sometimes legacy, you might face cases where there
-is already an existing database with tables and views and you simply would like to reflect them
-into your code by representation without the need of creating new ones.
+In large projects, especially those with legacy databases, you often need to represent existing database tables and views in your code without recreating them. Edgy's reflection feature provides a solution for this.
 
-This is where Edgy reflection comes in.
+## What is Reflection?
 
-## What is reflection
+Reflection involves reading existing database **tables and views** and representing them as models in your code, effectively mirroring their structure.
 
-Reflection means the opposite of creating the [models](../models.md), meaning, reading
-**tables and views** from an existing back into your code.
+Let's illustrate with an example.
 
-Let us see an example.
-
-Imagine you have the following table generated into the database.
+Suppose you have a `users` table in your database, created using the following Edgy model:
 
 ```python
 {!> ../docs_src/reflection/model.py !}
 ```
 
-This will create a table called `users` in the database as expected.
+This code snippet creates a `users` table in the database.
 
 !!! Note
-    We use the previous example to generate a table for explanation purposes. If you already
-    have tables in a given db, you don't need this.
+    This example is for demonstration purposes. If you already have tables in your database, you don't need to create them again.
 
-Now you want to reflect the existing table `users` from the database into your models (code).
+Now, you want to reflect this existing `users` table into your Edgy models:
 
 ```python hl_lines="8"
 {!> ../docs_src/reflection/reflect.py !}
 ```
 
-What is happening is:
+Here's what happens:
 
-* The `ReflectModel` is going to the database.
-* Reads the existing tables.
-* Verifies if there is any `users` table name.
-* Converts the `users` fields into Edgy model fields.
+* `ReflectModel` connects to the database.
+* It reads the existing tables.
+* It identifies the `users` table.
+* It converts the `users` table columns into Edgy model fields.
 
-### Note
+### Key Feature
 
-**ReflectModel works with database tables AND database views**. That is right, you can use the
-model reflect to reflect existing database tables and database views from any existing database.
+`ReflectModel` works with both **database tables and views**. This allows you to represent any existing data structure in your code.
 
-## ReflectModel
+## ReflectModel: Representing Existing Data
 
-The reflect model is very similar to `Model` from [models](../models.md) but with a main difference
-that won't generate any migrations.
+`ReflectModel` is similar to Edgy's `Model` but it does not generate migrations.
 
 ```python
 from edgy import ReflectModel
 ```
 
-The same operations of inserting, deleting, updating and creating are still valid and working
-as per normal behaviour.
+It supports standard database operations like inserting, deleting, updating, and creating records.
 
-**Parameters**
+**Parameters:**
 
-As per normal model, it is required the `Meta` class with two parameters.
-
-* **registry** - The [registry](../registry.md) instance for where the model will be generated. This
-field is **mandatory** and it will raise an `ImproperlyConfigured` error if no registry is found.
-
-* **tablename** - The name of the table or view to be reflected from the database, **not the class name**.
-
-    <sup>Default: `name of class pluralised`<sup>
+* **`Meta.registry`**: The [registry](../registry.md) instance. This is **mandatory**.
+* **`Meta.tablename`**: The name of the table or view to reflect. Defaults to the pluralized class name.
 
 Example:
 
@@ -72,10 +57,9 @@ Example:
 {!> ../docs_src/reflection/reflect.py !}
 ```
 
-## Fields
+## Fields: Mapping Database Columns
 
-The fields should be declared as per normal [fields](../fields/index.md) that represents the columns from
-the reflected database table or view.
+Fields in `ReflectModel` are declared like regular [fields](../fields/index.md), representing the columns of the reflected table or view.
 
 Example:
 
@@ -83,67 +67,40 @@ Example:
 {!> ../docs_src/reflection/reflect.py !}
 ```
 
-### The difference from the models
+### Key Difference from Regular Models
 
-When reflecting a model or a view from an existing database, usually you want to reflect the
-existing fields from it but sometimes in your code, you simply want **only a few fields** reflected
-and not all of them for your own reasons.
+Unlike regular Edgy models, `ReflectModel` allows you to specify only the fields you need, rather than requiring all fields from the database table or view.
 
-Edgy `ReflectModel` does this for you.
+Example:
 
-Let us see an example:
-
-Consider this table as already been created in a database somewhere with the following structure.
+Suppose you have a `users` table with the following structure:
 
 ```python
 {!> ../docs_src/reflection/reflect/model.py !}
 ```
 
-!!! Check
-    For this example, we use a pythonic representation of a table in a database instead of a SQL as
-    it looks easier to understand what is what in this context.
-
-Now imagine somewhere in another application you want to reflect the existing `users` table
-(above) but you only want a few fields and not all of them.
-
-Your reflect model would look like this:
+And you want to reflect only a few fields:
 
 ```python hl_lines="9-11"
 {!> ../docs_src/reflection/reflect/reflect.py !}
 ```
 
-Meaning, although you migh have legacy tables you still want to use you might also want to use
-only a few necessary fields for your operations and this is what `ReflectModel` allows you to
-achieve.
+This flexibility allows you to work with only the necessary fields, simplifying your code.
 
-## Operations
+## Operations: CRUD Functionality
 
-What about the database operations like the CRUD? Are they still possible with `ReflectModel`?
+`ReflectModel` supports standard CRUD operations, just like regular Edgy models.
 
-The answer is **yes**.
-
-With `ReflectModel` you can still perform the normal operations as you would do with
-[models](../models.md) anyway.
-
-Remember the [difference from the models](#the-difference-from-the-models)? Well here is another
-thing. The `ReflectModel` will only perform operations on the declared fields of the
-same `ReflectModel`.
-
-In other words, if you want to update a field that is the table being reflected but **not in**
-the `ReflectModel` declaration, **the operation on that field will not happen**.
+However, it only performs operations on the fields declared in the `ReflectModel`. If you attempt to update a field that is not declared in the `ReflectModel`, the operation will not occur.
 
 !!! Warning
-    If you are reflecting SQL views, you probably will not be able to write (create, update...) as
-    the SQL view has that same limitation.
+    SQL views may have limitations on write operations (create, update, etc.).
 
+## Reflection Outside of Defaults
 
-## Reflection outside of the defaults
+To reflect tables from a different database or schema, set `__using_schema__` and `database` after model creation.
 
-Sometimes you want reflect from a different database or schema than the main database or schema.
-This is possible by setting`__using_schema__` to None/string and set explicitly the class database after model creation:
-
-``` python
-
+```python
 import edgy
 
 registry = edgy.Registry(...)
@@ -151,14 +108,12 @@ registry = edgy.Registry(...)
 class AdvancedReflected(edgy.ReflectModel):
     __using_schema__ = "foo"
     a = edgy.CharField(max_length=40)
-    # here we cannot define database, it will be overwritten
 
     class Meta:
         registry = registry
 
 AdvancedReflected.database = otherdb
-# you can set __using_schema__ also here
 AdvancedReflected.__using_schema__ = "foo"
 ```
 
-This trick is used by AutoReflectModels.
+This technique is used by `AutoReflectModel` for automatic reflection.
