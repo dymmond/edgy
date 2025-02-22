@@ -1,249 +1,185 @@
 # Application Discovery
 
-Edgy has many different ways of understanding the commands, one is via
-[environment variables](#environment-variables) and another is via [auto discovery](#auto-discovery).
+Edgy provides multiple ways to identify and run commands. The two primary methods are:
 
-## Auto Discovery
+- [Environment variables](#environment-variables)
+- [Auto-discovery](#auto-discovery)
 
-If you are familiar with other frameworks like Django, you are surely familiar with the way the
-use the `manage.py` to basically run every command internally.
+## Auto-Discovery
 
-Although not having that same level, Edgy does a similar job by having "a guess" of what
-it should be and throws an error if not found or if no [environment variables or --app](#environment-variables)
-are provided.
+If you’re familiar with frameworks like Django, you might know how `manage.py` serves as a command-line interface for running internal commands. While Edgy doesn’t work exactly the same way, it does attempt to automatically detect the appropriate application and will raise an error if none is found or if neither an [environment variable](#environment-variables) nor `--app` is provided.
 
-**The application discovery works as an alternative to providing the `--app` or a `EDGY_DEFAULT_APP` environment variable**.
+**Auto-discovery serves as an alternative to manually specifying `--app` or setting the `EDGY_DEFAULT_APP` environment variable.**
 
-So, what does this mean?
+### How Does It Work?
 
-This means if **you do not provide an --app or a EDGY_DEFAULT_APP**, Edgy will try to find the
-application for you automatically.
+If **you do not provide `--app` or set `EDGY_DEFAULT_APP`**, Edgy will attempt to locate your application automatically.
 
-Let us see a practical example of what does this mean.
+For example, consider the following project structure:
 
-Imagine the following folder and file structure:
-
-```shell hl_lines="16" title="myproject"
+```shell
+title="myproject"
 .
 ├── Makefile
 └── myproject
     ├── __init__.py
     ├── apps
-    │   ├── __init__.py
+    │   ├── __init__.py
     ├── configs
-    │   ├── __init__.py
-    │   ├── development
-    │   │   ├── __init__.py
-    │   │   └── settings.py
-    │   ├── settings.py
-    │   └── testing
-    │       ├── __init__.py
-    │       └── settings.py
+    │   ├── __init__.py
+    │   ├── development
+    │   │   ├── __init__.py
+    │   │   └── settings.py
+    │   ├── settings.py
+    │   └── testing
+    │       ├── __init__.py
+    │       └── settings.py
     ├── main.py
     ├── tests
-    │   ├── __init__.py
-    │   └── test_app.py
+    │   ├── __init__.py
+    │   └── test_app.py
     └── urls.py
 ```
 
 !!! Tip
-    The `application` can be anything from Esmerald, Starlette, Sanic and even FastAPI.
+    The application can be built using Esmerald, Starlette, Sanic, FastAPI, or other frameworks.
 
-The structure above of `myproject` has a lot of files and the one higlighted is the one that
-contains the application object with the [Migration](./migrations.md#migration) from Edgy.
+Edgy follows these steps to locate the application:
 
-### How does it work?
+1. If no `--app` or `EDGY_DEFAULT_APP` is specified, it searches the current directory for a file named:
+   - `main.py`
+   - `app.py`
+   - `application.py`
+   - `asgi.py`
 
-When no `--app` or no `EDGY_DEFAULT_APP` environment variable is provided, Edgy will
-**automatically look for**:
+   *(If these files are importable without the `.py` extension, they will also be considered.)*
 
-* The current directory where `edgy` is being called contains a file called:
-    * **main.py**
-    * **app.py**
-    * **application.py**
-    * **asgi.py**
+2. If none of these files are found, Edgy checks the first-level subdirectories and repeats the search.
+3. If still not found, it raises a `CommandEnvironmentError` exception.
+4. Once a matching file is located, Edgy verifies whether the instance is correctly set.
 
-    (Or are otherwise importable by python without the .py stem)
+## Environment Variables
 
-    !!! Warning
-        **If none of these files are found**, Edgy will look **at the first children nodes, only**,
-        and repeats the same process. If no files are found then throws an `CommandEnvironmentError`
-        exception.
+Edgy uses environment variables to determine the correct database when generating migrations:
 
+- **`EDGY_DATABASE_URL`** - Specifies the database connection URL.
+- **`EDGY_DATABASE`** - Specifies an additional database name.
 
-* Once one of those files is found, Edgy will check if the instance was set.
+By default, the primary database is used. Since Edgy is framework-agnostic, this approach ensures seamless migration handling across different environments, including production.
 
-This is the way that Edgy can `auto discover` your application.
+## Using Auto-Discovery in Practice
 
+Now that we’ve seen how Edgy discovers applications, let’s look at how it works with actual commands. The following structure will be used as a reference:
 
-## Environment variables
-
-When generating migrations, Edgy can use two variables to detect the right database.
-
-* **EDGY_DATABASE_URL** - The database url for your database.
-* **EDGY_DATABASE** - The extra database name for your database.
-
-By default the default database is used.
-
-The reason for this is because Edgy is agnostic to any framework and this way it makes it easier
-to work with the `migrations`.
-
-Also, gives a clean design for the time where it is needed to go to production as the procedure is
-very likely to be done using environment variables.
-
-Or whatever connection string you are using.
-
-## How to use and when to use it
-
-Previously it was used a folder structure as example and then an explanation of how Edgy would
-understand the auto discovery but in practice, how would that work?
-
-**This is applied to any command within Edgy**.
-
-Let us see again the structure, in case you have forgotten already.
-
-```shell hl_lines="20" title="myproject"
+```shell
+title="myproject"
 .
 ├── Makefile
 └── src
     ├── __init__.py
     ├── apps
-    │   ├── accounts
-    │   │   ├── directives
-    │   │   │   ├── __init__.py
-    │   │   │   └── operations
-    │   │   │       └── __init__.py
+    │   ├── accounts
+    │   │   ├── directives
+    │   │   │   ├── __init__.py
+    │   │   │   └── operations
+    │   │   │       └── __init__.py
     ├── configs
-    │   ├── __init__.py
-    │   ├── development
-    │   │   ├── __init__.py
-    │   │   └── settings.py
-    │   ├── settings.py
-    │   └── testing
-    │       ├── __init__.py
-    │       └── settings.py
+    │   ├── __init__.py
+    │   ├── development
+    │   │   ├── __init__.py
+    │   │   └── settings.py
+    │   ├── settings.py
+    │   └── testing
+    │       ├── __init__.py
+    │       └── settings.py
     ├── main.py
     ├── tests
-    │   ├── __init__.py
-    │   └── test_app.py
+    │   ├── __init__.py
+    │   └── test_app.py
     └── urls.py
 ```
 
-The `main.py` is the file that contains the edgy migration. A file that could look like
-this:
+The `main.py` file contains the Edgy migration setup.
 
 ```python title="myproject/src/main.py"
 {!> ../docs_src/commands/discover.py !}
 ```
 
-This is a simple example with two endpoints, you can do as you desire with the patterns you wish to
-add and with any desired structure.
+This basic example includes two endpoints, but you can structure your application as needed.
 
-What will be doing now is run the following commands using the [auto discovery](#auto-discovery)
-and the [--app or EDGY_DEFAULT_APP](#environment-variables):
+### Running Commands
 
-* **init** - Starts the migrations and creates the migrations folder.
-* **makemigrations** - Generates the migrations for the application.
+Edgy supports both auto-discovery and manual application specification for executing commands like:
 
-We will be also executing the commands inside `myproject`.
+- **`init`** - Initializes migrations and creates the migrations folder.
+- **`makemigrations`** - Generates migrations for the application.
 
-**You can see more information about these [commands](./migrations.md), including**
-**parameters, in the next section.**
-
-### Using the auto discover
-
-#### init
-
-##### Using the auto discover
+#### Using Auto-Discovery
 
 ```shell
 $ edgy init
 ```
 
-Yes! Simply this and because not the `--app` or a `EDGY_DEFAULT_APP` was provided nor preloads were found, it triggered the
-auto discovery of the application that contains the edgy information.
+Since no `--app` or `EDGY_DEFAULT_APP` is provided, Edgy automatically discovers the application in `src/main.py` following its search pattern.
 
-Because the application is inside `src/main.py` it will be automatically discovered by Edgy as
-it followed the [discovery pattern](#how-does-it-work).
+#### Using Preloads
 
-##### Using preloads
+Edgy supports automatic registration via preloads. Instead of explicitly providing `--app` or `EDGY_DEFAULT_APP`, you can use the `preloads` setting in your configuration to specify an import path. When an instance is set in a preloaded file, auto-discovery is skipped.
 
-Edgy has an automatic registration pattern. All what `--app` or `EDGY_DEFAULT_APP` does is to import a file.
-The registration is expected to take place in the module automatically.
-Thanks to Monkay you can also provide such an import path as preload under
-`preloads` in settings.
-When the instance is set in a preloaded file, the auto-discovery is skipped.
+#### Using `--app` or `EDGY_DEFAULT_APP`
 
-
-##### Using the --app or EDGY_DEFAULT_APP
-
-This is the other way to tell Edgy where to find your application. Since the application is
-inside the `src/main.py` we need to provide the proper location is a `<module>` format.
-
-###### --app
-
-With the `--app` flag.
+##### `--app`
 
 ```shell
 $ edgy --app src.main init
 ```
 
-###### EDGY_DEFAULT_APP
+##### `EDGY_DEFAULT_APP`
 
-With the `EDGY_DEFAULT_APP`.
-
-Export the env var first:
+Set the environment variable:
 
 ```shell
 $ export EDGY_DEFAULT_APP=src.main
 ```
 
-And then run:
+Then run:
 
 ```shell
 $ edgy init
 ```
 
-#### makemigrations
+### Running `makemigrations`
 
-You can see [more details](./migrations.md#migrate-your-database) how to use it.
+For more details, see [Migrations](./migrations.md#migrate-your-database).
 
-It is time to run this command.
-
-##### Using the auto discover
+#### Using Auto-Discovery
 
 ```shell
 $ edgy makemigrations
 ```
 
-Again, same principle as before because the `--app` or a `EDGY_DEFAULT_APP` was provided,
-it triggered the auto discovery of the application.
+Again, Edgy automatically finds the application.
 
-##### Using the --app or EDGY_DISCOVERY_APP
+#### Using `--app` or `EDGY_DEFAULT_APP`
 
 !!! Note
-    There was a change in 0.23.0: the import path must be to a module in which the registration via the `Instance` object is automatically triggered.
-    See [Connection](../connection.md).
+    As of version 0.23.0, the import path must point to a module where the `Instance` object triggers automatic registration. See [Connection](../connection.md).
 
-###### --app
-
-With the `--app` parameter.
+##### `--app`
 
 ```shell
 $ edgy --app src.main makemigrations
 ```
 
-###### EDGY_DEFAULT_APP
+##### `EDGY_DEFAULT_APP`
 
-With the `EDGY_DEFAULT_APP`.
-
-Export the env var first:
+Set the environment variable:
 
 ```shell
 $ export EDGY_DEFAULT_APP=src.main
 ```
 
-And then run:
+Then run:
 
 ```shell
 $ edgy makemigrations

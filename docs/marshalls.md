@@ -1,49 +1,34 @@
-# Marshalls
+# Marshalls in Edgy
 
-Imagine you need to serialize you data and adding some extra flavours on top of it. Now, imagine
-that [Edgy models](./models.md) contain information that could be used but its not accessible
-directly upon the moment of serialization.
+Marshalls in Edgy provide a powerful mechanism for serializing data and adding extra layers of customization. They allow you to augment Edgy models with additional information that might not be directly accessible during serialization.
 
-Here is where the `marshalls` come into play.
+Essentially, marshalls facilitate adding validations on top of existing models and customizing the serialization process, including restricting which fields are serialized. While not primarily designed for direct database interaction, marshalls offer an interface to perform such operations if needed, through the `save()` method.
 
-The `marshalls` will simply help you adding those extra validations on the top of your existing
-model and add those same extras in the serialization process or even restrict the fields being
-serialized, for instance, you might not want to show all the fields.
+## Marshall Class
 
-A `marshall` is not designed to interact 100% with the database operations since that is done
-by the Edgy model but it provides an interface that can also do that in case you want, the
-[save method](#save).
-
-## Marshall
-
-This is the main class that **must** be subclassed when creating a Marshall. There is where
-you declare all the extra fields and/or fields you want to serialize.
+The `Marshall` class is the base class that **must** be subclassed when creating a marshall. It's where you define extra fields and specify which fields to serialize.
 
 ```python
 from edgy.core.marshalls import Marshall
 ```
 
-When declaring the `Marshall` you **must** declare a [ConfigMarshall](#configmarshall) and then
-all the extras you might want to add.
+When declaring a `Marshall`, you **must** define a [ConfigMarshall](#configmarshall) and then add any extra fields you want.
 
-In a nutshell, this is how you can use a Marshall.
+Here's a basic example of how to use a marshall:
 
 ```python
 {!> ../docs_src/marshalls/nutshell.py !}
 ```
 
-Ok, there is a lot to unwrap here but let us go step by step.
+Let's break this down step by step.
 
-The `Marshall` has a `marshall_config` that **must be declared** specifying the `model` and `fields`.
+The `Marshall` has a `marshall_config` attribute that **must be declared**, specifying the `model` and `fields`.
 
-The `fields` is a list of the **available fields** of the [model](./models.md) and it serves to specifically
-specify which ones should the marshall serialize directly from the model.
+The `fields` list contains the names of the [model](./models.md) fields that should be serialized directly from the model.
 
-Then, the `extra` and `details` are marshall `fields`, that means, the fields that are not model fields
-directly but must be serialized with the extra bit of information. You can check more details about
-the [Fields](#fields) later on.
+The `extra` and `details` fields are marshall-specific fields, meaning they are not directly from the model but are included in the serialization. You can find more details about these [Fields](#fields) later in this document.
 
-When the marshall is fully declared, you can simply do this:
+Once the marshall is defined, you can use it like this:
 
 ```python
 data = {"name": "Edgy", "email": "edgy@example.com"}
@@ -51,7 +36,7 @@ marshall = UserMarshall(**data)
 marshall.model_dump()
 ```
 
-And the result will be:
+The result will be:
 
 ```json
 {
@@ -62,25 +47,20 @@ And the result will be:
 }
 ```
 
-As you can see, the `Marshall` is also a Pydantic model so you can take the full potential of it.
+As you can see, `Marshall` is also a Pydantic model, allowing you to leverage its full potential.
 
-There are more operations and things you can do with marshalls regarding the [fields](#fields) that
-you can read in the next sections.
+There are more operations and customizations you can perform with marshalls, particularly regarding [fields](#fields), which are covered in the following sections.
 
 ## ConfigMarshall
 
-To operate with the marshalls you will need to declare the `marshall_config` which is simply a
-typed dictionary containing the following keys:
+To work with marshalls, you need to declare a `marshall_config`, which is a typed dictionary containing the following keys:
 
-* **model** - The Edgy [model](./models.md) associated with the Marshall or a string `dotted.path`
-pointing to the model.
-* **fields** - A list of strings of the fields you want to include by default in the serialization
-of the marshall.
-* **exclude** - A list of strings containing the name of the fields you **don't want to** have serialized.
+* **model:** The Edgy [model](./models.md) associated with the marshall, or a string `dotted.path` pointing to the model.
+* **fields:** A list of strings representing the fields to include in the marshall's serialization.
+* **exclude:** A list of strings representing the fields to exclude from the marshall's serialization.
 
 !!! warning
-    There is a caveat though, **you can only declare `fields` or `exclude` but not both** and the `model`
-    is mandatory or else an exception is raised.
+    **You can only declare either `fields` or `exclude`, but not both.** The `model` is mandatory, or an exception will be raised.
 
 === "fields"
 
@@ -94,10 +74,9 @@ of the marshall.
     {!> ../docs_src/marshalls/exclude.py !}
     ```
 
-The `fields` also allow the use of `__all__`. This means that you want all the fields declared in
-your Edgy model.
+The `fields` list also supports the use of `__all__`, which includes all fields declared in your Edgy model.
 
-**Example**
+**Example:**
 
 ```python
 class CustomMarshall(Marshall):
@@ -106,24 +85,20 @@ class CustomMarshall(Marshall):
 
 ## Fields
 
-Here is where the things get interesting. When declaring a `Marshall` and want to add extra fields
-to the serialization, you can do it by declaring two types of fields.
+This is where things get interesting. When declaring a `Marshall` and adding extra fields to the serialization, you can use two types of fields:
 
-* [MarshallField](#marshallfield) - Used the point to a `model` field, a python `property` that is also declared
-inside the Edgy model or a function.
-* [MarshallMethodField](#marshallmethodfield) - Used to point to a function that is declared **inside the marshall**
-and **not inside the model**.
+* [MarshallField](#marshallfield): Used to reference a model field, a Python `property` defined in the Edgy model, or a function.
+* [MarshallMethodField](#marshallmethodfield): Used to reference a function defined **within the marshall**, not the model.
 
-To use the fields, you can simply import it.
+To use these fields, import them:
 
 ```python
 from edgy.core.marshalls import fields
 ```
 
-All the fields have the **mandatory** attribute `field_type`. This is used to declare which type
-of field should be used for automatic validation of Pydantic.
+All fields have a **mandatory** attribute `field_type`, which specifies the Python type used by Pydantic for validation.
 
-**Example**
+**Example:**
 
 ```python
 class CustomMarshall(Marshall):
@@ -134,17 +109,16 @@ class CustomMarshall(Marshall):
 
 ### MarshallField
 
-This is the most common field you can declare in your marshall.
+This is the most common field type used in marshalls.
 
 #### Parameters
 
-* **field_type** - The Python type that is used by Pydantic to validate the data.
-* **source** - The source of the field to be gathered from the model. It can be directly the model
-field, a property or a function.
+* **field_type:** The Python type used by Pydantic for data validation.
+* **source:** The source of the field, which can be a model field, a property, or a function.
 
-**All of the values passed in the source must come from the Edgy Model**.
+**All values passed in the source must come from the Edgy Model.**
 
-**Example**
+**Example:**
 
 ```python
 {!> ../docs_src/marshalls/source.py !}
@@ -152,31 +126,27 @@ field, a property or a function.
 
 ### MarshallMethodField
 
-This function is used to get extra information that is provided by the `Marshall` itself.
+This field type is used to retrieve extra information provided by the `Marshall` itself.
 
-When declaring a `MarshallMethodField` you must have the function `get_` with the corresponding
-name of the field used by the `MarshallMethodField`.
+When declaring a `MarshallMethodField`, you must define a function named `get_` followed by the field name.
 
-When declaring the function, Edgy will automatically inject an object (instance) of the Edgy model
-declared in the `marshall_config`. This instance **is not persisted in the database** unless you
-specifically [save it](#save), which means, the `primary_key` will not be available until then but
-the remaining object, functions, attributes and operations, are.
+Edgy automatically injects an instance of the Edgy model declared in `marshall_config` into this function. This instance **is not persisted in the database** unless you explicitly [save it](#save). Therefore, the `primary_key` will not be available until then, but other object attributes and operations are.
 
 #### Parameters
 
-* **field_type** - The Python type that is used by Pydantic to validate the data.
+* **field_type:** The Python type used by Pydantic for data validation.
 
-**Example**
+**Example:**
 
 ```python
 {!> ../docs_src/marshalls/method_field.py !}
 ```
 
-## Including additional context
+## Including Additional Context
 
-In certain scenarios, it is necessary to provide additional context to the marshall. Additional context can be provided by passing a context argument when instantiating the marshall.
+In some cases, you might need to provide extra context to a marshall. You can do this by passing a `context` argument when instantiating the marshall.
 
-**Example**
+**Example:**
 
 ```python
 class UserMarshall(Marshall):
@@ -192,7 +162,7 @@ marshall = UserMarshall(**data, context={"foo": "bar"})
 marshall.model_dump()
 ```
 
-And the result will be:
+Result:
 
 ```json
 {
@@ -202,27 +172,21 @@ And the result will be:
 }
 ```
 
-## `save()`
+## `save()` Method
 
-Since the [Marshall](#marshall) is also a Pydantic base model, the same as Edgy, there may be some
-times where you would like to persist the data directly using the marshall instead of using complicated
-processes to make it happen.
+Since `Marshall` is a Pydantic base model, similar to Edgy models, you can persist data directly using the marshall.
 
-This is also possible as Edgy made it simple for you. In the same way an Edgy model has the `save()`
-so does the `marshall`. In reality, what Edgy is doing is performing that same Edgy `save()` operation
-for you.
-
-How does it work? In the same way it would work for a normal Edgy model.
+Edgy provides a `save()` method for marshalls that mirrors the `save()` method of Edgy models.
 
 ### Example
 
-Let us assume the following example.
+Using the `UserMarshall` from the previous example:
 
 ```python
 {!> ../docs_src/marshalls/method_field.py !}
 ```
 
-Now, to create and save an instance of the model `User`, we simply need to:
+To create and save a `User` instance:
 
 ```python
 data = {
@@ -235,24 +199,18 @@ marshall = UserMarshall(**data)
 await marshall.save()
 ```
 
-The marshall is smart enough to understand what fields belong to the model and what fields are
-custom and specific to the marshall and persists it.
+The marshall intelligently distinguishes between model fields and marshall-specific fields and persists the model fields.
 
-## Extra considerations
+## Extra Considerations
 
-Creating a `marshall` its easy and very intuitive but there are some considerations you **must have**.
+Creating marshalls is straightforward, but keep these points in mind:
 
-#### Model fields with `null=False`
+#### Model Fields with `null=False`
 
-When declaring the [ConfigMarshall](#configmarshall) `fields`, you
-**must select at least the mandatory fields necessary, `null=False`, or a `MarshallFieldDefinitionError`
-will be raised.
+When declaring `ConfigMarshall` `fields`, you **must select at least the mandatory fields (`null=False`)**, or a `MarshallFieldDefinitionError` will be raised.
 
-This is used to prevent any unnecessary errors from happening when the creation of the model
-occurs.
+This prevents errors during model creation.
 
-#### Model validators
+#### Model Validators
 
-This remains exactly was it was before, meaning, if you want to validate the fields of the model
-when creating an instance (persisted or not), that can and should be done using the normal
-Pydantic `@model_validator` and `@field_validator`.
+Model validators (using `@model_validator` and `@field_validator`) work as expected. You can use them to validate model fields during instance creation.

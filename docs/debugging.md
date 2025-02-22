@@ -1,79 +1,67 @@
 # Debugging & Performance
 
-Edgy has several debug features, also through databasez. It tries also to keep it's eventloop and use the most smartest way
-to execute a query performant.
-For example asyncio pools are thread protected in databasez so it is possible to keep the connections to the database open.
+Edgy provides several debugging features, also through databasez. It aims to maintain an efficient event loop and execute queries in the most performant manner. For example, asyncio pools are thread-protected in databasez, allowing connections to the database to remain open.
 
-But this requires that databases and registries are not just thrown away but kept open during the operation. For getting a
-sane lifespan a reference counter are used.
+However, this requires that databases and registries are not simply discarded but kept open during operation. To ensure a proper lifespan, a reference counter is used.
 
-When dropped to 0 the database is uninitialized and drops the connections.
+When the reference count drops to 0, the database is uninitialized, and connections are closed.
 
-There is no problem re-opening the database but it is imperformant and can have side-effects especcially with the `DatabaseTestClient`.
-For this the `DatabaseNotConnectedWarning` warning exist.
+Reopening the database is possible but inefficient and can lead to side effects, especially with the `DatabaseTestClient`. The `DatabaseNotConnectedWarning` exists to address this.
 
+### Getting the SQL Query
 
-### Getting the SQL query
+The `QuerySet` contains a cached debug property named `sql`, which displays the `QuerySet` as a query with inserted blanks.
 
-QuerySet contains a cached debug property named `sql` which contains the QuerySet as query with inserted blanks.
+### Performance Warnings (`DatabaseNotConnectedWarning`)
 
-### Performance warnings (`DatabaseNotConnectedWarning`)
+The `DatabaseNotConnectedWarning` is likely the most common warning in Edgy.
 
-The most common warning in edgy is probably the `DatabaseNotConnectedWarning` warning.
+It is intentional and serves to guide users in improving their code, preventing unnecessary disposal of engines. Additionally, it can lead to difficult-to-debug errors in test environments due to a missing database (e.g., `drop_database` parameter).
 
-It is deliberate and shall guide the user to improve his code so he doesn't throws away engines unneccessarily.
-Also it could lead in test environments to hard to debug errors because of a missing database (drop_database parameter).
+Edgy issues a `DatabaseNotConnectedWarning` when used without a connected database. To suppress it, wrap the affected code in a database scope:
 
-Edgy issues a `DatabaseNotConnectedWarning` when using edgy without a connected database. To silence it, wrap the affected
-code in a database scope
-
-``` python
+```python
 await model.save()
 # becomes
 async with model.database:
     await model.save()
 ```
 
-If the warning is completely unwanted despite the performance impact, you can filter:
+If the warning is completely unwanted despite the performance impact, you can filter it:
 
-``` python
+```python
 import warnings
 from edgy.exceptions import DatabaseNotConnectedWarning
+
 with warnings.catch_warnings(action="ignore", category=DatabaseNotConnectedWarning):
     await model.save()
 ```
 
-It inherits from `UserWarning` so it is possible to filter UserWarnings.
+It inherits from `UserWarning`, so filtering `UserWarning` is also possible.
 
-However the silencing way is not recommended.
+However, silencing the warning is generally not recommended.
 
-## Many connections
+## Many Connections
 
-If the database is slow due to many connections by edgy and no `DatabaseNotConnectedWarning` warning was raised
-it indicates that deferred fields are accessed.
-This includes ForeignKey, which models are not prefetched via `select_related`.
+If the database is slow due to numerous Edgy connections, and no `DatabaseNotConnectedWarning` was raised, it indicates that deferred fields are being accessed. This includes `ForeignKey` relationships where models are not prefetched via `select_related`.
 
-### Debugging deferred loads
+### Debugging Deferred Loads
 
-For debugging purposes (but sacrificing deferred loads with it) you can set the ContextVariable
-`edgy.core.context_vars.MODEL_GETATTR_BEHAVIOR` to `"passdown"` instead of `"load"`.
+For debugging purposes (at the cost of deferred loads), you can set the `ContextVariable` `edgy.core.context_vars.MODEL_GETATTR_BEHAVIOR` to `"passdown"` instead of `"load"`.
 
-This will lead to crashes in case an implicit loaded variable is accessed.
+This will cause crashes if an implicitly loaded variable is accessed.
 
-### Optimizing ReflectedModel
+### Optimizing `ReflectedModel`
 
-ReflectedModel have the problem that not all database fields are known. Therefor testing if an optional attribute
-is available via `getattr`/`hasattr` will lead to a load first.
+`ReflectedModel` has the issue that not all database fields are known. Therefore, testing if an optional attribute is available via `getattr`/`hasattr` will trigger a load first.
 
-There are two ways to work around:
+There are two ways to work around this:
 
-1. Use the model instance dict instead (e.g. `model.__dict__.get("foo")` or `"foo" in model.__dict__`).
-2. Add the optional available attributes to `__no_load_trigger_attrs__`. They won't trigger an load anymore.
+1.  Use the model instance dictionary instead (e.g., `model.__dict__.get("foo")` or `"foo" in model.__dict__`).
+2.  Add the optional available attributes to `__no_load_trigger_attrs__`. They will no longer trigger a load.
 
 ## Hangs
 
-Hangs typical occur when there is only **one** connection available or the database is blocked.
-This is normally easily debuggable often with the same ways like mentioned before because of the same reasons.
-If it has hard to debug stack traces, it seems that threads and asyncio are mixed.
+Hangs typically occur when only **one** connection is available or the database is blocked. This is usually easily debuggable, often with the same methods mentioned earlier, due to the same reasons. If there are hard-to-debug stack traces, it suggests that threads and asyncio are mixed.
 
-Here you can enforce hard timeouts via the `DATABASEZ_RESULT_TIMEOUT` environment variable.
+Here, you can enforce hard timeouts via the `DATABASEZ_RESULT_TIMEOUT` environment variable.

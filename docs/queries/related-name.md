@@ -1,67 +1,58 @@
 # Related Name
 
-**Edgy** is very flexible in the way you assemble your models and perform your queries.
+**Edgy** offers a high degree of flexibility in how you define your models and execute queries.
 
-One very common example is declaring [ForeignKeys][foreign_keys] pointing it out to
-declared [relationships][relationships] among tables.
+A common practice involves declaring [ForeignKeys][foreign_keys] to establish [relationships][relationships] between tables.
 
-One situation that happens very often is the one where you would like to do the `reverse query`.
+A frequent scenario is the need to perform a "reverse query."
 
-## What is the related name
+## What is a Related Name?
 
-Related name is an attribute that can be declared inside the [ForeignKeys][foreign_keys]
-and can be used to specify the name of the reverse relation from the related model back to the
-model that defines the relation.
+A related name is an attribute declared within [ForeignKeys][foreign_keys] that specifies the name of the reverse relation from the related model back to the model defining the relation.
 
-It is used to speficy the name of the attribute that can be used to access the related model from
-the reverse side of the relation.
+It designates the attribute name used to access the related model from the opposite side of the relation.
 
-Confusing? Nothing like a good example to clear the things out.
+Confused? Let's clarify with an example.
 
-### How does it work
+### How it Works
 
-#### related_name attribute
+#### `related_name` Attribute
 
-There are two ways of working with the `related_name`.
+There are two approaches to using `related_name`.
 
-##### The parameter
+##### Explicit Parameter
 
-The related name can be declared directly inside the [ForeignKeys][foreign_keys]
-`related_name` attribute where you specify explicitly which name you want to use.
+The related name can be directly declared within the [ForeignKeys][foreign_keys] `related_name` attribute, explicitly specifying the desired name.
 
-##### Auto generating
+##### Automatic Generation
 
-This is the other automatic way. When a `related_name` is not specified in the
-[ForeignKeys][foreign_keys], **Edgy** will **automatically generate the name for you** with the
-the following format:
+Alternatively, if a `related_name` is not specified in the [ForeignKeys][foreign_keys], **Edgy** will **automatically generate the name** using the following format:
 
 ```text
 <table-name>s_set
 ```
 
-when non-unique. And
+for non-unique relations, and
 
 ```text
 <table-name>
 ```
 
-when unique.
+for unique relations.
 
-Edgy will use the lowercased model name of the related model to create the reverse relation.
+Edgy will use the lowercase model name of the related model to create the reverse relation.
 
-Imagine you have a model `Team` that has a [ForeignKey][foreign_keys] to another model
-`Organisation`.
+For instance, consider a `Team` model with a [ForeignKey][foreign_keys] to an `Organisation` model.
 
 ```python title="models.py" hl_lines="16"
 {!> ../docs_src/queries/related_name/example.py !}
 ```
 
-Because no `related_name` was specified, automatically **Edgy** will call it **`organisations_set`**.
+Since no `related_name` was provided, **Edgy** will automatically assign the name **`organisations_set`**.
 
+#### Deep Dive into `related_name`
 
-#### Deep into the related_name
-
-Let us create three models:
+Let's create three models:
 
 * Organisation
 * Team
@@ -71,23 +62,23 @@ Let us create three models:
 {!> ../docs_src/queries/related_name/models.py !}
 ```
 
-Above we have the three models declared and inside we declared also three [ForeignKeys][foreign_keys].
+We have declared three models with three [ForeignKeys][foreign_keys]:
 
-* `org` - ForeignKey from Team to Organisation.
-* `team` - ForeignKey from Member to Team.
-* `second_team` - Another ForeignKey from Member to Team.
+* `org`: ForeignKey from `Team` to `Organisation`.
+* `team`: ForeignKey from `Member` to `Team`.
+* `second_team`: Another ForeignKey from `Member` to `Team`.
 
-Let us also add some data to the models.
+Now, let's populate the models with data.
 
 ```python
 {!> ../docs_src/queries/related_name/data.py !}
 ```
 
-We now can start querying using the `related_name`.
+We can now begin querying using `related_name`.
 
-##### Querying using the related_name
+##### Querying with `related_name`
 
-* **We want to know all the teams of `acme` organisation**
+* **Retrieve all teams belonging to the `acme` organization.**
 
 ```python
 teams = await acme.teams_set.all()
@@ -96,11 +87,9 @@ teams = await acme.teams_set.all()
 ```
 
 !!! Warning
-    Because in the `org` foreign key of the `Team` model no `related_name` was not specified.
-    Edgy automatically generated the `teams_set` that is accessible from the `Organisation`.
-    Check the [default behaviour](#auto-generating) to understand.
+    Because the `org` foreign key in the `Team` model lacked a `related_name`, Edgy automatically generated `teams_set`, accessible from `Organisation`. Refer to [default behavior](#auto-generating) for more information.
 
-* **We want the team where the members of the blue team belong to**
+* **Find the team to which the members of the `blue_team` belong.**
 
 ```python
 teams = await acme.teams_set.filter(members=blue_team).get()
@@ -108,16 +97,15 @@ teams = await acme.teams_set.filter(members=blue_team).get()
 # <Team: Team(id=2)>
 ```
 
-**Nested transversal queries**
+**Nested Traversal Queries**
 
-Did you see what happened here? Did you notice the `members`? The members is also a reverse query
-that links the `Member` model to the `Team`.
+Notice the use of `members`? It's another reverse query linking the `Member` model to `Team`.
 
-This means you can also do nested and transversal queries through your models.
+This illustrates how to perform nested and traversal queries across your models.
 
-Let us continue with some more examples to understand this better.
+Let's explore further examples.
 
-* **We want to know which team `charlie` belongs to**
+* **Determine the team to which `charlie` belongs.**
 
 ```python
 team = await acme.teams_set.filter(members__email=charlie.email).get()
@@ -125,47 +113,45 @@ team = await acme.teams_set.filter(members__email=charlie.email).get()
 # <Team: Team(id=1)>
 ```
 
-Again, we use the `members` related name declared in `Member` model that is a
-[ForeignKey][foreign_keys] to the `Team` and filter by the `email`.
+Again, we use the `members` related name, declared in the `Member` model as a [ForeignKey][foreign_keys] to `Team`, and filter by `email`.
 
 ##### Nested Queries
 
-This is where things get interesting. What happens if you need to go deep down the rabbit hole and
-do even more nested queries?
+This is where it gets interesting. What if you need to perform deeper nested queries?
 
-Ok, lets now add two more models to our example.
+Let's add two more models:
 
 * User
 * Profile
 
 !!! Warning
-    These are used only for explanation reasons and not to be perfectly aligned.
+    These are used for illustrative purposes and may not represent optimal model design.
 
-We should now have something like this:
+Our models now look like this:
 
 ```python title="models.py" hl_lines="38-40 47"
 {!> ../docs_src/queries/related_name/new_models.py !}
 ```
 
-We now have another two foreign keys:
+We have added two more foreign keys:
 
-* `member` - ForeignKey from User to Member.
-* `user` - ForeignKey from Profile to User.
+* `member`: ForeignKey from `User` to `Member`.
+* `user`: ForeignKey from `Profile` to `User`.
 
-And the corresponding **related names**:
+And their corresponding **related names**:
 
-* `users` - The related name for the user foreign key.
-* `profiles` - The related name for the profile foreign key.
+* `users`: Related name for the `User` foreign key.
+* `profiles`: Related name for the `Profile` foreign key.
 
-Let us also add some data into the database.
+Let's populate the database with data.
 
 ```python hl_lines="16-17"
 {!> ../docs_src/queries/related_name/new_data.py !}
 ```
 
-This should "deep enough" to understand and now we want to query as deep as we need to.
+This setup is sufficient to illustrate deep nested queries.
 
-* **We want to know what team monica belongs to and we want to make sure the user name is also checked**
+* **Find the team to which `monica` belongs, and verify the user's name.**
 
 ```python
 team = await acme.teams_set.filter(
@@ -175,9 +161,9 @@ team = await acme.teams_set.filter(
 # <Team: Team(id=4)>
 ```
 
-This is great, as expected, `monica` belongs to the `green_team` which is the `id=4`.
+As expected, `monica` belongs to `green_team`, which has `id=4`.
 
-* **We want to know what team monica belongs by checking the email, user name and the profile type**
+* **Find the team to which `monica` belongs, verifying the email, user name, and profile type.**
 
 ```python
 team = await acme.teams_set.filter(
@@ -189,10 +175,9 @@ team = await acme.teams_set.filter(
 # <Team: Team(id=4)>
 ```
 
-Perfect! We have our results as expected.
+Perfect! We have the expected results.
 
-This of course in production wouldn't make too much sense to have the models designed in this way
-but this shows how deep you can go with the related names reverse queries.
+While this model design might not be ideal for production, it demonstrates the depth achievable with related name reverse queries.
 
 [relationships]: ../relationships.md
 [fields]: ../fields/index.md

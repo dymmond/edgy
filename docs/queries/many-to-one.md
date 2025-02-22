@@ -1,34 +1,30 @@
-# Many-to-One relations
+# Many-to-One Relations
 
-Many to one relations are the inverse of a `ForeignKey`. There is only an implicit field for this,
-which is added to the target model with the related name specified or automatically generated.
-The interface is quite similar to [ManyToMany](./many-to-many.md).
-
+Many-to-one relations are the inverse of a `ForeignKey`. There is only an implicit field for this, which is added to the target model with the related name specified or automatically generated. The interface is quite similar to [ManyToMany](./many-to-many.md).
 
 ## Operations
 
-With the many to many you can perform all the normal operations of searching from normal queries
-to the [related_name][related_name] as per normal search.
+With the many-to-one relation, you can perform all the normal operations of searching from normal queries to the [related_name][related_name] as per normal search.
 
-ManyToMany allows three different methods when using it (the same applies for the reverse side).
+Many-to-one relations allow three different methods when using them (the same applies for the reverse side).
 
 * `add()` - Adds a record to the relation (Updates the ForeignKey).
 * `create()` - Create a new record and add it to the relation.
-* `remove()` - Removes a record to the relation (set the ForeignKey to None).
+* `remove()` - Removes a record to the relation (sets the ForeignKey to None).
 
 Let us see how it looks by using the following example.
 
-```python+
+```python
 {!> ../docs_src/queries/manytoone/example.py !}
 ```
 
 #### add()
 
-You can now add teams to organisations, something like this.
+You can now add members to teams, something like this.
 
 ```python
 member = await TeamMember.query.create(name="member1")
-blue_team = await Team.query.create(name="Blue Team")´
+blue_team = await Team.query.create(name="Blue Team")
 
 await blue_team.members.add(member)
 ```
@@ -36,7 +32,6 @@ await blue_team.members.add(member)
 #### create()
 
 You can fuse this to:
-
 
 ```python
 blue_team = await Team.query.create(name="Blue Team")
@@ -49,10 +44,10 @@ This is also more performant because less transactions are required.
 
 #### remove()
 
-You can now remove teams from organisations, something like this.
+You can now remove members from teams, something like this.
 
 ```python
-blue_team = await Team.query.create(name="Blue Team")´
+blue_team = await Team.query.create(name="Blue Team")
 
 member = await blue_team.members.create(name="member1")
 # and now remove
@@ -63,12 +58,10 @@ Hint: when unique, remove works also without argument.
 
 #### Related name
 
-When a [related_name][related_name] is not defined, Edgy will automatically generate one with the following
-format:
+When a [related_name][related_name] is not defined, Edgy will automatically generate one with the following format:
 
 ```shell
 <foreignkey>s_set
 ```
-
 
 [related_name]: ./related-name.md

@@ -1,32 +1,22 @@
-# Tips and tricks
+# Tips and Tricks for Edgy
 
-This part is dedicated to some code organisation within your application.
+This section provides guidance on organizing your code, particularly within an [Esmerald](https://esmerald.dymmond.com) application. While the examples are Esmerald-centric, the principles apply to any framework you use with Edgy.
 
-The examples are more focused on the [Esmerald](https://esmerald.dymmond.com) as the author is the
-same but again, you can do the same in your favourite framework.
+## Centralizing Database Connections
 
-## Placing your connection in a centralised place
+Declaring database connections repeatedly throughout your application can lead to redundancy and potential issues with object identity. By centralizing your connections, you ensure consistency and prevent the creation of unnecessary objects.
 
-This is probably what you would like to do in your application since you don't want to declare
-over and over again the same variables.
+### Global Settings File
 
-The main reason for that is the fact that every time you declare a [registry](./registry.md) or a
-`database`, in fact you are generating a new object and this is not great if you need to access
-the models used with the main registry, right?
+A common approach is to store connection details in a global settings file. This is especially convenient with Esmerald, which provides easy access to settings throughout your application.
 
-### Place the connection details inside a global settings file
-
-This is probably the easiest way to place the connection details and particulary for Esmerald since
-it comes with a simple and easy way of accesing the settings anywhere in the code.
-
-Something simple like this:
+Example:
 
 ```python hl_lines="20-28"
 {!> ../docs_src/tips/settings.py !}
 ```
 
-As you can see, now you have the `db_connection` in one place and easy to access from anywhere in
-your code. In the case of Esmerald:
+With this setup, you can access the `db_connection` from anywhere in your code. In Esmerald:
 
 ```python hl_lines="3"
 from esmerald.conf import settings
@@ -34,74 +24,55 @@ from esmerald.conf import settings
 registry = settings.db_connection
 ```
 
-**But is this enough?**. No.
+However, merely placing the connection details in a settings file isn't sufficient to ensure object identity. Each time you access `settings.db_connection`, a new object is created. To address this, we use the `lru_cache` technique.
 
-As mentioned before, when assigning or creating a variable, python itself generates a new object
-with a different `id` which can differ from each time you need to import the settings into the
-needed places.
+## The LRU Cache
 
-We won't talk about this pythonic tricks as there are plenty of documentation on the web and better
-suited for that same purpose.
+LRU stands for "Least Recently Used." It's a caching technique that ensures functions with the same arguments return the same cached object. This prevents redundant object creation, which is crucial for maintaining consistent database connections.
 
-How do we solve this issue? Enters [lru_cache](#the-lru-cache).
-
-## The LRU cache
-
-LRU extends for **least recently used**.
-
-A very common technique that aims to help caching certain pieces of functionality within your
-codebase and making sure you **do not generate** extra objects and this is exactly what we need.
-
-Use the example above, let us now create a new file called `utils.py` where we will be applying
-the `lru_cache` technique for our `db_connection`.
+Create a `utils.py` file to apply the `lru_cache` to your `db_connection`:
 
 ```python title="utils.py"
 {!> ../docs_src/tips/lru.py !}
 ```
 
-This will make sure that from now on you will always use the same connection and registry within
-your appliction by importing the `get_db_connection()` anywhere is needed.
+Now, you can import `get_db_connection()` anywhere in your application and always get the same connection and registry instance.
 
-Note, you cannot do that if `get_db_connection()` is in the same file like the application entrypoint.
-Here you can use a [`edgy.monkay.instance`](#excurse-the-edgymonkayinstance-sandwich) sandwich instead.
+**Important:** You cannot place `get_db_connection()` in the same file as your application entry point. In such cases, use the [`edgy.monkay.instance`](#excurse-the-edgymonkayinstance-sandwich) sandwich technique.
 
-You can also read further the [Practical Example](#practical-example).
+## Excurse: The `edgy.monkay.instance` Sandwich
 
-## Excurse: The `edgy.monkay.instance` sandwich
+If you prefer to consolidate your code within `main.py`, you can use manual post-loads and initialize connections within `get_application`. This involves:
 
-If you want to short down the code and concentrate in e.g. `main.py` you can also use manual post loads and do the initialization in
-`get_application` this way:
+1.  Creating the registry.
+2.  Assigning the instance to `edgy.instance` using `set_instance()` (without app and skipping extensions).
+3.  Post-loading models.
+4.  Creating the main app.
+5.  Assigning the instance to `edgy.instance` using `set_instance()` (with app).
 
-1. Creating registry.
-2. Assigning the Instance to edgy.instance via set_instance() but without app and skip extensions.
-3. Post loading models.
-4. Creating the main app.
-5. Assigning the Instance to edgy.instance via set_instance() but with app.
+Example `main.py`:
 
-this looks like:
-
-```` python title="main.py"
+````python title="main.py"
 {!> ../docs_src/tips/sandwich_main.py !}
 ````
 
-```` python title="myproject/models.py"
+Example `myproject/models.py`:
+
+````python title="myproject/models.py"
 {!> ../docs_src/tips/sandwich_models.py !}
 ````
 
-The sandwich way has the disadvantage of having just one registry, while with the lru_cache way you can have many
-registries in parallel and mix them.
+The sandwich method is limited to a single registry, while `lru_cache` allows for multiple parallel registries.
 
+## Practical Example
 
-## Practical example
+Let's assemble a practical application with:
 
-Let us now assemble everything and generate an application that will have:
+* A `User` model.
+* [Migrations](./migrations/migrations.md) ready.
+* Database connection setup.
 
-* **User model**
-* **Ready to generate** [migrations](./migrations/migrations.md)
-* **Starts the database connections**
-
-For this example we will have the following structure (we won't be use using all of the files).
-We won't be creating views as this is not the purpose of the example.
+Project structure:
 
 ```shell
 .
@@ -135,76 +106,50 @@ We won't be creating views as this is not the purpose of the example.
     └── urls.py
 ```
 
-This structure is generated by using the
-[Esmerald directives](https://esmerald.dymmond.com/management/directives/)
+### Settings
 
-### The settings
-
-As mentioned before we will have a settings file with database connection properties assembled.
-We have also `edgy_settings` defined (any name is possible). It will be used for the central configuration management
+Define database connection properties in `settings.py`:
 
 ```python title="my_project/configs/settings.py" hl_lines="20-28 30-35"
 {!> ../docs_src/tips/settings.py !}
 ```
 
-### The utils
+### Utils
 
-Now we create the `utils.py` where we appy the [LRU](#the-lru-cache) technique.
+Create `utils.py` with the `lru_cache` implementation:
 
 ```python title="myproject/utils.py"
 {!> ../docs_src/tips/lru.py !}
 ```
 
-Note: here we cannot just import settings. We should wait until `build_path` is called.
+**Note:** Importing settings directly is not possible here. Wait until `build_path` is called.
 
-### The models
+### Models
 
-We can now start creating our [models](./models.md) and making sure we keep them always in the
-same [registry](./registry.md)
-
+Create models in `myproject/apps/accounts/models.py`:
 
 ```python title="myproject/apps/accounts/models.py" hl_lines="8 19"
 {!> ../docs_src/tips/models.py !}
 ```
 
-Here applied the [inheritance](./models.md#with-inheritance) to make it clean and more readable in
-case we want even more models.
+Use [inheritance](./models.md#with-inheritance) for cleaner code. Import `get_db_connection()` to ensure consistent registry usage.
 
-As you could also notice, we are importing the `get_db_connection()` previously created. This is
-now what we will be using everywhere.
+### Prepare for Migrations
 
-### Prepare the application to allow migrations
-
-Now it is time to tell the application that your models and migrations are managed by Edgy.
-More information on [migrations](./migrations/migrations.md) where explains how to use it.
-
+Configure the application for Edgy migrations in `main.py`:
 
 ```python title="myproject/main.py" hl_lines="10 32 38-42 44"
 {!> ../docs_src/tips/migrations.py !}
 ```
 
-This will make sure that your application migrations are now managed by **Edgy**.
+### Hook the Connection
 
-### Hook the connection
-
-As a final step we now need to make sure we hook the [connection](./connection.md) in our
-application. We use an approach for the central management of configuration via esmerald. For this we
-provide a settings forwarder.
-You can also remove the settings forward and manage edgy settings via environment variable too.
+Hook the database connection in `main.py` using a settings forwarder for centralized configuration management:
 
 ```python title="myproject/main.py" hl_lines="32-38 40 48-52 54"
 {!> ../docs_src/tips/connection.py !}
 ```
 
-And this is it.
-
 ## Notes
 
-The above [example](#practical-example) shows how you could take leverage of a centralised place
-to manage your connections and then use it across your application keeping your code always clean
-not redundant and beautiful.
-
-This example is applied to any of your favourite frameworks and you can use as many and different
-techniques as the ones you see fit for your own purposes.
-
-**Edgy is framework agnostic**.
+This example demonstrates how to centralize connection management using `lru_cache` and settings files. Apply these techniques to your favorite frameworks and adapt them to your specific needs. Edgy is framework-agnostic, providing flexibility and consistency in your database interactions.

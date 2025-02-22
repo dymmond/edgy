@@ -1,154 +1,123 @@
-# Connection
+# Connection Management
 
-Using edgy is extremely simple and easy to do but there are some steps you might want to take
-into consideration like connections and what it can happen if this is not done properly.
+Using Edgy is designed to be straightforward, but understanding connection management is crucial for optimal performance and stability.
 
-Edgy is on SQLAlechemy core but is an `async` version of it and therefore what happens if you
-want to use it within your favourite frameworks like [Esmerald](https://esmerald.dymmond.com),
-Starlette or even FastAPI?
+Edgy is built on SQLAlchemy Core, but it's an asynchronous implementation. This raises questions about its integration with popular frameworks like [Esmerald](https://esmerald.dymmond.com), Starlette, or FastAPI.
 
-Well, Edgy is framework agnostic so it will fit in any framework you want, even in those that
-are not listed above that support **lifecycle events**.
+Edgy is framework-agnostic, meaning it can be seamlessly integrated into any framework that supports lifecycle events.
 
-## Lifecycle events
+## Lifecycle Events
 
-These are very common amongst those frameworks that are based on Starlette, like
-[Esmerald](https://esmerald.dymmond.com) or FastAPI but other might have a similar approach but
-using different approaches.
+Lifecycle events are common in frameworks built on Starlette, such as [Esmerald](https://esmerald.dymmond.com) and FastAPI. Other frameworks may offer similar functionality through different mechanisms.
 
-The common lifecycle events are the following:
+The most common lifecycle events include:
 
 * **on_startup**
 * **on_shutdown**
 * **lifespan**
 
-This document will focus on the one more commonly used, `lifespan`.
+This document focuses on `lifespan`, which is widely used.
 
-## Hooking your database connection into your application
+## Hooking Database Connections into Your Application
 
-Hooking a connection is as easy as putting them inside those events in your framework.
+Integrating database connections is as simple as incorporating them into your framework's lifecycle events.
 
-For this example, since the author is the same as the one of [Esmerald](https://esmerald.dymmond.com),
-we will be using it for explanatory purposes, feel free to apply the same principle in your favourite
-framework.
+For illustrative purposes, we'll use [Esmerald](https://esmerald.dymmond.com). However, the principles apply to any framework.
 
-with the ASGI integration:
+Using ASGI integration:
 
 ```python hl_lines="8-12"
 {!> ../docs_src/connections/asgi.py !}
 ```
 
-Or doing it manually (that applies to every framework):
-
+Manual integration (applicable to all frameworks):
 
 ```python hl_lines="11-12"
 {!> ../docs_src/connections/simple.py !}
 ```
 
-Or just as an async contexmanager
+Using an asynchronous context manager:
 
 ```python
 {!> ../docs_src/connections/asynccontextmanager.py !}
 ```
 
-And that is pretty much this. Once the connection is hooked into your application lifecycle.
-Otherwise you will get warnings about decreased performance because the databasez backend is not connected and will be
-reininitialized for each operation.
+Once the connection is integrated into your application's lifecycle, you can use the ORM throughout your application. Failing to do so will result in performance warnings, as the databasez backend will be reinitialized for each operation.
 
-You are now free to use the ORM anywhere in your application. As well as extra defined database connections in registry.
+You can also define additional database connections in the registry and switch between them.
 
-## Django integration
+## Django Integration
 
-Django currently doesn't support the lifespan protocol. So we have a keyword parameter to handle it ourselves.
+Django doesn't natively support the lifespan protocol. Therefore, we provide a keyword parameter for manual handling.
 
 ```python
 {!> ../docs_src/connections/django.py !}
 ```
 
-## Manual integration
+## Manual Integration
 
-The `__aenter__` and `__aexit__` methods support also being called like `connect` and `disconnect`.
-It is however not recommended as contextmanagers have advantages in simpler error handling.
+The `__aenter__` and `__aexit__` methods can be called as `connect` and `disconnect`. However, using context managers is recommended for simpler error handling.
 
 ```python
 {!> ../docs_src/connections/manual.py !}
 ```
 
-You can use this however for an integration via `on_startup` & `on_shutdown`.
+This approach is suitable for integration via `on_startup` and `on_shutdown`.
 
 ```python
 {!> ../docs_src/connections/manual_esmerald.py !}
 ```
 
-## `DatabaseNotConnectedWarning` warning
+## `DatabaseNotConnectedWarning`
 
-This warning appears, when an unconnected Database object is used for an operation.
+This warning appears when an unconnected `Database` object is used.
 
-Despite bailing out the warning `DatabaseNotConnectedWarning` is raised.
-You should connect correctly like shown above.
-In sync environments it is a bit trickier.
+Despite the warning being non-fatal, you should establish proper connections as demonstrated above. Synchronous environments require additional care.
 
 !!! Note
-    When passing Database objects via using, make sure they are connected. They are not necessarily connected
-    when not in extra.
+    Ensure that `Database` objects passed via `using` are connected. They are not guaranteed to be connected outside of `extra`.
 
-## Integration in sync environments
+## Integration in Synchronous Environments
 
-When the framework is sync by default and no async loop is active we can fallback to `run_sync`.
-It is required to build an async evnironment via the `with_async_env` method of registry. Otherwise
-we run in bad performance problems and have `DatabaseNotConnectedWarning` warnings.
-`run_sync` calls **must** happen within the scope of `with_async_env`. `with_async_env` is reentrant and has an optional loop parameter.
+When the framework is synchronous and no asynchronous loop is active, we can use `run_sync`. It's necessary to create an asynchronous environment using the `with_async_env` method of the registry. Otherwise, you'll encounter performance issues and `DatabaseNotConnectedWarning` warnings. `run_sync` calls must occur within the scope of `with_async_env`. `with_async_env` is re-entrant and accepts an optional loop parameter.
 
 ```python
 {!> ../docs_src/connections/contextmanager.py !}
 ```
-To keep the loop alive for performance reasons we can either wrap the server worker loop or in case of
-a single-threaded server the server loop which runs the application. As an alternative you can also keep the asyncio eventloop alive.
-This is easier for sync first frameworks like flask.
-Here an example which is even multithreading save.
+
+To maintain the loop for performance reasons, you can wrap the server worker loop or, for single-threaded servers, the server loop that runs the application. Alternatively, you can keep the asyncio event loop alive, which is easier for synchronous-first frameworks like Flask. Here's an example that's multi-threading safe.
 
 ```python
 {!> ../docs_src/connections/contextmanager_with_loop.py !}
 ```
 
-That was complicated, huh? Let's unroll it in a simpler example with explicit loop cleanup.
-
+That was complicated, right? Let's unroll it in a simpler example with explicit loop cleanup.
 
 ```python
 {!> ../docs_src/connections/contextmanager_with_loop_and_cleanup.py !}
 ```
 
-Note: `with_async_env` also calls `__aenter__` and `__aexit__` internally. So the database is connected during the
-with scope spanned by `with_async_env`.
-This means you can use `run_sync` as well as running commands in another loop via e.g. asyncio.run.
-Everything **just** works without raising the `DatabaseNotConnectedWarning`.
-This for example used for `edgy shell`.
+Note: `with_async_env` internally calls `__aenter__` and `__aexit__`. Therefore, the database is connected during the `with` scope of `with_async_env`. This means you can use `run_sync` and run commands in another loop (e.g., via `asyncio.run`). Everything works without raising `DatabaseNotConnectedWarning`. This is used, for example, in `edgy shell`.
 
-## `run_sync` function
+## `run_sync` Function
 
-`run_sync` needs a bit more explaination. On the one hand it hooks into the async environment
-spawned by `with_async_env`. On the other hand it prefers checking for an active running loop (except if an explicit loop was provided).
-If an active loop was found, a subloop is spawned which is only torn down when the found loop (or explicit provided loop) was collected.
-When an idling loop was found, it will be reused, instead of creating a subloop.
+`run_sync` requires further explanation. It integrates with the asynchronous environment created by `with_async_env` and prefers checking for an active running loop (unless an explicit loop is provided). If an active loop is found, a subloop is created, which is only terminated when the found loop (or explicit loop) is garbage collected. If an idling loop is found, it's reused instead of creating a subloop.
 
 What is a subloop?
 
-A subloop is an eventloop running in an extra thread. This enables us to run multiple eventloops simultanously.
-They are removed when the parent eventloop is garbage collected.
+A subloop is an event loop running in a separate thread. This allows multiple event loops to run concurrently. They are removed when the parent event loop is garbage collected.
 
-However given that the eventloops are quite sticky despite they should have been garbage collected
-we additionally poll if the old loop had stopped.
+However, given that event loops can be sticky, we additionally check if the old loop has stopped.
 
-## Querying other schemas
+## Querying Other Schemas
 
-Edgy supports that as well. Have a look at the [tenancy](./tenancy/edgy.md) section for more details.
+Edgy supports querying other schemas. Refer to the [tenancy](./tenancy/edgy.md) section for details.
 
-## Having multiple connections
+## Multiple Connections
 
-Edgy Registry has an extra parameter where named additional Database objects or strings can be defined. Having them there
-is useful because they will be connected/disconnected too.
+The Edgy Registry accepts an `extra` parameter for defining named additional `Database` objects or strings. Including them here ensures they're connected and disconnected appropriately.
 
-You can switch to them on the fly via [using](./queries/queries.md#selecting-the-database-and-schema).
+You can switch between them using [using](./queries/queries.md#selecting-the-database-and-schema).
 
 ## Migrate from flask-migrate
 
