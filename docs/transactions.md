@@ -1,53 +1,36 @@
-# Transactions
+# Transactions in Edgy
 
-Edgy using `databases` package allows also the use of transacations in a very familiar way for
-a lot of the users.
-
-You can see a transaction as atomic, which means, when you need to save everything or fail all.
+Edgy, leveraging the `databasez` package, provides robust transaction support that will feel familiar to many developers. Transactions ensure atomicity, meaning that a series of database operations either all succeed or all fail, maintaining data consistency.
 
 !!! Tip
-    Check more information about [atomicity](https://en.wikipedia.org/wiki/Atomicity_(database_systems)#:~:text=An%20atomic%20transaction%20is%20an,rejecting%20the%20whole%20series%20outright) to get familiar with the concept.
+    For a deeper understanding of atomicity, refer to the [Atomicity in Database Systems](https://en.wikipedia.org/wiki/Atomicity_(database_systems)#:~:text=An%20atomic%20transaction%20is%20an,rejecting%20the%20whole%20series%20outright) documentation.
 
-There are three ways of using the transaction in your application:
+Edgy offers three primary ways to manage transactions:
 
-* As a [decorator](#as-a-decorator)
-* As a [context manager](#as-a-context-manager)
-
-The following explanations and examples will take in account the following:
-
-Let us also assume we want to create a `user` and a `profile` for that user in a simple endpoint.
+The following examples will use a scenario where we create a `user` and a `profile` for that user within a single endpoint.
 
 !!! danger
-    If you are trying to setup your connection within your application and have faced some errors
-    such as `AssertationError: DatabaseBackend is not running`, please see the [connection](./connection.md)
-    section for more details and how to make it properly.
+    If you encounter `AssertionError: DatabaseBackend is not running`, please consult the [connection](./connection.md) section for proper connection setup.
 
 ```python
 {!> ../docs_src/transactions/models.py!}
 ```
 
-## As a decorator
+## As a Decorator
 
-This is probably one of the less common ways of using transactions but still very useful if you
-want all of your endpoint to be atomic.
+Using transactions as decorators is less common but useful for ensuring entire endpoints are atomic.
 
-We want to create an endpoint where we save the `user` and the `profile` in one go. Since the
-author of Edgy is the same as [Esmerald](https://esmerald.dymmond.com), it makes sense to use
-it as example.
-
-**You can use whatever you want, from Starlette to FastAPI. It is your choice**.
+Consider an Esmerald endpoint (but this can be any web framework) that creates a `user` and a `profile` in one atomic operation:
 
 ```python hl_lines="18"
 {!> ../docs_src/transactions/decorator.py!}
 ```
 
-As you can see, the whole endpoint is covered to work as one transaction. This cases are rare but
-still valid to be implemented.
+In this case, the `@transaction()` decorator ensures that the entire endpoint function executes within a single transaction. This approach is suitable for cases where all operations within a function must be atomic.
 
-## As a context manager
+## As a Context Manager
 
-This is probably the most common use-case for the majority of the applications where within a view
-or an operation, you will need to make some transactions that need atomacity.
+Context managers are the most common way to manage transactions, especially when specific sections of code within a view or operation need to be atomic.
 It is recommended to use the model or queryset transaction method.
 This way the transaction of the right database is used.
 
@@ -55,23 +38,22 @@ This way the transaction of the right database is used.
 {!> ../docs_src/transactions/context_manager.py!}
 ```
 
-It is also possible to use the current active database of a QuerySet:
+Using the current active database of a QuerySet:
 
 ```python hl_lines="23"
 {!> ../docs_src/transactions/context_manager2.py!}
 ```
 
-Of course you can also access the database and start the transaction:
+You can also access the database and start the transaction directly:
 
 ```python hl_lines="23"
 {!> ../docs_src/transactions/context_manager_direct.py!}
 ```
 
-## Important notes
+This ensures that the operations within the `async with` block are executed atomically. If any operation fails, all changes are rolled back.
 
-Edgy although running on the top of [Databasez](https://databasez.dymmond.com/) it varies in
-many aspects and offers features unprovided by sqlalchemy.
-For example the jdbc support or support for a mixed threading/async environment.
+## Important Notes
 
-If you are interested in knowing more about the low-level APIs of databasez,
-[check out](https://github.com/dymmond/databasez) or [documentation](https://databasez.dymmond.com/).
+Edgy, while built on top of [Databasez](https://databasez.dymmond.com/), offers unique features beyond those provided by SQLAlchemy. These include JDBC support and compatibility with mixed threading/async environments.
+
+For more information on the low-level APIs of Databasez, refer to the [Databasez repository](https://github.com/dymmond/databasez) and its [documentation](https://databasez.dymmond.com/).

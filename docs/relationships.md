@@ -1,31 +1,25 @@
 # Relationships
 
-Creating relationships in **Edgy** is as simple as importing the fields and apply them into
-the models.
+Establishing relationships between models in **Edgy** is straightforward, involving importing the necessary fields and applying them to your models.
 
-There are currently two types, the [ForeignKey](./fields/index.md#foreignkey)
-and the [OneToOne](./fields/index.md#onetoone).
+Edgy currently supports two relationship types: [ForeignKey](./fields/index.md#foreignkey) and [OneToOne](./fields/index.md#onetoone).
 
-When declaring a foreign key, you can pass the value in two ways, as a string or as a model
-object. Internally **Edgy** lookups up inside the [registry](./models.md#registry) and maps
-your fields.
+When defining a foreign key, you can specify the related model either as a string or as a model object. Edgy internally resolves the relationship using the [registry](./models.md#registry).
 
-When declaring a model you can have one or more ForeignKey pointing to different tables or
-multiple foreign keys pointing to the same table as well.
+A model can have one or more foreign keys pointing to different tables or multiple foreign keys referencing the same table.
 
 !!! Tip
-    Have a look at the [related name](./queries/related-name.md) documentation to understand how
-    you can leverage reverse queries with foreign keys.
+    Refer to the [related name](./queries/related-name.md) documentation to learn how to leverage reverse queries with foreign keys.
 
 ## ForeignKey
 
-Let us define the following models `User` and `Profile`.
+Let's define two models, `User` and `Profile`.
 
 ```python
 {!> ../docs_src/relationships/model.py !}
 ```
 
-Now let us create some entries for those models.
+Now, let's create some entries for these models.
 
 ```python
 user = await User.query.create(first_name="Foo", email="foo@bar.com")
@@ -35,47 +29,43 @@ user = await User.query.create(first_name="Bar", email="bar@foo.com")
 await Profile.query.create(user=user)
 ```
 
-### Multiple foreign keys pointing to the same table
+### Multiple Foreign Keys Pointing to the Same Table
 
-What if you want to have multiple foreign keys pointing to the same model? This is also easily
-possible to achieve.
+You can have multiple foreign keys referencing the same model.
 
 ```python hl_lines="20-29"
 {!> ../docs_src/relationships/multiple.py !}
 ```
 
 !!! Tip
-    Have a look at the [related name](./queries/related-name.md) documentation to understand how
-    you can leverage reverse queries with foreign keys withe the
-    [related_name](./queries/related-name.md#related_name-attribute).
+    Refer to the [related name](./queries/related-name.md) documentation to understand how to leverage reverse queries with foreign keys using the [related_name](./queries/related-name.md#related_name-attribute) attribute.
 
-### Load an instance without the foreign key relationship on it
+### Load an Instance Without the Foreign Key Relationship Populated
 
 ```python
 profile = await Profile.query.get(id=1)
 
-# We have an album instance, but it only has the primary key populated
+# We have a profile instance, but it only has the primary key populated
 print(profile.user)       # User(id=1) [sparse]
 print(profile.user.pk)    # 1
 print(profile.user.email)  # Raises AttributeError
 ```
 
-#### Load recursive
+#### Load Recursively
 
-Especcially in connection with model_dump it is helpful to populate all foreign keys.
-You can use `load_recursive` for that.
+Especially when using `model_dump`, it's helpful to populate all foreign keys. You can use `load_recursive` for this.
 
 ```python
 profile = await Profile.query.get(id=1)
 await profile.load_recursive()
 
-# We have an album instance and all foreign key relations populated
-print(profile.user)       # User(id=1) [sparse]
+# We have a profile instance and all foreign key relations populated
+print(profile.user)       # User(id=1)
 print(profile.user.pk)    # 1
-print(profile.user.email)  # ok
+print(profile.user.email)  # foo@bar.com
 ```
 
-### Load an instance with the foreign key relationship on it
+### Load an Instance with the Foreign Key Relationship Populated
 
 ```python
 profile = await Profile.query.get(user__id=1)
@@ -83,28 +73,24 @@ profile = await Profile.query.get(user__id=1)
 await profile.user.load() # loads the foreign key
 ```
 
-### Load an instance with the foreign key relationship on it with select related
+### Load an Instance with the Foreign Key Relationship Populated Using `select_related`
 
 ```python
 profile = await Profile.query.select_related("user").get(id=1)
 
-print(profile.user)       # User(id=1) [sparse]
+print(profile.user)       # User(id=1)
 print(profile.user.pk)    # 1
 print(profile.user.email)  # foo@bar.com
 ```
 
-### Access the foreign key values directly from the model
+### Access Foreign Key Values Directly from the Model
 
 !!! Note
-    This is only possible since the version 0.9.0 of **Edgy**, before this version, the only way was
-    by using the [select_related](#load-an-instance-with-the-foreign-key-relationship-on-it-with-select-related) or
-    using the [load()](./queries/queries.md#load-the-foreign-keys-beforehand-with-select-related).
+    This is possible since Edgy version 0.9.0. Before this version, you had to use `select_related` or `load()`.
 
-You can access the values of the foreign keys of your model directly via model instance without
-using the [select_related](#load-an-instance-with-the-foreign-key-relationship-on-it-with-select-related) or
-the [load()](./queries/queries.md#load-the-foreign-keys-beforehand-with-select-related).
+You can access foreign key values directly from the model instance without using `select_related` or `load()`.
 
-Let us see an example.
+Let's see an example.
 
 **Create a user and a profile**
 
@@ -122,72 +108,63 @@ print(profile.user.email) # "foo@bar.com"
 print(profile.user.first_name) # "Foo"
 ```
 
-## ForeignKey constraints
+## ForeignKey Constraints
 
-As mentioned in the [foreign key field](./fields/index.md#foreignkey), you can specify constraints in
-a foreign key.
+As mentioned in the [foreign key field](./fields/index.md#foreignkey) documentation, you can specify constraints for foreign keys.
 
-The available values are `CASCADE`, `SET_NULL`, `RESTRICT` and those can also be imported
-from `edgy`.
+The available values are `CASCADE`, `SET_NULL`, and `RESTRICT`, which can be imported from `edgy`.
 
 ```python
 from edgy import CASCADE, SET_NULL, RESTRICT
 ```
 
-When declaring a foreign key or a one to one key, the **on_delete must be provided** or an
-`AssertationError` is raised.
+When defining a foreign key or one-to-one key, the `on_delete` parameter is **mandatory**.
 
-Looking back to the previous example.
+Looking back at the previous example:
 
 ```python hl_lines="20"
 {!> ../docs_src/relationships/model.py !}
 ```
 
-`Profile` model defines a `edgy.ForeignKey` to the `User` with `on_delete=edgy.CASCADE` which
-means that whenever a `User` is deleted from the database, all associated `Profile` instances will
-also be removed.
+The `Profile` model defines an `edgy.ForeignKey` to `User` with `on_delete=edgy.CASCADE`. This means that whenever a `User` is deleted, all associated `Profile` instances will also be removed.
 
-### Delete options
+### Delete Options
 
-* **CASCADE** - Remove all referencing objects.
-* **RESTRICT** - Restricts the removing referenced objects.
-* **SET_NULL** - This will make sure that when an object is deleted, the associated referencing
-instances pointing to that object will set to null. When this `SET_NULL` is true, the `null=True`
-must be also provided or an `AssertationError` is raised.
+* **CASCADE**: Remove all referencing objects.
+* **RESTRICT**: Restricts the removal of referenced objects.
+* **SET_NULL**: Sets the referencing instance's foreign key to `null` when the referenced object is deleted. When using `SET_NULL`, `null=True` must also be provided.
 
 ## OneToOne
 
-Creating an `OneToOneField` relationship between models is basically the same as the
-[ForeignKey](#foreignkey) with the key difference that it uses `unique=True` on the foreign key
-column.
+Creating a `OneToOneField` relationship between models is similar to [ForeignKey](#foreignkey), with the key difference being that it uses `unique=True` on the foreign key column.
 
 ```python hl_lines="20"
 {!> ../docs_src/relationships/onetoone.py !}
 ```
 
-The same rules for this field are the same as the [ForeignKey](#foreignkey) as this derives from it.
+The same rules apply to this field as to [ForeignKey](#foreignkey), as it derives from it.
 
-Let us create a `User` and a `Profile`.
+Let's create a `User` and a `Profile`.
 
 ```python
 user = await User.query.create(email="foo@bar.com")
 await Profile.query.create(user=user)
 ```
 
-Now creating another `Profile` with the same user will fail and raise an exception.
+Creating another `Profile` with the same user will fail and raise an exception.
 
 ```
 await Profile.query.create(user=user)
 ```
 
-
 ## Limitations
 
-We cannot cross the database with a query, yet.
-This means you can not join a MySQL table with a PostgreSQL table.
+Edgy currently does not support cross-database queries.
+
+This means you cannot join a MySQL table with a PostgreSQL table.
 
 How can this be implemented?
 
 Of course joins are not possible. The idea is to execute a query on the child database and then check which foreign key values match.
 
-Of course the ForeignKey has no constraint and if the data vanish it points to nowhere
+Of course the ForeignKey has no constraint and if the data vanish it points to nowhere.

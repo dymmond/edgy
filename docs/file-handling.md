@@ -1,209 +1,148 @@
-# File handling
+# File Handling
 
-File handling is notorios difficult topic in ORMs. In edgy we try to streamline it,
-so it is easy to understand and secure.
+File handling in ORMs is notoriously challenging. Edgy aims to simplify and secure this process.
 
-For this edgy has three security layers:
+Edgy implements three security layers:
 
-1. Restricting the image formats parsed (ImageFields).
-2. Approved-only open of files (option).
-3. Direct size access as field. This way quota handling gets easy. No need to manually track the sizes.
-   However this configurable.
+1.  **Restricting Image Formats:** For `ImageFields`, Edgy restricts the image formats that can be parsed, mitigating potential security vulnerabilities.
+2.  **Approved-Only File Opening:** Edgy provides an option for approved-only file opening, ensuring that potentially dangerous files are not automatically processed.
+3.  **Direct Size Access:** Edgy offers direct size access as a field, simplifying quota management and eliminating the need for manual size tracking. This feature is configurable.
 
-and to align it with ORMs it uses a staging+non-overwrite by default concept for more safety.
+To align with ORM best practices, Edgy employs a staging and non-overwrite concept for enhanced safety. This prevents file name clashes and ensures that files are not overwritten if the save process fails.
 
-This means, there has no worry about file names clashing (one of the main reasons people wanting
-access to the model instance during file name creation).
-Nor that if a file shall be overwritten and the save process fails the file is still overwritten.
+Edgy uses process PID prefixing and thread-safe name reservation, committing file changes only after saving the model instance. This eliminates concerns about file overwrites, regardless of whether you're using processes or threads.
 
-It is realized via process pid prefixing and a thread-safe reserving an available name which is used after for the file creation and
-commiting the file changes only after saving the model instance (direct manipulation is still possible via parameters).
+Edgy provides three relevant file classes:
 
-In short: Just use and stop worrying about the files beeing overwritten. No matter if you use processes or threads.
-
-
-There are three relevant File classes:
-
-- File: Raw IO to a file-like. Baseclass with many helper functions.
-- ContentFile: In-memory IO. Transforms bytes on the fly. But can also be used with files.
-- FieldFile: Transactional handler for field oeprations. Used in FileField. Not used directly except in subclasses of FileField.
-
+* **File:** A base class for raw I/O operations on file-like objects, offering various helper functions.
+* **ContentFile:** An in-memory I/O class that transforms bytes on the fly and can also be used with files.
+* **FieldFile:** A transactional handler for field operations, used in `FileField` and its subclasses.
 
 ## Configuration
 
-Filehandling is configured via the global settings. See `edgy/conf/global_settings.py` for the options.
+File handling is configured through global settings, which can be found in `edgy/conf/global_settings.py`.
 
-## Direct
+## Direct Access
 
-Direct access is possible via the storages object in edgy.files. Here you can access the files directly with a storage of your choice.
-You get an url or path for accessing the files directly.
-This way besides the global configuration nothing is affected.
+Direct file access is possible through the `storages` object in `edgy.files`. This allows you to access files directly using a storage of your choice, obtaining URLs or paths for direct file access. This approach minimizes the impact on other parts of your application.
 
-However there is also just limited access to transactional file handling. There is more control by using `save` explicit.
+However, direct access provides limited transactional file handling. For more control, use the `save` method explicitly.
 
 ## Fields
 
-The recommended way to handle files with database tables are FileFields and ImageFields. Both are quite similar,
-in fact ImageFields are a subclass with image related extensions.
+`FileFields` and `ImageFields` are the recommended way to handle files within database tables. `ImageFields` are a subclass of `FileFields` with additional image-related extensions.
 
-Fields follow a multi-store concept. It is possible to use in the same FileField multiple stores. The store name is saved along with
-the file name, so the right store can be retrieved later.
+Edgy fields support a multi-store concept, allowing you to use multiple storage backends within the same field. The storage name is saved alongside the file name, enabling retrieval of the correct storage later.
 
 ### FileField
 
-FileField allow to save files next to the database. In contrast to Django, you don't have to worry about the file-handling.
-It is all done automatically.
+`FileField` allows you to save files alongside your database records. Edgy handles file operations automatically, including cleanups when files are unreferenced.
 
-The cleanups when a file gets unreferenced are done automatically (No old files laying around) but this is configurable too.
-Queries are fully integrated, it is possible to use delete, bulk_create, bulk_update without problems.
+Edgy also prevents overwriting files by default, even in the event of failed save operations.
 
-Also by default overwriting is not possible. Files even honor a failed save and doesn't overwrite blindly the old ones.
+Setting a `FileField` to `None` implicitly deletes the file after saving.
 
-Setting a file field to None, implicitly deletes the file after saving.
-
-For higher control, the methods of the FieldFile can be used.
+For finer control, you can use the methods of the `FieldFile` class.
 
 !!! Tip
-    You may want to set null=True to allow the deletion of the file and having a consistent state afterward.
-    However you can circumvent the logic by using `delete` with `instant=True` which disables the transactional
-    file handling and just deletes the file and set the name when `null=True` to None.
-    In DB the old name will be still referenced, so using `instant=True` is unsafe, except if the object is deleted anyway.
-    The `instant` parameter is used for the object deletion hook to cleanup.
+    Set `null=True` to allow file deletion and maintain a consistent state. Use `delete(instant=True)` to bypass transactional file handling and delete files immediately (use with caution).
 
 #### Parameters
 
-- `storage`: (Default: `default`) The default storage to use with the field.
-- `with_size`: (Default: `True`). Enable the size field.
-- `with_metadata`: (Default: `True`). Enable the metadata field.
-- `with_approval`: (Default: `False`). Enable the approval logic.
-- `extract_mime`: (Default: `True`). Save the mime in the metadata field. You can set "approved_only" to only do this for approved files.
-- `mime_use_magic`: (Default: `False`). Use the `python-magic` library to get the mime type
-- `field_file_class`: Provide a custom FieldFile class.
-- `generate_name_fn`: fn(instance (if available), name, file, is_direct_name). Customize the name generation.
-- `multi_process_safe`: (Default: `True`). Prefix name with the current process id by default.
+* `storage`: (Default: `default`) The default storage to use.
+* `with_size`: (Default: `True`) Enable the size field.
+* `with_metadata`: (Default: `True`) Enable the metadata field.
+* `with_approval`: (Default: `False`) Enable approval logic.
+* `extract_mime`: (Default: `True`) Save MIME type in metadata. Set to `"approved_only"` to do this only for approved files.
+* `mime_use_magic`: (Default: `False`) Use the `python-magic` library to get the MIME type.
+* `field_file_class`: Provide a custom `FieldFile` class.
+* `generate_name_fn`: Customize name generation.
+* `multi_process_safe`: (Default: `True`) Prefix name with process ID.
 
 !!! Tip
-    If you don't want the process pid prefix you can disable this feature with `multi_process_safe=False`.
+    Disable process PID prefixing with `multi_process_safe=False`.
 
 !!! Note
-    The process pid prefixing has a small limitation: all processes must be in the same process namespace (e.g. docker).
-    If two processes share the same pid and are alive, the logic doesn't work but because of the random part a collision will be still unlikely.
-    You may want to add an unique container identifier or ip address via the generate_name_fn parameter to the path.
+    Process PID prefixing requires all processes to be in the same process namespace. Use `generate_name_fn` to add unique identifiers.
 
 #### FieldFile
 
-Internally the changes are tracked via the FieldFile pseudo descriptor. It provides some useful interface parts of a file-like (at least
-so much, that pillow open is supported).
+`FieldFile` tracks changes and provides a file-like interface.
 
-You can manipulate the file via setting a file-like object or None or for better control, there are three methods:
+You can manipulate files by setting a file-like object or `None`, or use the following methods:
 
-* save(content, *, name="", delete_old=True, multi_process_safe=None, approved=None, storage=None, overwrite=None):
-* delete(*, instant, approved): Stage file deletion. When setting instant, the file is deleted without staging.
-* set_approved(bool): Set the approved flag. Saved in db with `with_approval`
+* `save(content, *, name="", delete_old=True, multi_process_safe=None, approved=None, storage=None, overwrite=None)`: Save a file.
+* `delete(*, instant, approved)`: Stage file deletion.
+* `set_approved(bool)`: Set the approved flag.
 
-`content` is the most important parameter. It supports File-Like objects in bytes mode as well as bytes directly as well as File instances.
-
-In contrast to Django the conversion is done automatically.
-
+`content` supports file-like objects, bytes, and `File` instances.
 
 !!! Tip
-    You can overwrite a file by providing overwrite=True to save and pass the old file name.
-    There is no extra prefix added from `multi_process_safe` by default (except you set the parameter explicitly `True`), so the overwrite works.
+    Overwrite files with `overwrite=True` and the old file name.
 
 !!! Tip
-    You can set the approved flag while saving deleting by providing the approved flag.
+    Set the approved flag during save or delete.
 
 !!! Tip
-    If you want for whatever reason `multi_process_safe` and `overwrite` together, you have to specify both parameters explicitly.
+    Use `multi_process_safe` and `overwrite` together by specifying both parameters explicitly.
 
 #### Metadata
 
-The default metadata of a FileField consists of
+`FileField` metadata includes:
 
-- `mime`
+* `mime`
 
-Additionally if `with_size` is True you can query the size of the file in db via the size field.
-It is automatically added with the name `<file_field_name>_size`.
-
+If `with_size` is `True`, the file size is available in the database as `<file_field_name>_size`.
 
 ### ImageField
 
-Extended FileField for image handling. Because some image formats are notorious unsafe you can limit the loaded formats.
+`ImageField` extends `FileField` for image handling, allowing you to restrict loaded image formats.
 
+#### Extra Parameters
 
-#### Extra-Parameters
-
-- `with_approval`: (Default: `True`). Enable the approval logic. Enabled by default in ImageFields.
-- `image_formats`: (Default: []). Pillow formats to allow loading when the file is not approved. Set to None to allow all.
-- `approved_image_formats`: (Default: None). Extra pillow formats to allow loading when the file is approved. Set to None to allow all (Default).
+* `with_approval`: (Default: `True`) Enable approval logic.
+* `image_formats`: (Default: `[]`) Allowed Pillow formats for non-approved files.
+* `approved_image_formats`: (Default: `None`) Allowed Pillow formats for approved files.
 
 #### ImageFieldFile
 
-This is a subclass from FieldFile with an additional method
+`ImageFieldFile` is a subclass of `FieldFile` with an additional method:
 
-`open_image`
-
-which opens the file as a PIL ImageFile.
+* `open_image`: Opens the file as a PIL `ImageFile`.
 
 !!! Note
-    `open_image` honors the format restrictions by the ImageField.
-
+    `open_image` honors the format restrictions specified by `ImageField`.
 
 #### Metadata
 
-The default metadata of a ImageField consists of
+`ImageField` metadata includes:
 
-- `mime`
-- `height` (if the image could be loaded (needs maybe approval))
-- `width` (if the image could be loaded (needs maybe approval))
+* `mime`
+* `height`
+* `width`
 
-Also the size is available like in FileField in a seperate field (if enabled).
+The file size is also available, similar to `FileField`.
 
 ## Concepts
 
 ### Quota
 
-When storing user data, a quota calculation is important to prevent a malicous use as well as billing
-the users correctly.
-
-A naive implementation would iterate through the objects and add all sizes, so a storage usage can be determined.
-
-This is inperformant! We have the size field.
-
-Instead of iterating through the objects, we just sum up the sizes in db per table via the sum operator
-
+Use the size field to calculate storage usage efficiently.
 
 ```python
 {!> ../docs_src/fields/files/file_with_size.py !}
 ```
 
-
-
 ### Metadata
 
-Because metadata of files are highly domain specific a JSONField is used to hold the attributes. By default
-`mime` is set and in case of ImageField `height` and `width`. This field is writable, so it can be extended via automatically set metadata.
-However when saving a file or the model without exclusions it is overwritten.
+Metadata is stored in a `JSONField`. Extend metadata by subclassing fields and providing a custom `extract_metadata` method.
 
-The recommend way of extending it is via subclassing the fields (actually the factories) and providing a custom extract_metadata.
+The metadata column is named `<file_or_image_field_name>_mdata`.
 
-The column name of the metadata field differs from the field name because of size reasons (long names can lead to violating
-column name length limits).
+### Approval Concept
 
-It is available as column `<file_or_image_field_name>_mdata`.
+The `with_approval` parameter enables per-file approval. Non-approved files have limited attribute extraction.
 
+`ImageField` allows specifying image formats that are processed regardless of approval.
 
-### Approval concept
-
-FileFields and ImageField have a parameter `with_approval`. This parameter enables a per file approval.
-Non-approved files cannot be opened and only a limited set of attributes is extracted (e.g. mime).
-
-This ensures dangerous files are not opened automatically but first checked by a moderator or admin before they are processed.
-For usability `ImageField` allows to specify image formats which are processed regardless if the file was approved.
-By default list of these formats is empty (behavior is off).
-
-Third party applications can scan for the field:
-
-`<file_or_image_field_name>_approved` or the column with name `<file_or_image_field_name>_ok`
-
-to detect if a file was approved.
+Third-party applications can check the `<file_or_image_field_name>_approved` field or `<file_or_image_field_name>_ok` column to determine file approval status.

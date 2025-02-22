@@ -1,117 +1,98 @@
-# Settings
+# Settings in Edgy
 
-Who never had that feeling that sometimes haing some database settings would be nice? Well, since
-Edgy is from the same author of Esmerald and since Esmerald is [settings][esmerald_settings] oriented, why not apply
-the same principle but in a simpler manner but to Edgy?
-
-This is exactly what happened.
+Have you ever wished you could easily configure database settings? Since Edgy is created by the same author as Esmerald, and Esmerald is [settings][esmerald_settings] oriented, Edgy adopts a similar approach, albeit in a simpler form.
 
 ## Edgy Settings Module
 
-The way of using the settings object within a Edgy use of the ORM is via:
+Edgy uses the following environment variable to locate its settings:
 
-* **EDGY_SETTINGS_MODULE** environment variable.
+* **EDGY_SETTINGS_MODULE**
 
-All the settings are **[Pydantic BaseSettings](https://pypi.org/project/pydantic-settings/)** objects which makes it easier to use and override
-when needed.
+All settings are **[Pydantic BaseSettings](https://pypi.org/project/pydantic-settings/)** objects, making them easy to use and override.
 
 ### EDGY_SETTINGS_MODULE
 
-Edgy by default uses is looking for a `EDGY_SETTINGS_MODULE` environment variable to run and
-apply the given settings to your instance.
+Edgy looks for the `EDGY_SETTINGS_MODULE` environment variable to load and apply settings.
 
-If no `EDGY_SETTINGS_MODULE` is found, Edgy then uses its own internal settings which are
-widely applied across the system.
+If `EDGY_SETTINGS_MODULE` is not found, Edgy uses its internal default settings.
 
-#### Custom settings
+#### Custom Settings
 
-When creating your own custom settings class, you should inherit from `EdgySettings` (or the subclass `TenancySettings` in case of multi tenancy). `EdgySettings` is
-the class responsible for all internal settings of Edgy and those can be extended and overriden
-with ease.
+To create custom settings, inherit from `EdgySettings` (or `TenancySettings` for multi-tenancy). `EdgySettings` handles Edgy's internal settings, which you can extend or override.
 
-Something like this:
+Example:
 
 ```python title="myproject/configs/settings.py"
 {!> ../docs_src/settings/custom_settings.py !}
 ```
 
-Super simple right? Yes and that is the intention. Edgy does not have a lot of settings but
-has some which are used across the codebase and those can be overriden easily.
+Edgy's settings are designed to be simple and easily overridable.
 
 !!! Danger
-    Be careful when overriding the settings as you might break functionality. It is your own risk
-    doing it.
+    Exercise caution when overriding settings, as it may break functionality.
 
 ##### Parameters
 
-* **preloads** - List of imports preloaded. Non-existing imports are simply ignored.
-  Can be used to inject a path to a module in which the instance is set.
-  It takes strings in format `module` and `module:fn`. In the later case the function or callable is executed without arguments.
+* **preloads**: List of imports to preload. Non-existent imports are ignored. Can be used to inject a path to a module in which the instance is set. Takes strings in format `module` and `module:fn`. In the latter case the function or callable is executed without arguments.
 
     <sup>Default: `[]`</sup>
 
-* **extensions** - List of Monkay extensions for edgy. See [Extensions](./extensions.md) for more details. Extensions can of course also preload imports.
+* **extensions**: List of Monkay extensions for Edgy. See [Extensions](./extensions.md) for details. Extensions can also preload imports.
 
     <sup>Default: `[]`</sup>
 
-* **ipython_args** - List of arguments passed to `ipython` when starting the `edgy shell`.
+* **ipython_args**: List of arguments passed to `ipython` when starting `edgy shell`.
 
     <sup>Default: `["--no-banner"]`</sup>
 
-* **ptpython_config_file** - Config file to be loaded into `ptpython` when starting the `edgy shell --kernel ptpython`.
+* **ptpython_config_file**: Config file loaded into `ptpython` when starting `edgy shell --kernel ptpython`.
 
     <sup>Default: `"~/.config/ptpython/config.py"`</sup>
 
+#### How to Use It
 
-#### How to use it
+Similar to [Esmerald settings][esmerald_settings], Edgy uses the `EDGY_SETTINGS_MODULE` environment variable.
 
-Similar to [esmerald settings][esmerald_settings], Edgy uses it in a similar way.
-
-Using the example [above](#custom-settings) and the location `myproject/configs/settings.py`, the
-settings should be called like this:
+Using the example from [above](#custom-settings) and the location `myproject/configs/settings.py`, the settings should be called like this:
 
 ```shell
 $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy <COMMAND>
 ```
 
-Optional prequesite: set one of the preload imports to the application path. This way you can skip
-providing the `--app` parameter or providing the `EDGY_DEFAULT_APP`.
+Optional prerequisite: set one of the preload imports to the application path. This way you can skip providing the `--app` parameter or providing the `EDGY_DEFAULT_APP`.
 
 Example:
 
-**Starting the default shell**
+**Starting the default shell:**
 
 ```shell
 $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy shell
 ```
 
-**Starting the PTPython shell**
+**Starting the PTPython shell:**
 
 ```shell
 $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy shell --kernel ptpython
 ```
 
-**Creating the migrations folder**
+**Creating the migrations folder:**
 
 ```shell
 $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy init
 ```
 
-**Generating migrations**
+**Generating migrations:**
 
 ```shell
 $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy makemigrations
 ```
 
-**Appying migrations**
+**Applying migrations:**
 
 ```shell
 $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy migrate
 ```
 
-And the list goes on and on, you get the gist. To understand which commands are available, check
-the [commands](./migrations/migrations.md) available to you and the [shell support](./shell.md) for
-the Edgy shell support.
+And so on. To see available commands, check the [commands](./migrations/migrations.md) and [shell support](./shell.md).
 
-
-[esmerald_settings]: https://esmerald.dev/application/settings/
+[esmerald_settings]: [https://esmerald.dev/application/settings/](https://esmerald.dev/application/settings/)

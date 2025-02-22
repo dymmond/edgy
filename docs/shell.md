@@ -1,60 +1,56 @@
+Absolutely! Let's expand on this section with thorough explanations for the end user.
+
 # Shell Support
 
-Who never needed to load a few database models ina command line  or have the need to do it so and
-got stuck trying to do it and wasted a lot of time?
+Have you ever found yourself needing to quickly interact with your database models directly from the command line? Perhaps you wanted to test a query, inspect data, or perform some quick data manipulation without writing a full script. If you've struggled with setting up such an environment in the past, Edgy's shell support is designed to make your life easier.
 
-Well, Edgy gives you that possibility completely out of the box and ready to use with your
-application models.
+Edgy provides an interactive Python shell that automatically loads your application's models, allowing you to seamlessly interact with your database. This feature is incredibly useful for development, debugging, and exploration.
 
 !!! Warning
-    Be aware of the use of this special class in production! It is advised not to use it there.
+    While the Edgy shell is a powerful tool, it's generally not recommended for use in production environments. Its primary purpose is for development and debugging.
 
-## Important
+## Important: Application Discovery
 
-Before reading this section, you should get familiar with the ways Edgy handles the discovery
-of the applications.
+Before diving into the shell, it's crucial to understand how Edgy discovers your application. The shell relies on the same discovery mechanisms used by Edgy's migration system.
 
-The following examples and explanations will be using the [auto discovery](./migrations/discovery.md#auto-discovery)
-but [--app and environment variables](./migrations/discovery.md#environment-variables) approach but the
-is equally valid and works in the same way.
+The following examples will primarily demonstrate the [auto-discovery](./migrations/discovery.md#auto-discovery) approach, but the concepts are equally applicable to the [--app and environment variables](./migrations/discovery.md#environment-variables) method.
 
+## How It Works: Behind the Scenes
 
-## How does it work
+Edgy's shell functionality is designed to be user-friendly, abstracting away much of the underlying complexity. Here's a simplified breakdown of what happens when you launch the Edgy shell:
 
-Edgy ecosystem is complex internally but simpler to the user. Edgy will use the application
-using the [migration](./migrations/migrations.md#migration) and automatically extract the
-[registry](./registry.md) from it.
+1.  **Application Discovery:** Edgy uses the same logic as its migration system to locate your application. This involves identifying the application where your Edgy models are defined.
+2.  **Registry Extraction:** Once the application is located, Edgy extracts the [registry](./registry.md) object. The registry is responsible for managing your database connection and model definitions.
+3.  **Model Loading:** Edgy then automatically loads all your defined [models](./models.md) and [reflected models](./reflection/reflection.md) into the interactive Python shell's namespace. This makes them readily available for you to use.
+4.  **Shell Initialization:** Finally, Edgy initializes the interactive Python shell, providing you with a ready-to-use environment for interacting with your models.
 
-From there it will automatically load the [models](./models.md) and [reflected models](./reflection/reflection.md)
-into the interactive python shell and load them for you with ease 🎉.
+This process ensures that your shell environment is correctly configured and that all your models are accessible, saving you the time and effort of manually setting up these components.
 
-### Requirements
+### Requirements: Installing Interactive Shells
 
-To run any of the available shells you will need `ipython` or `ptpython` or both installed.
+Edgy's shell support integrates with popular interactive Python shells, specifically `ipython` and `ptpython`. To use the Edgy shell, you'll need to have one or both of these installed.
 
-**IPython**
+**IPython:**
+
+IPython is a powerful interactive shell that provides enhanced features like tab completion, syntax highlighting, and magic commands.
+
+To install IPython:
 
 ```shell
 $ pip install ipython
 ```
 
-or
+**PTPython:**
 
-```shell
-$ pip install edgy[ipython]
-```
+PTPython is another excellent interactive Python shell that offers features like auto-completion, syntax highlighting, and multiline editing.
 
-**PTPython**
+To install PTPython:
 
 ```shell
 $ pip install ptpython
 ```
 
-or
-
-```shell
-$ pip install edgy[ptpyton]
-```
+Having these shells installed enables you to choose your preferred interactive environment when using the Edgy shell.
 
 ### How to call it
 
