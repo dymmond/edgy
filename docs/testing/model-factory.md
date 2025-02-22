@@ -1,20 +1,14 @@
-# ModelFactory
+# ModelFactory: Streamlining Model Stubbing in Edgy
 
-A ModelFactory is a faker based model stub generator.
+`ModelFactory` is a powerful tool in Edgy for generating model stubs based on fakers, simplifying your testing and development workflows.
 
-In the first step, building the factory class, you can define via `FactoryField`s customizations of the parameters passed
-for the fakers for the model. You can also define defaults by just providing attributes which match the field name of the underlying model.
+The process involves three key steps:
 
-The second step, is making a factory instance. Here can values be passed which should be used for the model. They are baked in
-the factory instance. But you are able to overwrite them in the last step or to exclude them.
+1.  **Factory Class Definition:** Define your factory class, customizing fakers using `FactoryField` and setting default values for model fields.
+2.  **Factory Instance Creation:** Create an instance of your factory, providing specific values to be used in the model. These values can be further customized or excluded later.
+3.  **Model Stub Generation:** Utilize the `build` method to generate a stubbed model instance.
 
-The last step, is building a stub model via `build`. This is an **instance-only** method not like the other build method other model definitions.
-
-In short the sequence is:
-
-Factory definition -> Factory instance -> Factory build method -> stubbed Model instance to play with.
-
-You can reuse the factory instance to produce a lot of models.
+This sequence allows you to efficiently create and manipulate model instances for testing and other purposes.
 
 Example:
 
@@ -22,173 +16,155 @@ Example:
 {!> ../docs_src/testing/factory/factory_basic.py !}
 ```
 
-Now we have a basic working model. Now let's get more complicated. Let's remove the `name` field via factory fields:
+This creates a basic `User` model factory. Let's explore more advanced features.
+
+Example: Excluding a field (`name`) using `FactoryField`:
 
 ```python
 {!> ../docs_src/testing/factory/factory_fields_exclude.py !}
 ```
 
 !!! Note
-    Every Factory class has an own internal faker instance. If you require a separate faker you have to provide it in the build method
-    as `faker` keyword parameter.
+    Each factory class has its own internal faker instance. To use a separate faker, provide it as the `faker` keyword parameter in the `build` method.
 
+## Parametrization
 
-## Parametrize
+You can customize faker behavior in two ways:
 
-For customization you have two options: provide parameters to the corresponding faker method or to provide an own callable which can also receive parameters.
-When no callback is provided the mappings are used which use the field type name of the corresponding edgy field.
+1.  **Provide parameters to faker methods.**
+2.  **Provide a custom callable that can receive parameters.**
 
-E.g. CharFields use the "CharField" mapping.
+When no callback is provided, Edgy uses mappings based on the field type name (e.g., `CharField` uses the "CharField" mapping).
+
+Example: Customizing faker parameters:
 
 ```python
 {!> ../docs_src/testing/factory/factory_parametrize.py !}
 ```
 
-You can also overwrite the field_type on FactoryField base. This can be used to parametrize
-fields differently. E.g. ImageFields like a FileField or a CharField like PasswordField.
+You can also override the `field_type` in `FactoryField` for different parametrization:
 
 ```python
 {!> ../docs_src/testing/factory/factory_field_overwrite.py !}
 ```
 
-In case you want to overwrite a mapping completely for all subclasses you can use the Meta `mappings` attribute.
+To override mappings for all subclasses, use the `Meta.mappings` attribute:
 
 ```python
 {!> ../docs_src/testing/factory/factory_mapping.py !}
 ```
 
-Setting a mapping to `None` will disable a stubbing by default.
-You will need to re-enable via setting the mapping in a subclass to a mapping function.
+Setting a mapping to `None` disables stubbing by default. Re-enable it in subclasses:
 
 ```python
 {!> ../docs_src/testing/factory/factory_mapping2.py !}
 ```
 
 !!! Tip
-    You can name a FactoryField differently and provide the name parameter explicitly. This way it is possible to workaround occluded fields.
+    Use the `name` parameter in `FactoryField` to avoid naming conflicts with model fields.
 
 ### ModelFactoryContext
 
-`ModelFactoryContext` is now replacing the `faker` argument. It is compatible to faker and you can keep the old syntax with Faker.
-This magic works by forwarding `__getattr__` accesses to the internal faker instance.
-You can access vars in context via `__getitem__` so both ways of calling doesn't interfere.
+`ModelFactoryContext` replaces the `faker` argument, providing compatibility with faker while allowing access to context variables. It forwards `__getattr__` calls to the internal faker instance and provides `__getitem__` access to context items.
 
-Known items are:
+Known items:
 
-- `faker`: The faker instance.
-- `exclude_autoincrement`: The current value of `exclude_autoincrement`. It is used in sub-factories.
-- `depth`: The current depth.
-- `callcounts`: Don't use directly. Use `field.get_callcount()` to get.or `field.inc_callcount()` to artifically manipulate the callcount.
+* `faker`: The faker instance.
+* `exclude_autoincrement`: Current `exclude_autoincrement` value.
+* `depth`: Current depth.
+* `callcounts`: Internal call count tracking (use `field.get_callcount()` and `field.inc_callcount()`).
 
-You can however save arbitary items here. They should not collide with the known items, so think of non-colliding names to future proof the code.
+You can store custom items in the context, ensuring they don't conflict with known items.
 
 ### Saving
 
-Saving can be done with save parameter or the `build_and_save(...)` method (more recommended).
+Save generated models using the `save` parameter or the `build_and_save(...)` method (recommended):
 
 ```python
 {!> ../docs_src/testing/factory/factory_save.py !}
 ```
 
 !!! Warning
-    The parameter `save=True` can move the saving to a subloop.
-    This can be problematic with `force_rollback` active or in case you have very few connections to use.
-    When possible and in an asynchronous context it is highly recommended to use `build_and_save(...)` instead.
+    `save=True` can move saving to a subloop, causing issues with `force_rollback` or limited connections. Use `build_and_save(...)` in asynchronous contexts.
 
 ### exclude_autoincrement
 
-A special class parameter is `exclude_autoincrement`. It can be used to auto-exclude the autoincrement column from beeing set.
-This is an alternative to manually exclude the auto-generated id field. It is by default `True`. Set it to `False` to get an stubbed value for an
-autoincrement field (in most cases `id` this can change in case the wrapped model defines primary key fields).
+The `exclude_autoincrement` class parameter (default `True`) automatically excludes autoincrement columns:
 
 ```python
 {!> ../docs_src/testing/factory/factory_fields_exclude_autoincrement.py !}
 ```
 
-### Setting database and schema
+Set it to `False` to generate values for autoincrement fields.
 
-By default the database and schema of the model used is unchanged. You can however provide an other database or schema than the default by defining
-them as class or instance variables (not by keyword arguments) on a Factory.
-The syntax is the same as the one used for database models, you define them on the main model. You can also overwrite them one-time in the build method.
+### Setting Database and Schema
 
-- `__using_schema__` (str or None)
-- `database` (Database or None)
+Specify a different database or schema using class or instance variables (`__using_schema__`, `database`):
+
+```python
+# class variables
+class UserFactory(ModelFactory, database=database, __using_schema__="other"):
+    ...
+```
+
+Or on the build method:
+
+```python
+user = factory.build(database=database, schema="other")
+```
 
 !!! Note
-    There is a subtle difference between database models and ModelFactories concerning `__using_schema__`.
-    When `None` in `ModelFactory` the default of the model is used while in database models None selects the main schema.
+    `__using_schema__ = None` in `ModelFactory` uses the model's default schema, while in database models, it selects the main schema.
 
+### Parametrizing Relation Fields
 
-### Parametrizing relation fields
+Parametrize relation fields (ForeignKey, ManyToMany, OneToOne, RelatedField) in two ways:
 
-Relation fields are fields like ForeignKey ManyToMany, OneToOne and RelatedField.
+1.  **Pass `build()` parameters as field parameters.** Use `min` and `max` for 1-n relations.
+2.  **Transform a `ModelFactory` to a `FactoryField` using `to_factory_field` or `to_list_factory_field(min=0, max=10)`.**
 
-To parametrize relation fields there are two variants:
+RelatedFields can only be parametrized using the second method.
 
-1. Pass `build()` parameters as field parameters. For 1-n relations there are two extra parameters min (default 0), max (default 10), which allow to specify how many
-   instances are generated.
-2. Transform a ModelFactory to a FactoryField.
-
-The first way cannot be used with RelatedFields, which are automatically excluded.
-You can however pass values to them via the second way.
-
-To transform a ModelFactory there are two helper classmethods:
-
-1. `to_factory_field`
-2. `to_list_factory_field(min=0, max=10)`
-
-
-Example for custom parametrization of a ForeignKey
+Example: Customizing a ForeignKey:
 
 ```python
 {!> ../docs_src/testing/factory/factory_to_field.py !}
 ```
 
-Example for custom parametrization of a RelatedField, a ManyToMany or a RefForeignKey
+Example: Customizing a RelatedField, ManyToMany, or RefForeignKey:
 
 ```python
 {!> ../docs_src/testing/factory/factory_to_fields.py !}
 ```
 
 !!! Warning
-    Relationship fields can easily lead to big graphs when not excluded in factory and provided manually. Especially dangerous
-    are ForeignKeys to the same model. They can lead to infinite recursion.
-    For this reason the autogenerated ModelFactories for relationship fields exclude by default all unparametrized ForeignKeys, ...
-    when they have a default or can be null.
+    Relationship fields can lead to large graphs. Auto-generated factories exclude unparametrized ForeignKeys, etc., by default when they have defaults or can be null.
 
-### Special parameters
+### Special Parameters
 
-There are two special parameters which are always available for all fields:
+Two special parameters are available for all fields:
 
-- randomly_unset
-- randomly_nullify
+* `randomly_unset`: Randomly exclude a field value.
+* `randomly_nullify`: Randomly set a value to `None`.
 
-The first randomly excludes a field value. The second randomly sets a value to None.
-You can either pass True for a equal distribution or a number from 0-100 to bias it.
+Pass `True` for equal distribution or a number (0-100) for bias.
 
-### Excluding a field
+### Excluding Fields
 
-To exclude a field there are four ways
+Exclude fields in four ways:
 
-- Provide a field with `exclude=True`. It should be defined under the name of the value.
-- Add the field name to the exclude parameter of build.
-- Raise `edgy.testing.exceptions.ExcludeValue` in a callback.
-- The `exclude_autoincrement` classvar or parameter.
+1.  **Provide a field with `exclude=True`.**
+2.  **Add the field name to the `exclude` parameter of `build`.**
+3.  **Raise `edgy.testing.exceptions.ExcludeValue` in a callback.**
+4.  **Use the `exclude_autoincrement` class variable or parameter.**
 
-Let's revisit one of the first examples. Here the id field is excluded by a different named FactoryField.
+Example: Excluding a field using `exclude=True`:
 
 ```python
 {!> ../docs_src/testing/factory/factory_fields_exclude.py !}
 ```
 
-Note: However that the FactoryField can only be overwritten by its provided name or in case it is unset its implicit name.
-When multiple fields have the same name, the last found in the same class is overwritting the other.
-
-Otherwise the mro order is used.
-
-The `exclude_autoincrement` is explained above in [exclude_autoincrement](#exclude_autoincrement).
-
-Here an example using both other ways:
+Example: Excluding fields using `exclude` parameter or `ExcludeValue`:
 
 ```python
 {!> ../docs_src/testing/factory/factory_exclude.py !}
@@ -196,38 +172,27 @@ Here an example using both other ways:
 
 ### Sequences
 
-Sometimes you want to have increasing sequences. This can be archived by using the callcounts.
-Every field has a method named `get_callcount()` which returns the current amount of calls.
-By default it starts with 1. First field call = 1.
-
-#### Resetting sequences
-
-For resetting the sequences, simply call `Factory.meta.callcounts.clear()` of the main factory or of the passed dict object.
-You can also use throw away dicts as callcounts for archiving the reset.
-
-#### Examples
+Generate increasing sequences using call counts:
 
 ```python
 {!> ../docs_src/testing/factory/sequences.py !}
 ```
 
-If you only want even numbers you can also use `inc_callcount` which advances the callcount by two:
+Reset sequences using `Factory.meta.callcounts.clear()` or pass a custom `callcounts` dictionary.
+
+Example: Generating even sequences:
 
 ```python
 {!> ../docs_src/testing/factory/sequences_even.py !}
 ```
 
-Wanting odd sequences is a bit more difficult. Here we have to manipulate the callcounter before entering a context.
-This can be archived by passing `callcounts` explicitly to `inc_callcount`. Otherwise the not yet existing context is tried
-to be used.
+Example: Generating odd sequences:
 
 ```python
 {!> ../docs_src/testing/factory/sequences_odd.py !}
 ```
 
-What happens when we use a [SubFactory](#subfactory)? Only the callcounts of the entrypoint Factory increase.
-You can also pass exclicitly a callcounts dict which will be increased.
-Here we see how to pass the callcounts of a different factory.
+SubFactories only increment the call counts of the entry point factory. Pass a custom `callcounts` dictionary to increment other factory call counts:
 
 ```python
 {!> ../docs_src/testing/factory/sequences_subfactory.py !}
@@ -235,24 +200,19 @@ Here we see how to pass the callcounts of a different factory.
 
 ## Build & build_and_save
 
-The central method for factories are `build(...)` and `build_and_save(...)` for saving after. It generates the model instance.
-It has also some keyword parameters for post-customization. They are also available for default relationship fields
-or for wrapping factory fields via the `to_factory_field` or `to_list_factory_field` methods.
+The `build(...)` and `build_and_save(...)` methods generate model instances with customizable parameters:
 
-The parameters are:
+* `faker`: Custom faker instance.
+* `parameters`: Field-specific parameters or callbacks.
+* `overwrites`: Direct value overrides.
+* `exclude`: Fields to exclude from stubbing.
+* `database`: Database to use.
+* `schema`: Schema to use.
+* `exclude_autoincrement`: Auto-exclude autoincrement columns.
+* `save`: Synchronously save the model.
+* `callcounts`: Custom call counts dictionary.
 
-- **faker** (not available for factories for relationship fields. Here is the provided faker or faker of the parent model used). Provide a custom Faker instance.
-  This can be useful when the seed is modified.
-- **parameters** ({fieldname: {parametername: parametervalue} | FactoryCallback}): Provide per field name either a callback which returns the value or parameters.
-- **overwrites** ({fieldname: value}): Provide the value directly. Skip any evaluation
-- **exclude** (e.g. {"id"}): Exclude the values from stubbing. Useful for removing the autogenerated id.
-- **database** (Database | None | False): Use a different database. When `None` pick the one of the ModelFactory if available, then fallback to the model.
-  When `False`, just use the one of the model.
-- **schema** (str | None | False):  Use a different schema. When `None` pick the one of the ModelFactory if available, then fallback to the model.
-  When `False`, just use the one of the model.
-- **exclude_autoincrement** (None | bool): Auto-exclude the column with the `autoincrement` flag set. This is normally the injected id field.
-- **save** (Bool, only build): Save synchronously the model. It is a shortcut for `run_sync(factory_instance.build_and_save(...))`. By default `False`.
-- **callcounts** (dict): Provide a different dict where the callcounts are saved. Useful for resetting.
+Example: Using `build` with parameters:
 
 ```python
 {!> ../docs_src/testing/factory/factory_build.py !}
@@ -260,24 +220,15 @@ The parameters are:
 
 ## Model Validation
 
-By default a validation is executed if the model can ever succeed in generation. If not an error
-is printed but the model still builds.
-If you dislike this behaviour, you can disable the implicit model validation via:
+Control model validation during factory generation using the `model_validation` class variable:
 
-```python
-class UserFactory(ModelFactory, model_validation="none"):
-    ...
-```
-
-You have following options:
-
-- `none`: No implicit validation.
-- `warn`: Warn for unsound factory/model definitions which produce other errors than pydantic validation errors. The default.
-- `error`: Same as warn but reraise the exception instead of a warning.
-- `pedantic`: Raise even for pydantic validation errors.
+* `none`: No validation.
+* `warn`: Warn for unsound definitions. (Default)
+* `error`: Raise exceptions for unsound definitions.
+* `pedantic`: Raise exceptions for Pydantic validation errors.
 
 !!! Note
-    The validation doesn't increase the callcount of sequences.
+    Validation does not increment sequence call counts.
 
 ## SubFactory
 
@@ -301,14 +252,7 @@ class ProductFactory(ModelFactory):
     name = "Product 1"
     rating = 5
     in_stock = True
-    user = SubFactory("accounts.tests.factories.UserFactory")
-
-
-class ItemFactory(ModelFactory):
-    class Meta:
-        model = Item
-
-    product = SubFactory("products.tests.ProductFactory")
+    user = SubFactory("tests.factories.UserFactory") # String import
 ```
 
 Did you see? With this SubFactory object, we can simply apply factories as a `string` with the location of the factory
@@ -330,7 +274,7 @@ class ProductFactory(ModelFactory):
     name = "Product 1"
     rating = 5
     in_stock = True
-    user = SubFactory(UserFactory)
+    user = SubFactory(UserFactory) # Object import
     user.parameters["randomly_nullify"] = True
 
 
@@ -350,3 +294,13 @@ You can even parametrize them given that they are FactoryFields.
 !!! Tip
     Effectively SubFactories are a nice wrapper around `to_factory_field` and `to_list_factory_field` which can pull in
     from other files.
+
+**Enhanced Explanation:**
+
+In the first `ProductFactory` example, `user = SubFactory("tests.factories.UserFactory")` demonstrates how to use a string to import a `UserFactory`. This is particularly useful when dealing with circular imports or when factories are defined in separate modules.
+
+* **String Import:** The string `"tests.factories.UserFactory"` specifies the fully qualified path to the `UserFactory` class. Edgy's `SubFactory` will dynamically import and instantiate this factory when needed. This approach is beneficial when your factory classes are organized into distinct modules, which is a common practice in larger projects.
+
+* **Object Import:** The second `ProductFactory` example, `user = SubFactory(UserFactory)`, showcases direct object import. This is straightforward when the factory class is already in the current scope.
+
+Both methods achieve the same result: creating a `User` instance within the `Product` factory. The choice between them depends on your project's structure and import preferences.
