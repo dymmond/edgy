@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 terminal = Print()
 
 
-class BaseContentTypeFieldField(BaseForeignKeyField):
+class BaseContentTypeField(BaseForeignKeyField):
     async def pre_save_callback(
         self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
     ) -> dict[str, Any]:
@@ -56,7 +56,7 @@ class BaseContentTypeFieldField(BaseForeignKeyField):
 
 
 class ContentTypeField(ForeignKey):
-    field_bases = (BaseContentTypeFieldField,)
+    field_bases = (BaseContentTypeField,)
 
     def __new__(  # type: ignore
         cls,

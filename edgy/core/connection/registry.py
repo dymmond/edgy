@@ -194,7 +194,7 @@ class Registry:
         with_content_type: Union[Literal[True], type["BaseModelType"]],
         old_content_type_to_replace: Optional[type["BaseModelType"]] = None,
     ) -> None:
-        from edgy.contrib.contenttypes.fields import BaseContentTypeFieldField, ContentTypeField
+        from edgy.contrib.contenttypes.fields import BaseContentTypeField, ContentTypeField
         from edgy.contrib.contenttypes.models import ContentType
         from edgy.core.db.models.metaclasses import MetaInfo
         from edgy.core.db.relationships.related_field import RelatedField
@@ -229,7 +229,7 @@ class Registry:
                 return
             # skip if is explicit set or remove when copying
             for field in model_class.meta.fields.values():
-                if isinstance(field, BaseContentTypeFieldField):
+                if isinstance(field, BaseContentTypeField):
                     if (
                         old_content_type_to_replace is not None
                         and field.target is old_content_type_to_replace

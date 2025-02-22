@@ -61,6 +61,7 @@ def test_parametrize_factory():
     assert len(user.language) <= 3
     assert user.name == "edgy edgy"
 
+
 def test_parametrize_factory_context():
     class UserFactory(ModelFactory):
         class Meta:

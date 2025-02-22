@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+### 0.27.2
+
+### Fixed
+
+- Typo in `BaseContentTypeField` from `BaseContentTypeFieldField`.
+
 ### 0.27.1
 
 ### Added
