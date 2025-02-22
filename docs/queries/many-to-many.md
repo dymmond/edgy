@@ -131,7 +131,6 @@ format:
 
 As you can see, because no `related_name` was provided, it defaulted to `team_organisationteams_set`.
 
-
 ##### Example with related name
 
 ```python hl_lines="17"
@@ -148,7 +147,6 @@ You can now query normally, something like this.
 ```python hl_lines="11"
 {!> ../docs_src/queries/manytomany/query_example.py !}
 ```
-
 
 [many_to_many]: ../fields/index.md#manytomany
 [related_name]: ./related-name.md

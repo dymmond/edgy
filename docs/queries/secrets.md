@@ -1,41 +1,32 @@
 # Secrets
 
-Was there a time where you wished you could have a way of querying the database and not returning
-some sentive data without the hassle of filtering all over the codebase? Well, say no more.
+Have you ever wished for a way to query the database and omit sensitive data without the hassle of filtering throughout your codebase? Your wish is granted.
 
-The `secret` is a special attribute of the [fields](../fields/index.md) that is available on each field
-that basically if set to `True` and using the `exclude_secrets` will make sure it will never
-return any sensitive data.
+The `secret` attribute is a special feature of [fields](../fields/index.md), available on each field. When set to `True`, and used in conjunction with `exclude_secrets`, it ensures that sensitive data is never returned.
 
-In other words, it will safely expose your data.
+In essence, it provides a safe way to expose your data.
 
 ## Exclude Secrets
 
-How does this work in reality? Well, very simple actually. You will need to set the `secret`
-attribute to `True` and when you want to safely expose the data via query, call the `exclude_secrets`.
+How does this work in practice? It's quite simple. Set the `secret` attribute to `True`, and when you want to safely expose data via a query, call `exclude_secrets`.
 
-**No worries, the `secret` attribute is not stored in the database in any way**.
+**Rest assured, the `secret` attribute is not stored in the database in any way.**
 
-Let us see an example.
+Let's look at an example.
 
 ```python hl_lines="11"
 {!> ../docs_src/queries/secrets/model.py !}
 ```
 
-Check the `password` field. That same field has the `secret` set to `True` and this is great because
-now we want to query the database and get some records without worrying about leaking the `password`
-to the outside world.
+Notice the `password` field. It has the `secret` attribute set to `True`. This is beneficial because now we can query the database and retrieve records without worrying about leaking the `password` to the outside world.
 
-For this we will be using a special method called `exclude_secrets`. This function also returns a
-[queryset](./queries.md#queryset) which means you can mix with any other operation as per normal
-usage but with the plus of not exposing the secrets.
+We'll use a special method called `exclude_secrets`. This function returns a [queryset](./queries.md#queryset), allowing you to combine it with other operations as usual, but with the added benefit of not exposing secrets.
 
-### exclude_secrets
+### `exclude_secrets`
 
-This is the special function that allows all the magic to happen. Let us see how it would look
-like if we were using it.
+This is the function that makes all the magic happen. Let's see how it's used.
 
-The syntax is very simple.
+The syntax is straightforward.
 
 ```python
 Model.query.exclude_secrets()
@@ -43,27 +34,26 @@ Model.query.exclude_secrets()
 
 #### Example
 
-Let us create some data.
+Let's create some data.
 
 ```python
 await User.query.create(name="Edgy", email="edgy@example.dev", password="A@Pass123")
 await User.query.create(name="Esmerald", email="esmerald@esmerald.dev", password="A@Pass321")
 ```
 
-Now, let us query excluding the secrets.
+Now, let's query, excluding the secrets.
 
 ```python
 await User.query.exclude_secrets()
 ```
 
-This will return all the users as per normal query but let us see more in detail.
+This will return all users as a normal query would. Let's look at it more closely.
 
 ```python
 user = await User.query.exclude_secrets(id=1)
 ```
 
-This will return the user with `id=1` which is the name `Edgy`. Now, let us see how it would look
-like seeing all the details of the object.
+This will return the user with `id=1`, which is named "Edgy". Now, let's see the full object details.
 
 ```python
 user.model_dump()
@@ -71,15 +61,11 @@ user.model_dump()
 {"id": 1, "name": "Edgy", "email": "edgy@example.com"}
 ```
 
-As you can see, there is no `password` being displayed at all and that is because the field has
-the `secret` declared. This can be specially useful if you don't want to be bother to filter and
-manipulate all of those details manually and simlpy still using the normal ORM queries without any
-hassle.
+As you can see, the `password` is not displayed at all. This is because the field has the `secret` attribute declared. This is especially useful when you don't want to manually filter and manipulate these details, and prefer to use standard ORM queries without any hassle.
 
-#### Other examples
+#### Other Examples
 
-As mentioned before, you can mix the operations with the `exclude_secrets` which means you can do
-things like this.
+As mentioned, you can combine operations with `exclude_secrets`.
 
 ```python
 users = await User.query.filter(id=1).exclude_secrets()
@@ -87,17 +73,14 @@ users = await User.query.filter(id=1).exclude_secrets().get() # returns only 1 o
 users = await User.query.exclude_secrets().only("email")
 ```
 
-And the list goes on and on.
+And so on.
 
-### Make the field available
+### Make the Field Available
 
-What if you want to expose the fields that previously had the `secret` declared?
+What if you want to expose fields that previously had the `secret` attribute declared?
 
-There are different ways of making this happen.
+There are a few ways to do this.
 
-One of the ways is by **not using the exclude_secrets** queryset and the other is by removing the
-flag `secret` from the field.
+One way is by **not using the `exclude_secrets`** queryset. Another is by removing the `secret` flag from the field.
 
-Removing the flag has no issue since you can add it back at any given time but the best way it would
-be by simply not calling `exclude_secrets` at all since the flag `secret=True` is only used for that
-given queryset which also means it won't impact anything in your models.
+Removing the flag is fine, as you can add it back at any time. However, the best approach is to simply not call `exclude_secrets` at all. The `secret=True` flag is only used for that specific queryset, meaning it won't affect anything in your models.
