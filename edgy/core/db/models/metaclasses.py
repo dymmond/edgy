@@ -797,8 +797,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             value.owner = new_class
 
         if meta.unique_together:
-            if meta.abstract:
-                raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
             unique_together = meta.unique_together
             for value in unique_together:
                 if not isinstance(value, (str, tuple, UniqueConstraint)):
@@ -808,8 +806,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         # Handle indexes
         if meta.indexes:
-            if meta.abstract:
-                raise ImproperlyConfigured("indexes cannot be in abstract classes.")
             indexes = meta.indexes
             for value in indexes:
                 if not isinstance(value, Index):
@@ -817,8 +813,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         # Handle constraints
         if meta.constraints:
-            if meta.abstract:
-                raise ImproperlyConfigured("Constraints cannot be in abstract classes.")
             constraints = meta.constraints
             for value in constraints:
                 if not isinstance(value, sqlalchemy.Constraint):
