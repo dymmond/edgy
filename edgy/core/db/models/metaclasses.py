@@ -286,6 +286,7 @@ class MetaInfo:
                 raise ImproperlyConfigured(
                     f"{attr} must be a tuple or list. Got {type(attr_val).__name__} instead."
                 )
+
             setattr(self, attr, list(attr_val))
 
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
@@ -796,9 +797,12 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         for value in meta.managers.values():
             value.owner = new_class
 
+        # inherited unique_together
+        for base in new_class.__bases__:
+            if hasattr(base, "meta") and base.meta.unique_together:
+                meta.unique_together.extend(base.meta.unique_together)
+
         if meta.unique_together:
-            if meta.abstract:
-                raise ImproperlyConfigured("unique_together cannot be in abstract classes.")
             unique_together = meta.unique_together
             for value in unique_together:
                 if not isinstance(value, (str, tuple, UniqueConstraint)):
@@ -806,19 +810,25 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                         "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
                     )
 
+        # inherited indexes
+        for base in new_class.__bases__:
+            if hasattr(base, "meta") and base.meta.indexes:
+                meta.indexes.extend(base.meta.indexes)
+
         # Handle indexes
         if meta.indexes:
-            if meta.abstract:
-                raise ImproperlyConfigured("indexes cannot be in abstract classes.")
             indexes = meta.indexes
             for value in indexes:
                 if not isinstance(value, Index):
                     raise ValueError("Meta.indexes must be a list of Index types.")
 
+        # inherited constraints
+        for base in new_class.__bases__:
+            if hasattr(base, "meta") and base.meta.constraints:
+                meta.constraints.extend(base.meta.constraints)
+
         # Handle constraints
         if meta.constraints:
-            if meta.abstract:
-                raise ImproperlyConfigured("Constraints cannot be in abstract classes.")
             constraints = meta.constraints
             for value in constraints:
                 if not isinstance(value, sqlalchemy.Constraint):
@@ -831,6 +841,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             tablename = f"{name.lower()}s"
             meta.tablename = tablename
         meta.model = new_class
+
         # Now find a registry and add it to the meta.
         if meta.registry is None and skip_registry is not True:
             registry: Union[Registry, None, Literal[False]] = get_model_registry(bases, meta_class)
@@ -840,6 +851,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         if not meta.registry or skip_registry:
             new_class.model_rebuild(force=True)
             return new_class
+
         new_class.add_to_registry(meta.registry, database=database, on_conflict=on_conflict)
         return new_class
 

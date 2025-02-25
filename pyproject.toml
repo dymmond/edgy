@@ -78,7 +78,7 @@ test = ["faker>=33.3.1", "sqlalchemy_utils>=0.41.1"]
 testing = [
     "anyio>=4.0.0,<5",
     "asyncpg>=0.27.0,<1",
-    "asyncmy>=0.2.7,<0.3.0",
+    "asyncmy>=0.2.7",
     "esmerald[test]>=3.2.0",
     "pytest-timeout",
     "ipdb",

@@ -8,6 +8,10 @@ hide:
 
 ### 0.27.2
 
+### Chamged
+
+- Edgy now allows inheritance of `unique_together` and `indexes` from abstract classes.
+
 ### Fixed
 
 - Typo in `BaseContentTypeField` from `BaseContentTypeFieldField`.
