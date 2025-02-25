@@ -28,7 +28,7 @@ class BaseModel(edgy.StrictModel):
         registry = models
 
 
-class BaseUserAbs(edgy.StrictModel)
+class BaseUserAbs(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
     email = edgy.CharField(max_length=60)
 
@@ -36,8 +36,8 @@ class BaseUserAbs(edgy.StrictModel)
         abstract = True
         unique_together = [("name", "email")]
 
-class User(BaseUserAbs, BaseModel):
-    ...
+
+class User(BaseUserAbs, BaseModel): ...
 
 
 class HubUserAbs(edgy.StrictModel):
@@ -49,8 +49,8 @@ class HubUserAbs(edgy.StrictModel):
         abstract = True
         unique_together = [("name", "email"), ("email", "age")]
 
-class HubUser(HubUserAbs, BaseModel):
-    ...
+
+class HubUser(HubUserAbs, BaseModel): ...
 
 
 class AbsProduct(edgy.StrictModel):
@@ -61,8 +61,8 @@ class AbsProduct(edgy.StrictModel):
         abstract = True
         unique_together = [("name", "sku")]
 
-class Product(AbsProduct, BaseModel):
-    ...
+
+class Product(AbsProduct, BaseModel): ...
 
 
 class AbsNewProduct(edgy.StrictModel):
@@ -73,8 +73,8 @@ class AbsNewProduct(edgy.StrictModel):
         abstract = True
         unique_together = ["name", "sku"]
 
-class NewProduct(AbsNewProduct, BaseModel):
-    ...
+
+class NewProduct(AbsNewProduct, BaseModel): ...
 
 
 @pytest.fixture(autouse=True, scope="module")
