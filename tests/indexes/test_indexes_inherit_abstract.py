@@ -20,7 +20,7 @@ def get_random_string(length):
     return result_str
 
 
-class BaseUserAbstract(edgy.StrictModel):
+class BaseUserAbstract(edgy.Model):
     name = edgy.CharField(max_length=255, index=True)
     title = edgy.CharField(max_length=255, null=True)
 
@@ -34,7 +34,7 @@ class User(BaseUserAbstract):
         registry = models
 
 
-class AbsHubUser(edgy.StrictModel):
+class AbsHubUser(edgy.Model):
     name = edgy.CharField(max_length=255)
     title = edgy.CharField(max_length=255, null=True)
     description = edgy.CharField(max_length=255, null=True)
@@ -47,7 +47,7 @@ class AbsHubUser(edgy.StrictModel):
         ]
 
 
-class HubUser(edgy.StrictModel):
+class HubUser(AbsHubUser):
     class Meta:
         registry = models
 

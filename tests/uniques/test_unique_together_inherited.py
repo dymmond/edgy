@@ -28,8 +28,8 @@ class BaseModel(edgy.StrictModel):
         registry = models
 
 
-class BaseUserAbs(edgy.StrictModel):
-    name = edgy.CharField(max_length=255)
+class AbsUser(edgy.Model):
+    name = edgy.CharField(max_length=255, index=True)
     email = edgy.CharField(max_length=60)
 
     class Meta:
@@ -37,35 +37,38 @@ class BaseUserAbs(edgy.StrictModel):
         unique_together = [("name", "email")]
 
 
-class User(BaseUserAbs, BaseModel): ...
+class User(AbsUser, BaseModel): ...
 
 
-class HubUserAbs(edgy.StrictModel):
+class AbsHubUser(edgy.Model):
     name = edgy.CharField(max_length=255)
-    email = edgy.CharField(max_length=60, null=True)
-    age = edgy.IntegerField(minimum=18, null=True)
+    title = edgy.CharField(max_length=255, null=True)
+    description = edgy.CharField(max_length=255, null=True)
 
     class Meta:
         abstract = True
         unique_together = [("name", "email"), ("email", "age")]
 
 
-class HubUser(HubUserAbs, BaseModel): ...
+class HubUser(AbsHubUser, BaseModel):
+    name = edgy.CharField(max_length=255)
+    email = edgy.CharField(max_length=60, null=True)
+    age = edgy.IntegerField(minimum=18, null=True)
 
 
-class AbsProduct(edgy.StrictModel):
+class AbsProduct(edgy.Model):
     name = edgy.CharField(max_length=255)
     sku = edgy.CharField(max_length=255)
 
     class Meta:
         abstract = True
-        unique_together = [("name", "sku")]
+        unique_together = ["name", "sku"]
 
 
 class Product(AbsProduct, BaseModel): ...
 
 
-class AbsNewProduct(edgy.StrictModel):
+class AbsNewProduct(edgy.Model):
     name = edgy.CharField(max_length=255)
     sku = edgy.CharField(max_length=255)
 
