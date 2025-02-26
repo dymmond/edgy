@@ -6,7 +6,13 @@ hide:
 
 # Release Notes
 
-### 0.27.2
+## 0.27.3
+
+### Fixed
+
+- BooleanField typing. Thanks to Izcarmt95.
+
+## 0.27.2
 
 ### Chamged
 
@@ -16,7 +22,7 @@ hide:
 
 - Typo in `BaseContentTypeField` from `BaseContentTypeFieldField`.
 
-### 0.27.1
+## 0.27.1
 
 ### Added
 
