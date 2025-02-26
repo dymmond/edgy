@@ -245,7 +245,7 @@ class DecimalField(FieldFactory, decimal.Decimal):
             raise FieldDefinitionError("decimal_places are required for DecimalField")
 
 
-class BooleanField(FieldFactory, int):
+class BooleanField(FieldFactory, bool):
     """Representation of a boolean"""
 
     field_type = bool

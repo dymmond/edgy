@@ -25,7 +25,7 @@ class TenantMixin(edgy.Model):
     tenant_name: str = edgy.CharField(max_length=100, unique=True, null=False)
     tenant_uuid: UUID = edgy.UUIDField(default=uuid.uuid4, null=False)
     paid_until: date = edgy.DateField(null=True)
-    on_trial: bool = edgy.BooleanField(null=True)  # type: ignore
+    on_trial: bool = edgy.BooleanField(null=True)
     created_on: date = edgy.DateField(auto_now_add=True)
 
     # Default True, the schema will be automatically created and synched when it is saved.
@@ -118,7 +118,7 @@ class DomainMixin(edgy.Model):
 
     domain: str = edgy.CharField(max_length=253, unique=True, db_index=True)
     tenant: Any = edgy.ForeignKey(settings.tenant_model, index=True, related_name="domains")
-    is_primary: bool = edgy.BooleanField(default=True, index=True)  # type: ignore
+    is_primary: bool = edgy.BooleanField(default=True, index=True)
 
     class Meta:
         abstract = True
@@ -173,7 +173,7 @@ class TenantUserMixin(edgy.Model):
         null=False,
         related_name="tenant_users_tenant",
     )
-    is_active: bool = edgy.BooleanField(default=False)  # type: ignore
+    is_active: bool = edgy.BooleanField(default=False)
     created_on: date = edgy.DateField(auto_now_add=True)
 
     class Meta:
