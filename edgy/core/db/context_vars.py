@@ -1,12 +1,17 @@
+from collections.abc import Iterable
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
-from typing import TYPE_CHECKING, Literal, Optional, Union
+from typing import TYPE_CHECKING, Literal, Optional, Union, cast
 from warnings import warn
 
 if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.querysets.base import QuerySet
 
+_empty: set = cast(set, frozenset())
+FORCE_FIELDS_NULLABLE: ContextVar[set[tuple[str, str]]] = ContextVar(
+    "FORCE_FIELDS_NULLABLE", default=_empty
+)
 CURRENT_INSTANCE: ContextVar[Optional[Union["BaseModelType", "QuerySet"]]] = ContextVar(
     "CURRENT_INSTANCE", default=None
 )
@@ -66,6 +71,23 @@ def with_tenant(tenant: Union[str, None]) -> None:
         yield
     finally:
         TENANT.reset(token)
+
+
+def _process_force_field_nullable(item: Union[str, tuple[str, str]]) -> tuple[str, str]:
+    result = item if isinstance(item, tuple) else tuple(item.split(":"))
+    assert isinstance(result, tuple) and len(result) == 2
+    assert isinstance(result[0], str)
+    assert isinstance(result[1], str)
+    return result
+
+
+@contextmanager
+def with_force_fields_nullable(inp: Iterable[Union[str, tuple[str, str]]]) -> None:
+    token = FORCE_FIELDS_NULLABLE.set({_process_force_field_nullable(item) for item in inp})
+    try:
+        yield
+    finally:
+        FORCE_FIELDS_NULLABLE.reset(token)
 
 
 def get_schema(check_tenant: bool = True) -> Union[str, None]:

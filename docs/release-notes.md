@@ -6,6 +6,28 @@ hide:
 
 # Release Notes
 
+## 0.28.0
+
+### Added
+
+- `null-field` or `nf` parameter for makemigrations/revision.
+- Add `FORCE_FIELDS_NULLABLE` context var.
+- Add `force_non_partial_update` parameter to model.save for injecting defaults.
+
+### Changed
+
+- The default migration templates allow now to use complex defaults for migrations.
+- Fields must use get_columns_nullable instead of ColumnDefinitionModel null. for determining if the columns should be nullable.
+- In model.update the values can be callables which are evaluated.
+
+### Fixed
+
+- ForeignKeys aren't required to be saved models when passed.
+- Cli command revision takes now also the arg argument.
+- Revisioning works now with relative revisions with - (e.g. -2).
+- Downgrades are now possible with unique_together. Build a constraint name from the fields.
+- `is_partial` was incorrectly set to always False for the model.save update path.
+
 ## 0.27.4
 
 ### Changed
@@ -24,7 +46,7 @@ hide:
 
 ## 0.27.2
 
-### Chamged
+### Changed
 
 - Edgy now allows inheritance of `unique_together` and `indexes` from abstract classes.
 

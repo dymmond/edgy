@@ -101,7 +101,10 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 kwargs[arg.__related_name__] = existing
 
         kwargs = self.transform_input(
-            kwargs, phase=__phase__, instance=self, drop_extra_kwargs=__drop_extra_kwargs__
+            kwargs,
+            phase=__phase__,
+            instance=self,
+            drop_extra_kwargs=__drop_extra_kwargs__,
         )
         super().__init__(**kwargs)
         self.__no_load_trigger_attrs__ = __no_load_trigger_attrs__
@@ -383,18 +386,26 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         phase: str = "",
         instance: Optional[Union[BaseModelType, QuerySet]] = None,
         model_instance: Optional[BaseModelType] = None,
+        evaluate_values: bool = False,
     ) -> dict[str, Any]:
         validated: dict[str, Any] = {}
         token = CURRENT_PHASE.set(phase)
         token2 = CURRENT_INSTANCE.set(instance)
         token3 = CURRENT_MODEL_INSTANCE.set(model_instance)
+
         try:
-            # phase 1: transform when required
-            if cls.meta.input_modifying_fields:
+            # phase 1:  maybe evaluate kwarg values and copy input dict
+            if evaluate_values:
+                extracted_values = {
+                    k: v() if callable(v) else v for k, v in extracted_values.items()
+                }
+            else:
                 extracted_values = {**extracted_values}
+            # phase 2: transform when required
+            if cls.meta.input_modifying_fields:
                 for field_name in cls.meta.input_modifying_fields:
                     cls.meta.fields[field_name].modify_input(field_name, extracted_values)
-            # phase 2: validate fields and set defaults for readonly
+            # phase 3: validate fields and set defaults for readonly
             need_second_pass: list[BaseFieldType] = []
             for field_name, field in cls.meta.fields.items():
                 if field.read_only:
@@ -418,7 +429,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     # only include fields which have inject_default_on_partial_update set or if not is_partial
                     need_second_pass.append(field)
 
-            # phase 3: set defaults for the rest if not partial or inject_default_on_partial_update
+            # phase 4: set defaults for the rest if not partial or inject_default_on_partial_update
             if need_second_pass:
                 for field in need_second_pass:
                     # check if field appeared e.g. by composite

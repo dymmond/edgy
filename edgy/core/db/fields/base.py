@@ -16,7 +16,7 @@ import sqlalchemy
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
-from edgy.core.db.context_vars import CURRENT_PHASE, MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.context_vars import CURRENT_PHASE, FORCE_FIELDS_NULLABLE, MODEL_GETATTR_BEHAVIOR
 from edgy.types import Undefined
 
 from .types import BaseFieldType, ColumnDefinitionModel
@@ -85,6 +85,16 @@ class BaseField(BaseFieldType, FieldInfo):
             default = None
         if default is not Undefined:
             self.default = default
+
+    def get_columns_nullable(self) -> bool:
+        """
+        Helper method.
+        Returns if the columns of the field should be nullable.
+        """
+        if self.null:
+            return True
+        force_fields = FORCE_FIELDS_NULLABLE.get()
+        return (self.owner.__name__, self.name) in force_fields or ("", self.name) in force_fields
 
     def operator_to_clause(
         self, field_name: str, operator: str, table: sqlalchemy.Table, value: Any
@@ -204,6 +214,7 @@ class Field(BaseField):
             column_model.column_type,
             *column_model.constraints,
             key=name,
+            nullable=self.get_columns_nullable(),
             **column_model.model_dump(by_alias=True, exclude_none=True),
         )
 

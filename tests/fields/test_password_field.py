@@ -58,7 +58,10 @@ async def create_test_database():
 
 
 def test_can_create_password_field():
-    field = PasswordField(derive_fn=hasher.derive)
+    class MyModel2(edgy.StrictModel):
+        pass
+
+    field = PasswordField(derive_fn=hasher.derive, owner=MyModel2)
 
     assert isinstance(field, BaseField)
     assert field.min_length is None

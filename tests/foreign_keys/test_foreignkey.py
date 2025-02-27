@@ -140,6 +140,15 @@ async def test_create_via_relation_create():
     assert len(tracks) == 2
 
 
+async def test_create_dynamic():
+    track = await Track.query.create(title="The Waters", position=3)
+    track.album = Album(name="Malibu")
+    await track.save()
+    assert await Album.query.get(name="Malibu")
+    await track.update(album=Album(name="Foo"))
+    assert await Album.query.get(name="Foo")
+
+
 async def test_select_related():
     album = await Album.query.create(name="Malibu")
     await Track.query.create(album=album, title="The Bird", position=1)

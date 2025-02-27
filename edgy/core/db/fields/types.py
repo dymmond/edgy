@@ -39,8 +39,7 @@ class ColumnDefinition(_ColumnDefinition):
 class ColumnDefinitionModel(
     _ColumnDefinition, BaseModel, extra="ignore", arbitrary_types_allowed=True
 ):
-    # no default extraction, edgy uses a custom logic
-    null: bool = Field(serialization_alias="nullable", default=False)
+    # no default and null extraction, edgy uses a custom logic
     column_name: Optional[str] = Field(exclude=True, default=None)
     column_type: Any = Field(exclude=True, default=None)
     constraints: Sequence[sqlalchemy.Constraint] = Field(exclude=True, default=())
