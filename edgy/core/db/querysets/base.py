@@ -1589,6 +1589,8 @@ class QuerySet(BaseQuerySet):
         finally:
             CURRENT_INSTANCE.reset(token)
 
+    import json
+
     async def bulk_get_or_create(
         self,
         objs: list[Union[dict[str, Any], EdgyModel]],
@@ -1613,55 +1615,62 @@ class QuerySet(BaseQuerySet):
 
         if unique_fields:
             existing_records = {}
-            all_db_records = [record async for record in queryset.all()]
-
             for obj in objs:
                 if isinstance(obj, dict):
-                    obj_unique_values = {
-                        field: obj[field] for field in unique_fields if field in obj
-                    }
-                    found_existing = False
-
-                    for db_record in all_db_records:
-                        db_record_unique_values = {
-                            field: getattr(db_record, field) for field in unique_fields
-                        }
-
-                        if db_record_unique_values == obj_unique_values:
+                    filter_kwargs = {}
+                    dict_fields = {}
+                    for field, value in obj.items():
+                        if field in unique_fields:
+                            if isinstance(value, dict):
+                                dict_fields[field] = value
+                            else:
+                                filter_kwargs[field] = value
+                    db_records = [record async for record in queryset.filter(**filter_kwargs)]
+                    found = False
+                    for record in db_records:
+                        record_dict_fields = {k: getattr(record, k) for k in dict_fields}
+                        if dict_fields == record_dict_fields:
                             lookup_key = tuple(
-                                json.dumps(getattr(db_record, field))
-                                if isinstance(getattr(db_record, field), dict)
-                                else getattr(db_record, field)
+                                json.dumps(getattr(record, field))
+                                if isinstance(getattr(record, field), dict)
+                                else getattr(record, field)
                                 for field in unique_fields
                             )
-                            existing_records[lookup_key] = db_record
-                            found_existing = True
+                            existing_records[lookup_key] = record
+                            retrieved_objs.append(record)
+                            found = True
                             break
-
-                    if not found_existing:
+                    if found is False:
                         new_objs.append(queryset.model_class(**obj))
                 else:
-                    obj_unique_values = {field: getattr(obj, field) for field in unique_fields}
-                    found_existing = False
-
-                    for db_record in all_db_records:
-                        db_record_unique_values = {
-                            field: getattr(db_record, field) for field in unique_fields
+                    filter_kwargs = {}
+                    dict_fields = {}
+                    for field in unique_fields:
+                        value = getattr(obj, field)
+                        if isinstance(value, dict):
+                            dict_fields[field] = value
+                        else:
+                            filter_kwargs[field] = value
+                    db_records = [record async for record in queryset.filter(**filter_kwargs)]
+                    found = False
+                    for record in db_records:
+                        record_dict_fields = {
+                            k: getattr(record, k) for k, _ in dict_fields.items()
                         }
-
-                        if db_record_unique_values == obj_unique_values:
+                        if dict_fields == record_dict_fields:
                             lookup_key = tuple(
-                                json.dumps(getattr(db_record, field))
-                                if isinstance(getattr(db_record, field), dict)
-                                else getattr(db_record, field)
+                                json.dumps(getattr(record, field))
+                                if isinstance(getattr(record, field), dict)
+                                else getattr(record, field)
                                 for field in unique_fields
                             )
-                            existing_records[lookup_key] = db_record
-                            found_existing = True
+                            existing_records[lookup_key] = record
+                            retrieved_objs.append(record)
+                            found = True
                             break
-
-                    if not found_existing:
+                    if found is False:
                         new_objs.append(obj)
+
         else:
             new_objs.extend(
                 [queryset.model_class(**obj) if isinstance(obj, dict) else obj for obj in objs]
@@ -1690,29 +1699,11 @@ class QuerySet(BaseQuerySet):
 
         try:
             async with queryset.database as database, database.transaction():
-                for obj_or_dict in objs:
-                    obj = await _prepare_obj(obj_or_dict)
-                    lookup_key = (
-                        tuple(
-                            json.dumps(getattr(obj, field))
-                            if isinstance(getattr(obj, field), dict)
-                            else getattr(obj, field)
-                            for field in unique_fields
-                        )
-                        if unique_fields
-                        else None
-                    )
-                    existing_obj = existing_records.get(lookup_key) if lookup_key else None
-
-                    if existing_obj:
-                        retrieved_objs.append(existing_obj)
-                    else:
-                        retrieved_objs.append(obj)
-
                 if new_objs:
                     new_obj_values = [await _iterate(obj) for obj in new_objs]
                     expression = queryset.table.insert().values(new_obj_values)
                     await database.execute_many(expression)
+                    retrieved_objs.extend(new_objs)
 
                 self._clear_cache()
                 for obj in new_objs:
