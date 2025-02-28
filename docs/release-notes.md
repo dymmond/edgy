@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.27.4
+
+### Changed
+
+- Use `orjson` instead of json for [bulk_get_or_create](./queries/queries.md#bulk-get-or-create).
+
 ## 0.27.3
 
 ### Added
