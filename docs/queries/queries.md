@@ -866,6 +866,28 @@ for user in users:
 await User.query.bulk_update(users, fields=['is_active'])
 ```
 
+### Bulk Get or Create
+
+When you need to perform in bulk a `get_or_create` in your models. The normal behavior would
+be like the `bulk_create` but this bring an additional `unique_fields` where we can make sure
+we do not insert duplicates by filtering the unique keys of the model data being inserted.
+
+```python
+await User.query.bulk_get_or_create([
+    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
+    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
+], unique_fields=["email"])
+
+# Try to reinsert the same values
+await User.query.bulk_get_or_create([
+    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
+    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
+], unique_fields=["email"])
+
+
+users = await User.query.all() # 2 as total
+```
+
 ## Operators
 
 There are sometimes the need of adding some extra conditions like `AND`, or `OR` or even the `NOT`

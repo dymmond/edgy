@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import warnings
 from collections.abc import AsyncIterator, Awaitable, Generator, Iterable, Sequence
 from functools import cached_property
@@ -1587,6 +1588,132 @@ class QuerySet(BaseQuerySet):
                     await obj.execute_post_save_hooks(fields, force_insert=False)
         finally:
             CURRENT_INSTANCE.reset(token)
+
+    import json
+
+    async def bulk_get_or_create(
+        self,
+        objs: list[Union[dict[str, Any], EdgyModel]],
+        unique_fields: Union[list[str], None] = None,
+    ) -> list[EdgyModel]:
+        """
+        Bulk gets or creates records in a table.
+
+        If records exist based on unique fields, they are retrieved.
+        Otherwise, new records are created.
+
+        Args:
+            objs (list[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
+            unique_fields (list[str] | None): Fields that determine uniqueness. If None, all records are treated as new.
+
+        Returns:
+            list[EdgyModel]: A list of retrieved or newly created objects.
+        """
+        queryset: QuerySet = self._clone()
+        new_objs: list[EdgyModel] = []
+        retrieved_objs: list[EdgyModel] = []
+
+        if unique_fields:
+            existing_records = {}
+            for obj in objs:
+                if isinstance(obj, dict):
+                    filter_kwargs = {}
+                    dict_fields = {}
+                    for field, value in obj.items():
+                        if field in unique_fields:
+                            if isinstance(value, dict):
+                                dict_fields[field] = value
+                            else:
+                                filter_kwargs[field] = value
+                    db_records = [record async for record in queryset.filter(**filter_kwargs)]
+                    found = False
+                    for record in db_records:
+                        record_dict_fields = {k: getattr(record, k) for k in dict_fields}
+                        if dict_fields == record_dict_fields:
+                            lookup_key = tuple(
+                                json.dumps(getattr(record, field))
+                                if isinstance(getattr(record, field), dict)
+                                else getattr(record, field)
+                                for field in unique_fields
+                            )
+                            existing_records[lookup_key] = record
+                            retrieved_objs.append(record)
+                            found = True
+                            break
+                    if found is False:
+                        new_objs.append(queryset.model_class(**obj))
+                else:
+                    filter_kwargs = {}
+                    dict_fields = {}
+                    for field in unique_fields:
+                        value = getattr(obj, field)
+                        if isinstance(value, dict):
+                            dict_fields[field] = value
+                        else:
+                            filter_kwargs[field] = value
+                    db_records = [record async for record in queryset.filter(**filter_kwargs)]
+                    found = False
+                    for record in db_records:
+                        record_dict_fields = {
+                            k: getattr(record, k) for k, _ in dict_fields.items()
+                        }
+                        if dict_fields == record_dict_fields:
+                            lookup_key = tuple(
+                                json.dumps(getattr(record, field))
+                                if isinstance(getattr(record, field), dict)
+                                else getattr(record, field)
+                                for field in unique_fields
+                            )
+                            existing_records[lookup_key] = record
+                            retrieved_objs.append(record)
+                            found = True
+                            break
+                    if found is False:
+                        new_objs.append(obj)
+
+        else:
+            new_objs.extend(
+                [queryset.model_class(**obj) if isinstance(obj, dict) else obj for obj in objs]
+            )
+            existing_records = {}
+
+        async def _prepare_obj(obj_or_dict: Union[EdgyModel, dict[str, Any]]) -> EdgyModel:
+            if isinstance(obj_or_dict, dict):
+                obj: EdgyModel = queryset.model_class(**obj_or_dict)
+            else:
+                obj = obj_or_dict
+            return obj
+
+        async def _iterate(obj: EdgyModel) -> dict[str, Any]:
+            original = obj.extract_db_fields()
+            col_values: dict[str, Any] = obj.extract_column_values(
+                original, phase="prepare_insert", instance=self
+            )
+            col_values.update(
+                await obj.execute_pre_save_hooks(col_values, original, force_insert=True)
+            )
+            return col_values
+
+        check_db_connection(queryset.database)
+        token = CURRENT_INSTANCE.set(self)
+
+        try:
+            async with queryset.database as database, database.transaction():
+                if new_objs:
+                    new_obj_values = [await _iterate(obj) for obj in new_objs]
+                    expression = queryset.table.insert().values(new_obj_values)
+                    await database.execute_many(expression)
+                    retrieved_objs.extend(new_objs)
+
+                self._clear_cache()
+                for obj in new_objs:
+                    await obj.execute_post_save_hooks(
+                        self.model_class.meta.fields.keys(), force_insert=True
+                    )
+        finally:
+            CURRENT_INSTANCE.reset(token)
+
+        return retrieved_objs
 
     async def delete(self, use_models: bool = False) -> int:
         if (

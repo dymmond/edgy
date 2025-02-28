@@ -8,6 +8,10 @@ hide:
 
 ## 0.27.3
 
+### Added
+
+- [bulk_get_or_create](./queries/queries.md#bulk-get-or-create) to queryset allowing to bulk inserting or getting existing objects.
+
 ### Fixed
 
 - BooleanField typing. Thanks to Izcarmt95.
