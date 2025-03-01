@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import warnings
 from collections.abc import AsyncIterator, Awaitable, Generator, Iterable, Sequence
 from functools import cached_property
@@ -15,6 +14,7 @@ from typing import (
     cast,
 )
 
+import orjson
 import sqlalchemy
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR, get_schema
@@ -1631,7 +1631,7 @@ class QuerySet(BaseQuerySet):
                         record_dict_fields = {k: getattr(record, k) for k in dict_fields}
                         if dict_fields == record_dict_fields:
                             lookup_key = tuple(
-                                json.dumps(getattr(record, field))
+                                orjson.dumps(getattr(record, field))
                                 if isinstance(getattr(record, field), dict)
                                 else getattr(record, field)
                                 for field in unique_fields
@@ -1659,7 +1659,7 @@ class QuerySet(BaseQuerySet):
                         }
                         if dict_fields == record_dict_fields:
                             lookup_key = tuple(
-                                json.dumps(getattr(record, field))
+                                orjson.dumps(getattr(record, field))
                                 if isinstance(getattr(record, field), dict)
                                 else getattr(record, field)
                                 for field in unique_fields
