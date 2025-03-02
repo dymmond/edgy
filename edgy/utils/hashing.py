@@ -21,7 +21,7 @@ def hash_to_identifier(key: str | bytes) -> str:
     return f"_{b32encode(blake2b(key, digest_size=16).digest()).decode().rstrip('=')}"
 
 
-# for migrations
+# for migrations, so the function can be changed in future
 # needs however either python 3.10 or from __future__ import annotations
 hash_to_identifier_as_string: str = """
 def hash_to_identifier(key: str | bytes) -> str:

@@ -106,8 +106,11 @@ class BaseModelType(ABC):
         self,
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], list[str], None] = None,
+        force_non_partial_update: bool = False,
     ) -> BaseModelType:
         """Save model"""
+        # force_non_partial_update: force assumption values are complete. Triggers all defaults.
+        # Useful to set defaults after migration
 
     @abstractmethod
     async def delete(
@@ -167,6 +170,7 @@ class BaseModelType(ABC):
         is_partial: bool = False,
         instance: Optional[Union[BaseModelType, QuerySet]] = None,
         model_instance: Optional[BaseModelType] = None,
+        evaluate_kwarg_values: bool = False,
     ) -> dict[str, Any]:
         """
         Extracts all the default values from the given fields and returns the raw

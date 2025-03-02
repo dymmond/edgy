@@ -72,3 +72,9 @@ To opt out, override `content_type` on the model with any field. Use `ExcludeFie
 ### Tenancy Compatibility
 
 `ContentType` is tenancy-compatible out of the box.
+
+
+## Migrate to ContentTypes
+
+Given an old project and you want to use ContentTypes, there is an easy migration path via `--null-field` or `--nf` options
+of `edgy makemigrations` and `edgy revision`.

@@ -1,8 +1,10 @@
 import warnings
+from collections.abc import Iterable
 from contextvars import ContextVar
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from edgy.core.db.context_vars import FORCE_FIELDS_NULLABLE
 from edgy.exceptions import DatabaseNotConnectedWarning
 from edgy.utils.hashing import hash_to_identifier
 
@@ -29,7 +31,7 @@ def check_db_connection(db: "Database", stacklevel: int = 3) -> None:
 
 @lru_cache(512, typed=False)
 def _hash_tablekey(tablekey: str, prefix: str) -> str:
-    return f'_join{hash_to_identifier(f"{tablekey}_{prefix}")}'
+    return f"_join{hash_to_identifier(f'{tablekey}_{prefix}')}"
 
 
 def hash_tablekey(*, tablekey: str, prefix: str) -> str:
@@ -40,3 +42,17 @@ def hash_tablekey(*, tablekey: str, prefix: str) -> str:
     if not prefix:
         return tablekey
     return _hash_tablekey(tablekey, prefix)
+
+
+def hash_names(field_or_col_names: Iterable[str], *, prefix: str) -> str:
+    return hash_to_identifier(f"{prefix}_{','.join(sorted(field_or_col_names))}")
+
+
+def force_fields_nullable_as_list_string(apostroph: str = '"') -> str:
+    items = FORCE_FIELDS_NULLABLE.get()
+    if not all(apostroph not in item[0] and apostroph not in item[1] for item in items):
+        raise RuntimeError(f"{apostroph} was found in items")
+    joined = ", ".join(
+        f"({apostroph}{item[0]}{apostroph}, {apostroph}{item[1]}{apostroph})" for item in items
+    )
+    return f"[{joined}]"

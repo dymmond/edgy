@@ -87,7 +87,7 @@ class BaseForeignKeyField(BaseForeignKey):
         # e.g. default was a Model
         if isinstance(value, (target, target.proxy_model)):
             await value.save()
-            return self.clean(self.name, value, for_query=False)
+            return self.clean(self.name, value, for_query=False, hook_call=True)
         elif isinstance(value, dict):
             return await self.pre_save_callback(
                 target(**value), original_value=None, force_insert=force_insert, instance=instance
@@ -163,8 +163,12 @@ class BaseForeignKeyField(BaseForeignKey):
         instance.identifying_db_fields = related_columns
         return instance
 
-    def clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
+    def clean(
+        self, name: str, value: Any, for_query: bool = False, hook_call: bool = False
+    ) -> dict[str, Any]:
         retdict: dict[str, Any] = {}
+        target = self.target
+        phase = CURRENT_PHASE.get()
         column_names = self.owner.meta.field_to_column_names[name]
         assert len(column_names) >= 1
         if value is None:
@@ -175,11 +179,14 @@ class BaseForeignKeyField(BaseForeignKey):
                 translated_name = self.from_fk_field_name(name, column_name)
                 if translated_name in value:
                     retdict[column_name] = value[translated_name]
-        elif isinstance(value, BaseModel):
+        elif isinstance(value, (target, target.proxy_model)):
             for column_name in column_names:
                 translated_name = self.from_fk_field_name(name, column_name)
                 if hasattr(value, translated_name):
                     retdict[column_name] = getattr(value, translated_name)
+                elif phase in {"prepare_insert", "prepare_update"} and not hook_call:
+                    # save model first when not fully specified
+                    return {name: value}
         elif len(column_names) == 1:
             column_name = next(iter(column_names))
             retdict[column_name] = value
@@ -287,6 +294,7 @@ class BaseForeignKeyField(BaseForeignKey):
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
         target = self.target
         columns = []
+        nullable = self.get_columns_nullable()
         for column_key, related_column in self.related_columns.items():
             if related_column is None:
                 related_column = target.table.columns[column_key]
@@ -298,7 +306,7 @@ class BaseForeignKeyField(BaseForeignKey):
                 name=self.get_fk_column_name(name, related_column.name),
                 primary_key=self.primary_key,
                 autoincrement=False,
-                nullable=related_column.nullable or self.null,
+                nullable=related_column.nullable or nullable,
                 unique=related_column.unique,
             )
             columns.append(fkcolumn)

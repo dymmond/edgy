@@ -4,7 +4,7 @@ import contextlib
 import copy
 import inspect
 import warnings
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from functools import partial
 from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Optional, Union, cast
@@ -27,7 +27,7 @@ from edgy.core.db.models.metaclasses import MetaInfo
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import build_pkcolumns, build_pknames
 from edgy.core.db.relationships.related_field import RelatedField
-from edgy.core.utils.db import check_db_connection
+from edgy.core.utils.db import check_db_connection, hash_names
 from edgy.core.utils.models import create_edgy_model
 from edgy.exceptions import ForeignKeyBadConfigured, ModelCollisionError, ObjectNotFound
 from edgy.types import Undefined
@@ -459,18 +459,19 @@ class DatabaseMixin:
                 )
         return clauses
 
-    async def _update(self: Model, **kwargs: Any) -> Any:
+    async def _update(self: Model, is_partial: bool, /, **kwargs: Any) -> Any:
         """
         Update operation of the database fields.
         """
         await self.meta.signals.pre_update.send_async(self.__class__, instance=self)
         column_values = self.extract_column_values(
             extracted_values=kwargs,
-            is_partial=True,
+            is_partial=is_partial,
             is_update=True,
             phase="prepare_update",
             instance=self,
             model_instance=self,
+            evaluate_values=True,
         )
         # empty updates shouldn't cause an error. E.g. only model references are updated
         clauses = self.identifying_clauses()
@@ -509,7 +510,7 @@ class DatabaseMixin:
     async def update(self: Model, **kwargs: Any) -> Model:
         token = EXPLICIT_SPECIFIED_VALUES.set(set(kwargs.keys()))
         try:
-            await self._update(**kwargs)
+            await self._update(True, **kwargs)
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token)
         return self
@@ -624,6 +625,7 @@ class DatabaseMixin:
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], None] = None,
         force_save: Optional[bool] = None,
+        force_non_partial_update: bool = False,
     ) -> Model:
         """
         Performs a save of a given model instance.
@@ -677,7 +679,10 @@ class DatabaseMixin:
                 # force save must ensure a complete mapping
                 await self._insert(**extracted_fields)
             else:
-                await self._update(**(extracted_fields if values is None else values))
+                await self._update(
+                    values is not None and not force_non_partial_update,
+                    **(extracted_fields if values is None else values),
+                )
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token2)
         await self.meta.signals.post_save.send_async(self.__class__, instance=self)
@@ -776,7 +781,7 @@ class DatabaseMixin:
 
     @classmethod
     def _get_unique_constraints(
-        cls, fields: Union[Sequence, str, sqlalchemy.UniqueConstraint]
+        cls, fields: Union[Collection[str], str, UniqueConstraint]
     ) -> Optional[sqlalchemy.UniqueConstraint]:
         """
         Returns the unique constraints for the model.
@@ -786,18 +791,26 @@ class DatabaseMixin:
         :return: Model UniqueConstraint.
         """
         if isinstance(fields, str):
-            return sqlalchemy.UniqueConstraint(*cls.meta.field_to_column_names[fields])
+            return sqlalchemy.UniqueConstraint(
+                *cls.meta.field_to_column_names[fields],
+                name=hash_names([fields], prefix=f"uc_{cls.__name__}"),
+            )
         elif isinstance(fields, UniqueConstraint):
             return sqlalchemy.UniqueConstraint(
                 *chain.from_iterable(
-                    cls.meta.field_to_column_names[field] for field in fields.fields
+                    # deduplicate and extract columns
+                    cls.meta.field_to_column_names[field]
+                    for field in set(fields.fields)
                 ),
                 name=fields.name,
                 deferrable=fields.deferrable,
                 initially=fields.initially,
             )
+        # deduplicate
+        fields = set(fields)
         return sqlalchemy.UniqueConstraint(
-            *chain.from_iterable(cls.meta.field_to_column_names[field] for field in fields)
+            *chain.from_iterable(cls.meta.field_to_column_names[field] for field in fields),
+            name=hash_names(fields, prefix=f"uc_{cls.__name__}"),
         )
 
     @classmethod
