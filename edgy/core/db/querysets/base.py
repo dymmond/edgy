@@ -610,9 +610,9 @@ class BaseQuerySet(
 
                 clauses.append(wrapper)
             else:
-                assert not isinstance(
-                    value, BaseModelType
-                ), f"should be parsed in clean: {key}: {value}"
+                assert not isinstance(value, BaseModelType), (
+                    f"should be parsed in clean: {key}: {value}"
+                )
 
                 async def wrapper(
                     queryset: QuerySet,
@@ -915,9 +915,9 @@ class BaseQuerySet(
                 else:
                     converted_clauses.extend(extracted_clauses)
             elif isinstance(raw_clause, QuerySet):
-                assert (
-                    raw_clause.model_class is queryset.model_class
-                ), f"QuerySet arg has wrong model_class {raw_clause.model_class}"
+                assert raw_clause.model_class is queryset.model_class, (
+                    f"QuerySet arg has wrong model_class {raw_clause.model_class}"
+                )
                 converted_clauses.append(raw_clause.build_where_clause)
                 if not queryset._select_related.issuperset(raw_clause._select_related):
                     queryset._select_related.update(raw_clause._select_related)
@@ -1625,7 +1625,7 @@ class QuerySet(BaseQuerySet):
                                 dict_fields[field] = value
                             else:
                                 filter_kwargs[field] = value
-                    db_records = [record async for record in queryset.filter(**filter_kwargs)]
+                    db_records = await queryset.filter(**filter_kwargs)
                     found = False
                     for record in db_records:
                         record_dict_fields = {k: getattr(record, k) for k in dict_fields}
@@ -1651,7 +1651,7 @@ class QuerySet(BaseQuerySet):
                             dict_fields[field] = value
                         else:
                             filter_kwargs[field] = value
-                    db_records = [record async for record in queryset.filter(**filter_kwargs)]
+                    db_records = await queryset.filter(**filter_kwargs)
                     found = False
                     for record in db_records:
                         record_dict_fields = {
