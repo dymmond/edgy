@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Literal, Optional, Union, cast
 from warnings import warn
 
 if TYPE_CHECKING:
+    from edgy.core.db.fields.types import FIELD_CONTEXT_TYPE
     from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.querysets.base import QuerySet
 
@@ -12,6 +13,7 @@ _empty: set = cast(set, frozenset())
 FORCE_FIELDS_NULLABLE: ContextVar[set[tuple[str, str]]] = ContextVar(
     "FORCE_FIELDS_NULLABLE", default=_empty
 )
+CURRENT_FIELD_CONTEXT: ContextVar["FIELD_CONTEXT_TYPE"] = ContextVar("CURRENT_FIELD_CONTEXT")
 CURRENT_INSTANCE: ContextVar[Optional[Union["BaseModelType", "QuerySet"]]] = ContextVar(
     "CURRENT_INSTANCE", default=None
 )

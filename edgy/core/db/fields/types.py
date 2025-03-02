@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, TypedDict, Union, cast
 
 import sqlalchemy
 from pydantic import BaseModel, Field
@@ -15,6 +15,13 @@ if TYPE_CHECKING:
     from edgy.core.db.fields.factories import FieldFactory
     from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.db.models.types import BaseModelType
+
+
+class FIELD_CONTEXT_TYPE(TypedDict):
+    field: BaseFieldType
+
+
+FIELD_CONTEXT_TYPE.__total__ = False
 
 
 class _ColumnDefinition:

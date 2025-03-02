@@ -11,7 +11,8 @@ hide:
 ### Added
 
 - `null-field` or `nf` parameter for makemigrations/revision.
-- Add `FORCE_FIELDS_NULLABLE` context var.
+- Add `FORCE_FIELDS_NULLABLE` ContextVar.
+- Add `FIELD_CONTEXT` ContextVar.
 - Add `force_non_partial_update` parameter to model.save for injecting defaults.
 
 ### Changed
@@ -19,6 +20,7 @@ hide:
 - The default migration templates allow now to use complex defaults for migrations.
 - Fields must use get_columns_nullable instead of ColumnDefinitionModel null. for determining if the columns should be nullable.
 - In model.update the values can be callables which are evaluated.
+- Streamline ContentTypeField in using a parameter-less default function.
 
 ### Fixed
 
