@@ -125,7 +125,8 @@ class ConcreteFileField(BaseCompositeField):
                 file_instance = self.field_file_class(
                     self,
                     name=field_instance_or_value[field_name],
-                    # can be empty string after migrations
+                    # can be empty string after migrations or when unset
+                    # string or Storage instance are both ok for FieldFile
                     storage=field_instance_or_value.get(f"{field_name}_storage") or self.storage,
                     size=field_instance_or_value.get(f"{field_name}_size"),
                     metadata=field_instance_or_value.get(f"{field_name}_metadata", {}),
@@ -182,8 +183,8 @@ class ConcreteFileField(BaseCompositeField):
                 key=f"{field_name}_storage",
                 name=f"{column_name}_storage",
                 type_=sqlalchemy.String(length=20, collation=self.column_type.collation),
-                default=self.storage.name,
-                # for migrations
+                # for migrations, default storage should be able to change without causing a new migration
+                # so keep the server_default abstract.
                 server_default=sqlalchemy.text("''"),
             ),
         ]
@@ -229,6 +230,7 @@ class ConcreteFileField(BaseCompositeField):
                     name=metadata_name,
                     owner=self.owner,
                     default=dict,
+                    # for migrations
                     server_default=sqlalchemy.text("'{}'"),
                 )
         return retdict
@@ -377,7 +379,7 @@ class FileField(FieldFactory):
             nulldict: dict[str, Any] = {
                 field_name: None,
             }
-            nulldict[f"{field_name}_storage"] = None
+            nulldict[f"{field_name}_storage"] = ""
             if not for_query:
                 if field_obj.with_approval:
                     nulldict[f"{field_name}_approved"] = False
