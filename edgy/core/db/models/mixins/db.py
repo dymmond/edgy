@@ -459,7 +459,7 @@ class DatabaseMixin:
                 )
         return clauses
 
-    async def _update(self: Model, is_partial: bool, /, **kwargs: Any) -> Any:
+    async def _update(self: Model, is_partial: bool, kwargs: dict[str, Any]) -> Any:
         """
         Update operation of the database fields.
         """
@@ -510,7 +510,8 @@ class DatabaseMixin:
     async def update(self: Model, **kwargs: Any) -> Model:
         token = EXPLICIT_SPECIFIED_VALUES.set(set(kwargs.keys()))
         try:
-            await self._update(True, **kwargs)
+            # assume always partial
+            await self._update(True, kwargs)
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token)
         return self
@@ -575,7 +576,7 @@ class DatabaseMixin:
         self.__dict__.update(self.transform_input(dict(row._mapping), phase="load", instance=self))
         self._loaded_or_deleted = True
 
-    async def _insert(self: Model, **kwargs: Any) -> Model:
+    async def _insert(self: Model, evaluate_values: bool, kwargs: dict[str, Any]) -> Model:
         """
         Performs the save instruction.
         """
@@ -586,6 +587,7 @@ class DatabaseMixin:
             phase="prepare_insert",
             instance=self,
             model_instance=self,
+            evaluate_values=evaluate_values,
         )
         check_db_connection(self.database, stacklevel=4)
         token = CURRENT_INSTANCE.set(self)
@@ -625,7 +627,6 @@ class DatabaseMixin:
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], None] = None,
         force_save: Optional[bool] = None,
-        force_non_partial_update: bool = False,
     ) -> Model:
         """
         Performs a save of a given model instance.
@@ -677,11 +678,12 @@ class DatabaseMixin:
                 if values:
                     extracted_fields.update(values)
                 # force save must ensure a complete mapping
-                await self._insert(**extracted_fields)
+                await self._insert(bool(values), extracted_fields)
             else:
                 await self._update(
-                    values is not None and not force_non_partial_update,
-                    **(extracted_fields if values is None else values),
+                    # assume partial when values are None
+                    values is not None,
+                    extracted_fields if values is None else values,
                 )
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token2)

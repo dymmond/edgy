@@ -125,7 +125,8 @@ class ConcreteFileField(BaseCompositeField):
                 file_instance = self.field_file_class(
                     self,
                     name=field_instance_or_value[field_name],
-                    storage=field_instance_or_value.get(f"{field_name}_storage", self.storage),
+                    # can be empty string after migrations
+                    storage=field_instance_or_value.get(f"{field_name}_storage") or self.storage,
                     size=field_instance_or_value.get(f"{field_name}_size"),
                     metadata=field_instance_or_value.get(f"{field_name}_metadata", {}),
                     approved=field_instance_or_value.get(
@@ -173,13 +174,17 @@ class ConcreteFileField(BaseCompositeField):
                 type_=model.column_type,
                 name=column_name,
                 nullable=self.get_columns_nullable(),
-                **model.model_dump(by_alias=True, exclude_none=True, exclude={"column_name"}),
+                **model.model_dump(
+                    by_alias=True, exclude_none=True, exclude={"column_name", "server_default"}
+                ),
             ),
             sqlalchemy.Column(
                 key=f"{field_name}_storage",
                 name=f"{column_name}_storage",
                 type_=sqlalchemy.String(length=20, collation=self.column_type.collation),
                 default=self.storage.name,
+                # for migrations
+                server_default=sqlalchemy.text("''"),
             ),
         ]
 
@@ -195,6 +200,8 @@ class ConcreteFileField(BaseCompositeField):
                 retdict[size_name] = BigIntegerField(
                     ge=0,
                     null=self.null,
+                    # we need to overwrite the method
+                    get_columns_nullable=self.get_columns_nullable,
                     exclude=True,
                     read_only=True,
                     name=size_name,
@@ -207,6 +214,7 @@ class ConcreteFileField(BaseCompositeField):
                 retdict[approval_name] = BooleanField(
                     null=False,
                     default=False,
+                    server_default=sqlalchemy.text("false"),
                     exclude=True,
                     column_name=f"{column_name}_ok",
                     name=approval_name,
@@ -221,6 +229,7 @@ class ConcreteFileField(BaseCompositeField):
                     name=metadata_name,
                     owner=self.owner,
                     default=dict,
+                    server_default=sqlalchemy.text("'{}'"),
                 )
         return retdict
 
@@ -277,6 +286,10 @@ class FileField(FieldFactory):
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
         super().validate(kwargs)
+        if kwargs.get("server_default"):
+            raise FieldDefinitionError(
+                '"server_default" is not supported for FileField or ImageField.'
+            ) from None
         if kwargs.get("mime_use_magic"):
             try:
                 import magic  # noqa: F401

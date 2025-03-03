@@ -106,11 +106,8 @@ class BaseModelType(ABC):
         self,
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], list[str], None] = None,
-        force_non_partial_update: bool = False,
     ) -> BaseModelType:
         """Save model"""
-        # force_non_partial_update: force assumption values are complete. Triggers all defaults.
-        # Useful to set defaults after migration
 
     @abstractmethod
     async def delete(

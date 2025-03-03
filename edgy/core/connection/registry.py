@@ -206,7 +206,8 @@ class Registry:
             for obj in await model.query.filter(**filter_kwargs):
                 kwargs = {k: v for k, v in obj.extract_db_fields().items() if k not in field_set}
                 kwargs.update(model_specific_defaults)
-                ops.append(obj.save(values=kwargs, force_non_partial_update=True))
+                # is_partial = False
+                ops.append(obj._update(False, kwargs))
         await asyncio.gather(*ops)
 
     def extra_name_check(self, name: Any) -> bool:

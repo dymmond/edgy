@@ -12,15 +12,16 @@ hide:
 
 - `null-field` or `nf` parameter for makemigrations/revision.
 - Add `FORCE_FIELDS_NULLABLE` ContextVar.
-- Add `FIELD_CONTEXT` ContextVar.
-- Add `force_non_partial_update` parameter to model.save for injecting defaults.
+- Add `CURRENT_FIELD_CONTEXT` ContextVar.
 
 ### Changed
 
 - The default migration templates allow now to use complex defaults for migrations.
 - Fields must use get_columns_nullable instead of ColumnDefinitionModel null. for determining if the columns should be nullable.
-- In model.update the values can be callables which are evaluated.
-- Streamline ContentTypeField in using a parameter-less default function.
+- For model `save` and `update` the values can be callables which are evaluated.
+- Streamline ContentTypeField in using a parameter-less default function. Use `CURRENT_FIELD_CONTEXT` ContextVar field for referencing the owner.
+- Fail when specifying a server_default for ForeignKey, ManyToMany, FileField, ImageField. This is not possible.
+- Internals: _insert and _update have now a different signature.
 
 ### Fixed
 
@@ -28,7 +29,8 @@ hide:
 - Cli command revision takes now also the arg argument.
 - Revisioning works now with relative revisions with - (e.g. -2).
 - Downgrades are now possible with unique_together. Build a constraint name from the fields.
-- `is_partial` was incorrectly set to always False for the model.save update path.
+- `is_partial` was incorrectly set to always `False` for the model.save update path.
+- FileFields could have make problems when migrating.
 
 ## 0.27.4
 

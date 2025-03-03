@@ -376,6 +376,10 @@ class ForeignKey(ForeignKeyFieldFactory):
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
         super().validate(kwargs)
+        if kwargs.get("server_default"):
+            raise FieldDefinitionError(
+                '"server_default" is not supported for ForeignKeys.'
+            ) from None
         embed_parent = kwargs.get("embed_parent")
         if embed_parent and "__" in embed_parent[1]:
             raise FieldDefinitionError(

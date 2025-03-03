@@ -385,7 +385,7 @@ The `unique_together` expects one of the following:
 * **List of tuple of strings**.
 * **List of tuples of strings**.
 * **List of tuples of strings as well as strings**
-* **A List of UniqueConstraint instances**.
+* **A list of UniqueConstraint instances**.
 
 If none of these values are provided, it will raise a `ValueError`.
 
