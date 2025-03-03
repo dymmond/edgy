@@ -1475,7 +1475,7 @@ class QuerySet(BaseQuerySet):
                 table=queryset.table,
                 database=queryset.database,
             )
-            # values=kwargs is required for ensuring all kwargs are seen as explicit kwargs
+            # values=set(kwargs.keys()) is required for marking the provided kwargs as explicit provided kwargs
             instance = await instance.save(force_insert=True, values=set(kwargs.keys()))
             result = await self._embed_parent_in_result(instance)
             self._clear_cache(True)

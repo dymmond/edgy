@@ -487,12 +487,17 @@ new_user = await user.save()
 
 `save` has following signature:
 
-`save(force_insert=False,values=None)`
+`save(force_insert=False, values=None)`
 
 What they do is:
 
 - `force_insert` (former `force_save`): Instead of conditionally updating, force an insert.
 - `values`: Overwrite values explicitly. Values specified here are marked as explicit set parameters.
+  You can provide here also callables which are evaluated in the `extract_column_values` method.
+
+!!! Tip
+    For the values parameter of the model instance you can also provide callables which are evaluated
+    in the `extract_column_values` method and have the ContextVars `CURRENT_INSTANCE`, `CURRENT_MODEL_INSTANCE`, `CURRENT_FIELD_CONTEXT`, `EXPLICIT_SPECIFIED_VALUES` initialized.
 
 ### Update
 
@@ -506,6 +511,10 @@ user = await User.query.get(email="foo@bar.com")
 await user.update(email="bar@example.com")
 ```
 
+!!! Tip
+    For the update method of the model instance you can also provide callables which are evaluated
+    in the `extract_column_values` method and have the ContextVars `CURRENT_INSTANCE`, `CURRENT_MODEL_INSTANCE`, `CURRENT_FIELD_CONTEXT`, `EXPLICIT_SPECIFIED_VALUES` initialized.
+
 ### Create
 
 Used to create model instances.
@@ -517,6 +526,9 @@ await User.query.create(is_active=True, email="foo@bar.com", first_name="Foo", l
 ```
 
 Create takes `ModelRef`s as positional arguments to automatically evaluate and stage them.
+
+!!! Warning
+    Because there is no model for reference, callables are not evaluated here.
 
 ### Delete
 

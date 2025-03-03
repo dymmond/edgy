@@ -406,6 +406,10 @@ class ManyToManyField(ForeignKeyFieldFactory):
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
         super().validate(kwargs)
+        if kwargs.get("server_default"):
+            raise FieldDefinitionError(
+                '"server_default" is not supported for ManyToMany.'
+            ) from None
         embed_through = kwargs.get("embed_through")
         if embed_through and "__" in embed_through:
             raise FieldDefinitionError('"embed_through" cannot contain "__".')

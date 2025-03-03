@@ -3,7 +3,7 @@ import contextlib
 import re
 import warnings
 from collections import defaultdict
-from collections.abc import Container, Generator, Sequence
+from collections.abc import Container, Generator, Iterable, Sequence
 from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
@@ -18,6 +18,7 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 from edgy.conf import evaluate_settings_once_ready
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
+from edgy.core.db.context_vars import FORCE_FIELDS_NULLABLE
 from edgy.core.utils.sync import current_eventloop, run_sync
 from edgy.types import Undefined
 
@@ -148,6 +149,67 @@ class Registry:
         if with_content_type is not False:
             self._set_content_type(with_content_type)
 
+    async def apply_default_force_nullable_fields(
+        self,
+        *,
+        force_fields_nullable: Optional[Iterable[tuple[str, str]]] = None,
+        model_defaults: Optional[dict[str, dict[str, Any]]] = None,
+        filter_db_url: Optional[str] = None,
+        filter_db_name: Union[str, None] = None,
+    ) -> None:
+        """For online migrations and after migrations to apply defaults."""
+        if force_fields_nullable is None:
+            force_fields_nullable = set(FORCE_FIELDS_NULLABLE.get())
+        else:
+            force_fields_nullable = set(force_fields_nullable)
+        if model_defaults is None:
+            model_defaults = {}
+        for model_name, defaults in model_defaults.items():
+            for default_name in defaults:
+                force_fields_nullable.add((model_name, default_name))
+        # for empty model names extract all matching models
+        for item in list(force_fields_nullable):
+            if not item[0]:
+                force_fields_nullable.discard(item)
+                for model in self.models.values():
+                    if item[1] in model.meta.fields:
+                        force_fields_nullable.add((model.__name__, item[1]))
+
+        if not force_fields_nullable:
+            return
+        if isinstance(filter_db_name, str):
+            if filter_db_name:
+                filter_db_url = str(self.extra[filter_db_name].url)
+            else:
+                filter_db_url = str(self.database.url)
+        models_with_fields: dict[str, set[str]] = {}
+        for item in force_fields_nullable:
+            if item[0] not in self.models:
+                continue
+            if item[1] not in self.models[item[0]].meta.fields:
+                continue
+            if not self.models[item[0]].meta.fields[item[1]].has_default():
+                overwrite_default = model_defaults.get(item[0]) or {}
+                if item[1] not in overwrite_default:
+                    continue
+            field_set = models_with_fields.setdefault(item[0], set())
+            field_set.add(item[1])
+        if not models_with_fields:
+            return
+        ops = []
+        for model_name, field_set in models_with_fields.items():
+            model = self.models[model_name]
+            if filter_db_url and str(model.database.url) != filter_db_url:
+                continue
+            model_specific_defaults = model_defaults.get(model_name) or {}
+            filter_kwargs = {field_name: None for field_name in field_set}
+            for obj in await model.query.filter(**filter_kwargs):
+                kwargs = {k: v for k, v in obj.extract_db_fields().items() if k not in field_set}
+                kwargs.update(model_specific_defaults)
+                # is_partial = False
+                ops.append(obj._update(False, kwargs))
+        await asyncio.gather(*ops)
+
     def extra_name_check(self, name: Any) -> bool:
         if not isinstance(name, str):
             logger.error(f"Extra database name: {name!r} is not a string.")
@@ -249,9 +311,9 @@ class Registry:
             if "content_type" in model_class.meta.fields:
                 return
             related_name = f"reverse_{model_class.__name__.lower()}"
-            assert (
-                related_name not in real_content_type.meta.fields
-            ), f"duplicate model name: {model_class.__name__}"
+            assert related_name not in real_content_type.meta.fields, (
+                f"duplicate model name: {model_class.__name__}"
+            )
 
             field_args: dict[str, Any] = {
                 "name": "content_type",

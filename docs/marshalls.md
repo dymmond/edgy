@@ -176,7 +176,7 @@ Result:
 
 Since `Marshall` is a Pydantic base model, similar to Edgy models, you can persist data directly using the marshall.
 
-Edgy provides a `save()` method for marshalls that mirrors the `save()` method of Edgy models.
+Edgy provides a `save()` method for marshalls that forwards to the `save()` method of Edgy models. It doesn't take any parameters.
 
 ### Example
 

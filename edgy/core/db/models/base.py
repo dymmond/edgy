@@ -20,6 +20,7 @@ from pydantic import BaseModel, ConfigDict
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
 from edgy.core.db.context_vars import (
+    CURRENT_FIELD_CONTEXT,
     CURRENT_INSTANCE,
     CURRENT_MODEL_INSTANCE,
     CURRENT_PHASE,
@@ -33,7 +34,7 @@ from .types import BaseModelType
 
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
-    from edgy.core.db.fields.types import BaseFieldType
+    from edgy.core.db.fields.types import FIELD_CONTEXT_TYPE, BaseFieldType
     from edgy.core.db.models.model import Model
     from edgy.core.db.querysets.base import QuerySet
     from edgy.core.signals import Broadcaster
@@ -101,7 +102,10 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 kwargs[arg.__related_name__] = existing
 
         kwargs = self.transform_input(
-            kwargs, phase=__phase__, instance=self, drop_extra_kwargs=__drop_extra_kwargs__
+            kwargs,
+            phase=__phase__,
+            instance=self,
+            drop_extra_kwargs=__drop_extra_kwargs__,
         )
         super().__init__(**kwargs)
         self.__no_load_trigger_attrs__ = __no_load_trigger_attrs__
@@ -338,11 +342,15 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             # don't trigger loads
             token = MODEL_GETATTR_BEHAVIOR.set("passdown")
             token2 = CURRENT_MODEL_INSTANCE.set(self)
+            field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
+            token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
             try:
                 for field_name in affected_fields:
                     if field_name not in column_values and field_name not in original:
                         continue
                     field = self.meta.fields[field_name]
+                    field_dict.clear()
+                    field_dict["field"] = field
                     retdict.update(
                         await field.pre_save_callback(
                             column_values.get(field_name),
@@ -352,6 +360,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                         )
                     )
             finally:
+                CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
                 MODEL_GETATTR_BEHAVIOR.reset(token)
                 CURRENT_MODEL_INSTANCE.reset(token2)
         return retdict
@@ -362,6 +371,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             # don't trigger loads, AttributeErrors are used for skipping fields
             token = MODEL_GETATTR_BEHAVIOR.set("passdown")
             token2 = CURRENT_MODEL_INSTANCE.set(self)
+            field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
+            token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
             try:
                 for field_name in affected_fields:
                     field = self.meta.fields[field_name]
@@ -369,8 +380,11 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                         value = getattr(self, field_name)
                     except AttributeError:
                         continue
+                    field_dict.clear()
+                    field_dict["field"] = field
                     await field.post_save_callback(value, instance=self, force_insert=force_insert)
             finally:
+                CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
                 MODEL_GETATTR_BEHAVIOR.reset(token)
                 CURRENT_MODEL_INSTANCE.reset(token2)
 
@@ -383,20 +397,37 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         phase: str = "",
         instance: Optional[Union[BaseModelType, QuerySet]] = None,
         model_instance: Optional[BaseModelType] = None,
+        evaluate_values: bool = False,
     ) -> dict[str, Any]:
         validated: dict[str, Any] = {}
         token = CURRENT_PHASE.set(phase)
         token2 = CURRENT_INSTANCE.set(instance)
         token3 = CURRENT_MODEL_INSTANCE.set(model_instance)
+        field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
+        token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
+
         try:
-            # phase 1: transform when required
-            if cls.meta.input_modifying_fields:
+            # phase 1:  maybe evaluate kwarg values and copy input dict
+            if evaluate_values:
+                new_extracted_values = {}
+                for k, v in extracted_values.items():
+                    if callable(v):
+                        field_dict.clear()
+                        field_dict["field"] = cast("BaseFieldType", cls.meta.fields.get(k))
+                        v = v()
+                    new_extracted_values[k] = v
+                extracted_values = new_extracted_values
+            else:
                 extracted_values = {**extracted_values}
+            # phase 2: transform when required
+            if cls.meta.input_modifying_fields:
                 for field_name in cls.meta.input_modifying_fields:
                     cls.meta.fields[field_name].modify_input(field_name, extracted_values)
-            # phase 2: validate fields and set defaults for readonly
+            # phase 3: validate fields and set defaults for readonly
             need_second_pass: list[BaseFieldType] = []
             for field_name, field in cls.meta.fields.items():
+                field_dict.clear()
+                field_dict["field"] = field
                 if field.read_only:
                     # if read_only, updates are not possible anymore
                     if (
@@ -418,14 +449,17 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     # only include fields which have inject_default_on_partial_update set or if not is_partial
                     need_second_pass.append(field)
 
-            # phase 3: set defaults for the rest if not partial or inject_default_on_partial_update
+            # phase 4: set defaults for the rest if not partial or inject_default_on_partial_update
             if need_second_pass:
                 for field in need_second_pass:
+                    field_dict.clear()
+                    field_dict["field"] = field
                     # check if field appeared e.g. by composite
                     # Note: default values are directly passed without validation
                     if field.name not in validated:
                         validated.update(field.get_default_values(field.name, validated))
         finally:
+            CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
             CURRENT_MODEL_INSTANCE.reset(token3)
             CURRENT_INSTANCE.reset(token2)
             CURRENT_PHASE.reset(token)
@@ -436,6 +470,10 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         field = fields.get(key, None)
         token = CURRENT_INSTANCE.set(self)
         token2 = CURRENT_PHASE.set("set")
+        if field is not None:
+            token_field_ctx = CURRENT_FIELD_CONTEXT.set(
+                cast("FIELD_CONTEXT_TYPE", {"field": field})
+            )
         try:
             if field is not None:
                 if hasattr(field, "__set__"):
@@ -459,6 +497,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 # ensures, __dict__ is updated
                 object.__setattr__(self, key, value)
         finally:
+            if field is not None:
+                CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
             CURRENT_INSTANCE.reset(token)
             CURRENT_PHASE.reset(token2)
 
@@ -496,38 +536,46 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             return self.__dict__[name]
 
         field = self.meta.fields.get(name)
-        getter: Any = None
-        if field is not None and hasattr(field, "__get__"):
-            getter = field.__get__
-            if behavior == "coro" or behavior == "passdown":
-                return field.__get__(self, self.__class__)
-            else:
-                token = MODEL_GETATTR_BEHAVIOR.set("passdown")
-                # no need to set an descriptor object
-                try:
+        if field is not None:
+            token_field_ctx = CURRENT_FIELD_CONTEXT.set(
+                cast("FIELD_CONTEXT_TYPE", {"field": field})
+            )
+        try:
+            getter: Any = None
+            if field is not None and hasattr(field, "__get__"):
+                getter = field.__get__
+                if behavior == "coro" or behavior == "passdown":
                     return field.__get__(self, self.__class__)
-                except AttributeError:
-                    # forward to load routine
-                    pass
-                finally:
-                    MODEL_GETATTR_BEHAVIOR.reset(token)
-        if (
-            name not in self.__dict__
-            and behavior != "passdown"
-            # is already loaded
-            and not self.__dict__.get("_loaded_or_deleted", False)
-            # only load when it is a field except for reflected
-            and (field is not None or self.__reflected__)
-            # exclude attr names from triggering load
-            and name not in self.__dict__.get("__no_load_trigger_attrs__", _empty)
-            and name not in self.identifying_db_fields
-            and self.can_load
-        ):
-            coro = self._agetattr_helper(name, getter)
-            if behavior == "coro":
-                return coro
-            return run_sync(coro)
-        return super().__getattr__(name)
+                else:
+                    token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+                    # no need to set an descriptor object
+                    try:
+                        return field.__get__(self, self.__class__)
+                    except AttributeError:
+                        # forward to load routine
+                        pass
+                    finally:
+                        MODEL_GETATTR_BEHAVIOR.reset(token)
+            if (
+                name not in self.__dict__
+                and behavior != "passdown"
+                # is already loaded
+                and not self.__dict__.get("_loaded_or_deleted", False)
+                # only load when it is a field except for reflected
+                and (field is not None or self.__reflected__)
+                # exclude attr names from triggering load
+                and name not in self.__dict__.get("__no_load_trigger_attrs__", _empty)
+                and name not in self.identifying_db_fields
+                and self.can_load
+            ):
+                coro = self._agetattr_helper(name, getter)
+                if behavior == "coro":
+                    return coro
+                return run_sync(coro)
+            return super().__getattr__(name)
+        finally:
+            if field:
+                CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
 
     def __eq__(self, other: Any) -> bool:
         # if self.__class__ != other.__class__:
