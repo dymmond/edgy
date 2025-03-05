@@ -1,13 +1,12 @@
 # Permissions in Edgy
 
-Managing permissions is a crucial aspect of database-driven applications.
-Edgy provides a flexible and portable way to handle permissions, using database tables rather than relying solely on database users.
-This feature is entirely composable in contrast to django, you can have full-fledged object-permissions to a simple user permission system
-just by providing the fields.
-It is up to you how to design e.g. the Group model. If it should have extra attributes or not.
-You just need to keep the convention, some fields are mandatory to get the results wanted.
+Managing permissions is a crucial aspect of database-driven applications. Edgy provides a flexible and portable way to handle permissions using database tables rather than relying solely on database users.
 
-The permission system does **not** require ContentTypes. They are only required for per object permissions.
+In contrast to Django, Edgy's permission feature is entirely composable. You can have anything from full-fledged object-permissions to a simple user permission system by just providing the necessary fields.
+
+It is up to you how to design it, such as the Group model. You can decide if it should have extra attributes or not. You just need to follow the convention, as some fields are mandatory to achieve the desired results.
+
+The permission system does **not** require ContentTypes. They are only required for per-object permissions.
 
 ## Permission Objects
 
