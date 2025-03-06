@@ -167,6 +167,7 @@ class BaseModelType(ABC):
         is_partial: bool = False,
         instance: Optional[Union[BaseModelType, QuerySet]] = None,
         model_instance: Optional[BaseModelType] = None,
+        evaluate_kwarg_values: bool = False,
     ) -> dict[str, Any]:
         """
         Extracts all the default values from the given fields and returns the raw

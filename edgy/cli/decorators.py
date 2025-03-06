@@ -45,6 +45,18 @@ def add_migration_directory_option(fn: Any) -> Any:
     )(fn)
 
 
+def add_force_field_nullable_option(fn: Any) -> Any:
+    import click
+
+    return click.option(
+        "--null-field",
+        "--nf",
+        multiple=True,
+        default=(),
+        help='Force field being nullable. Syntax model:field or ":field" for auto-detection of models with such a field.',
+    )(fn)
+
+
 def add_app_module_option(fn: Any) -> Any:
     import click
 

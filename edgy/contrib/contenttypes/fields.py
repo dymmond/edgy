@@ -2,6 +2,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union, cast
 
 from edgy.core.db.constants import CASCADE
+from edgy.core.db.context_vars import CURRENT_FIELD_CONTEXT
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField, ForeignKey
 from edgy.core.db.relationships.relation import SingleRelation
 from edgy.core.terminal import Print
@@ -39,13 +40,6 @@ class BaseContentTypeField(BaseForeignKeyField):
             ),
         )
 
-    def get_default_value(self) -> Any:
-        default = getattr(self, "default", None)
-        if callable(default):
-            # WARNING: here defaults are called with the owner
-            return default(self.owner)
-        return default
-
     @cached_property
     def reverse_name(self) -> str:
         return f"reverse_{self.owner.__name__.lower()}"
@@ -53,6 +47,12 @@ class BaseContentTypeField(BaseForeignKeyField):
     @cached_property
     def related_name(self) -> str:
         return f"reverse_{self.owner.__name__.lower()}"
+
+
+def default_fn() -> Any:
+    owner = CURRENT_FIELD_CONTEXT.get()["field"].owner
+    # the name and schema parameter are also set in pre_save_callbacks
+    return owner.meta.registry.content_type(name=owner.__name__)
 
 
 class ContentTypeField(ForeignKey):
@@ -64,7 +64,7 @@ class ContentTypeField(ForeignKey):
         on_delete: str = CASCADE,
         no_constraint: bool = False,
         remove_referenced: bool = True,
-        default: Any = lambda owner: owner.meta.registry.content_type(name=owner.__name__),
+        default: Any = default_fn,
         **kwargs: Any,
     ) -> "BaseFieldType":
         return super().__new__(

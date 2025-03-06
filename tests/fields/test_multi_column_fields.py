@@ -34,12 +34,14 @@ class MultiColumnFieldInner(BaseField):
                 field_name,
                 model.column_type,
                 *model.constraints,
+                nullable=self.get_columns_nullable(),
                 **model.model_dump(by_alias=True, exclude_none=True),
             ),
             sqlalchemy.Column(
                 field_name + "_inner",
                 model.column_type,
                 *model.constraints,
+                nullable=self.get_columns_nullable(),
                 **model.model_dump(by_alias=True, exclude_none=True),
             ),
         ]

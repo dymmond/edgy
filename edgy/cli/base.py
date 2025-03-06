@@ -13,6 +13,7 @@ from alembic.config import Config as AlembicConfig
 import edgy
 from edgy.cli.constants import DEFAULT_TEMPLATE_NAME
 from edgy.cli.decorators import catch_errors
+from edgy.core.db.context_vars import with_force_fields_nullable
 from edgy.utils.compat import is_class_and_subclass
 
 if TYPE_CHECKING:
@@ -87,9 +88,9 @@ class Migrate:
         self.registry = registry
         self.model_apps = model_apps or {}
 
-        assert isinstance(
-            self.model_apps, (dict, tuple, list)
-        ), "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
+        assert isinstance(self.model_apps, (dict, tuple, list)), (
+            "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
+        )
 
         if isinstance(self.model_apps, dict):
             self.model_apps = cast(dict[str, str], self.model_apps.values())
@@ -180,27 +181,28 @@ def revision(
     branch_label: Optional[str] = None,
     version_path: Optional[str] = None,
     revision_id: Optional[typing.Any] = None,
+    arg: Optional[typing.Any] = None,
+    null_fields: Union[list[str], tuple[str, ...]] = (),
 ) -> None:
     """
     Creates a new revision file
     """
     options = ["autogenerate"] if autogenerate else None
-    config = Config.get_instance(options=options)
+    config = Config.get_instance(options=options, args=arg)
+    with with_force_fields_nullable(null_fields):
+        command.revision(
+            config,
+            message,
+            autogenerate=autogenerate,
+            sql=sql,
+            head=head,
+            splice=splice,
+            branch_label=branch_label,
+            version_path=version_path,
+            rev_id=revision_id,
+        )
 
-    command.revision(
-        config,
-        message,
-        autogenerate=autogenerate,
-        sql=sql,
-        head=head,
-        splice=splice,
-        branch_label=branch_label,
-        version_path=version_path,
-        rev_id=revision_id,
-    )
 
-
-@catch_errors
 def migrate(
     message: Optional[str] = None,
     sql: bool = False,
@@ -210,20 +212,19 @@ def migrate(
     version_path: Optional[str] = None,
     revision_id: Optional[typing.Any] = None,
     arg: Optional[typing.Any] = None,
+    null_fields: Union[list[str], tuple[str, ...]] = (),
 ) -> None:
     """Alias for 'revision --autogenerate'"""
-    config = Config.get_instance(options=["autogenerate"], args=arg)
-
-    command.revision(
-        config,
-        message,
+    return revision(
         autogenerate=True,
         sql=sql,
         head=head,
         splice=splice,
         branch_label=branch_label,
         version_path=version_path,
-        rev_id=revision_id,
+        revision_id=revision_id,
+        arg=arg,
+        null_fields=null_fields,
     )
 
 

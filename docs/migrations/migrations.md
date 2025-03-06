@@ -444,6 +444,72 @@ Edgy migrations use Alembic, so commands are similar, with two exceptions:
 
 Edgy uses more intuitive names.
 
+## Migrate to new non-nullable fields
+
+Sometimes you want to add fields to a model which are required afterwards.
+
+### With server_default
+
+This is a bit more work and requires a supported field (all single-column fields and some multiple-column fields like CompositeField). It works as follows:
+
+1. Add a column with a server_default which is used by the migrations.
+2. Create the migration and migrate.
+3. Remove the server_default and create another migration.
+
+Here is a basic example:
+
+1.  Create the field with a server_default
+    ``` python
+    class CustomModel(edgy.Model):
+        active: bool = edgy.fields.BooleanField(server_default=sqlalchemy.text("true"))
+        ...
+    ```
+2.  Generate the migrations and migrate
+    ``` sh
+    edgy makemigration
+    edgy migrate
+    ```
+3. Remove the server_default
+    ``` python
+    class CustomModel(edgy.Model):
+        active: bool = edgy.fields.BooleanField()
+        ...
+    ```
+4.  Generate the migrations without the server_default and migrate
+    ``` sh
+    edgy makemigration
+    edgy migrate
+    ```
+
+### With null-field
+Null-field is a feature to make fields nullable for one makemigration/revision. You can either specify
+`model:field_name` or just `:field_name` for automatic detection of models.
+Non-existing models are ignored, and only models in `registry.models` are migrated.
+In the migration file, you will find a construct `monkay.instance.registry.apply_default_force_nullable_fields(...)`.
+The `model_defaults` argument can be used to provide one-time defaults that overwrite all other defaults.
+You can also pass callables, which are executed in context of the `extract_column_values` method and have all of the context variables available.
+
+Let's see how to implement the last example with null-field and we add also ContentTypes.
+1. Add the field with the default (not server-default).
+    ``` python
+    class CustomModel(edgy.Model):
+        active: bool = edgy.fields.BooleanField(default=True)
+        ...
+    ```
+2. Apply null-field to CustomModel:active and also for all models with active content_type.
+    ``` sh
+    edgy makemigration --nf CustomModel:active --nf :content_type
+    edgy migrate
+    ```
+3. Now create a cleanup migration.
+    ``` sh
+    edgy makemigration
+    edgy migrate
+    ```
+
+!!! Tip
+    In case you mess up the null-fields, you can also fix them manually in the script file. You can also specify custom defaults for fields.
+
 ## Multi-Database Migrations
 
 Edgy supports multi-database migrations. Continue using single-database migrations or update `env.py` and existing migrations.
