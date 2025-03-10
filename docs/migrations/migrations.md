@@ -576,7 +576,7 @@ Cons:
 
 ### Automigrations
 
-Provide an extra registry with the `automigrate_on_connect` parameter filled with an `EdgySettings` object/string to the config.
+Provide an extra registry with the `automigrate_config` parameter filled with an `EdgySettings` object/string to the config.
 
 Pros:
 

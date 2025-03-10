@@ -114,14 +114,14 @@ class Registry:
         with_content_type: Union[bool, type["BaseModelType"]] = False,
         schema: Union[str, None] = None,
         extra: Optional[dict[str, Database]] = None,
-        automigrate_on_connect: Union[
+        automigrate_config: Union[
             "EdgySettings", str, type["EdgySettings"], Callable[[], "EdgySettings"], None
         ] = None,
         **kwargs: Any,
     ) -> None:
         evaluate_settings_once_ready()
         self.db_schema = schema
-        self._automigrate_on_connect = automigrate_on_connect
+        self._automigrate_config = automigrate_config
         self._is_automigrated: bool = False
         extra = extra or {}
         self.database: Database = (
@@ -583,7 +583,7 @@ class Registry:
     async def _automigrate(self) -> None:
         from edgy import monkay
 
-        migration_settings = self._automigrate_on_connect
+        migration_settings = self._automigrate_config
         if not migration_settings or not monkay.settings.allow_automigrations:
             self._is_automigrated = True
             return

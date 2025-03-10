@@ -24,7 +24,7 @@ class Config(EdgySettings):
 
 
 async def create_custom_registry():
-    return Registry("DB_URL", automigrate_on_connect=LibraryConfig)
+    return Registry("DB_URL", automigrate_config=LibraryConfig)
 
 
 def get_application():

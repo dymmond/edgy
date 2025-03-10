@@ -53,7 +53,7 @@ class Config(EdgySettings):
 
 
 def create_registry(db):
-    registry = Registry(db, automigrate_on_connect=Config)
+    registry = Registry(db, automigrate_config=Config)
     assert not registry._is_automigrated
     return registry
 
