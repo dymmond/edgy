@@ -130,7 +130,7 @@ This field type is used to retrieve extra information provided by the `Marshall`
 
 When declaring a `MarshallMethodField`, you must define a function named `get_` followed by the field name.
 
-Edgy automatically injects an instance of the Edgy model declared in `marshall_config` into this function. This instance **is not persisted in the database** unless you explicitly [save it](#save). Therefore, the `primary_key` will not be available until then, but other object attributes and operations are.
+Edgy automatically injects an instance of the Edgy model declared in `marshall_config` into this function. This instance **is not persisted in the database** unless you explicitly [save it](#save-method). Therefore, the `primary_key` will not be available until then, but other object attributes and operations are.
 
 #### Parameters
 

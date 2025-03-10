@@ -1,5 +1,4 @@
 import edgy
-import asyncio
 from monkay import ExtensionProtocol
 from edgy import Registry, EdgySettings
 
@@ -16,12 +15,12 @@ class AddUserExtension(ExtensionProtocol):
         User.add_to_registry(monkay_instance.registry)
 
 
-class Config(EdgySettings):
+class LibraryConfig(EdgySettings):
     extensions = [AddUserExtension()]
 
 
 async def create_custom_registry():
-    return Registry("sqlite:///:memory:", automigrate_on_connect=Config)
+    return Registry("DB_URL", automigrate_on_connect=LibraryConfig)
 
 
 def get_application(): ...
