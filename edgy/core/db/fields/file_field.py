@@ -294,7 +294,7 @@ class FileField(FieldFactory):
             ) from None
         if kwargs.get("mime_use_magic"):
             try:
-                import magic  # noqa: F401
+                import magic  # noqa: F401  # pyright: ignore[reportMissingImports]
             except ImportError:
                 raise FieldDefinitionError(
                     "python-magic library is missing. Cannot use mime_use_magic parameter"
@@ -318,7 +318,7 @@ class FileField(FieldFactory):
             field_file.approved or field_obj.extract_mime != "approved_only"
         ):
             if getattr(field_obj, "mime_use_magic", False):
-                from magic import Magic
+                from magic import Magic  # pyright: ignore[reportMissingImports]
 
                 magic = Magic(mime=True)
                 # only open, not close, done later

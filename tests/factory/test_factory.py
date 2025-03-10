@@ -37,7 +37,7 @@ class User(edgy.StrictModel):
 class Product(edgy.StrictModel):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     name: str = edgy.CharField(max_length=100, null=True)
-    rating: int = edgy.IntegerField(minimum=1, maximum=5, default=1)
+    rating: int = edgy.IntegerField(gte=1, lte=5, default=1)
     in_stock: bool = edgy.BooleanField(default=False)
     user: User = edgy.fields.ForeignKey(User)
     type: ProductType = edgy.fields.ChoiceField(choices=ProductType, default=ProductType.virtual)

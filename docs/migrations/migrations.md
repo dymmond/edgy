@@ -551,3 +551,45 @@ def downgrade(engine_name: str = ""):
 ## Multi-Schema Migrations
 
 Enable multi-schema migrations by setting `multi_schema` in [Migration Settings](#migration-settings). Filter schemas using schema parameters.
+
+## Migrations in libraries  and middleware
+
+Edgy has not only an interface for main applications but also for libraries.
+We can use edgy even in an asgi middleware when the main project is django.
+
+To integrate there are two ways:
+
+### Extensions
+
+Add an extension which when included in edgy settings extensions is injecting the model in the
+
+Pros:
+
+- Reuses the registry and database.
+- Migrations contain also the injected models.
+
+Cons:
+
+- Requires edgy as main application.
+- Only one registry is supported.
+- Not completely independent. Affected by settings.
+
+### Automigrations
+
+
+
+Pros:
+
+- Can use an own registry and database. Completely independent from the main application.
+- Ideal for asgi middleware.
+
+Cons:
+
+- Requires ddl access on the database it is using. In case of the offline mode of alembic,
+  all libraries must be accessed manually via `edgy migrate -d librarypath/migrations`.
+- Must maybe be disabled via `allow_automigrations=False` in edgy settings in case of missing permissions.
+
+### What to use
+
+The optimal way is to provide the user the extension way and a fallback way with automigrations which
+reuses the extension way to inject in a registry.

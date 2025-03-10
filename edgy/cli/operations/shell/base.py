@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import select
 import sys
@@ -30,7 +32,11 @@ def shell(kernel: str) -> None:
 
     This can be used with a Migration class or with EdgyExtra object lookup.
     """
-    registry, app = edgy.monkay.instance
+    instance = edgy.monkay.instance
+    app, registry = None, None
+    if instance is not None:
+        app = instance.app
+        registry = instance.registry
     if (
         sys.platform != "win32"
         and not sys.stdin.isatty()
@@ -45,11 +51,12 @@ def shell(kernel: str) -> None:
     lifespan = handle_lifespan_events(
         on_startup=on_startup, on_shutdown=on_shutdown, lifespan=lifespan
     )
+    assert registry is not None
     run_sync(run_shell(app, lifespan, registry, kernel))
     return None
 
 
-async def run_shell(app: Any, lifespan: Any, registry: "Registry", kernel: str) -> None:
+async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) -> None:
     """Executes the database shell connection"""
 
     async with lifespan(app):

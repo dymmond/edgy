@@ -29,7 +29,7 @@ else:  # pragma: no cover
     from typing_extensions import ParamSpec
 
 if TYPE_CHECKING:
-    from PIL.ImageFile import ImageFile
+    from PIL.ImageFile import ImageFile  # pyright: ignore[reportMissingImports]
 
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
@@ -462,7 +462,7 @@ class FieldFile(File):
 
 class ImageFieldFile(FieldFile):
     def open_image(self) -> ImageFile:
-        from PIL import Image
+        from PIL import Image  # pyright: ignore[reportMissingImports]
 
         allowed_formats: Optional[Sequence[str]] = getattr(self.field, "image_formats", ())
         if self.approved and allowed_formats is not None:

@@ -53,7 +53,7 @@ class AbsHubUser(edgy.Model):
 class HubUser(AbsHubUser, BaseModel):
     name = edgy.CharField(max_length=255)
     email = edgy.CharField(max_length=60, null=True)
-    age = edgy.IntegerField(minimum=18, null=True)
+    age = edgy.IntegerField(gte=18, null=True)
 
 
 class AbsProduct(edgy.Model):

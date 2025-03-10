@@ -1,4 +1,3 @@
-from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union
 
 from monkay import load
@@ -20,11 +19,14 @@ class StorageHandler:
         self._backends = backends
         self._storages: dict[str, Storage] = {}
 
-    @cached_property
+    @property
     def backends(self) -> dict[str, Any]:
         if self._backends is None:
             self._backends = settings.storages.copy()
         return self._backends
+
+    def __copy__(self) -> "StorageHandler":
+        return StorageHandler(self._backends)
 
     def __getitem__(self, alias: str) -> "Storage":
         """
@@ -65,8 +67,8 @@ class StorageHandler:
         Raises:
             InvalidStorageError: If the backend specified in params cannot be imported.
         """
-        backend = params.pop("backend")
-        options = params.pop("options", {})
+        backend = params.get("backend")
+        options = params.get("options", {})
 
         try:
             storage_cls: type[Storage] = load(backend)
