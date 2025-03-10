@@ -114,9 +114,7 @@ class Registry:
         with_content_type: Union[bool, type["BaseModelType"]] = False,
         schema: Union[str, None] = None,
         extra: Optional[dict[str, Database]] = None,
-        automigrate_config: Union[
-            "EdgySettings", str, type["EdgySettings"], Callable[[], "EdgySettings"], None
-        ] = None,
+        automigrate_config: Union["EdgySettings", None] = None,
         **kwargs: Any,
     ) -> None:
         evaluate_settings_once_ready()
@@ -566,7 +564,10 @@ class Registry:
             return_set.add(model_class.meta.tablename)
         return return_set
 
-    def _automigrate_update(self, migration_settings: "EdgySettings") -> None:
+    def _automigrate_update(
+        self,
+        migration_settings: "EdgySettings",
+    ) -> None:
         from edgy import Instance, monkay
         from edgy.cli.base import upgrade
 
@@ -584,7 +585,7 @@ class Registry:
         from edgy import monkay
 
         migration_settings = self._automigrate_config
-        if not migration_settings or not monkay.settings.allow_automigrations:
+        if migration_settings is None or not monkay.settings.allow_automigrations:
             self._is_automigrated = True
             return
 
