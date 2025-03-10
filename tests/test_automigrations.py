@@ -31,7 +31,7 @@ async def cleanup_db():
     with suppress(Exception):
         await database.drop_database(database.url)
     rmtree("test_migrations", ignore_errors=True)
-    await asyncio.sleep(2)
+    await asyncio.sleep(0.5)
 
 
 class User(edgy.Model):
@@ -77,7 +77,6 @@ def prepare(with_upgrade: bool):
 
 @pytest.mark.parametrize("run", [1, 2])
 async def test_automigrate_manual(run):
-    assert edgy.monkay.instance is None
     subprocess = await asyncio.create_subprocess_exec(sys.executable, __file__, "prepare", "true")
     out, err = await subprocess.communicate()
     assert not err
@@ -93,7 +92,6 @@ async def test_automigrate_manual(run):
 
 @pytest.mark.parametrize("run", [1, 2])
 async def test_automigrate_automatic(run):
-    assert edgy.monkay.instance is None
     subprocess = await asyncio.create_subprocess_exec(sys.executable, __file__, "prepare", "false")
     out, err = await subprocess.communicate()
     assert not err
@@ -112,7 +110,6 @@ async def test_automigrate_automatic(run):
 
 
 async def test_automigrate_disabled():
-    assert edgy.monkay.instance is None
     subprocess = await asyncio.create_subprocess_exec(sys.executable, __file__, "prepare", "false")
     out, err = await subprocess.communicate()
     assert not err

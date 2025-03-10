@@ -160,8 +160,8 @@ def test_can_create_float_field():
     field = FloatField(gte=5, lte=10, null=True)
 
     assert isinstance(field, BaseField)
-    assert field.minimum == 5
-    assert field.maximum == 10
+    assert field.gte == 5
+    assert field.lte == 10
     assert field.null is True
 
 

@@ -74,6 +74,7 @@ def test_migrate_without_model_apps(instance_wrapper, deprecated):
     through = registry.get_model("Profile").meta.fields["related"].through
     assert through is registry.get_model(through.__name__)
     assert registry.get_model("Contact").database is database2
+    edgy.monkay.set_instance(None)
 
 
 def test_migrate_without_model_apps_and_app():
@@ -84,6 +85,7 @@ def test_migrate_without_model_apps_and_app():
     assert len(migrate.registry.models) == 3
     registry = edgy.get_migration_prepared_registry()
     assert len(registry.models) == 3
+    edgy.monkay.set_instance(None)
 
 
 @pytest.mark.parametrize(
