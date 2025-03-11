@@ -134,7 +134,7 @@ async def test_migrate_objs_namespace_only():
     app = Esmerald()
 
     with (
-        edgy.monkay.set_instance(Instance(app=app, registry=models)),
+        edgy.monkay.with_instance(Instance(app=app, registry=models)),
         edgy.monkay.with_settings(
             edgy.monkay.settings.model_copy(update={"multi_schema": "saffier"})
         ),
