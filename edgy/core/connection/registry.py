@@ -315,9 +315,9 @@ class Registry:
             if "content_type" in model_class.meta.fields:
                 return
             related_name = f"reverse_{model_class.__name__.lower()}"
-            assert (
-                related_name not in real_content_type.meta.fields
-            ), f"duplicate model name: {model_class.__name__}"
+            assert related_name not in real_content_type.meta.fields, (
+                f"duplicate model name: {model_class.__name__}"
+            )
 
             field_args: dict[str, Any] = {
                 "name": "content_type",

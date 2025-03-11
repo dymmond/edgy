@@ -32,6 +32,7 @@ hide:
 - Downgrades are now possible with unique_together. Build a constraint name from the fields.
 - `is_partial` was incorrectly set to always `False` for the model.save update path.
 - FileFields could have make problems when migrating.
+- Differing ruff versions and rules between `hatch fmt` and `pre-commit`.
 
 ## 0.27.4
 

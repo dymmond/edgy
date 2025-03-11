@@ -6,10 +6,10 @@ from edgy.cli.decorators import add_migration_directory_option
 
 @add_migration_directory_option
 @click.option(
-    "--sql", is_flag=True, help=("Don't emit SQL to database - dump to standard output " "instead")
+    "--sql", is_flag=True, help=("Don't emit SQL to database - dump to standard output instead")
 )
 @click.option(
-    "--tag", default=None, help=('Arbitrary "tag" name - can be used by custom env.py ' "scripts")
+    "--tag", default=None, help=('Arbitrary "tag" name - can be used by custom env.py scripts')
 )
 @click.argument("revision", default="head")
 @click.command()

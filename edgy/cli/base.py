@@ -88,9 +88,9 @@ class Migrate:
         self.registry = registry
         self.model_apps = model_apps or {}
 
-        assert isinstance(
-            self.model_apps, (dict, tuple, list)
-        ), "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
+        assert isinstance(self.model_apps, (dict, tuple, list)), (
+            "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
+        )
 
         if isinstance(self.model_apps, dict):
             self.model_apps = cast(dict[str, str], self.model_apps.values())

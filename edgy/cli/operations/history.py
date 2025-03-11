@@ -13,7 +13,7 @@ from edgy.cli.decorators import add_migration_directory_option
     "-i",
     "--indicate-current",
     is_flag=True,
-    help=("Indicate current version (Alembic 0.9.9 or greater is " "required)"),
+    help=("Indicate current version (Alembic 0.9.9 or greater is required)"),
 )
 @click.command()
 def history(rev_range: str, verbose: bool, indicate_current: bool) -> None:

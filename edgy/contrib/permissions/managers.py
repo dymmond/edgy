@@ -19,9 +19,9 @@ class PermissionManager(Manager):
             # none
             return cast("QuerySet", self.filter(and_()))
         UserField = self.owner.meta.fields["users"]
-        assert (
-            UserField.embed_through is False or UserField.embed_through
-        ), "users field need embed_through=foo|False."
+        assert UserField.embed_through is False or UserField.embed_through, (
+            "users field need embed_through=foo|False."
+        )
         GroupField = self.owner.meta.fields.get("groups", None)
         assert (
             GroupField is None or GroupField.embed_through is False or GroupField.embed_through
@@ -58,9 +58,9 @@ class PermissionManager(Manager):
         if objects is not None and include_null_object:
             objects = [*objects, None]
         UserField = self.owner.meta.fields["users"]
-        assert (
-            UserField.embed_through is False or UserField.embed_through
-        ), "users field need embed_through=foo|False."
+        assert UserField.embed_through is False or UserField.embed_through, (
+            "users field need embed_through=foo|False."
+        )
         GroupField = self.owner.meta.fields.get("groups", None)
         assert (
             GroupField is None or GroupField.embed_through is False or GroupField.embed_through
@@ -69,7 +69,9 @@ class PermissionManager(Manager):
             GroupField is None
             or GroupField.target.meta.fields[self.owner.users_field_group].embed_through is False
             or GroupField.target.meta.fields[self.owner.users_field_group].embed_through
-        ), f"{GroupField.target} {self.owner.users_field_group} field need embed_through=foo|False."
+        ), (
+            f"{GroupField.target} {self.owner.users_field_group} field need embed_through=foo|False."
+        )
         ModelNameField = self.owner.meta.fields.get("name_model", None)
         ContentTypeField = self.owner.meta.fields.get("obj", None)
         if objects is not None and len(objects) == 0:
@@ -87,9 +89,9 @@ class PermissionManager(Manager):
             groups_field_user = GroupField.target.meta.fields[
                 self.owner.users_field_group
             ].reverse_name
-            assert isinstance(
-                groups_field_user, str
-            ), f"{GroupField.target} {self.owner.users_field_group} field needs reverse_name."
+            assert isinstance(groups_field_user, str), (
+                f"{GroupField.target} {self.owner.users_field_group} field needs reverse_name."
+            )
             clauses[-1][f"{groups_field_user}__{GroupField.reverse_name}__name__in"] = permissions
             if model_names is not None:
                 if ModelNameField is not None:
@@ -133,13 +135,15 @@ class PermissionManager(Manager):
         if objects is not None and include_null_object:
             objects = [*objects, None]
         GroupField = self.owner.meta.fields["groups"]
-        assert (
-            GroupField.embed_through is False or GroupField.embed_through
-        ), "groups field need embed_through=foo|False."
+        assert GroupField.embed_through is False or GroupField.embed_through, (
+            "groups field need embed_through=foo|False."
+        )
         assert (
             GroupField.target.meta.fields[self.owner.users_field_group].embed_through is False
             or GroupField.target.meta.fields[self.owner.users_field_group].embed_through
-        ), f"{GroupField.target} {self.owner.users_field_group} field need embed_through=foo|False."
+        ), (
+            f"{GroupField.target} {self.owner.users_field_group} field need embed_through=foo|False."
+        )
         ModelNameField = self.owner.meta.fields.get("name_model", None)
         ContentTypeField = self.owner.meta.fields.get("obj", None)
         if objects is not None and len(objects) == 0:

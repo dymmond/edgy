@@ -12,7 +12,7 @@ from edgy.cli.decorators import add_migration_directory_option
     "--branch-label", default=None, help=("Specify a branch label to apply to the new revision")
 )
 @click.option(
-    "--rev-id", default=None, help=("Specify a hardcoded revision id instead of generating " "one")
+    "--rev-id", default=None, help=("Specify a hardcoded revision id instead of generating one")
 )
 @click.command()
 @click.argument("revisions", nargs=-1)
