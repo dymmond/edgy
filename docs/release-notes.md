@@ -13,6 +13,7 @@ hide:
 - `null-field` or `nf` parameter for makemigrations/revision.
 - Add `FORCE_FIELDS_NULLABLE` ContextVar.
 - Add `CURRENT_FIELD_CONTEXT` ContextVar.
+- Add automigrations (migrations capsuled in Registry).
 
 ### Changed
 
