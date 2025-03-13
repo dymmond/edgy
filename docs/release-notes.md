@@ -15,6 +15,7 @@ hide:
 ### Fixed
 
 - `hash_names` with unique_together incorrectly fed the `uc` prefix into the hasher. This makes the names unidentificatable.
+- `BooleanField` logic for automic migrations works by using server_default.
 
 ## 0.28.0
 

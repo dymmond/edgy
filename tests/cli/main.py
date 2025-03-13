@@ -36,6 +36,8 @@ class User(edgy.StrictModel):
         # simple default
         active = edgy.fields.BooleanField(server_default=sqlalchemy.text("true"), default=False)
         profile = edgy.fields.ForeignKey("Profile", null=False, default=complex_default)
+        # auto server defaults
+        is_staff = edgy.fields.BooleanField()
 
     class Meta:
         registry = models
