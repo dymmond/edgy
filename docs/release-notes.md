@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.28.2
+
+### Fixed
+
+- Missing `message` parameter passing in migrate command after refactory.
+
 ## 0.28.1
 
 ### Changed
