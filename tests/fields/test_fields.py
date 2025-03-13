@@ -163,6 +163,7 @@ def test_can_create_float_field():
     assert field.gte == 5
     assert field.lte == 10
     assert field.null is True
+    assert not field.column_type.asdecimal
 
 
 def test_can_create_max_digits_float_field():
@@ -170,6 +171,17 @@ def test_can_create_max_digits_float_field():
 
     assert isinstance(field, BaseField)
     assert field.column_type.precision == 10
+
+
+@pytest.mark.parametrize("klass", [FloatField, IntegerField, BigIntegerField, SmallIntegerField])
+def test_can_create_minimum_maximum_field(klass):
+    # these are old parameter names, not documented anymore in pydantic
+    field = klass(minimum=5, maximum=10, null=True)
+
+    assert isinstance(field, BaseField)
+    assert field.minimum == 5
+    assert field.maximum == 10
+    assert field.null is True
 
 
 def test_can_create_boolean_field():
@@ -261,19 +273,24 @@ def test_can_create_binary_field():
     assert field.default is Undefined
 
 
-@pytest.mark.parametrize("klass", [FloatField, IntegerField, BigIntegerField, SmallIntegerField])
+@pytest.mark.parametrize("klass", [IntegerField, BigIntegerField, SmallIntegerField])
 def test_can_create_integer_field(klass):
     field = klass(gte=1, lte=10)
 
     assert isinstance(field, BaseField)
     assert field.default is Undefined
+    assert field.gte == 1
+    assert field.lte == 10
 
 
 def test_can_create_decimal_field():
-    field = DecimalField(max_digits=2, decimal_places=2)
+    field = DecimalField(max_digits=3, decimal_places=2)
 
     assert isinstance(field, BaseField)
     assert field.default is Undefined
+    assert field.column_type.precision == 3
+    assert field.column_type.scale == 2
+    assert field.column_type.asdecimal
 
 
 def test_can_create_uuid_field():
