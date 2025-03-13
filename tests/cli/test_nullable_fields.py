@@ -201,6 +201,7 @@ async def main():
         async with main.models:
             user = await main.User.query.get(name="edgy")
             assert user.active
+            assert not user.is_staff
             assert user.content_type.name == "User"
             assert user.profile == await main.Profile.query.get(name="edgy")
             assert user.profile.content_type.name == "Profile"
@@ -211,6 +212,7 @@ async def main():
         async with main.models:
             user = await main.User.query.get(name="edgy")
             assert user.active
+            assert not user.is_staff
             assert user.content_type.name == "User"
             assert user.profile == await main.Profile.query.get(name="edgy")
 

@@ -260,18 +260,24 @@ class BooleanField(FieldFactory, bool_type):
     def __new__(  # type: ignore
         cls,
         *,
-        default: Optional[bool] = False,
+        default: Union[None, bool, Callable[[], bool]] = False,
         **kwargs: Any,
     ) -> BaseFieldType:
-        kwargs = {
-            **kwargs,
-            **{key: value for key, value in locals().items() if key not in CLASS_DEFAULTS},
-        }
+        if default is not None:
+            kwargs["default"] = default
         return super().__new__(cls, **kwargs)
 
     @classmethod
     def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.Boolean()
+
+    @classmethod
+    def validate(cls, kwargs: dict[str, Any]) -> None:
+        super().validate(kwargs)
+
+        default = kwargs.get("default")
+        if default is not None and isinstance(default, bool):
+            kwargs.setdefault("server_default", sqlalchemy.text("true" if default else "false"))
 
 
 class DateTimeField(_AutoNowMixin, datetime.datetime):
