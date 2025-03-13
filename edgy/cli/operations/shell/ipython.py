@@ -28,7 +28,7 @@ def get_ipython(app: typing.Any, registry: Registry, options: typing.Any = None)
     and boots up the kernel.
     """
     try:
-        from IPython import start_ipython
+        from IPython import start_ipython  # pyright: ignore[reportMissingModuleSource]
 
         def run_ipython() -> None:
             ipython_arguments = get_ipython_arguments(options)

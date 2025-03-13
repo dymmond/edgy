@@ -95,9 +95,9 @@ class Permission(BasePermission):
             None
         """
 
-        assert isinstance(users, list) or isinstance(
-            users, User
-        ), "Users must be a list or a User instance."
+        assert isinstance(users, list) or isinstance(users, User), (
+            "Users must be a list or a User instance."
+        )
 
         if not isinstance(users, list):
             users = [users]

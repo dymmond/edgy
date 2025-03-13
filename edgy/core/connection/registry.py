@@ -25,6 +25,7 @@ from edgy.types import Undefined
 from .asgi import ASGIApp, ASGIHelper
 
 if TYPE_CHECKING:
+    from edgy.conf.global_settings import EdgySettings
     from edgy.contrib.autoreflection.models import AutoReflectionModel
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
@@ -113,10 +114,13 @@ class Registry:
         with_content_type: Union[bool, type["BaseModelType"]] = False,
         schema: Union[str, None] = None,
         extra: Optional[dict[str, Database]] = None,
+        automigrate_config: Union["EdgySettings", None] = None,
         **kwargs: Any,
     ) -> None:
         evaluate_settings_once_ready()
         self.db_schema = schema
+        self._automigrate_config = automigrate_config
+        self._is_automigrated: bool = False
         extra = extra or {}
         self.database: Database = (
             database if isinstance(database, Database) else Database(database, **kwargs)
@@ -560,10 +564,39 @@ class Registry:
             return_set.add(model_class.meta.tablename)
         return return_set
 
+    def _automigrate_update(
+        self,
+        migration_settings: "EdgySettings",
+    ) -> None:
+        from edgy import Instance, monkay
+        from edgy.cli.base import upgrade
+
+        with (
+            monkay.with_extensions({}),
+            monkay.with_settings(migration_settings),
+            monkay.with_instance(Instance(registry=self), apply_extensions=False),
+        ):
+            self._is_automigrated = True
+            monkay.evaluate_settings()
+            monkay.apply_extensions()
+            upgrade()
+
+    async def _automigrate(self) -> None:
+        from edgy import monkay
+
+        migration_settings = self._automigrate_config
+        if migration_settings is None or not monkay.settings.allow_automigrations:
+            self._is_automigrated = True
+            return
+
+        await asyncio.to_thread(self._automigrate_update, migration_settings)
+
     async def _connect_and_init(self, name: Union[str, None], database: "Database") -> None:
         from edgy.core.db.models.metaclasses import MetaInfo
 
         await database.connect()
+        if not self._is_automigrated:
+            await self._automigrate()
         if not self.pattern_models or name in self.dbs_reflected:
             return
         schemes = set()

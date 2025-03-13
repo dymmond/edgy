@@ -32,6 +32,7 @@ class MediaSettings(BaseSettings):
 
 
 class MigrationSettings(BaseSettings):
+    allow_automigrations: bool = True
     multi_schema: Union[bool, re.Pattern, str] = False
     ignore_schema_pattern: Union[None, re.Pattern, str] = "information_schema"
     migrate_databases: Union[list[Union[str, None]], tuple[Union[str, None], ...]] = (None,)

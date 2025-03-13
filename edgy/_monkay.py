@@ -1,19 +1,24 @@
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass, field
 from importlib import import_module
-from typing import TYPE_CHECKING, Any, NamedTuple, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 from monkay import Monkay
+
+from edgy.core.files.storage.handler import StorageHandler
 
 if TYPE_CHECKING:
     from edgy.conf.global_settings import EdgySettings
     from edgy.core.connection import Registry
 
 
-class Instance(NamedTuple):
+@dataclass
+class Instance:
     registry: Registry
     app: Optional[Any] = None
+    storages: StorageHandler = field(default_factory=StorageHandler)
 
 
 def create_monkay(global_dict: dict, all_var: list[str]) -> Monkay[Instance, EdgySettings]:

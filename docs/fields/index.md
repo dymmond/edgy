@@ -77,7 +77,7 @@ import edgy
 
 class MyModel(edgy.Model):
     big_number: int = edgy.BigIntegerField(default=0)
-    another_big_number: int = edgy.BigIntegerField(minimum=10)
+    another_big_number: int = edgy.BigIntegerField(gte=10)
     ...
 
 ```
@@ -89,8 +89,10 @@ This field is used as a default field for the `id` of a model.
 
 ##### Parameters:
 
-* `minimum` - An integer indicating the minimum.
-* `maximum` - An integer indicating the maximum.
+* `gte` - An integer indicating the minimum.
+* `gt` - An integer indicating the exclusive minimum.
+* `lte` - An integer indicating the maximum.
+* `lt` - An integer indicating the exclusive maximum.
 * `multiple_of` - An integer indicating the multiple of.
 * `increment_on_save` - An integer which is applied on every save.
 
@@ -102,14 +104,16 @@ import edgy
 
 class MyModel(edgy.Model):
     a_number: int = edgy.IntegerField(default=0)
-    another_number: int = edgy.IntegerField(minimum=10)
+    another_number: int = edgy.IntegerField(gte=10)
     ...
 ```
 
 ##### Parameters:
 
-* `minimum` - An integer indicating the minimum.
-* `maximum` - An integer indicating the maximum.
+* `gte` - An integer indicating the minimum.
+* `gt` - An integer indicating the exclusive minimum.
+* `lte` - An integer indicating the maximum.
+* `lt` - An integer indicating the exclusive maximum.
 * `multiple_of` - An integer indicating the multiple of.
 * `increment_on_save` - An integer which is applied on every save.
 
@@ -122,14 +126,16 @@ import edgy
 
 class MyModel(edgy.Model):
     a_number: int = edgy.SmallIntegerField(default=0)
-    another_number: int = edgy.SmallIntegerField(minimum=10)
+    another_number: int = edgy.SmallIntegerField(gte=10)
     ...
 ```
 
 ##### Parameters:
 
-* `minimum` - An integer indicating the minimum.
-* `maximum` - An integer indicating the maximum.
+* `gte` - An integer indicating the minimum.
+* `gt` - An integer indicating the exclusive minimum.
+* `lte` - An integer indicating the maximum.
+* `lt` - An integer indicating the exclusive maximum.
 * `multiple_of` - An integer indicating the multiple of.
 * `increment_on_save` - An integer which is applied on every save.
 
@@ -407,8 +413,10 @@ class MyModel(edgy.Model):
 
 ##### Parameters
 
-* `minimum` - An integer indicating the minimum.
-* `maximum` - An integer indicating the maximum.
+* `gte` - An integer indicating the minimum.
+* `gt` - An integer indicating the exclusive minimum.
+* `lte` - An integer indicating the maximum.
+* `lt` - An integer indicating the exclusive maximum.
 * `max_digits` - An integer indicating the total maximum digits. Optional.
 * `decimal_places` - An integer indicating the total decimal places.
 * `multiple_of` - An integer, float or decimal indicating the multiple of.

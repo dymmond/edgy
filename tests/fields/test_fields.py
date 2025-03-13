@@ -157,11 +157,11 @@ def test_can_create_text_field():
 
 
 def test_can_create_float_field():
-    field = FloatField(minimum=5, maximum=10, null=True)
+    field = FloatField(gte=5, lte=10, null=True)
 
     assert isinstance(field, BaseField)
-    assert field.minimum == 5
-    assert field.maximum == 10
+    assert field.gte == 5
+    assert field.lte == 10
     assert field.null is True
 
 
@@ -263,7 +263,7 @@ def test_can_create_binary_field():
 
 @pytest.mark.parametrize("klass", [FloatField, IntegerField, BigIntegerField, SmallIntegerField])
 def test_can_create_integer_field(klass):
-    field = klass(minimum=1, maximum=10)
+    field = klass(gte=1, lte=10)
 
     assert isinstance(field, BaseField)
     assert field.default is Undefined

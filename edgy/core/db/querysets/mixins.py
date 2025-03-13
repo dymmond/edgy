@@ -91,9 +91,9 @@ class TenancyMixin:
             elif database is None:
                 connection = self.model_class.meta.registry.database
             else:
-                assert (
-                    database is None or database in self.model_class.meta.registry.extra
-                ), f"`{database}` is not in the connections extra of the model`{self.model_class.__name__}` registry"
+                assert database is None or database in self.model_class.meta.registry.extra, (
+                    f"`{database}` is not in the connections extra of the model`{self.model_class.__name__}` registry"
+                )
 
                 connection = self.model_class.meta.registry.extra[database]
             queryset.database = connection

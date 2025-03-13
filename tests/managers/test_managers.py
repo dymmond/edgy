@@ -32,7 +32,7 @@ class Product(edgy.StrictModel):
     active: ClassVar[Manager] = ActiveManager()
 
     name = edgy.CharField(max_length=100)
-    rating = edgy.IntegerField(minimum=1, maximum=5)
+    rating = edgy.IntegerField(gte=1, lte=5)
     in_stock = edgy.BooleanField(default=False)
     is_active = edgy.BooleanField(default=False)
 

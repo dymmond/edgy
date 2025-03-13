@@ -56,12 +56,12 @@ class MarshallMeta(ModelMetaclass):
         base_fields_include = marshall_config.get("fields", None)
         base_fields_exclude = marshall_config.get("exclude", None)
 
-        assert (
-            base_fields_include is None or base_fields_exclude is None
-        ), "Use either 'fields' or 'exclude', not both."
-        assert (
-            base_fields_include is not None or base_fields_exclude is not None
-        ), "Either 'fields' or 'exclude' must be declared."
+        assert base_fields_include is None or base_fields_exclude is None, (
+            "Use either 'fields' or 'exclude', not both."
+        )
+        assert base_fields_include is not None or base_fields_exclude is not None, (
+            "Either 'fields' or 'exclude' must be declared."
+        )
 
         base_model_fields: dict[str, Any] = {}
 

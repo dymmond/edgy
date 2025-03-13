@@ -194,9 +194,9 @@ class _EnhancedClausesHelper:
                     )
                     clauses.append(fk_tuple.in_(await sub_query))
                 else:
-                    assert not isinstance(
-                        value, BaseModelType
-                    ), f"should be parsed in clean: {key}: {value}"
+                    assert not isinstance(value, BaseModelType), (
+                        f"should be parsed in clean: {key}: {value}"
+                    )
 
                     value = await parse_clause_arg(value, queryset, tables_and_models)
                     table = tables_and_models[related_str][0]

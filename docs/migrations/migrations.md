@@ -187,7 +187,7 @@ Set `migrate_databases` if additional databases are used.
 
 ## Generating and Working with Migrations
 
-Ensure you've read the [Migration](#migration) section and have everything set up.
+Ensure you've read the [Usage](#usage) section and have everything set up.
 
 Edgy's internal client, `edgy`, manages the migration process.
 
@@ -551,3 +551,75 @@ def downgrade(engine_name: str = ""):
 ## Multi-Schema Migrations
 
 Enable multi-schema migrations by setting `multi_schema` in [Migration Settings](#migration-settings). Filter schemas using schema parameters.
+
+## Migrations in Libraries and Middleware
+
+Edgy has not only an interface for main applications but also for libraries.
+We can use Edgy even in an ASGI middleware when the main project is Django.
+
+To integrate, there are two ways:
+
+### Extensions
+
+Add an extension which, when included in Edgy settings extensions, injects the model into the current registry.
+
+Pros:
+
+- Reuses the registry and database.
+- Migrations contain the injected models.
+
+Cons:
+
+- Requires Edgy as the main application.
+- Only one registry is supported.
+- Not completely independent. Affected by settings.
+
+### Automigrations
+
+Provide an extra registry with the `automigrate_config` parameter filled with an `EdgySettings` object/string to the config.
+
+Pros:
+
+- Can use its own registry and database. Completely independent from the main application.
+- Ideal for ASGI middleware.
+- In the best case, no user interaction is required.
+
+Cons:
+
+- Requires DDL access on the database it is using. In the case of the offline mode of Alembic,
+  all libraries must be accessed manually via `edgy migrate -d librarypath/migrations`.
+- May need to be disabled via `allow_automigrations=False` in Edgy settings in case of missing DDL permissions.
+
+### What to Use
+
+The optimal way is to provide the user the extension way and provide a fallback way with automigrations which
+reuses the extension way to inject into a registry.
+
+```python
+{!> ../docs_src/migrations/automigrations_library.py !}
+```
+
+This way, the user is free to decide which way to use. If this is not enough, they can also directly attach the
+models to a registry and provide their own migration settings. But this is similar to automigrations just without extensions.
+
+```python
+{!> ../docs_src/migrations/automigrations_main.py !}
+```
+
+In special environments without DDL change permissions, you need to disable the automigrations via configuration and extract the migrations with `--sql`.
+
+```python
+{!> ../docs_src/migrations/automigrations_library_disabled.py !}
+```
+
+## Offline Mode
+
+Sometimes, without DDL access, we need the offline mode. Offline means the database structure is only read, not modified, and the migrations
+are output as SQL scripts for the user to provide to the DBA.
+
+Here we need the [Environment Variables](#environment-variables) and add to `edgy migrate` `--sql` to get the SQL scripts for migrations one-by-one.
+
+This can be quite time-intensive, especially if libraries need their own tables.
+
+You may consider in this case to use the [Extension way](#extensions) of integration or to use a different database like SQLite for
+the library registries which do not have the restrictions.
