@@ -57,9 +57,7 @@ def test_column_type():
     assert isinstance(SmallIntegerField.get_column_type({}), sqlalchemy.SmallInteger)
     assert isinstance(DecimalField.get_column_type({}), sqlalchemy.Numeric)
     assert isinstance(UUIDField.get_column_type({}), sqlalchemy.Uuid)
-    assert isinstance(
-        ChoiceField.get_column_type({"choices": Choices}), sqlalchemy.Enum
-    )
+    assert isinstance(ChoiceField.get_column_type({"choices": Choices}), sqlalchemy.Enum)
 
 
 @pytest.mark.parametrize(
@@ -175,9 +173,7 @@ def test_can_create_max_digits_float_field():
     assert field.column_type.precision == 10
 
 
-@pytest.mark.parametrize(
-    "klass", [FloatField, IntegerField, BigIntegerField, SmallIntegerField]
-)
+@pytest.mark.parametrize("klass", [FloatField, IntegerField, BigIntegerField, SmallIntegerField])
 def test_can_create_minimum_maximum_field(klass):
     # these are old parameter names, not documented anymore in pydantic
     field = klass(minimum=5, maximum=10, null=True)
