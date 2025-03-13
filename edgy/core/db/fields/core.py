@@ -263,7 +263,9 @@ class BooleanField(FieldFactory, bool_type):
         default: Union[None, bool, Callable[[], bool]] = False,
         **kwargs: Any,
     ) -> BaseFieldType:
-        return super().__new__(cls, default=default, **kwargs)
+        if default is not None:
+            kwargs["default"] = default
+        return super().__new__(cls, **kwargs)
 
     @classmethod
     def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
