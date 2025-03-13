@@ -64,7 +64,10 @@ _removed_copy_keys.difference_update(
 
 def _check_replace_related_field(
     replace_related_field: Union[
-        bool, type[BaseModelType], tuple[type[BaseModelType], ...], list[type[BaseModelType]]
+        bool,
+        type[BaseModelType],
+        tuple[type[BaseModelType], ...],
+        list[type[BaseModelType]],
     ],
     model: type[BaseModelType],
 ) -> bool:
@@ -82,7 +85,10 @@ def _set_related_field(
     related_name: str,
     source: type[BaseModelType],
     replace_related_field: Union[
-        bool, type[BaseModelType], tuple[type[BaseModelType], ...], list[type[BaseModelType]]
+        bool,
+        type[BaseModelType],
+        tuple[type[BaseModelType], ...],
+        list[type[BaseModelType]],
     ],
 ) -> None:
     if replace_related_field is not True and related_name in target.meta.fields:
@@ -124,7 +130,10 @@ def _set_related_name_for_foreign_keys(
     meta: MetaInfo,
     model_class: type[BaseModelType],
     replace_related_field: Union[
-        bool, type[BaseModelType], tuple[type[BaseModelType], ...], list[type[BaseModelType]]
+        bool,
+        type[BaseModelType],
+        tuple[type[BaseModelType], ...],
+        list[type[BaseModelType]],
     ] = False,
 ) -> None:
     """
@@ -212,7 +221,9 @@ class DatabaseMixin:
             else:
                 with contextlib.suppress(LookupError):
                     original_model = registry.get_model(
-                        cls.__name__, include_content_type_attr=False, exclude=("tenant_models",)
+                        cls.__name__,
+                        include_content_type_attr=False,
+                        exclude=("tenant_models",),
                     )
                     if on_conflict == "keep":
                         return original_model
@@ -379,9 +390,11 @@ class DatabaseMixin:
                 registry,
                 replace_related_field=replaceable_models,
                 on_conflict=on_conflict,
-                database="keep"
-                if cls.meta.registry is False or cls.database is not cls.meta.registry.database
-                else True,
+                database=(
+                    "keep"
+                    if cls.meta.registry is False or cls.database is not cls.meta.registry.database
+                    else True
+                ),
             )
         return _copy
 
@@ -746,9 +759,11 @@ class DatabaseMixin:
             *indexes,
             *global_constraints,
             extend_existing=True,
-            schema=schema
-            if schema
-            else cls.get_active_class_schema(check_schema=False, check_tenant=False),
+            schema=(
+                schema
+                if schema
+                else cls.get_active_class_schema(check_schema=False, check_tenant=False)
+            ),
         )
 
     @classmethod
@@ -795,7 +810,7 @@ class DatabaseMixin:
         if isinstance(fields, str):
             return sqlalchemy.UniqueConstraint(
                 *cls.meta.field_to_column_names[fields],
-                name=hash_names([fields], prefix=f"uc_{cls.__name__}"),
+                name=hash_names([fields], inner_prefix=cls.__name__, outer_prefix="uc"),
             )
         elif isinstance(fields, UniqueConstraint):
             return sqlalchemy.UniqueConstraint(
@@ -812,7 +827,7 @@ class DatabaseMixin:
         fields = set(fields)
         return sqlalchemy.UniqueConstraint(
             *chain.from_iterable(cls.meta.field_to_column_names[field] for field in fields),
-            name=hash_names(fields, prefix=f"uc_{cls.__name__}"),
+            name=hash_names(fields, inner_prefix=cls.__name__, outer_prefix="uc"),
         )
 
     @classmethod
@@ -823,9 +838,11 @@ class DatabaseMixin:
         return sqlalchemy.Index(
             index.name,
             *chain.from_iterable(
-                [field]
-                if isinstance(field, sqlalchemy.TextClause)
-                else cls.meta.field_to_column_names[field]
+                (
+                    [field]
+                    if isinstance(field, sqlalchemy.TextClause)
+                    else cls.meta.field_to_column_names[field]
+                )
                 for field in index.fields
             ),
         )
@@ -839,5 +856,6 @@ class DatabaseMixin:
         This method is automatically assigned to transaction masking the metaclass transaction for instances.
         """
         return cast(
-            "Transaction", self.database.transaction(force_rollback=force_rollback, **kwargs)
+            "Transaction",
+            self.database.transaction(force_rollback=force_rollback, **kwargs),
         )
