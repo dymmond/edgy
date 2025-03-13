@@ -11,7 +11,7 @@ hide:
 ### Changed
 
 - `hash_names` has now two prefix parameters: `inner_prefix`, `outer_prefix`.
--
+
 ### Fixed
 
 - `hash_names` with unique_together incorrectly fed the `uc` prefix into the hasher. This makes the names unidentificatable.
