@@ -76,6 +76,21 @@ async def rollback_transactions():
         yield
 
 
+async def test_unique_together_naming():
+    assert Product._get_unique_constraints("name").name.startswith("uc_")
+    assert (
+        Product._get_unique_constraints("name").name
+        != NewProduct._get_unique_constraints("name").name
+    )
+    assert Product._get_unique_constraints(["name", "sku"]).name.startswith("uc_")
+    assert (
+        Product._get_unique_constraints(
+            edgy.UniqueConstraint(name="foo", fields=["name", "sku"])
+        ).name
+        == "foo"
+    )
+
+
 @pytest.mark.skipif(database.url.dialect == "mysql", reason="Not supported on MySQL")
 async def test_unique_together():
     await User.query.create(name="Test", email="test@example.com")

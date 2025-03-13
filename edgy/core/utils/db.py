@@ -44,8 +44,13 @@ def hash_tablekey(*, tablekey: str, prefix: str) -> str:
     return _hash_tablekey(tablekey, prefix)
 
 
-def hash_names(field_or_col_names: Iterable[str], *, prefix: str) -> str:
-    return hash_to_identifier(f"{prefix}_{','.join(sorted(field_or_col_names))}")
+def hash_names(
+    field_or_col_names: Iterable[str], *, inner_prefix: str, outer_prefix: str = ""
+) -> str:
+    hashed = hash_to_identifier(f"{inner_prefix}_{','.join(sorted(field_or_col_names))}")
+    if outer_prefix:
+        hashed = f"{outer_prefix}{hashed}"
+    return hashed
 
 
 def force_fields_nullable_as_list_string(apostroph: str = '"') -> str:
