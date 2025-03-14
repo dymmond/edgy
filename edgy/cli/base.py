@@ -216,6 +216,7 @@ def migrate(
 ) -> None:
     """Alias for 'revision --autogenerate'"""
     return revision(
+        message=message,
         autogenerate=True,
         sql=sql,
         head=head,
