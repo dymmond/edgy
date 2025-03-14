@@ -192,6 +192,12 @@ at [connections](./connection.md) to understand how to do it properly.
 
 In the documentation we go deeper in explanations and examples, this was just to warm up. 😁
 
+### Powered by
+
+Worth mentioning who is helping us.
+
+[![JetBrains logo.](https://resources.jetbrains.com/storage/products/company/brand/logos/jetbrains.svg)](https://jb.gg/OpenSourceSupport)
+
 
 [edgy]: https://edgy.dymmond.com
 [saffier]: https://saffier.tarsild.io
