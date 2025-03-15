@@ -6,6 +6,22 @@ hide:
 
 # Release Notes
 
+## 0.28.3
+
+### Added
+
+- Convert for most fields defaults to server_default to ease migrations. There are some exceptions.
+- Add the setting `allow_auto_compute_server_defaults` which allows to disable the automatic generation of server defaults.
+
+### Changed
+
+- `get_default_value` is now also overwritable by factories.
+
+### Fixed
+
+- JSONField `default` is deepcopied to prevent accidental modifications of the default.
+  There is no need anymore to provide a lambda.
+
 ## 0.28.2
 
 ### Fixed

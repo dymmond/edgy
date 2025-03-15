@@ -24,6 +24,13 @@ Check the [unique_together](../models.md#unique-together) for more details.
 - `comment` - A comment to be added with the field in the SQL database.
 - `secret` - A special attribute that allows to call the [exclude_secrets](../queries/secrets.md#exclude-secrets) and avoid
 accidental leakage of sensitive data.
+- `auto_compute_server_default` - A special attribute which allows to calculate the `server_default` from the `default` if not set explicitly and a default was set. It has four possible values:
+    - `False` - Default for basic fields. Disables the feature. For field authors.
+    - `None` - Default for basic single column fields. When not disabled by the `allow_auto_compute_server_defaults` setting,
+      the field `null` attribute is `False` and the `default` is not a callable, the server_default is calculated. For field authors.
+    - `"ignore_null"` - Like for `None` just ignore the null attribute for the decision. For field authors.
+    - `True` - When no explicit server_default is set, evaluate default for it. It also has a higher preference than `allow_auto_compute_server_defaults`.
+      Only for endusers. The default must be compatible with the server_default.
 
 All fields are required unless one of the following is set:
 
@@ -31,14 +38,18 @@ All fields are required unless one of the following is set:
 
     <sup>Set default to `None`</sup>
 
-- `server_default` - instance, str, Unicode or a SQLAlchemy `sqlalchemy.sql.expression.text`
-construct representing the DDL DEFAULT value for the column.
+- `server_default` - instance, str, None or a SQLAlchemy `sqlalchemy.sql.expression.text` construct representing the DDL DEFAULT value for the column.
+  If None is provided the automatic server_default generation is disabled. The default set here always disables the automatic generation of `server_default`.
 - `default` - A value or a callable (function).
 - `auto_now` or `auto_now_add` -  Only for DateTimeField and DateField
 
 
 !!! Tip
     Despite not always advertised you can pass valid keyword arguments for pydantic FieldInfo (they are in most cases just passed through).
+
+!!! Warning
+    When `auto_compute_server_default` is `True` the default is in `BaseField.__init__` evaluated always (overwrites safety checks and settings).
+    Here are no contextvars set. So be careful when you pass a callable to `default`.
 
 ## Available fields
 
@@ -702,10 +713,12 @@ import edgy
 class MyModel(edgy.Model):
     data: Dict[str, Any] = edgy.JSONField(default={})
     ...
-
 ```
 
 Simple JSON representation object.
+
+!!! Note
+    Mutable default values (list, dict) are deep-copied to ensure that the default is not manipulated accidentally.
 
 
 #### BinaryField

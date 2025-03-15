@@ -1,3 +1,4 @@
+import copy
 import datetime
 import decimal
 import enum
@@ -10,6 +11,7 @@ from re import Pattern
 from secrets import compare_digest
 from typing import TYPE_CHECKING, Annotated, Any, Optional, Union, cast
 
+import orjson
 import pydantic
 import sqlalchemy
 from monkay import Monkay
@@ -271,14 +273,6 @@ class BooleanField(FieldFactory, bool_type):
     def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.Boolean()
 
-    @classmethod
-    def validate(cls, kwargs: dict[str, Any]) -> None:
-        super().validate(kwargs)
-
-        default = kwargs.get("default")
-        if default is not None and isinstance(default, bool):
-            kwargs.setdefault("server_default", sqlalchemy.text("true" if default else "false"))
-
 
 class DateTimeField(_AutoNowMixin, datetime.datetime):
     """Representation of a datetime field"""
@@ -387,6 +381,24 @@ class JSONField(FieldFactory, pydantic.Json):  # type: ignore
     def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.JSON()
 
+    @classmethod
+    def get_default_value(cls, field_obj: BaseFieldType, original_fn: Any = None) -> Any:
+        default = original_fn()
+        # copy mutable structures
+        if isinstance(default, (list, dict)):
+            default = copy.deepcopy(default)
+        return default
+
+    @classmethod
+    def customize_default_for_server_default(cls, field_obj: BaseFieldType, default: Any, original_fn: Any = None) -> Any:
+        if callable(default):
+            default = default()
+        if not isinstance(default, str):
+            default = orjson.dumps(default)
+        return sqlalchemy.text(":value").bindparams(
+            value=default
+        )
+
 
 class BinaryField(FieldFactory, bytes):
     """Representation of a binary"""
@@ -449,6 +461,15 @@ class ChoiceField(FieldFactory):
     def get_column_type(cls, kwargs: dict[str, Any]) -> sqlalchemy.Enum:
         choice_class = kwargs.get("choices")
         return sqlalchemy.Enum(choice_class)
+
+    @classmethod
+    def customize_default_for_server_default(cls, field_obj: BaseFieldType, default: Any, original_fn: Any = None) -> Any:
+        if callable(default):
+            default = default()
+        return sqlalchemy.text(":value").bindparams(
+            value=default.name
+        )
+
 
 
 class PasswordField(CharField):

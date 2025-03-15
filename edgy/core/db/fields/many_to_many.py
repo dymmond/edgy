@@ -406,6 +406,11 @@ class ManyToManyField(ForeignKeyFieldFactory):
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
         super().validate(kwargs)
+        if kwargs.get("auto_compute_server_default"):
+            raise FieldDefinitionError(
+                '"auto_compute_server_default" is not supported for ManyToMany.'
+            ) from None
+        kwargs["auto_compute_server_default"] = False
         if kwargs.get("server_default"):
             raise FieldDefinitionError(
                 '"server_default" is not supported for ManyToMany.'

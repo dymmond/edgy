@@ -260,10 +260,15 @@ def test_can_overwrite_method_autonow_field(mocker):
 
 
 def test_can_create_json_field():
-    field = JSONField(default={"json": "json"})
+    default = {"json": "json"}
+    field = JSONField(default=default)
 
     assert isinstance(field, BaseField)
     assert field.default == {"json": "json"}
+    # test if return mutations affect the default
+    returned = field.get_default_value()
+    returned["json"] = "not_json"
+    assert default == {"json": "json"}
 
 
 def test_can_create_binary_field():
