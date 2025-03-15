@@ -47,6 +47,7 @@ class MigrationSettings(BaseSettings):
 
 class EdgySettings(MediaSettings, MigrationSettings):
     model_config = SettingsConfigDict(extra="allow", ignored_types=(cached_property,))
+    allow_auto_compute_server_defaults: bool = True
     preloads: Union[list[str], tuple[str, ...]] = ()
     extensions: Union[list[ExtensionProtocol], tuple[ExtensionProtocol, ...]] = ()
     ipython_args: Union[list[str], tuple[str, ...]] = ("--no-banner",)

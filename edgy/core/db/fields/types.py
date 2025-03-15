@@ -174,6 +174,17 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         """
 
     @abstractmethod
+    def customize_default_for_server_default(self, value: Any) -> Any:
+        """
+        Modify default for server_default.
+
+        Args:
+            field_name: the field name (can be different from name)
+            cleaned_data: currently validated data. Useful to check if the default was already applied.
+
+        """
+
+    @abstractmethod
     def embed_field(
         self,
         prefix: str,
