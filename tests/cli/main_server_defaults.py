@@ -1,12 +1,11 @@
 import os
+from enum import Enum
 
 import pytest
-import sqlalchemy
 
 import edgy
 from edgy import Instance
 from edgy.contrib.permissions import BasePermission
-from edgy.core.db.context_vars import CURRENT_MODEL_INSTANCE
 from tests.settings import TEST_DATABASE
 
 pytestmark = pytest.mark.anyio
@@ -17,25 +16,25 @@ models = edgy.Registry(
 
 basedir = os.path.abspath(os.path.dirname(__file__))
 
-if os.environ.get("TEST_ADD_NULLABLE_FIELDS", "false") == "true":
 
-    class Profile(edgy.StrictModel):
-        name = edgy.fields.CharField(max_length=100)
-
-        class Meta:
-            registry = models
-
-    def complex_default() -> Profile:
-        instance = CURRENT_MODEL_INSTANCE.get()
-        return Profile(name=instance.name)
+class UserTypeEnum(Enum):
+    INTERNAL = "Internal"
+    SYSTEM = "System"
+    EXTERNAL = "External"
 
 
 class User(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100)
-    if os.environ.get("TEST_ADD_NULLABLE_FIELDS", "false") == "true":
-        # simple default
-        active = edgy.fields.BooleanField(server_default=sqlalchemy.text("true"), default=False)
-        profile = edgy.fields.ForeignKey("Profile", null=False, default=complex_default)
+    if os.environ.get("TEST_ADD_AUTO_SERVER_DEFAULTS", "false") == "true":
+        # auto server defaults
+        active = edgy.fields.BooleanField(default=True)
+        is_staff = edgy.fields.BooleanField()
+        age = edgy.fields.IntegerField(default=18)
+        size = edgy.fields.DecimalField(default="1.8", decimal_places=2)
+        blob = edgy.fields.BinaryField(default=b"abc")
+        # needs special library for alembic enum migrations
+        # user_type = edgy.fields.ChoiceField(choices=UserTypeEnum, default=UserTypeEnum.INTERNAL)
+        data = edgy.fields.JSONField(default={"test": "test"})
 
     class Meta:
         registry = models
