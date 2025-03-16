@@ -24,6 +24,7 @@ Check the [unique_together](../models.md#unique-together) for more details.
 - `comment` - A comment to be added with the field in the SQL database.
 - `secret` - A special attribute that allows to call the [exclude_secrets](../queries/secrets.md#exclude-secrets) and avoid
 accidental leakage of sensitive data.
+- `server_onupdate` - Like a `server_default` for updates. You may can use the fields `customize_default_for_server_default` to convert a static python value to `server_onupdate`.
 - `auto_compute_server_default` - A special attribute which allows to calculate the `server_default` from the `default` if not set explicitly and a default was set. It has four possible values:
     - `False` - Default for basic fields. Disables the feature. For field authors.
     - `None` - Default for basic single column fields. When not disabled by the `allow_auto_compute_server_defaults` setting,
@@ -1078,7 +1079,6 @@ Note: When using in-db updates of QuerySet there is no instance.
 
 Note: There is one exception of a QuerySet method which use a model instance as `CURRENT_INSTANCE`: `create`.
 
-
 #### Finding out which values are explicit set
 
 The `EXPLICIT_SPECIFIED_VALUES` ContextVar is either None or contains the key names of the explicit specified values.
@@ -1112,7 +1112,6 @@ Fields using `__get__` must consider the context_var `MODEL_GETATTR_BEHAVIOR`. T
 2. `coro`: `__get__` needs to issue the load itself (in case this is wanted) and to handle returned coroutines. AttributeErrors are passed through.
 
 The third mode `load` is only relevant for models and querysets.
-
 
 ## Customizing fields after model initialization
 

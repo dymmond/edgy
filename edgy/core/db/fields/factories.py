@@ -169,7 +169,6 @@ class ForeignKeyFieldFactory(FieldFactory):
         on_update: str = CASCADE,
         on_delete: str = RESTRICT,
         related_name: Union[str, Literal[False]] = "",
-        server_onupdate: Any = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         kwargs = {

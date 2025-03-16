@@ -234,7 +234,7 @@ class Field(BaseField):
 
     def clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         """
-        Applies
+        Converts a field value via check method to a column value.
         """
         return {name: self.check(value)}
 
@@ -255,6 +255,9 @@ class Field(BaseField):
         )
 
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
+        """
+        Return the single column from get_column for the field declared.
+        """
         column = self.get_column(name)
         if column is None:
             return []

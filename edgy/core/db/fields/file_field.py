@@ -297,6 +297,10 @@ class FileField(FieldFactory):
             raise FieldDefinitionError(
                 '"server_default" is not supported for FileField or ImageField.'
             ) from None
+        if kwargs.get("server_onupdate"):
+            raise FieldDefinitionError(
+                '"server_onupdate" is not supported for FileField or ImageField.'
+            ) from None
         if kwargs.get("mime_use_magic"):
             try:
                 import magic  # noqa: F401  # pyright: ignore[reportMissingImports]

@@ -31,6 +31,7 @@ class _ColumnDefinition:
     index: bool = False
     unique: bool = False
     comment: Optional[str] = None
+    # keep both any, so multi-column field authors can set a dict
     server_default: Optional[Any] = None
     server_onupdate: Optional[Any] = None
 

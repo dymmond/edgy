@@ -415,6 +415,10 @@ class ManyToManyField(ForeignKeyFieldFactory):
             raise FieldDefinitionError(
                 '"server_default" is not supported for ManyToMany.'
             ) from None
+        if kwargs.get("server_onupdate"):
+            raise FieldDefinitionError(
+                '"server_onupdate" is not supported for ManyToMany.'
+            ) from None
         embed_through = kwargs.get("embed_through")
         if embed_through and "__" in embed_through:
             raise FieldDefinitionError('"embed_through" cannot contain "__".')
