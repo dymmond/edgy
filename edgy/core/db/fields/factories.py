@@ -42,6 +42,7 @@ default_methods_overwritable_by_factory.add("is_cross_db")
 # ForeignKey
 default_methods_overwritable_by_factory.add("expand_relationship")
 
+
 class FieldFactoryMeta(type):
     def __instancecheck__(self, instance: Any) -> bool:
         return super().__instancecheck__(instance) or isinstance(

@@ -259,16 +259,6 @@ class BooleanField(FieldFactory, bool_type):
 
     field_type = bool
 
-    def __new__(  # type: ignore
-        cls,
-        *,
-        default: Union[None, bool, Callable[[], bool]] = False,
-        **kwargs: Any,
-    ) -> BaseFieldType:
-        if default is not None:
-            kwargs["default"] = default
-        return super().__new__(cls, **kwargs)
-
     @classmethod
     def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
         return sqlalchemy.Boolean()
@@ -390,14 +380,14 @@ class JSONField(FieldFactory, pydantic.Json):  # type: ignore
         return default
 
     @classmethod
-    def customize_default_for_server_default(cls, field_obj: BaseFieldType, default: Any, original_fn: Any = None) -> Any:
+    def customize_default_for_server_default(
+        cls, field_obj: BaseFieldType, default: Any, original_fn: Any = None
+    ) -> Any:
         if callable(default):
             default = default()
         if not isinstance(default, str):
             default = orjson.dumps(default)
-        return sqlalchemy.text(":value").bindparams(
-            value=default
-        )
+        return sqlalchemy.text(":value").bindparams(value=default)
 
 
 class BinaryField(FieldFactory, bytes):
@@ -463,13 +453,12 @@ class ChoiceField(FieldFactory):
         return sqlalchemy.Enum(choice_class)
 
     @classmethod
-    def customize_default_for_server_default(cls, field_obj: BaseFieldType, default: Any, original_fn: Any = None) -> Any:
+    def customize_default_for_server_default(
+        cls, field_obj: BaseFieldType, default: Any, original_fn: Any = None
+    ) -> Any:
         if callable(default):
             default = default()
-        return sqlalchemy.text(":value").bindparams(
-            value=default.name
-        )
-
+        return sqlalchemy.text(":value").bindparams(value=default.name)
 
 
 class PasswordField(CharField):

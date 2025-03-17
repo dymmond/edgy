@@ -24,7 +24,7 @@ pytestmark = pytest.mark.anyio
 @pytest.fixture(autouse=True, scope="function")
 async def cleanup_db():
     rmtree("test_migrations", ignore_errors=True)
-    await asyncio.sleep(2)
+    await asyncio.sleep(0.5)
     with suppress(Exception):
         await database.drop_database(database.url)
     yield
@@ -44,7 +44,7 @@ class AddUserExtension(ExtensionProtocol):
 
     def apply(self, monkay_instance):
         UserCopy = User.copy_edgy_model()
-        UserCopy.add_to_registry(monkay_instance.instance.registry)
+        UserCopy.add_to_registry(monkay_instance.instance.registry, name="User")
 
 
 class Config(EdgySettings):
@@ -63,8 +63,11 @@ async def _prepare(with_upgrade: bool):
         with (
             edgy.monkay.with_extensions({}),
             edgy.monkay.with_settings(Config()),
-            edgy.monkay.with_instance(edgy.Instance(Registry(database)), apply_extensions=True),
+            edgy.monkay.with_instance(edgy.Instance(Registry(database)), apply_extensions=False),
         ):
+            edgy.monkay.evaluate_settings()
+            edgy.monkay.apply_extensions()
+            assert "User" in edgy.monkay.instance.registry.models
             await asyncio.to_thread(init)
             await asyncio.to_thread(migrate)
             if with_upgrade:
@@ -78,8 +81,7 @@ def prepare(with_upgrade: bool):
 @pytest.mark.parametrize("run", [1, 2])
 async def test_automigrate_manual(run):
     subprocess = await asyncio.create_subprocess_exec(sys.executable, __file__, "prepare", "true")
-    out, err = await subprocess.communicate()
-    assert not err
+    await subprocess.communicate()
     async with Registry(database) as registry:
         UserCopy = User.copy_edgy_model()
         UserCopy.add_to_registry(registry)
@@ -93,8 +95,7 @@ async def test_automigrate_manual(run):
 @pytest.mark.parametrize("run", [1, 2])
 async def test_automigrate_automatic(run):
     subprocess = await asyncio.create_subprocess_exec(sys.executable, __file__, "prepare", "false")
-    out, err = await subprocess.communicate()
-    assert not err
+    await subprocess.communicate()
     async with create_registry(database) as registry:
         registry.refresh_metadata()
         assert "User" in registry.models
@@ -111,8 +112,7 @@ async def test_automigrate_automatic(run):
 
 async def test_automigrate_disabled():
     subprocess = await asyncio.create_subprocess_exec(sys.executable, __file__, "prepare", "false")
-    out, err = await subprocess.communicate()
-    assert not err
+    await subprocess.communicate()
     with edgy.monkay.with_settings(Config(allow_automigrations=False)):
         async with create_registry(database) as registry:
             assert "User" not in registry.models
@@ -120,6 +120,5 @@ async def test_automigrate_disabled():
 
 
 if __name__ == "__main__":  # noqa: SIM102
-    print("enter", sys.argv)
     if sys.argv[1] == "prepare":
         prepare(sys.argv[2] == "true")

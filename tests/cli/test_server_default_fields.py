@@ -62,15 +62,11 @@ async def test_migrate_server_defaults_upgrade(template_param):
     )
     assert ss == 0
 
-    (o, e, ss) = await arun_cmd(
-        "tests.cli.main_server_defaults", "edgy makemigrations"
-    )
+    (o, e, ss) = await arun_cmd("tests.cli.main_server_defaults", "edgy makemigrations")
     assert ss == 0
     assert b"No changes in schema detected" not in o
 
-    (o, e, ss) = await arun_cmd(
-        "tests.cli.main_server_defaults", "edgy migrate"
-    )
+    (o, e, ss) = await arun_cmd("tests.cli.main_server_defaults", "edgy migrate")
     assert ss == 0
 
     (o, e, ss) = await arun_cmd(
@@ -90,7 +86,9 @@ async def test_migrate_server_defaults_upgrade(template_param):
     )
 
     (o, e, ss) = await arun_cmd(
-        "tests.cli.main_server_defaults", "edgy migrate", extra_env={"TEST_ADD_AUTO_SERVER_DEFAULTS": "true"}
+        "tests.cli.main_server_defaults",
+        "edgy migrate",
+        extra_env={"TEST_ADD_AUTO_SERVER_DEFAULTS": "true"},
     )
     assert ss == 0
 
@@ -116,6 +114,94 @@ async def test_migrate_server_defaults_upgrade(template_param):
 
     migrations = list((base_path / "migrations" / "versions").glob("*.py"))
     assert len(migrations) == 2
+
+
+@pytest.mark.parametrize(
+    "template_param",
+    ["", " -t default", " -t plain", " -t url"],
+    ids=["default_empty", "default", "plain", "url"],
+)
+async def test_no_migration_when_switching_to_asd(template_param):
+    os.chdir(base_path)
+    assert not (base_path / "migrations").exists()
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main_server_defaults",
+        f"edgy init{template_param}",
+    )
+    assert ss == 0
+
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main_server_defaults",
+        "edgy makemigrations",
+        extra_env={
+            "TEST_ADD_AUTO_SERVER_DEFAULTS": "true",
+            "EDGY_SETTINGS_MODULE": "tests.settings.disabled_auto_server_defaults.TestSettings",
+        },
+    )
+    assert ss == 0
+
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main_server_defaults",
+        "edgy migrate",
+        extra_env={
+            "TEST_ADD_AUTO_SERVER_DEFAULTS": "true",
+            "EDGY_SETTINGS_MODULE": "tests.settings.disabled_auto_server_defaults.TestSettings",
+        },
+    )
+    assert ss == 0
+
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main_server_defaults",
+        "edgy makemigrations",
+        extra_env={"TEST_ADD_AUTO_SERVER_DEFAULTS": "true"},
+    )
+    assert ss == 0
+
+    migrations = list((base_path / "migrations" / "versions").glob("*.py"))
+    assert len(migrations) == 1
+
+
+@pytest.mark.parametrize(
+    "template_param",
+    ["", " -t default", " -t plain", " -t url"],
+    ids=["default_empty", "default", "plain", "url"],
+)
+async def test_no_migration_when_switching_from_asd(template_param):
+    os.chdir(base_path)
+    assert not (base_path / "migrations").exists()
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main_server_defaults",
+        f"edgy init{template_param}",
+    )
+    assert ss == 0
+
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main_server_defaults",
+        "edgy makemigrations",
+        extra_env={"TEST_ADD_AUTO_SERVER_DEFAULTS": "true"},
+    )
+    assert ss == 0
+
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main_server_defaults",
+        "edgy migrate",
+        extra_env={"TEST_ADD_AUTO_SERVER_DEFAULTS": "true"},
+    )
+    assert ss == 0
+
+    (o, e, ss) = await arun_cmd(
+        "tests.cli.main_server_defaults",
+        "edgy makemigrations",
+        extra_env={
+            "TEST_ADD_AUTO_SERVER_DEFAULTS": "true",
+            "EDGY_SETTINGS_MODULE": "tests.settings.disabled_auto_server_defaults.TestSettings",
+        },
+    )
+    assert ss == 0
+
+    migrations = list((base_path / "migrations" / "versions").glob("*.py"))
+    assert len(migrations) == 1
+
 
 async def main():
     if sys.argv[1] == "add":
@@ -145,5 +231,7 @@ async def main():
             user2 = await main.User.query.get(name="edgy2")
             assert not user2.active
             assert user.content_type.name == "User"
+
+
 if __name__ == "__main__":
     run(main())

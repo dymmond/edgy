@@ -6,7 +6,7 @@ hide:
 
 # Release Notes
 
-## 0.28.3
+## 0.29
 
 ### Added
 
@@ -16,11 +16,18 @@ hide:
 ### Changed
 
 - `get_default_value` is now also overwritable by factories.
+- The undocumented default of `BooleanField` of `False` is removed.
 
 ### Fixed
 
 - JSONField `default` is deepcopied to prevent accidental modifications of the default.
   There is no need anymore to provide a lambda.
+
+### Breaking
+
+- The undocumented default of `BooleanField` of `False` is removed.
+- Fields compute now `server_default`s for a set default. This can be turned off via the `allow_auto_compute_server_defaults` setting.
+
 
 ## 0.28.2
 

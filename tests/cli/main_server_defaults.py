@@ -28,7 +28,7 @@ class User(edgy.StrictModel):
     if os.environ.get("TEST_ADD_AUTO_SERVER_DEFAULTS", "false") == "true":
         # auto server defaults
         active = edgy.fields.BooleanField(default=True)
-        is_staff = edgy.fields.BooleanField()
+        is_staff = edgy.fields.BooleanField(default=False)
         age = edgy.fields.IntegerField(default=18)
         size = edgy.fields.DecimalField(default="1.8", decimal_places=2)
         blob = edgy.fields.BinaryField(default=b"abc")

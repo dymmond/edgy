@@ -161,8 +161,10 @@ class MyModel(edgy.Model):
     is_active: bool = edgy.BooleanField(default=True)
     is_completed: bool = edgy.BooleanField(default=False)
     ...
-
 ```
+
+!!! Note
+    Until edgy 0.29.0 there was an undocumented default of `False`.
 
 #### CharField
 
@@ -753,7 +755,6 @@ class User(edgy.Model):
 class MyModel(edgy.Model):
     user: User = edgy.OneToOne("User")
     ...
-
 ```
 
 Derives from the same as [ForeignKey](#foreignkey) and applies a One to One direction.

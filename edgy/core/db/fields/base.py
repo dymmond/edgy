@@ -89,7 +89,8 @@ class BaseField(BaseFieldType, FieldInfo):
             self.default = default
         # check if there was an explicit defined server_default=None
         if (
-            default is not None and default is not Undefined
+            default is not None
+            and default is not Undefined
             and self.server_default is None
             and "server_default" not in kwargs
         ):
@@ -107,17 +108,19 @@ class BaseField(BaseFieldType, FieldInfo):
 
             if auto_compute_server_default:
                 # required because the patching is done later
-                if hasattr(self, "factory") and hasattr(self.factory, "customize_default_for_server_default"):
-                    self.server_default = self.factory.customize_default_for_server_default(self, default, original_fn=self.customize_default_for_server_default)
+                if hasattr(self, "factory") and getattr(
+                    self.factory, "customize_default_for_server_default", None
+                ):
+                    self.server_default = self.factory.customize_default_for_server_default(
+                        self, default, original_fn=self.customize_default_for_server_default
+                    )
                 else:
                     self.server_default = self.customize_default_for_server_default(default)
 
     def customize_default_for_server_default(self, default: Any) -> Any:
         if callable(default):
             default = default()
-        return sqlalchemy.text(":value").bindparams(
-            value=default
-        )
+        return sqlalchemy.text(":value").bindparams(value=default)
 
     def get_columns_nullable(self) -> bool:
         """
