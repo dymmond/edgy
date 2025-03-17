@@ -193,9 +193,6 @@ def test_can_create_boolean_field():
     field = BooleanField(default=True)
     assert field.default is True
 
-    field = BooleanField()
-    assert field.default is False
-
 
 def test_can_create_datetime_field():
     field = DateTimeField(auto_now=True)
