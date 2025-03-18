@@ -28,6 +28,7 @@ hide:
 - `apply_default_force_nullable_fields` could run into transaction problems.
 - `bulk_update` and `bulk_create` optimizations and small fixes.
 - `pre_update` and `post_update` are now received when using a QuerySet.
+- Allow prefixing column names in CompositeField via `prefix_column_name` parameter.
 
 ### Breaking
 

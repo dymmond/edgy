@@ -193,7 +193,7 @@ class BaseField(BaseFieldType, FieldInfo):
         prefix: str,
         new_fieldname: str,
         owner: Optional[type["BaseModelType"]] = None,
-        parent: Optional["BaseField"] = None,
+        parent: Optional["BaseFieldType"] = None,
     ) -> Optional["BaseField"]:
         """
         Embed this field or return None to prevent embedding.
@@ -202,6 +202,14 @@ class BaseField(BaseFieldType, FieldInfo):
         field_copy = copy.copy(self)
         field_copy.name = new_fieldname
         field_copy.owner = owner
+        if getattr(parent, "prefix_column_name", None):
+            if getattr(field_copy, "column_name", None):
+                field_copy.column_name = f"{parent.prefix_column_name}{field_copy.column_name}"  # type: ignore
+            else:
+                field_copy.column_name = (
+                    f"{parent.prefix_column_name}{new_fieldname[len(prefix) :]}"  # type: ignore
+                )
+
         return field_copy
 
     def get_default_value(self) -> Any:

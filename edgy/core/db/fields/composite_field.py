@@ -27,6 +27,12 @@ class ConcreteCompositeField(BaseCompositeField):
     Conrete, internal implementation of the CompositeField
     """
 
+    prefix_embedded: str = ""
+    prefix_column_name: str = ""
+    unsafe_json_serialization: bool = False
+    absorb_existing_fields: bool = False
+    model: Union[type[BaseModel], type[ConditionalRedirect], None] = None
+
     def __init__(
         self,
         *,
@@ -36,7 +42,11 @@ class ConcreteCompositeField(BaseCompositeField):
             dict[str, BaseFieldType],
         ] = (),
         **kwargs: Any,
-    ):
+    ) -> None:
+        self._copy_params = {
+            **kwargs,
+            "inner_fields": inner_fields,
+        }
         self.inner_field_names: list[str] = []
         self.embedded_field_defs: dict[str, BaseFieldType] = {}
         if hasattr(inner_fields, "meta"):
@@ -45,16 +55,16 @@ class ConcreteCompositeField(BaseCompositeField):
             inner_fields = inner_fields.meta.fields
         if isinstance(inner_fields, dict):
             inner_fields = inner_fields.items()  # type: ignore
-        owner = kwargs.pop("owner", None)
-        self.prefix_embedded: str = kwargs.pop("prefix_embedded", "")
-        self.unsafe_json_serialization: bool = kwargs.pop("unsafe_json_serialization", False)
-        self.absorb_existing_fields: bool = kwargs.pop("absorb_existing_fields", False)
-        self.model: Optional[Union[type[BaseModel], type[ConditionalRedirect]]] = kwargs.pop(
-            "model", None
-        )
+        owner = kwargs.get("owner")
+        self.model = kwargs.pop("model", self.model)
         if self.model is not None and issubclass(self.model, BaseModel):
             kwargs["field_type"] = self.model
             kwargs["annotation"] = self.model
+        super().__init__(
+            # this is just a holder for real fields
+            null=True,
+            **kwargs,
+        )
         for field in inner_fields:
             if isinstance(field, str):
                 self.inner_field_names.append(field)
@@ -68,25 +78,16 @@ class ConcreteCompositeField(BaseCompositeField):
                     )
                 field_name = f"{self.prefix_embedded}{field_name}"
                 # set field_name and owner
-                # parent is None because not fully initialized
                 field_def = field[1].embed_field(
-                    self.prefix_embedded, field_name, owner=owner, parent=None
+                    self.prefix_embedded, field_name, owner=owner, parent=self
                 )
                 if field_def is not None:
                     field_def.exclude = True
                     self.inner_field_names.append(field_def.name)
                     self.embedded_field_defs[field_def.name] = field_def
 
-        return super().__init__(
-            owner=owner,
-            # this is just a holder for real fields
-            null=True,
-            **kwargs,
-        )
-
     def translate_name(self, name: str) -> str:
         if self.prefix_embedded and name in self.embedded_field_defs:
-            # PYTHON 3.8 compatibility
             return name.removeprefix(self.prefix_embedded)
         return name
 
@@ -98,9 +99,13 @@ class ConcreteCompositeField(BaseCompositeField):
         parent: Optional[BaseFieldType] = None,
     ) -> BaseFieldType:
         field_copy = cast(
-            BaseFieldType, super().embed_field(prefix, new_fieldname, owner=owner, parent=self)
+            BaseFieldType, super().embed_field(prefix, new_fieldname, owner=owner, parent=parent)
         )
         field_copy.prefix_embedded = f"{prefix}{field_copy.prefix_embedded}"
+        if getattr(parent, "prefix_column_name", None):
+            field_copy.prefix_column_name = (
+                f"{parent.prefix_column_name}{field_copy.prefix_embedded or ''}"  # type: ignore
+            )
         embedded_field_defs = field_copy.embedded_field_defs
         field_copy.inner_field_names = [
             f"{prefix}{field_name}"
@@ -115,7 +120,7 @@ class ConcreteCompositeField(BaseCompositeField):
                     f"_ prefixed fields are not supported: {field_name} with prefix ending with _"
                 )
             field_name = f"{prefix}{field_name}"
-            field_def = field.embed_field(prefix, field_name, owner)
+            field_def = field.embed_field(prefix, field_name, owner=owner, parent=field_copy)
             if field_def is not None:
                 field_def.exclude = True
                 field_copy.inner_field_names.append(field_def.name)
@@ -198,7 +203,6 @@ class ConcreteCompositeField(BaseCompositeField):
         retdict = {}
         # owner is set: further down in hierarchy, or uninitialized embeddable, where the owner = model
         # owner is not set: current class
-
         if not self.absorb_existing_fields:
             if self.owner is None:
                 duplicate_fields = set(self.embedded_field_defs.keys()).intersection(
@@ -236,6 +240,7 @@ class ConcreteCompositeField(BaseCompositeField):
                     raise ValueError(
                         f'absorption failed: field "{field_name}" handle the type: {absorbed_field.field_type}, required: {field.field_type}'
                     )
+
         return retdict
 
     def get_composite_fields(self) -> dict[str, BaseFieldType]:
@@ -246,6 +251,12 @@ class ConcreteCompositeField(BaseCompositeField):
 
     def has_default(self) -> bool:
         return False
+
+    def __copy__(self) -> "ConcreteCompositeField":
+        copy_obj = type(self)(**self._copy_params)
+        # owner is sometimes set later but very important
+        copy_obj.owner = self.owner
+        return copy_obj
 
 
 class CompositeField(FieldFactory):
