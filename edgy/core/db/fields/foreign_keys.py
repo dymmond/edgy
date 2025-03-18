@@ -140,7 +140,7 @@ class BaseForeignKeyField(BaseForeignKey):
             elif target.pkcolumns:
                 # placeholder for extracting column
                 # WARNING: this can recursively loop
-                columns = {col: None for col in target.pkcolumns}
+                columns = dict.fromkeys(target.pkcolumns)
         return columns
 
     def expand_relationship(self, value: Any) -> Any:
@@ -376,9 +376,18 @@ class ForeignKey(ForeignKeyFieldFactory):
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
         super().validate(kwargs)
+        if kwargs.get("auto_compute_server_default"):
+            raise FieldDefinitionError(
+                '"auto_compute_server_default" is not supported for ForeignKey.'
+            ) from None
+        kwargs["auto_compute_server_default"] = False
         if kwargs.get("server_default"):
             raise FieldDefinitionError(
-                '"server_default" is not supported for ForeignKeys.'
+                '"server_default" is not supported for ForeignKey.'
+            ) from None
+        if kwargs.get("server_onupdate"):
+            raise FieldDefinitionError(
+                '"server_onupdate" is not supported for ForeignKey.'
             ) from None
         embed_parent = kwargs.get("embed_parent")
         if embed_parent and "__" in embed_parent[1]:

@@ -14,7 +14,7 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 class User(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=255)
-    is_admin = edgy.fields.BooleanField()
+    is_admin = edgy.fields.BooleanField(default=False)
     age = edgy.IntegerField(null=True)
 
     class Meta:

@@ -72,8 +72,6 @@ Source = "https://github.com/dymmond/edgy"
 edgy = "edgy.__main__:run_cli"
 
 [project.optional-dependencies]
-
-# we need it anyway in databasez
 test = ["faker>=33.3.1", "sqlalchemy_utils>=0.41.1"]
 testing = [
     "anyio>=4.0.0,<5",

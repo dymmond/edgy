@@ -16,6 +16,7 @@ import sqlalchemy
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
 
+from edgy.conf import settings
 from edgy.core.db.context_vars import CURRENT_PHASE, FORCE_FIELDS_NULLABLE, MODEL_GETATTR_BEHAVIOR
 from edgy.types import Undefined
 
@@ -59,6 +60,7 @@ class BaseField(BaseFieldType, FieldInfo):
         "lte": "__le__",
         "le": "__le__",
     }
+    auto_compute_server_default: Union[bool, None, Literal["ignore_null"]] = False
 
     def __init__(
         self,
@@ -85,6 +87,40 @@ class BaseField(BaseFieldType, FieldInfo):
             default = None
         if default is not Undefined:
             self.default = default
+        # check if there was an explicit defined server_default=None
+        if (
+            default is not None
+            and default is not Undefined
+            and self.server_default is None
+            and "server_default" not in kwargs
+        ):
+            if not callable(default):
+                if self.auto_compute_server_default is None:
+                    auto_compute_server_default: bool = (
+                        not self.null and settings.allow_auto_compute_server_defaults
+                    )
+                elif self.auto_compute_server_default == "ignore_null":
+                    auto_compute_server_default = settings.allow_auto_compute_server_defaults
+                else:
+                    auto_compute_server_default = self.auto_compute_server_default
+            else:
+                auto_compute_server_default = bool(self.auto_compute_server_default)
+
+            if auto_compute_server_default:
+                # required because the patching is done later
+                if hasattr(self, "factory") and getattr(
+                    self.factory, "customize_default_for_server_default", None
+                ):
+                    self.server_default = self.factory.customize_default_for_server_default(
+                        self, default, original_fn=self.customize_default_for_server_default
+                    )
+                else:
+                    self.server_default = self.customize_default_for_server_default(default)
+
+    def customize_default_for_server_default(self, default: Any) -> Any:
+        if callable(default):
+            default = default()
+        return sqlalchemy.text(":value").bindparams(value=default)
 
     def get_columns_nullable(self) -> bool:
         """
@@ -187,8 +223,11 @@ class BaseField(BaseFieldType, FieldInfo):
 
 class Field(BaseField):
     """
-    Field with fallbacks and used for factories.
+    Single column field used by factories.
     """
+
+    # safe here as we have only one column
+    auto_compute_server_default: Union[bool, None, Literal["ignore_null"]] = None
 
     def check(self, value: Any) -> Any:
         """
@@ -198,7 +237,7 @@ class Field(BaseField):
 
     def clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         """
-        Runs the checks for the fields being validated. Multiple columns possible
+        Converts a field value via check method to a column value.
         """
         return {name: self.check(value)}
 
@@ -219,6 +258,9 @@ class Field(BaseField):
         )
 
     def get_columns(self, name: str) -> Sequence[sqlalchemy.Column]:
+        """
+        Return the single column from get_column for the field declared.
+        """
         column = self.get_column(name)
         if column is None:
             return []

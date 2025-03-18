@@ -17,6 +17,9 @@ default_methods_overwritable_by_factory: set[str] = {
 default_methods_overwritable_by_factory.discard("get_column_names")
 default_methods_overwritable_by_factory.discard("__init__")
 
+# useful helpers
+default_methods_overwritable_by_factory.add("get_default_value")
+
 # extra methods
 default_methods_overwritable_by_factory.add("__set__")
 default_methods_overwritable_by_factory.add("__get__")
@@ -167,7 +170,6 @@ class ForeignKeyFieldFactory(FieldFactory):
         on_update: str = CASCADE,
         on_delete: str = RESTRICT,
         related_name: Union[str, Literal[False]] = "",
-        server_onupdate: Any = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         kwargs = {

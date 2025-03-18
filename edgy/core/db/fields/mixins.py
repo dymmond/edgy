@@ -59,7 +59,7 @@ class IncrementOnSaveBaseField(Field):
     ) -> dict[str, Any]:
         if self.increment_on_save != 0:
             phase = CURRENT_PHASE.get()
-            if phase in "prepare_update":
+            if phase == "prepare_update":
                 return {field_name: None}
         return super().get_default_values(field_name, cleaned_data)
 
@@ -158,4 +158,6 @@ class AutoNowMixin(FieldFactory):
         if auto_now_add or auto_now:
             # date.today cannot handle timezone so use alway datetime and convert back to date
             kwargs["default"] = partial(datetime.datetime.now, default_timezone)
+            # ensure no automatic calculation happens
+            kwargs.setdefault("auto_compute_server_default", False)
         return super().__new__(cls, **kwargs)

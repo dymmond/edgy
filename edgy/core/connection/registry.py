@@ -206,7 +206,7 @@ class Registry:
             if filter_db_url and str(model.database.url) != filter_db_url:
                 continue
             model_specific_defaults = model_defaults.get(model_name) or {}
-            filter_kwargs = {field_name: None for field_name in field_set}
+            filter_kwargs = dict.fromkeys(field_set)
             for obj in await model.query.filter(**filter_kwargs):
                 kwargs = {k: v for k, v in obj.extract_db_fields().items() if k not in field_set}
                 kwargs.update(model_specific_defaults)

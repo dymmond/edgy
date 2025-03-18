@@ -446,9 +446,9 @@ Edgy uses more intuitive names.
 
 ## Migrate to new non-nullable fields
 
-Sometimes you want to add fields to a model which are required afterwards.
+Sometimes you want to add fields to a model which are required afterwards in the database. Here are some ways to archive this.
 
-### With server_default
+### With explicit server_default (`allow_auto_compute_server_defaults=False`)
 
 This is a bit more work and requires a supported field (all single-column fields and some multiple-column fields like CompositeField). It works as follows:
 
@@ -480,8 +480,38 @@ Here is a basic example:
     edgy makemigration
     edgy migrate
     ```
+### With implicit server_default (`allow_auto_compute_server_defaults=True` (default))
+
+This is the easiest way; it only works with fields which allow `auto_compute_server_default`, which are the most.
+Notable exceptions are Relationship fields and FileFields.
+
+You just add a default... and that was it.
+
+1.  Create the field with a default
+    ``` python
+    class CustomModel(edgy.Model):
+        active: bool = edgy.fields.BooleanField(default=True)
+        ...
+    ```
+2.  Generate the migrations and migrate
+    ``` sh
+    edgy makemigration
+    edgy migrate
+    ```
+
+In case of `allow_auto_compute_server_defaults=False` you can enable the auto-compute of a server_default
+by passing `auto_compute_server_default=True` to the field. The first step would be here:
+
+``` python
+class CustomModel(edgy.Model):
+    active: bool = edgy.fields.BooleanField(default=True, auto_compute_server_default=True)
+    ...
+```
+
+To disable the behaviour for one field you can either pass `auto_compute_server_default=False` or `server_default=None` to the field.
 
 ### With null-field
+
 Null-field is a feature to make fields nullable for one makemigration/revision. You can either specify
 `model:field_name` or just `:field_name` for automatic detection of models.
 Non-existing models are ignored, and only models in `registry.models` are migrated.
@@ -490,10 +520,10 @@ The `model_defaults` argument can be used to provide one-time defaults that over
 You can also pass callables, which are executed in context of the `extract_column_values` method and have all of the context variables available.
 
 Let's see how to implement the last example with null-field and we add also ContentTypes.
-1. Add the field with the default (not server-default).
+1. Add the field with the default (and no server-default).
     ``` python
     class CustomModel(edgy.Model):
-        active: bool = edgy.fields.BooleanField(default=True)
+        active: bool = edgy.fields.BooleanField(default=True, server_default=None)
         ...
     ```
 2. Apply null-field to CustomModel:active and also for all models with active content_type.
