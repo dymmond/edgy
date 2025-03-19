@@ -43,9 +43,6 @@ class ConcreteCompositeField(BaseCompositeField):
         ] = (),
         **kwargs: Any,
     ) -> None:
-        self._copy_params = {
-            "inner_fields": inner_fields,
-        }
         self.inner_field_names: list[str] = []
         self.embedded_field_defs: dict[str, BaseFieldType] = {}
         if hasattr(inner_fields, "meta"):
@@ -255,10 +252,10 @@ class ConcreteCompositeField(BaseCompositeField):
         params = {
             k: v
             for k, v in self.__dict__.items()
-            if k not in {"_copy_params", "inner_field_names", "embedded_field_defs", "null"}
+            if k != "null"
         }
-        params.update(self._copy_params)
         copy_obj = type(self)(**params)
+        copy_obj.embedded_field_defs = {k: copy.copy(v) for k, v in self.embedded_field_defs.items()}
         return copy_obj
 
 
