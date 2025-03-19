@@ -965,7 +965,7 @@ class BaseQuerySet(
         return queryset
 
     async def _model_based_delete(self) -> int:
-        queryset = self.distinct().limit(self._batch_size)
+        queryset = self.limit(self._batch_size)
         # we set embed_parent on the copy to None to get raw instances
         # embed_parent_filters is not affected
         queryset.embed_parent = None
