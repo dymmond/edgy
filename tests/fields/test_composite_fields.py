@@ -234,7 +234,7 @@ def test_dump_composite_model():
 
 def test_inheritance():
     class AbstractModel(edgy.StrictModel):
-        composite: dict[str, Any] = edgy.CompositeField(
+        composite_inherit: dict[str, Any] = edgy.CompositeField(
             inner_fields=[
                 ("first_name", edgy.CharField(max_length=255)),
                 ("last_name", edgy.CharField(max_length=255)),
@@ -245,8 +245,10 @@ def test_inheritance():
         class Meta:
             abstract = True
 
+    assert all(field.owner is AbstractModel for field in AbstractModel.meta.fields.values())
+
     class ConcreteModel1(AbstractModel):
-        composite: dict[str, Any] = edgy.CompositeField(
+        composite_inherit: dict[str, Any] = edgy.CompositeField(
             inner_fields=[
                 ("first_name", edgy.CharField(max_length=255)),
                 ("last_name", edgy.CharField(max_length=51)),
@@ -255,9 +257,10 @@ def test_inheritance():
 
     assert "age" not in ConcreteModel1.meta.fields
     assert ConcreteModel1.meta.fields["last_name"].max_length == 51
+    assert all(field.owner is ConcreteModel1 for field in ConcreteModel1.meta.fields.values())
 
     class ConcreteModel2(AbstractModel):
-        composite2: dict[str, Any] = edgy.CompositeField(
+        composite_absorb: dict[str, Any] = edgy.CompositeField(
             inner_fields=[
                 ("first_name", edgy.CharField(max_length=255)),
                 ("last_name", edgy.CharField(max_length=50)),
@@ -267,9 +270,10 @@ def test_inheritance():
 
     assert "age" in ConcreteModel2.meta.fields
     assert ConcreteModel2.meta.fields["last_name"].max_length == 255
+    assert all(field.owner is ConcreteModel2 for field in ConcreteModel2.meta.fields.values())
 
     class ConcreteModel3(AbstractModel):
-        composite3: dict[str, Any] = edgy.CompositeField(
+        composite_overwrite: dict[str, Any] = edgy.CompositeField(
             inner_fields=[
                 ("first_name", edgy.CharField(max_length=255)),
                 ("last_name", edgy.CharField(max_length=50)),
@@ -280,7 +284,7 @@ def test_inheritance():
     assert "age" in ConcreteModel3.meta.fields
 
 
-def test_copying():
+def test_copying_of_inner_fields():
     field = edgy.CompositeField(
         inner_fields=[
             ("first_name", edgy.CharField(max_length=255)),
@@ -292,5 +296,26 @@ def test_copying():
     fields["first_name"].owner = "test"
     fields["first_name"].newattribute = "test"
     fields2 = field.get_embedded_fields("field", {})
+    assert fields2["first_name"].owner is None
+    assert not hasattr(fields2["first_name"], "newattribute")
+
+
+def test_copying_of_inner_fields_nested():
+    inner_field = edgy.CompositeField(
+        inner_fields=[
+            ("first_name", edgy.CharField(max_length=255)),
+            ("last_name", edgy.CharField(max_length=255)),
+        ],
+    )
+    outer_field = edgy.CompositeField(inner_fields=[("inner", inner_field)])
+    fields = outer_field.get_embedded_fields("outer_field", {})["inner"].get_embedded_fields(
+        "inner_field", {}
+    )
+    assert fields["first_name"].owner is None
+    fields["first_name"].owner = "test"
+    fields["first_name"].newattribute = "test"
+    fields2 = outer_field.get_embedded_fields("outer_field", {})["inner"].get_embedded_fields(
+        "inner_field", {}
+    )
     assert fields2["first_name"].owner is None
     assert not hasattr(fields2["first_name"], "newattribute")
