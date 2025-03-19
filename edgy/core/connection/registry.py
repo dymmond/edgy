@@ -207,11 +207,41 @@ class Registry:
                 continue
             model_specific_defaults = model_defaults.get(model_name) or {}
             filter_kwargs = dict.fromkeys(field_set)
-            for obj in await model.query.filter(**filter_kwargs):
-                kwargs = {k: v for k, v in obj.extract_db_fields().items() if k not in field_set}
-                kwargs.update(model_specific_defaults)
-                # is_partial = False
-                ops.append(obj._update(False, kwargs))
+
+            async def wrapper_fn(
+                _model: type["BaseModelType"]=model,
+                _model_specific_defaults: dict=model_specific_defaults,
+                _filter_kwargs: dict=filter_kwargs,
+                _field_set: set[str]=field_set,
+            ) -> None:
+                # To reduce the memory usage, only retrieve pknames and load per object
+                # We need to load all at once because otherwise the cursor could interfere with updates
+                for obj in await _model.query.filter(**_filter_kwargs).only(*_model.pknames).distinct():
+                    await obj.load()
+                    kwargs = {
+                        k: v for k, v in obj.extract_db_fields().items() if k not in _field_set
+                    }
+                    kwargs.update(_model_specific_defaults)
+                    # We need to serialize per table because otherwise transactions can fail
+                    # because of interlocking errors.
+                    # Also the tables can get big
+                    # is_partial = False
+                    await obj._update(
+                        False,
+                        kwargs,
+                        pre_fn=partial(
+                            _model.meta.signals.pre_update.send_async,
+                            is_update=True,
+                            is_migration=True,
+                        ),
+                        post_fn=partial(
+                            _model.meta.signals.post_update.send_async,
+                            is_update=True,
+                            is_migration=True,
+                        ),
+                    )
+
+            ops.append(wrapper_fn())
         await asyncio.gather(*ops)
 
     def extra_name_check(self, name: Any) -> bool:

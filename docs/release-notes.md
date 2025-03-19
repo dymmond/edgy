@@ -12,16 +12,22 @@ hide:
 
 - Convert for most fields defaults to server_default to ease migrations. There are some exceptions.
 - Add the setting `allow_auto_compute_server_defaults` which allows to disable the automatic generation of server defaults.
+- `pre_migrate` and `post_migrate` signals.
 
 ### Changed
 
 - `get_default_value` is now also overwritable by factories.
 - The undocumented default of `BooleanField` of `False` is removed.
+- The signal receiver functions receive more parameters.
 
 ### Fixed
 
 - JSONField `default` is deepcopied to prevent accidental modifications of the default.
   There is no need anymore to provide a lambda.
+- `pre_update` and `post_update` is not called anymore when calling save and the update path is executed.
+- `apply_default_force_nullable_fields` could run into transaction problems.
+- `bulk_update` and `bulk_create` optimizations and small fixes.
+- `pre_update` and `post_update` are now received when using a QuerySet.
 
 ### Breaking
 

@@ -7,6 +7,7 @@ import edgy
 from edgy import Instance
 from edgy.contrib.permissions import BasePermission
 from edgy.core.db.context_vars import CURRENT_MODEL_INSTANCE
+from edgy.core.signals import post_migrate, pre_migrate
 from tests.settings import TEST_DATABASE
 
 pytestmark = pytest.mark.anyio
@@ -68,6 +69,24 @@ class Permission(BasePermission):
         registry = models
         if os.environ.get("TEST_NO_CONTENT_TYPE", "false") != "true":
             unique_together = [("name", "name_model", "obj")]
+
+
+if os.environ.get("TEST_ADD_SIGNALS", "false") == "true":
+
+    @pre_migrate.connect_via("revision")
+    def shout_revision(sender, sql, **kwargs):
+        print(f"abc start {sender} ")
+
+    @pre_migrate.connect_via("downgrade")
+    @pre_migrate.connect_via("upgrade")
+    def shout_migration(sender, sql, **kwargs):
+        print(f"abc start {sender} {'offline' if sql else 'online'}")
+
+    @post_migrate.connect_via("upgrade")
+    async def create_user(sender, sql, **kwargs):
+        print(f"abc start {sender}, create_user ")
+        async with models:
+            await User.query.get_or_create(name="migration_user")
 
 
 edgy.monkay.set_instance(Instance(registry=models))

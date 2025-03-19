@@ -58,6 +58,21 @@ def get_table_key_or_name(table: Union[sqlalchemy.Table, sqlalchemy.Alias]) -> s
         # alias
         return table.name
 
+def _extract_unique_lookup_key(obj: Any, unique_fields: Sequence[str]) -> Union[tuple, None]:
+    lookup_key = []
+    if isinstance(obj, dict):
+        for field in unique_fields:
+            if field not in obj:
+                return None
+            value = obj[field]
+            lookup_key.append(orjson.dumps(value, option=orjson.OPT_SORT_KEYS) if isinstance(value, (dict, list)) else value)
+    else:
+        for field in unique_fields:
+            if not hasattr(obj, field):
+                return None
+            value = getattr(obj, field)
+            lookup_key.append(orjson.dumps(value, option=orjson.OPT_SORT_KEYS) if isinstance(value, (dict, list)) else value)
+    return tuple(lookup_key)
 
 class BaseQuerySet(
     TenancyMixin,
@@ -950,7 +965,7 @@ class BaseQuerySet(
         return queryset
 
     async def _model_based_delete(self) -> int:
-        queryset = self.limit(self._batch_size)
+        queryset = self.distinct().limit(self._batch_size)
         # we set embed_parent on the copy to None to get raw instances
         # embed_parent_filters is not affected
         queryset.embed_parent = None
@@ -1589,8 +1604,6 @@ class QuerySet(BaseQuerySet):
         finally:
             CURRENT_INSTANCE.reset(token)
 
-    import json
-
     async def bulk_get_or_create(
         self,
         objs: list[Union[dict[str, Any], EdgyModel]],
@@ -1612,77 +1625,58 @@ class QuerySet(BaseQuerySet):
         queryset: QuerySet = self._clone()
         new_objs: list[EdgyModel] = []
         retrieved_objs: list[EdgyModel] = []
+        check_db_connection(queryset.database)
 
         if unique_fields:
-            existing_records = {}
+            existing_records: dict[tuple, EdgyModel] = {}
             for obj in objs:
+                filter_kwargs = {}
+                dict_fields = {}
                 if isinstance(obj, dict):
-                    filter_kwargs = {}
-                    dict_fields = {}
-                    for field, value in obj.items():
-                        if field in unique_fields:
+                    for field in unique_fields:
+                        if field in obj:
+                            value = obj[field]
                             if isinstance(value, dict):
                                 dict_fields[field] = value
                             else:
                                 filter_kwargs[field] = value
-                    db_records = await queryset.filter(**filter_kwargs)
-                    found = False
-                    for record in db_records:
-                        record_dict_fields = {k: getattr(record, k) for k in dict_fields}
-                        if dict_fields == record_dict_fields:
-                            lookup_key = tuple(
-                                orjson.dumps(getattr(record, field))
-                                if isinstance(getattr(record, field), dict)
-                                else getattr(record, field)
-                                for field in unique_fields
-                            )
-                            existing_records[lookup_key] = record
-                            retrieved_objs.append(record)
-                            found = True
-                            break
-                    if found is False:
-                        new_objs.append(queryset.model_class(**obj))
                 else:
-                    filter_kwargs = {}
-                    dict_fields = {}
                     for field in unique_fields:
                         value = getattr(obj, field)
                         if isinstance(value, dict):
                             dict_fields[field] = value
                         else:
                             filter_kwargs[field] = value
-                    db_records = await queryset.filter(**filter_kwargs)
-                    found = False
-                    for record in db_records:
-                        record_dict_fields = {
-                            k: getattr(record, k) for k, _ in dict_fields.items()
-                        }
-                        if dict_fields == record_dict_fields:
-                            lookup_key = tuple(
-                                orjson.dumps(getattr(record, field))
-                                if isinstance(getattr(record, field), dict)
-                                else getattr(record, field)
-                                for field in unique_fields
-                            )
-                            existing_records[lookup_key] = record
-                            retrieved_objs.append(record)
+                lookup_key = _extract_unique_lookup_key(obj, unique_fields)
+                if lookup_key is not None and lookup_key in existing_records:
+                    continue
+                found = False
+                if bool(queryset.database.force_rollback):
+                    for record in await queryset.filter(**filter_kwargs):
+                        if all(getattr(record, k) == expected for k, expected in dict_fields.items()):
+                            lookup_key = _extract_unique_lookup_key(record, unique_fields)
+                            assert lookup_key is not None, "invalid fields/attributes in unique_fields"
+                            if lookup_key not in existing_records:
+                                existing_records[lookup_key] = record
                             found = True
                             break
-                    if found is False:
-                        new_objs.append(obj)
+                else:
+                    async for record in queryset.filter(**filter_kwargs):
+                        if all(getattr(record, k) == expected for k, expected in dict_fields.items()):
+                            lookup_key = _extract_unique_lookup_key(record, unique_fields)
+                            assert lookup_key is not None, "invalid fields/attributes in unique_fields"
+                            if lookup_key not in existing_records:
+                                existing_records[lookup_key] = record
+                            found = True
+                            break
+                if found is False:
+                    new_objs.append(queryset.model_class(**obj) if isinstance(obj, dict) else obj)
 
+            retrieved_objs.extend(existing_records.values())
         else:
             new_objs.extend(
                 [queryset.model_class(**obj) if isinstance(obj, dict) else obj for obj in objs]
-            )
-            existing_records = {}
-
-        async def _prepare_obj(obj_or_dict: Union[EdgyModel, dict[str, Any]]) -> EdgyModel:
-            if isinstance(obj_or_dict, dict):
-                obj: EdgyModel = queryset.model_class(**obj_or_dict)
-            else:
-                obj = obj_or_dict
-            return obj
+           )
 
         async def _iterate(obj: EdgyModel) -> dict[str, Any]:
             original = obj.extract_db_fields()
@@ -1694,7 +1688,6 @@ class QuerySet(BaseQuerySet):
             )
             return col_values
 
-        check_db_connection(queryset.database)
         token = CURRENT_INSTANCE.set(self)
 
         try:
@@ -1725,7 +1718,7 @@ class QuerySet(BaseQuerySet):
             return await self._model_based_delete()
 
         # delete of model issues already signals, so don't integrate them
-        await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
+        await self.model_class.meta.signals.pre_delete.send_async(self.model_class, instance=self)
 
         expression = self.table.delete()
         expression = expression.where(await self.build_where_clause())
@@ -1737,7 +1730,9 @@ class QuerySet(BaseQuerySet):
         # clear cache before executing post_delete. Fresh results can be retrieved in signals
         self._clear_cache()
 
-        await self.model_class.meta.signals.post_delete.send_async(self.__class__, instance=self)
+        await self.model_class.meta.signals.post_delete.send_async(
+            self.model_class, instance=self, row_count=row_count
+        )
         return row_count
 
     async def update(self, **kwargs: Any) -> None:
@@ -1752,8 +1747,14 @@ class QuerySet(BaseQuerySet):
         )
 
         # Broadcast the initial update details
+        # add is_update to match save
         await self.model_class.meta.signals.pre_update.send_async(
-            self.__class__, instance=self, kwargs=column_values
+            self.model_class,
+            instance=self,
+            values=kwargs,
+            column_values=column_values,
+            is_update=True,
+            is_migration=False,
         )
 
         expression = self.table.update().values(**column_values)
@@ -1763,7 +1764,15 @@ class QuerySet(BaseQuerySet):
             await database.execute(expression)
 
         # Broadcast the update executed
-        await self.model_class.meta.signals.post_update.send_async(self.__class__, instance=self)
+        # add is_update to match save
+        await self.model_class.meta.signals.post_update.send_async(
+            self.model_class,
+            instance=self,
+            values=kwargs,
+            column_values=column_values,
+            is_update=True,
+            is_migration=False,
+        )
         self._clear_cache()
 
     async def get_or_create(

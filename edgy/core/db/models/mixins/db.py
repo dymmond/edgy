@@ -4,7 +4,7 @@ import contextlib
 import copy
 import inspect
 import warnings
-from collections.abc import Collection, Sequence
+from collections.abc import Awaitable, Callable, Collection, Sequence
 from functools import partial
 from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Optional, Union, cast
@@ -472,11 +472,16 @@ class DatabaseMixin:
                 )
         return clauses
 
-    async def _update(self: Model, is_partial: bool, kwargs: dict[str, Any]) -> Any:
+    async def _update(
+        self: Model,
+        is_partial: bool,
+        kwargs: dict[str, Any],
+        pre_fn: Callable[..., Awaitable],
+        post_fn: Callable[..., Awaitable],
+    ) -> Any:
         """
         Update operation of the database fields.
         """
-        await self.meta.signals.pre_update.send_async(self.__class__, instance=self)
         column_values = self.extract_column_values(
             extracted_values=kwargs,
             is_partial=is_partial,
@@ -486,6 +491,7 @@ class DatabaseMixin:
             model_instance=self,
             evaluate_values=True,
         )
+        await pre_fn(self.__class__, instance=self, values=kwargs, column_values=column_values)
         # empty updates shouldn't cause an error. E.g. only model references are updated
         clauses = self.identifying_clauses()
         token = CURRENT_INSTANCE.set(self)
@@ -518,13 +524,22 @@ class DatabaseMixin:
         if column_values or kwargs:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
-        await self.meta.signals.post_update.send_async(self.__class__, instance=self)
+        await post_fn(self.__class__, instance=self, values=kwargs, column_values=column_values)
 
     async def update(self: Model, **kwargs: Any) -> Model:
         token = EXPLICIT_SPECIFIED_VALUES.set(set(kwargs.keys()))
         try:
             # assume always partial
-            await self._update(True, kwargs)
+            await self._update(
+                True,
+                kwargs,
+                pre_fn=partial(
+                    self.meta.signals.pre_update.send_async, is_update=True, is_migration=False
+                ),
+                post_fn=partial(
+                    self.meta.signals.post_update.send_async, is_update=True, is_migration=False
+                ),
+            )
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token)
         return self
@@ -555,11 +570,12 @@ class DatabaseMixin:
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(token)
         clauses = self.identifying_clauses()
+        row_count = 0
         if clauses:
             expression = self.table.delete().where(*clauses)
             check_db_connection(self.database)
             async with self.database as database:
-                await database.execute(expression)
+                row_count = await database.execute(expression)
         # we cannot load anymore
         self._loaded_or_deleted = True
         # now cleanup with the saved values
@@ -567,7 +583,9 @@ class DatabaseMixin:
             field = self.meta.fields[field_name]
             await field.post_delete_callback(value, instance=self)
 
-        await self.meta.signals.post_delete.send_async(self.__class__, instance=self)
+        await self.meta.signals.post_delete.send_async(
+            self.__class__, instance=self, row_count=row_count
+        )
 
     async def load(self, only_needed: bool = False) -> None:
         if only_needed and self._loaded_or_deleted:
@@ -589,7 +607,13 @@ class DatabaseMixin:
         self.__dict__.update(self.transform_input(dict(row._mapping), phase="load", instance=self))
         self._loaded_or_deleted = True
 
-    async def _insert(self: Model, evaluate_values: bool, kwargs: dict[str, Any]) -> Model:
+    async def _insert(
+        self: Model,
+        evaluate_values: bool,
+        kwargs: dict[str, Any],
+        pre_fn: Callable[..., Awaitable],
+        post_fn: Callable[..., Awaitable],
+    ) -> Model:
         """
         Performs the save instruction.
         """
@@ -602,6 +626,7 @@ class DatabaseMixin:
             model_instance=self,
             evaluate_values=evaluate_values,
         )
+        await pre_fn(self.__class__, instance=self, column_values=column_values, values=kwargs)
         check_db_connection(self.database, stacklevel=4)
         token = CURRENT_INSTANCE.set(self)
         try:
@@ -632,6 +657,7 @@ class DatabaseMixin:
             CURRENT_INSTANCE.reset(token)
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False
+        await post_fn(self.__class__, instance=self, column_values=column_values, values=kwargs)
 
         return self
 
@@ -653,8 +679,6 @@ class DatabaseMixin:
                 stacklevel=2,
             )
             force_insert = force_save
-
-        await self.meta.signals.pre_save.send_async(self.__class__, instance=self)
 
         extracted_fields = self.extract_db_fields()
         if values is None:
@@ -691,16 +715,30 @@ class DatabaseMixin:
                 if values:
                     extracted_fields.update(values)
                 # force save must ensure a complete mapping
-                await self._insert(bool(values), extracted_fields)
+                await self._insert(
+                    bool(values),
+                    extracted_fields,
+                    pre_fn=partial(
+                        self.meta.signals.pre_save.send_async, is_update=False, is_migration=False
+                    ),
+                    post_fn=partial(
+                        self.meta.signals.post_save.send_async, is_update=False, is_migration=False
+                    ),
+                )
             else:
                 await self._update(
                     # assume partial when values are None
                     values is not None,
                     extracted_fields if values is None else values,
+                    pre_fn=partial(
+                        self.meta.signals.pre_save.send_async, is_update=True, is_migration=False
+                    ),
+                    post_fn=partial(
+                        self.meta.signals.post_save.send_async, is_update=True, is_migration=False
+                    ),
                 )
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token2)
-        await self.meta.signals.post_save.send_async(self.__class__, instance=self)
         return self
 
     @classmethod
