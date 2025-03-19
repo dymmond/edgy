@@ -44,7 +44,6 @@ class ConcreteCompositeField(BaseCompositeField):
         **kwargs: Any,
     ) -> None:
         self._copy_params = {
-            **kwargs,
             "inner_fields": inner_fields,
         }
         self.inner_field_names: list[str] = []
@@ -253,9 +252,13 @@ class ConcreteCompositeField(BaseCompositeField):
         return False
 
     def __copy__(self) -> "ConcreteCompositeField":
-        copy_obj = type(self)(**self._copy_params)
-        # owner is sometimes set later but very important
-        copy_obj.owner = self.owner
+        params = {
+            k: v
+            for k, v in self.__dict__.items()
+            if k not in {"_copy_params", "inner_field_names", "embedded_field_defs", "null"}
+        }
+        params.update(self._copy_params)
+        copy_obj = type(self)(**params)
         return copy_obj
 
 
