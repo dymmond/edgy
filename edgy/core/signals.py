@@ -8,8 +8,10 @@ post_delete = Signal()
 post_save = Signal()
 post_update = Signal()
 pre_delete = Signal()
+post_migrate = Signal()
 pre_save = Signal()
 pre_update = Signal()
+pre_migrate = Signal()
 
 
 class Broadcaster(dict):
@@ -42,7 +44,9 @@ __all__ = [
     "post_delete",
     "post_save",
     "post_update",
+    "post_migrate",
     "pre_delete",
     "pre_save",
     "pre_update",
+    "pre_migrate",
 ]

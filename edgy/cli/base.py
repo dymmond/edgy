@@ -3,6 +3,7 @@ import inspect
 import os
 import typing
 import warnings
+from collections.abc import Awaitable, Callable
 from importlib import import_module
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
@@ -14,6 +15,7 @@ import edgy
 from edgy.cli.constants import DEFAULT_TEMPLATE_NAME
 from edgy.cli.decorators import catch_errors
 from edgy.core.db.context_vars import with_force_fields_nullable
+from edgy.core.signals import post_migrate, pre_migrate
 from edgy.utils.compat import is_class_and_subclass
 
 if TYPE_CHECKING:
@@ -64,6 +66,13 @@ class Config(AlembicConfig):
             else:
                 config.cmd_opts.x = None
         return config
+
+
+def _async_wrapper(fn: Callable[..., Awaitable]) -> Callable:
+    def _(*args: Any, **kwargs: Any) -> None:
+        edgy.run_sync(fn(*args, **kwargs))
+
+    return _
 
 
 class Migrate:
@@ -190,6 +199,19 @@ def revision(
     options = ["autogenerate"] if autogenerate else None
     config = Config.get_instance(options=options, args=arg)
     with with_force_fields_nullable(null_fields):
+        pre_migrate.send(
+            "revision",
+            _async_wrapper=_async_wrapper,
+            config=config,
+            message=message,
+            autogenerate=autogenerate,
+            sql=sql,
+            head=head,
+            splice=splice,
+            branch_label=branch_label,
+            version_path=version_path,
+            revision_id=revision_id,
+        )
         command.revision(
             config,
             message,
@@ -200,6 +222,19 @@ def revision(
             branch_label=branch_label,
             version_path=version_path,
             rev_id=revision_id,
+        )
+        post_migrate.send(
+            "revision",
+            _async_wrapper=_async_wrapper,
+            config=config,
+            message=message,
+            autogenerate=autogenerate,
+            sql=sql,
+            head=head,
+            splice=splice,
+            branch_label=branch_label,
+            version_path=version_path,
+            revision_id=revision_id,
         )
 
 
@@ -262,7 +297,23 @@ def upgrade(
 ) -> None:
     """Upgrade to a later version"""
     config = Config.get_instance(args=arg)
+    pre_migrate.send(
+        "upgrade",
+        _async_wrapper=_async_wrapper,
+        config=config,
+        revision=revision,
+        sql=sql,
+        tag=tag,
+    )
     command.upgrade(config, revision, sql=sql, tag=tag)
+    post_migrate.send(
+        "upgrade",
+        _async_wrapper=_async_wrapper,
+        config=config,
+        revision=revision,
+        sql=sql,
+        tag=tag,
+    )
 
 
 @catch_errors
@@ -276,7 +327,23 @@ def downgrade(
     config = Config.get_instance(args=arg)
     if sql and revision == "-1":
         revision = "head:-1"
+    pre_migrate.send(
+        "downgrade",
+        _async_wrapper=_async_wrapper,
+        config=config,
+        revision=revision,
+        sql=sql,
+        tag=tag,
+    )
     command.downgrade(config, revision, sql=sql, tag=tag)
+    post_migrate.send(
+        "downgrade",
+        _async_wrapper=_async_wrapper,
+        config=config,
+        revision=revision,
+        sql=sql,
+        tag=tag,
+    )
 
 
 @catch_errors

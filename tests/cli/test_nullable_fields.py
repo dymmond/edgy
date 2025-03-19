@@ -62,15 +62,21 @@ async def test_migrate_nullable_upgrade(template_param):
     assert ss == 0
 
     (o, e, ss) = await arun_cmd(
-        "tests.cli.main", "edgy makemigrations", extra_env={"TEST_NO_CONTENT_TYPE": "true"}
+        "tests.cli.main",
+        "edgy makemigrations",
+        extra_env={"TEST_NO_CONTENT_TYPE": "true", "TEST_ADD_SIGNALS": "true"},
     )
     assert ss == 0
     assert b"No changes in schema detected" not in o
+    assert b"abc start revision" in o
 
     (o, e, ss) = await arun_cmd(
-        "tests.cli.main", "edgy migrate", extra_env={"TEST_NO_CONTENT_TYPE": "true"}
+        "tests.cli.main",
+        "edgy migrate",
+        extra_env={"TEST_NO_CONTENT_TYPE": "true", "TEST_ADD_SIGNALS": "true"},
     )
     assert ss == 0
+    assert b"abc start upgrade online" in o
 
     (o, e, ss) = await arun_cmd(
         "tests.cli.main",
@@ -78,6 +84,7 @@ async def test_migrate_nullable_upgrade(template_param):
         extra_env={
             "EDGY_SETTINGS_MODULE": "tests.settings.multidb.TestSettings",
             "TEST_NO_CONTENT_TYPE": "true",
+            "TEST_ADD_SIGNALS": "true",
         },
     )
     assert ss == 0
@@ -85,11 +92,14 @@ async def test_migrate_nullable_upgrade(template_param):
     (o, e, ss) = await arun_cmd(
         "tests.cli.main",
         "edgy makemigrations --null-field User:content_type --null-field User:profile",
-        extra_env={"TEST_ADD_NULLABLE_FIELDS": "true"},
+        extra_env={"TEST_ADD_NULLABLE_FIELDS": "true", "TEST_ADD_SIGNALS": "true"},
     )
+    assert ss == 0
 
     (o, e, ss) = await arun_cmd(
-        "tests.cli.main", "edgy migrate", extra_env={"TEST_ADD_NULLABLE_FIELDS": "true"}
+        "tests.cli.main",
+        "edgy migrate",
+        extra_env={"TEST_ADD_NULLABLE_FIELDS": "true", "TEST_ADD_SIGNALS": "true"},
     )
     assert ss == 0
 
@@ -99,6 +109,7 @@ async def test_migrate_nullable_upgrade(template_param):
         extra_env={
             "EDGY_SETTINGS_MODULE": "tests.settings.multidb.TestSettings",
             "TEST_ADD_NULLABLE_FIELDS": "true",
+            "TEST_ADD_SIGNALS": "true",
         },
     )
     assert ss == 0
@@ -110,6 +121,7 @@ async def test_migrate_nullable_upgrade(template_param):
         extra_env={
             "EDGY_SETTINGS_MODULE": "tests.settings.multidb.TestSettings",
             "TEST_ADD_NULLABLE_FIELDS": "true",
+            "TEST_ADD_SIGNALS": "true",
         },
     )
     assert ss == 0
@@ -117,7 +129,7 @@ async def test_migrate_nullable_upgrade(template_param):
     (o, e, ss) = await arun_cmd(
         "tests.cli.main",
         "edgy makemigrations",
-        extra_env={"TEST_ADD_NULLABLE_FIELDS": "true"},
+        extra_env={"TEST_ADD_NULLABLE_FIELDS": "true", "TEST_ADD_SIGNALS": "true"},
     )
 
     migrations = list((base_path / "migrations" / "versions").glob("*.py"))
@@ -126,7 +138,9 @@ async def test_migrate_nullable_upgrade(template_param):
     # now remove the nulls
 
     (o, e, ss) = await arun_cmd(
-        "tests.cli.main", "edgy migrate", extra_env={"TEST_ADD_NULLABLE_FIELDS": "true"}
+        "tests.cli.main",
+        "edgy migrate",
+        extra_env={"TEST_ADD_NULLABLE_FIELDS": "true", "TEST_ADD_SIGNALS": "true"},
     )
     assert ss == 0
     (o, e, ss) = await arun_cmd(
@@ -136,6 +150,7 @@ async def test_migrate_nullable_upgrade(template_param):
         extra_env={
             "EDGY_SETTINGS_MODULE": "tests.settings.multidb.TestSettings",
             "TEST_ADD_NULLABLE_FIELDS": "true",
+            "TEST_ADD_SIGNALS": "true",
         },
     )
     assert ss == 0
@@ -143,7 +158,9 @@ async def test_migrate_nullable_upgrade(template_param):
     # now reset
     await recreate_db()
     (o, e, ss) = await arun_cmd(
-        "tests.cli.main", "edgy migrate +1", extra_env={"TEST_ADD_NULLABLE_FIELDS": "true"}
+        "tests.cli.main",
+        "edgy migrate +1",
+        extra_env={"TEST_NO_CONTENT_TYPE": "true", "TEST_ADD_SIGNALS": "true"},
     )
     assert ss == 0
     (o, e, ss) = await arun_cmd(
@@ -153,12 +170,15 @@ async def test_migrate_nullable_upgrade(template_param):
         extra_env={
             "EDGY_SETTINGS_MODULE": "tests.settings.multidb.TestSettings",
             "TEST_NO_CONTENT_TYPE": "true",
+            "TEST_ADD_SIGNALS": "true",
         },
     )
     assert ss == 0
 
     (o, e, ss) = await arun_cmd(
-        "tests.cli.main", "edgy migrate", extra_env={"TEST_ADD_NULLABLE_FIELDS": "true"}
+        "tests.cli.main",
+        "edgy migrate",
+        extra_env={"TEST_ADD_NULLABLE_FIELDS": "true", "TEST_ADD_SIGNALS": "true"},
     )
     assert ss == 0
 
@@ -169,6 +189,7 @@ async def test_migrate_nullable_upgrade(template_param):
         extra_env={
             "EDGY_SETTINGS_MODULE": "tests.settings.multidb.TestSettings",
             "TEST_ADD_NULLABLE_FIELDS": "true",
+            "TEST_ADD_SIGNALS": "true",
         },
     )
     assert ss == 0
@@ -199,6 +220,7 @@ async def main():
         from tests.cli import main
 
         async with main.models:
+            assert await main.User.query.exists(name="migration_user")
             user = await main.User.query.get(name="edgy")
             assert user.active
             assert user.content_type.name == "User"
@@ -209,6 +231,7 @@ async def main():
         from tests.cli import main
 
         async with main.models:
+            assert await main.User.query.exists(name="migration_user")
             user = await main.User.query.get(name="edgy")
             assert user.active
             assert user.content_type.name == "User"

@@ -39,6 +39,7 @@ class Profile(edgy.StrictModel):
 class Log(edgy.StrictModel):
     signal = edgy.CharField(max_length=255)
     instance = edgy.JSONField()
+    params = edgy.JSONField(default={})
 
     class Meta:
         registry = models
@@ -62,22 +63,22 @@ def test_invalid_signal():
 async def test_signals():
     @pre_save.connect_via(User)
     async def pre_saving(sender, instance, **kwargs):
-        await Log.query.create(signal="pre_save", instance=instance.model_dump())
+        await Log.query.create(signal="pre_save", instance=instance.model_dump(), params=kwargs)
         logger.info(f"pre_save signal broadcasted for {instance.get_instance_name()}")
 
     @post_save.connect_via(User)
     async def post_saving(sender, instance, **kwargs):
-        await Log.query.create(signal="post_save", instance=instance.model_dump())
+        await Log.query.create(signal="post_save", instance=instance.model_dump(), params=kwargs)
         logger.info(f"post_save signal broadcasted for {instance.get_instance_name()}")
 
     @pre_update.connect_via(User)
     async def pre_updating(sender, instance, **kwargs):
-        await Log.query.create(signal="pre_update", instance=instance.model_dump())
+        await Log.query.create(signal="pre_update", instance=instance.model_dump(), params=kwargs)
         logger.info(f"pre_update signal broadcasted for {instance.get_instance_name()}")
 
     @post_update.connect_via(User)
     async def post_updating(sender, instance, **kwargs):
-        await Log.query.create(signal="post_update", instance=instance.model_dump())
+        await Log.query.create(signal="post_update", instance=instance.model_dump(), params=kwargs)
         logger.info(f"post_update signal broadcasted for {instance.get_instance_name()}")
 
     @pre_delete.connect_via(User)
@@ -100,12 +101,12 @@ async def test_signals():
     assert logs[1].signal == "post_save"
 
     user = await User.query.create(name="Saffier")
-    logs = await Log.query.all()
+    logs = await Log.query.offset(2)
 
-    assert len(logs) == 4
-    assert logs[2].signal == "pre_save"
-    assert logs[2].instance["name"] == user.name
-    assert logs[3].signal == "post_save"
+    assert len(logs) == 2
+    assert logs[0].signal == "pre_save"
+    assert logs[0].instance["name"] == user.name
+    assert logs[1].signal == "post_save"
 
     # For the updates
     user = await user.update(name="Another Saffier")
@@ -133,6 +134,8 @@ async def test_signals():
     user.meta.signals.post_delete.disconnect(post_deleting)
     user.meta.signals.pre_save.disconnect(pre_saving)
     user.meta.signals.post_save.disconnect(post_saving)
+    user.meta.signals.pre_update.disconnect(pre_updating)
+    user.meta.signals.post_update.disconnect(post_updating)
 
     users = await User.query.all()
     assert len(users) == 1
