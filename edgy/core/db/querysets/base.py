@@ -58,6 +58,7 @@ def get_table_key_or_name(table: Union[sqlalchemy.Table, sqlalchemy.Alias]) -> s
         # alias
         return table.name
 
+
 def _extract_unique_lookup_key(obj: Any, unique_fields: Sequence[str]) -> Union[tuple, None]:
     lookup_key = []
     if isinstance(obj, dict):
@@ -65,14 +66,23 @@ def _extract_unique_lookup_key(obj: Any, unique_fields: Sequence[str]) -> Union[
             if field not in obj:
                 return None
             value = obj[field]
-            lookup_key.append(orjson.dumps(value, option=orjson.OPT_SORT_KEYS) if isinstance(value, (dict, list)) else value)
+            lookup_key.append(
+                orjson.dumps(value, option=orjson.OPT_SORT_KEYS)
+                if isinstance(value, (dict, list))
+                else value
+            )
     else:
         for field in unique_fields:
             if not hasattr(obj, field):
                 return None
             value = getattr(obj, field)
-            lookup_key.append(orjson.dumps(value, option=orjson.OPT_SORT_KEYS) if isinstance(value, (dict, list)) else value)
+            lookup_key.append(
+                orjson.dumps(value, option=orjson.OPT_SORT_KEYS)
+                if isinstance(value, (dict, list))
+                else value
+            )
     return tuple(lookup_key)
+
 
 class BaseQuerySet(
     TenancyMixin,
@@ -1653,18 +1663,26 @@ class QuerySet(BaseQuerySet):
                 found = False
                 if bool(queryset.database.force_rollback):
                     for record in await queryset.filter(**filter_kwargs):
-                        if all(getattr(record, k) == expected for k, expected in dict_fields.items()):
+                        if all(
+                            getattr(record, k) == expected for k, expected in dict_fields.items()
+                        ):
                             lookup_key = _extract_unique_lookup_key(record, unique_fields)
-                            assert lookup_key is not None, "invalid fields/attributes in unique_fields"
+                            assert lookup_key is not None, (
+                                "invalid fields/attributes in unique_fields"
+                            )
                             if lookup_key not in existing_records:
                                 existing_records[lookup_key] = record
                             found = True
                             break
                 else:
                     async for record in queryset.filter(**filter_kwargs):
-                        if all(getattr(record, k) == expected for k, expected in dict_fields.items()):
+                        if all(
+                            getattr(record, k) == expected for k, expected in dict_fields.items()
+                        ):
                             lookup_key = _extract_unique_lookup_key(record, unique_fields)
-                            assert lookup_key is not None, "invalid fields/attributes in unique_fields"
+                            assert lookup_key is not None, (
+                                "invalid fields/attributes in unique_fields"
+                            )
                             if lookup_key not in existing_records:
                                 existing_records[lookup_key] = record
                             found = True
@@ -1676,7 +1694,7 @@ class QuerySet(BaseQuerySet):
         else:
             new_objs.extend(
                 [queryset.model_class(**obj) if isinstance(obj, dict) else obj for obj in objs]
-           )
+            )
 
         async def _iterate(obj: EdgyModel) -> dict[str, Any]:
             original = obj.extract_db_fields()

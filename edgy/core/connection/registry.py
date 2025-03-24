@@ -209,10 +209,10 @@ class Registry:
             filter_kwargs = dict.fromkeys(field_set)
 
             async def wrapper_fn(
-                _model: type["BaseModelType"]=model,
-                _model_specific_defaults: dict=model_specific_defaults,
-                _filter_kwargs: dict=filter_kwargs,
-                _field_set: set[str]=field_set,
+                _model: type["BaseModelType"] = model,
+                _model_specific_defaults: dict = model_specific_defaults,
+                _filter_kwargs: dict = filter_kwargs,
+                _field_set: set[str] = field_set,
             ) -> None:
                 # To reduce the memory usage, only retrieve pknames and load per object
                 # We need to load all at once because otherwise the cursor could interfere with updates

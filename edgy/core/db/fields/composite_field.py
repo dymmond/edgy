@@ -249,13 +249,11 @@ class ConcreteCompositeField(BaseCompositeField):
         return False
 
     def __copy__(self) -> "ConcreteCompositeField":
-        params = {
-            k: v
-            for k, v in self.__dict__.items()
-            if k != "null"
-        }
+        params = {k: v for k, v in self.__dict__.items() if k != "null"}
         copy_obj = type(self)(**params)
-        copy_obj.embedded_field_defs = {k: copy.copy(v) for k, v in self.embedded_field_defs.items()}
+        copy_obj.embedded_field_defs = {
+            k: copy.copy(v) for k, v in self.embedded_field_defs.items()
+        }
         return copy_obj
 
 
