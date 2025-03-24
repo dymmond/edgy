@@ -10,7 +10,7 @@ hide:
 
 ### Fixed
 
-- FieldFile did use potential heavily blocking sync API in async code-pathes.
+- FieldFile did use potential heavily blocking sync API in async code paths.
 
 ## 0.29.0
 
