@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.29.1
+
+### Fixed
+
+- FieldFile did use potential heavily blocking sync API in async code-pathes.
+
 ## 0.29.0
 
 ### Added
