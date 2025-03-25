@@ -3,11 +3,10 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator, Hashable
 from typing import TYPE_CHECKING
 
-from .counter import Paginator
+from .base import Page, Paginator
 
 if TYPE_CHECKING:
     from edgy.core.db.querysets import QuerySet
-    from edgy.core.db.querysets.types import EdgyEmbedTarget
 
 
 class CursorPaginator(Paginator):
@@ -21,13 +20,11 @@ class CursorPaginator(Paginator):
         field = self.queryset.model_class.meta.fields[self.cursor_field]
         assert not field.null, "cursor_field cannot be nullable."
 
-    async def get_page_after(
-        self, cursor: Hashable = None
-    ) -> tuple[list[EdgyEmbedTarget], Hashable]:
+    async def get_page_after(self, cursor: Hashable = None) -> tuple[Page, Hashable]:
         if cursor in self._page_cache:
             query = self._page_cache[cursor]
         elif cursor is None:
-            query = self.queryset.limit(self.page_size)
+            query = self.queryset.limit(self.page_size + 1)
             self._page_cache[cursor] = query
         else:
             if self.order_by[0].startswith("-"):
@@ -38,23 +35,27 @@ class CursorPaginator(Paginator):
             self._page_cache[cursor] = query
         resultarr = await query
         if resultarr:
-            return resultarr, getattr(resultarr[-1], self.cursor_field)
-        return resultarr, None
+            return Page(
+                resultarr[: self.page_size], cursor is None, len(resultarr) <= self.page_size
+            ), getattr(resultarr[-1], self.cursor_field)
+        return Page(
+            resultarr[: self.page_size], cursor is None, len(resultarr) <= self.page_size
+        ), None
 
-    async def get_page_before(
-        self, cursor: Hashable = None
-    ) -> tuple[list[EdgyEmbedTarget], Hashable]:
+    async def get_page_before(self, cursor: Hashable = None) -> tuple[Page, Hashable]:
         return await self.get_reverse_paginator().get_page_after(cursor)
 
     async def get_page(
         self, cursor: Hashable = None, reverse: bool = False
-    ) -> tuple[list[EdgyEmbedTarget], Hashable]:
+    ) -> tuple[Page, Hashable]:
         if reverse:
             return await self.get_page_before(cursor)
         else:
             return await self.get_page_after(cursor)
 
-    async def paginate(self, start_cursor:  Hashable = None, stop_cursor:  Hashable = None) -> AsyncGenerator[tuple[list[EdgyEmbedTarget], bool], None]:
+    async def paginate(
+        self, start_cursor: Hashable = None, stop_cursor: Hashable = None
+    ) -> AsyncGenerator[Page, None]:
         container: list = []
         query = self.queryset
         if start_cursor is not None:
@@ -67,16 +68,18 @@ class CursorPaginator(Paginator):
                 query = query.filter(**{f"{self.cursor_field}__gt": stop_cursor})
             else:
                 query = query.filter(**{f"{self.cursor_field}__lt": stop_cursor})
+        first: bool = True
         async for item in query:
             if len(container) > self.page_size:
-                yield container[:-1], True
+                yield Page(container[:-1], first, False)
+                first = False
                 container = [container[-1]]
             container.append(item)
         if len(container) > self.page_size:
-            yield container[:-1], True
-            yield container[-1], False
+            yield Page(container[:-1], first, False)
+            yield Page(container[-1], False, True)
         else:
-            yield container, False
+            yield Page(container[:-1], first, True)
 
     def get_reverse_paginator(self) -> CursorPaginator:
         if self.reverse_paginator is None:

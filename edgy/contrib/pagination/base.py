@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Hashable
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, NamedTuple
 
 if TYPE_CHECKING:
     from edgy.core.db.querysets import QuerySet
-    from edgy.core.db.querysets.types import EdgyEmbedTarget
+
+
+class Page(NamedTuple):
+    content: list[Any]
+    is_first: bool
+    is_last: bool
 
 
 class Paginator:
@@ -27,7 +32,7 @@ class Paginator:
             self.order_by = queryset._order_by
         self._page_cache: dict[Hashable, QuerySet] = {}
 
-    async def get_page(self, page: int = 1) -> list[EdgyEmbedTarget]:
+    async def get_page(self, page: int = 1) -> Page:
         reverse = False
         if page == 0 or not isinstance(page, int):
             raise ValueError(f"Invalid page parameter value: {page!r}")
@@ -39,32 +44,44 @@ class Paginator:
             offset = self.page_size * (page - 1)
         if self.queryset._cache_fetch_all:
             if reverse:
-                return (await self.queryset)[-offset - 1 : -offset - self.page_size - 1 : -1]
-            return (await self.queryset)[offset : offset + self.page_size]
+                resultarr = (await self.queryset)[-offset - 1 : -offset - self.page_size - 2 : -1]
+            resultarr = (await self.queryset)[offset : offset + self.page_size + 1]
+            return Page(
+                content=resultarr[: self.page_size],
+                is_first=offset == 0,
+                is_last=len(resultarr) <= self.page_size,
+            )
         if page in self._page_cache:
             query = self._page_cache[page]
         else:
-            query = self.queryset.offset(offset).limit(self.page_size)
+            query = self.queryset.offset(offset).limit(self.page_size + 1)
             if reverse:
                 query = query.reverse()
             self._page_cache[page] = query
-        return await query
+        resultarr = await query
+        return Page(
+            content=resultarr[: self.page_size],
+            is_first=offset == 0,
+            is_last=len(resultarr) <= self.page_size,
+        )
 
-    async def paginate(self, start_page: int = 1) -> AsyncGenerator[tuple[list[EdgyEmbedTarget], bool], None]:
+    async def paginate(self, start_page: int = 1) -> AsyncGenerator[Page, None]:
         container: list = []
         query = self.queryset
         if start_page > 1:
             query = query.offset(self.page_size * (start_page - 1))
+        first: bool = True
         async for item in query:
             if len(container) > self.page_size:
-                yield container[:-1], True
+                yield Page(container[:-1], first, False)
+                first = False
                 container = [container[-1]]
             container.append(item)
         if len(container) > self.page_size:
-            yield container[:-1], True
-            yield container[-1], False
+            yield Page(container[:-1], first, False)
+            yield Page(container[-1], False, True)
         else:
-            yield container, False
+            yield Page(container[:-1], first, True)
 
     def get_reverse_paginator(self) -> Paginator:
         if self.reverse_paginator is None:
