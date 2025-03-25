@@ -50,17 +50,21 @@ class Paginator:
             self._page_cache[page] = query
         return await query
 
-    async def paginate(self, start_page: int = 1) -> AsyncGenerator[list[EdgyEmbedTarget], None]:
+    async def paginate(self, start_page: int = 1) -> AsyncGenerator[tuple[list[EdgyEmbedTarget], bool], None]:
         container: list = []
         query = self.queryset
         if start_page > 1:
             query = query.offset(self.page_size * (start_page - 1))
         async for item in query:
-            if len(container) >= self.page_size:
-                yield container
-                container = []
+            if len(container) > self.page_size:
+                yield container[:-1], True
+                container = [container[-1]]
             container.append(item)
-        yield container
+        if len(container) > self.page_size:
+            yield container[:-1], True
+            yield container[-1], False
+        else:
+            yield container, False
 
     def get_reverse_paginator(self) -> Paginator:
         if self.reverse_paginator is None:
