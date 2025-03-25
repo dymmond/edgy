@@ -112,7 +112,7 @@ class Paginator:
                     if self.previous_item_attr and is_first:
                         min_size += 1
                     is_first = False
-                    container = [page.content[-1], item]
+                    container = [page.content[-1], item] if self.previous_item_attr else [item]
         else:
             async for item in queryset:
                 container.append(item)
@@ -122,14 +122,18 @@ class Paginator:
                     if self.previous_item_attr and is_first:
                         min_size += 1
                     is_first = False
-                    container = [page.content[-1], item]
+                    container = [page.content[-1], item] if self.previous_item_attr else [item]
         if page is None or not page.is_last:
             yield self.convert_to_page(container, is_first=is_first)
 
     async def paginate(self, start_page: int = 1) -> AsyncGenerator[Page, None]:
         query = self.queryset
         if start_page > 1:
-            query = query.offset(self.page_size * (start_page - 1))
+            offset = self.page_size * (start_page - 1)
+            if self.previous_item_attr:
+                offset = max(offset - 1, 0)
+            if offset > 0:
+                query = query.offset(offset)
         async for page in self.paginate_queryset(query, is_first=start_page == 1):
             yield page
 

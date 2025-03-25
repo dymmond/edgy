@@ -56,13 +56,17 @@ class CursorPaginator(Paginator):
                 query = query.filter(**{f"{self.cursor_field}__lt": cursor})
             else:
                 query = query.filter(**{f"{self.cursor_field}__gt": cursor})
+        is_first = cursor is None
         if cursor is not None and self.previous_item_attr:
             resultarr = await self.get_extra(cursor)
+            # if on first position
+            if not resultarr:
+                is_first = True
             resultarr.extend(await query)
         else:
             resultarr = await query
 
-        page_obj = self.convert_to_page(resultarr, is_first=cursor is None)
+        page_obj = self.convert_to_page(resultarr, is_first=is_first)
         self._page_cache[cursor] = page_obj
         next_cursor = (
             getattr(page_obj.content[-1], self.cursor_field) if page_obj.content else None
@@ -98,7 +102,9 @@ class CursorPaginator(Paginator):
             else:
                 query = query.filter(**{f"{self.cursor_field}__lt": stop_cursor})
         async for page in self.paginate_queryset(
-            query, is_first=start_cursor is None, prefill=prefill_container
+            query,
+            is_first=bool(start_cursor is None and not prefill_container),
+            prefill=prefill_container,
         ):
             yield page
 
