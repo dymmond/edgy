@@ -29,6 +29,9 @@ class Paginator:
 
     async def get_page(self, page: int = 1) -> list[EdgyEmbedTarget]:
         reverse = False
+        if page == 0 or not isinstance(page, int):
+            raise ValueError(f"Invalid page parameter value: {page!r}")
+
         if page < 0:
             reverse = True
             offset = self.page_size * (1 - page)
