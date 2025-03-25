@@ -10,13 +10,11 @@ if TYPE_CHECKING:
     from edgy.core.db.querysets.types import EdgyEmbedTarget
 
 
-
 class CursorPaginator(Paginator):
-    def __init__(
-        self, queryset: QuerySet, page_size: int, cursor_def: str
-    ) -> None:
+    reverse_paginator: CursorPaginator | None = None
+
+    def __init__(self, queryset: QuerySet, page_size: int, cursor_def: str) -> None:
         super().__init__(queryset=queryset, page_size=page_size, order_by=(cursor_def,))
-        self.reverse_paginator: CursorPaginator | None = None
         self.cursor_field = self.order_by[0]
         if self.cursor_field.startswith("-"):
             self.cursor_field = self.cursor_field[1:]

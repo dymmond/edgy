@@ -8,8 +8,10 @@ if TYPE_CHECKING:
     from edgy.core.db.querysets.types import EdgyEmbedTarget
 
 
-
 class Paginator:
+    reverse_paginator: Paginator | None = None
+    order_by: tuple[str, ...]
+
     def __init__(
         self,
         queryset: QuerySet,
@@ -17,31 +19,35 @@ class Paginator:
         order_by: tuple[str, ...] | None = None,
     ) -> None:
         self.page_size = page_size
-        self.order_by = order_by
-        self.queryset = queryset.order_by(*self.order_by)
+        if order_by:
+            self.queryset = queryset.order_by(*order_by)
+            self.order_by = order_by
+        else:
+            self.queryset = queryset
+            self.order_by = queryset._order_by
         self._page_cache: dict[Hashable, QuerySet] = {}
 
     async def get_page(self, page: int = 1) -> list[EdgyEmbedTarget]:
         reverse = False
         if page < 0:
             reverse = True
-            base = self.page_size * (-page)
+            offset = self.page_size * (1 - page)
         else:
-            base = self.page_size * (page - 1)
+            offset = self.page_size * (page - 1)
         if self.queryset._cache_fetch_all:
             if reverse:
-                return (await self.queryset)[-base : -(base + self.page_size) : -1]
-            return (await self.queryset)[base : base + self.page_size]
+                return (await self.queryset)[-offset - 1 : -offset - self.page_size - 1 : -1]
+            return (await self.queryset)[offset : offset + self.page_size]
         if page in self._page_cache:
             query = self._page_cache[page]
         else:
-            query = self.queryset.offset(base).limit(self.page_size)
+            query = self.queryset.offset(offset).limit(self.page_size)
             if reverse:
                 query = query.reverse()
             self._page_cache[page] = query
         return await query
 
-    async def paginate(self) -> AsyncGenerator[list[EdgyEmbedTarget], None]:
+    async def paginate(self, start_page: int = 1) -> AsyncGenerator[list[EdgyEmbedTarget], None]:
         container: list = []
         async for item in self.queryset:
             if len(container) >= self.page_size:
@@ -49,3 +55,8 @@ class Paginator:
                 container = []
             container.append(item)
         yield container
+
+    def get_reverse_paginator(self) -> Paginator:
+        if self.reverse_paginator is None:
+            self.reverse_paginator = type(self)(self.queryset.reverse(), page_size=self.page_size)
+        return self.reverse_paginator
