@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Hashable
+from collections.abc import AsyncGenerator, Hashable
 from typing import TYPE_CHECKING
 
 from .counter import Paginator
@@ -53,6 +53,21 @@ class CursorPaginator(Paginator):
             return await self.get_page_before(cursor)
         else:
             return await self.get_page_after(cursor)
+
+    async def paginate(self, cursor:  Hashable = None) -> AsyncGenerator[list[EdgyEmbedTarget], None]:
+        container: list = []
+        query = self.queryset
+        if cursor is not None:
+            if self.order_by[0].startswith("-"):
+                query = query.filter(**{f"{self.cursor_field}__lt": cursor})
+            else:
+                query = query.filter(**{f"{self.cursor_field}__gt": cursor})
+        async for item in query:
+            if len(container) >= self.page_size:
+                yield container
+                container = []
+            container.append(item)
+        yield container
 
     def get_reverse_paginator(self) -> CursorPaginator:
         if self.reverse_paginator is None:

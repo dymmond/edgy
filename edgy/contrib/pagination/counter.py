@@ -52,7 +52,10 @@ class Paginator:
 
     async def paginate(self, start_page: int = 1) -> AsyncGenerator[list[EdgyEmbedTarget], None]:
         container: list = []
-        async for item in self.queryset:
+        query = self.queryset
+        if start_page > 1:
+            query = query.offset(self.page_size * (start_page - 1))
+        async for item in query:
             if len(container) >= self.page_size:
                 yield container
                 container = []
