@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 from collections.abc import Generator, Sequence
@@ -313,7 +314,7 @@ class FieldFile(File):
             return File(cast(BinaryIO, copy(self)), name=self.name, storage=self.storage)
         return None
 
-    async def execute_operation(self, nodelete_old: bool = False) -> None:
+    def _execute_operation(self, nodelete_old: bool) -> None:
         operation = self.operation
         self.operation = "none"
         if operation == "save" or operation == "save_delete":
@@ -342,6 +343,11 @@ class FieldFile(File):
                 self.old[0].delete(self.old[1])
         # else approve operation or metadata update
         self.old = None
+
+    async def execute_operation(self, nodelete_old: bool = False) -> None:
+        """Execute async the operation"""
+        # wrap the sync code in an extra thread to prevent stalling the event loop
+        await asyncio.to_thread(self._execute_operation, nodelete_old=nodelete_old)
 
     def save(
         self,

@@ -258,7 +258,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             exclude_second_pass = _exclude
         else:
             initial_full_field_exclude = set(_exclude)
-            exclude_passed = {field_name: True for field_name in initial_full_field_exclude}
+            exclude_passed = dict.fromkeys(initial_full_field_exclude, True)
             exclude_second_pass = exclude_passed.copy()
 
         need_second_pass: set[str] = set()
