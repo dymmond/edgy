@@ -7,13 +7,16 @@ from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 if TYPE_CHECKING:
     from edgy.core.db.querysets import QuerySet
 
+
 @dataclass
 class Page:
     content: list[Any]
     is_first: bool
     is_last: bool
 
+
 PageType = TypeVar("PageType", bound=Page)
+
 
 class Paginator(Generic[PageType]):
     reverse_paginator: Paginator | None = None
@@ -49,8 +52,14 @@ class Paginator(Generic[PageType]):
         if self.reverse_paginator:
             self.reverse_paginator.clear_caches()
 
+    async def get_amount_pages(self) -> int:
+        if not self.page_size:
+            return 1
+        count, remainder = divmod(await self.queryset.count(), self.page_size)
+        return count + (1 if remainder else 0)
+
     async def get_total(self) -> int:
-        return await  self.queryset.count()
+        return await self.queryset.count()
 
     async def get_page(self, page: int = 1) -> Page:
         if page == 0 or not isinstance(page, int):
@@ -63,7 +72,11 @@ class Paginator(Generic[PageType]):
 
         if page < 0 and self.page_size:
             reverse_page = await self.get_reverse_paginator().get_page(-page)
-            page_obj = Page(content=reverse_page.content[::-1], is_first=reverse_page.is_last, is_last=reverse_page.is_first)
+            page_obj = Page(
+                content=reverse_page.content[::-1],
+                is_first=reverse_page.is_last,
+                is_last=reverse_page.is_first,
+            )
             self._page_cache[page] = cast(PageType, page_obj)
             return page_obj
         else:
@@ -71,7 +84,7 @@ class Paginator(Generic[PageType]):
         if self.previous_item_attr:
             offset = max(offset - 1, 0)
         if self.queryset._cache_fetch_all:
-            resultarr = (await self.queryset)
+            resultarr = await self.queryset
             if self.page_size:
                 resultarr = resultarr[offset : offset + self.page_size + 1]
             page_obj = self.convert_to_page(resultarr, is_first=offset == 0)

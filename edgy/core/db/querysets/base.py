@@ -51,7 +51,9 @@ if TYPE_CHECKING:  # pragma: no cover
 
 _empty_set = cast(Sequence[Any], frozenset())
 # get current row during iteration. Used for prefetching.
-_current_row_holder: ContextVar[Optional[list[Optional[sqlalchemy.Row]]]] = ContextVar("_current_row_holder", default=None)
+_current_row_holder: ContextVar[Optional[list[Optional[sqlalchemy.Row]]]] = ContextVar(
+    "_current_row_holder", default=None
+)
 
 
 def get_table_key_or_name(table: Union[sqlalchemy.Table, sqlalchemy.Alias]) -> str:
@@ -871,9 +873,10 @@ class BaseQuerySet(
                 self._cache_fetch_all = True
             else:
                 async with queryset.database as database:
-                    async for batch in cast(AsyncGenerator[Sequence[sqlalchemy.Row]], database.batched_iterate(
-                        expression, batch_size=self._batch_size
-                    )):
+                    async for batch in cast(
+                        AsyncGenerator[Sequence[sqlalchemy.Row]],
+                        database.batched_iterate(expression, batch_size=self._batch_size),
+                    ):
                         # clear only result cache
                         self._cache.clear()
                         self._cache_fetch_all = False
@@ -1269,7 +1272,9 @@ class QuerySet(BaseQuerySet):
         queryset._cache_first = self._cache_last
         queryset._cache_count = self._cache_count
         if self._cache_fetch_all:
-            queryset._cache.update(list(reversed(self._cache.get_category(self.model_class).values())))
+            queryset._cache.update(
+                list(reversed(self._cache.get_category(self.model_class).values()))
+            )
             queryset._cache_fetch_all = True
         return queryset
 

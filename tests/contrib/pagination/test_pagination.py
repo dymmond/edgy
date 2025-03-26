@@ -45,6 +45,7 @@ async def rollback_connection():
     async with models:
         yield
 
+
 async def test_reverse():
     await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
     assert (await IntCounter.query.all())[0].id == 0
@@ -53,6 +54,7 @@ async def test_reverse():
     assert (await IntCounter.query.reverse().last()).id == 0
     assert (await IntCounter.query.reverse().all().last()).id == 0
     assert (await IntCounter.query.reverse())[0].id == 99
+
 
 async def test_pagination_int_count():
     await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
@@ -106,7 +108,11 @@ async def test_pagination_int_single_page():
 async def test_pagination_int_single_counter_page():
     await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
     paginator = CursorPaginator(
-        IntCounter.query.all(), page_size=0, next_item_attr="next", previous_item_attr="prev", cursor_def="id"
+        IntCounter.query.all(),
+        page_size=0,
+        next_item_attr="next",
+        previous_item_attr="prev",
+        cursor_def="id",
     )
     assert paginator.queryset._order_by == ("id",)
     assert paginator.get_reverse_paginator().queryset._order_by == ("-id",)
@@ -121,6 +127,7 @@ async def test_pagination_int_single_counter_page():
     pseudo_page = await paginator.get_page(1)
     assert pseudo_page.content[0].id == 2
     assert pseudo_page.content[-1].id == 99
+
 
 async def test_pagination_int_count_no_attrs():
     await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
@@ -177,11 +184,12 @@ async def test_pagination_int_cursor():
     assert (await paginator.get_page(page.next_cursor)).content[-1].id == 59
     assert (await paginator.get_reverse_paginator().get_page()).content[0].id == 99
 
-    page_rev = await paginator.get_page(page.next_cursor+1, reverse=True)
+    page_rev = await paginator.get_page(page.next_cursor + 1, reverse=True)
     assert page_rev.content[-1].id == 29
     assert page_rev.content[0].id == 0
     assert page_rev.is_first
     assert page_rev.next_cursor == 0
+
 
 async def test_pagination_float_cursor():
     await FloatCounter.query.bulk_create([{"id": i / 1.324} for i in range(100)])

@@ -9,9 +9,11 @@ from .base import Page, Paginator
 if TYPE_CHECKING:
     from edgy.core.db.querysets import QuerySet
 
+
 @dataclass
 class CursorPage(Page):
     next_cursor: Hashable = None
+
 
 class CursorPaginator(Paginator[CursorPage]):
     reverse_paginator: CursorPaginator | None = None
@@ -47,7 +49,12 @@ class CursorPaginator(Paginator[CursorPage]):
         next_cursor = (
             getattr(page_obj.content[-1], self.cursor_field) if page_obj.content else None
         )
-        return CursorPage(content=page_obj.content, is_first=page_obj.is_first, is_last=page_obj.is_last, next_cursor=next_cursor)
+        return CursorPage(
+            content=page_obj.content,
+            is_first=page_obj.is_first,
+            is_last=page_obj.is_last,
+            next_cursor=next_cursor,
+        )
 
     async def get_extra(self, cursor: Hashable) -> list:
         query = self.get_reverse_paginator().queryset
@@ -88,13 +95,16 @@ class CursorPaginator(Paginator[CursorPage]):
             page_obj = self._reverse_page_cache[cursor]
             return page_obj
         reverse_page = await self.get_reverse_paginator().get_page_after(cursor)
-        page_obj = CursorPage(content=reverse_page.content[::-1], is_first=reverse_page.is_last, is_last=reverse_page.is_first, next_cursor=reverse_page.next_cursor)
+        page_obj = CursorPage(
+            content=reverse_page.content[::-1],
+            is_first=reverse_page.is_last,
+            is_last=reverse_page.is_first,
+            next_cursor=reverse_page.next_cursor,
+        )
         self._reverse_page_cache[cursor] = page_obj
         return page_obj
 
-    async def get_page(
-        self, cursor: Hashable = None, reverse: bool = False
-    ) -> CursorPage:
+    async def get_page(self, cursor: Hashable = None, reverse: bool = False) -> CursorPage:
         if reverse:
             return await self.get_page_before(cursor)
         else:
