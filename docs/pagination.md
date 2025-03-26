@@ -11,16 +11,12 @@ It is however not as flexible as the Paginator of django. You can only pass Quer
 ## Counter-based
 
 This is the classic way of pagination. You pass a number and get a page basing on the order of the QuerySet.
-You may pass a custom order_by parameter to set an order for the QuerySet.This will however cause a copy.
 
-
-### Default mode
-
-A note of warning should be said about when not passing an order or the queryset used for hasn't an order:
-
-The Paginator uses the pkcolumns as fallback for ordering. This aligns with the behavior of QuerySet when no order is found.
 
 ## Cursor-based
+
+This pagination works like the counter-based one but supports only one column: It is used as a cursor.
+This is more efficient and allows querying for new contents, in case of sequential cursors.
 
 
 ## Single-page mode (linked lists)

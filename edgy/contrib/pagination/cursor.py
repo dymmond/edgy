@@ -25,7 +25,7 @@ class CursorPaginator(Paginator[CursorPage]):
         previous_item_attr: str = "",
     ) -> None:
         if len(queryset._order_by) != 1:
-            raise ValueError("You must pass a QuerySet with .order_by(cursor_field)")
+            raise ValueError("You must pass a QuerySet with .order_by(cursor_column)")
         super().__init__(
             queryset=queryset,
             page_size=page_size,
@@ -33,11 +33,14 @@ class CursorPaginator(Paginator[CursorPage]):
             previous_item_attr=previous_item_attr,
         )
         self._reverse_page_cache: dict[Hashable, CursorPage] = {}
-        self.cursor_field = self.order_by[0]
-        if self.cursor_field.startswith("-"):
-            self.cursor_field = self.cursor_field[1:]
-        field = self.queryset.model_class.meta.fields[self.cursor_field]
-        assert not field.null, "cursor_field cannot be nullable."
+        self.cursor_column = self.order_by[0]
+        if self.cursor_column.startswith("-"):
+            self.cursor_column = self.cursor_column[1:]
+        column = self.queryset.model_class.table.columns.get(self.cursor_column)
+        if column is None:
+            raise ValueError("cursor_column does not exist.")
+        if column.nullable:
+            raise ValueError("cursor_column cannot be nullable.")
 
     def clear_caches(self) -> None:
         super().clear_caches()
@@ -46,7 +49,7 @@ class CursorPaginator(Paginator[CursorPage]):
     def convert_to_page(self, inp: Iterable, /, is_first: bool) -> CursorPage:
         page_obj: Page = super().convert_to_page(inp, is_first=is_first)
         next_cursor = (
-            getattr(page_obj.content[-1], self.cursor_field) if page_obj.content else None
+            getattr(page_obj.content[-1], self.cursor_column) if page_obj.content else None
         )
         return CursorPage(
             content=page_obj.content,
@@ -59,9 +62,9 @@ class CursorPaginator(Paginator[CursorPage]):
         query = self.get_reverse_paginator().queryset
         # inverted
         if self.order_by[0].startswith("-"):
-            query = query.filter(**{f"{self.cursor_field}__gt": cursor})
+            query = query.filter(**{f"{self.cursor_column}__gt": cursor})
         else:
-            query = query.filter(**{f"{self.cursor_field}__lt": cursor})
+            query = query.filter(**{f"{self.cursor_column}__lt": cursor})
         query = query.limit(1)
         return await query
 
@@ -72,9 +75,9 @@ class CursorPaginator(Paginator[CursorPage]):
         query = self.queryset.limit(self.page_size + 1) if self.page_size else self.queryset
         if cursor is not None:
             if self.order_by[0].startswith("-"):
-                query = query.filter(**{f"{self.cursor_field}__lt": cursor})
+                query = query.filter(**{f"{self.cursor_column}__lt": cursor})
             else:
-                query = query.filter(**{f"{self.cursor_field}__gt": cursor})
+                query = query.filter(**{f"{self.cursor_column}__gt": cursor})
         is_first = cursor is None
         if cursor is not None and self.previous_item_attr:
             resultarr = await self.get_extra(cursor)
@@ -116,16 +119,16 @@ class CursorPaginator(Paginator[CursorPage]):
         prefill_container = []
         if start_cursor is not None:
             if self.order_by[0].startswith("-"):
-                query = query.filter(**{f"{self.cursor_field}__lt": start_cursor})
+                query = query.filter(**{f"{self.cursor_column}__lt": start_cursor})
             else:
-                query = query.filter(**{f"{self.cursor_field}__gt": start_cursor})
+                query = query.filter(**{f"{self.cursor_column}__gt": start_cursor})
             if self.previous_item_attr:
                 prefill_container = await self.get_extra(start_cursor)
         if stop_cursor is not None:
             if self.order_by[0].startswith("-"):
-                query = query.filter(**{f"{self.cursor_field}__gt": stop_cursor})
+                query = query.filter(**{f"{self.cursor_column}__gt": stop_cursor})
             else:
-                query = query.filter(**{f"{self.cursor_field}__lt": stop_cursor})
+                query = query.filter(**{f"{self.cursor_column}__lt": stop_cursor})
         async for page in self.paginate_queryset(
             query,
             is_first=bool(start_cursor is None and not prefill_container),

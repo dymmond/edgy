@@ -25,6 +25,14 @@ class IntCounter2(edgy.Model):
         registry = models
 
 
+class CounterTricky(edgy.Model):
+    cursor: float = edgy.FloatField(unique=True)
+    non_cursor: float = edgy.FloatField(unique=True, null=True)
+
+
+    class Meta:
+        registry = models
+
 class FloatCounter(edgy.Model):
     id: float = edgy.FloatField(primary_key=True, autoincrement=False)
 
@@ -61,6 +69,24 @@ async def test_reverse():
     assert (await IntCounter.query.reverse().last()).id == 0
     assert (await IntCounter.query.reverse().all().last()).id == 0
     assert (await IntCounter.query.reverse())[0].id == 99
+
+
+async def test_pagination_tricky():
+    await CounterTricky.query.bulk_create([{"cursor": i/1.1, "non_cursor": i} for i in range(100)])
+    paginator = Paginator(
+        CounterTricky.query.order_by("non_cursor"), page_size=30, next_item_attr="next", previous_item_attr="prev"
+    )
+    assert (await paginator.get_page()).content[0].non_cursor == 0.0
+
+    with pytest.raises(ValueError):
+        CursorPaginator(
+            CounterTricky.query.order_by("non_exist"), page_size=30, next_item_attr="next", previous_item_attr="prev"
+        )
+
+    with pytest.raises(ValueError):
+        CursorPaginator(
+            CounterTricky.query.order_by("non_cursor"), page_size=30, next_item_attr="next", previous_item_attr="prev"
+        )
 
 
 async def test_pagination_int_count():
