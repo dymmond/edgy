@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import warnings
-from collections.abc import AsyncIterator, Awaitable, Generator, Iterable, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Generator, Iterable, Sequence
+from contextvars import ContextVar
 from functools import cached_property
 from inspect import isawaitable
 from typing import (
@@ -49,6 +50,10 @@ if TYPE_CHECKING:  # pragma: no cover
 
 
 _empty_set = cast(Sequence[Any], frozenset())
+# get current row during iteration. Used for prefetching.
+_current_row_holder: ContextVar[Optional[list[Optional[sqlalchemy.Row]]]] = ContextVar(
+    "_current_row_holder", default=None
+)
 
 
 def get_table_key_or_name(table: Union[sqlalchemy.Table, sqlalchemy.Alias]) -> str:
@@ -240,9 +245,6 @@ class BaseQuerySet(
         self._cache_last: Optional[tuple[BaseModelType, BaseModelType]] = None
         # fetch all is in cache
         self._cache_fetch_all: bool = False
-        # get current row during iteration. Used for prefetching.
-        # Bad style but no other way currently possible
-        self._cache_current_row: Optional[sqlalchemy.Row] = None
 
     def _build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
         """Builds the order by expression"""
@@ -809,6 +811,14 @@ class BaseQuerySet(
             ),
         )
 
+    @property
+    def _current_row(self) -> Optional[sqlalchemy.Row]:
+        """Get async safe the current row when in _execute_iterate"""
+        row_holder = _current_row_holder.get()
+        if not row_holder:
+            return None
+        return row_holder[0]
+
     async def _execute_iterate(
         self, fetch_all_at_once: bool = False
     ) -> AsyncIterator[BaseModelType]:
@@ -845,38 +855,42 @@ class BaseQuerySet(
         counter = 0
         last_element: Optional[tuple[BaseModelType, BaseModelType]] = None
         check_db_connection(queryset.database, stacklevel=4)
-        if fetch_all_at_once:
-            async with queryset.database as database:
-                batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
-            for row_num, result in enumerate(
-                await self._handle_batch(batch, tables_and_models, queryset)
-            ):
-                if counter == 0:
-                    self._cache_first = result
-                last_element = result
-                counter += 1
-                self._cache_current_row = batch[row_num]
-                yield result[1]
-            self._cache_current_row = None
-            self._cache_fetch_all = True
-        else:
-            async with queryset.database as database:
-                async for batch in database.batched_iterate(
-                    expression, batch_size=self._batch_size
+        current_row: list[Optional[sqlalchemy.Row]] = [None]
+        token = _current_row_holder.set(current_row)
+        try:
+            if fetch_all_at_once:
+                async with queryset.database as database:
+                    batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
+                for row_num, result in enumerate(
+                    await self._handle_batch(batch, tables_and_models, queryset)
                 ):
-                    # clear only result cache
-                    self._cache.clear()
-                    self._cache_fetch_all = False
-                    for row_num, result in enumerate(
-                        await self._handle_batch(batch, tables_and_models, queryset)
+                    if counter == 0:
+                        self._cache_first = result
+                    last_element = result
+                    counter += 1
+                    current_row[0] = batch[row_num]
+                    yield result[1]
+                self._cache_fetch_all = True
+            else:
+                async with queryset.database as database:
+                    async for batch in cast(
+                        AsyncGenerator[Sequence[sqlalchemy.Row], None],
+                        database.batched_iterate(expression, batch_size=self._batch_size),
                     ):
-                        if counter == 0:
-                            self._cache_first = result
-                        last_element = result
-                        counter += 1
-                        self._cache_current_row = batch[row_num]  # type: ignore
-                        yield result[1]
-                self._cache_current_row = None
+                        # clear only result cache
+                        self._cache.clear()
+                        self._cache_fetch_all = False
+                        for row_num, result in enumerate(
+                            await self._handle_batch(batch, tables_and_models, queryset)
+                        ):
+                            if counter == 0:
+                                self._cache_first = result
+                            last_element = result
+                            counter += 1
+                            current_row[0] = batch[row_num]
+                            yield result[1]
+        finally:
+            _current_row_holder.reset(token)
         # better update them once
         self._cache_count = counter
         self._cache_last = last_element
@@ -1247,10 +1261,21 @@ class QuerySet(BaseQuerySet):
         return queryset
 
     def reverse(self) -> QuerySet:
-        queryset: QuerySet = self._clone()
+        if not self._order_by:
+            queryset = self.order_by(*self.model_class.pkcolumns)
+        else:
+            queryset = self._clone()
         queryset._order_by = tuple(
             el[1:] if el.startswith("-") else f"-{el}" for el in queryset._order_by
         )
+        queryset._cache_last = self._cache_first
+        queryset._cache_first = self._cache_last
+        queryset._cache_count = self._cache_count
+        if self._cache_fetch_all:
+            queryset._cache.update(
+                list(reversed(self._cache.get_category(self.model_class).values()))
+            )
+            queryset._cache_fetch_all = True
         return queryset
 
     def limit(self, limit_count: int) -> QuerySet:

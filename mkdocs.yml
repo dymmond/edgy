@@ -97,6 +97,7 @@ nav:
   - Features:
       - Signals: "signals.md"
       - Relationships: "relationships.md"
+      - Pagination & Linked Lists: "pagination.md"
       - Reference ForeignKey: "reference-foreignkey.md"
       - Marshalls: "marshalls.md"
       - ContentTypes:
