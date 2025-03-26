@@ -45,6 +45,14 @@ async def rollback_connection():
     async with models:
         yield
 
+async def test_reverse():
+    await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
+    assert (await IntCounter.query.all())[0].id == 0
+    assert (await IntCounter.query.first()).id == 0
+    assert (await IntCounter.query.reverse().first()).id == 99
+    assert (await IntCounter.query.reverse().last()).id == 0
+    assert (await IntCounter.query.reverse().all().last()).id == 0
+    assert (await IntCounter.query.reverse())[0].id == 99
 
 async def test_pagination_int_count():
     await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
@@ -52,6 +60,9 @@ async def test_pagination_int_count():
     paginator = Paginator(
         IntCounter.query.all(), page_size=30, next_item_attr="next", previous_item_attr="prev"
     )
+    assert paginator.queryset._order_by == ("id",)
+    assert paginator.get_reverse_paginator().queryset._order_by == ("-id",)
+    assert paginator.get_reverse_paginator().page_size == 30
     arr = [item async for item in paginator.paginate()]
     assert arr[0].content[0].id == 0
     assert arr[0].content[-1].id == 29
@@ -65,6 +76,7 @@ async def test_pagination_int_count():
     assert arr[0].is_first
     assert arr[3].is_last
     assert arr[0].content[1].prev is arr[0].content[0]
+    assert (await paginator.get_reverse_paginator().get_page(-1)).content[0].id == 29
     assert (await paginator.get_page(-1)).content[-1].id == 99
 
 
@@ -108,9 +120,10 @@ async def test_pagination_int_cursor():
     assert arr[3].is_last
     assert arr[0].content[1].prev is arr[0].content[0]
 
-    page, cursor = await paginator.get_page()
-    assert cursor == 29
-    arr = [item async for item in paginator.paginate(start_cursor=cursor)]
+    page = await paginator.get_page()
+    assert page.is_first
+    assert page.next_cursor == 29
+    arr = [item async for item in paginator.paginate(start_cursor=page.next_cursor)]
     assert len(arr) == 3
     assert arr[0].content[0].id == 30
     assert arr[0].content[0].prev is not None
@@ -118,7 +131,15 @@ async def test_pagination_int_cursor():
     assert len(arr[2].content) == 10
     assert not arr[0].is_first
     assert arr[2].is_last
+    assert (await paginator.get_page()).content[-1].id == 29
+    assert (await paginator.get_page(page.next_cursor)).content[-1].id == 59
+    assert (await paginator.get_reverse_paginator().get_page()).content[0].id == 99
 
+    page_rev = await paginator.get_page(page.next_cursor+1, reverse=True)
+    assert page_rev.content[-1].id == 29
+    assert page_rev.content[0].id == 0
+    assert page_rev.is_first
+    assert page_rev.next_cursor == 0
 
 async def test_pagination_float_cursor():
     await FloatCounter.query.bulk_create([{"id": i / 1.324} for i in range(100)])
@@ -138,8 +159,8 @@ async def test_pagination_float_cursor():
     assert arr[3].is_last
     assert arr[0].content[1].prev is arr[0].content[0]
 
-    page, cursor = await paginator.get_page()
-    arr = [item async for item in paginator.paginate(start_cursor=cursor)]
+    page = await paginator.get_page()
+    arr = [item async for item in paginator.paginate(start_cursor=page.next_cursor)]
     assert len(arr) == 3
     assert arr[0].content[0].prev is not None
     assert arr[2].content[-1].next is None
@@ -166,8 +187,8 @@ async def test_pagination_str_cursor():
     assert arr[3].is_last
     assert arr[0].content[1].prev is arr[0].content[0]
 
-    page, cursor = await paginator.get_page()
-    arr = [item async for item in paginator.paginate(start_cursor=cursor)]
+    page = await paginator.get_page()
+    arr = [item async for item in paginator.paginate(start_cursor=page.next_cursor)]
     assert len(arr) == 3
     assert arr[0].content[0].prev is not None
     assert arr[2].content[-1].next is None
@@ -189,8 +210,8 @@ async def test_pagination_str_cursor_no_attrs():
     assert arr[0].is_first
     assert arr[3].is_last
 
-    page, cursor = await paginator.get_page()
-    arr = [item async for item in paginator.paginate(start_cursor=cursor)]
+    page = await paginator.get_page()
+    arr = [item async for item in paginator.paginate(start_cursor=page.next_cursor)]
     assert len(arr) == 3
     assert len(arr[2].content) == 10
     assert not arr[0].is_first

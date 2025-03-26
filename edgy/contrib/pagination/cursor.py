@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, Hashable
+from collections.abc import AsyncGenerator, Hashable, Iterable
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .base import Page, Paginator
@@ -8,8 +9,11 @@ from .base import Page, Paginator
 if TYPE_CHECKING:
     from edgy.core.db.querysets import QuerySet
 
+@dataclass
+class CursorPage(Page):
+    next_cursor: Hashable = None
 
-class CursorPaginator(Paginator):
+class CursorPaginator(Paginator[CursorPage]):
     reverse_paginator: CursorPaginator | None = None
 
     def __init__(
@@ -33,6 +37,13 @@ class CursorPaginator(Paginator):
         field = self.queryset.model_class.meta.fields[self.cursor_field]
         assert not field.null, "cursor_field cannot be nullable."
 
+    def convert_to_page(self, inp: Iterable, /, is_first: bool) -> CursorPage:
+        page_obj: Page = super().convert_to_page(inp, is_first=is_first)
+        next_cursor = (
+            getattr(page_obj.content[-1], self.cursor_field) if page_obj.content else None
+        )
+        return CursorPage(content=page_obj.content, is_first=page_obj.is_first, is_last=page_obj.is_last, next_cursor=next_cursor)
+
     async def get_extra(self, cursor: Hashable) -> list:
         query = self.get_reverse_paginator().queryset
         # inverted
@@ -43,13 +54,10 @@ class CursorPaginator(Paginator):
         query = query.limit(1)
         return await query
 
-    async def get_page_after(self, cursor: Hashable = None) -> tuple[Page, Hashable]:
+    async def get_page_after(self, cursor: Hashable = None) -> CursorPage:
         if cursor in self._page_cache:
             page_obj = self._page_cache[cursor]
-            next_cursor = (
-                getattr(page_obj.content[-1], self.cursor_field) if page_obj.content else None
-            )
-            return page_obj, next_cursor
+            return page_obj
         query = self.queryset.limit(self.page_size + 1)
         if cursor is not None:
             if self.order_by[0].startswith("-"):
@@ -68,17 +76,15 @@ class CursorPaginator(Paginator):
 
         page_obj = self.convert_to_page(resultarr, is_first=is_first)
         self._page_cache[cursor] = page_obj
-        next_cursor = (
-            getattr(page_obj.content[-1], self.cursor_field) if page_obj.content else None
-        )
-        return page_obj, next_cursor
+        return page_obj
 
-    async def get_page_before(self, cursor: Hashable = None) -> tuple[Page, Hashable]:
-        return await self.get_reverse_paginator().get_page_after(cursor)
+    async def get_page_before(self, cursor: Hashable = None) -> CursorPage:
+        reverse_page = await self.get_reverse_paginator().get_page_after(cursor)
+        return CursorPage(content=reverse_page.content[::-1], is_first=reverse_page.is_last, is_last=reverse_page.is_first, next_cursor=reverse_page.next_cursor)
 
     async def get_page(
         self, cursor: Hashable = None, reverse: bool = False
-    ) -> tuple[Page, Hashable]:
+    ) -> CursorPage:
         if reverse:
             return await self.get_page_before(cursor)
         else:
@@ -86,7 +92,7 @@ class CursorPaginator(Paginator):
 
     async def paginate(
         self, start_cursor: Hashable = None, stop_cursor: Hashable = None
-    ) -> AsyncGenerator[Page, None]:
+    ) -> AsyncGenerator[CursorPage, None]:
         query = self.queryset
         prefill_container = []
         if start_cursor is not None:
@@ -110,7 +116,7 @@ class CursorPaginator(Paginator):
 
     def get_reverse_paginator(self) -> CursorPaginator:
         if self.reverse_paginator is None:
-            self.reverse_paginator = type(self)(
+            self.reverse_paginator = reverse_paginator = type(self)(
                 self.queryset,
                 page_size=self.page_size,
                 cursor_def=self.cursor_field
@@ -119,4 +125,5 @@ class CursorPaginator(Paginator):
                 next_item_attr=self.next_item_attr,
                 previous_item_attr=self.previous_item_attr,
             )
+            reverse_paginator.reverse_paginator = self
         return self.reverse_paginator

@@ -8,9 +8,18 @@ hide:
 
 ## 0.29.1
 
+### Added
+
+- Pagination.
+
+### Changed
+
+- Internal cleanup how the current row is passed in QuerySet.
+
 ### Fixed
 
 - FieldFile did use potential heavily blocking sync API in async code paths.
+- `reverse` when no order_by was set.
 
 ## 0.29.0
 

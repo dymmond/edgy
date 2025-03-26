@@ -36,7 +36,7 @@ class Prefetch:
         async for result in self.queryset._execute_iterate(True):
             # a bit hacky but we need the current row
             model_key = model_class.create_model_key_from_sqla_row(
-                self.queryset._cache_current_row, row_prefix=self._bake_prefix
+                self.queryset._current_row, row_prefix=self._bake_prefix
             )
             self._baked_results[model_key].append(result)
 
