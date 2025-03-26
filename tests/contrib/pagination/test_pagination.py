@@ -56,10 +56,10 @@ async def test_reverse():
 
 async def test_pagination_int_count():
     await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
-    assert await IntCounter.query.count() == 100
     paginator = Paginator(
         IntCounter.query.all(), page_size=30, next_item_attr="next", previous_item_attr="prev"
     )
+    assert await paginator.get_total() == 100
     assert paginator.queryset._order_by == ("id",)
     assert paginator.get_reverse_paginator().queryset._order_by == ("-id",)
     assert paginator.get_reverse_paginator().page_size == 30
@@ -79,6 +79,48 @@ async def test_pagination_int_count():
     assert (await paginator.get_reverse_paginator().get_page(-1)).content[0].id == 29
     assert (await paginator.get_page(-1)).content[-1].id == 99
 
+
+async def test_pagination_int_single_page():
+    await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
+    paginator = Paginator(
+        IntCounter.query.all(), page_size=0, next_item_attr="next", previous_item_attr="prev"
+    )
+    assert await paginator.get_total() == 100
+    assert paginator.queryset._order_by == ("id",)
+    assert paginator.get_reverse_paginator().queryset._order_by == ("-id",)
+    assert paginator.get_reverse_paginator().page_size == 0
+    arr = [item async for item in paginator.paginate()]
+    assert arr[0].content[0].id == 0
+    assert arr[0].content[-1].id == 99
+    assert arr[0].is_first
+    assert arr[0].is_last
+    assert arr[0].content[1].prev is arr[0].content[0]
+    last_page = await paginator.get_page(-1)
+    rev_last_page = await paginator.get_reverse_paginator().get_page(-1)
+    assert last_page.content[-1].id == 99
+    assert (await paginator.get_reverse_paginator().get_page(1)).content[0].id == 99
+    assert (await paginator.get_reverse_paginator().get_page(2)).content[0].id == 99
+    assert rev_last_page.content[0].id == 99
+
+
+async def test_pagination_int_single_counter_page():
+    await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
+    paginator = CursorPaginator(
+        IntCounter.query.all(), page_size=0, next_item_attr="next", previous_item_attr="prev", cursor_def="id"
+    )
+    assert paginator.queryset._order_by == ("id",)
+    assert paginator.get_reverse_paginator().queryset._order_by == ("-id",)
+    assert paginator.get_reverse_paginator().page_size == 0
+    arr = [item async for item in paginator.paginate()]
+    assert arr[0].content[0].id == 0
+    assert arr[0].content[-1].id == 99
+    assert arr[0].is_first
+    assert arr[0].is_last
+    assert arr[0].content[1].prev is arr[0].content[0]
+    # cursor is 1
+    pseudo_page = await paginator.get_page(1)
+    assert pseudo_page.content[0].id == 2
+    assert pseudo_page.content[-1].id == 99
 
 async def test_pagination_int_count_no_attrs():
     await IntCounter.query.bulk_create([{"id": i} for i in range(100)])

@@ -15,6 +15,7 @@ hide:
 ### Changed
 
 - Internal cleanup how the current row is passed in QuerySet.
+- Optimize `reverse` method of QuerySet. Now it reuses a potential available cache.
 
 ### Fixed
 

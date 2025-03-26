@@ -31,11 +31,16 @@ class CursorPaginator(Paginator[CursorPage]):
             next_item_attr=next_item_attr,
             previous_item_attr=previous_item_attr,
         )
+        self._reverse_page_cache: dict[Hashable, CursorPage] = {}
         self.cursor_field = self.order_by[0]
         if self.cursor_field.startswith("-"):
             self.cursor_field = self.cursor_field[1:]
         field = self.queryset.model_class.meta.fields[self.cursor_field]
         assert not field.null, "cursor_field cannot be nullable."
+
+    def clear_caches(self) -> None:
+        super().clear_caches()
+        self._reverse_page_cache.clear()
 
     def convert_to_page(self, inp: Iterable, /, is_first: bool) -> CursorPage:
         page_obj: Page = super().convert_to_page(inp, is_first=is_first)
@@ -58,7 +63,7 @@ class CursorPaginator(Paginator[CursorPage]):
         if cursor in self._page_cache:
             page_obj = self._page_cache[cursor]
             return page_obj
-        query = self.queryset.limit(self.page_size + 1)
+        query = self.queryset.limit(self.page_size + 1) if self.page_size else self.queryset
         if cursor is not None:
             if self.order_by[0].startswith("-"):
                 query = query.filter(**{f"{self.cursor_field}__lt": cursor})
@@ -79,8 +84,13 @@ class CursorPaginator(Paginator[CursorPage]):
         return page_obj
 
     async def get_page_before(self, cursor: Hashable = None) -> CursorPage:
+        if cursor in self._reverse_page_cache:
+            page_obj = self._reverse_page_cache[cursor]
+            return page_obj
         reverse_page = await self.get_reverse_paginator().get_page_after(cursor)
-        return CursorPage(content=reverse_page.content[::-1], is_first=reverse_page.is_last, is_last=reverse_page.is_first, next_cursor=reverse_page.next_cursor)
+        page_obj = CursorPage(content=reverse_page.content[::-1], is_first=reverse_page.is_last, is_last=reverse_page.is_first, next_cursor=reverse_page.next_cursor)
+        self._reverse_page_cache[cursor] = page_obj
+        return page_obj
 
     async def get_page(
         self, cursor: Hashable = None, reverse: bool = False
