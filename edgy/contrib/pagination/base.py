@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import sys
 from collections.abc import AsyncGenerator, Hashable, Iterable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
 
 if TYPE_CHECKING:
     from edgy.core.db.querysets import QuerySet
+
+if sys.version_info >= (3, 11):  # pragma: no cover
+    from typing import Self
+else:  # pragma: no cover
+    from typing_extensions import Self
 
 
 @dataclass
@@ -19,38 +25,32 @@ PageType = TypeVar("PageType", bound=Page)
 
 
 class Paginator(Generic[PageType]):
-    reverse_paginator: Paginator | None = None
     order_by: tuple[str, ...]
 
     def __init__(
         self,
         queryset: QuerySet,
         page_size: int,
-        order_by: tuple[str, ...] | None = None,
         next_item_attr: str = "",
         previous_item_attr: str = "",
     ) -> None:
+        self._reverse_paginator: Self | None = None
         self.page_size = int(page_size)
         if page_size < 0:
             raise ValueError("page_size must be at least 0")
+        if len(queryset._order_by) == 0:
+            raise ValueError("You must pass a QuerySet with .order_by(*criteria)")
         self.next_item_attr = next_item_attr
         self.previous_item_attr = previous_item_attr
-        if order_by:
-            self.queryset = queryset.order_by(*order_by)
-            self.order_by = order_by
-        elif not queryset._order_by:
-            self.order_by = queryset.model_class.pknames
-            self.queryset = queryset.order_by(*self.order_by)
-        else:
-            self.queryset = queryset
-            self.order_by = queryset._order_by
+        self.queryset = queryset
+        self.order_by = queryset._order_by
         self._page_cache: dict[Hashable, PageType] = {}
 
     def clear_caches(self) -> None:
         self._page_cache.clear()
         self.queryset.all(clear_cache=True)
-        if self.reverse_paginator:
-            self.reverse_paginator.clear_caches()
+        if self._reverse_paginator:
+            self._reverse_paginator = None
 
     async def get_amount_pages(self) -> int:
         if not self.page_size:
@@ -168,13 +168,13 @@ class Paginator(Generic[PageType]):
         async for page in self.paginate_queryset(query, is_first=start_page == 1):
             yield page
 
-    def get_reverse_paginator(self) -> Paginator[PageType]:
-        if self.reverse_paginator is None:
-            self.reverse_paginator = reverse_paginator = type(self)(
+    def get_reverse_paginator(self) -> Self:
+        if self._reverse_paginator is None:
+            self._reverse_paginator = type(self)(
                 self.queryset.reverse(),
                 page_size=self.page_size,
                 next_item_attr=self.next_item_attr,
                 previous_item_attr=self.previous_item_attr,
             )
-            reverse_paginator.reverse_paginator = self
-        return self.reverse_paginator
+            self._reverse_paginator._reverse_paginator = self
+        return self._reverse_paginator

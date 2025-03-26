@@ -16,20 +16,19 @@ class CursorPage(Page):
 
 
 class CursorPaginator(Paginator[CursorPage]):
-    reverse_paginator: CursorPaginator | None = None
 
     def __init__(
         self,
         queryset: QuerySet,
         page_size: int,
-        cursor_def: str,
         next_item_attr: str = "",
         previous_item_attr: str = "",
     ) -> None:
+        if len(queryset._order_by) != 1:
+            raise ValueError("You must pass a QuerySet with .order_by(cursor_field)")
         super().__init__(
             queryset=queryset,
             page_size=page_size,
-            order_by=(cursor_def,),
             next_item_attr=next_item_attr,
             previous_item_attr=previous_item_attr,
         )
@@ -133,17 +132,3 @@ class CursorPaginator(Paginator[CursorPage]):
             prefill=prefill_container,
         ):
             yield page
-
-    def get_reverse_paginator(self) -> CursorPaginator:
-        if self.reverse_paginator is None:
-            self.reverse_paginator = reverse_paginator = type(self)(
-                self.queryset,
-                page_size=self.page_size,
-                cursor_def=self.cursor_field
-                if self.order_by[0].startswith("-")
-                else f"-{self.cursor_field}",
-                next_item_attr=self.next_item_attr,
-                previous_item_attr=self.previous_item_attr,
-            )
-            reverse_paginator.reverse_paginator = self
-        return self.reverse_paginator
