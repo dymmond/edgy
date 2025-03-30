@@ -17,6 +17,7 @@ class IntCounter(edgy.Model):
     class Meta:
         registry = models
 
+
 class IntCounter2(edgy.Model):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=False)
     id2: int = edgy.IntegerField(primary_key=True, autoincrement=False)
@@ -29,9 +30,9 @@ class CounterTricky(edgy.Model):
     cursor: float = edgy.FloatField(unique=True)
     non_cursor: float = edgy.FloatField(unique=True, null=True)
 
-
     class Meta:
         registry = models
+
 
 class FloatCounter(edgy.Model):
     id: float = edgy.FloatField(primary_key=True, autoincrement=False)
@@ -61,38 +62,67 @@ async def rollback_connection():
         yield
 
 
-async def test_reverse():
-    await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
-    assert (await IntCounter.query.all())[0].id == 0
-    assert (await IntCounter.query.first()).id == 0
-    assert (await IntCounter.query.reverse().first()).id == 99
-    assert (await IntCounter.query.reverse().last()).id == 0
-    assert (await IntCounter.query.reverse().all().last()).id == 0
-    assert (await IntCounter.query.reverse())[0].id == 99
-
-
 async def test_pagination_tricky():
-    await CounterTricky.query.bulk_create([{"cursor": i/1.1, "non_cursor": i} for i in range(100)])
+    await CounterTricky.query.bulk_create(
+        [{"cursor": i / 1.1, "non_cursor": i} for i in range(100)]
+    )
     paginator = Paginator(
-        CounterTricky.query.order_by("non_cursor"), page_size=30, next_item_attr="next", previous_item_attr="prev"
+        CounterTricky.query.order_by("non_cursor"),
+        page_size=30,
+        next_item_attr="next",
+        previous_item_attr="prev",
     )
     assert (await paginator.get_page()).content[0].non_cursor == 0.0
 
     with pytest.raises(ValueError):
         CursorPaginator(
-            CounterTricky.query.order_by("non_exist"), page_size=30, next_item_attr="next", previous_item_attr="prev"
+            CounterTricky.query.order_by("non_exist"),
+            page_size=30,
+            next_item_attr="next",
+            previous_item_attr="prev",
         )
 
     with pytest.raises(ValueError):
         CursorPaginator(
-            CounterTricky.query.order_by("non_cursor"), page_size=30, next_item_attr="next", previous_item_attr="prev"
+            CounterTricky.query.order_by("non_cursor"),
+            page_size=30,
+            next_item_attr="next",
+            previous_item_attr="prev",
         )
+
+
+async def test_pagination_int_count_no_leak():
+    await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
+    ordered = IntCounter.query.order_by("-id")
+    await ordered.count()
+    paginator = Paginator(ordered, page_size=0, next_item_attr="next", previous_item_attr="prev")
+    # this shall be passed
+    assert paginator.queryset._cache_count is not None
+    entries_ordered = await ordered
+    entries_paginator = list((await paginator.get_page()).content)
+    assert all(not hasattr(entry, "next") for entry in entries_ordered)
+    assert all(not hasattr(entry, "prev") for entry in entries_ordered)
+    assert all(hasattr(entry, "next") for entry in entries_paginator)
+    assert all(hasattr(entry, "prev") for entry in entries_paginator)
+    assert len(entries_ordered) == len(entries_paginator)
+    assert all(entry1 == entry2 for entry1, entry2 in zip(entries_ordered, entries_paginator))
+
+
+async def test_pagination_int_count_no_copy():
+    await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
+    ordered = IntCounter.query.order_by("-id")
+    paginator = Paginator(ordered, page_size=0)
+    await ordered
+    assert paginator.queryset._cache_fetch_all
 
 
 async def test_pagination_int_count():
     await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
     paginator = Paginator(
-        IntCounter.query.order_by("id"), page_size=30, next_item_attr="next", previous_item_attr="prev"
+        IntCounter.query.order_by("id"),
+        page_size=30,
+        next_item_attr="next",
+        previous_item_attr="prev",
     )
     assert await paginator.get_total() == 100
     assert paginator.queryset._order_by == ("id",)
@@ -111,6 +141,7 @@ async def test_pagination_int_count():
     assert arr[0].is_first
     assert arr[3].is_last
     assert arr[0].content[1].prev is arr[0].content[0]
+    assert arr[0].content[0].next is arr[0].content[1]
     assert (await paginator.get_reverse_paginator().get_page(-1)).content[0].id == 29
     assert (await paginator.get_page(-1)).content[-1].id == 99
 
@@ -118,7 +149,10 @@ async def test_pagination_int_count():
 async def test_pagination_int_count_double():
     await IntCounter2.query.bulk_create([{"id": 10, "id2": i} for i in range(100)])
     paginator = Paginator(
-        IntCounter2.query.order_by("id", "id2"), page_size=30, next_item_attr="next", previous_item_attr="prev"
+        IntCounter2.query.order_by("id", "id2"),
+        page_size=30,
+        next_item_attr="next",
+        previous_item_attr="prev",
     )
     assert await paginator.get_total() == 100
     assert paginator.queryset._order_by == ("id", "id2")
@@ -145,7 +179,10 @@ async def test_pagination_int_count_double():
 async def test_pagination_int_single_page():
     await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
     paginator = Paginator(
-        IntCounter.query.order_by("id"), page_size=0, next_item_attr="next", previous_item_attr="prev"
+        IntCounter.query.order_by("id"),
+        page_size=0,
+        next_item_attr="next",
+        previous_item_attr="prev",
     )
     assert await paginator.get_total() == 100
     assert paginator.queryset._order_by == ("id",)

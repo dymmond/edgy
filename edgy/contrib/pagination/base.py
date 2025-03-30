@@ -43,6 +43,16 @@ class Paginator(Generic[PageType]):
         self.next_item_attr = next_item_attr
         self.previous_item_attr = previous_item_attr
         self.queryset = queryset
+        if self.previous_item_attr or self.next_item_attr:
+            # copy for not leaking attributes in the cache
+            old_queryset = self.queryset
+            self.queryset = self.queryset.all()
+            # but keep some caches
+            self.queryset._cache_count = old_queryset._cache_count
+            self.queryset._cached_select_related_expression = (
+                old_queryset._cached_select_related_expression
+            )
+            self.queryset._cached_select_with_tables = old_queryset._cached_select_with_tables
         self.order_by = queryset._order_by
         self._page_cache: dict[Hashable, PageType] = {}
 

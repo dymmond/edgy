@@ -16,7 +16,6 @@ class CursorPage(Page):
 
 
 class CursorPaginator(Paginator[CursorPage]):
-
     def __init__(
         self,
         queryset: QuerySet,
