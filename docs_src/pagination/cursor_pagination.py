@@ -26,10 +26,6 @@ async def get_blogpost(cursor: datetime.datetime) -> BlogEntry | None:
     page = await paginator.get_page(cursor)
     if page.content:
         return page.content[0]
-    # get first page
-    fallback_page = await paginator.get_page()
-    if fallback_page.content:
-        return fallback_page.content[0]
     return None
 
 

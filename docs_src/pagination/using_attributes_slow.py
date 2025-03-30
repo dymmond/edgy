@@ -17,7 +17,6 @@ class BlogEntry(edgy.Model):
 
 async def get_blogpost(id: int) -> BlogEntry | None:
     query = BlogEntry.query.order_by("-created", "-id")
-    created = (await query.get(id=id)).created
     # order by is required for paginators
     paginator = Paginator(
         query,
@@ -30,7 +29,7 @@ async def get_blogpost(id: int) -> BlogEntry | None:
         for blogpost in page:
             if blogpost.id == id:
                 return blogpost
-    # get first page
+    # get first blogpost as fallback
     fallback_page = await paginator.get_page()
     if fallback_page.content:
         return fallback_page.content[0]

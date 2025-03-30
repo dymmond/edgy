@@ -17,7 +17,6 @@ class BlogEntry(edgy.Model):
 
 async def get_blogpost(id: int) -> BlogEntry | None:
     query = BlogEntry.query.order_by("-created", "-id")
-    created = (await query.get(id=id)).created
     # order by is required for paginators
     paginator = CursorPaginator(
         query,
@@ -25,11 +24,15 @@ async def get_blogpost(id: int) -> BlogEntry | None:
         next_item_attr="next_blogpost",
         previous_item_attr="last_blogpost",
     )
-    # cursor must match order_by
-    page = await paginator.get_page(cursor=(created, id))
-    if page.content:
-        return page.content[0]
-    # get first page
+    try:
+        created = (await query.get(id=id)).created
+        # cursor must match order_by order
+        page = await paginator.get_page(cursor=(created, id))
+        if page.content:
+            return page.content[0]
+    except edgy.ObjectNotFound:
+        ...
+    # get first blogpost as fallback
     fallback_page = await paginator.get_page()
     if fallback_page.content:
         return fallback_page.content[0]
