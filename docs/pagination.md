@@ -17,10 +17,15 @@ This is the classic way of pagination. You pass a number and get a page basing o
 {!> ../docs_src/pagination/simple_pagination.py !}
 ```
 
-You may also can use attributes to get the partner before/after.
+You may also can use attributes to get the partner before/after. We use the CursorPaginator for more performance.
 
 ```python
 {!> ../docs_src/pagination/using_attributes.py !}
+```
+This example would be in the slow variant
+
+```python
+{!> ../docs_src/pagination/using_attributes_slow.py !}
 ```
 
 !!! Note

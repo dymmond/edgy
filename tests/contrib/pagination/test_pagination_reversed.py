@@ -28,7 +28,7 @@ class IntCounter2(edgy.Model):
 
 class CounterTricky(edgy.Model):
     cursor: float = edgy.FloatField(unique=True)
-    non_cursor: float = edgy.FloatField(unique=True, null=True)
+    cursor2: float = edgy.FloatField(unique=True, null=True)
 
     class Meta:
         registry = models
@@ -63,16 +63,14 @@ async def rollback_connection():
 
 
 async def test_pagination_tricky():
-    await CounterTricky.query.bulk_create(
-        [{"cursor": i / 1.1, "non_cursor": i} for i in range(100)]
-    )
+    await CounterTricky.query.bulk_create([{"cursor": i / 1.1, "cursor2": i} for i in range(100)])
     paginator = Paginator(
-        CounterTricky.query.order_by("-non_cursor"),
+        CounterTricky.query.order_by("-cursor2"),
         page_size=30,
         next_item_attr="next",
         previous_item_attr="prev",
     )
-    assert (await paginator.get_page()).content[0].non_cursor == 99.0
+    assert (await paginator.get_page()).content[0].cursor2 == 99.0
 
 
 async def test_pagination_int_count():

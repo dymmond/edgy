@@ -19,7 +19,7 @@ class BlogEntry(edgy.Model):
 async def get_blogposts_with_partners() -> list[BlogEntry]:
     # order by is required for paginators
     paginator = Paginator(
-        User.query.order_by("-created", "-id"),
+        BlogEntry.query.order_by("-created", "-id"),
         page_size=0,
         next_item_attr="next_blogpost",
         previous_item_attr="last_blogpost",
@@ -30,7 +30,7 @@ async def get_blogposts_with_partners() -> list[BlogEntry]:
 async def get_blogposts_with_partners_after(after: datetime.datetime) -> list[BlogEntry]:
     # order by is required for paginators
     paginator = CursorPaginator(
-        User.query.order_by("-created"),
+        BlogEntry.query.order_by("-created"),
         page_size=0,
         next_item_attr="next_blogpost",
         previous_item_attr="last_blogpost",

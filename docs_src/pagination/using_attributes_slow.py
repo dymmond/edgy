@@ -1,6 +1,6 @@
 from __future__ import annotations
 import edgy
-from edgy.contrib.pagination import CursorPaginator
+from edgy.contrib.pagination import Paginator, CursorPaginator
 from edgy import Registry
 
 models = Registry(database="sqlite:///db.sqlite")
@@ -19,16 +19,17 @@ async def get_blogpost(id: int) -> BlogEntry | None:
     query = BlogEntry.query.order_by("-created", "-id")
     created = (await query.get(id=id)).created
     # order by is required for paginators
-    paginator = CursorPaginator(
+    paginator = Paginator(
         query,
-        page_size=1,
+        page_size=30,
         next_item_attr="next_blogpost",
         previous_item_attr="last_blogpost",
     )
-    # cursor must match order_by
-    page = await paginator.get_page(cursor=(created, id))
-    if page.content:
-        return page.content[0]
+    # this is less performant than the cursor variant
+    async for page in paginator.paginate():
+        for blogpost in page:
+            if blogpost.id == id:
+                return blogpost
     # get first page
     fallback_page = await paginator.get_page()
     if fallback_page.content:

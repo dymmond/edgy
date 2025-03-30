@@ -15,33 +15,51 @@ class BlogEntry(edgy.Model):
         registry = models
 
 
+async def get_blogpost(cursor: datetime.datetime) -> BlogEntry | None:
+    # order by is required for paginators
+    paginator = CursorPaginator(
+        BlogEntry.query.order_by("-created"),
+        page_size=1,
+        next_item_attr="next_blogpost",
+        previous_item_attr="last_blogpost",
+    )
+    page = await paginator.get_page(cursor)
+    if page.content:
+        return page.content[0]
+    # get first page
+    fallback_page = await paginator.get_page()
+    if fallback_page.content:
+        return fallback_page.content[0]
+    return None
+
+
 async def get_last_blogpost_page():
     # order by is required for paginators
-    paginator = CursorPaginator(User.query.order_by("-created"), page_size=30)
+    paginator = CursorPaginator(BlogEntry.query.order_by("-created"), page_size=30)
     return await paginator.get_page(reverse=True), await paginator.get_amount_pages()
 
 
 async def get_next_blogpost_page(cursor: datetime.datetime):
     # order by is required for paginators
-    paginator = CursorPaginator(User.query.order_by("-created"), page_size=30)
+    paginator = CursorPaginator(BlogEntry.query.order_by("-created"), page_size=30)
     return await paginator.get_page(cursor), await paginator.get_amount_pages()
 
 
 async def get_last_blogpost_page(cursor: datetime.datetime):
     # order by is required for paginators
-    paginator = CursorPaginator(User.query.order_by("-created"), page_size=30)
+    paginator = CursorPaginator(BlogEntry.query.order_by("-created"), page_size=30)
     return await paginator.get_page(cursor, reverse=True), await paginator.get_amount_pages()
 
 
 async def get_blogpost_pages(after: datetime.datetime):
-    # order by is required for paginators, CursorPaginator supports only one criteria
-    paginator = CursorPaginator(User.query.order_by("-created"), page_size=30)
+    # order by is required for paginators
+    paginator = CursorPaginator(BlogEntry.query.order_by("-created"), page_size=30)
     return [page async for page in paginator.paginate(start_cursor=after)]
 
 
 async def search_blogpost(title: str, cursor: datetime.datetime):
-    # order by is required for paginators, CursorPaginator supports only one criteria
+    # order by is required for paginators
     paginator = CursorPaginator(
-        User.query.filter(title__icontains=title).order_by("created", "id"), page_size=30
+        BlogEntry.query.filter(title__icontains=title).order_by("-created"), page_size=30
     )
     return await paginator.get_page(page), await paginator.get_amount_pages()

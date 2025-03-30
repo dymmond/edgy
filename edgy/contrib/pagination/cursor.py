@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Hashable, Iterable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .base import Page, Paginator
 
@@ -23,8 +23,6 @@ class CursorPaginator(Paginator[CursorPage]):
         next_item_attr: str = "",
         previous_item_attr: str = "",
     ) -> None:
-        if len(queryset._order_by) != 1:
-            raise ValueError("You must pass a QuerySet with .order_by(cursor_column)")
         super().__init__(
             queryset=queryset,
             page_size=page_size,
@@ -32,14 +30,33 @@ class CursorPaginator(Paginator[CursorPage]):
             previous_item_attr=previous_item_attr,
         )
         self._reverse_page_cache: dict[Hashable, CursorPage] = {}
-        self.cursor_column = self.order_by[0]
-        if self.cursor_column.startswith("-"):
-            self.cursor_column = self.cursor_column[1:]
-        column = self.queryset.model_class.table.columns.get(self.cursor_column)
-        if column is None:
-            raise ValueError("cursor_column does not exist.")
-        if column.nullable:
-            raise ValueError("cursor_column cannot be nullable.")
+        self.search_vector = self.calculate_search_vector()
+
+    def calculate_search_vector(self) -> tuple[str, ...]:
+        vector = [
+            f"{criteria[1:]}__lte" if criteria.startswith("-") else f"{criteria}__gte"
+            for criteria in self.order_by[:-1]
+        ]
+        criteria = self.order_by[-1]
+        vector.append(f"{criteria[1:]}__lt" if criteria.startswith("-") else f"{criteria}__gt")
+
+        return tuple(vector)
+
+    def cursor_to_vector(self, cursor: Hashable) -> tuple[Hashable, ...]:
+        if isinstance(cursor, tuple):
+            return cursor
+        assert len(self.order_by) == 1
+        return (cursor,)
+
+    def vector_to_cursor(self, vector: tuple[Hashable, ...]) -> Hashable:
+        if len(self.order_by) > 1:
+            return vector
+        return vector[0]
+
+    def obj_to_cursor(self, obj: Any) -> Hashable:
+        return self.vector_to_cursor(
+            tuple(getattr(obj, attr.lstrip("-")) for attr in self.order_by)
+        )
 
     def clear_caches(self) -> None:
         super().clear_caches()
@@ -47,9 +64,7 @@ class CursorPaginator(Paginator[CursorPage]):
 
     def convert_to_page(self, inp: Iterable, /, is_first: bool) -> CursorPage:
         page_obj: Page = super().convert_to_page(inp, is_first=is_first)
-        next_cursor = (
-            getattr(page_obj.content[-1], self.cursor_column) if page_obj.content else None
-        )
+        next_cursor = self.obj_to_cursor(page_obj.content[-1]) if page_obj.content else None
         return CursorPage(
             content=page_obj.content,
             is_first=page_obj.is_first,
@@ -57,33 +72,38 @@ class CursorPaginator(Paginator[CursorPage]):
             next_cursor=next_cursor,
         )
 
-    async def get_extra(self, cursor: Hashable) -> list:
-        query = self.get_reverse_paginator().queryset
-        # inverted
-        if self.order_by[0].startswith("-"):
-            query = query.filter(**{f"{self.cursor_column}__gt": cursor})
-        else:
-            query = query.filter(**{f"{self.cursor_column}__lt": cursor})
-        query = query.limit(1)
-        return await query
+    async def get_extra_before(self, cursor: Hashable) -> list:
+        vector = self.cursor_to_vector(cursor)
+        rpaginator = self.get_reverse_paginator()
+        return await rpaginator.queryset.filter(
+            **dict(zip(rpaginator.search_vector, vector))
+        ).limit(1)
+
+    async def exists_extra_before(self, cursor: Hashable) -> bool:
+        vector = self.cursor_to_vector(cursor)
+        rpaginator = self.get_reverse_paginator()
+        return await rpaginator.queryset.filter(
+            **dict(zip(rpaginator.search_vector, vector))
+        ).exists()
 
     async def get_page_after(self, cursor: Hashable = None) -> CursorPage:
+        if cursor is not None:
+            cursor = self.cursor_to_vector(cursor)
         if cursor in self._page_cache:
             page_obj = self._page_cache[cursor]
             return page_obj
         query = self.queryset.limit(self.page_size + 1) if self.page_size else self.queryset
         if cursor is not None:
-            if self.order_by[0].startswith("-"):
-                query = query.filter(**{f"{self.cursor_column}__lt": cursor})
-            else:
-                query = query.filter(**{f"{self.cursor_column}__gt": cursor})
+            query = query.filter(**dict(zip(self.search_vector, cursor)))
         is_first = cursor is None
-        if cursor is not None and self.previous_item_attr:
-            resultarr = await self.get_extra(cursor)
+        if not is_first and self.previous_item_attr:
+            resultarr = await self.get_extra_before(cursor)
             # if on first position
             if not resultarr:
                 is_first = True
             resultarr.extend(await query)
+        elif not is_first and not await self.exists_extra_before(cursor):
+            is_first = True
         else:
             resultarr = await query
 
@@ -92,6 +112,8 @@ class CursorPaginator(Paginator[CursorPage]):
         return page_obj
 
     async def get_page_before(self, cursor: Hashable = None) -> CursorPage:
+        if cursor is not None:
+            cursor = self.cursor_to_vector(cursor)
         if cursor in self._reverse_page_cache:
             page_obj = self._reverse_page_cache[cursor]
             return page_obj
@@ -117,17 +139,15 @@ class CursorPaginator(Paginator[CursorPage]):
         query = self.queryset
         prefill_container = []
         if start_cursor is not None:
-            if self.order_by[0].startswith("-"):
-                query = query.filter(**{f"{self.cursor_column}__lt": start_cursor})
-            else:
-                query = query.filter(**{f"{self.cursor_column}__gt": start_cursor})
+            start_vector = self.cursor_to_vector(start_cursor)
+            query = query.filter(**dict(zip(self.search_vector, start_vector)))
             if self.previous_item_attr:
-                prefill_container = await self.get_extra(start_cursor)
+                prefill_container = await self.get_extra_before(start_vector)
         if stop_cursor is not None:
-            if self.order_by[0].startswith("-"):
-                query = query.filter(**{f"{self.cursor_column}__gt": stop_cursor})
-            else:
-                query = query.filter(**{f"{self.cursor_column}__lt": stop_cursor})
+            stop_vector = self.cursor_to_vector(stop_cursor)
+            query = query.filter(
+                **dict(zip(self.get_reverse_paginator().search_vector, stop_vector))
+            )
         async for page in self.paginate_queryset(
             query,
             is_first=bool(start_cursor is None and not prefill_container),

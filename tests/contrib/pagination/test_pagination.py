@@ -28,7 +28,7 @@ class IntCounter2(edgy.Model):
 
 class CounterTricky(edgy.Model):
     cursor: float = edgy.FloatField(unique=True)
-    non_cursor: float = edgy.FloatField(unique=True, null=True)
+    cursor2: float = edgy.FloatField(unique=True, null=True)
 
     class Meta:
         registry = models
@@ -63,32 +63,22 @@ async def rollback_connection():
 
 
 async def test_pagination_tricky():
-    await CounterTricky.query.bulk_create(
-        [{"cursor": i / 1.1, "non_cursor": i} for i in range(100)]
-    )
+    await CounterTricky.query.bulk_create([{"cursor": i / 1.1, "cursor2": i} for i in range(100)])
     paginator = Paginator(
-        CounterTricky.query.order_by("non_cursor"),
+        CounterTricky.query.order_by("cursor2"),
         page_size=30,
         next_item_attr="next",
         previous_item_attr="prev",
     )
-    assert (await paginator.get_page()).content[0].non_cursor == 0.0
+    assert (await paginator.get_page()).content[0].cursor2 == 0.0
 
-    with pytest.raises(ValueError):
-        CursorPaginator(
+    with pytest.raises(KeyError):
+        await CursorPaginator(
             CounterTricky.query.order_by("non_exist"),
             page_size=30,
             next_item_attr="next",
             previous_item_attr="prev",
-        )
-
-    with pytest.raises(ValueError):
-        CursorPaginator(
-            CounterTricky.query.order_by("non_cursor"),
-            page_size=30,
-            next_item_attr="next",
-            previous_item_attr="prev",
-        )
+        ).get_page()
 
 
 async def test_pagination_int_count_no_leak():
@@ -174,6 +164,55 @@ async def test_pagination_int_count_double():
     assert arr[0].content[1].prev is arr[0].content[0]
     assert (await paginator.get_reverse_paginator().get_page(-1)).content[0].id2 == 29
     assert (await paginator.get_page(-1)).content[-1].id2 == 99
+
+
+async def test_pagination_int_cursor_double():
+    await IntCounter2.query.bulk_create([{"id": 10, "id2": i} for i in range(100)])
+    paginator = CursorPaginator(
+        IntCounter2.query.order_by("id", "id2"),
+        page_size=30,
+        next_item_attr="next",
+        previous_item_attr="prev",
+    )
+    assert await paginator.get_total() == 100
+    assert paginator.queryset._order_by == ("id", "id2")
+    assert paginator.get_reverse_paginator().queryset._order_by == ("-id", "-id2")
+    assert paginator.get_reverse_paginator().page_size == 30
+    arr = [item async for item in paginator.paginate()]
+    assert arr[0].content[0].id == 10
+    assert arr[0].content[0].id2 == 0
+    assert arr[0].content[-1].id2 == 29
+    assert arr[1].content[0].id2 == 30
+    assert arr[2].content[0].id2 == 60
+    assert arr[3].content[-1].id2 == 99
+    assert len(arr[0].content) == 30
+    assert arr[0].content[0].prev is None
+    assert arr[3].content[-1].next is None
+    assert len(arr[3].content) == 10
+    assert arr[0].is_first
+    assert arr[3].is_last
+    assert arr[0].content[1].prev is arr[0].content[0]
+
+    page = await paginator.get_page()
+    assert page.is_first
+    assert page.next_cursor == (10, 29.0)
+    arr = [item async for item in paginator.paginate(start_cursor=page.next_cursor)]
+    assert len(arr) == 3
+    assert arr[0].content[0].id2 == 30.0
+    assert arr[0].content[0].prev is not None
+    assert arr[2].content[-1].next is None
+    assert len(arr[2].content) == 10
+    assert not arr[0].is_first
+    assert arr[2].is_last
+    assert (await paginator.get_page()).content[-1].id2 == 29.0
+    assert (await paginator.get_page(page.next_cursor)).content[-1].id2 == 59.0
+    assert (await paginator.get_reverse_paginator().get_page()).content[0].id2 == 99.0
+
+    page_rev = await paginator.get_page(page.next_cursor, reverse=True)
+    assert page_rev.content[-1].id2 == 28.0
+    assert page_rev.content[0].id2 == 0.0
+    assert page_rev.is_first
+    assert page_rev.next_cursor == (10, 0)
 
 
 async def test_pagination_int_single_page():
