@@ -235,7 +235,6 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
         fields: Union[Sequence[str], str, None],
         exclude: Union[Sequence[str], set[str]],
         exclude_none: bool,
-        flatten: bool,
         **kwargs: Any,
     ) -> list[Any]: ...
 
