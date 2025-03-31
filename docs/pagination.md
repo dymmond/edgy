@@ -1,28 +1,26 @@
 # Pagination
 
-Edgy supports out of the box counter-based as well as cursor based high-performance pagination with optional support
-of setting extra attributes so all items are like a double-linked list.
+**edgy** offers built-in support for both counter-based and cursor-based high-performance pagination. You can also set extra attributes to make all items behave like a double-linked list.
 
-High-performance means, everything is cached smartly and if you re-use the paginator you will may
-even skip database access. This is why it reuses the order of the QuerySet.
-A QuerySet which has already the whole query in cache,
+**High-performance** means smart caching is used, so if you reuse the paginator, you might even skip database access. This works because it reuses the order of the QuerySet, which may already have the entire query cached.
 
-It is however not as flexible as the Paginator of django. You can only pass QuerySets.
+However, **edgy** is not as flexible as Django's Paginator. It only accepts QuerySets.
 
 ## Counter-based
 
-This is the classic way of pagination. You pass a number and get a page basing on the order of the QuerySet.
+This is the classic way of pagination. You provide a page number, and it returns a specific set of items based on the order of the QuerySet.
 
 ```python
 {!> ../docs_src/pagination/simple_pagination.py !}
 ```
 
-You may also can use attributes to get the partner before/after. We use the CursorPaginator for more performance.
+You can also use attributes to get the previous or next item. For better performance, we use the CursorPaginator:
 
 ```python
 {!> ../docs_src/pagination/using_attributes.py !}
 ```
-This example would be in the slow variant
+
+This example would be in the slow variant:
 
 ```python
 {!> ../docs_src/pagination/using_attributes_slow.py !}
@@ -40,13 +38,18 @@ This is more efficient and allows querying for new contents, in case of sequenti
 {!> ../docs_src/pagination/cursor_pagination.py !}
 ```
 
+Because you can have vectors as cursors, you can also use this paginator to calculate efficiently the partners for
+a single item like shown above:
+
+```python
+{!> ../docs_src/pagination/using_attributes.py !}
+```
+
 ## Single-page mode (linked lists)
 
-The paginators understand a special value of page_size of 0. Here everything is put on one page.
-This way we can transform a QuerySet into a linked list, where every item knows its partners.
+If you set the `page_size` to 0, all items are displayed on one page. This transforms the QuerySet into a linked list, where each item knows its neighbors.
 
-`CursorPaginator` is here a bit special: There is only one page shown but we can still pass cursors to limitate the range.
-
+The `CursorPaginator` works a bit different: it shows only one page, but you can still pass cursors to limit the range.
 
 ```python
 {!> ../docs_src/pagination/double_linked_list.py !}
@@ -54,9 +57,9 @@ This way we can transform a QuerySet into a linked list, where every item knows 
 
 ## Reversing
 
-Every paginator has a get_reverse_paginator() method which inverts the query. This also reverts the order.
+Every paginator has a `get_reverse_paginator()` method which returns a cached paginator which contains a reversed QuerySet of the current paginator (the order is reversed).
 
 ## Cache management
 
 Sometimes you need to clear the cache to get fresh results. For this the paginator provides the
-`clear_caches` method.
+`clear_caches()` method.
