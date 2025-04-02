@@ -63,8 +63,7 @@ class BlogPage(BaseModel):
     pages: int
 
 
-@get("/blog/item/{id}")
-async def get_blogpost(id: int) -> Optional[BlogEntry]:
+async def _get_blogpost(item: int) -> Optional[BlogEntry]:
     # order by is required for paginators
     paginator = CursorPaginator(
         BlogEntry.query.order_by("-id"),
@@ -72,10 +71,14 @@ async def get_blogpost(id: int) -> Optional[BlogEntry]:
         next_item_attr="next",
         previous_item_attr="last",
     )
-    page = await paginator.get_page(id)
+    page = await paginator.get_page(item)
     if page.content:
         return page.content[0]
     return None
+
+@get("/blog/item/{item}")
+async def get_blogpost(item: int) -> Optional[BlogEntry]:
+    return await _get_blogpost(item)
 
 
 @get("/")
@@ -239,6 +242,7 @@ async def test_pagination_get(async_client):
     for _ in range(100):
         response = await async_client.post("/create", json=factory.build().model_dump())
         assert response.status_code == 201
+    (await _get_blogpost(32)).model_dump_json()
     response = await async_client.get("/blog/item/32")
     item = response.json()
     assert item.get("next", None)
