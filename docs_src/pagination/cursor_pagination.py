@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import datetime
 import edgy
 from edgy.contrib.pagination import CursorPaginator
@@ -29,12 +31,6 @@ async def get_blogpost(cursor: datetime.datetime) -> BlogEntry | None:
     return None
 
 
-async def get_last_blogpost_page():
-    # order by is required for paginators
-    paginator = CursorPaginator(BlogEntry.query.order_by("-created"), page_size=30)
-    return await paginator.get_page(reverse=True), await paginator.get_amount_pages()
-
-
 async def get_next_blogpost_page(cursor: datetime.datetime):
     # order by is required for paginators
     paginator = CursorPaginator(BlogEntry.query.order_by("-created"), page_size=30)
@@ -47,15 +43,15 @@ async def get_last_blogpost_page(cursor: datetime.datetime):
     return await paginator.get_page(cursor, reverse=True), await paginator.get_amount_pages()
 
 
-async def get_blogpost_pages(after: datetime.datetime):
+async def get_blogpost_pages(after: datetime.datetime | None = None):
     # order by is required for paginators
     paginator = CursorPaginator(BlogEntry.query.order_by("-created"), page_size=30)
     return [page async for page in paginator.paginate(start_cursor=after)]
 
 
-async def search_blogpost(title: str, cursor: datetime.datetime):
+async def search_blogpost(title: str, cursor: datetime.datetime | None = None):
     # order by is required for paginators
     paginator = CursorPaginator(
         BlogEntry.query.filter(title__icontains=title).order_by("-created"), page_size=30
     )
-    return await paginator.get_page(page), await paginator.get_amount_pages()
+    return await paginator.get_page(cursor), await paginator.get_amount_pages()

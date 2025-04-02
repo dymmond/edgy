@@ -44,8 +44,19 @@ a single item like shown above:
 ```python
 {!> ../docs_src/pagination/using_attributes.py !}
 ```
+## Integration
 
-## Single-page mode (linked lists)
+How would an application look like, using this feature?
+
+Here an example for esmerald with cursors and attributes:
+
+```python
+{!> ../docs_src/pagination/esmerald_example.py !}
+```
+
+## Special features
+
+### Single-page mode (linked lists)
 
 If you set the `page_size` to 0, all items are displayed on one page. This transforms the QuerySet into a linked list, where each item knows its neighbors.
 
@@ -55,11 +66,11 @@ The `CursorPaginator` works a bit different: it shows only one page, but you can
 {!> ../docs_src/pagination/double_linked_list.py !}
 ```
 
-## Reversing
+### Reversing
 
 Every paginator has a `get_reverse_paginator()` method which returns a cached paginator which contains a reversed QuerySet of the current paginator (the order is reversed).
 
-## Cache management
+### Cache management
 
 Sometimes you need to clear the cache to get fresh results. For this the paginator provides the
 `clear_caches()` method.
