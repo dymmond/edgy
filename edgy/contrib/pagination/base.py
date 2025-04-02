@@ -100,7 +100,7 @@ class Paginator(Generic[PageType]):
             return cast(Page, self._page_cache[page])
         page_obj = await self._get_page(page=page)
 
-        self._page_cache[page] = page_obj
+        self._page_cache[page] = cast(PageType, page_obj)
         return page_obj
 
     def convert_to_page(self, inp: Iterable, /, is_first: bool, reverse: bool = False) -> PageType:
