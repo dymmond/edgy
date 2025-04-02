@@ -40,7 +40,7 @@ async def get_next_blogpost_page(cursor: datetime.datetime):
 async def get_last_blogpost_page(cursor: datetime.datetime):
     # order by is required for paginators
     paginator = CursorPaginator(BlogEntry.query.order_by("-created"), page_size=30)
-    return await paginator.get_page(cursor, reverse=True), await paginator.get_amount_pages()
+    return await paginator.get_page(cursor, backward=True), await paginator.get_amount_pages()
 
 
 async def get_blogpost_pages(after: datetime.datetime | None = None):

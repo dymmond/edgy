@@ -160,9 +160,9 @@ class CursorPaginator(Paginator[CursorPage]):
         self._reverse_page_cache[vector] = reverse_page
         return page_obj
 
-    async def get_page(self, cursor: Hashable = None, reverse: bool = False) -> CursorPage:
+    async def get_page(self, cursor: Hashable = None, backward: bool = False) -> CursorPage:
         # this reverse only reverses the direction in which the cursor is evaluated
-        if reverse:
+        if backward:
             return await self.get_page_before(cursor)
         else:
             return await self.get_page_after(cursor)

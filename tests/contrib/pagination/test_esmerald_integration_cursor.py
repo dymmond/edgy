@@ -114,7 +114,7 @@ async def get_last_blogpost_page(reverse_cursor: int) -> BlogPage:
         previous_item_attr="last",
     )
     p, amount = (
-        await paginator.get_page(reverse_cursor, reverse=True),
+        await paginator.get_page(reverse_cursor, backward=True),
         await paginator.get_amount_pages(),
     )
     return BlogPage(**p.model_dump(), pages=amount)

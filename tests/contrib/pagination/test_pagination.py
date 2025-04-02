@@ -218,7 +218,7 @@ async def test_pagination_int_cursor_double():
     assert (await paginator.get_page(page.next_cursor)).content[-1].id2 == 59.0
     assert (await paginator.get_reverse_paginator().get_page()).content[0].id2 == 99.0
 
-    page_rev = await paginator.get_page(page.next_cursor, reverse=True)
+    page_rev = await paginator.get_page(page.next_cursor, backward=True)
     assert page_rev.content[-1].id2 == 29.0
     assert page_rev.content[0].id2 == 0.0
     assert page_rev.is_first
@@ -328,7 +328,7 @@ async def test_pagination_int_cursor():
     assert (await paginator.get_page(page.next_cursor)).content[-1].id == 59
     assert (await paginator.get_reverse_paginator().get_page()).content[0].id == 99
 
-    page_rev = await paginator.get_page(page.next_cursor, reverse=True)
+    page_rev = await paginator.get_page(page.next_cursor, backward=True)
     assert page_rev.content[-1].id == 29
     assert page_rev.content[0].id == 0
     assert page_rev.is_first
