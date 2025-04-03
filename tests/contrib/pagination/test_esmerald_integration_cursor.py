@@ -73,8 +73,10 @@ async def _get_blogpost(item: int) -> Optional[BlogEntry]:
     )
     page = await paginator.get_page(item)
     if page.content:
+        page.content[0].query.all()
         return page.content[0]
     return None
+
 
 @get("/blog/item/{item}")
 async def get_blogpost(item: int) -> Optional[BlogEntry]:

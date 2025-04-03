@@ -21,6 +21,7 @@ hide:
 
 - FieldFile did use potential heavily blocking sync API in async code paths.
 - `reverse` when no order_by was set.
+- Serialization fixes.
 
 ## 0.29.0
 

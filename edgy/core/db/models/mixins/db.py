@@ -10,7 +10,7 @@ from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Optional, Union, cast
 
 import sqlalchemy
-from pydantic import BaseModel
+from pydantic import BaseModel, PrivateAttr
 
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.context_vars import (
@@ -175,12 +175,16 @@ def _set_related_name_for_foreign_keys(
         registry.register_callback(foreign_key.to, related_field_fn, one_time=True)
 
 
-class DatabaseMixin:
+class DatabaseMixin(BaseModel):
     _removed_copy_keys: ClassVar[set[str]] = _removed_copy_keys
+    # private attributes need a BaseModel
+    _pkcolumns: set[str] = PrivateAttr()
+    _pknames: set[str] = PrivateAttr()
+    _table: sqlalchemy.Table = PrivateAttr()
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self.__dict__["transaction"] = self.not_set_transaction
+        self.transaction = self.not_set_transaction
 
     @classmethod
     def real_add_to_registry(
