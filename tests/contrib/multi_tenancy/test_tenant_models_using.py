@@ -81,13 +81,16 @@ async def test_schema_with_using_in_different_place(use_copy):
         NewCart = copied.get_model("Cart")
     cart = await NewCart.query.using(schema=tenant.schema_name).create()
     assert cart.__using_schema__ == tenant.schema_name
+    assert await NewCart.query.using(schema=tenant.schema_name).get(id=cart.id)
     for i in range(5):
         product = await NewProduct.query.using(schema=tenant.schema_name).create(
             name=f"product-{i}"
         )
+        assert product.__using_schema__ == tenant.schema_name
         if i % 2 == 0:
             product_through = cart.products.through(cart=cart, product=product)
             product_through.__using_schema__ = tenant.schema_name
+            assert product_through.table.schema == tenant.schema_name
             assert await cart.products.add(product_through)
         else:
             assert await cart.products.add(product)

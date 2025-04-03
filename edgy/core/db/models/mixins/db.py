@@ -25,7 +25,7 @@ from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.models.metaclasses import MetaInfo
 from edgy.core.db.models.types import BaseModelType
-from edgy.core.db.models.utils import build_pkcolumns, build_pknames
+from edgy.core.db.models.utils import build_pkcolumns
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.db import check_db_connection, hash_names
 from edgy.core.utils.models import create_edgy_model
@@ -51,7 +51,6 @@ _removed_copy_keys = {
     *BaseModel.__dict__.keys(),
     "_loaded_or_deleted",
     "_pkcolumns",
-    "_pknames",
     "_table",
     "_db_schemas",
     "__proxy_model__",
@@ -177,8 +176,6 @@ def _set_related_name_for_foreign_keys(
 
 class DatabaseMixin:
     _removed_copy_keys: ClassVar[set[str]] = _removed_copy_keys
-    _pkcolumns: ClassVar[Sequence[str]]
-    _pknames: ClassVar[Sequence[str]]
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -291,8 +288,8 @@ class DatabaseMixin:
     def get_active_instance_schema(
         self, check_schema: bool = True, check_tenant: bool = True
     ) -> Union[str, None]:
-        if self.__using_schema__ is not Undefined:
-            return cast(Union[str, None], self.__using_schema__)
+        if self._edgy_namespace["__using_schema__"] is not Undefined:
+            return cast(Union[str, None], self._edgy_namespace["__using_schema__"])
         return type(self).get_active_class_schema(
             check_schema=check_schema, check_tenant=check_tenant
         )
@@ -402,35 +399,28 @@ class DatabaseMixin:
 
     @property
     def table(self) -> sqlalchemy.Table:
-        if getattr(self, "_table", None) is None:
+        if self._edgy_namespace.get("_table") is None:
             schema = self.get_active_instance_schema()
             return cast(
                 "sqlalchemy.Table",
                 type(self).table_schema(schema),
             )
-        return self._table
+        return cast("sqlalchemy.Table", self._edgy_namespace["_table"])
 
     @table.setter
     def table(self, value: Optional[sqlalchemy.Table]) -> None:
-        with contextlib.suppress(AttributeError):
-            del self._pknames
-        with contextlib.suppress(AttributeError):
-            del self._pkcolumns
+        self._edgy_namespace.pop("_pkcolumns", None)
         self._table = value
 
     @table.deleter
     def table(self) -> None:
-        with contextlib.suppress(AttributeError):
-            del self._pknames
-        with contextlib.suppress(AttributeError):
-            del self._pkcolumns
-        with contextlib.suppress(AttributeError):
-            del self._table
+        self._edgy_namespace.pop("_pkcolumns", None)
+        self._edgy_namespace.pop("_table", None)
 
     @property
     def pkcolumns(self) -> Sequence[str]:
-        if getattr(self, "_pkcolumns", None) is None:
-            if getattr(self, "_table", None) is None:
+        if self._edgy_namespace.get("_pkcolumns") is None:
+            if self._edgy_namespace.get("table") is None:
                 self._pkcolumns: Sequence[str] = cast(Sequence[str], type(self).pkcolumns)
             else:
                 build_pkcolumns(self)
@@ -438,12 +428,12 @@ class DatabaseMixin:
 
     @property
     def pknames(self) -> Sequence[str]:
-        if getattr(self, "_pknames", None) is None:
-            if getattr(self, "_table", None) is None:
-                self._pknames: Sequence[str] = cast(Sequence[str], type(self).pknames)
-            else:
-                build_pknames(self)
-        return self._pknames
+        return cast(Sequence[str], type(self).pknames)
+
+    def __setattr__(self, key: str, value: Any) -> None:
+        if key == "__using_schema__":
+            del self.table
+        super().__setattr__(key, value)
 
     def get_columns_for_name(self: Model, name: str) -> Sequence[sqlalchemy.Column]:
         table = self.table
@@ -887,9 +877,7 @@ class DatabaseMixin:
             ),
         )
 
-    def not_set_transaction(
-        self=None, *, force_rollback: bool = False, **kwargs: Any
-    ) -> Transaction:
+    def not_set_transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
         """
         Return database transaction for the assigned database.
 
