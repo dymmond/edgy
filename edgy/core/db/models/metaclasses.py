@@ -21,6 +21,7 @@ from typing import (
 
 import sqlalchemy
 from pydantic._internal._model_construction import ModelMetaclass
+from pydantic.fields import ModelPrivateAttr
 
 from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
@@ -897,6 +898,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             # raising is required
             raise AttributeError("No registry.")
         table = getattr(cls, "_table", None)
+        if isinstance(table, ModelPrivateAttr):
+            table = None
         # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} != {cls.meta.tablename}"
         # fix assigned table
         if table is None or table.name.lower() != cls.meta.tablename:
