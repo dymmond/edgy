@@ -59,13 +59,14 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             "__no_load_trigger_attrs__",
             "database",
             "transaction",
+            "_pkcolumns",
         }
     )
     _edgy_namespace: dict = PrivateAttr()
     __proxy_model__: ClassVar[Union[type[Model], None]] = None
     __reflected__: ClassVar[bool] = False
     __show_pk__: ClassVar[bool] = False
-    __using_schema__: Union[str, None, Any] = Undefined
+    __using_schema__: ClassVar[Union[str, None, Any]] = Undefined
     __no_load_trigger_attrs__: ClassVar[set[str]] = _empty
     database: ClassVar[Database] = None
     # private attribute
@@ -567,11 +568,11 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         behavior = MODEL_GETATTR_BEHAVIOR.get()
         manager = self.meta.managers.get(name)
         if manager is not None:
-            if name not in self.__dict__:
+            if name not in self._edgy_namespace:
                 manager = copy.copy(manager)
                 manager.instance = self
-                self.__dict__[name] = manager
-            return self.__dict__[name]
+                self._edgy_namespace[name] = manager
+            return self._edgy_namespace[name]
 
         field = self.meta.fields.get(name)
         if field is not None:

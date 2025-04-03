@@ -410,7 +410,7 @@ class DatabaseMixin:
     @table.setter
     def table(self, value: Optional[sqlalchemy.Table]) -> None:
         self._edgy_namespace.pop("_pkcolumns", None)
-        self._table = value
+        self._edgy_namespace["_table"] = value
 
     @table.deleter
     def table(self) -> None:
@@ -420,11 +420,11 @@ class DatabaseMixin:
     @property
     def pkcolumns(self) -> Sequence[str]:
         if self._edgy_namespace.get("_pkcolumns") is None:
-            if self._edgy_namespace.get("table") is None:
-                self._pkcolumns: Sequence[str] = cast(Sequence[str], type(self).pkcolumns)
+            if self._edgy_namespace.get("_table") is None:
+                self._edgy_namespace["_pkcolumns"] = type(self).pkcolumns
             else:
-                build_pkcolumns(self)
-        return self._pkcolumns
+                self._edgy_namespace["_pkcolumns"] = build_pkcolumns(self)
+        return cast(Sequence[str], self._edgy_namespace["_pkcolumns"])
 
     @property
     def pknames(self) -> Sequence[str]:
@@ -432,7 +432,7 @@ class DatabaseMixin:
 
     def __setattr__(self, key: str, value: Any) -> None:
         if key == "__using_schema__":
-            del self.table
+            self._edgy_namespace.pop("_table", None)
         super().__setattr__(key, value)
 
     def get_columns_for_name(self: Model, name: str) -> Sequence[sqlalchemy.Column]:

@@ -6,22 +6,26 @@ hide:
 
 # Release Notes
 
-## 0.29.1
+## 0.30.0
 
 ### Added
 
-- Pagination.
+- Add optimized pagination for `QuerySet`.
 
 ### Changed
 
 - Internal cleanup how the current row is passed in QuerySet.
 - Optimize `reverse` method of QuerySet. Now it reuses a potential available cache.
+- `build_pknames` and `build_pkcolumns` return their result instead of setting it automatically.
+- Introduce `_edgy_namespace` for edgy related attributes.
+- Use `_edgy_namespace` for managers.
 
 ### Fixed
 
 - FieldFile did use potential heavily blocking sync API in async code paths.
 - `reverse` when no order_by was set.
-- Serialization fixes.
+- Serialization fixes for newer pydantic versions (>=2.11).
+- Private attributes handling.
 
 ## 0.29.0
 

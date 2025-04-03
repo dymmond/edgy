@@ -916,13 +916,13 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
     @property
     def pkcolumns(cls) -> Sequence[str]:
         if cls.__dict__.get("_pkcolumns", None) is None:
-            build_pkcolumns(cls)
+            cls._pkcolumns = build_pkcolumns(cls)
         return cast(Sequence[str], cls._pkcolumns)
 
     @property
     def pknames(cls) -> Sequence[str]:
         if cls.__dict__.get("_pknames", None) is None:
-            build_pknames(cls)
+            cls._pknames = build_pknames(cls)
         return cast(Sequence[str], cls._pknames)
 
     @property
