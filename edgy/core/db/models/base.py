@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from edgy.core.signals import Broadcaster
 
 _empty = cast(set[str], frozenset())
+_excempted_attrs: set[str] = {"_loaded_or_deleted", "_edgy_namespace", "_edgy_private_attrs"}
 
 
 class EdgyBaseModel(BaseModel, BaseModelType):
@@ -80,9 +81,12 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     ) -> None:
         # always set _loaded_or_deleted in __dict__ to prevent __getattr__ loop
         self.__dict__["_loaded_or_deleted"] = False
+        klass = self.__class__
         self.__dict__["_edgy_namespace"] = _edgy_namespace = {
-            "__show_pk__": type(self).__show_pk__,
-            "__no_load_trigger_attrs__": {*type(self).__no_load_trigger_attrs__},
+            "__show_pk__": klass.__show_pk__,
+            "__no_load_trigger_attrs__": {*klass.__no_load_trigger_attrs__},
+            "__using_schema__": klass.__using_schema__,
+            "database": klass.database,
         }
         if __show_pk__ is not None:
             self.__show_pk__ = __show_pk__
@@ -557,8 +561,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         3. Run an one off query to populate any foreign key making sure
            it runs only once per foreign key avoiding multiple database calls.
         """
-        # this name needs a shortcut
-        if name == "_loaded_or_deleted":
+        # these attributes needs an excemption
+        if name in _excempted_attrs or name in self._edgy_private_attrs:
             return super().__getattr__(name)
         behavior = MODEL_GETATTR_BEHAVIOR.get()
         manager = self.meta.managers.get(name)

@@ -10,7 +10,7 @@ from itertools import chain
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, Optional, Union, cast
 
 import sqlalchemy
-from pydantic import BaseModel, PrivateAttr
+from pydantic import BaseModel
 
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.context_vars import (
@@ -175,12 +175,10 @@ def _set_related_name_for_foreign_keys(
         registry.register_callback(foreign_key.to, related_field_fn, one_time=True)
 
 
-class DatabaseMixin(BaseModel):
+class DatabaseMixin:
     _removed_copy_keys: ClassVar[set[str]] = _removed_copy_keys
     _pkcolumns: ClassVar[Sequence[str]]
     _pknames: ClassVar[Sequence[str]]
-    # private attributes need a BaseModel
-    _table: sqlalchemy.Table = PrivateAttr()
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -404,7 +402,7 @@ class DatabaseMixin(BaseModel):
 
     @property
     def table(self) -> sqlalchemy.Table:
-        if self.__dict__.get("_table", None) is None:
+        if getattr(self, "_table", None) is None:
             schema = self.get_active_instance_schema()
             return cast(
                 "sqlalchemy.Table",
@@ -431,8 +429,8 @@ class DatabaseMixin(BaseModel):
 
     @property
     def pkcolumns(self) -> Sequence[str]:
-        if self.__dict__.get("_pkcolumns", None) is None:
-            if self.__dict__.get("_table", None) is None:
+        if getattr(self, "_pkcolumns", None) is None:
+            if getattr(self, "_table", None) is None:
                 self._pkcolumns: Sequence[str] = cast(Sequence[str], type(self).pkcolumns)
             else:
                 build_pkcolumns(self)
@@ -440,8 +438,8 @@ class DatabaseMixin(BaseModel):
 
     @property
     def pknames(self) -> Sequence[str]:
-        if self.__dict__.get("_pknames", None) is None:
-            if self.__dict__.get("_table", None) is None:
+        if getattr(self, "_pknames", None) is None:
+            if getattr(self, "_table", None) is None:
                 self._pknames: Sequence[str] = cast(Sequence[str], type(self).pknames)
             else:
                 build_pknames(self)

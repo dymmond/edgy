@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
 from edgy.core.db.fields.base import RelationshipField
@@ -18,8 +18,6 @@ class ManyRelation(ManyRelationProtocol):
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
-
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     def __init__(
         self,
@@ -187,8 +185,6 @@ class SingleRelation(ManyRelationProtocol):
     When a `related_name` is generated, creates a RelatedField from the table pointed
     from the ForeignKey declaration and the the table declaring it.
     """
-
-    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     def __init__(
         self,
