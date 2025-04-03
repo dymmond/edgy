@@ -178,8 +178,8 @@ def _set_related_name_for_foreign_keys(
 class DatabaseMixin(BaseModel):
     _removed_copy_keys: ClassVar[set[str]] = _removed_copy_keys
     # private attributes need a BaseModel
-    _pkcolumns: set[str] = PrivateAttr()
-    _pknames: set[str] = PrivateAttr()
+    _pkcolumns: Sequence[str] = PrivateAttr()
+    _pknames: Sequence[str] = PrivateAttr()
     _table: sqlalchemy.Table = PrivateAttr()
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
