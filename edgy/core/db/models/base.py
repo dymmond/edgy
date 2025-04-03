@@ -59,7 +59,6 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             "__no_load_trigger_attrs__",
             "database",
             "transaction",
-            "_pkcolumns",
         }
     )
     _edgy_namespace: dict = PrivateAttr()
