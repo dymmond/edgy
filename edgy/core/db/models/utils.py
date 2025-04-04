@@ -19,7 +19,7 @@ def get_model(registry: "Registry", model_name: str) -> "Model":
     return cast("Model", registry.get_model(model_name))
 
 
-def build_pknames(model_class: Any) -> None:
+def build_pknames(model_class: Any) -> tuple[str, ...]:
     """
     Set explicit pknames (field names with primary_key=True set)
     """
@@ -28,10 +28,10 @@ def build_pknames(model_class: Any) -> None:
     for field_name, field in meta.fields.items():
         if field.primary_key:
             pknames.add(field_name)
-    model_class._pknames = tuple(sorted(pknames))
+    return tuple(sorted(pknames))
 
 
-def build_pkcolumns(model_class: Any) -> None:
+def build_pkcolumns(model_class: Any) -> tuple[str, ...]:
     """
     Set pkcolumns (columns with primary_key set)
     """
@@ -41,7 +41,7 @@ def build_pkcolumns(model_class: Any) -> None:
         if column.primary_key:
             # key is the sqlalchemy name, in our case name and key should be identically
             pkcolumns.add(column.key)
-    model_class._pkcolumns = tuple(sorted(pkcolumns))
+    return tuple(sorted(pkcolumns))
 
 
 def from_model_to_clauses(model: "BaseModelType") -> Iterable[Any]:

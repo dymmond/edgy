@@ -160,8 +160,8 @@ async def test_pagination_int_cursor():
     assert (await paginator.get_page(page.next_cursor)).content[-1].id == 40
     assert (await paginator.get_reverse_paginator().get_page()).content[0].id == 0
 
-    page_rev = await paginator.get_page(page.next_cursor + 1, reverse=True)
-    assert page_rev.content[-1].id == 72
+    page_rev = await paginator.get_page(page.next_cursor, backward=True)
+    assert page_rev.content[-1].id == 70
     assert page_rev.content[0].id == 99
     assert page_rev.is_first
     assert page_rev.next_cursor == 99

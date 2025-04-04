@@ -16,7 +16,7 @@ from typing import (
 )
 
 import orjson
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, PrivateAttr
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
 from edgy.core.db.context_vars import (
@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from edgy.core.signals import Broadcaster
 
 _empty = cast(set[str], frozenset())
+_excempted_attrs: set[str] = {"_loaded_or_deleted", "_edgy_namespace", "_edgy_private_attrs"}
 
 
 class EdgyBaseModel(BaseModel, BaseModelType):
@@ -51,29 +52,44 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         extra="allow", arbitrary_types_allowed=True, validate_assignment=True
     )
 
+    _edgy_private_attrs: ClassVar[set[str]] = PrivateAttr(
+        default={
+            "__show_pk__",
+            "__using_schema__",
+            "__no_load_trigger_attrs__",
+            "database",
+            "transaction",
+        }
+    )
+    _edgy_namespace: dict = PrivateAttr()
     __proxy_model__: ClassVar[Union[type[Model], None]] = None
     __reflected__: ClassVar[bool] = False
     __show_pk__: ClassVar[bool] = False
-    __using_schema__: Union[str, None, Any] = Undefined
+    __using_schema__: ClassVar[Union[str, None, Any]] = Undefined
     __no_load_trigger_attrs__: ClassVar[set[str]] = _empty
     database: ClassVar[Database] = None
     # private attribute
-    _loaded_or_deleted: bool = False
+    _loaded_or_deleted: bool = PrivateAttr(default=False)
 
     def __init__(
         self,
         *args: Any,
-        __show_pk__: bool = False,
+        __show_pk__: Optional[bool] = None,
         __phase__: str = "init",
         __drop_extra_kwargs__: bool = False,
         **kwargs: Any,
     ) -> None:
-        self.__show_pk__ = __show_pk__
-        # always set them in __dict__ to prevent __getattr__ loop
-        self._loaded_or_deleted = False
-        # per instance it is a mutable set with pk added
-        __no_load_trigger_attrs__ = {*type(self).__no_load_trigger_attrs__}
-        self.__no_load_trigger_attrs__ = __no_load_trigger_attrs__
+        # always set _loaded_or_deleted in __dict__ to prevent __getattr__ loop
+        self.__dict__["_loaded_or_deleted"] = False
+        klass = self.__class__
+        self.__dict__["_edgy_namespace"] = _edgy_namespace = {
+            "__show_pk__": klass.__show_pk__,
+            "__no_load_trigger_attrs__": {*klass.__no_load_trigger_attrs__},
+            "__using_schema__": klass.__using_schema__,
+            "database": klass.database,
+        }
+        if __show_pk__ is not None:
+            self.__show_pk__ = __show_pk__
         # inject in relation fields anonymous ModelRef (without a Field)
         for arg in args:
             if isinstance(arg, ModelRef):
@@ -107,8 +123,13 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             instance=self,
             drop_extra_kwargs=__drop_extra_kwargs__,
         )
+        # remove the stub attributes in dict
+        del self.__dict__["_edgy_namespace"]
+        _loaded_or_deleted = self.__dict__.pop("_loaded_or_deleted")
         super().__init__(**kwargs)
-        self.__no_load_trigger_attrs__ = __no_load_trigger_attrs__
+        # and set them properly
+        self._loaded_or_deleted = _loaded_or_deleted
+        self._edgy_namespace = _edgy_namespace
         # move to dict (e.g. reflected or subclasses which allow extra attributes)
         if self.__pydantic_extra__ is not None:
             # default was triggered
@@ -466,6 +487,12 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         return validated
 
     def __setattr__(self, key: str, value: Any) -> None:
+        if key in self._edgy_private_attrs:
+            self._edgy_namespace[key] = value
+            return
+        if key in self.__private_attributes__:
+            super().__setattr__(key, value)
+            return
         fields = self.meta.fields
         field = fields.get(key, None)
         token = CURRENT_INSTANCE.set(self)
@@ -518,6 +545,14 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         except KeyError:
             raise AttributeError(f"Attribute: {name} not found") from None
 
+    def __getattribute__(self, name: str) -> Any:
+        if name != "_edgy_private_attrs" and name in self._edgy_private_attrs:
+            try:
+                return self._edgy_namespace[name]
+            except KeyError as exc:
+                raise AttributeError from exc
+        return super().__getattribute__(name)
+
     def __getattr__(self, name: str) -> Any:
         """
         Does following things
@@ -526,14 +561,17 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         3. Run an one off query to populate any foreign key making sure
            it runs only once per foreign key avoiding multiple database calls.
         """
+        # these attributes needs an excemption
+        if name in _excempted_attrs or name in self._edgy_private_attrs:
+            return super().__getattr__(name)
         behavior = MODEL_GETATTR_BEHAVIOR.get()
         manager = self.meta.managers.get(name)
         if manager is not None:
-            if name not in self.__dict__:
+            if name not in self._edgy_namespace:
                 manager = copy.copy(manager)
                 manager.instance = self
-                self.__dict__[name] = manager
-            return self.__dict__[name]
+                self._edgy_namespace[name] = manager
+            return self._edgy_namespace[name]
 
         field = self.meta.fields.get(name)
         if field is not None:
@@ -560,11 +598,11 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 name not in self.__dict__
                 and behavior != "passdown"
                 # is already loaded
-                and not self.__dict__.get("_loaded_or_deleted", False)
+                and not self._loaded_or_deleted
                 # only load when it is a field except for reflected
                 and (field is not None or self.__reflected__)
                 # exclude attr names from triggering load
-                and name not in self.__dict__.get("__no_load_trigger_attrs__", _empty)
+                and name not in getattr(self, "__no_load_trigger_attrs__", _empty)
                 and name not in self.identifying_db_fields
                 and self.can_load
             ):
@@ -576,6 +614,15 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         finally:
             if field:
                 CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
+
+    def __delattr__(self, name: str) -> None:
+        if name in self._edgy_private_attrs:
+            try:
+                del self._edgy_namespace[name]
+                return
+            except KeyError as exc:
+                raise AttributeError from exc
+        super().__delattr__(name)
 
     def __eq__(self, other: Any) -> bool:
         # if self.__class__ != other.__class__:
