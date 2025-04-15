@@ -461,6 +461,59 @@ class ChoiceField(FieldFactory):
         return sqlalchemy.text(":value").bindparams(value=default.name)
 
 
+class CharChoiceField(ChoiceField):
+    @classmethod
+    def validate(cls, kwargs: dict[str, Any]) -> None:
+        super().validate(kwargs)
+        max_length = kwargs.setdefault("max_length", 30)
+        choice_class = kwargs.get("choices")
+        if max_length is not None:
+            for k in choice_class.__members__:
+                if len(k) > max_length:
+                    raise FieldDefinitionError(
+                        f"ChoiceField choice name {k} is longer than {max_length} characters."
+                        "Alternatively raise the max_length via explicitly passing a max_length argument or "
+                        "set it to None (less performant)."
+                    )
+
+    @classmethod
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
+        max_length: Optional[int] = kwargs.get("max_length")
+        return (
+            sqlalchemy.Text(collation=kwargs.get("collation"))
+            if max_length is None
+            else sqlalchemy.String(length=max_length, collation=kwargs.get("collation"))
+        )
+
+    @classmethod
+    def to_model(
+        cls, field_obj: BaseFieldType, field_name: str, value: Any, original_fn: Any = None
+    ) -> dict[str, Any]:
+        return {field_name: cls.check(field_obj, value=value)}
+
+    @classmethod
+    def clean(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        value: Any,
+        for_query: bool = False,
+        original_fn: Any = None,
+    ) -> dict[str, Any]:
+        return {field_name: cls.check(field_obj, value=value).name}
+
+    @classmethod
+    def check(cls, field_obj: BaseFieldType, value: Any, original_fn: Any = None) -> Any:
+        if isinstance(value, EnumMeta):
+            value = value.name
+        if not isinstance(value, str):
+            raise ValueError("Value must be a string or enum member.")
+        try:
+            return field_obj.choices.__members__[value]
+        except KeyError:
+            raise ValueError(f"Invalid enum key {value}.") from None
+
+
 class PasswordField(CharField):
     """
     Representation of a Password
