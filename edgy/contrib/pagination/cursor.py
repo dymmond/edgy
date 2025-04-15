@@ -1,20 +1,21 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Hashable, Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
-from .base import Page, Paginator
+from .base import BasePage, BasePaginator
 
 if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.querysets import QuerySet
 
 
-class CursorPage(Page):
-    next_cursor: Hashable = None
+class CursorPage(BasePage):
+    next_cursor: Optional[Hashable]
+    current_cursor: Optional[Hashable]
 
 
-class CursorPaginator(Paginator[CursorPage]):
+class CursorPaginator(BasePaginator[CursorPage]):
     def __init__(
         self,
         queryset: QuerySet,
@@ -63,15 +64,20 @@ class CursorPaginator(Paginator[CursorPage]):
         self._reverse_page_cache.clear()
 
     def convert_to_page(
-        self, inp: Iterable, /, is_first: bool, reverse: bool = False
+        self, inp: Iterable, /, cursor: Optional[Hashable], is_first: bool, reverse: bool = False
     ) -> CursorPage:
-        page_obj: Page = super().convert_to_page(inp, is_first=is_first, reverse=reverse)
+        page_obj: BasePage = super().convert_to_page(
+            inp,
+            is_first=is_first,
+            reverse=reverse,
+        )
         next_cursor = self.obj_to_cursor(page_obj.content[-1]) if page_obj.content else None
         return CursorPage(
             content=page_obj.content,
             is_first=page_obj.is_first,
             is_last=page_obj.is_last,
             next_cursor=next_cursor,
+            current_cursor=cursor,
         )
 
     async def get_extra_before(self, cursor: Hashable) -> list[BaseModelType]:
@@ -90,8 +96,8 @@ class CursorPaginator(Paginator[CursorPage]):
 
     async def _get_page_after(
         self,
-        vector: tuple | None,
-        injected_extra: list[BaseModelType] | None = None,
+        vector: Optional[tuple[Hashable, ...]],
+        injected_extra: Optional[list[BaseModelType]] = None,
         reverse: bool = False,
     ) -> tuple[CursorPage, list[BaseModelType]]:
         query = self.queryset.limit(self.page_size + 1) if self.page_size else self.queryset
@@ -116,11 +122,16 @@ class CursorPaginator(Paginator[CursorPage]):
                 is_first = True
             resultarr = await query
 
-        page_obj = self.convert_to_page(resultarr, is_first=is_first, reverse=reverse)
+        page_obj = self.convert_to_page(
+            resultarr,
+            cursor=None if vector is None else self.vector_to_cursor(vector),
+            is_first=is_first,
+            reverse=reverse,
+        )
         return page_obj, resultarr
 
-    async def get_page_after(self, cursor: Hashable = None) -> CursorPage:
-        vector: tuple | None = None
+    async def get_page_after(self, cursor: Optional[Hashable] = None) -> CursorPage:
+        vector: Optional[tuple[Hashable, ...]] = None
         if cursor is not None:
             vector = self.cursor_to_vector(cursor)
         if vector in self._page_cache:
@@ -130,15 +141,15 @@ class CursorPaginator(Paginator[CursorPage]):
         self._page_cache[vector] = page_obj
         return page_obj
 
-    async def get_page_before(self, cursor: Hashable = None) -> CursorPage:
-        vector: tuple | None = None
+    async def get_page_before(self, cursor: Optional[Hashable] = None) -> CursorPage:
+        vector: Optional[tuple[Hashable, ...]] = None
         if cursor is not None:
             vector = self.cursor_to_vector(cursor)
         if vector in self._reverse_page_cache:
             page_obj = self._reverse_page_cache[vector]
             return page_obj
         reverse_paginator = self.get_reverse_paginator()
-        new_vector: tuple | None = None
+        new_vector: Optional[tuple[Hashable, ...]] = None
         # to match the cursors we need to go back one more item
         injected_reverse = (
             await reverse_paginator.get_extra_before(vector) if vector is not None else []
@@ -156,11 +167,14 @@ class CursorPaginator(Paginator[CursorPage]):
             is_first=reverse_page.is_first,
             is_last=reverse_page.is_last,
             next_cursor=self.obj_to_cursor(raw_array[-1]) if raw_array else None,
+            current_cursor=None if vector is None else self.vector_to_cursor(vector),
         )
         self._reverse_page_cache[vector] = reverse_page
         return page_obj
 
-    async def get_page(self, cursor: Hashable = None, backward: bool = False) -> CursorPage:
+    async def get_page(
+        self, cursor: Optional[Hashable] = None, backward: bool = False
+    ) -> CursorPage:
         # this reverse only reverses the direction in which the cursor is evaluated
         if backward:
             return await self.get_page_before(cursor)
@@ -168,10 +182,11 @@ class CursorPaginator(Paginator[CursorPage]):
             return await self.get_page_after(cursor)
 
     async def paginate(
-        self, start_cursor: Hashable = None, stop_cursor: Hashable = None
+        self, start_cursor: Optional[Hashable] = None, stop_cursor: Optional[Hashable] = None
     ) -> AsyncGenerator[CursorPage, None]:
         query = self.queryset
         prefill_container = []
+        start_vector: Optional[tuple[Hashable, ...]] = None
         if start_cursor is not None:
             start_vector = self.cursor_to_vector(start_cursor)
             query = query.filter(**dict(zip(self.search_vector, start_vector)))
@@ -182,9 +197,16 @@ class CursorPaginator(Paginator[CursorPage]):
             query = query.filter(
                 **dict(zip(self.get_reverse_paginator().search_vector, stop_vector))
             )
+        current_cursor: Optional[Hashable] = (
+            None if start_vector is None else self.vector_to_cursor(start_vector)
+        )
         async for page in self.paginate_queryset(
             query,
             is_first=bool(start_cursor is None and not prefill_container),
             prefill=prefill_container,
         ):
-            yield page
+            next_cursor = self.obj_to_cursor(page.content[-1]) if page.content else None
+            yield CursorPage(
+                **page.__dict__, next_cursor=next_cursor, current_cursor=current_cursor
+            )
+            current_cursor = next_cursor

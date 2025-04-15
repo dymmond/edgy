@@ -159,6 +159,9 @@ async def test_pagination_int_count_double():
     assert paginator.get_reverse_paginator().queryset._order_by == ("-id", "-id2")
     assert paginator.get_reverse_paginator().page_size == 30
     arr = [item async for item in paginator.paginate()]
+    assert arr[0].previous_page is None
+    assert arr[0].current_page == 1
+    assert arr[0].next_page == 2
     assert arr[0].content[0].id == 10
     assert arr[0].content[0].id2 == 0
     assert arr[0].content[-1].id2 == 29
@@ -219,6 +222,7 @@ async def test_pagination_int_cursor_double():
     assert (await paginator.get_reverse_paginator().get_page()).content[0].id2 == 99.0
 
     page_rev = await paginator.get_page(page.next_cursor, backward=True)
+    assert page_rev.current_cursor == page.next_cursor
     assert page_rev.content[-1].id2 == 29.0
     assert page_rev.content[0].id2 == 0.0
     assert page_rev.is_first

@@ -6,6 +6,20 @@ hide:
 
 # Release Notes
 
+
+## 0.30.1
+
+### Changed
+
+- Split from Page and Paginator BasePaginator and BasePage.
+- Add fields next_page, previous_page, current_page to Page.
+- Add field current_cursor to CursorPage.
+- Make specifying all of the page attributes mandatory.
+
+### Fixed
+
+- Fix and improve pagination examples.
+
 ## 0.30.0
 
 ### Added
