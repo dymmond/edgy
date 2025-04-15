@@ -59,6 +59,7 @@ class BlogPage(BaseModel):
     content: list[BlogEntry]
     is_first: bool
     is_last: bool
+    current_cursor: Optional[int]
     next_cursor: Optional[int]
     pages: int
 
@@ -122,7 +123,7 @@ async def get_last_blogpost_page(reverse_cursor: int) -> BlogPage:
         await paginator.get_page(reverse_cursor, backward=True),
         await paginator.get_amount_pages(),
     )
-    return BlogPage(**p.model_dump(), pages=amount)
+    return BlogPage(**p.__dict__, pages=amount)
 
 
 @post("/search")
@@ -137,7 +138,7 @@ async def search_blogpost(string: str, cursor: Optional[int] = None) -> BlogPage
         previous_item_attr="last",
     )
     p, amount = await paginator.get_page(cursor), await paginator.get_amount_pages()
-    return BlogPage(**p.model_dump(), pages=amount)
+    return BlogPage(**p.__dict__, pages=amount)
 
 
 @post("/create")
@@ -181,18 +182,21 @@ async def test_pagination_misc(async_client):
     assert page1["content"][1]["last"]["id"] == 100
     assert page1["pages"] == 4
     assert page1["next_cursor"] == 71
+    assert page1["current_cursor"] is None
 
     response = await async_client.get(f"/blog/nextpage/{page1['next_cursor']}")
     page2 = response.json()
     assert len(page2["content"]) == 30
     assert page2["content"][0]["id"] == 70
     assert page2["pages"] == 4
+    assert page2["current_cursor"] == page1["next_cursor"]
 
     response = await async_client.get(f"/blog/nextpage/{page2['next_cursor']}")
     page3 = response.json()
     assert len(page3["content"]) == 30
     assert page3["content"][0]["id"] == 40
     assert page3["pages"] == 4
+    assert page3["current_cursor"] == page2["next_cursor"]
 
     response = await async_client.get(f"/blog/nextpage/{page3['next_cursor']}")
     page4 = response.json()

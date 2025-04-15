@@ -3,6 +3,7 @@ from esmerald import Esmerald, Gateway, get, post
 from pydantic import BaseModel
 
 import edgy
+from edgy.testing.factory import ModelFactory
 from edgy.contrib.pagination import CursorPaginator
 from edgy.core.marshalls import Marshall
 from edgy.core.marshalls.config import ConfigMarshall
@@ -42,6 +43,7 @@ class BlogPage(BaseModel):
     content: list[BlogEntry]
     is_first: bool
     is_last: bool
+    current_cursor: Optional[int]
     next_cursor: Optional[int]
     pages: int
 
@@ -71,7 +73,8 @@ async def index() -> BlogPage:
         previous_item_attr="last",
     )
     p, amount = await paginator.get_page(), await paginator.get_amount_pages()
-    return BlogPage(**p.model_dump(), pages=amount)
+    # model_dump would also serialize the BlogEntries, so use __dict__ which should be also faster
+    return BlogPage(**p.__dict__, pages=amount)
 
 
 @get("/blog/nextpage/{advance_cursor}")
@@ -84,7 +87,8 @@ async def get_next_blogpost_page(advance_cursor: int) -> BlogPage:
         previous_item_attr="last",
     )
     p, amount = await paginator.get_page(advance_cursor), await paginator.get_amount_pages()
-    return BlogPage(**p.model_dump(), pages=amount)
+    # model_dump would also serialize the BlogEntries, so use __dict__ which should be also faster
+    return BlogPage(**p.__dict__, pages=amount)
 
 
 @get("/blog/lastpage/{reverse_cursor}")
@@ -100,7 +104,8 @@ async def get_last_blogpost_page(reverse_cursor: int) -> BlogPage:
         await paginator.get_page(reverse_cursor, backward=True),
         await paginator.get_amount_pages(),
     )
-    return BlogPage(**p.model_dump(), pages=amount)
+    # model_dump would also serialize the BlogEntries, so use __dict__ which should be also faster
+    return BlogPage(**p.__dict__, pages=amount)
 
 
 @post("/search")
@@ -115,7 +120,8 @@ async def search_blogpost(string: str, cursor: Optional[int] = None) -> BlogPage
         previous_item_attr="last",
     )
     p, amount = await paginator.get_page(cursor), await paginator.get_amount_pages()
-    return BlogPage(**p.model_dump(), pages=amount)
+    # model_dump would also serialize the BlogEntries, so use __dict__ which should be also faster
+    return BlogPage(**p.__dict__, pages=amount)
 
 
 @post("/create")

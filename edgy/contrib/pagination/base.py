@@ -15,16 +15,22 @@ else:  # pragma: no cover
     from typing_extensions import Self
 
 
-class Page(BaseModel):
+class BasePage(BaseModel):
     content: list[Any]
     is_first: bool
     is_last: bool
 
 
-PageType = TypeVar("PageType", bound=Page)
+class Page(BasePage):
+    current_page: int = 1
+    next_page: int | None
+    previous_page: int | None
 
 
-class Paginator(Generic[PageType]):
+PageType = TypeVar("PageType", bound=BasePage)
+
+
+class BasePaginator(Generic[PageType]):
     order_by: tuple[str, ...]
 
     def __init__(
@@ -71,43 +77,17 @@ class Paginator(Generic[PageType]):
     async def get_total(self) -> int:
         return await self.queryset.count()
 
-    async def _get_page(self, page: int, reverse: bool = False) -> Page:
-        # this is a special intern reverse which really reverses a page
-        if page < 0 and self.page_size:
-            return await self.get_reverse_paginator()._get_page(-page, reverse=True)
-        else:
-            offset = self.page_size * (page - 1)
-        if self.previous_item_attr:
-            offset = max(offset - 1, 0)
-        if self.queryset._cache_fetch_all:
-            resultarr = await self.queryset
-            if self.page_size:
-                resultarr = resultarr[offset : offset + self.page_size + 1]
-            return self.convert_to_page(resultarr, is_first=offset == 0, reverse=reverse)
-        query = self.queryset
-        query = query.offset(offset)
-        if self.page_size:
-            query = query.limit(self.page_size + 1)
-        return self.convert_to_page(await query, is_first=offset == 0, reverse=reverse)
+    async def get_page(self) -> PageType:
+        raise NotImplementedError()
 
-    async def get_page(self, page: int = 1) -> Page:
-        if page == 0 or not isinstance(page, int):
-            raise ValueError(f"Invalid page parameter value: {page!r}")
-        if self.page_size == 0:
-            # for caching, there are no other pages, this does not apply to cursor!
-            page = 1
-        if page in self._page_cache:
-            return cast(Page, self._page_cache[page])
-        page_obj = await self._get_page(page=page)
-
-        self._page_cache[page] = cast(PageType, page_obj)
-        return page_obj
+    def shall_drop_first(self, is_first: bool) -> bool:
+        return bool(self.next_item_attr and not is_first)
 
     def convert_to_page(self, inp: Iterable, /, is_first: bool, reverse: bool = False) -> PageType:
         last_item: Any = None
+        drop_first = self.shall_drop_first(is_first)
         result_list = []
         item_counter = 0
-        drop_first = not is_first and self.previous_item_attr
         for item in inp:
             if reverse:
                 if self.next_item_attr:
@@ -137,13 +117,17 @@ class Paginator(Generic[PageType]):
             result_list.append(last_item)
         if reverse:
             result_list.reverse()
-            return cast(PageType, Page(content=result_list, is_first=is_last, is_last=is_first))
+            return cast(
+                PageType, BasePage(content=result_list, is_first=is_last, is_last=is_first)
+            )
         else:
-            return cast(PageType, Page(content=result_list, is_first=is_first, is_last=is_last))
+            return cast(
+                PageType, BasePage(content=result_list, is_first=is_first, is_last=is_last)
+            )
 
     async def paginate_queryset(
         self, queryset: QuerySet, is_first: bool = True, prefill: Iterable | None = None
-    ) -> AsyncGenerator[PageType, None]:
+    ) -> AsyncGenerator[BasePage, None]:
         container: list = []
         if prefill is not None:
             container.extend(prefill)
@@ -155,7 +139,7 @@ class Paginator(Generic[PageType]):
             for item in await queryset:
                 container.append(item)
                 if self.page_size and len(container) >= min_size:
-                    page = self.convert_to_page(container, is_first=is_first)
+                    page = BasePaginator.convert_to_page(self, container, is_first=is_first)
                     yield page
                     if self.previous_item_attr and is_first:
                         min_size += 1
@@ -165,25 +149,17 @@ class Paginator(Generic[PageType]):
             async for item in queryset:
                 container.append(item)
                 if self.page_size and len(container) >= min_size:
-                    page = self.convert_to_page(container, is_first=is_first)
+                    page = BasePaginator.convert_to_page(self, container, is_first=is_first)
                     yield page
                     if self.previous_item_attr and is_first:
                         min_size += 1
                     is_first = False
                     container = [page.content[-1], item] if self.previous_item_attr else [item]
         if page is None or not page.is_last:
-            yield self.convert_to_page(container, is_first=is_first)
+            yield BasePaginator.convert_to_page(self, container, is_first=is_first)
 
-    async def paginate(self, start_page: int = 1) -> AsyncGenerator[PageType, None]:
-        query = self.queryset
-        if start_page > 1:
-            offset = self.page_size * (start_page - 1)
-            if self.previous_item_attr:
-                offset = max(offset - 1, 0)
-            if offset > 0:
-                query = query.offset(offset)
-        async for page in self.paginate_queryset(query, is_first=start_page == 1):
-            yield page
+    async def paginate(self) -> AsyncGenerator[PageType, None]:
+        raise NotImplementedError()
 
     def get_reverse_paginator(self) -> Self:
         if self._reverse_paginator is None:
@@ -195,3 +171,72 @@ class Paginator(Generic[PageType]):
             )
             self._reverse_paginator._reverse_paginator = self
         return self._reverse_paginator
+
+
+class Paginator(BasePaginator[Page]):
+    async def paginate(self, start_page: int = 1) -> AsyncGenerator[Page, None]:
+        query = self.queryset
+        if start_page > 1:
+            offset = self.page_size * (start_page - 1)
+            if self.previous_item_attr:
+                offset = max(offset - 1, 0)
+            if offset > 0:
+                query = query.offset(offset)
+        counter = 1
+        async for page_obj in self.paginate_queryset(query, is_first=start_page == 1):
+            yield Page(
+                **page_obj.__dict__,
+                next_page=None if page_obj.is_last else counter + 1,
+                previous_page=None if page_obj.is_first else counter - 1,
+                current_page=counter,
+            )
+            counter += 1
+
+    def convert_to_page(
+        self, inp: Iterable, /, page: int, is_first: bool, reverse: bool = False
+    ) -> Page:
+        page_obj: BasePage = super().convert_to_page(
+            inp,
+            is_first=is_first,
+            reverse=reverse,
+        )
+        return Page(
+            **page_obj.__dict__,
+            current_page=page,
+            next_page=None if page_obj.is_last else page + 1,
+            previous_page=None if page_obj.is_first else page + 1,
+        )
+
+    async def _get_page(self, page: int, reverse: bool = False) -> Page:
+        # this is a special intern reverse which really reverses a page
+        if page < 0 and self.page_size:
+            return await self.get_reverse_paginator()._get_page(-page, reverse=True)
+        else:
+            offset = self.page_size * (page - 1)
+        if self.previous_item_attr:
+            offset = max(offset - 1, 0)
+        if self.queryset._cache_fetch_all:
+            resultarr = await self.queryset
+            if self.page_size:
+                resultarr = resultarr[offset : offset + self.page_size + 1]
+            return self.convert_to_page(
+                resultarr, page=page, is_first=offset == 0, reverse=reverse
+            )
+        query = self.queryset
+        query = query.offset(offset)
+        if self.page_size:
+            query = query.limit(self.page_size + 1)
+        return self.convert_to_page(await query, page=page, is_first=offset == 0, reverse=reverse)
+
+    async def get_page(self, page: int = 1) -> Page:
+        if page == 0 or not isinstance(page, int):
+            raise ValueError(f"Invalid page parameter value: {page!r}")
+        if self.page_size == 0:
+            # for caching, there are no other pages, this does not apply to cursor!
+            page = 1
+        if page in self._page_cache:
+            return self._page_cache[page]
+        page_obj = await self._get_page(page=page)
+
+        self._page_cache[page] = page_obj
+        return page_obj
