@@ -12,6 +12,17 @@ hide:
 
 - Add the ChoiceField alternative CharChoiceField.
 
+### Changed
+
+- Cleanup the callback interface:
+  - The instances are only passed via ContextVars.
+  - `force_insert` is by `is_update` replaced.
+  - Delete uses now *_INSTANCE ContextVars.
+- Split `delete` in `delete` (CURRENT_INSTANCE set) and `real_delete` (CURRENT_MODEL_INSTANCE set) for better customizations.
+
+### Fixed
+
+- `QuerySet.create` passed the model instance as CURRENT_INSTANCE.
 
 ## 0.30.1
 

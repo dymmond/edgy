@@ -989,21 +989,27 @@ class BaseQuerySet(
         return queryset
 
     async def _model_based_delete(self) -> int:
-        queryset = self.limit(self._batch_size)
+        queryset = self.limit(self._batch_size) if not self._cache_fetch_all else self
         # we set embed_parent on the copy to None to get raw instances
         # embed_parent_filters is not affected
         queryset.embed_parent = None
-        counter = 0
+        row_count = 0
         models = await queryset
-        while models:
-            for model in models:
-                counter += 1
-                # delete issues already signals
-                await model.delete()
-            # clear cache and fetch new batch
-            models = await queryset.all(True)
+        token = CURRENT_INSTANCE.set(self)
+        await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
+        try:
+            while models:
+                for model in models:
+                    row_count += 1
+                    # delete issues already signals
+                    await model.delete()
+                # clear cache and fetch new batch
+                models = await queryset.all(True)
+        finally:
+            CURRENT_INSTANCE.reset(token)
         self._clear_cache()
-        return counter
+        await self.model_class.meta.signals.post_delete.send_async(self.__class__, instance=self, row_count=row_count)
+        return row_count
 
     async def _get_raw(self, **kwargs: Any) -> tuple[BaseModelType, Any]:
         """

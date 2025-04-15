@@ -110,10 +110,16 @@ class BaseModelType(ABC):
         """Save model"""
 
     @abstractmethod
+    async def real_delete(
+        self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
+    ) -> None:
+        """Delete Model. Raw version without CURRENT_INSTANCE set."""
+
+    @abstractmethod
     async def delete(
         self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
     ) -> None:
-        """Delete Model"""
+        """Delete Model. With CURRENT_INSTANCE set."""
 
     @abstractmethod
     async def load_recursive(

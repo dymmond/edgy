@@ -14,7 +14,9 @@ from pydantic import BaseModel
 
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.context_vars import (
+    CURRENT_FIELD_CONTEXT,
     CURRENT_INSTANCE,
+    CURRENT_MODEL_INSTANCE,
     EXPLICIT_SPECIFIED_VALUES,
     MODEL_GETATTR_BEHAVIOR,
     NO_GLOBAL_FIELD_CONSTRAINTS,
@@ -37,7 +39,7 @@ if TYPE_CHECKING:
 
     from edgy.core.connection.database import Database
     from edgy.core.connection.registry import Registry
-    from edgy.core.db.fields.types import BaseFieldType
+    from edgy.core.db.fields.types import FIELD_CONTEXT_TYPE, BaseFieldType
     from edgy.core.db.models.model import Model
     from edgy.core.db.querysets.base import QuerySet
 
@@ -535,11 +537,10 @@ class DatabaseMixin:
             EXPLICIT_SPECIFIED_VALUES.reset(token)
         return self
 
-    async def delete(
+    async def real_delete(
         self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
-    ) -> None:
+    ) -> int:
         """Delete operation from the database"""
-        await self.meta.signals.pre_delete.send_async(self.__class__, instance=self)
         # get values before deleting
         field_values: dict[str, Any] = {}
         if not skip_post_delete_hooks and self.meta.post_delete_fields:
@@ -570,10 +571,31 @@ class DatabaseMixin:
         # we cannot load anymore
         self._loaded_or_deleted = True
         # now cleanup with the saved values
-        for field_name, value in field_values.items():
-            field = self.meta.fields[field_name]
-            await field.post_delete_callback(value, instance=self)
+        if field_values:
+            token = CURRENT_MODEL_INSTANCE.set(self)
+            field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
+            token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
+            try:
+                for field_name, value in field_values.items():
+                    field = self.meta.fields[field_name]
+                    field_dict.clear()
+                    field_dict["field"] = field
+                    await field.post_delete_callback(value)
+            finally:
+                CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
+                CURRENT_MODEL_INSTANCE.reset(token)
+        return row_count
 
+    async def delete(
+        self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
+    ) -> None:
+        """Delete operation from the database"""
+        await self.meta.signals.pre_delete.send_async(self.__class__, instance=self)
+        token = CURRENT_INSTANCE.set(self)
+        try:
+            row_count = await self.real_delete(skip_post_delete_hooks=skip_post_delete_hooks, remove_referenced_call=remove_referenced_call)
+        finally:
+            CURRENT_INSTANCE.reset(token)
         await self.meta.signals.post_delete.send_async(
             self.__class__, instance=self, row_count=row_count
         )

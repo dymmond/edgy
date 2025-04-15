@@ -71,7 +71,7 @@ class BaseForeignKeyField(BaseForeignKey):
         if self.on_delete == SET_NULL and not self.null:
             terminal.write_warning("Declaring on_delete `SET NULL` but null is False.")
 
-    async def _notset_post_delete_callback(self, value: Any, instance: "BaseModelType") -> None:
+    async def _notset_post_delete_callback(self, value: Any) -> None:
         value = self.expand_relationship(value)
         if value is not None:
             await value.delete(remove_referenced_call=True)

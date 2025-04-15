@@ -49,20 +49,24 @@ You should also provide an init method which sets following attributes (when usi
 * `column_type` - either None (default) or the sqlalchemy column type
 * `inject_default_on_partial_update` - Add default value despite being a partial update. Useful for implementing `auto_now` or other fields which should change on every update.
 
-For advanced internal stuff you can use the callback fields. They will cause an different, less efficient code-path when updating, inserting or deleting models having fields with such attributes (can be mitigated by only updating non-effected fields). This is only true for QuerySet because model instances have no efficient sql shortcuts.
-So the best thing is to only set them if you require them. See e.g. RelatedField how to do that.
-
-* `pre_save_callback(value, original_value, is_update) -> dict`: Affects updates/insert. Can be used to parse special data-types to multiple db columns directly. It will be executed after `extract_column_values`. Advantage over clean: we have always an instance (saved/unsaved) and it is only called when actually saving.
-* `post_save_callback(value, is_update) -> dict`: Affects updates/inserts. Can be used to save files after db-updates succeed. It is executed after all fields are set to the instance via modify_input.
-* `post_delete_callback(value, instance) -> None`: Affects deletions. Automatically triggers a model based deletion (instead of using fast sql, the deletion takes place row by row). This is used for ContentTypes.
-
 !!! Note
     Instance checks can also be done against the `field_type` attribute in case you want to check the compatibility with other fields (composite style).
     The `annotation` field parameter is for pydantic (automatically set by factories).
     For examples have a look in `tests/fields/test_composite_fields.py` or in `edgy/core/db/fields/core.py`.
 
 !!! Note
-    Instance parameters and CURRENT_MODEL_INSTANCE are always model instances in contrast to the CURRENT_INSTANCE ContextVar.
+    The CURRENT_MODEL_INSTANCE is always the model instance in contrast to the CURRENT_INSTANCE ContextVar.
+
+For advanced internal stuff you can use the callback fields. They will cause an different, less efficient code-path when updating, inserting or deleting models having fields with such attributes (can be mitigated by only updating non-effected fields). This is only true for QuerySet because model instances have no efficient sql shortcuts.
+So the best thing is to only set them if you require them. See e.g. RelatedField how to do that.
+
+* `pre_save_callback(value, original_value, is_update) -> dict`: Affects updates/insert. Can be used to parse special data-types to multiple db columns directly. It will be executed after `extract_column_values`. Advantage over clean: we have always an instance (saved/unsaved) and it is only called when actually saving.
+* `post_save_callback(value, is_update) -> dict`: Affects updates/inserts. Can be used to save files after db-updates succeed. It is executed after all fields are set to the instance via modify_input.
+* `post_delete_callback(value) -> None`: Affects deletions. Automatically triggers a model based deletion (instead of using fast sql, the deletion takes place row by row). This is used for ContentTypes.
+
+
+!!! Note
+    The callbacks have no CURRENT_PHASE set. Use the is_update parameter to figure out what operation is executed.
 
 ## Tricks
 
