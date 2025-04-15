@@ -14,6 +14,7 @@ hide:
 - Split from Page and Paginator BasePaginator and BasePage.
 - Add fields next_page, previous_page, current_page to Page.
 - Add field current_cursor to CursorPage.
+- Make specifying all of the page attributes mandatory.
 
 ### Fixed
 

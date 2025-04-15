@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import AsyncGenerator, Hashable, Iterable
-from typing import TYPE_CHECKING, Any, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generic, Optional, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -23,8 +23,8 @@ class BasePage(BaseModel):
 
 class Page(BasePage):
     current_page: int = 1
-    next_page: int | None
-    previous_page: int | None
+    next_page: Optional[int]
+    previous_page: Optional[int]
 
 
 PageType = TypeVar("PageType", bound=BasePage)
@@ -40,7 +40,7 @@ class BasePaginator(Generic[PageType]):
         next_item_attr: str = "",
         previous_item_attr: str = "",
     ) -> None:
-        self._reverse_paginator: Self | None = None
+        self._reverse_paginator: Optional[Self] = None
         self.page_size = int(page_size)
         if page_size < 0:
             raise ValueError("page_size must be at least 0")

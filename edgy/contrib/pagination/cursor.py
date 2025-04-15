@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Hashable, Iterable
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from .base import BasePage, BasePaginator
 
@@ -11,8 +11,8 @@ if TYPE_CHECKING:
 
 
 class CursorPage(BasePage):
-    next_cursor: Hashable
-    current_cursor: Hashable
+    next_cursor: Optional[Hashable]
+    current_cursor: Optional[Hashable]
 
 
 class CursorPaginator(BasePaginator[CursorPage]):
@@ -64,7 +64,7 @@ class CursorPaginator(BasePaginator[CursorPage]):
         self._reverse_page_cache.clear()
 
     def convert_to_page(
-        self, inp: Iterable, /, cursor: Hashable | None, is_first: bool, reverse: bool = False
+        self, inp: Iterable, /, cursor: Optional[Hashable], is_first: bool, reverse: bool = False
     ) -> CursorPage:
         page_obj: BasePage = super().convert_to_page(
             inp,
@@ -96,8 +96,8 @@ class CursorPaginator(BasePaginator[CursorPage]):
 
     async def _get_page_after(
         self,
-        vector: tuple | None,
-        injected_extra: list[BaseModelType] | None = None,
+        vector: Optional[tuple[Hashable, ...]],
+        injected_extra: Optional[list[BaseModelType]] = None,
         reverse: bool = False,
     ) -> tuple[CursorPage, list[BaseModelType]]:
         query = self.queryset.limit(self.page_size + 1) if self.page_size else self.queryset
@@ -130,8 +130,8 @@ class CursorPaginator(BasePaginator[CursorPage]):
         )
         return page_obj, resultarr
 
-    async def get_page_after(self, cursor: Hashable = None) -> CursorPage:
-        vector: tuple | None = None
+    async def get_page_after(self, cursor: Optional[Hashable] = None) -> CursorPage:
+        vector: Optional[tuple[Hashable, ...]] = None
         if cursor is not None:
             vector = self.cursor_to_vector(cursor)
         if vector in self._page_cache:
@@ -141,15 +141,15 @@ class CursorPaginator(BasePaginator[CursorPage]):
         self._page_cache[vector] = page_obj
         return page_obj
 
-    async def get_page_before(self, cursor: Hashable = None) -> CursorPage:
-        vector: tuple | None = None
+    async def get_page_before(self, cursor: Optional[Hashable] = None) -> CursorPage:
+        vector: Optional[tuple[Hashable, ...]] = None
         if cursor is not None:
             vector = self.cursor_to_vector(cursor)
         if vector in self._reverse_page_cache:
             page_obj = self._reverse_page_cache[vector]
             return page_obj
         reverse_paginator = self.get_reverse_paginator()
-        new_vector: tuple | None = None
+        new_vector: Optional[tuple[Hashable, ...]] = None
         # to match the cursors we need to go back one more item
         injected_reverse = (
             await reverse_paginator.get_extra_before(vector) if vector is not None else []
@@ -172,7 +172,9 @@ class CursorPaginator(BasePaginator[CursorPage]):
         self._reverse_page_cache[vector] = reverse_page
         return page_obj
 
-    async def get_page(self, cursor: Hashable = None, backward: bool = False) -> CursorPage:
+    async def get_page(
+        self, cursor: Optional[Hashable] = None, backward: bool = False
+    ) -> CursorPage:
         # this reverse only reverses the direction in which the cursor is evaluated
         if backward:
             return await self.get_page_before(cursor)
@@ -180,11 +182,11 @@ class CursorPaginator(BasePaginator[CursorPage]):
             return await self.get_page_after(cursor)
 
     async def paginate(
-        self, start_cursor: Hashable = None, stop_cursor: Hashable = None
+        self, start_cursor: Optional[Hashable] = None, stop_cursor: Optional[Hashable] = None
     ) -> AsyncGenerator[CursorPage, None]:
         query = self.queryset
         prefill_container = []
-        start_vector: tuple[Hashable, ...] | None = None
+        start_vector: Optional[tuple[Hashable, ...]] = None
         if start_cursor is not None:
             start_vector = self.cursor_to_vector(start_cursor)
             query = query.filter(**dict(zip(self.search_vector, start_vector)))
@@ -195,7 +197,7 @@ class CursorPaginator(BasePaginator[CursorPage]):
             query = query.filter(
                 **dict(zip(self.get_reverse_paginator().search_vector, stop_vector))
             )
-        current_cursor: Hashable | None = (
+        current_cursor: Optional[Hashable] = (
             None if start_vector is None else self.vector_to_cursor(start_vector)
         )
         async for page in self.paginate_queryset(
