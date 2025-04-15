@@ -58,11 +58,11 @@ You should also provide an init method which sets following attributes (when usi
     The CURRENT_MODEL_INSTANCE is always the model instance in contrast to the CURRENT_INSTANCE ContextVar.
 
 For advanced internal stuff you can use the callback fields. They will cause an different, less efficient code-path when updating, inserting or deleting models having fields with such attributes (can be mitigated by only updating non-effected fields). This is only true for QuerySet because model instances have no efficient sql shortcuts.
-So the best thing is to only set them if you require them. See e.g. RelatedField how to do that.
+So the best thing is to only set them if you require them. See e.g. RelatedField how to do that. You will need them if you have async code you want to execute while cleaning.
 
-* `pre_save_callback(value, original_value, is_update) -> dict`: Affects updates/insert. Can be used to parse special data-types to multiple db columns directly. It will be executed after `extract_column_values`. Advantage over clean: we have always an instance (saved/unsaved) and it is only called when actually saving.
-* `post_save_callback(value, is_update) -> dict`: Affects updates/inserts. Can be used to save files after db-updates succeed. It is executed after all fields are set to the instance via modify_input.
-* `post_delete_callback(value) -> None`: Affects deletions. Automatically triggers a model based deletion (instead of using fast sql, the deletion takes place row by row). This is used for ContentTypes.
+* `async def pre_save_callback(value, original_value, is_update) -> dict`: Affects updates/insert. Can be used to parse special data-types to multiple db columns directly. It will be executed after `extract_column_values`. Advantage over clean: we have always an instance (saved/unsaved) and it is only called when actually saving.
+* `async def post_save_callback(value, is_update) -> dict`: Affects updates/inserts. Can be used to save files after db-updates succeed. It is executed after all fields are set to the instance via modify_input.
+* `async def post_delete_callback(value) -> None`: Affects deletions. Automatically triggers a model based deletion (instead of using fast sql, the deletion takes place row by row). This is used for ContentTypes.
 
 
 !!! Note
