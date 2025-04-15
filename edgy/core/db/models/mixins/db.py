@@ -485,7 +485,7 @@ class DatabaseMixin:
             model_instance=self,
             evaluate_values=True,
         )
-        await pre_fn(self.__class__, instance=self, values=kwargs, column_values=column_values)
+        await pre_fn(self.__class__, instance=instance, values=kwargs, column_values=column_values)
         # empty updates shouldn't cause an error. E.g. only model references are updated
         clauses = self.identifying_clauses()
         token = CURRENT_INSTANCE.set(self)
@@ -514,7 +514,7 @@ class DatabaseMixin:
         if column_values or kwargs:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
-        await post_fn(self.__class__, instance=self, values=kwargs, column_values=column_values)
+        await post_fn(self.__class__, instance=instance, values=kwargs, column_values=column_values)
 
     async def update(self: Model, **kwargs: Any) -> Model:
         token = EXPLICIT_SPECIFIED_VALUES.set(set(kwargs.keys()))
@@ -618,7 +618,7 @@ class DatabaseMixin:
             model_instance=self,
             evaluate_values=evaluate_values,
         )
-        await pre_fn(self.__class__, instance=self, column_values=column_values, values=kwargs)
+        await pre_fn(self.__class__, instance=instance, column_values=column_values, values=kwargs)
         check_db_connection(self.database, stacklevel=4)
         token = CURRENT_INSTANCE.set(instance)
         try:
@@ -649,7 +649,7 @@ class DatabaseMixin:
             CURRENT_INSTANCE.reset(token)
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False
-        await post_fn(self.__class__, instance=self, column_values=column_values, values=kwargs)
+        await post_fn(self.__class__, instance=instance, column_values=column_values, values=kwargs)
 
         return self
 
