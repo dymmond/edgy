@@ -1526,7 +1526,7 @@ class QuerySet(BaseQuerySet):
                 database=queryset.database,
             )
             # values=set(kwargs.keys()) is required for marking the provided kwargs as explicit provided kwargs
-            instance = await instance.save(force_insert=True, values=set(kwargs.keys()))
+            instance = await instance._save(force_insert=True, values=set(kwargs.keys()), instance=self)
             result = await self._embed_parent_in_result(instance)
             self._clear_cache(True)
             self._cache.update([result])
@@ -1559,7 +1559,7 @@ class QuerySet(BaseQuerySet):
                 original, phase="prepare_insert", instance=self
             )
             col_values.update(
-                await obj.execute_pre_save_hooks(col_values, original, force_insert=True)
+                await obj.execute_pre_save_hooks(col_values, original, is_update=False)
             )
             return col_values
 
@@ -1573,7 +1573,7 @@ class QuerySet(BaseQuerySet):
             if new_objs:
                 for obj in new_objs:
                     await obj.execute_post_save_hooks(
-                        self.model_class.meta.fields.keys(), force_insert=True
+                        self.model_class.meta.fields.keys(), is_update=False
                     )
         finally:
             CURRENT_INSTANCE.reset(token)
@@ -1616,7 +1616,7 @@ class QuerySet(BaseQuerySet):
                         model_instance=obj,
                     )
                     update.update(
-                        await obj.execute_pre_save_hooks(update, extracted, force_insert=False)
+                        await obj.execute_pre_save_hooks(update, extracted, is_update=True)
                     )
                     if "id" in update:
                         update["__id"] = update.pop("id")
@@ -1635,7 +1635,7 @@ class QuerySet(BaseQuerySet):
                 and not self.model_class.meta.post_save_fields.isdisjoint(fields)
             ):
                 for obj in objs:
-                    await obj.execute_post_save_hooks(fields, force_insert=False)
+                    await obj.execute_post_save_hooks(fields, is_update=True)
         finally:
             CURRENT_INSTANCE.reset(token)
 
@@ -1727,7 +1727,7 @@ class QuerySet(BaseQuerySet):
                 original, phase="prepare_insert", instance=self
             )
             col_values.update(
-                await obj.execute_pre_save_hooks(col_values, original, force_insert=True)
+                await obj.execute_pre_save_hooks(col_values, original, is_update=False)
             )
             return col_values
 
@@ -1744,7 +1744,7 @@ class QuerySet(BaseQuerySet):
                 self._clear_cache()
                 for obj in new_objs:
                     await obj.execute_post_save_hooks(
-                        self.model_class.meta.fields.keys(), force_insert=True
+                        self.model_class.meta.fields.keys(), is_update=False
                     )
         finally:
             CURRENT_INSTANCE.reset(token)

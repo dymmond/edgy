@@ -77,7 +77,7 @@ class BaseForeignKeyField(BaseForeignKey):
             await value.delete(remove_referenced_call=True)
 
     async def pre_save_callback(
-        self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
+        self, value: Any, original_value: Any, is_update
     ) -> dict[str, Any]:
         target = self.target
         # value is clean result, check what is provided as kwarg
@@ -90,7 +90,7 @@ class BaseForeignKeyField(BaseForeignKey):
             return self.clean(self.name, value, for_query=False, hook_call=True)
         elif isinstance(value, dict):
             return await self.pre_save_callback(
-                target(**value), original_value=None, force_insert=force_insert, instance=instance
+                target(**value), original_value=None, is_update=is_update
             )
         # don't mess around when None, we cannot save something here
         if value is None:

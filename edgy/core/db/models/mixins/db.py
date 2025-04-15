@@ -39,6 +39,7 @@ if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.model import Model
+    from edgy.core.db.querysets.base import QuerySet
 
 
 _empty = cast(set[str], frozenset())
@@ -470,6 +471,7 @@ class DatabaseMixin:
         kwargs: dict[str, Any],
         pre_fn: Callable[..., Awaitable],
         post_fn: Callable[..., Awaitable],
+        instance: Union[BaseModelType, QuerySet]
     ) -> Any:
         """
         Update operation of the database fields.
@@ -493,9 +495,7 @@ class DatabaseMixin:
                 async with self.database as database, database.transaction():
                     # can update column_values
                     column_values.update(
-                        await self.execute_pre_save_hooks(
-                            column_values, kwargs, force_insert=False
-                        )
+                        await self.execute_pre_save_hooks(column_values, kwargs, is_update=True)
                     )
                     expression = self.table.update().values(**column_values).where(*clauses)
                     await database.execute(expression)
@@ -507,9 +507,7 @@ class DatabaseMixin:
                 self.__dict__.update(new_kwargs)
 
             # updates aren't required to change the db, they can also just affect the meta fields
-            await self.execute_post_save_hooks(
-                cast(Sequence[str], kwargs.keys()), force_insert=False
-            )
+            await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()), is_update=True)
 
         finally:
             CURRENT_INSTANCE.reset(token)
@@ -531,6 +529,7 @@ class DatabaseMixin:
                 post_fn=partial(
                     self.meta.signals.post_update.send_async, is_update=True, is_migration=False
                 ),
+                instance=self
             )
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token)
@@ -605,6 +604,7 @@ class DatabaseMixin:
         kwargs: dict[str, Any],
         pre_fn: Callable[..., Awaitable],
         post_fn: Callable[..., Awaitable],
+        instance: Union[BaseModelType, QuerySet]
     ) -> Model:
         """
         Performs the save instruction.
@@ -614,18 +614,18 @@ class DatabaseMixin:
             is_partial=False,
             is_update=False,
             phase="prepare_insert",
-            instance=self,
+            instance=instance,
             model_instance=self,
             evaluate_values=evaluate_values,
         )
         await pre_fn(self.__class__, instance=self, column_values=column_values, values=kwargs)
         check_db_connection(self.database, stacklevel=4)
-        token = CURRENT_INSTANCE.set(self)
+        token = CURRENT_INSTANCE.set(instance)
         try:
             async with self.database as database, database.transaction():
                 # can update column_values
                 column_values.update(
-                    await self.execute_pre_save_hooks(column_values, kwargs, force_insert=True)
+                    await self.execute_pre_save_hooks(column_values, kwargs, is_update=False)
                 )
                 expression = self.table.insert().values(**column_values)
                 autoincrement_value = await database.execute(expression)
@@ -643,7 +643,7 @@ class DatabaseMixin:
 
             if self.meta.post_save_fields:
                 await self.execute_post_save_hooks(
-                    cast(Sequence[str], kwargs.keys()), force_insert=True
+                    cast(Sequence[str], kwargs.keys()), is_update=False
                 )
         finally:
             CURRENT_INSTANCE.reset(token)
@@ -653,24 +653,12 @@ class DatabaseMixin:
 
         return self
 
-    async def save(
+    async def _save(
         self: Model,
-        force_insert: bool = False,
-        values: Union[dict[str, Any], set[str], None] = None,
-        force_save: Optional[bool] = None,
+        force_insert: bool,
+        values: Union[dict[str, Any], set[str], None],
+        instance: Union[BaseModelType, QuerySet]
     ) -> Model:
-        """
-        Performs a save of a given model instance.
-        When creating a user it will make sure it can update existing or
-        create a new one.
-        """
-        if force_save is not None:
-            warnings.warn(
-                "'force_save' is deprecated in favor of 'force_insert'",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            force_insert = force_save
 
         extracted_fields = self.extract_db_fields()
         if values is None:
@@ -716,6 +704,7 @@ class DatabaseMixin:
                     post_fn=partial(
                         self.meta.signals.post_save.send_async, is_update=False, is_migration=False
                     ),
+                    instance=instance
                 )
             else:
                 await self._update(
@@ -728,10 +717,35 @@ class DatabaseMixin:
                     post_fn=partial(
                         self.meta.signals.post_save.send_async, is_update=True, is_migration=False
                     ),
+                    instance=instance
                 )
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token2)
         return self
+
+    async def save(
+        self: Model,
+        force_insert: bool = False,
+        values: Union[dict[str, Any], set[str], None] = None,
+        force_save: Optional[bool] = None,
+    ) -> Model:
+        """
+        Performs a save of a given model instance.
+        When creating a user it will make sure it can update existing or
+        create a new one.
+        """
+        if force_save is not None:
+            warnings.warn(
+                "'force_save' is deprecated in favor of 'force_insert'",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            force_insert = force_save
+        return await self._save(
+            force_insert=force_insert,
+            values=values,
+            instance=self
+        )
 
     @classmethod
     def build(

@@ -216,7 +216,8 @@ class Registry:
             ) -> None:
                 # To reduce the memory usage, only retrieve pknames and load per object
                 # We need to load all at once because otherwise the cursor could interfere with updates
-                for obj in await _model.query.filter(**_filter_kwargs).only(*_model.pknames):
+                query =  _model.query.filter(**_filter_kwargs).only(*_model.pknames)
+                for obj in await query:
                     await obj.load()
                     kwargs = {
                         k: v for k, v in obj.extract_db_fields().items() if k not in _field_set
@@ -239,6 +240,7 @@ class Registry:
                             is_update=True,
                             is_migration=True,
                         ),
+                        instance=query
                     )
 
             ops.append(wrapper_fn())

@@ -144,11 +144,11 @@ class BaseModelType(ABC):
         """
 
     @abstractmethod
-    async def execute_post_save_hooks(self, fields: Sequence[str], force_insert: bool) -> None: ...
+    async def execute_post_save_hooks(self, fields: Sequence[str], is_update: bool) -> None: ...
 
     @abstractmethod
     async def execute_pre_save_hooks(
-        self, values: dict[str, Any], original: dict[str, Any], force_insert: bool
+        self, values: dict[str, Any], original: dict[str, Any], is_update: bool
     ) -> dict[str, Any]:
         """
         For async operations after clean. Can be used to reintroduce stripped values for save.

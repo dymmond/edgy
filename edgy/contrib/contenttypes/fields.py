@@ -2,7 +2,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union, cast
 
 from edgy.core.db.constants import CASCADE
-from edgy.core.db.context_vars import CURRENT_FIELD_CONTEXT
+from edgy.core.db.context_vars import CURRENT_FIELD_CONTEXT, CURRENT_MODEL_INSTANCE
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField, ForeignKey
 from edgy.core.db.relationships.relation import SingleRelation
 from edgy.core.terminal import Print
@@ -17,8 +17,9 @@ terminal = Print()
 
 class BaseContentTypeField(BaseForeignKeyField):
     async def pre_save_callback(
-        self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
+        self, value: Any, original_value: Any, is_update: bool
     ) -> dict[str, Any]:
+        instance = CURRENT_MODEL_INSTANCE.get()
         target = self.target
         if value is None or (isinstance(value, dict) and not value):
             value = original_value
@@ -27,7 +28,7 @@ class BaseContentTypeField(BaseForeignKeyField):
             value.name = self.owner.__name__
             value.schema_name = instance.get_active_instance_schema()
         return await super().pre_save_callback(
-            value, original_value, force_insert=force_insert, instance=instance
+            value, original_value, is_update=is_update
         )
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:

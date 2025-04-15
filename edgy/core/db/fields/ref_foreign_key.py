@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any, Optional, Union, cast
 
 import edgy
-from edgy.core.db.context_vars import CURRENT_PHASE
+from edgy.core.db.context_vars import CURRENT_MODEL_INSTANCE, CURRENT_PHASE
 from edgy.core.db.fields.base import BaseField
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.exceptions import ModelReferenceError
@@ -59,10 +59,10 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         cls,
         field_obj: "BaseFieldType",
         value: Optional[list],
-        instance: "BaseModelType",
-        force_insert: bool,
+        is_update: bool,
         original_fn: Any = None,
     ) -> None:
+        instance = CURRENT_MODEL_INSTANCE.get()
         if not value:
             return
         model_ref = field_obj.to
