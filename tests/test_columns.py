@@ -42,6 +42,7 @@ class Product(edgy.StrictModel):
     huge_number = fields.BigIntegerField(default=0)
     price = fields.DecimalField(max_digits=9, decimal_places=2, null=True)
     status = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
+    status2 = fields.CharChoiceField(StatusEnum, default=StatusEnum.DRAFT)
     value = fields.FloatField(null=True)
 
     class Meta:
@@ -102,6 +103,7 @@ async def test_model_crud():
     assert product.huge_number == 0
     assert product.price is None
     assert product.status == StatusEnum.DRAFT
+    assert product.status2 == StatusEnum.DRAFT
     assert product.value is None
     assert product.uuid is None
 
@@ -109,6 +111,7 @@ async def test_model_crud():
         data={"foo": 123},
         value=123.456,
         status=StatusEnum.RELEASED,
+        status2=StatusEnum.RELEASED,
         price=decimal.Decimal("999.99"),
         uuid=uuid.UUID("f4e87646-bafa-431e-a0cb-e84f2fcf6b55"),
     )
@@ -117,6 +120,7 @@ async def test_model_crud():
     assert product.value == 123.456
     assert product.data == {"foo": 123}
     assert product.status == StatusEnum.RELEASED
+    assert product.status2 == StatusEnum.RELEASED
     assert product.price == decimal.Decimal("999.99")
     assert product.uuid == uuid.UUID("f4e87646-bafa-431e-a0cb-e84f2fcf6b55")
 

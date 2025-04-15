@@ -12,6 +12,7 @@ from edgy.core.db.fields import (
     BigIntegerField,
     BinaryField,
     BooleanField,
+    CharChoiceField,
     CharField,
     ChoiceField,
     DateField,
@@ -58,6 +59,7 @@ def test_column_type():
     assert isinstance(DecimalField.get_column_type({}), sqlalchemy.Numeric)
     assert isinstance(UUIDField.get_column_type({}), sqlalchemy.Uuid)
     assert isinstance(ChoiceField.get_column_type({"choices": Choices}), sqlalchemy.Enum)
+    assert isinstance(CharChoiceField.get_column_type({"choices": Choices}), sqlalchemy.String)
 
 
 @pytest.mark.parametrize(
@@ -77,6 +79,7 @@ def test_column_type():
         (SmallIntegerField(), int),
         (DecimalField(max_digits=20, decimal_places=2), decimal.Decimal),
         (ChoiceField(choices=Choices), enum.Enum),
+        (CharChoiceField(choices=Choices), enum.Enum),
     ],
 )
 def test_field_annotation(field, annotation):
@@ -302,17 +305,24 @@ def test_can_create_uuid_field():
     assert field.default == uuid.uuid4
 
 
-def test_can_choice_field():
+@pytest.mark.parametrize("field_klass", [ChoiceField, CharChoiceField])
+def test_can_choice_field(field_klass):
     class StatusChoice(str, enum.Enum):
         ACTIVE = "active"
         INACTIVE = "inactive"
 
-    field = ChoiceField(choices=StatusChoice)
+    field = field_klass(choices=StatusChoice)
 
     assert isinstance(field, BaseField)
     assert len(field.choices) == 2
+    assert field.clean("foo", "ACTIVE") == {"foo": StatusChoice.ACTIVE.value}
+    assert field.clean("foo", StatusChoice.INACTIVE) == {"foo": "inactive"}
+    assert field.to_model("foo", StatusChoice.INACTIVE)["foo"] is StatusChoice.INACTIVE
+    assert field.to_model("foo", "ACTIVE")["foo"] is StatusChoice.ACTIVE
 
 
-def test_raise_exception_choice_field():
+
+@pytest.mark.parametrize("field_klass", [ChoiceField, CharChoiceField])
+def test_raise_exception_choice_field(field_klass):
     with pytest.raises(FieldDefinitionError):
-        ChoiceField(choices=None)
+        field_klass(choices=None)
