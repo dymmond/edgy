@@ -21,10 +21,11 @@ hide:
 - Split `delete` in `delete` (only used for direct calls) and `raw_delete` for better customizations.
 - Remove internal only parameter `remove_referenced_call` from delete (but not from raw_delete).
 - Virtual cascade deletions doesn't trigger delete signals anymore.
+- `QuerySet.create` passes now the QuerySet instance as CURRENT_INSTANCE.
 
 ### Fixed
 
-- `QuerySet.create` passed the QuerySet instance as CURRENT_INSTANCE.
+- `QuerySet.create` passed the model instance as CURRENT_INSTANCE.
 - Virtual cascade deletions doesn't trigger delete signals anymore.
 
 ### Breaking
