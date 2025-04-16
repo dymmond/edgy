@@ -24,7 +24,7 @@ hide:
 
 ### Fixed
 
-- `QuerySet.create` passed the model instance as CURRENT_INSTANCE.
+- `QuerySet.create` passed the QuerySet instance as CURRENT_INSTANCE.
 - Virtual cascade deletions doesn't trigger delete signals anymore.
 
 ### Breaking
