@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.31.0
+
+### Added
+
+- Add the ChoiceField alternative CharChoiceField.
+
 
 ## 0.30.1
 

@@ -186,6 +186,8 @@ class MyModel(edgy.Model):
 
 #### ChoiceField
 
+An ChoiceField which uses the native SQLAlchemy Enum type. It has some problems when used with migrations and
+
 ```python
 from enum import Enum
 import edgy
@@ -198,12 +200,41 @@ class Status(Enum):
 class MyModel(edgy.Model):
     status: Status = edgy.ChoiceField(choices=Status, default=Status.ACTIVE)
     ...
+```
 
+!!! Tip
+    Use [CharChoiceField](#charchoicefield) instead when using with migrations or old databases.
+    It works internally by using a CharField.
+
+##### Parameters
+
+* `choices` - An enum containing the choices for the field.
+
+
+#### CharChoiceField
+
+An emulated ChoiceField. It has better database support but maybe adjustments in the key name length are required.
+
+```python
+from enum import Enum
+import edgy
+
+class Status(Enum):
+    ACTIVE = "active"
+    INACTIVE = "inactive"
+
+
+class MyModel(edgy.Model):
+    status: Status = edgy.CharChoiceField(choices=Status, default=Status.ACTIVE)
+    ...
 ```
 
 ##### Parameters
 
 * `choices` - An enum containing the choices for the field.
+* `max_length` - Max length or None for unlimited. By default 20.
+* `collation` - Like in CharField.
+
 
 #### CompositeField
 

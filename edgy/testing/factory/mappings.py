@@ -244,6 +244,7 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
     "ImageField": ImageField_callback,
     "FileField": FileField_callback,
     "ChoiceField": ChoiceField_callback,
+    "CharChoiceField": ChoiceField_callback,
     "CharField": edgy_field_param_extractor("name"),
     "DateField": edgy_field_param_extractor("date"),
     "DateTimeField": edgy_field_param_extractor("date_time"),

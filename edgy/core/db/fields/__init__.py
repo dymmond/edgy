@@ -7,13 +7,14 @@ from .types import BaseFieldType
 
 if TYPE_CHECKING:
     from .composite_field import CompositeField
+    from .computed_field import ComputedField
     from .core import (
         BigIntegerField,
         BinaryField,
         BooleanField,
+        CharChoiceField,
         CharField,
         ChoiceField,
-        ComputedField,
         DateField,
         DateTimeField,
         DecimalField,
@@ -24,7 +25,6 @@ if TYPE_CHECKING:
         IPAddressField,
         JSONField,
         PasswordField,
-        PlaceholderField,
         SmallIntegerField,
         TextField,
         TimeField,
@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     from .image_field import ImageField
     from .many_to_many import ManyToMany, ManyToManyField
     from .one_to_one_keys import OneToOne, OneToOneField
+    from .place_holder_field import PlaceholderField
     from .ref_foreign_key import RefForeignKey
 
 __all__ = [
@@ -47,6 +48,7 @@ __all__ = [
     "BooleanField",
     "CharField",
     "ChoiceField",
+    "CharChoiceField",
     "ComputedField",
     "CompositeField",
     "DateField",
@@ -85,6 +87,7 @@ Monkay(
         "BooleanField": ".core.BooleanField",
         "CharField": ".core.CharField",
         "ChoiceField": ".core.ChoiceField",
+        "CharChoiceField": ".core.CharChoiceField",
         "ComputedField": ".computed_field.ComputedField",
         "CompositeField": ".composite_field.CompositeField",
         "DateField": ".core.DateField",

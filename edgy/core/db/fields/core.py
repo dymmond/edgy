@@ -6,7 +6,7 @@ import ipaddress
 import uuid
 import warnings
 from collections.abc import Callable
-from enum import EnumMeta
+from enum import Enum, EnumMeta
 from re import Pattern
 from secrets import compare_digest
 from typing import TYPE_CHECKING, Annotated, Any, Optional, Union, cast
@@ -459,6 +459,66 @@ class ChoiceField(FieldFactory):
         if callable(default):
             default = default()
         return sqlalchemy.text(":value").bindparams(value=default.name)
+
+
+class CharChoiceField(ChoiceField):
+    @classmethod
+    def validate(cls, kwargs: dict[str, Any]) -> None:
+        super().validate(kwargs)
+        kwargs.setdefault("max_length", 30)
+        # we need to rename max_length. Pydantic will raise otherwise a TypeError
+        max_length = kwargs["key_max_length"] = kwargs.pop("max_length")
+        choice_class = kwargs.get("choices")
+        if max_length is not None:
+            for k in choice_class.__members__:
+                if len(k) > max_length:
+                    raise FieldDefinitionError(
+                        f"ChoiceField choice name {k} is longer than {max_length} characters."
+                        "Alternatively raise the max_length via explicitly passing a max_length argument or "
+                        "set it to None (less performant)."
+                    )
+
+    @classmethod
+    def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
+        max_length: Optional[int] = kwargs.get("key_max_length")
+        return (
+            sqlalchemy.Text(collation=kwargs.get("collation"))
+            if max_length is None
+            else sqlalchemy.String(length=max_length, collation=kwargs.get("collation"))
+        )
+
+    @classmethod
+    def to_model(
+        cls, field_obj: BaseFieldType, field_name: str, value: Any, original_fn: Any = None
+    ) -> dict[str, Any]:
+        return {field_name: cls.check(field_obj, value=value)}
+
+    @classmethod
+    def clean(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        value: Any,
+        for_query: bool = False,
+        original_fn: Any = None,
+    ) -> dict[str, Any]:
+        return {field_name: cls.check(field_obj, value=value).name}
+
+    @classmethod
+    def check(cls, field_obj: BaseFieldType, value: Any, original_fn: Any = None) -> Any:
+        if isinstance(value, Enum):
+            value = value.name
+        if not isinstance(value, str):
+            raise ValueError("Value must be a string or enum member.")
+        try:
+            return field_obj.choices.__members__[value]
+        except KeyError:
+            raise ValueError(f"Invalid enum key {value}.") from None
+
+    @classmethod
+    def get_default_value(cls, field_obj: BaseFieldType, original_fn: Any = None) -> Any:
+        default = original_fn()
+        return default.name
 
 
 class PasswordField(CharField):
