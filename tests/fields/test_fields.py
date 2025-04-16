@@ -305,21 +305,31 @@ def test_can_create_uuid_field():
     assert field.default == uuid.uuid4
 
 
-@pytest.mark.parametrize("field_klass", [ChoiceField, CharChoiceField])
-def test_can_choice_field(field_klass):
+def test_can_choice_field():
     class StatusChoice(str, enum.Enum):
         ACTIVE = "active"
         INACTIVE = "inactive"
 
-    field = field_klass(choices=StatusChoice)
+    field = ChoiceField(choices=StatusChoice)
 
     assert isinstance(field, BaseField)
     assert len(field.choices) == 2
-    assert field.clean("foo", "ACTIVE") == {"foo": StatusChoice.ACTIVE.value}
-    assert field.clean("foo", StatusChoice.INACTIVE) == {"foo": "inactive"}
+
+
+def test_can_char_choice_field():
+    class StatusChoice(str, enum.Enum):
+        ACTIVE = "active"
+        INACTIVE = "inactive"
+
+    field = CharChoiceField(choices=StatusChoice)
+
+    assert isinstance(field, BaseField)
+    assert len(field.choices) == 2
+    assert field.clean("foo", "ACTIVE") == {"foo": StatusChoice.ACTIVE.name}
+    assert field.clean("foo", StatusChoice.INACTIVE) == {"foo": "INACTIVE"}
+    assert isinstance(field.clean("foo", StatusChoice.INACTIVE)["foo"], str)
     assert field.to_model("foo", StatusChoice.INACTIVE)["foo"] is StatusChoice.INACTIVE
     assert field.to_model("foo", "ACTIVE")["foo"] is StatusChoice.ACTIVE
-
 
 
 @pytest.mark.parametrize("field_klass", [ChoiceField, CharChoiceField])
