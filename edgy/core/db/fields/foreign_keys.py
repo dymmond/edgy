@@ -76,7 +76,7 @@ class BaseForeignKeyField(BaseForeignKey):
         if value is not None:
             token = CURRENT_INSTANCE.set(value)
             try:
-                await value.raw_delete(remove_referenced_call=True)
+                await value.raw_delete(skip_post_delete_hooks=False, remove_referenced_call=True)
             finally:
                 CURRENT_INSTANCE.reset(token)
 
