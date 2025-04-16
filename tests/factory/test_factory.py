@@ -350,7 +350,7 @@ def test_mapping():
                 ),
                 {},
             )
-        elif field_type_name == "ChoiceField":
+        elif field_type_name == "ChoiceField" or field_type_name == "CharChoiceField":
             DEFAULT_MAPPING[field_type_name](
                 ProductFactory.meta.fields["type"],
                 ModelFactoryContextImplementation(
