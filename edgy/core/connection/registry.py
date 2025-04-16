@@ -18,7 +18,7 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 from edgy.conf import evaluate_settings_once_ready
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
-from edgy.core.db.context_vars import FORCE_FIELDS_NULLABLE
+from edgy.core.db.context_vars import CURRENT_INSTANCE, FORCE_FIELDS_NULLABLE
 from edgy.core.utils.sync import current_eventloop, run_sync
 from edgy.types import Undefined
 
@@ -227,21 +227,25 @@ class Registry:
                     # because of interlocking errors.
                     # Also the tables can get big
                     # is_partial = False
-                    await obj._update(
-                        False,
-                        kwargs,
-                        pre_fn=partial(
-                            _model.meta.signals.pre_update.send_async,
-                            is_update=True,
-                            is_migration=True,
-                        ),
-                        post_fn=partial(
-                            _model.meta.signals.post_update.send_async,
-                            is_update=True,
-                            is_migration=True,
-                        ),
-                        instance=query,
-                    )
+                    token = CURRENT_INSTANCE.set(query)
+                    try:
+                        await obj._update(
+                            False,
+                            kwargs,
+                            pre_fn=partial(
+                                _model.meta.signals.pre_update.send_async,
+                                is_update=True,
+                                is_migration=True,
+                            ),
+                            post_fn=partial(
+                                _model.meta.signals.post_update.send_async,
+                                is_update=True,
+                                is_migration=True,
+                            ),
+                            instance=query,
+                        )
+                    finally:
+                        CURRENT_INSTANCE.reset(token)
 
             ops.append(wrapper_fn())
         await asyncio.gather(*ops)

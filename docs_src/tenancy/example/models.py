@@ -50,7 +50,7 @@ class Tenant(edgy.Model):
     async def create_schema(self) -> None:
         await registry.schema.create_schema(self.schema_name)
 
-    async def save(
+    async def real_save(
         self,
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], None] = None,

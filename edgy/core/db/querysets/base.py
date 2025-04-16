@@ -1534,9 +1534,11 @@ class QuerySet(BaseQuerySet):
                 database=queryset.database,
             )
             # values=set(kwargs.keys()) is required for marking the provided kwargs as explicit provided kwargs
-            instance = await instance._save(
-                force_insert=True, values=set(kwargs.keys()), instance=self
-            )
+            token2 = CURRENT_INSTANCE.set(self)
+            try:
+                instance = await instance.real_save(force_insert=True, values=set(kwargs.keys()))
+            finally:
+                CURRENT_INSTANCE.reset(token2)
             result = await self._embed_parent_in_result(instance)
             self._clear_cache(True)
             self._cache.update([result])

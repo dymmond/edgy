@@ -102,6 +102,14 @@ class BaseModelType(ABC):
         """
 
     @abstractmethod
+    async def real_save(
+        self,
+        force_insert: bool = False,
+        values: Union[dict[str, Any], set[str], list[str], None] = None,
+    ) -> BaseModelType:
+        """Save model"""
+
+    @abstractmethod
     async def save(
         self,
         force_insert: bool = False,

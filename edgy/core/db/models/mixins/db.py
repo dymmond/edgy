@@ -490,29 +490,23 @@ class DatabaseMixin:
         await pre_fn(self.__class__, instance=instance, values=kwargs, column_values=column_values)
         # empty updates shouldn't cause an error. E.g. only model references are updated
         clauses = self.identifying_clauses()
-        token = CURRENT_INSTANCE.set(self)
-        try:
-            if column_values and clauses:
-                check_db_connection(self.database, stacklevel=4)
-                async with self.database as database, database.transaction():
-                    # can update column_values
-                    column_values.update(
-                        await self.execute_pre_save_hooks(column_values, kwargs, is_update=True)
-                    )
-                    expression = self.table.update().values(**column_values).where(*clauses)
-                    await database.execute(expression)
-
-                # Update the model instance.
-                new_kwargs = self.transform_input(
-                    column_values, phase="post_update", instance=self
+        if column_values and clauses:
+            check_db_connection(self.database, stacklevel=4)
+            async with self.database as database, database.transaction():
+                # can update column_values
+                column_values.update(
+                    await self.execute_pre_save_hooks(column_values, kwargs, is_update=True)
                 )
-                self.__dict__.update(new_kwargs)
+                expression = self.table.update().values(**column_values).where(*clauses)
+                await database.execute(expression)
 
-            # updates aren't required to change the db, they can also just affect the meta fields
-            await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()), is_update=True)
+            # Update the model instance.
+            new_kwargs = self.transform_input(column_values, phase="post_update", instance=self)
+            self.__dict__.update(new_kwargs)
 
-        finally:
-            CURRENT_INSTANCE.reset(token)
+        # updates aren't required to change the db, they can also just affect the meta fields
+        await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()), is_update=True)
+
         if column_values or kwargs:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
@@ -522,6 +516,7 @@ class DatabaseMixin:
 
     async def update(self: Model, **kwargs: Any) -> Model:
         token = EXPLICIT_SPECIFIED_VALUES.set(set(kwargs.keys()))
+        token2 = CURRENT_INSTANCE.set(self)
         try:
             # assume always partial
             await self._update(
@@ -537,6 +532,7 @@ class DatabaseMixin:
             )
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token)
+            CURRENT_INSTANCE.reset(token2)
         return self
 
     async def raw_delete(
@@ -645,33 +641,27 @@ class DatabaseMixin:
         )
         await pre_fn(self.__class__, instance=instance, column_values=column_values, values=kwargs)
         check_db_connection(self.database, stacklevel=4)
-        token = CURRENT_INSTANCE.set(instance)
-        try:
-            async with self.database as database, database.transaction():
-                # can update column_values
-                column_values.update(
-                    await self.execute_pre_save_hooks(column_values, kwargs, is_update=False)
-                )
-                expression = self.table.insert().values(**column_values)
-                autoincrement_value = await database.execute(expression)
-            # sqlalchemy supports only one autoincrement column
-            if autoincrement_value:
-                column = self.table.autoincrement_column
-                if column is not None and hasattr(autoincrement_value, "_mapping"):
-                    autoincrement_value = autoincrement_value._mapping[column.key]
-                # can be explicit set, which causes an invalid value returned
-                if column is not None and column.key not in column_values:
-                    column_values[column.key] = autoincrement_value
+        async with self.database as database, database.transaction():
+            # can update column_values
+            column_values.update(
+                await self.execute_pre_save_hooks(column_values, kwargs, is_update=False)
+            )
+            expression = self.table.insert().values(**column_values)
+            autoincrement_value = await database.execute(expression)
+        # sqlalchemy supports only one autoincrement column
+        if autoincrement_value:
+            column = self.table.autoincrement_column
+            if column is not None and hasattr(autoincrement_value, "_mapping"):
+                autoincrement_value = autoincrement_value._mapping[column.key]
+            # can be explicit set, which causes an invalid value returned
+            if column is not None and column.key not in column_values:
+                column_values[column.key] = autoincrement_value
 
-            new_kwargs = self.transform_input(column_values, phase="post_insert", instance=self)
-            self.__dict__.update(new_kwargs)
+        new_kwargs = self.transform_input(column_values, phase="post_insert", instance=self)
+        self.__dict__.update(new_kwargs)
 
-            if self.meta.post_save_fields:
-                await self.execute_post_save_hooks(
-                    cast(Sequence[str], kwargs.keys()), is_update=False
-                )
-        finally:
-            CURRENT_INSTANCE.reset(token)
+        if self.meta.post_save_fields:
+            await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()), is_update=False)
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False
         await post_fn(
@@ -680,12 +670,12 @@ class DatabaseMixin:
 
         return self
 
-    async def _save(
+    async def real_save(
         self: Model,
         force_insert: bool,
         values: Union[dict[str, Any], set[str], None],
-        instance: Union[BaseModelType, QuerySet],
     ) -> Model:
+        instance: Union[BaseModelType, QuerySet] = CURRENT_INSTANCE.get()
         extracted_fields = self.extract_db_fields()
         if values is None:
             explicit_values: set[str] = set()
@@ -767,7 +757,11 @@ class DatabaseMixin:
                 stacklevel=2,
             )
             force_insert = force_save
-        return await self._save(force_insert=force_insert, values=values, instance=self)
+        token = CURRENT_INSTANCE.set(self)
+        try:
+            return await self.real_save(force_insert=force_insert, values=values)
+        finally:
+            CURRENT_INSTANCE.reset(token)
 
     @classmethod
     def build(
