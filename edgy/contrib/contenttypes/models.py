@@ -30,10 +30,13 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
             .get()
         )
 
-    async def real_delete(
-        self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
+    async def raw_delete(
+        self, *, skip_post_delete_hooks: bool, remove_referenced_call: bool
     ) -> None:
-        await super().real_delete(skip_post_delete_hooks=skip_post_delete_hooks)
+        await super().raw_delete(
+            skip_post_delete_hooks=skip_post_delete_hooks,
+            remove_referenced_call=remove_referenced_call,
+        )
         if remove_referenced_call:
             return
         reverse_name = f"reverse_{self.name.lower()}"

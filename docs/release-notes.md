@@ -18,11 +18,23 @@ hide:
   - The instances are only passed via ContextVars.
   - `force_insert` is by `is_update` replaced.
   - Delete uses now *_INSTANCE ContextVars.
-- Split `delete` in `delete` (CURRENT_INSTANCE set) and `real_delete` (CURRENT_MODEL_INSTANCE set) for better customizations.
+- Split `delete` in `delete` (only used for direct calls) and `raw_delete` for better customizations.
+- Remove internal only parameter `remove_referenced_call` from delete (but not from raw_delete).
+- Virtual cascade deletions doesn't trigger delete signals anymore.
 
 ### Fixed
 
 - `QuerySet.create` passed the model instance as CURRENT_INSTANCE.
+- Virtual cascade deletions doesn't trigger delete signals anymore.
+
+### Breaking
+
+- For authors of custom fields: the interface of the async callback hooks changed:
+  - The instances are only passed via ContextVars.
+  - `force_insert` is by `is_update` replaced.
+  - Delete callbacks use now *_INSTANCE ContextVars.
+- When you overwrote the `delete` method of a model, you probably want to overwrite now `raw_delete`.
+- `delete` losses its internal only parameter `remove_referenced_call`.
 
 ## 0.30.1
 

@@ -164,7 +164,7 @@ then you can simply declare the model without the `id`.
 {!> ../docs_src/models/default_model.py !}
 ```
 
-##### Customizing the deletion variant
+##### Customizing the deletion
 
 By default a database only deletion is used where possible when using the QuerySet delete method.
 
@@ -172,6 +172,11 @@ If you want to force the QuerySet calling the delete method of the model instead
 you can set the class variable:
 
 `__require_model_based_deletion__ = True`
+
+Afterwards you can overwrite the `async def raw_delete(skip_post_delete_hooks, remove_referenced_call)` method
+for customizing the deletion for QuerySet deletions and direct deletions of a model instance.
+If you only want a special deletion when called directly on a model instance,
+then overload `async def delete(skip_post_delete_hooks=False)`.
 
 ##### Copying a model to a new registry
 

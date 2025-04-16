@@ -27,9 +27,7 @@ class BaseContentTypeField(BaseForeignKeyField):
         if isinstance(value, (target, target.proxy_model)):
             value.name = self.owner.__name__
             value.schema_name = instance.get_active_instance_schema()
-        return await super().pre_save_callback(
-            value, original_value, is_update=is_update
-        )
+        return await super().pre_save_callback(value, original_value, is_update=is_update)
 
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         if self.relation_fn is not None:

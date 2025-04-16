@@ -473,7 +473,7 @@ class DatabaseMixin:
         kwargs: dict[str, Any],
         pre_fn: Callable[..., Awaitable],
         post_fn: Callable[..., Awaitable],
-        instance: Union[BaseModelType, QuerySet]
+        instance: Union[BaseModelType, QuerySet],
     ) -> Any:
         """
         Update operation of the database fields.
@@ -516,7 +516,9 @@ class DatabaseMixin:
         if column_values or kwargs:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
-        await post_fn(self.__class__, instance=instance, values=kwargs, column_values=column_values)
+        await post_fn(
+            self.__class__, instance=instance, values=kwargs, column_values=column_values
+        )
 
     async def update(self: Model, **kwargs: Any) -> Model:
         token = EXPLICIT_SPECIFIED_VALUES.set(set(kwargs.keys()))
@@ -531,14 +533,14 @@ class DatabaseMixin:
                 post_fn=partial(
                     self.meta.signals.post_update.send_async, is_update=True, is_migration=False
                 ),
-                instance=self
+                instance=self,
             )
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token)
         return self
 
-    async def real_delete(
-        self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
+    async def raw_delete(
+        self: Model, *, skip_post_delete_hooks: bool, remove_referenced_call: bool
     ) -> int:
         """Delete operation from the database"""
         # get values before deleting
@@ -567,12 +569,12 @@ class DatabaseMixin:
             expression = self.table.delete().where(*clauses)
             check_db_connection(self.database)
             async with self.database as database:
-                row_count = await database.execute(expression)
+                row_count = cast(int, await database.execute(expression))
         # we cannot load anymore
         self._loaded_or_deleted = True
         # now cleanup with the saved values
         if field_values:
-            token = CURRENT_MODEL_INSTANCE.set(self)
+            token_instance = CURRENT_MODEL_INSTANCE.set(self)
             field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
             token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
             try:
@@ -583,17 +585,18 @@ class DatabaseMixin:
                     await field.post_delete_callback(value)
             finally:
                 CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
-                CURRENT_MODEL_INSTANCE.reset(token)
+                CURRENT_MODEL_INSTANCE.reset(token_instance)
         return row_count
 
-    async def delete(
-        self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
-    ) -> None:
+    async def delete(self: Model, skip_post_delete_hooks: bool = False) -> None:
         """Delete operation from the database"""
         await self.meta.signals.pre_delete.send_async(self.__class__, instance=self)
         token = CURRENT_INSTANCE.set(self)
         try:
-            row_count = await self.real_delete(skip_post_delete_hooks=skip_post_delete_hooks, remove_referenced_call=remove_referenced_call)
+            row_count = await self.raw_delete(
+                skip_post_delete_hooks=skip_post_delete_hooks,
+                remove_referenced_call=False,
+            )
         finally:
             CURRENT_INSTANCE.reset(token)
         await self.meta.signals.post_delete.send_async(
@@ -626,7 +629,7 @@ class DatabaseMixin:
         kwargs: dict[str, Any],
         pre_fn: Callable[..., Awaitable],
         post_fn: Callable[..., Awaitable],
-        instance: Union[BaseModelType, QuerySet]
+        instance: Union[BaseModelType, QuerySet],
     ) -> Model:
         """
         Performs the save instruction.
@@ -671,7 +674,9 @@ class DatabaseMixin:
             CURRENT_INSTANCE.reset(token)
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False
-        await post_fn(self.__class__, instance=instance, column_values=column_values, values=kwargs)
+        await post_fn(
+            self.__class__, instance=instance, column_values=column_values, values=kwargs
+        )
 
         return self
 
@@ -679,9 +684,8 @@ class DatabaseMixin:
         self: Model,
         force_insert: bool,
         values: Union[dict[str, Any], set[str], None],
-        instance: Union[BaseModelType, QuerySet]
+        instance: Union[BaseModelType, QuerySet],
     ) -> Model:
-
         extracted_fields = self.extract_db_fields()
         if values is None:
             explicit_values: set[str] = set()
@@ -726,7 +730,7 @@ class DatabaseMixin:
                     post_fn=partial(
                         self.meta.signals.post_save.send_async, is_update=False, is_migration=False
                     ),
-                    instance=instance
+                    instance=instance,
                 )
             else:
                 await self._update(
@@ -739,7 +743,7 @@ class DatabaseMixin:
                     post_fn=partial(
                         self.meta.signals.post_save.send_async, is_update=True, is_migration=False
                     ),
-                    instance=instance
+                    instance=instance,
                 )
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token2)
@@ -763,11 +767,7 @@ class DatabaseMixin:
                 stacklevel=2,
             )
             force_insert = force_save
-        return await self._save(
-            force_insert=force_insert,
-            values=values,
-            instance=self
-        )
+        return await self._save(force_insert=force_insert, values=values, instance=self)
 
     @classmethod
     def build(

@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     import zoneinfo
 
 
-
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
 
@@ -42,12 +41,7 @@ class IncrementOnSaveBaseField(Field):
                 return {self.name: value + self.increment_on_save}
         elif not self.primary_key:
             # update path
-            return {
-                self.name: (
-                    model_or_query
-                ).table.columns[self.name]
-                + self.increment_on_save
-            }
+            return {self.name: (model_or_query).table.columns[self.name] + self.increment_on_save}
         else:
             # update path
             return {}

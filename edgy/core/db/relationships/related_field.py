@@ -109,8 +109,6 @@ class RelatedField(RelationshipField):
     async def post_save_callback(self, value: ManyRelationProtocol, is_update: bool) -> None:
         await value.save_related()
 
-    async def _notset_post_delete_callback(
-        self, value: ManyRelationProtocol
-    ) -> None:
+    async def _notset_post_delete_callback(self, value: ManyRelationProtocol) -> None:
         if hasattr(value, "post_delete_callback"):
             await value.post_delete_callback()

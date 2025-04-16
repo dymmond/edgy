@@ -995,7 +995,7 @@ class BaseQuerySet(
         queryset.embed_parent = None
         row_count = 0
         models = await queryset
-        token = CURRENT_INSTANCE.set(self)
+        token = CURRENT_INSTANCE.set(cast("QuerySet", self))
         await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
         try:
             while models:
@@ -1008,7 +1008,9 @@ class BaseQuerySet(
         finally:
             CURRENT_INSTANCE.reset(token)
         self._clear_cache()
-        await self.model_class.meta.signals.post_delete.send_async(self.__class__, instance=self, row_count=row_count)
+        await self.model_class.meta.signals.post_delete.send_async(
+            self.__class__, instance=self, row_count=row_count
+        )
         return row_count
 
     async def _get_raw(self, **kwargs: Any) -> tuple[BaseModelType, Any]:
@@ -1532,7 +1534,9 @@ class QuerySet(BaseQuerySet):
                 database=queryset.database,
             )
             # values=set(kwargs.keys()) is required for marking the provided kwargs as explicit provided kwargs
-            instance = await instance._save(force_insert=True, values=set(kwargs.keys()), instance=self)
+            instance = await instance._save(
+                force_insert=True, values=set(kwargs.keys()), instance=self
+            )
             result = await self._embed_parent_in_result(instance)
             self._clear_cache(True)
             self._cache.update([result])

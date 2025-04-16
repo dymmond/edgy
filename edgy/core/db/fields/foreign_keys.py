@@ -13,7 +13,7 @@ import sqlalchemy
 from pydantic import BaseModel
 
 from edgy.core.db.constants import SET_DEFAULT, SET_NULL
-from edgy.core.db.context_vars import CURRENT_PHASE
+from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.types import BaseFieldType
@@ -74,10 +74,14 @@ class BaseForeignKeyField(BaseForeignKey):
     async def _notset_post_delete_callback(self, value: Any) -> None:
         value = self.expand_relationship(value)
         if value is not None:
-            await value.delete(remove_referenced_call=True)
+            token = CURRENT_INSTANCE.set(value)
+            try:
+                await value.raw_delete(remove_referenced_call=True)
+            finally:
+                CURRENT_INSTANCE.reset(token)
 
     async def pre_save_callback(
-        self, value: Any, original_value: Any, is_update
+        self, value: Any, original_value: Any, is_update: bool
     ) -> dict[str, Any]:
         target = self.target
         # value is clean result, check what is provided as kwarg
