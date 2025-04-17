@@ -902,7 +902,7 @@ users = await User.query.all() # 2 as total
 
 !!! Note
     `bulk_get_or_create` fetches when using `unique_fields` all matching entries in a list.
-    For reducing the amount searched, use something like `limit(100).bulk_get_or_create()`.
+    For reducing the amount searched, use something like `limit(100).bulk_get_or_create(..., unique_fields=[...])`.
 
 ## Operators
 
