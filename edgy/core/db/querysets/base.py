@@ -1700,28 +1700,22 @@ class QuerySet(BaseQuerySet):
                 found = False
                 # This fixes edgy-guardian bug when using databasez.iterate indirectly and
                 # is safe in case force_rollback is active
-                # Because there shouldn't be many records, we can use always fetch_all
-                # For extra safety disallow accidentally loads by getattr
-                token_behavior = MODEL_GETATTR_BEHAVIOR.set("passdown")
-                try:
-                    for model in await queryset.filter(**filter_kwargs).limit(self._batch_size):
-                        if all(
-                            getattr(model, k) == expected for k, expected in dict_fields.items()
-                        ):
-                            lookup_key = _extract_unique_lookup_key(model, unique_fields)
-                            assert lookup_key is not None, (
-                                "invalid fields/attributes in unique_fields"
-                            )
-                            if lookup_key not in existing_records:
-                                existing_records[lookup_key] = model
-                            found = True
-                            break
-                    if found is False:
-                        new_objs.append(
-                            queryset.model_class(**obj) if isinstance(obj, dict) else obj
+                for model in await queryset.filter(**filter_kwargs):
+                    if all(
+                        getattr(model, k) == expected for k, expected in dict_fields.items()
+                    ):
+                        lookup_key = _extract_unique_lookup_key(model, unique_fields)
+                        assert lookup_key is not None, (
+                            "invalid fields/attributes in unique_fields"
                         )
-                finally:
-                    MODEL_GETATTR_BEHAVIOR.reset(token_behavior)
+                        if lookup_key not in existing_records:
+                            existing_records[lookup_key] = model
+                        found = True
+                        break
+                if found is False:
+                    new_objs.append(
+                        queryset.model_class(**obj) if isinstance(obj, dict) else obj
+                    )
 
             retrieved_objs.extend(existing_records.values())
         else:
