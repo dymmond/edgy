@@ -30,6 +30,7 @@ hide:
 
 - `QuerySet.create` passed the model instance as CURRENT_INSTANCE.
 - Virtual cascade deletions doesn't trigger delete signals anymore.
+- Fix spurious iterate bug in `bulk_get_or_create`, triggered in `edgy-guardian`.
 
 ### Breaking
 

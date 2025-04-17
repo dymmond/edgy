@@ -1698,34 +1698,30 @@ class QuerySet(BaseQuerySet):
                 if lookup_key is not None and lookup_key in existing_records:
                     continue
                 found = False
-                if bool(queryset.database.force_rollback):
-                    for record in await queryset.filter(**filter_kwargs):
+                # This fixes edgy-guardian bug when using databasez.iterate indirectly and
+                # is safe in case force_rollback is active
+                # Because there shouldn't be many records, we can use always fetch_all
+                # For extra safety disallow loading records, this prevents accidentally loads
+                token_behavior = MODEL_GETATTR_BEHAVIOR.set("passdown")
+                try:
+                    for model in await queryset.filter(**filter_kwargs):
                         if all(
-                            getattr(record, k) == expected for k, expected in dict_fields.items()
+                            getattr(model, k) == expected for k, expected in dict_fields.items()
                         ):
-                            lookup_key = _extract_unique_lookup_key(record, unique_fields)
+                            lookup_key = _extract_unique_lookup_key(model, unique_fields)
                             assert lookup_key is not None, (
                                 "invalid fields/attributes in unique_fields"
                             )
                             if lookup_key not in existing_records:
-                                existing_records[lookup_key] = record
+                                existing_records[lookup_key] = model
                             found = True
                             break
-                else:
-                    async for record in queryset.filter(**filter_kwargs):
-                        if all(
-                            getattr(record, k) == expected for k, expected in dict_fields.items()
-                        ):
-                            lookup_key = _extract_unique_lookup_key(record, unique_fields)
-                            assert lookup_key is not None, (
-                                "invalid fields/attributes in unique_fields"
-                            )
-                            if lookup_key not in existing_records:
-                                existing_records[lookup_key] = record
-                            found = True
-                            break
-                if found is False:
-                    new_objs.append(queryset.model_class(**obj) if isinstance(obj, dict) else obj)
+                    if found is False:
+                        new_objs.append(
+                            queryset.model_class(**obj) if isinstance(obj, dict) else obj
+                        )
+                finally:
+                    MODEL_GETATTR_BEHAVIOR.reset(token_behavior)
 
             retrieved_objs.extend(existing_records.values())
         else:
