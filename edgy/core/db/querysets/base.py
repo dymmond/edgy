@@ -1701,6 +1701,7 @@ class QuerySet(BaseQuerySet):
                 # This fixes edgy-guardian bug when using databasez.iterate indirectly and
                 # is safe in case force_rollback is active
                 # Models can also issue loads by accessing attrs for building unique_fields
+                # For limiting use something like QuerySet.limit(100).bulk_get_or_create(...)
                 for model in await queryset.filter(**filter_kwargs):
                     if all(
                         getattr(model, k) == expected for k, expected in dict_fields.items()
