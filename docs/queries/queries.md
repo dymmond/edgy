@@ -900,6 +900,10 @@ await User.query.bulk_get_or_create([
 users = await User.query.all() # 2 as total
 ```
 
+!!! Note
+    `bulk_get_or_create` fetches when using `unique_fields` all matching entries in a list.
+    For reducing the amount searched, use something like `limit(100).bulk_get_or_create(..., unique_fields=[...])`.
+
 ## Operators
 
 There are sometimes the need of adding some extra conditions like `AND`, or `OR` or even the `NOT`
