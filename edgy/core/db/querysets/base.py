@@ -1701,10 +1701,10 @@ class QuerySet(BaseQuerySet):
                 # This fixes edgy-guardian bug when using databasez.iterate indirectly and
                 # is safe in case force_rollback is active
                 # Because there shouldn't be many records, we can use always fetch_all
-                # For extra safety disallow loading records, this prevents accidentally loads
+                # For extra safety disallow accidentally loads by getattr
                 token_behavior = MODEL_GETATTR_BEHAVIOR.set("passdown")
                 try:
-                    for model in await queryset.filter(**filter_kwargs):
+                    for model in await queryset.filter(**filter_kwargs).limit(self._batch_size):
                         if all(
                             getattr(model, k) == expected for k, expected in dict_fields.items()
                         ):
