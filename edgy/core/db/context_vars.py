@@ -1,4 +1,4 @@
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from typing import TYPE_CHECKING, Literal, Optional, Union, cast
@@ -59,7 +59,7 @@ def set_tenant(value: Union[str, None]) -> Token:
 
 
 @contextmanager
-def with_tenant(tenant: Union[str, None]) -> None:
+def with_tenant(tenant: Union[str, None]) -> Generator[None, None, None]:
     """
     Sets the global tenant for the context of the queries.
     When a global tenant is set the `get_schema` -> `SCHEMA` is ignored.
@@ -84,7 +84,9 @@ def _process_force_field_nullable(item: Union[str, tuple[str, str]]) -> tuple[st
 
 
 @contextmanager
-def with_force_fields_nullable(inp: Iterable[Union[str, tuple[str, str]]]) -> None:
+def with_force_fields_nullable(
+    inp: Iterable[Union[str, tuple[str, str]]],
+) -> Generator[None, None, None]:
     token = FORCE_FIELDS_NULLABLE.set({_process_force_field_nullable(item) for item in inp})
     try:
         yield
@@ -107,7 +109,7 @@ def set_schema(value: Union[str, None]) -> Token:
 
 
 @contextmanager
-def with_schema(schema: Union[str, None]) -> None:
+def with_schema(schema: Union[str, None]) -> Generator[None, None, None]:
     token = SCHEMA.set(schema)
     try:
         yield

@@ -989,21 +989,29 @@ class BaseQuerySet(
         return queryset
 
     async def _model_based_delete(self) -> int:
-        queryset = self.limit(self._batch_size)
+        queryset = self.limit(self._batch_size) if not self._cache_fetch_all else self
         # we set embed_parent on the copy to None to get raw instances
         # embed_parent_filters is not affected
         queryset.embed_parent = None
-        counter = 0
+        row_count = 0
         models = await queryset
-        while models:
-            for model in models:
-                counter += 1
-                # delete issues already signals
-                await model.delete()
-            # clear cache and fetch new batch
-            models = await queryset.all(True)
+        token = CURRENT_INSTANCE.set(cast("QuerySet", self))
+        await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
+        try:
+            while models:
+                for model in models:
+                    row_count += 1
+                    # delete issues already signals
+                    await model.delete()
+                # clear cache and fetch new batch
+                models = await queryset.all(True)
+        finally:
+            CURRENT_INSTANCE.reset(token)
         self._clear_cache()
-        return counter
+        await self.model_class.meta.signals.post_delete.send_async(
+            self.__class__, instance=self, row_count=row_count
+        )
+        return row_count
 
     async def _get_raw(self, **kwargs: Any) -> tuple[BaseModelType, Any]:
         """
@@ -1526,7 +1534,11 @@ class QuerySet(BaseQuerySet):
                 database=queryset.database,
             )
             # values=set(kwargs.keys()) is required for marking the provided kwargs as explicit provided kwargs
-            instance = await instance.save(force_insert=True, values=set(kwargs.keys()))
+            token2 = CURRENT_INSTANCE.set(self)
+            try:
+                instance = await instance.real_save(force_insert=True, values=set(kwargs.keys()))
+            finally:
+                CURRENT_INSTANCE.reset(token2)
             result = await self._embed_parent_in_result(instance)
             self._clear_cache(True)
             self._cache.update([result])
@@ -1559,7 +1571,7 @@ class QuerySet(BaseQuerySet):
                 original, phase="prepare_insert", instance=self
             )
             col_values.update(
-                await obj.execute_pre_save_hooks(col_values, original, force_insert=True)
+                await obj.execute_pre_save_hooks(col_values, original, is_update=False)
             )
             return col_values
 
@@ -1573,7 +1585,7 @@ class QuerySet(BaseQuerySet):
             if new_objs:
                 for obj in new_objs:
                     await obj.execute_post_save_hooks(
-                        self.model_class.meta.fields.keys(), force_insert=True
+                        self.model_class.meta.fields.keys(), is_update=False
                     )
         finally:
             CURRENT_INSTANCE.reset(token)
@@ -1616,7 +1628,7 @@ class QuerySet(BaseQuerySet):
                         model_instance=obj,
                     )
                     update.update(
-                        await obj.execute_pre_save_hooks(update, extracted, force_insert=False)
+                        await obj.execute_pre_save_hooks(update, extracted, is_update=True)
                     )
                     if "id" in update:
                         update["__id"] = update.pop("id")
@@ -1635,7 +1647,7 @@ class QuerySet(BaseQuerySet):
                 and not self.model_class.meta.post_save_fields.isdisjoint(fields)
             ):
                 for obj in objs:
-                    await obj.execute_post_save_hooks(fields, force_insert=False)
+                    await obj.execute_post_save_hooks(fields, is_update=True)
         finally:
             CURRENT_INSTANCE.reset(token)
 
@@ -1727,7 +1739,7 @@ class QuerySet(BaseQuerySet):
                 original, phase="prepare_insert", instance=self
             )
             col_values.update(
-                await obj.execute_pre_save_hooks(col_values, original, force_insert=True)
+                await obj.execute_pre_save_hooks(col_values, original, is_update=False)
             )
             return col_values
 
@@ -1744,7 +1756,7 @@ class QuerySet(BaseQuerySet):
                 self._clear_cache()
                 for obj in new_objs:
                     await obj.execute_post_save_hooks(
-                        self.model_class.meta.fields.keys(), force_insert=True
+                        self.model_class.meta.fields.keys(), is_update=False
                     )
         finally:
             CURRENT_INSTANCE.reset(token)
@@ -1794,6 +1806,7 @@ class QuerySet(BaseQuerySet):
         await self.model_class.meta.signals.pre_update.send_async(
             self.model_class,
             instance=self,
+            model_instance=None,
             values=kwargs,
             column_values=column_values,
             is_update=True,
@@ -1811,6 +1824,7 @@ class QuerySet(BaseQuerySet):
         await self.model_class.meta.signals.post_update.send_async(
             self.model_class,
             instance=self,
+            model_instance=None,
             values=kwargs,
             column_values=column_values,
             is_update=True,

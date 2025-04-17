@@ -11,8 +11,6 @@ from edgy.exceptions import FieldDefinitionError
 if TYPE_CHECKING:
     import zoneinfo
 
-    from edgy.core.db.models.types import BaseModelType
-
 
 CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
@@ -28,26 +26,22 @@ class IncrementOnSaveBaseField(Field):
             self.pre_save_callback = self._notset_pre_save_callback
 
     async def _notset_pre_save_callback(
-        self, value: Any, original_value: Any, force_insert: bool, instance: "BaseModelType"
+        self, value: Any, original_value: Any, is_update: bool
     ) -> dict[str, Any]:
         explicit_values = EXPLICIT_SPECIFIED_VALUES.get()
         if explicit_values is not None and self.name in explicit_values:
             return {}
         model_or_query = CURRENT_INSTANCE.get()
 
-        if force_insert:
+        if not is_update:
+            # insert path
             if original_value is None:
                 return {self.name: self.get_default_value()}
             else:
                 return {self.name: value + self.increment_on_save}
         elif not self.primary_key:
             # update path
-            return {
-                self.name: (
-                    model_or_query if model_or_query is not None else instance
-                ).table.columns[self.name]
-                + self.increment_on_save
-            }
+            return {self.name: (model_or_query).table.columns[self.name] + self.increment_on_save}
         else:
             # update path
             return {}

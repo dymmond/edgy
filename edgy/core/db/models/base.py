@@ -353,7 +353,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         return orjson.dumps(self.model_dump(mode="json", **kwargs)).decode()
 
     async def execute_pre_save_hooks(
-        self, column_values: dict[str, Any], original: dict[str, Any], force_insert: bool
+        self, column_values: dict[str, Any], original: dict[str, Any], is_update: bool
     ) -> dict[str, Any]:
         # also handle defaults
         keys = {*column_values.keys(), *original.keys()}
@@ -376,8 +376,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                         await field.pre_save_callback(
                             column_values.get(field_name),
                             original.get(field_name),
-                            force_insert=force_insert,
-                            instance=self,
+                            is_update=is_update,
                         )
                     )
             finally:
@@ -386,7 +385,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 CURRENT_MODEL_INSTANCE.reset(token2)
         return retdict
 
-    async def execute_post_save_hooks(self, fields: Sequence[str], force_insert: bool) -> None:
+    async def execute_post_save_hooks(self, fields: Sequence[str], is_update: bool) -> None:
         affected_fields = self.meta.post_save_fields.intersection(fields)
         if affected_fields:
             # don't trigger loads, AttributeErrors are used for skipping fields
@@ -403,7 +402,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                         continue
                     field_dict.clear()
                     field_dict["field"] = field
-                    await field.post_save_callback(value, instance=self, force_insert=force_insert)
+                    await field.post_save_callback(value, is_update=is_update)
             finally:
                 CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
                 MODEL_GETATTR_BEHAVIOR.reset(token)

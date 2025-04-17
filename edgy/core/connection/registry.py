@@ -18,7 +18,7 @@ from sqlalchemy.orm import declarative_base as sa_declarative_base
 from edgy.conf import evaluate_settings_once_ready
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
-from edgy.core.db.context_vars import FORCE_FIELDS_NULLABLE
+from edgy.core.db.context_vars import CURRENT_INSTANCE, FORCE_FIELDS_NULLABLE
 from edgy.core.utils.sync import current_eventloop, run_sync
 from edgy.types import Undefined
 
@@ -216,7 +216,8 @@ class Registry:
             ) -> None:
                 # To reduce the memory usage, only retrieve pknames and load per object
                 # We need to load all at once because otherwise the cursor could interfere with updates
-                for obj in await _model.query.filter(**_filter_kwargs).only(*_model.pknames):
+                query = _model.query.filter(**_filter_kwargs).only(*_model.pknames)
+                for obj in await query:
                     await obj.load()
                     kwargs = {
                         k: v for k, v in obj.extract_db_fields().items() if k not in _field_set
@@ -226,20 +227,25 @@ class Registry:
                     # because of interlocking errors.
                     # Also the tables can get big
                     # is_partial = False
-                    await obj._update(
-                        False,
-                        kwargs,
-                        pre_fn=partial(
-                            _model.meta.signals.pre_update.send_async,
-                            is_update=True,
-                            is_migration=True,
-                        ),
-                        post_fn=partial(
-                            _model.meta.signals.post_update.send_async,
-                            is_update=True,
-                            is_migration=True,
-                        ),
-                    )
+                    token = CURRENT_INSTANCE.set(query)
+                    try:
+                        await obj._update(
+                            False,
+                            kwargs,
+                            pre_fn=partial(
+                                _model.meta.signals.pre_update.send_async,
+                                is_update=True,
+                                is_migration=True,
+                            ),
+                            post_fn=partial(
+                                _model.meta.signals.post_update.send_async,
+                                is_update=True,
+                                is_migration=True,
+                            ),
+                            instance=query,
+                        )
+                    finally:
+                        CURRENT_INSTANCE.reset(token)
 
             ops.append(wrapper_fn())
         await asyncio.gather(*ops)

@@ -245,14 +245,12 @@ class ConcreteFileField(BaseCompositeField):
             field_names.append(f"{self.name}_metadata")
         return {name: self.owner.meta.fields[name] for name in field_names}
 
-    async def post_save_callback(
-        self, value: FieldFile, instance: "BaseModelType", force_insert: bool
-    ) -> None:
-        await value.execute_operation(nodelete_old=force_insert)
+    async def post_save_callback(self, value: FieldFile, is_update: bool) -> None:
+        await value.execute_operation(nodelete_old=not is_update)
         # cleanup temp file
         value.close(keep_size=True)
 
-    async def post_delete_callback(self, value: FieldFile, instance: "BaseModelType") -> None:
+    async def post_delete_callback(self, value: FieldFile) -> None:
         value.delete(instant=True)
 
 

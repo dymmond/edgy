@@ -102,6 +102,14 @@ class BaseModelType(ABC):
         """
 
     @abstractmethod
+    async def real_save(
+        self,
+        force_insert: bool = False,
+        values: Union[dict[str, Any], set[str], list[str], None] = None,
+    ) -> BaseModelType:
+        """Save model"""
+
+    @abstractmethod
     async def save(
         self,
         force_insert: bool = False,
@@ -110,10 +118,14 @@ class BaseModelType(ABC):
         """Save model"""
 
     @abstractmethod
-    async def delete(
-        self, skip_post_delete_hooks: bool = False, remove_referenced_call: bool = False
+    async def raw_delete(
+        self, *, skip_post_delete_hooks: bool, remove_referenced_call: bool
     ) -> None:
-        """Delete Model"""
+        """Delete Model. Raw version called by QuerySet and delete. For customization."""
+
+    @abstractmethod
+    async def delete(self, skip_post_delete_hooks: bool = False) -> None:
+        """Delete Model."""
 
     @abstractmethod
     async def load_recursive(
@@ -144,11 +156,11 @@ class BaseModelType(ABC):
         """
 
     @abstractmethod
-    async def execute_post_save_hooks(self, fields: Sequence[str], force_insert: bool) -> None: ...
+    async def execute_post_save_hooks(self, fields: Sequence[str], is_update: bool) -> None: ...
 
     @abstractmethod
     async def execute_pre_save_hooks(
-        self, values: dict[str, Any], original: dict[str, Any], force_insert: bool
+        self, values: dict[str, Any], original: dict[str, Any], is_update: bool
     ) -> dict[str, Any]:
         """
         For async operations after clean. Can be used to reintroduce stripped values for save.

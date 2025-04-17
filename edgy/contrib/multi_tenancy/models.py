@@ -46,7 +46,7 @@ class TenantMixin(edgy.Model):
     def __str__(self) -> str:
         return f"{self.tenant_name} - {self.schema_name}"
 
-    async def save(
+    async def real_save(
         self,
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], None] = None,
@@ -84,7 +84,7 @@ class TenantMixin(edgy.Model):
                 f"Can't update tenant outside it's own schema or the public schema. Current schema is '{current_schema}'"
             )
 
-        tenant = await super().save(force_insert, values)
+        tenant = await super().real_save(force_insert, values)
         try:
             await registry.schema.create_schema(
                 schema=tenant.schema_name,
@@ -126,7 +126,7 @@ class DomainMixin(edgy.Model):
     def __str__(self) -> str:
         return self.domain
 
-    async def save(
+    async def real_save(
         self: Any,
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], None] = None,
@@ -146,7 +146,7 @@ class DomainMixin(edgy.Model):
             if self.is_primary:
                 await domains.update(is_primary=False)
 
-            return await super().save(force_insert, values)
+            return await super().real_save(force_insert, values)
 
     async def delete(self) -> None:
         tenant = await self.tenant.load()
@@ -199,10 +199,10 @@ class TenantUserMixin(edgy.Model):
     def __str__(self) -> str:
         return f"User: {self.user.pk}, Tenant: {self.tenant}"
 
-    async def save(self, *args: Any, **kwargs: Any) -> edgy.Model:
+    async def real_save(self, *args: Any, **kwargs: Any) -> edgy.Model:
         registry = self.meta.registry
         assert registry, "registry is not set"
-        await super().save(*args, **kwargs)
+        await super().real_save(*args, **kwargs)
         if self.is_active:
             await (
                 get_model(registry=registry, model_name=type(self).__name__)

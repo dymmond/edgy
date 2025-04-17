@@ -319,5 +319,5 @@ class SingleRelation(ManyRelationProtocol):
 
 
 class VirtualCascadeDeletionSingleRelation(SingleRelation):
-    async def post_delete_callback(self, instance: "BaseModelType") -> None:
+    async def post_delete_callback(self) -> None:
         await self.delete()

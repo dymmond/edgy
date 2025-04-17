@@ -11,7 +11,37 @@ hide:
 ### Added
 
 - Add the ChoiceField alternative CharChoiceField.
+- `model_instance` parameter for *_save, *_update signals.
 
+### Changed
+
+- Cleanup the callback interface:
+  - The instances are only passed via ContextVars.
+  - `force_insert` is by `is_update` replaced.
+  - Delete uses now *_INSTANCE ContextVars.
+- Split `delete` in `delete` (only used for direct calls) and `raw_delete` for better customizations.
+- Split `save` in `save` (only used for direct calls) and `real_save` for better customizations.
+- Remove internal only parameter `remove_referenced_call` from delete (but not from raw_delete).
+- Virtual cascade deletions doesn't trigger delete signals anymore.
+- `QuerySet.create` passes now the QuerySet instance as CURRENT_INSTANCE.
+- `QuerySet.create` passes now the QuerySet instance as signal parameter instance.
+
+### Fixed
+
+- `QuerySet.create` passed the model instance as CURRENT_INSTANCE.
+- Virtual cascade deletions doesn't trigger delete signals anymore.
+
+### Breaking
+
+- For authors of custom fields: the interface of the async callback hooks changed:
+  - The instances are only passed via ContextVars.
+  - `force_insert` is by `is_update` replaced.
+  - Delete callbacks use now *_INSTANCE ContextVars.
+- When you overwrote the `delete` method of a model, you probably want to overwrite now `raw_delete`.
+- When you overwrote the `save` method of a model, you probably want to overwrite now `real_save`.
+- `delete` losses its internal only parameter `remove_referenced_call`.
+- When using the pre_save/post_save signal, you might want to use the `model_instance` parameter instead of the `instance`
+  parameter. We pass down `QuerySet`s now in create.
 
 ## 0.30.1
 

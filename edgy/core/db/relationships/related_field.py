@@ -2,7 +2,7 @@ import functools
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Optional, cast
 
-from edgy.core.db.context_vars import CURRENT_INSTANCE
+from edgy.core.db.context_vars import CURRENT_MODEL_INSTANCE
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.protocols.many_relationship import ManyRelationProtocol
@@ -56,7 +56,7 @@ class RelatedField(RelationshipField):
         """
         Meta field
         """
-        instance = cast("BaseModelType", CURRENT_INSTANCE.get())
+        instance = CURRENT_MODEL_INSTANCE.get()
         if isinstance(value, ManyRelationProtocol):
             return {field_name: value}
         if instance:
@@ -106,13 +106,9 @@ class RelatedField(RelationshipField):
     def __str__(self) -> str:
         return f"({self.related_to.__name__}={self.related_name})"
 
-    async def post_save_callback(
-        self, value: ManyRelationProtocol, instance: "BaseModelType", force_insert: bool
-    ) -> None:
+    async def post_save_callback(self, value: ManyRelationProtocol, is_update: bool) -> None:
         await value.save_related()
 
-    async def _notset_post_delete_callback(
-        self, value: ManyRelationProtocol, instance: "BaseModelType"
-    ) -> None:
+    async def _notset_post_delete_callback(self, value: ManyRelationProtocol) -> None:
         if hasattr(value, "post_delete_callback"):
-            await value.post_delete_callback(instance)
+            await value.post_delete_callback()
