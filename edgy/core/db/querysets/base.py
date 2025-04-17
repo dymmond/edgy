@@ -1806,6 +1806,7 @@ class QuerySet(BaseQuerySet):
         await self.model_class.meta.signals.pre_update.send_async(
             self.model_class,
             instance=self,
+            model_instance=None,
             values=kwargs,
             column_values=column_values,
             is_update=True,
@@ -1823,6 +1824,7 @@ class QuerySet(BaseQuerySet):
         await self.model_class.meta.signals.post_update.send_async(
             self.model_class,
             instance=self,
+            model_instance=None,
             values=kwargs,
             column_values=column_values,
             is_update=True,

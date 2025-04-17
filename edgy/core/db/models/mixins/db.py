@@ -487,7 +487,13 @@ class DatabaseMixin:
             model_instance=self,
             evaluate_values=True,
         )
-        await pre_fn(self.__class__, instance=instance, values=kwargs, column_values=column_values)
+        await pre_fn(
+            self.__class__,
+            model_instance=self,
+            instance=instance,
+            values=kwargs,
+            column_values=column_values,
+        )
         # empty updates shouldn't cause an error. E.g. only model references are updated
         clauses = self.identifying_clauses()
         if column_values and clauses:
@@ -511,7 +517,11 @@ class DatabaseMixin:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
         await post_fn(
-            self.__class__, instance=instance, values=kwargs, column_values=column_values
+            self.__class__,
+            model_instance=self,
+            instance=instance,
+            values=kwargs,
+            column_values=column_values,
         )
 
     async def update(self: Model, **kwargs: Any) -> Model:
@@ -639,7 +649,13 @@ class DatabaseMixin:
             model_instance=self,
             evaluate_values=evaluate_values,
         )
-        await pre_fn(self.__class__, instance=instance, column_values=column_values, values=kwargs)
+        await pre_fn(
+            self.__class__,
+            model_instance=self,
+            instance=instance,
+            column_values=column_values,
+            values=kwargs,
+        )
         check_db_connection(self.database, stacklevel=4)
         async with self.database as database, database.transaction():
             # can update column_values
@@ -665,7 +681,11 @@ class DatabaseMixin:
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False
         await post_fn(
-            self.__class__, instance=instance, column_values=column_values, values=kwargs
+            self.__class__,
+            model_instance=self,
+            instance=instance,
+            column_values=column_values,
+            values=kwargs,
         )
 
         return self

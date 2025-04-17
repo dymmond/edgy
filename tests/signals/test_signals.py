@@ -62,24 +62,32 @@ def test_invalid_signal():
 
 async def test_signals():
     @pre_save.connect_via(User)
-    async def pre_saving(sender, instance, **kwargs):
-        await Log.query.create(signal="pre_save", instance=instance.model_dump(), params=kwargs)
-        logger.info(f"pre_save signal broadcasted for {instance.get_instance_name()}")
+    async def pre_saving(sender, instance, model_instance, **kwargs):
+        await Log.query.create(
+            signal="pre_save", instance=model_instance.model_dump(), params=kwargs
+        )
+        logger.info(f"pre_save signal broadcasted for {model_instance.get_instance_name()}")
 
     @post_save.connect_via(User)
-    async def post_saving(sender, instance, **kwargs):
-        await Log.query.create(signal="post_save", instance=instance.model_dump(), params=kwargs)
-        logger.info(f"post_save signal broadcasted for {instance.get_instance_name()}")
+    async def post_saving(sender, instance, model_instance, **kwargs):
+        await Log.query.create(
+            signal="post_save", instance=model_instance.model_dump(), params=kwargs
+        )
+        logger.info(f"post_save signal broadcasted for {model_instance.get_instance_name()}")
 
     @pre_update.connect_via(User)
-    async def pre_updating(sender, instance, **kwargs):
-        await Log.query.create(signal="pre_update", instance=instance.model_dump(), params=kwargs)
-        logger.info(f"pre_update signal broadcasted for {instance.get_instance_name()}")
+    async def pre_updating(sender, instance, model_instance, **kwargs):
+        await Log.query.create(
+            signal="pre_update", instance=model_instance.model_dump(), params=kwargs
+        )
+        logger.info(f"pre_update signal broadcasted for {model_instance.get_instance_name()}")
 
     @post_update.connect_via(User)
-    async def post_updating(sender, instance, **kwargs):
-        await Log.query.create(signal="post_update", instance=instance.model_dump(), params=kwargs)
-        logger.info(f"post_update signal broadcasted for {instance.get_instance_name()}")
+    async def post_updating(sender, instance, model_instance, **kwargs):
+        await Log.query.create(
+            signal="post_update", instance=model_instance.model_dump(), params=kwargs
+        )
+        logger.info(f"post_update signal broadcasted for {model_instance.get_instance_name()}")
 
     @pre_delete.connect_via(User)
     async def pre_deleting(sender, instance, **kwargs):
@@ -145,13 +153,17 @@ async def test_staticmethod_signals():
     class Static:
         @staticmethod
         @pre_save.connect_via(User)
-        async def pre_save_one(sender, instance, **kwargs):
-            await Log.query.create(signal="pre_save_one", instance=instance.model_dump_json())
+        async def pre_save_one(sender, model_instance, **kwargs):
+            await Log.query.create(
+                signal="pre_save_one", instance=model_instance.model_dump_json()
+            )
 
         @staticmethod
         @pre_save.connect_via(User)
-        async def pre_save_two(sender, instance, **kwargs):
-            await Log.query.create(signal="pre_save_two", instance=instance.model_dump_json())
+        async def pre_save_two(sender, model_instance, **kwargs):
+            await Log.query.create(
+                signal="pre_save_two", instance=model_instance.model_dump_json()
+            )
 
     # Signals for the create
     user = await User.query.create(name="Edgy")

@@ -11,6 +11,7 @@ hide:
 ### Added
 
 - Add the ChoiceField alternative CharChoiceField.
+- `model_instance` parameter for *_save, *_update signals.
 
 ### Changed
 
@@ -23,6 +24,7 @@ hide:
 - Remove internal only parameter `remove_referenced_call` from delete (but not from raw_delete).
 - Virtual cascade deletions doesn't trigger delete signals anymore.
 - `QuerySet.create` passes now the QuerySet instance as CURRENT_INSTANCE.
+- `QuerySet.create` passes now the QuerySet instance as signal parameter instance.
 
 ### Fixed
 
@@ -38,6 +40,8 @@ hide:
 - When you overwrote the `delete` method of a model, you probably want to overwrite now `raw_delete`.
 - When you overwrote the `save` method of a model, you probably want to overwrite now `real_save`.
 - `delete` losses its internal only parameter `remove_referenced_call`.
+- When using the pre_save/post_save signal, you might want to use the `model_instance` parameter instead of the `instance`
+  parameter. We pass down `QuerySet`s now in create.
 
 ## 0.30.1
 

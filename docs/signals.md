@@ -32,7 +32,7 @@ from edgy.core.signals import (
 Triggered before a model is saved (during `Model.save()` and `Model.query.create()`).
 
 ```python
-pre_save(send: Type["Model"], instance: "Model", values: dict, column_values: dict, is_update: bool)
+pre_save(send: Type["Model"], instance: Union["Model", "QuerySet"], model_instance: "Model", values: dict, column_values: dict, is_update: bool)
 ```
 
 Only the `EXPLICIT_SPECIFIED_VALUES` contextvar is available.
@@ -42,7 +42,7 @@ Only the `EXPLICIT_SPECIFIED_VALUES` contextvar is available.
 Triggered after a model is saved (during `Model.save()` and `Model.query.create()`).
 
 ```python
-post_save(send: Type["Model"], instance: "Model", values: dict, column_values: dict, is_update: bool)
+post_save(send: Type["Model"], instance: Union["Model", "QuerySet"], model_instance: "Model", values: dict, column_values: dict, is_update: bool)
 ```
 
 #### pre_update
@@ -50,7 +50,7 @@ post_save(send: Type["Model"], instance: "Model", values: dict, column_values: d
 Triggered before a model is updated (during `Model.update()` and `Model.query.update()`).
 
 ```python
-pre_update(sender: Type["Model"], instance: Union["Model", "QuerySet"], values: dict, column_values: dict)
+pre_update(sender: Type["Model"], instance: Union["Model", "QuerySet"], model_instance: Optional["Model"], values: dict, column_values: dict)
 ```
 
 #### post_update
@@ -58,14 +58,15 @@ pre_update(sender: Type["Model"], instance: Union["Model", "QuerySet"], values: 
 Triggered after a model is updated (during `Model.update()` and `Model.query.update()`).
 
 ```python
-post_update(sender: Type["Model"], instance: Union["Model", "QuerySet"], values: dict, column_values: dict)
+post_update(sender: Type["Model"], instance: Union["Model", "QuerySet"], model_instance: Optional["Model"], values: dict, column_values: dict)
 ```
 
 #### pre_save, post_save, pre_update, post_update parameters
 
 The receiver function receives following parameters:
 
-- instance - The model or QuerySet instance. For save signals only the model instance is possible.
+- instance - The model or QuerySet instance.
+- model_instance -The model instance if available. For save signals always available
 - values - The passed values.
 - column_values - The parsed values which are used for the db.
 - is_update - Is it an update? This is also set for `*_update` to match the save parameters.
