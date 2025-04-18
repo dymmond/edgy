@@ -73,12 +73,17 @@ class BaseForeignKeyField(BaseForeignKey):
 
     async def _notset_post_delete_callback(self, value: Any) -> None:
         value = self.expand_relationship(value)
+        with_signals = self.target.__deletion_with_signals__
         if value is not None:
             token = CURRENT_INSTANCE.set(value)
+            if with_signals:
+                await self.meta.signals.pre_delete.send_async(self.__class__, instance=value, model_instance=value, row_count=None)
             try:
-                await value.raw_delete(skip_post_delete_hooks=False, remove_referenced_call=True)
+                row_count = await value.raw_delete(skip_post_delete_hooks=False, remove_referenced_call=True)
             finally:
                 CURRENT_INSTANCE.reset(token)
+            if with_signals:
+                await self.meta.signals.post_delete.send_async(self.__class__, instance=value, model_instance=value, row_count=row_count)
 
     async def pre_save_callback(
         self, value: Any, original_value: Any, is_update: bool

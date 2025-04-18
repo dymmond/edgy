@@ -596,7 +596,7 @@ class DatabaseMixin:
 
     async def delete(self: Model, skip_post_delete_hooks: bool = False) -> None:
         """Delete operation from the database"""
-        await self.meta.signals.pre_delete.send_async(self.__class__, instance=self)
+        await self.meta.signals.pre_delete.send_async(self.__class__, instance=self, model_instance=self, row_count=None)
         token = CURRENT_INSTANCE.set(self)
         try:
             row_count = await self.raw_delete(
@@ -606,7 +606,7 @@ class DatabaseMixin:
         finally:
             CURRENT_INSTANCE.reset(token)
         await self.meta.signals.post_delete.send_async(
-            self.__class__, instance=self, row_count=row_count
+            self.__class__, instance=self, model_instance=self, row_count=row_count
         )
 
     async def load(self, only_needed: bool = False) -> None:

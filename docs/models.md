@@ -178,6 +178,9 @@ for customizing the deletion for QuerySet deletions and direct deletions of a mo
 If you only want a special deletion when called directly on a model instance,
 then overload `async def delete(skip_post_delete_hooks=False)`.
 
+If you prefer having also delete signals for virtual cascade deletions and model based deletions
+you set the class variable: `__deletion_with_signals__ = True`.
+
 ##### Copying a model to a new registry
 
 We have now a method:

@@ -996,20 +996,29 @@ class BaseQuerySet(
         row_count = 0
         models = await queryset
         token = CURRENT_INSTANCE.set(cast("QuerySet", self))
-        await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
+        await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self, model_instance=None, row_count=0)
+        trigger_model_signals = self.model_class.__deletion_with_signals__
         try:
             while models:
                 for model in models:
+                    if trigger_model_signals:
+                        await self.model_class.meta.signals.pre_delete.send_async(
+                            self.__class__, instance=self, model_instance=model, row_count=row_count
+                        )
                     row_count += 1
                     # delete issues already signals
                     await model.delete()
+                    if trigger_model_signals:
+                        await self.model_class.meta.signals.post_delete.send_async(
+                            self.__class__, instance=self, model_instance=model, row_count=row_count
+                        )
                 # clear cache and fetch new batch
                 models = await queryset.all(True)
         finally:
             CURRENT_INSTANCE.reset(token)
         self._clear_cache()
         await self.model_class.meta.signals.post_delete.send_async(
-            self.__class__, instance=self, row_count=row_count
+            self.__class__, instance=self, model_instance=None, row_count=row_count
         )
         return row_count
 
@@ -1765,7 +1774,7 @@ class QuerySet(BaseQuerySet):
             return await self._model_based_delete()
 
         # delete of model issues already signals, so don't integrate them
-        await self.model_class.meta.signals.pre_delete.send_async(self.model_class, instance=self)
+        await self.model_class.meta.signals.pre_delete.send_async(self.model_class, instance=self, model_instance=None, row_count=0)
 
         expression = self.table.delete()
         expression = expression.where(await self.build_where_clause())
@@ -1778,7 +1787,7 @@ class QuerySet(BaseQuerySet):
         self._clear_cache()
 
         await self.model_class.meta.signals.post_delete.send_async(
-            self.model_class, instance=self, row_count=row_count
+            self.model_class, instance=self, row_count=row_count, model_instance=None
         )
         return row_count
 
