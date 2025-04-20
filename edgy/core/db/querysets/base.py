@@ -988,7 +988,7 @@ class BaseQuerySet(
             queryset.filter_clauses.extend(converted_clauses)
         return queryset
 
-    async def _model_based_delete(self) -> int:
+    async def _model_based_delete(self, remove_referenced_call: Union[str, bool]) -> int:
         queryset = self.limit(self._batch_size) if not self._cache_fetch_all else self
         # we set embed_parent on the copy to None to get raw instances
         # embed_parent_filters is not affected
@@ -1000,7 +1000,7 @@ class BaseQuerySet(
             while models:
                 for model in models:
                     await model.raw_delete(
-                        skip_post_delete_hooks=False, remove_referenced_call=False
+                        skip_post_delete_hooks=False, remove_referenced_call=remove_referenced_call
                     )
                     row_count += 1
                 # clear cache and fetch new batch
@@ -1009,14 +1009,18 @@ class BaseQuerySet(
             CURRENT_INSTANCE.reset(token)
         return row_count
 
-    async def raw_delete(self, use_models: bool = False) -> int:
+    async def raw_delete(
+        self, use_models: bool = False, remove_referenced_call: Union[str, bool] = False
+    ) -> int:
         if (
             self.model_class.__require_model_based_deletion__
             or self.model_class.meta.post_delete_fields
         ):
             use_models = True
         if use_models:
-            row_count = await self._model_based_delete()
+            row_count = await self._model_based_delete(
+                remove_referenced_call=remove_referenced_call
+            )
         else:
             expression = self.table.delete()
             expression = expression.where(await self.build_where_clause())
@@ -1770,7 +1774,7 @@ class QuerySet(BaseQuerySet):
         await self.model_class.meta.signals.pre_delete.send_async(
             self.model_class, instance=self, model_instance=None
         )
-        row_count = await self.raw_delete(use_models)
+        row_count = await self.raw_delete(use_models=use_models, remove_referenced_call=False)
         await self.model_class.meta.signals.post_delete.send_async(
             self.model_class, instance=self, model_instance=None, row_count=row_count
         )

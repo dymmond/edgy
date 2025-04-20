@@ -15,3 +15,5 @@ async def is_verified_user(id: int):
     if user.is_verified:
         # triggers the custom signal
         await User.meta.signals.on_verify.send_async(User, instance=user)
+        # or when maybe a proxy
+        await User.meta.signals.on_verify.send_async(User.get_real_class(), instance=user)

@@ -34,6 +34,7 @@ terminal = Print()
 
 
 class BaseForeignKeyField(BaseForeignKey):
+    use_model_based_deletion: bool = False
     force_cascade_deletion_relation: bool = False
     relation_has_post_delete_callback: bool = False
     # overwrite for sondercharacters
@@ -73,12 +74,14 @@ class BaseForeignKeyField(BaseForeignKey):
 
     async def _notset_post_delete_callback(self, value: Any) -> None:
         # FIXME: we are stuck on an old version of field before copy, so replace self
-        self = CURRENT_FIELD_CONTEXT.get()["field"]
+        self = CURRENT_FIELD_CONTEXT.get()["field"]  # type: ignore
         value = self.expand_relationship(value)
         if value is not None:
             token = CURRENT_INSTANCE.set(value)
             try:
-                await value.raw_delete(skip_post_delete_hooks=False, remove_referenced_call=True)
+                await value.raw_delete(
+                    skip_post_delete_hooks=False, remove_referenced_call=self.reverse_name or True
+                )
             finally:
                 CURRENT_INSTANCE.reset(token)
 

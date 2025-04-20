@@ -602,8 +602,9 @@ from `edgy`.
     ```
 * `relation_fn` - Optionally drop a function which returns a Relation for the reverse side. This will be used by the RelatedField (if it is created). Used by the ManyToMany field.
 * `reverse_path_fn` - Optionally drop a function which handles the traversal from the reverse side. Used by the ManyToMany field.
-- `column_name` - A string. Base database name of the column (by default the same as the name). Useful for models with special characters in their name.
-
+* `column_name` - A string. Base database name of the column (by default the same as the name). Useful for models with special characters in their name.
+* `force_cascade_deletion_relation` enforces a deletion in edgy instead in the db.
+* `use_model_based_deletion` - A bool. Defaults to False. Can be used to force model based deletions when using `force_cascade_deletion_relation`.
 
 !!! Note
     The index parameter can improve the performance and is strongly recommended especially with `no_constraint` but also

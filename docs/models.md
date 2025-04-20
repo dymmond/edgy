@@ -77,11 +77,12 @@ There are few special attributes which can be set
 
 - `database`: Different database/access current database of model. Should be in registry extra. It is set per instance when using queries.
 - `__using_schema__`: Different schema. The schema must be created first. Default is Undefined. It is set per instance for tenant models.
-- ``
+
 These attributes work on instances as well as classes.
 
 There are a few more exotic ones:
 
+- `__deletion_with_signals__`: (Default False): For every model deletion a deletion signal is raised, no matter if it is the originator or not. By default only for toplevel deletes the signals are raised. Useful in combination with model based deletion.
 - `__require_model_based_deletion__`: (Default False): Enforce a deletion in edgy instead of the database (Query iterates through models and deletes each explicitly). This is quite imperformant, so only set it if you really require that the delete method of a model is called.
 - `__reflected__`: Only read but don't set it. It shows if a model has the reflected state.
 

@@ -34,7 +34,7 @@ class IncrementOnSaveBaseField(Field):
         self, value: Any, original_value: Any, is_update: bool
     ) -> dict[str, Any]:
         # FIXME: we are stuck on an old version of field before copy, so replace self
-        self = CURRENT_FIELD_CONTEXT.get()["field"]
+        self = CURRENT_FIELD_CONTEXT.get()["field"]  # type: ignore
         explicit_values = EXPLICIT_SPECIFIED_VALUES.get()
         if explicit_values is not None and self.name in explicit_values:
             return {}

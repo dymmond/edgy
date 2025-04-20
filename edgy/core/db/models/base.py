@@ -89,6 +89,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             "__show_pk__": klass.__show_pk__,
             "__no_load_trigger_attrs__": {*klass.__no_load_trigger_attrs__},
             "__using_schema__": klass.__using_schema__,
+            "__deletion_with_signals__": klass.__deletion_with_signals__,
             "database": klass.database,
         }
         if __show_pk__ is not None:

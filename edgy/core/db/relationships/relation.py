@@ -321,4 +321,7 @@ class SingleRelation(ManyRelationProtocol):
 class VirtualCascadeDeletionSingleRelation(SingleRelation):
     async def post_delete_callback(self) -> None:
         # issue a plain deletion, without signals on QuerySet
-        await self.raw_delete()
+        await self.raw_delete(
+            use_models=self.to.meta.fields[self.to_foreign_key].use_model_based_deletion,
+            remove_referenced_call=self.to_foreign_key,
+        )
