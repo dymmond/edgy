@@ -58,9 +58,7 @@ class BaseModelType(ABC):
     __parent__: ClassVar[Union[type[BaseModelType], None]] = None
     __is_proxy_model__: ClassVar[bool] = False
     __require_model_based_deletion__: ClassVar[bool] = False
-    __deletion_with_signals__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
-    _db_schemas: ClassVar[dict[str, type[BaseModelType]]]
 
     @property
     @abstractmethod

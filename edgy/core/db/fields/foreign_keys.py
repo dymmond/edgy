@@ -13,7 +13,7 @@ import sqlalchemy
 from pydantic import BaseModel
 
 from edgy.core.db.constants import SET_DEFAULT, SET_NULL
-from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE
+from edgy.core.db.context_vars import CURRENT_FIELD_CONTEXT, CURRENT_INSTANCE, CURRENT_PHASE
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.types import BaseFieldType
@@ -72,18 +72,15 @@ class BaseForeignKeyField(BaseForeignKey):
             terminal.write_warning("Declaring on_delete `SET NULL` but null is False.")
 
     async def _notset_post_delete_callback(self, value: Any) -> None:
+        # FIXME: we are stuck on an old version of field before copy, so replace self
+        self = CURRENT_FIELD_CONTEXT.get()["field"]
         value = self.expand_relationship(value)
-        with_signals = self.target.__deletion_with_signals__
         if value is not None:
             token = CURRENT_INSTANCE.set(value)
-            if with_signals:
-                await self.meta.signals.pre_delete.send_async(self.__class__, instance=value, model_instance=value, row_count=None)
             try:
-                row_count = await value.raw_delete(skip_post_delete_hooks=False, remove_referenced_call=True)
+                await value.raw_delete(skip_post_delete_hooks=False, remove_referenced_call=True)
             finally:
                 CURRENT_INSTANCE.reset(token)
-            if with_signals:
-                await self.meta.signals.post_delete.send_async(self.__class__, instance=value, model_instance=value, row_count=row_count)
 
     async def pre_save_callback(
         self, value: Any, original_value: Any, is_update: bool
@@ -109,6 +106,7 @@ class BaseForeignKeyField(BaseForeignKey):
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         if self.relation_fn is not None:
             return self.relation_fn(**kwargs)
+        # also set in db.py
         if self.force_cascade_deletion_relation:
             relation: Any = VirtualCascadeDeletionSingleRelation
         else:

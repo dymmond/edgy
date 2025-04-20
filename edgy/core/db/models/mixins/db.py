@@ -58,6 +58,7 @@ _removed_copy_keys = {
     "_db_schemas",
     "__proxy_model__",
     "meta",
+    "transaction"
 }
 _removed_copy_keys.difference_update(
     {*_EmptyClass.__dict__.keys(), "__annotations__", "__module__"}
@@ -549,6 +550,12 @@ class DatabaseMixin:
         self: Model, *, skip_post_delete_hooks: bool, remove_referenced_call: bool
     ) -> int:
         """Delete operation from the database"""
+        instance = CURRENT_INSTANCE.get()
+        with_signals = self.__deletion_with_signals__ and instance is not self
+        if with_signals:
+            await self.meta.signals.pre_delete.send_async(
+                self.__class__, instance=instance, model_instance=self
+            )
         # get values before deleting
         field_values: dict[str, Any] = {}
         if not skip_post_delete_hooks and self.meta.post_delete_fields:
@@ -592,11 +599,20 @@ class DatabaseMixin:
             finally:
                 CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
                 CURRENT_MODEL_INSTANCE.reset(token_instance)
+        if with_signals:
+            await self.meta.signals.post_delete.send_async(
+                self.__class__,
+                instance=CURRENT_INSTANCE.get(),
+                model_instance=self,
+                row_count=row_count,
+            )
         return row_count
 
     async def delete(self: Model, skip_post_delete_hooks: bool = False) -> None:
         """Delete operation from the database"""
-        await self.meta.signals.pre_delete.send_async(self.__class__, instance=self, model_instance=self, row_count=None)
+        await self.meta.signals.pre_delete.send_async(
+            self.__class__, instance=self, model_instance=self
+        )
         token = CURRENT_INSTANCE.set(self)
         try:
             row_count = await self.raw_delete(

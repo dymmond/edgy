@@ -57,6 +57,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             "__show_pk__",
             "__using_schema__",
             "__no_load_trigger_attrs__",
+            "__deletion_with_signals__",
             "database",
             "transaction",
         }
@@ -66,10 +67,12 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     __reflected__: ClassVar[bool] = False
     __show_pk__: ClassVar[bool] = False
     __using_schema__: ClassVar[Union[str, None, Any]] = Undefined
+    __deletion_with_signals__: ClassVar[bool] = False
     __no_load_trigger_attrs__: ClassVar[set[str]] = _empty
     database: ClassVar[Database] = None
-    # private attribute
+    # private attributes
     _loaded_or_deleted: bool = PrivateAttr(default=False)
+    _db_schemas: ClassVar[dict[str, type[BaseModelType]]]
 
     def __init__(
         self,

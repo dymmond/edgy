@@ -1,5 +1,4 @@
 import pytest
-from loguru import logger
 
 import edgy
 from edgy.core.signals import (
@@ -66,38 +65,38 @@ async def test_signals():
         await Log.query.create(
             signal="pre_save", instance=model_instance.model_dump(), params=kwargs
         )
-        logger.info(f"pre_save signal broadcasted for {model_instance.get_instance_name()}")
+        print(f"pre_save signal broadcasted for {model_instance.get_instance_name()}")
 
     @post_save.connect_via(User)
     async def post_saving(sender, instance, model_instance, **kwargs):
         await Log.query.create(
             signal="post_save", instance=model_instance.model_dump(), params=kwargs
         )
-        logger.info(f"post_save signal broadcasted for {model_instance.get_instance_name()}")
+        print(f"post_save signal broadcasted for {model_instance.get_instance_name()}")
 
     @pre_update.connect_via(User)
     async def pre_updating(sender, instance, model_instance, **kwargs):
         await Log.query.create(
             signal="pre_update", instance=model_instance.model_dump(), params=kwargs
         )
-        logger.info(f"pre_update signal broadcasted for {model_instance.get_instance_name()}")
+        print(f"pre_update signal broadcasted for {model_instance.get_instance_name()}")
 
     @post_update.connect_via(User)
     async def post_updating(sender, instance, model_instance, **kwargs):
         await Log.query.create(
             signal="post_update", instance=model_instance.model_dump(), params=kwargs
         )
-        logger.info(f"post_update signal broadcasted for {model_instance.get_instance_name()}")
+        print(f"post_update signal broadcasted for {model_instance.get_instance_name()}")
 
     @pre_delete.connect_via(User)
-    async def pre_deleting(sender, instance, **kwargs):
-        await Log.query.create(signal="pre_delete", instance=instance.model_dump())
-        logger.info(f"pre_delete signal broadcasted for {instance.get_instance_name()}")
+    async def pre_deleting(sender, instance, model_instance, **kwargs):
+        await Log.query.create(signal="pre_delete", instance=model_instance.model_dump())
+        print(f"pre_delete signal broadcasted for {model_instance.get_instance_name()}")
 
     @post_delete.connect_via(User)
-    async def post_deleting(sender, instance, **kwargs):
-        await Log.query.create(signal="post_delete", instance=instance.model_dump())
-        logger.info(f"post_delete signal broadcasted for {instance.get_instance_name()}")
+    async def post_deleting(sender, instance, model_instance, **kwargs):
+        await Log.query.create(signal="post_delete", instance=model_instance.model_dump())
+        print(f"post_delete signal broadcasted for {model_instance.get_instance_name()}")
 
     # Signals for the create
     user = await User.query.create(name="Edgy")
