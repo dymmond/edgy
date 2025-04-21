@@ -58,6 +58,7 @@ _removed_copy_keys = {
     "_db_schemas",
     "__proxy_model__",
     "meta",
+    "transaction",
 }
 _removed_copy_keys.difference_update(
     {*_EmptyClass.__dict__.keys(), "__annotations__", "__module__"}
@@ -478,6 +479,7 @@ class DatabaseMixin:
         """
         Update operation of the database fields.
         """
+        real_class = self.get_real_class()
         column_values = self.extract_column_values(
             extracted_values=kwargs,
             is_partial=is_partial,
@@ -488,7 +490,7 @@ class DatabaseMixin:
             evaluate_values=True,
         )
         await pre_fn(
-            self.__class__,
+            real_class,
             model_instance=self,
             instance=instance,
             values=kwargs,
@@ -517,7 +519,7 @@ class DatabaseMixin:
             # Ensure on access refresh the results is active
             self._loaded_or_deleted = False
         await post_fn(
-            self.__class__,
+            real_class,
             model_instance=self,
             instance=instance,
             values=kwargs,
@@ -546,15 +548,28 @@ class DatabaseMixin:
         return self
 
     async def raw_delete(
-        self: Model, *, skip_post_delete_hooks: bool, remove_referenced_call: bool
+        self: Model, *, skip_post_delete_hooks: bool, remove_referenced_call: Union[bool, str]
     ) -> int:
         """Delete operation from the database"""
+        instance = CURRENT_INSTANCE.get()
+        real_class = self.get_real_class()
+        # remove_referenced_call = called from a deleter of another field or model
+        with_signals = self.__deletion_with_signals__ and (
+            instance is not self or remove_referenced_call
+        )
+        if with_signals:
+            await self.meta.signals.pre_delete.send_async(
+                real_class, instance=instance, model_instance=self
+            )
+        ignore_fields: set[str] = set()
+        if remove_referenced_call and isinstance(remove_referenced_call, str):
+            ignore_fields.add(remove_referenced_call)
         # get values before deleting
         field_values: dict[str, Any] = {}
-        if not skip_post_delete_hooks and self.meta.post_delete_fields:
+        if not skip_post_delete_hooks and self.meta.post_delete_fields.difference(ignore_fields):
             token = MODEL_GETATTR_BEHAVIOR.set("coro")
             try:
-                for field_name in self.meta.post_delete_fields:
+                for field_name in self.meta.post_delete_fields.difference(ignore_fields):
                     try:
                         field_value = getattr(self, field_name)
                     except AttributeError:
@@ -592,11 +607,21 @@ class DatabaseMixin:
             finally:
                 CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
                 CURRENT_MODEL_INSTANCE.reset(token_instance)
+        if with_signals:
+            await self.meta.signals.post_delete.send_async(
+                real_class,
+                instance=CURRENT_INSTANCE.get(),
+                model_instance=self,
+                row_count=row_count,
+            )
         return row_count
 
     async def delete(self: Model, skip_post_delete_hooks: bool = False) -> None:
         """Delete operation from the database"""
-        await self.meta.signals.pre_delete.send_async(self.__class__, instance=self)
+        real_class = self.get_real_class()
+        await self.meta.signals.pre_delete.send_async(
+            real_class, instance=self, model_instance=self
+        )
         token = CURRENT_INSTANCE.set(self)
         try:
             row_count = await self.raw_delete(
@@ -606,7 +631,7 @@ class DatabaseMixin:
         finally:
             CURRENT_INSTANCE.reset(token)
         await self.meta.signals.post_delete.send_async(
-            self.__class__, instance=self, row_count=row_count
+            real_class, instance=self, model_instance=self, row_count=row_count
         )
 
     async def load(self, only_needed: bool = False) -> None:
@@ -640,6 +665,7 @@ class DatabaseMixin:
         """
         Performs the save instruction.
         """
+        real_class = self.get_real_class()
         column_values: dict[str, Any] = self.extract_column_values(
             extracted_values=kwargs,
             is_partial=False,
@@ -650,7 +676,7 @@ class DatabaseMixin:
             evaluate_values=evaluate_values,
         )
         await pre_fn(
-            self.__class__,
+            real_class,
             model_instance=self,
             instance=instance,
             column_values=column_values,
@@ -681,7 +707,7 @@ class DatabaseMixin:
         # Ensure on access refresh the results is active
         self._loaded_or_deleted = False
         await post_fn(
-            self.__class__,
+            real_class,
             model_instance=self,
             instance=instance,
             column_values=column_values,

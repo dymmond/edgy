@@ -2,7 +2,12 @@ import datetime
 from functools import partial
 from typing import TYPE_CHECKING, Any, Optional, Union
 
-from edgy.core.db.context_vars import CURRENT_INSTANCE, CURRENT_PHASE, EXPLICIT_SPECIFIED_VALUES
+from edgy.core.db.context_vars import (
+    CURRENT_FIELD_CONTEXT,
+    CURRENT_INSTANCE,
+    CURRENT_PHASE,
+    EXPLICIT_SPECIFIED_VALUES,
+)
 from edgy.core.db.fields.base import Field
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.core.db.fields.types import BaseFieldType
@@ -28,6 +33,8 @@ class IncrementOnSaveBaseField(Field):
     async def _notset_pre_save_callback(
         self, value: Any, original_value: Any, is_update: bool
     ) -> dict[str, Any]:
+        # FIXME: we are stuck on an old version of field before copy, so replace self
+        self = CURRENT_FIELD_CONTEXT.get()["field"]  # type: ignore
         explicit_values = EXPLICIT_SPECIFIED_VALUES.get()
         if explicit_values is not None and self.name in explicit_values:
             return {}

@@ -59,7 +59,6 @@ class BaseModelType(ABC):
     __is_proxy_model__: ClassVar[bool] = False
     __require_model_based_deletion__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
-    _db_schemas: ClassVar[dict[str, type[BaseModelType]]]
 
     @property
     @abstractmethod
@@ -119,13 +118,25 @@ class BaseModelType(ABC):
 
     @abstractmethod
     async def raw_delete(
-        self, *, skip_post_delete_hooks: bool, remove_referenced_call: bool
+        self, *, skip_post_delete_hooks: bool, remove_referenced_call: Union[bool, str]
     ) -> None:
-        """Delete Model. Raw version called by QuerySet and delete. For customization."""
+        """
+        Delete Model. Raw version called by QuerySet and delete.
+        For customization. Should be called for user and non-user-facing customizations.
+
+        Kwargs:
+            skip_post_delete_hooks: Skip field post deletehooks.
+            remove_referenced_call: Either bool if the originator of the call is the model itself or
+                                    string from which field the delete call originates from
+                                    Should be passed through by customizations.
+        """
+        # Why remove_referenced_call as string?
+        # When traversing a RelatedField for deletions there are stub back references
+        # If not trimmed, they are used for model deletion.
 
     @abstractmethod
     async def delete(self, skip_post_delete_hooks: bool = False) -> None:
-        """Delete Model."""
+        """Delete Model. User-facing, not used by internal methods."""
 
     @abstractmethod
     async def load_recursive(
@@ -187,6 +198,9 @@ class BaseModelType(ABC):
         """
 
     # helpers
+    @classmethod
+    def get_real_class(cls) -> BaseModelType:
+        return cls.__parent__ if cls.__is_proxy_model__ else cls  # type: ignore
 
     def extract_db_fields(self, only: Optional[Sequence[str]] = None) -> dict[str, Any]:
         """

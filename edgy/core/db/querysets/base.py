@@ -988,7 +988,7 @@ class BaseQuerySet(
             queryset.filter_clauses.extend(converted_clauses)
         return queryset
 
-    async def _model_based_delete(self) -> int:
+    async def _model_based_delete(self, remove_referenced_call: Union[str, bool]) -> int:
         queryset = self.limit(self._batch_size) if not self._cache_fetch_all else self
         # we set embed_parent on the copy to None to get raw instances
         # embed_parent_filters is not affected
@@ -996,21 +996,42 @@ class BaseQuerySet(
         row_count = 0
         models = await queryset
         token = CURRENT_INSTANCE.set(cast("QuerySet", self))
-        await self.model_class.meta.signals.pre_delete.send_async(self.__class__, instance=self)
         try:
             while models:
                 for model in models:
+                    await model.raw_delete(
+                        skip_post_delete_hooks=False, remove_referenced_call=remove_referenced_call
+                    )
                     row_count += 1
-                    # delete issues already signals
-                    await model.delete()
                 # clear cache and fetch new batch
                 models = await queryset.all(True)
         finally:
             CURRENT_INSTANCE.reset(token)
+        return row_count
+
+    async def raw_delete(
+        self, use_models: bool = False, remove_referenced_call: Union[str, bool] = False
+    ) -> int:
+        if (
+            self.model_class.__require_model_based_deletion__
+            or self.model_class.meta.post_delete_fields
+        ):
+            use_models = True
+        if use_models:
+            row_count = await self._model_based_delete(
+                remove_referenced_call=remove_referenced_call
+            )
+        else:
+            expression = self.table.delete()
+            expression = expression.where(await self.build_where_clause())
+
+            check_db_connection(self.database)
+            async with self.database as database:
+                row_count = cast(int, await database.execute(expression))
+
+        # clear cache before executing post_delete. Fresh results can be retrieved in signals
         self._clear_cache()
-        await self.model_class.meta.signals.post_delete.send_async(
-            self.__class__, instance=self, row_count=row_count
-        )
+
         return row_count
 
     async def _get_raw(self, **kwargs: Any) -> tuple[BaseModelType, Any]:
@@ -1703,21 +1724,15 @@ class QuerySet(BaseQuerySet):
                 # Models can also issue loads by accessing attrs for building unique_fields
                 # For limiting use something like QuerySet.limit(100).bulk_get_or_create(...)
                 for model in await queryset.filter(**filter_kwargs):
-                    if all(
-                        getattr(model, k) == expected for k, expected in dict_fields.items()
-                    ):
+                    if all(getattr(model, k) == expected for k, expected in dict_fields.items()):
                         lookup_key = _extract_unique_lookup_key(model, unique_fields)
-                        assert lookup_key is not None, (
-                            "invalid fields/attributes in unique_fields"
-                        )
+                        assert lookup_key is not None, "invalid fields/attributes in unique_fields"
                         if lookup_key not in existing_records:
                             existing_records[lookup_key] = model
                         found = True
                         break
                 if found is False:
-                    new_objs.append(
-                        queryset.model_class(**obj) if isinstance(obj, dict) else obj
-                    )
+                    new_objs.append(queryset.model_class(**obj) if isinstance(obj, dict) else obj)
 
             retrieved_objs.extend(existing_records.values())
         else:
@@ -1756,29 +1771,12 @@ class QuerySet(BaseQuerySet):
         return retrieved_objs
 
     async def delete(self, use_models: bool = False) -> int:
-        if (
-            self.model_class.__require_model_based_deletion__
-            or self.model_class.meta.post_delete_fields
-        ):
-            use_models = True
-        if use_models:
-            return await self._model_based_delete()
-
-        # delete of model issues already signals, so don't integrate them
-        await self.model_class.meta.signals.pre_delete.send_async(self.model_class, instance=self)
-
-        expression = self.table.delete()
-        expression = expression.where(await self.build_where_clause())
-
-        check_db_connection(self.database)
-        async with self.database as database:
-            row_count = cast(int, await database.execute(expression))
-
-        # clear cache before executing post_delete. Fresh results can be retrieved in signals
-        self._clear_cache()
-
+        await self.model_class.meta.signals.pre_delete.send_async(
+            self.model_class, instance=self, model_instance=None
+        )
+        row_count = await self.raw_delete(use_models=use_models, remove_referenced_call=False)
         await self.model_class.meta.signals.post_delete.send_async(
-            self.model_class, instance=self, row_count=row_count
+            self.model_class, instance=self, model_instance=None, row_count=row_count
         )
         return row_count
 

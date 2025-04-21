@@ -22,15 +22,17 @@ hide:
 - Split `delete` in `delete` (only used for direct calls) and `raw_delete` for better customizations.
 - Split `save` in `save` (only used for direct calls) and `real_save` for better customizations.
 - Remove internal only parameter `remove_referenced_call` from delete (but not from raw_delete).
-- Virtual cascade deletions doesn't trigger delete signals anymore.
-- `QuerySet.create` passes now the QuerySet instance as CURRENT_INSTANCE.
+- Change the `remove_referenced_call` to also accept strings, which are the fields from which the deletion originates from.
+- Virtual cascade and model based deletions doesn't trigger delete signals anymore (except if `__deletion_with_signals__=True` is set).
+- `QuerySet.create` passes now the QuerySet instance as `CURRENT_INSTANCE`.
 - `QuerySet.create` passes now the QuerySet instance as signal parameter instance.
 
 ### Fixed
 
-- `QuerySet.create` passed the model instance as CURRENT_INSTANCE.
-- Virtual cascade deletions doesn't trigger delete signals anymore.
+- `QuerySet.create` passed the model instance as `CURRENT_INSTANCE`.
+- Virtual cascade and model based deletions doesn't trigger delete signals anymore.
 - Fix spurious iterate bug in `bulk_get_or_create`, triggered in `edgy-guardian`.
+- Fix wrong signal sender class for proxy models.
 
 ### Breaking
 

@@ -77,25 +77,27 @@ The receiver function receives following parameters:
 Triggered before a model is deleted (during `Model.delete()` and `Model.query.delete()`).
 
 ```python
-pre_delete(send: Type["Model"], instance: Union["Model", "QuerySet"],)
+pre_delete(send: Type["Model"], instance: Union["Model", "QuerySet"], model_instance: Optional["Model"])
 ```
 
 ##### pre_delete parameters
 
 - instance - The model or QuerySet instance.
+- model_instance -The model instance if available.
 
 #### post_delete
 
 Triggered after a model is deleted (during `Model.delete()` and `Model.query.delete()`).
 
 ```python
-post_delete(send: Type["Model"], instance: Union["Model", "QuerySet"], row_count: Optional[int])
+post_delete(send: Type["Model"], instance: Union["Model", "QuerySet"], model_instance: Optional["Model"], row_count: Optional[int])
 ```
 
 ##### post_delete parameters
 
 - instance - The model or QuerySet instance.
 - row_count - How many rows are deleted (only some dbs can be None).
+- model_instance -The model instance if available.
 
 #### pre_migrate
 

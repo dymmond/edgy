@@ -1,10 +1,11 @@
-from typing import TYPE_CHECKING, ClassVar, cast
+from typing import TYPE_CHECKING, ClassVar, Union, cast
 
 import edgy
 
 from .metaclasses import ContentTypeMeta
 
 if TYPE_CHECKING:
+    from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
     from edgy.core.db.querysets.base import QuerySet
 
 
@@ -31,7 +32,7 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
         )
 
     async def raw_delete(
-        self, *, skip_post_delete_hooks: bool, remove_referenced_call: bool
+        self, *, skip_post_delete_hooks: bool, remove_referenced_call: Union[bool, str]
     ) -> None:
         await super().raw_delete(
             skip_post_delete_hooks=skip_post_delete_hooks,
@@ -41,5 +42,8 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
             return
         reverse_name = f"reverse_{self.name.lower()}"
         referenced_obs = cast("QuerySet", getattr(self, reverse_name))
-        if self.meta.fields[reverse_name].foreign_key.force_cascade_deletion_relation:
-            await referenced_obs.using(schema=self.schema_name).delete()
+        fk = cast("BaseForeignKeyField", self.meta.fields[reverse_name].foreign_key)
+        if fk.force_cascade_deletion_relation:
+            await referenced_obs.using(schema=self.schema_name).raw_delete(
+                use_models=fk.use_model_based_deletion, remove_referenced_call=reverse_name
+            )
