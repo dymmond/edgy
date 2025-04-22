@@ -79,10 +79,10 @@ async def create_test_database():
     await models.drop_all()
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
     with database.force_rollback():
-        async with database:
+        async with models:
             yield
 
 

@@ -25,8 +25,9 @@ async def create_test_database():
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
-    async with models:
-        yield
+    with models.database.force_rollback(True):
+        async with models:
+            yield
 
 
 class Computer(edgy.StrictModel):
