@@ -891,8 +891,7 @@ class BaseQuerySet(
                 async with queryset.database as database:
                     async for batch in cast(
                         AsyncGenerator[Sequence[sqlalchemy.Row], None],
-                        database.batched_iterate(expression, batch_size=self._batch_size),
-                        new_cache=new_cache
+                        database.batched_iterate(expression, batch_size=self._batch_size)
                     ):
                         # clear only result cache
                         new_cache.clear()
