@@ -27,7 +27,7 @@ async def create_test_database():
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
-    async with models.database:
+    async with models:
         yield
 
 

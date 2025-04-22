@@ -75,7 +75,7 @@ async def create_test_database():
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
-    async with models.database:
+    async with models:
         for i in range(10):  # noqa
             await SuperProfileFactory().build().save()
         yield
