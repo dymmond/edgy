@@ -746,10 +746,9 @@ class BaseQuerySet(
         batch: Sequence[sqlalchemy.Row],
         tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
         queryset: BaseQuerySet,
-        new_cache: Optional[QueryModelResultCache] = None,
+        new_cache: QueryModelResultCache,
     ) -> Sequence[tuple[BaseModelType, BaseModelType]]:
         is_defer_fields = bool(queryset._defer)
-        new_cache = self._cache if new_cache is None else new_cache
         del queryset
         _prefetch_related: list[Prefetch] = []
 
@@ -900,7 +899,7 @@ class BaseQuerySet(
                         new_cache.clear()
                         self._cache_fetch_all = False
                         for row_num, result in enumerate(
-                            await self._handle_batch(batch, tables_and_models, queryset)
+                            await self._handle_batch(batch, tables_and_models, queryset, new_cache)
                         ):
                             if counter == 0:
                                 self._cache_first = result
