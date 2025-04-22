@@ -130,6 +130,7 @@ class QueryModelResultCache:
         """
         Build a cache key for the model.
         """
+        # we don't know if we get a row, a dict or a model, so use model_class
         cache_key_list: list[Any] = [self.create_category(model_class, prefix=prefix)]
         if attrs is None:
             attrs = self.attrs
