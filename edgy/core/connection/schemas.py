@@ -154,6 +154,7 @@ class Schema:
             list_schemes: list[str] = []
             metadata = sqlalchemy.MetaData()
             with database.force_rollback(False):
+
                 def wrapper(connection: sqlalchemy.Connection) -> None:
                     nonlocal list_schemes
                     inspector = sqlalchemy.inspect(connection)
