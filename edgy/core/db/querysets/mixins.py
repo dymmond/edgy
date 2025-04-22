@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
@@ -18,8 +20,8 @@ class QuerySetPropsMixin:
     for clean access and maintainance.
     """
 
-    _table: Optional["sqlalchemy.Table"] = None
-    _database: Optional["Database"] = None
+    _table: Optional[sqlalchemy.Table] = None
+    _database: Optional[Database] = None
 
     @property
     def database(self) -> Database:
@@ -28,8 +30,9 @@ class QuerySetPropsMixin:
         return self._database
 
     @database.setter
-    def database(self, value: Database) -> None:
+    def database(self: QuerySet, value: Database) -> None:
         self._database = value
+        self._clear_cache()
 
     @property
     def table(self) -> sqlalchemy.Table:
@@ -38,8 +41,9 @@ class QuerySetPropsMixin:
         return self._table
 
     @table.setter
-    def table(self, value: Optional[sqlalchemy.Table]) -> None:
+    def table(self: QuerySet, value: Optional[sqlalchemy.Table]) -> None:
         self._table = value
+        self._clear_cache()
 
     @property
     def pknames(self) -> Sequence[str]:
@@ -62,9 +66,9 @@ class TenancyMixin:
         self,
         _positional: Any = _sentinel,
         *,
-        database: Union[str, Any, None, "Database"] = Undefined,
+        database: Union[str, Any, None, Database] = Undefined,
         schema: Union[str, Any, None, Literal[False]] = Undefined,
-    ) -> "QuerySet":
+    ) -> QuerySet:
         """
         Enables and switches the db schema and/or db.
 
@@ -108,7 +112,7 @@ class TenancyMixin:
 
     def using_with_db(
         self, connection_name: str, schema: Union[str, Any, None, Literal[False]] = Undefined
-    ) -> "QuerySet":
+    ) -> QuerySet:
         """
         Switches the database connection and schema
         """
