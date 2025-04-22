@@ -746,9 +746,10 @@ class BaseQuerySet(
         batch: Sequence[sqlalchemy.Row],
         tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
         queryset: BaseQuerySet,
-        new_cache: Optional[QueryModelResultCache] = None
+        new_cache: Optional[QueryModelResultCache] = None,
     ) -> Sequence[tuple[BaseModelType, BaseModelType]]:
         is_defer_fields = bool(queryset._defer)
+        new_cache = self._cache if new_cache is None else new_cache
         del queryset
         _prefetch_related: list[Prefetch] = []
 
@@ -817,7 +818,7 @@ class BaseQuerySet(
                     reference_select=self._reference_select,
                 ),
                 transform_fn=self._embed_parent_in_result,
-                old_cache=self._cache
+                old_cache=self._cache,
             ),
         )
 
@@ -875,7 +876,9 @@ class BaseQuerySet(
                 async with queryset.database as database:
                     batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
                 for row_num, result in enumerate(
-                    await self._handle_batch(batch, tables_and_models, queryset, new_cache=new_cache)
+                    await self._handle_batch(
+                        batch, tables_and_models, queryset, new_cache=new_cache
+                    )
                 ):
                     if counter == 0:
                         self._cache_first = result
@@ -891,7 +894,7 @@ class BaseQuerySet(
                 async with queryset.database as database:
                     async for batch in cast(
                         AsyncGenerator[Sequence[sqlalchemy.Row], None],
-                        database.batched_iterate(expression, batch_size=self._batch_size)
+                        database.batched_iterate(expression, batch_size=self._batch_size),
                     ):
                         # clear only result cache
                         new_cache.clear()
@@ -1593,7 +1596,9 @@ class QuerySet(BaseQuerySet):
             result = await self._embed_parent_in_result(instance)
             self._clear_cache(keep_result_cache=True)
             self._cache.update(
-                self.model_class, [result], cache_keys=[self._cache.create_cache_key(self.model_class, result[0])]
+                self.model_class,
+                [result],
+                cache_keys=[self._cache.create_cache_key(self.model_class, result[0])],
             )
             return cast(EdgyEmbedTarget, result[1])
         finally:

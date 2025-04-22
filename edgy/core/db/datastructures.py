@@ -260,9 +260,7 @@ class QueryModelResultCache:
                     result = await transform_fn(result)
                 results.append(result)
                 continue
-            result = self.get_for_cache_key(
-                cache_key, prefix=prefix, old_cache=old_cache
-            )
+            result = self.get_for_cache_key(cache_key, prefix=prefix, old_cache=old_cache)
             if result is None and cache_fn is not None:
                 result = await cache_fn(row_or_model)
                 if result is not None:
