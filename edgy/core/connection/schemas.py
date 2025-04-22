@@ -153,23 +153,23 @@ class Schema:
         async with database as database:
             list_schemes: list[str] = []
             metadata = sqlalchemy.MetaData()
+            with database.force_rollback(False):
+                def wrapper(connection: sqlalchemy.Connection) -> None:
+                    nonlocal list_schemes
+                    inspector = sqlalchemy.inspect(connection)
+                    default_schema_name = inspector.default_schema_name
+                    list_schemes = [
+                        "" if default_schema_name == schema else schema
+                        for schema in inspector.get_schema_names()
+                    ]
+                    if not no_reflect:
+                        for schema in list_schemes:
+                            metadata.reflect(
+                                connection, schema=schema, only=lambda name, _: name in tablenames
+                            )
 
-            def wrapper(connection: sqlalchemy.Connection) -> None:
-                nonlocal list_schemes
-                inspector = sqlalchemy.inspect(connection)
-                default_schema_name = inspector.default_schema_name
-                list_schemes = [
-                    "" if default_schema_name == schema else schema
-                    for schema in inspector.get_schema_names()
-                ]
-                if not no_reflect:
-                    for schema in list_schemes:
-                        metadata.reflect(
-                            connection, schema=schema, only=lambda name, _: name in tablenames
-                        )
-
-            await database.run_sync(wrapper)
-            return metadata, list_schemes
+                await database.run_sync(wrapper)
+                return metadata, list_schemes
 
     async def get_schemes_tree(
         self, *, no_reflect: bool = False
