@@ -887,13 +887,15 @@ class BaseQuerySet(
                 self._cache = new_cache
             else:
                 batch_num: int = 0
+                new_cache = QueryModelResultCache(self._cache.attrs)
                 async with queryset.database as database:
                     async for batch in cast(
                         AsyncGenerator[Sequence[sqlalchemy.Row], None],
                         database.batched_iterate(expression, batch_size=self._batch_size),
+                        new_cache=new_cache
                     ):
                         # clear only result cache
-                        self._cache.clear()
+                        new_cache.clear()
                         self._cache_fetch_all = False
                         for row_num, result in enumerate(
                             await self._handle_batch(batch, tables_and_models, queryset)
@@ -906,6 +908,7 @@ class BaseQuerySet(
                             yield result[1]
                         batch_num += 1
                 if batch_num <= 1:
+                    self._cache = new_cache
                     self._cache_fetch_all = True
 
         finally:
