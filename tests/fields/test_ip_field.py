@@ -19,14 +19,16 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    await models.create_all()
-    yield
-    if not database.drop:
+    # this creates and drops the database
+    async with database:
+        await models.create_all()
+        yield
         await models.drop_all()
 
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
+    # this rolls back
     async with models:
         yield
 

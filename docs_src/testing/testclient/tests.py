@@ -17,7 +17,7 @@ from edgy.core.db import fields
 from edgy.testclient import DatabaseTestClient
 
 database = DatabaseTestClient(DATABASE_URL, drop_database=True)
-models = edgy.Registry(database=database)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 pytestmark = pytest.mark.anyio
 
@@ -74,16 +74,18 @@ class Customer(edgy.Model):
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    await models.create_all()
-    yield
-    await models.drop_all()
+    # this creates and drops the database
+    async with database:
+        await models.create_all()
+        yield
+        await models.drop_all()
 
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
-    with database.force_rollback():
-        async with models:
-            yield
+    # this rolls back
+    async with models:
+        yield
 
 
 async def test_model_crud():

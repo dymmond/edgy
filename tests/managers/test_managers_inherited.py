@@ -61,17 +61,18 @@ class Product(BaseModel):
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    await models.create_all()
-    yield
-    if not database.drop:
+    # this creates and drops the database
+    async with database:
+        await models.create_all()
+        yield
         await models.drop_all()
 
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
-    with models.database.force_rollback():
-        async with models:
-            yield
+    # this rolls back
+    async with models:
+        yield
 
 
 async def test_inherited_base_model_managers():
