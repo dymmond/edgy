@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Generator,
 from contextvars import ContextVar
 from functools import cached_property
 from inspect import isawaitable
+from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -185,7 +186,7 @@ class BaseQuerySet(
         # cache should not be cloned
         self._cache = QueryModelResultCache(attrs=self.model_class.pkcolumns)
         # is empty
-        self._clear_cache(False)
+        self._clear_cache(keep_result_cache=False)
         # this is not cleared, because the expression is immutable
         self._cached_select_related_expression: Optional[
             tuple[
@@ -234,15 +235,22 @@ class BaseQuerySet(
         queryset._cached_select_related_expression = self._cached_select_related_expression
         return cast("QuerySet", queryset)
 
-    def _clear_cache(self, keep_result_cache: bool = False) -> None:
+    @cached_property
+    def _has_dynamic_clauses(self) -> bool:
+        return any(callable(clause) for clause in chain(self.filter_clauses, self.or_clauses))
+
+    def _clear_cache(
+        self, *, keep_result_cache: bool = False, keep_cached_selected: bool = False
+    ) -> None:
         if not keep_result_cache:
             self._cache.clear()
-        self._cached_select_with_tables: Optional[
-            tuple[Any, dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]]
-        ] = None
+        if not keep_cached_selected:
+            self._cached_select_with_tables: Optional[
+                tuple[Any, dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]]
+            ] = None
         self._cache_count: Optional[int] = None
-        self._cache_first: Optional[tuple[BaseModelType, BaseModelType]] = None
-        self._cache_last: Optional[tuple[BaseModelType, BaseModelType]] = None
+        self._cache_first: Optional[tuple[BaseModelType, Any]] = None
+        self._cache_last: Optional[tuple[BaseModelType, Any]] = None
         # fetch all is in cache
         self._cache_fetch_all: bool = False
 
@@ -678,7 +686,7 @@ class BaseQuerySet(
         if isawaitable(result):
             result = await result
         if not self.embed_parent:
-            return (cast(EdgyModel, result), cast(EdgyModel, result))
+            return (cast(EdgyModel, result), result)
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
             new_result: Any = result
@@ -698,9 +706,9 @@ class BaseQuerySet(
         tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
         extra_attr: str = "",
         raw: bool = False,
-    ) -> tuple[EdgyModel, EdgyModel]:
+    ) -> tuple[EdgyModel, EdgyEmbedTarget]:
         is_defer_fields = bool(self._defer)
-        raw_result, result = (
+        result_tuple: tuple[EdgyModel, EdgyEmbedTarget] = (
             await self._cache.aget_or_cache_many(
                 self.model_class,
                 [row],
@@ -721,8 +729,8 @@ class BaseQuerySet(
         )[0]
         if extra_attr:
             for attr in extra_attr.split(","):
-                setattr(self, attr, result)
-        return cast("EdgyModel", raw_result), cast("EdgyModel", result)
+                setattr(self, attr, result_tuple)
+        return result_tuple
 
     def get_schema(self) -> Optional[str]:
         # Differs from get_schema global
@@ -738,6 +746,7 @@ class BaseQuerySet(
         batch: Sequence[sqlalchemy.Row],
         tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
         queryset: BaseQuerySet,
+        new_cache: QueryModelResultCache,
     ) -> Sequence[tuple[BaseModelType, BaseModelType]]:
         is_defer_fields = bool(queryset._defer)
         del queryset
@@ -792,7 +801,7 @@ class BaseQuerySet(
 
         return cast(
             Sequence[tuple[BaseModelType, BaseModelType]],
-            await self._cache.aget_or_cache_many(
+            await new_cache.aget_or_cache_many(
                 self.model_class,
                 batch,
                 cache_fn=lambda row: self.model_class.from_sqla_row(
@@ -808,6 +817,7 @@ class BaseQuerySet(
                     reference_select=self._reference_select,
                 ),
                 transform_fn=self._embed_parent_in_result,
+                old_cache=self._cache,
             ),
         )
 
@@ -831,6 +841,7 @@ class BaseQuerySet(
                 self._cache.get_category(self.model_class).values(),
             ):
                 yield result[1]
+            return
         queryset = self
         if queryset.embed_parent:
             # activates distinct, not distinct on
@@ -859,10 +870,14 @@ class BaseQuerySet(
         token = _current_row_holder.set(current_row)
         try:
             if fetch_all_at_once:
+                # we need a new cache to have the right order
+                new_cache = QueryModelResultCache(self._cache.attrs)
                 async with queryset.database as database:
                     batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
                 for row_num, result in enumerate(
-                    await self._handle_batch(batch, tables_and_models, queryset)
+                    await self._handle_batch(
+                        batch, tables_and_models, queryset, new_cache=new_cache
+                    )
                 ):
                     if counter == 0:
                         self._cache_first = result
@@ -871,17 +886,20 @@ class BaseQuerySet(
                     current_row[0] = batch[row_num]
                     yield result[1]
                 self._cache_fetch_all = True
+                self._cache = new_cache
             else:
+                batch_num: int = 0
+                new_cache = QueryModelResultCache(self._cache.attrs)
                 async with queryset.database as database:
                     async for batch in cast(
                         AsyncGenerator[Sequence[sqlalchemy.Row], None],
                         database.batched_iterate(expression, batch_size=self._batch_size),
                     ):
                         # clear only result cache
-                        self._cache.clear()
+                        new_cache.clear()
                         self._cache_fetch_all = False
                         for row_num, result in enumerate(
-                            await self._handle_batch(batch, tables_and_models, queryset)
+                            await self._handle_batch(batch, tables_and_models, queryset, new_cache)
                         ):
                             if counter == 0:
                                 self._cache_first = result
@@ -889,6 +907,11 @@ class BaseQuerySet(
                             counter += 1
                             current_row[0] = batch[row_num]
                             yield result[1]
+                        batch_num += 1
+                if batch_num <= 1:
+                    self._cache = new_cache
+                    self._cache_fetch_all = True
+
         finally:
             _current_row_holder.reset(token)
         # better update them once
@@ -1049,6 +1072,11 @@ class BaseQuerySet(
             # connect parent query cache
             filter_query._cache = self._cache
             return await filter_query._get_raw()
+        elif self._cache_count == 1:
+            if self._cache_first is not None:
+                return self._cache_first
+            elif self._cache_last is not None:
+                return self._cache_last
 
         expression, tables_and_models = await self.as_select_with_tables()
         check_db_connection(self.database, stacklevel=4)
@@ -1111,7 +1139,7 @@ class QuerySet(BaseQuerySet):
         Returns a cloned query with empty cache. Optionally just clear the cache and return the same query.
         """
         if clear_cache:
-            self._clear_cache()
+            self._clear_cache(keep_cached_selected=not self._has_dynamic_clauses)
             return self
         return self._clone()
 
@@ -1301,9 +1329,13 @@ class QuerySet(BaseQuerySet):
         queryset._cache_first = self._cache_last
         queryset._cache_count = self._cache_count
         if self._cache_fetch_all:
-            queryset._cache.update(
-                list(reversed(self._cache.get_category(self.model_class).values()))
-            )
+            # we may have embedded active
+            cache_keys = []
+            values = []
+            for k, v in reversed(self._cache.get_category(self.model_class).items()):
+                cache_keys.append(k)
+                values.append(v)
+            queryset._cache.update(self.model_class, values, cache_keys=cache_keys)
             queryset._cache_fetch_all = True
         return queryset
 
@@ -1561,8 +1593,12 @@ class QuerySet(BaseQuerySet):
             finally:
                 CURRENT_INSTANCE.reset(token2)
             result = await self._embed_parent_in_result(instance)
-            self._clear_cache(True)
-            self._cache.update([result])
+            self._clear_cache(keep_result_cache=True)
+            self._cache.update(
+                self.model_class,
+                [result],
+                cache_keys=[self._cache.create_cache_key(self.model_class, result[0])],
+            )
             return cast(EdgyEmbedTarget, result[1])
         finally:
             CHECK_DB_CONNECTION_SILENCED.reset(token)
@@ -1602,7 +1638,7 @@ class QuerySet(BaseQuerySet):
             async with queryset.database as database, database.transaction():
                 expression = queryset.table.insert().values([await _iterate(obj) for obj in objs])
                 await database.execute_many(expression)
-            self._clear_cache(True)
+            self._clear_cache(keep_result_cache=True)
             if new_objs:
                 for obj in new_objs:
                     await obj.execute_post_save_hooks(

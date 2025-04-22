@@ -33,8 +33,8 @@ async def test_get_or_none():
     query = User.query.filter(name="Charles")
     assert user == await query.get()
     assert query._cache_count == 1
-    assert query._cache_first == user
-    assert query._cache_last == user
+    assert query._cache_first[1] == user
+    assert query._cache_last[1] == user
 
     user = await User.query.get_or_none(name="Luigi")
     assert user is None

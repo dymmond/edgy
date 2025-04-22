@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.31.1
+
+### Fixed
+
+- Fix and test QuerySet caching.
+
 ## 0.31.0
 
 ### Added
