@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, Request, get
-from esmerald.protocols.middleware import MiddlewareProtocol
+from esmerald.core.protocols.middleware import MiddlewareProtocol
 from httpx import ASGITransport, AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
 
