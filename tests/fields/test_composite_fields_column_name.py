@@ -38,7 +38,7 @@ class MyModel(edgy.StrictModel):
 async def create_test_database():
     async with database:
         await models.create_all()
-        async with models.database:
+        async with models:
             yield
 
 

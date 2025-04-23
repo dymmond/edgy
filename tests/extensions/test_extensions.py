@@ -38,7 +38,8 @@ async def create_test_database():
         await models.create_all()
         async with models:
             yield
-        await models.drop_all()
+        if not database.drop:
+            await models.drop_all()
         # clear the registry
         models.models.clear()
 

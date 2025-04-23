@@ -11,6 +11,7 @@ hide:
 ### Fixed
 
 - Fix and test QuerySet caching.
+- Fix potential hang in `get_metadata_of_all_schemes` with `force_rollback` active.
 
 ## 0.31.0
 

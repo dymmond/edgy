@@ -58,6 +58,7 @@ class Permission(EdgyTenantBaseModel):
 
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
+    # this creates and drops the database
     async with database:
         await models.create_all()
         yield
@@ -67,7 +68,8 @@ async def create_test_database():
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_transactions():
-    async with models.database:
+    # this rolls back
+    async with models:
         yield
 
 

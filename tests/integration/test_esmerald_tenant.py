@@ -4,11 +4,11 @@ from typing import Any
 import pytest
 from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, Request, get
-from esmerald.protocols.middleware import MiddlewareProtocol
+from esmerald.core.protocols.middleware import MiddlewareProtocol
 from httpx import ASGITransport, AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
 
-from edgy import Registry
+import edgy
 from edgy.contrib.multi_tenancy import TenantModel
 from edgy.contrib.multi_tenancy.models import TenantMixin, TenantUserMixin
 from edgy.core.db import fields, with_tenant
@@ -17,7 +17,7 @@ from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 database = DatabaseTestClient(DATABASE_URL)
-models = Registry(database=database)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 pytestmark = pytest.mark.anyio

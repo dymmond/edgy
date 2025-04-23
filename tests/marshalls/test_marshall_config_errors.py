@@ -25,7 +25,7 @@ async def create_test_database():
 
 @pytest.fixture(autouse=True, scope="function")
 async def rollback_connections():
-    async with models.database:
+    async with models:
         yield
 
 
