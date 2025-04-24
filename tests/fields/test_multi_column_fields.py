@@ -35,6 +35,7 @@ class MultiColumnFieldInner(BaseField):
                 model.column_type,
                 *model.constraints,
                 nullable=self.get_columns_nullable(),
+                server_default=self.get_server_default(),
                 **model.model_dump(by_alias=True, exclude_none=True),
             ),
             sqlalchemy.Column(
@@ -42,6 +43,7 @@ class MultiColumnFieldInner(BaseField):
                 model.column_type,
                 *model.constraints,
                 nullable=self.get_columns_nullable(),
+                server_default=self.get_server_default(),
                 **model.model_dump(by_alias=True, exclude_none=True),
             ),
         ]

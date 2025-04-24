@@ -19,6 +19,9 @@ default_methods_overwritable_by_factory.discard("__init__")
 
 # useful helpers
 default_methods_overwritable_by_factory.add("get_default_value")
+default_methods_overwritable_by_factory.add("get_columns_nullable")
+default_methods_overwritable_by_factory.add("get_server_default")
+default_methods_overwritable_by_factory.add("customize_default_for_server_default")
 
 # extra methods
 default_methods_overwritable_by_factory.add("__set__")

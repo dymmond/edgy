@@ -31,8 +31,7 @@ class _ColumnDefinition:
     index: bool = False
     unique: bool = False
     comment: Optional[str] = None
-    # keep both any, so multi-column field authors can set a dict
-    server_default: Optional[Any] = None
+    # keep any, so multi-column field authors can set a dict
     server_onupdate: Optional[Any] = None
 
 
@@ -42,6 +41,8 @@ class ColumnDefinition(_ColumnDefinition):
     column_name: Optional[str] = None
     column_type: Any = None
     constraints: Sequence[sqlalchemy.Constraint] = ()
+    # keep any, so multi-column field authors can set a dict
+    server_default: Optional[Any] = None
 
 
 class ColumnDefinitionModel(
@@ -167,17 +168,6 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         """
         Define for each field/column a default. Non-private multicolumn fields should
         always check if the default was already applied.
-
-        Args:
-            field_name: the field name (can be different from name)
-            cleaned_data: currently validated data. Useful to check if the default was already applied.
-
-        """
-
-    @abstractmethod
-    def customize_default_for_server_default(self, value: Any) -> Any:
-        """
-        Modify default for server_default.
 
         Args:
             field_name: the field name (can be different from name)

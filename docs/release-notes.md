@@ -6,6 +6,31 @@ hide:
 
 # Release Notes
 
+## 0.31.2
+
+### Added
+
+- Add the method `get_server_default`.
+- Add `get_columns_nullable`, `get_server_default` and `customize_default_for_server_default` to factory
+  overwritable methods.
+
+### Changed
+
+- `server_default` is not extracted anymore by `ColumnDefinitionModel`. Use `get_server_default` instead.
+
+### Removed
+
+- Remove the abstract method `customize_default_for_server_default` from BaseFieldType.
+
+### Fixed
+
+- Fix potential too early import of settings because of the auto computation of server_defaults.
+
+### Breaking
+
+When creating a custom field providing get_columns and
+relying on the extraction of server defaults from field, you may need to update the code to use `get_server_default`.
+
 ## 0.31.1
 
 ### Fixed

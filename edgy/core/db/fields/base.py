@@ -66,6 +66,7 @@ class BaseField(BaseFieldType, FieldInfo):
         self,
         *,
         default: Any = Undefined,
+        server_default: Any = Undefined,
         **kwargs: Any,
     ) -> None:
         if "__type__" in kwargs:
@@ -87,37 +88,42 @@ class BaseField(BaseFieldType, FieldInfo):
             default = None
         if default is not Undefined:
             self.default = default
-        # check if there was an explicit defined server_default=None
-        if (
-            default is not None
-            and default is not Undefined
-            and self.server_default is None
-            and "server_default" not in kwargs
-        ):
-            if not callable(default):
-                if self.auto_compute_server_default is None:
-                    auto_compute_server_default: bool = (
-                        not self.null and settings.allow_auto_compute_server_defaults
-                    )
-                elif self.auto_compute_server_default == "ignore_null":
-                    auto_compute_server_default = settings.allow_auto_compute_server_defaults
-                else:
-                    auto_compute_server_default = self.auto_compute_server_default
-            else:
-                auto_compute_server_default = bool(self.auto_compute_server_default)
 
-            if auto_compute_server_default:
-                # required because the patching is done later
-                if hasattr(self, "factory") and getattr(
-                    self.factory, "customize_default_for_server_default", None
-                ):
-                    self.server_default = self.factory.customize_default_for_server_default(
-                        self, default, original_fn=self.customize_default_for_server_default
-                    )
-                else:
-                    self.server_default = self.customize_default_for_server_default(default)
+    def get_server_default(self) -> Any:
+        """
+        Retrieve the server_default.
+        """
+        # check if there was an explicit defined server_default
+        if self.server_default is not Undefined:
+            return self.server_default
+        default = self.default
+        if default is Undefined or default is None:
+            return None
+        if not callable(default):
+            if self.auto_compute_server_default is None:
+                auto_compute_server_default: bool = (
+                    not self.null and settings.allow_auto_compute_server_defaults
+                )
+            elif self.auto_compute_server_default == "ignore_null":
+                auto_compute_server_default = settings.allow_auto_compute_server_defaults
+            else:
+                auto_compute_server_default = self.auto_compute_server_default
+        else:
+            auto_compute_server_default = bool(self.auto_compute_server_default)
+
+        if auto_compute_server_default:
+            return self.customize_default_for_server_default(default)
+        return None
 
     def customize_default_for_server_default(self, default: Any) -> Any:
+        """
+        Modify default for server_default.
+
+        Args:
+            field_name: the field name (can be different from name)
+            cleaned_data: currently validated data. Useful to check if the default was already applied.
+
+        """
         if callable(default):
             default = default()
         return sqlalchemy.text(":value").bindparams(value=default)
@@ -262,6 +268,7 @@ class Field(BaseField):
             *column_model.constraints,
             key=name,
             nullable=self.get_columns_nullable(),
+            server_default=self.get_server_default(),
             **column_model.model_dump(by_alias=True, exclude_none=True),
         )
 
