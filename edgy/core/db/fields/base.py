@@ -84,7 +84,9 @@ class BaseField(BaseFieldType, FieldInfo):
         # this is required for backward compatibility and pydantic_core uses null=True too
         # for opting out of nullable columns overwrite the get_column(s) method
         if (
-            self.null or self.server_default is not None or self.autoincrement
+            self.null
+            or (self.server_default is not None and self.server_default is not Undefined)
+            or self.autoincrement
         ) and default is Undefined:
             default = None
         if default is not Undefined:
@@ -179,8 +181,9 @@ class BaseField(BaseFieldType, FieldInfo):
             return False
         return not (
             self.null
-            or self.server_default is not None
-            or ((self.default is not None or self.explicit_none) and self.default is not Undefined)
+            # we cannot use get_server_default() here. The test is client side not for migrations.
+            or (self.server_default is not None and self.server_default is not Undefined)
+            or self.has_default()
         )
 
     def has_default(self) -> bool:

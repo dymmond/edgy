@@ -42,7 +42,7 @@ class ColumnDefinition(_ColumnDefinition):
     column_type: Any = None
     constraints: Sequence[sqlalchemy.Constraint] = ()
     # keep any, so multi-column field authors can set a dict
-    server_default: Optional[Any] = None
+    server_default: Optional[Any] = Undefined
 
 
 class ColumnDefinitionModel(
@@ -71,7 +71,7 @@ class BaseFieldDefinitions:
     owner: Any = None
     default: Any = Undefined
     explicit_none: bool = False
-    server_default: Any = None
+    server_default: Any = Undefined
 
     # column specific
     primary_key: bool = False
