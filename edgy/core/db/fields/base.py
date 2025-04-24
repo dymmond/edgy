@@ -72,6 +72,7 @@ class BaseField(BaseFieldType, FieldInfo):
         if "__type__" in kwargs:
             kwargs["field_type"] = kwargs.pop("__type__")
         self.explicit_none = default is None
+        self.server_default = server_default
 
         super().__init__(**kwargs)
 
@@ -93,9 +94,10 @@ class BaseField(BaseFieldType, FieldInfo):
         """
         Retrieve the server_default.
         """
+        server_default = getattr(self, "server_default", Undefined)
         # check if there was an explicit defined server_default
-        if self.server_default is not Undefined:
-            return self.server_default
+        if server_default is not Undefined:
+            return server_default
         default = self.default
         if default is Undefined or default is None:
             return None
@@ -109,7 +111,7 @@ class BaseField(BaseFieldType, FieldInfo):
             else:
                 auto_compute_server_default = self.auto_compute_server_default
         else:
-            auto_compute_server_default = bool(self.auto_compute_server_default)
+            auto_compute_server_default = self.auto_compute_server_default is True
 
         if auto_compute_server_default:
             return self.customize_default_for_server_default(default)
@@ -117,11 +119,10 @@ class BaseField(BaseFieldType, FieldInfo):
 
     def customize_default_for_server_default(self, default: Any) -> Any:
         """
-        Modify default for server_default.
+        Modify default for non-null server_default.
 
         Args:
-            field_name: the field name (can be different from name)
-            cleaned_data: currently validated data. Useful to check if the default was already applied.
+            default: The original default.
 
         """
         if callable(default):

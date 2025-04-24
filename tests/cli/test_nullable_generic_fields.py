@@ -6,15 +6,17 @@ from asyncio import run
 from pathlib import Path
 
 import pytest
-import sqlalchemy
-from sqlalchemy.ext.asyncio import create_async_engine
 
+from edgy.testing.client import DatabaseTestClient
 from tests.cli.utils import arun_cmd
-from tests.settings import DATABASE_URL
+from tests.settings import TEST_DATABASE
 
 pytestmark = pytest.mark.anyio
 
 base_path = Path(os.path.abspath(__file__)).absolute().parent
+outer_database = DatabaseTestClient(
+    TEST_DATABASE, use_existing=False, drop_database=True, test_prefix=""
+)
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -32,19 +34,15 @@ def cleanup_folders():
 
 
 async def recreate_db():
-    engine = create_async_engine(DATABASE_URL, isolation_level="AUTOCOMMIT")
-    try:
-        async with engine.connect() as conn:
-            await conn.execute(sqlalchemy.text("DROP DATABASE test_edgy"))
-    except Exception:
-        pass
-    async with engine.connect() as conn:
-        await conn.execute(sqlalchemy.text("CREATE DATABASE test_edgy"))
+    if await outer_database.is_database_exist():
+        await outer_database.drop_database(outer_database.url)
+    await outer_database.create_database(outer_database.url)
 
 
 @pytest.fixture(scope="function", autouse=True)
 async def cleanup_prepare_db():
-    await recreate_db()
+    async with outer_database:
+        yield
 
 
 @pytest.mark.parametrize(
