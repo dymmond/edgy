@@ -66,11 +66,13 @@ class BaseField(BaseFieldType, FieldInfo):
         self,
         *,
         default: Any = Undefined,
+        server_default: Any = Undefined,
         **kwargs: Any,
     ) -> None:
         if "__type__" in kwargs:
             kwargs["field_type"] = kwargs.pop("__type__")
         self.explicit_none = default is None
+        self.server_default = server_default
 
         super().__init__(**kwargs)
 
@@ -82,42 +84,49 @@ class BaseField(BaseFieldType, FieldInfo):
         # this is required for backward compatibility and pydantic_core uses null=True too
         # for opting out of nullable columns overwrite the get_column(s) method
         if (
-            self.null or self.server_default is not None or self.autoincrement
+            self.null
+            or (self.server_default is not None and self.server_default is not Undefined)
+            or self.autoincrement
         ) and default is Undefined:
             default = None
         if default is not Undefined:
             self.default = default
-        # check if there was an explicit defined server_default=None
-        if (
-            default is not None
-            and default is not Undefined
-            and self.server_default is None
-            and "server_default" not in kwargs
-        ):
-            if not callable(default):
-                if self.auto_compute_server_default is None:
-                    auto_compute_server_default: bool = (
-                        not self.null and settings.allow_auto_compute_server_defaults
-                    )
-                elif self.auto_compute_server_default == "ignore_null":
-                    auto_compute_server_default = settings.allow_auto_compute_server_defaults
-                else:
-                    auto_compute_server_default = self.auto_compute_server_default
-            else:
-                auto_compute_server_default = bool(self.auto_compute_server_default)
 
-            if auto_compute_server_default:
-                # required because the patching is done later
-                if hasattr(self, "factory") and getattr(
-                    self.factory, "customize_default_for_server_default", None
-                ):
-                    self.server_default = self.factory.customize_default_for_server_default(
-                        self, default, original_fn=self.customize_default_for_server_default
-                    )
-                else:
-                    self.server_default = self.customize_default_for_server_default(default)
+    def get_server_default(self) -> Any:
+        """
+        Retrieve the server_default.
+        """
+        server_default = getattr(self, "server_default", Undefined)
+        # check if there was an explicit defined server_default
+        if server_default is not Undefined:
+            return server_default
+        default = self.default
+        if default is Undefined or default is None:
+            return None
+        if not callable(default):
+            if self.auto_compute_server_default is None:
+                auto_compute_server_default: bool = (
+                    not self.null and settings.allow_auto_compute_server_defaults
+                )
+            elif self.auto_compute_server_default == "ignore_null":
+                auto_compute_server_default = settings.allow_auto_compute_server_defaults
+            else:
+                auto_compute_server_default = self.auto_compute_server_default
+        else:
+            auto_compute_server_default = self.auto_compute_server_default is True
+
+        if auto_compute_server_default:
+            return self.customize_default_for_server_default(default)
+        return None
 
     def customize_default_for_server_default(self, default: Any) -> Any:
+        """
+        Modify default for non-null server_default.
+
+        Args:
+            default: The original default.
+
+        """
         if callable(default):
             default = default()
         return sqlalchemy.text(":value").bindparams(value=default)
@@ -172,8 +181,9 @@ class BaseField(BaseFieldType, FieldInfo):
             return False
         return not (
             self.null
-            or self.server_default is not None
-            or ((self.default is not None or self.explicit_none) and self.default is not Undefined)
+            # we cannot use get_server_default() here. The test is client side not for migrations.
+            or (self.server_default is not None and self.server_default is not Undefined)
+            or self.has_default()
         )
 
     def has_default(self) -> bool:
@@ -262,6 +272,7 @@ class Field(BaseField):
             *column_model.constraints,
             key=name,
             nullable=self.get_columns_nullable(),
+            server_default=self.get_server_default(),
             **column_model.model_dump(by_alias=True, exclude_none=True),
         )
 

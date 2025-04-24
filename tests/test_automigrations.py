@@ -1,6 +1,5 @@
 import asyncio
 import sys
-from contextlib import suppress
 from shutil import rmtree
 
 import pytest
@@ -12,26 +11,22 @@ from edgy.cli.base import init, migrate, upgrade
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-database = DatabaseTestClient(
+database_outer = DatabaseTestClient(
     url=DATABASE_URL,
     force_rollback=False,
-    drop_database=False,
-    use_existing=True,
+    drop_database=True,
+    use_existing=False,
 )
+database = edgy.Database(database_outer)
 pytestmark = pytest.mark.anyio
 
 
 @pytest.fixture(autouse=True, scope="function")
 async def cleanup_db():
     rmtree("test_migrations", ignore_errors=True)
-    await asyncio.sleep(0.5)
-    with suppress(Exception):
-        await database.drop_database(database.url)
-    yield
-    with suppress(Exception):
-        await database.drop_database(database.url)
+    async with database_outer:
+        yield
     rmtree("test_migrations", ignore_errors=True)
-    await asyncio.sleep(0.5)
 
 
 class User(edgy.Model):

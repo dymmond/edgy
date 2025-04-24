@@ -10,6 +10,7 @@ import sqlalchemy
 from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.ext.asyncio import create_async_engine
 
+from edgy.testing.client import DatabaseTestClient
 from tests.cli.utils import arun_cmd
 from tests.settings import (
     DATABASE_ALTERNATIVE_URL,
@@ -21,6 +22,12 @@ from tests.settings import (
 pytestmark = pytest.mark.anyio
 
 base_path = Path(os.path.abspath(__file__)).absolute().parent
+outer_database = DatabaseTestClient(
+    TEST_DATABASE, use_existing=False, drop_database=True, test_prefix=""
+)
+outer_database2 = DatabaseTestClient(
+    TEST_ALTERNATIVE_DATABASE, use_existing=False, drop_database=True, test_prefix=""
+)
 
 
 @pytest.fixture(scope="function", autouse=True)
@@ -53,14 +60,8 @@ async def prepare_db():
 
 @pytest.fixture(scope="function", autouse=True)
 async def cleanup_db():
-    for url in [DATABASE_ALTERNATIVE_URL, DATABASE_URL]:
-        engine = create_async_engine(url, isolation_level="AUTOCOMMIT")
-        try:
-            async with engine.connect() as conn:
-                await conn.execute(sqlalchemy.text("DROP DATABASE test_edgy"))
-        except Exception:
-            pass
-        await engine.dispose()
+    async with outer_database, outer_database2:
+        yield
 
 
 @pytest.mark.parametrize("app_flag", ["explicit", "explicit_env"])
