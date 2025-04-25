@@ -29,7 +29,8 @@ def create_monkay(global_dict: dict, all_var: list[str]) -> Monkay[Instance, Edg
         # must be at least an empty string to initialize the settings
         settings_path=lambda: os.environ.get(
             "EDGY_SETTINGS_MODULE", "edgy.conf.global_settings.EdgySettings"
-        ) or "",
+        )
+        or "",
         settings_extensions_name="extensions",
         settings_preloads_name="preloads",
         uncached_imports={"settings"},

@@ -607,14 +607,13 @@ class Registry:
         from edgy import Instance, monkay
         from edgy.cli.base import upgrade
 
-        with (
-            monkay.with_extensions({}),
-            monkay.with_settings(migration_settings),
-            monkay.with_instance(Instance(registry=self), apply_extensions=False),
+        self._is_automigrated = True
+        with monkay.with_full_overwrite(
+            extensions={},
+            settings=migration_settings,
+            instance=Instance(registry=self),
+            evaluate_settings_with={},
         ):
-            self._is_automigrated = True
-            monkay.evaluate_settings()
-            monkay.apply_extensions()
             upgrade()
 
     async def _automigrate(self) -> None:
