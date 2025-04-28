@@ -6,6 +6,13 @@ hide:
 
 # Release Notes
 
+
+## 0.31.3
+
+### Changed
+- Lazy evaluate the environment variable for the settings import. This relaxes the restraints on the import order.
+  You can e.g. import lilya settings before adjusting `LILYA_SETTINGS_MODULE` as long as you don't access the settings object.
+
 ## 0.31.2
 
 ### Added
