@@ -64,8 +64,8 @@ async def main():
         assert not edgy.monkay.settings_evaluated
         from tests.cli import main as main  # noqa
         assert not edgy.monkay.settings_evaluated
-        async with main.models:
-            assert edgy.monkay.settings_evaluated
+        main.models.refresh_metadata()
+        assert edgy.monkay.settings_evaluated
 
 if __name__ == "__main__":
     run(main())
