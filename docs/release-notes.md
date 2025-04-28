@@ -7,12 +7,6 @@ hide:
 # Release Notes
 
 
-## 0.31.3
-
-### Changed
-- Lazy evaluate the environment variable for the settings import. This relaxes the restraints on the import order.
-  You can e.g. import lilya settings before adjusting `LILYA_SETTINGS_MODULE` as long as you don't access the settings object.
-
 ## 0.31.2
 
 ### Added
@@ -24,6 +18,10 @@ hide:
 ### Changed
 
 - `server_default` is not extracted anymore by `ColumnDefinitionModel`. Use `get_server_default` instead.
+- Lazy evaluate the environment variable for the settings import. This relaxes the restraints on the import order.
+  You can e.g. import edgy settings before adjusting `EDGY_SETTINGS_MODULE` as long as you don't access the settings object.
+- Don't call `evaluate_settings_once_ready` during init of Registry anymore.
+
 
 ### Removed
 
