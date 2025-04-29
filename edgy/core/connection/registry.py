@@ -15,7 +15,6 @@ from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
 from sqlalchemy.orm import declarative_base as sa_declarative_base
 
-from edgy.conf import evaluate_settings_once_ready
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
 from edgy.core.db.context_vars import CURRENT_INSTANCE, FORCE_FIELDS_NULLABLE
@@ -117,7 +116,6 @@ class Registry:
         automigrate_config: Union["EdgySettings", None] = None,
         **kwargs: Any,
     ) -> None:
-        evaluate_settings_once_ready()
         self.db_schema = schema
         self._automigrate_config = automigrate_config
         self._is_automigrated: bool = False
@@ -607,14 +605,14 @@ class Registry:
         from edgy import Instance, monkay
         from edgy.cli.base import upgrade
 
-        with (
-            monkay.with_extensions({}),
-            monkay.with_settings(migration_settings),
-            monkay.with_instance(Instance(registry=self), apply_extensions=False),
+        self._is_automigrated = True
+        with monkay.with_full_overwrite(
+            extensions={},
+            settings=migration_settings,
+            instance=Instance(registry=self),
+            evaluate_settings_with={},
+            apply_extensions=True
         ):
-            self._is_automigrated = True
-            monkay.evaluate_settings()
-            monkay.apply_extensions()
             upgrade()
 
     async def _automigrate(self) -> None:

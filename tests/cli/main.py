@@ -24,7 +24,8 @@ if os.environ.get("TEST_ADD_NULLABLE_FIELDS", "false") == "true":
         name = edgy.fields.CharField(max_length=100)
 
         class Meta:
-            registry = models
+            if os.environ.get("TEST_NO_REGISTRY_SET", "false") != "true":
+                registry = models
 
     def complex_default() -> Profile:
         instance = CURRENT_MODEL_INSTANCE.get()
@@ -39,7 +40,8 @@ class User(edgy.StrictModel):
         profile = edgy.fields.ForeignKey("Profile", null=False, default=complex_default)
 
     class Meta:
-        registry = models
+        if os.environ.get("TEST_NO_REGISTRY_SET", "false") != "true":
+            registry = models
 
 
 class Group(edgy.StrictModel):
@@ -50,7 +52,8 @@ class Group(edgy.StrictModel):
     content_type = edgy.fields.ExcludeField()
 
     class Meta:
-        registry = models
+        if os.environ.get("TEST_NO_REGISTRY_SET", "false") != "true":
+            registry = models
 
 
 class Permission(BasePermission):
@@ -66,7 +69,8 @@ class Permission(BasePermission):
     content_type = edgy.fields.ExcludeField()
 
     class Meta:
-        registry = models
+        if os.environ.get("TEST_NO_REGISTRY_SET", "false") != "true":
+            registry = models
         if os.environ.get("TEST_NO_CONTENT_TYPE", "false") != "true":
             unique_together = [("name", "name_model", "obj")]
 
@@ -89,4 +93,6 @@ if os.environ.get("TEST_ADD_SIGNALS", "false") == "true":
             await User.query.get_or_create(name="migration_user")
 
 
-edgy.monkay.set_instance(Instance(registry=models))
+
+if os.environ.get("TEST_NO_REGISTRY_SET", "false") != "true":
+    edgy.monkay.set_instance(Instance(registry=models))

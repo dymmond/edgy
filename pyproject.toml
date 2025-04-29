@@ -37,7 +37,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
 ]
 dependencies = [
-    "monkay>=0.3.0",
+    "monkay>=0.4.2",
     "orjson",
     "alembic>=1.11.3,<2.0.0",
     "click>=8.1.3,<9.0.0",
