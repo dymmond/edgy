@@ -611,7 +611,7 @@ class Registry:
             settings=migration_settings,
             instance=Instance(registry=self),
             evaluate_settings_with={},
-            apply_extensions=True
+            apply_extensions=True,
         ):
             upgrade()
 
