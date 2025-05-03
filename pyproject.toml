@@ -93,9 +93,10 @@ mysql = ["databasez[mysql]"]
 sqlite = ["databasez[sqlite]"]
 mssql = ["databasez[aioodbc]"]
 jdbc = ["databasez[jdbc]"]
+admin = ["lilya>=0.13.4"]
 # all except testing
 all = [
-    "edgy[test,mime,image,postgres,mysql,sqlite,mssql,jdbc]",
+    "edgy[test,mime,image,postgres,mysql,sqlite,mssql,jdbc,admin]",
     "ipython",
     "ptpython",
 ]

@@ -29,6 +29,11 @@ tasks:
     cmds:
       - hatch run test:check_types
 
+  build-admin:
+    desc: Build the Edgy admin
+    cmds:
+      - cd edgy/contrib/admin/frontend && npm install && npm run build && cd ../../../
+
   #---------------------------- DOCS -------------------------------
 
   serve:
