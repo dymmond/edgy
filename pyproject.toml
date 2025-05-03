@@ -102,7 +102,7 @@ all = [
 ]
 
 [tool.hatch.envs.default]
-dependencies = ["pre-commit>=4.0.0,<5.0.0", "edgy[sqlite]"]
+dependencies = ["pre-commit>=4.0.0,<5.0.0", "edgy[sqlite]", "uvicorn>=0.34.2"]
 
 [tool.hatch.envs.default.scripts]
 clean_pyc = "find . -type f -name \"*.pyc\" -delete"

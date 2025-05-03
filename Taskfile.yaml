@@ -34,6 +34,15 @@ tasks:
     cmds:
       - cd edgy/contrib/admin/frontend && npm install && npm run build && cd ../../../
 
+  run-ui-admin:
+    desc: Run FE for admin
+    cmds:
+      - cd edgy/contrib/admin/frontend && npm run dev
+
+  run-admin-dev:
+    desc: Run BE for admin
+    cmds:
+      - cd edgy/contrib/admin/backend && python serve.py
   #---------------------------- DOCS -------------------------------
 
   serve:

@@ -9,7 +9,7 @@ from edgy.contrib.admin.backend.crud import (
     retrieve_object,
     update_object,
 )
-from edgy.contrib.admin.backend.registry import get_model_by_name
+from edgy.contrib.admin.backend.registry import get_model_by_name, get_registered_models
 from edgy.contrib.admin.backend.schemas import get_model_schema
 
 
@@ -19,22 +19,25 @@ async def model_schema(model_name: str) -> JSONResponse:
         raise HTTPException(status_code=404, detail="Model not registered")
     return JSONResponse(get_model_schema(model))
 
+async def list_registered_models() -> JSONResponse:
+    models = get_registered_models()
+    return JSONResponse({"models": list(models.keys())})
 
-async def list_route(model_name: str, request: Request) -> JSONResponse:
+async def list_all(model_name: str, request: Request) -> JSONResponse:
     return await list_objects(request, model_name)
 
 
-async def create_route(model_name: str, request: Request) -> JSONResponse:
+async def create(model_name: str, request: Request) -> JSONResponse:
     return await create_object(request, model_name)
 
 
-async def retrieve_route(model_name: str, pk: str, request: Request) -> JSONResponse:
+async def retrieve(model_name: str, pk: str, request: Request) -> JSONResponse:
     return await retrieve_object(request, model_name, pk)
 
 
-async def update_route(model_name: str, pk: str, request: Request) -> JSONResponse:
+async def update(model_name: str, pk: str, request: Request) -> JSONResponse:
     return await update_object(request, model_name, pk)
 
 
-async def delete_route(model_name: str, pk: str, request: Request) -> JSONResponse:
+async def delete(model_name: str, pk: str, request: Request) -> JSONResponse:
     return await delete_object(request, model_name, pk)
