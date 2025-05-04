@@ -27,7 +27,7 @@ admin_group_app = ChildLilya(
 )
 
 admin_app = Lilya(routes=[
-    Include(path="/admin", app=admin_group_app),
+    Include(path="/api/admin", app=admin_group_app),
     Include(path="/", app=StaticFiles(directory="static", html=True))
 ],
 middleware=[

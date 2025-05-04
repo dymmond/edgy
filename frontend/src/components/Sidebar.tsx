@@ -30,7 +30,7 @@ export default function Sidebar() {
         ))}
       </nav>
       <div className="p-4 border-t border-gray-700 text-sm">
-        © 2025 Edgy Inc.
+        © 2025 Dymmond Ltd.
       </div>
     </aside>)
 }
