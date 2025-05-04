@@ -22,7 +22,7 @@ async def create_object(request: Request, model_name: str) -> JSONResponse:
     data = await request.json()
     instance = model(**data)
     await instance.save()
-    return JSONResponse(instance.dict(), status_code=201)
+    return JSONResponse(instance.model_dump(), status_code=201)
 
 
 async def retrieve_object(request: Request, model_name: str, pk: str) -> JSONResponse:
@@ -30,7 +30,7 @@ async def retrieve_object(request: Request, model_name: str, pk: str) -> JSONRes
     if not model:
         raise HTTPException(status_code=404, detail="Model not registered")
 
-    obj = await model.query.get(pk)
+    obj = await model.query.get_or_none(id=pk)
     if not obj:
         raise HTTPException(status_code=404, detail="Object not found")
     return JSONResponse(obj.dict())
@@ -41,7 +41,7 @@ async def update_object(request: Request, model_name: str, pk: str) -> JSONRespo
     if not model:
         raise HTTPException(status_code=404, detail="Model not registered")
 
-    obj = await model.query.get(pk)
+    obj = await model.query.get_or_none(id=pk)
     if not obj:
         raise HTTPException(status_code=404, detail="Object not found")
 
@@ -57,7 +57,7 @@ async def delete_object(request: Request, model_name: str, pk: str) -> JSONRespo
     if not model:
         raise HTTPException(status_code=404, detail="Model not registered")
 
-    obj = await model.query.get(pk)
+    obj = await model.query.get_or_none(id=pk)
     if not obj:
         raise HTTPException(status_code=404, detail="Object not found")
 
