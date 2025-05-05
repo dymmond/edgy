@@ -3,9 +3,12 @@ from typing import Any
 from lilya.requests import Request
 
 from edgy.conf import settings
+from edgy.contrib.admin.templates import templates
 
 
 class AdminMixin:
+    templates = templates
+
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:  # noqa
         context = {}
         context.update(
