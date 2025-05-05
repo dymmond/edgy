@@ -1,5 +1,6 @@
 from typing import Any
 
+from lilya.exceptions import NotFound
 from lilya.requests import Request
 from lilya.templating.controllers import TemplateController
 
@@ -33,3 +34,30 @@ class ModelListView(AdminMixin, TemplateController):
 
     async def get(self, request: Request) -> Any:
         return await self.render_template(request)
+
+
+class ModelDetailView(AdminMixin, TemplateController):
+    template_name = "admin/model_detail.html"
+
+    async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
+        context = await super().get_context_data(request, **kwargs)
+        model_name = kwargs.get("name")
+
+        models = get_registered_models()
+        model = models.get(model_name)
+        if not model:
+            raise NotFound()
+
+        # Fetch first 100 records (for now) from model
+        objects = await model.query.limit(100).all()
+
+        context.update({
+            "title": model.__name__,
+            "model": model,
+            "objects": objects,
+            "model_name": model_name
+        })
+        return context
+
+    async def get(self, request: Request, **kwargs: Any) -> Any:
+        return await self.render_template(request, **kwargs)

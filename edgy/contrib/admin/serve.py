@@ -3,7 +3,7 @@ from lilya.middleware.base import DefineMiddleware
 from lilya.middleware.cors import CORSMiddleware
 from lilya.routing import Include
 
-from edgy.contrib.admin.app import app
+from edgy.contrib.admin.application import app
 
 dash_app = Lilya(
     routes=[Include(path="/", app=app)],
