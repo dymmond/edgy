@@ -36,6 +36,11 @@ tasks:
     cmds:
       - hatch run docs:serve
 
+  dashboard:
+    desc: Run BE for admin
+    cmds:
+      - cd edgy/contrib/admin && python -m serve
+
   # --------------------------- TEST ------------------------------------
 
   test:

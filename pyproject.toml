@@ -85,6 +85,7 @@ testing = [
     "mypy[faster-cache]>=1.15,<2.0; python_version >= '3.10'",
     "httpx",
     "types-orjson==3.6.2",
+    "uvicorn"
 ]
 mime = ["python-magic"]
 image = ["pillow"]
@@ -99,6 +100,7 @@ all = [
     "ipython",
     "ptpython",
 ]
+admin = ["lilya>=0.13.6"]
 
 [tool.hatch.envs.default]
 dependencies = ["pre-commit>=4.0.0,<5.0.0", "edgy[sqlite]"]
@@ -125,12 +127,11 @@ dependencies = [
 ]
 [tool.hatch.envs.docs.scripts]
 build = "mkdocs build {args}"
-serve = "mkdocs serve --dev-addr localhost:8000"
 
 
 [tool.hatch.envs.test]
 # required for cli tests and check_types
-features = ["all", "testing", "test"]
+features = ["all", "testing", "test", "admin"]
 # for typings
 extra-dependencies = ["pydantic>=2.10.1"]
 
