@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <link rel="icon" href="{{ favicon }}"/>
-    <title>{% block title %}{{ title }}{% endblock %}</title>
+    <title>{% block title %}Edgy Admin | {{ title }}{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script>
@@ -34,7 +34,13 @@
                             <span>Dashboard</span>
                         </a>
                     </li>
-                    <!-- Add more menu items here -->
+                    <li>
+                      <a href="/admin/models"
+                           class="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-white/20 transition">
+                          <i data-lucide="database" class="w-5 h-5"></i>
+                          <span class="capitalize">Models</span>
+                      </a>
+                  </li>
                 </ul>
             </nav>
         </aside>

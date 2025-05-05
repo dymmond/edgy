@@ -93,6 +93,5 @@ if os.environ.get("TEST_ADD_SIGNALS", "false") == "true":
             await User.query.get_or_create(name="migration_user")
 
 
-
 if os.environ.get("TEST_NO_REGISTRY_SET", "false") != "true":
     edgy.monkay.set_instance(Instance(registry=models))

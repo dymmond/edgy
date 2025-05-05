@@ -3,7 +3,7 @@ from lilya.middleware.base import DefineMiddleware
 from lilya.middleware.cors import CORSMiddleware
 from lilya.routing import Include
 
-from edgy.contrib.admin.routes import app
+from edgy.contrib.admin.app import app
 
 dash_app = Lilya(
     routes=[Include(path="/", app=app)],
@@ -20,4 +20,5 @@ dash_app = Lilya(
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("serve:dash_app", host="0.0.0.0", port=8000, reload=True)

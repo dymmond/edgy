@@ -6,7 +6,7 @@ from edgy.conf import settings
 
 
 class AdminMixin:
-    async def get_context_data(self, request: Request, **kwargs: Any) -> dict: # noqa
+    async def get_context_data(self, request: Request, **kwargs: Any) -> dict:  # noqa
         context = {}
         context.update(
             {
