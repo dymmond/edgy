@@ -11,10 +11,13 @@
         <div class="flex flex-col gap-1">
             <label class="text-sm font-semibold text-gray-700" for="{{ field }}">
                 {{ field.replace('_', ' ') | title }}
+                {% if not field_info.null %}
+                  <span class="text-red-500 ml-1" title="Required">*</span>
+                {% endif %}
             </label>
 
             {% set value = getattr(object, field) %}
-            {% set type = field_info.annotation.__name__ %}
+            {% set type = get_input_type(field_info.annotation) %}
 
             {% if type == "bool" %}
             <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">

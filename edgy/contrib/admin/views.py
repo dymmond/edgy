@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from math import ceil
-from typing import Any, cast
+from typing import Any, Union, cast, get_args, get_origin
 
 import anyio
 from lilya.datastructures import FormData
@@ -15,6 +16,28 @@ from edgy.conf import settings
 from edgy.contrib.admin.mixins import AdminMixin
 from edgy.contrib.admin.model_registry import get_registered_models
 from edgy.core.db.relationships.related_field import RelatedField
+
+
+def get_input_type(annotation) -> str:
+    """
+    Unwraps Optional/Union[..., None] to find the real type,
+    then returns one of: 'bool', 'date', 'datetime', or 'text'.
+    """
+    origin = get_origin(annotation)
+    if origin is Union:
+        # strip out NoneType
+        args = [a for a in get_args(annotation) if a is not type(None)]
+        if len(args) == 1:
+            annotation = args[0]
+
+    if annotation is bool:
+        return "bool"
+    if annotation is date:
+        return "date"
+    if annotation is datetime:
+        return "datetime"
+    return "text"
+
 
 
 class AdminDashboard(AdminMixin, TemplateController):
@@ -550,6 +573,8 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
                 "model": model,
                 "model_name": model_name,
                 "relationship_fields": relationship_fields,
+                "get_input_type": get_input_type,
+
             }
         )
         return context
@@ -704,6 +729,7 @@ class ModelCreateView(AdminMixin, BaseObjectView, TemplateController):
                 "model": model,
                 "model_name": model_name,
                 "relationship_fields": relationship_fields,
+                "get_input_type": get_input_type,
             }
         )
         return context

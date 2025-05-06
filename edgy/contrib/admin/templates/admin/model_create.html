@@ -11,18 +11,22 @@
         <div class="flex flex-col gap-1">
             <label class="text-sm font-semibold text-gray-700" for="{{ field }}">
                 {{ field.replace('_', ' ') | title }}
+                {% if not field_info.null %}
+                  <span class="text-red-500 ml-1" title="Required">*</span>
+                {% endif %}
             </label>
 
             {% set annotation = field_info.annotation.__name__ %}
+            {% set type = get_input_type(field_info.annotation) %}
 
-            {% if annotation == "bool" %}
+            {% if type == "bool" %}
             <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">
                 <option value="">Select...</option>
                 <option value="1">True</option>
                 <option value="0">False</option>
             </select>
 
-            {% elif annotation == "date" %}
+            {% elif type == "date" %}
             <input
                 type="date"
                 name="{{ field }}"
@@ -30,7 +34,7 @@
                 class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
             />
 
-            {% elif annotation == "datetime" %}
+            {% elif type == "datetime" %}
             <input
                 type="datetime-local"
                 name="{{ field }}"
