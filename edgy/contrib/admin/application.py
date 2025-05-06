@@ -11,6 +11,7 @@ from edgy.conf import settings
 from edgy.contrib.admin.views import (
     AdminDashboard,
     ModelDetailView,
+    ModelEditView,
     ModelListView,
     ModelObjectView,
 )
@@ -34,6 +35,7 @@ app = Lilya(
                 RoutePath("/models", handler=ModelListView, name="models"),
                 RoutePath("/models/{name}", handler=ModelDetailView, name="model-details"),
                 RoutePath("/models/{name}/{id}", handler=ModelObjectView, name="model-object"),
+                RoutePath("/models/{name}/{id}/edit", handler=ModelEditView, name="model-edit", methods=["GET", "POST"]),
             ],
         ),
     ],

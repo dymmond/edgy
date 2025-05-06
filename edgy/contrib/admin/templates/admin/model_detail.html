@@ -21,7 +21,7 @@
         </thead>
         <tbody class="divide-y divide-gray-100 bg-white">
             {% for obj in objects %}
-            <tr class="hover:bg-gray-50 transition cursor-pointer" onclick="window.location='/admin/models/{{ model_name }}/{{ obj.id }}'">
+            <tr class="hover:bg-gray-50 transition cursor-pointer" onclick="window.location='{{ url_prefix }}/models/{{ model_name }}/{{ obj.id }}'">
                 {% if 'id' in model.__fields__.keys() %}
                 <td class="px-6 py-4 text-sm text-gray-800 whitespace-nowrap">
                     {{ getattr(obj, 'id') }}
