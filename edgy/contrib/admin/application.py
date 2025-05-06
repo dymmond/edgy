@@ -20,6 +20,7 @@ async def not_found(request: Request, exc: Exception) -> Any:
 
 
 app = Lilya(
+    debug=True,
     routes=[
         Include(
             path=settings.admin_config.admin_prefix_url,

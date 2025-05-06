@@ -1,10 +1,11 @@
 {% extends "admin/base.html" %}
 
 {% block header %}Registered Models{% endblock %}
+
 {% block content %}
 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
     {% for name, model in models.items() %}
-    <a href="#" class="block bg-white rounded shadow hover:shadow-md transition p-4">
+    <a href="{{ url_prefix}}/models/{{ name }}" class="block bg-white rounded shadow hover:shadow-md transition p-4">
         <h2 class="text-lg font-semibold text-edgy-pink capitalize">{{ name }}</h2>
         <p class="text-sm text-gray-500">{{ model.__module__ }}.{{ model.__name__ }}</p>
     </a>

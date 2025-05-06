@@ -1,10 +1,42 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Title</title>
-</head>
-<body>
+{% extends "admin/base.html" %}
 
-</body>
-</html>
+{% block header %}{{ model_name | capitalize }} Details{% endblock %}
+
+{% block content %}
+<div class="overflow-x-auto bg-white rounded-lg shadow border">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                {# Always show 'id' first if it's defined #}
+                {% if 'id' in model.__fields__.keys() %}
+                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    id
+                </th>
+                {% endif %}
+                {# Then render other fields excluding 'id' #}
+                {% for field in model.__fields__.keys() if field != 'id' %}
+                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    {{ field }}
+                </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 bg-white">
+            {% for obj in objects %}
+            <tr class="hover:bg-gray-50">
+                {% if 'id' in model.__fields__.keys() %}
+                <td class="px-6 py-4 text-sm text-gray-800 whitespace-nowrap">
+                    {{ getattr(obj, 'id') }}
+                </td>
+                {% endif %}
+                {% for field in model.__fields__.keys() if field != 'id' %}
+                <td class="px-6 py-4 text-sm text-gray-800 whitespace-nowrap">
+                    {{ getattr(obj, field) }}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -41,7 +41,7 @@ class ModelDetailView(AdminMixin, TemplateController):
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         context = await super().get_context_data(request, **kwargs)
-        model_name = kwargs.get("name")
+        model_name = request.path_params.get("name")
 
         models = get_registered_models()
         model = models.get(model_name)

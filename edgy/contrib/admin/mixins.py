@@ -1,10 +1,15 @@
+from pathlib import Path
 from typing import Any
 
 from lilya.requests import Request
+from lilya.templating import Jinja2Template
 
 from edgy.conf import settings
-from edgy.contrib.admin.templates import templates
 
+templates = Jinja2Template(
+    directory=str(Path(__file__).resolve().parent / "templates")
+)
+templates.env.globals["getattr"] = getattr
 
 class AdminMixin:
     templates = templates
@@ -17,6 +22,7 @@ class AdminMixin:
                 "menu_title": settings.admin_config.menu_title,
                 "favicon": settings.admin_config.favicon,
                 "sidebar_bg_colour": settings.admin_config.sidebar_bg_colour,
+                "url_prefix": settings.admin_config.admin_prefix_url,
             }
         )
         return context
