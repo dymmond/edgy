@@ -8,7 +8,12 @@ from lilya.routing import Include, RoutePath
 from lilya.templating.controllers import templates  # noqa
 
 from edgy.conf import settings
-from edgy.contrib.admin.views import AdminDashboard, ModelDetailView, ModelListView
+from edgy.contrib.admin.views import (
+    AdminDashboard,
+    ModelDetailView,
+    ModelListView,
+    ModelObjectView,
+)
 
 
 async def not_found(request: Request, exc: Exception) -> Any:
@@ -28,6 +33,7 @@ app = Lilya(
                 RoutePath("/", handler=AdminDashboard, name="admin"),
                 RoutePath("/models", handler=ModelListView, name="models"),
                 RoutePath("/models/{name}", handler=ModelDetailView, name="model-details"),
+                RoutePath("/models/{name}/{id}", handler=ModelObjectView, name="model-object"),
             ],
         ),
     ],
