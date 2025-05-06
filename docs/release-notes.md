@@ -6,6 +6,11 @@ hide:
 
 # Release Notes
 
+## 0.31.3
+
+### Fixed
+
+- Loose minimum version of rich causing conflicts.
 
 ## 0.31.2
 
