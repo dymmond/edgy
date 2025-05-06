@@ -1,6 +1,6 @@
 {% extends "admin/base.html" %}
 
-{% block header %}Edit {{ model_name | capitalize }} #{{ object.id }}{% endblock %}
+{% block header %}Edit {{ model_name | replace('_', ' ') | title }} #{{ object.id }}{% endblock %}
 
 {% block content %}
 <form method="post" class="bg-white rounded-lg shadow p-6 min-w-full mx-auto space-y-6">
@@ -8,11 +8,15 @@
     {% for field, field_info in model.__fields__.items() %}
         {% if field != "id" and field != "pk" %}
         <div class="flex flex-col gap-1">
-            <label class="text-sm font-semibold text-gray-700">{{ field }}</label>
+            <label class="text-sm font-semibold text-gray-700" for="{{ field }}">
+                {{ field.replace('_', ' ') | title }}
+            </label>
+
             {% set value = getattr(object, field) %}
             <input
                 type="text"
                 name="{{ field }}"
+                id="{{ field }}"
                 value="{% if value.__class__.__name__ not in ['str', 'int', 'float'] %}{{ value.id if value and value.id is not none else '' }}{% else %}{{ value }}{% endif %}"
                 class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
             />
