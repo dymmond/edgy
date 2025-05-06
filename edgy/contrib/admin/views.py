@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from math import ceil
 from typing import Any
 
 import anyio
@@ -145,19 +146,46 @@ class ModelDetailView(AdminMixin, TemplateController):
         context = await super().get_context_data(request, **kwargs)
         model_name = request.path_params.get("name")
 
+        # For the search
+        query = request.query_params.get("q", "").strip()
+        page = int(request.query_params.get("page", 1))
+        per_page = int(request.query_params.get("per_page", 25))
+        per_page = min(max(per_page, 1), 250)
+
+        offset = (page - 1) * per_page
+
         models = get_registered_models()
         model = models.get(model_name)
         if not model:
             raise NotFound()
 
-        # Fetch first 100 records (for now) from model
-        objects = await model.query.limit(100).all()
+        queryset = model.query
+
+        if query:
+            filters = []
+            for field in model.model_fields.values():
+                if field.annotation is str:
+                    column = model.table.c.get(field.name)
+                    if column is not None:
+                        filters.append(column.ilike(f"%{query}%"))
+
+            if filters:
+                queryset = queryset.filter(*filters)
+
+        total_records = await queryset.count()
+        objects = await queryset.limit(per_page).offset(offset).all()
+        total_pages = ceil(total_records / per_page) if total_records else 1
 
         context.update({
-            "title": model.__name__,
+            "title": f"{model.__name__} Details",
             "model": model,
             "objects": objects,
-            "model_name": model_name
+            "model_name": model_name,
+            "query": query,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": total_pages,
+            "url_prefix": settings.admin_config.admin_prefix_url,
         })
         return context
 
