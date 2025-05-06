@@ -1,0 +1,108 @@
+{% extends "admin/base.html" %}
+
+{% block header %}Create {{ model_name | replace('_', ' ') | title }}{% endblock %}
+
+{% block content %}
+<form method="post" class="bg-white rounded-lg shadow p-6 min-w-full mx-auto space-y-6">
+
+    {# Regular fields (non-relationship) #}
+    {% for field, field_info in model.model_fields.items() %}
+        {% if field != "id" and not field_info.primary_key and not relationship_fields.get(field) %}
+        <div class="flex flex-col gap-1">
+            <label class="text-sm font-semibold text-gray-700" for="{{ field }}">
+                {{ field.replace('_', ' ') | title }}
+            </label>
+
+            {% set annotation = field_info.annotation.__name__ %}
+
+            {% if annotation == "bool" %}
+            <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">
+                <option value="">Select...</option>
+                <option value="1">True</option>
+                <option value="0">False</option>
+            </select>
+
+            {% elif annotation == "date" %}
+            <input
+                type="date"
+                name="{{ field }}"
+                id="{{ field }}"
+                class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+            />
+
+            {% elif annotation == "datetime" %}
+            <input
+                type="datetime-local"
+                name="{{ field }}"
+                id="{{ field }}"
+                class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+            />
+
+            {% else %}
+            <input
+                type="text"
+                name="{{ field }}"
+                id="{{ field }}"
+                class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+            />
+            {% endif %}
+        </div>
+        {% endif %}
+    {% endfor %}
+
+    {# Relationship fields (FK and M2M) #}
+    {% for field, rel in relationship_fields.items() %}
+    <div class="flex flex-col gap-1">
+        <label class="text-sm font-semibold text-gray-700" for="{{ field }}">
+            {{ field.replace('_', ' ') | title }}
+        </label>
+
+        {% if rel["type"] == "foreign_key" %}
+        <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">
+            <option value="">Select...</option>
+            {% for obj in rel["items"] %}
+                <option value="{{ obj.id }}">{{ obj }}</option>
+            {% endfor %}
+        </select>
+
+        {% elif rel["type"] == "many_to_many" %}
+        <div class="flex gap-4 items-center">
+            <select id="{{ field }}_available" class="w-full border rounded h-48 text-sm" multiple>
+                {% for obj in rel["items"] %}
+                    <option value="{{ obj.id }}">{{ obj }}</option>
+                {% endfor %}
+            </select>
+
+            <div class="flex flex-col gap-2">
+                <button type="button" onclick="moveSelected('{{ field }}_available', '{{ field }}_selected')" class="text-sm bg-gray-300 rounded px-2 py-1 hover:bg-gray-400">→</button>
+                <button type="button" onclick="moveSelected('{{ field }}_selected', '{{ field }}_available')" class="text-sm bg-gray-300 rounded px-2 py-1 hover:bg-gray-400">←</button>
+            </div>
+
+            <select id="{{ field }}_selected" name="{{ field }}" multiple class="w-full border rounded h-48 text-sm">
+                {# Empty on create, pre-filled on edit #}
+            </select>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="pt-6 flex gap-4">
+        <button type="submit" class="px-5 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700">
+            Create
+        </button>
+        <a href="{{ url_prefix }}/models/{{ model_name }}" class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:bg-gray-300">
+            Cancel
+        </a>
+    </div>
+</form>
+
+<script>
+function moveSelected(fromId, toId) {
+    const from = document.getElementById(fromId);
+    const to = document.getElementById(toId);
+    Array.from(from.selectedOptions).forEach(option => {
+        to.appendChild(option);
+    });
+}
+</script>
+{% endblock %}

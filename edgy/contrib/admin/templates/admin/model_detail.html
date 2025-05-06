@@ -1,0 +1,101 @@
+{% extends "admin/base.html" %}
+
+{% block header %}{{ model_name | capitalize }} Details{% endblock %}
+
+{% block content %}
+<div class="mb-2 text-sm text-gray-600">
+  {{ total_records }} {{ model_name | replace('_', ' ') | title }} records
+  {% if query %} matching “<strong>{{ query }}</strong>”{% endif %}
+</div>
+
+<div class="bg-white border rounded-md shadow-sm p-4 flex flex-col md:flex-row justify-between gap-4 items-start md:items-center mb-6">
+    <form method="get" class="flex gap-2 w-full max-w-md">
+        <input type="text" name="q" value="{{ query or '' }}" placeholder="Search..."
+               class="flex-grow px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring focus:ring-blue-200 text-sm" />
+        <button type="submit"
+                class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition">
+            Search
+        </button>
+    </form>
+
+    <form method="get" class="flex items-center gap-2">
+        <label for="per_page" class="text-sm text-gray-600">Show</label>
+        <select name="per_page" id="per_page" onchange="this.form.submit()"
+                class="text-sm border border-gray-300 rounded px-2 py-1">
+            {% for option in [10, 25, 50, 100] %}
+                <option value="{{ option }}" {% if per_page == option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+        <span class="text-sm text-gray-600">per page</span>
+        <input type="hidden" name="q" value="{{ query or '' }}" />
+    </form>
+
+    <a href="{{ url_prefix }}/models/{{ model_name }}/create"
+       class="inline-flex items-center gap-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+        </svg>
+        Create {{ model_name | capitalize }}
+    </a>
+</div>
+
+{% if objects %}
+<div class="overflow-x-auto bg-white rounded-lg shadow border">
+    <table class="min-w-full divide-y divide-gray-200">
+        <thead class="bg-gray-50">
+            <tr>
+                {% if 'id' in model.__fields__.keys() %}
+                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    id
+                </th>
+                {% endif %}
+                {% for field in model.__fields__.keys() if field != 'id' %}
+                <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                    {{ field.replace('_', ' ') | title }}
+                </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 bg-white">
+            {% for obj in objects %}
+            <tr class="hover:bg-gray-50 transition cursor-pointer" onclick="window.location='{{ url_prefix }}/models/{{ model_name }}/{{ obj.id }}'">
+                {% if 'id' in model.__fields__.keys() %}
+                <td class="px-6 py-4 text-sm text-gray-800 whitespace-nowrap">
+                    {{ getattr(obj, 'id') }}
+                </td>
+                {% endif %}
+                {% for field in model.__fields__.keys() if field != 'id' %}
+                <td class="px-6 py-4 text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-xs">
+                    {{ getattr(obj, field) }}
+                </td>
+                {% endfor %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="text-center text-gray-500 py-12">
+  No {{ model_name | replace('_', ' ') | title }} records found.
+</div>
+{% endif %}
+
+{% if page and total_pages %}
+<div class="mt-6 flex justify-center space-x-2 text-sm">
+    {% if page > 1 %}
+    <a href="?page={{ page - 1 }}&per_page={{ per_page }}{% if query %}&q={{ query }}{% endif %}"
+       class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Previous</a>
+    {% endif %}
+
+    {% for p in range(1, total_pages + 1) %}
+    <a href="?page={{ p }}&per_page={{ per_page }}{% if query %}&q={{ query }}{% endif %}"
+       class="px-3 py-1 {{ 'bg-blue-600 text-white' if p == page else 'bg-gray-100 text-gray-800' }} rounded hover:bg-gray-200">{{ p }}</a>
+    {% endfor %}
+
+    {% if page < total_pages %}
+    <a href="?page={{ page + 1 }}&per_page={{ per_page }}{% if query %}&q={{ query }}{% endif %}"
+       class="px-3 py-1 bg-gray-200 text-gray-700 rounded hover:bg-gray-300">Next</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

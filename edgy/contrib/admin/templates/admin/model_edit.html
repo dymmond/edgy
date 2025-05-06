@@ -1,0 +1,143 @@
+{% extends "admin/base.html" %}
+
+{% block header %}Edit {{ model_name | replace('_', ' ') | title }} #{{ object.id }}{% endblock %}
+
+{% block content %}
+<form method="post" class="bg-white rounded-lg shadow p-6 min-w-full mx-auto space-y-6">
+
+    {# Regular fields (non-relationship) #}
+    {% for field, field_info in model.model_fields.items() %}
+        {% if field != "id" and field != "pk" and not relationship_fields.get(field) %}
+        <div class="flex flex-col gap-1">
+            <label class="text-sm font-semibold text-gray-700" for="{{ field }}">
+                {{ field.replace('_', ' ') | title }}
+            </label>
+
+            {% set value = getattr(object, field) %}
+            {% set type = field_info.annotation.__name__ %}
+
+            {% if type == "bool" %}
+            <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">
+                <option value="1" {% if value is sameas true %}selected{% endif %}>True</option>
+                <option value="0" {% if value is sameas false %}selected{% endif %}>False</option>
+            </select>
+
+            {% elif type == "date" %}
+            <input
+                type="date"
+                name="{{ field }}"
+                id="{{ field }}"
+                value="{{ value }}"
+                class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+            />
+
+            {% elif type == "datetime" %}
+            <input
+                type="datetime-local"
+                name="{{ field }}"
+                id="{{ field }}"
+                value="{{ value.isoformat() if value else '' }}"
+                class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+            />
+
+            {% else %}
+            <input
+                type="text"
+                name="{{ field }}"
+                id="{{ field }}"
+                value="{{ value }}"
+                class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+            />
+            {% endif %}
+        </div>
+        {% endif %}
+    {% endfor %}
+
+    {# Relationship fields (FK and M2M) #}
+    {% for field, rel in relationship_fields.items() %}
+    <div class="flex flex-col gap-1">
+        <label class="text-sm font-semibold text-gray-700" for="{{ field }}">
+            {{ field.replace('_', ' ') | title }}
+        </label>
+
+        {% if rel["type"] == "foreign_key" %}
+        <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">
+            <option value="">Select...</option>
+            {% for obj in rel["items"] %}
+                <option value="{{ obj.id }}" {% if getattr(object, field).id == obj.id %}selected{% endif %}>{{ obj }}</option>
+            {% endfor %}
+        </select>
+
+        {% elif rel["type"] == "many_to_many" %}
+        {% set selected = rel["selected"] %}
+        <input type="hidden" name="_{{ field }}_initial" value="{{ selected | join(',') }}">
+
+        <div class="flex gap-4 items-center">
+            <select id="{{ field }}_available" class="w-full border rounded h-48 text-sm" multiple>
+                {% for obj in rel["items"] %}
+                    {% if obj.id not in selected %}
+                    <option value="{{ obj.id }}">{{ obj }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+
+            <div class="flex flex-col gap-2">
+                <button type="button" onclick="moveSelected('{{ field }}_available', '{{ field }}_selected')" class="text-sm bg-gray-300 rounded px-2 py-1 hover:bg-gray-400">→</button>
+                <button type="button" onclick="moveSelected('{{ field }}_selected', '{{ field }}_available')" class="text-sm bg-gray-300 rounded px-2 py-1 hover:bg-gray-400">←</button>
+            </div>
+
+            <select id="{{ field }}_selected" name="{{ field }}" multiple class="w-full border rounded h-48 text-sm">
+                {% for obj in rel["items"] %}
+                    {% if obj.id in selected %}
+                    <option value="{{ obj.id }}">{{ obj }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <div class="pt-6 flex gap-4">
+        <button type="submit" class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+            Save Changes
+        </button>
+        <a href="{{ url_prefix }}/models/{{ model_name }}/{{ object.id }}" class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:bg-gray-300">
+            Cancel
+        </a>
+    </div>
+</form>
+
+<script>
+function moveSelected(fromId, toId) {
+    const from = document.getElementById(fromId);
+    const to = document.getElementById(toId);
+    Array.from(from.selectedOptions).forEach(option => {
+        to.appendChild(option);
+    });
+}
+
+// Ensure selected values are actually marked as selected + submit dummy field if none
+document.querySelector("form").addEventListener("submit", function (event) {
+    const form = this;
+
+    document.querySelectorAll("select[multiple]").forEach(select => {
+        const name = select.name;
+
+        // Force all options inside the select to be selected
+        Array.from(select.options).forEach(option => option.selected = true);
+
+        // If no options exist at all, manually add a dummy hidden input
+        if (name && select.options.length === 0) {
+            const hidden = document.createElement("input");
+            hidden.type = "hidden";
+            hidden.name = name;
+            hidden.value = "";
+            form.appendChild(hidden);
+        }
+    });
+});
+</script>
+
+
+{% endblock %}

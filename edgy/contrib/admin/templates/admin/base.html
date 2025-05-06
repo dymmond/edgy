@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel="icon" href="{{ favicon }}"/>
+    <title>{% block title %}Edgy Admin | {{ title }}{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        edgy: {
+                            pink: "{{ sidebar_bg_colour }}"
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+      .loader {
+        border-top-color: #3490dc;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+  <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-70 z-50 flex items-center justify-center hidden">
+    <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
+  </div>
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-edgy-pink shadow-md flex flex-col text-white">
+            <div class="p-4 text-2xl font-bold text-center border-b border-white/20">Edgy Admin</div>
+            <nav class="flex-1 p-4 overflow-y-auto">
+                <ul class="space-y-2 text-sm">
+                    <li>
+                        <a href="{{ url_prefix }} " class="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-white/20 transition">
+                            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li>
+                      <a href="{{ url_prefix }}/models"
+                           class="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-white/20 transition">
+                          <i data-lucide="database" class="w-5 h-5"></i>
+                          <span class="capitalize">Models</span>
+                      </a>
+                  </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main content -->
+        <main class="flex-1 flex flex-col overflow-hidden">
+            <!-- Top Navbar -->
+            <header class="bg-white shadow px-6 py-4 flex justify-between items-center">
+                <h1 class="text-2xl font-semibold text-edgy-pink">{% block header %}Dashboard{% endblock %}</h1>
+                <div class="text-sm text-gray-500">Welcome, Admin</div>
+            </header>
+
+            <!-- Page Content -->
+            <section class="p-6 flex-1 overflow-y-auto">
+                {% block content %}
+                <p class="text-gray-700">Welcome to Edgy Admin.</p>
+                {% endblock %}
+            </section>
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+
+  <script>
+    // Show loading on form submit
+    document.addEventListener("DOMContentLoaded", function () {
+      document.querySelectorAll("form").forEach(form => {
+        form.addEventListener("submit", function () {
+          document.getElementById("loading-overlay").classList.remove("hidden");
+        });
+      });
+
+      // Optional: Show loading on navigation clicks
+      document.querySelectorAll("a").forEach(link => {
+        link.addEventListener("click", function (e) {
+          if (link.getAttribute("href") && !link.getAttribute("href").startsWith("#")) {
+            document.getElementById("loading-overlay").classList.remove("hidden");
+          }
+        });
+      });
+    });
+  </script>
+</body>
+</html>

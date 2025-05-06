@@ -9,6 +9,8 @@ from typing import Union
 from monkay import ExtensionProtocol
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from edgy.contrib.admin.config import AdminConfig
+
 
 class MediaSettings(BaseSettings):
     """
@@ -52,3 +54,7 @@ class EdgySettings(MediaSettings, MigrationSettings):
     extensions: Union[list[ExtensionProtocol], tuple[ExtensionProtocol, ...]] = ()
     ipython_args: Union[list[str], tuple[str, ...]] = ("--no-banner",)
     ptpython_config_file: str = "~/.config/ptpython/config.py"
+
+    @property
+    def admin_config(self) -> AdminConfig:
+        return AdminConfig()

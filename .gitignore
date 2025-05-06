@@ -33,3 +33,4 @@ test_media/
 coverage.*
 docker-compose.override.yml
 compose.override.yml
+*.zip

@@ -15,6 +15,7 @@ from edgy.exceptions import FieldDefinitionError
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
+    from edgy import Model
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
@@ -381,13 +382,13 @@ class ManyToManyField(ForeignKeyFieldFactory):
 
     def __new__(  # type: ignore
         cls,
-        to: Union["BaseModelType", str],
+        to: Union["BaseModelType", type["Model"], str],
         *,
         to_fields: Sequence[str] = (),
         to_foreign_key: str = "",
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
-        through: Union[str, type["BaseModelType"]] = "",
+        through: Union[str, type["BaseModelType"], type["Model"]] = "",
         through_tablename: Union[str, type[OLD_M2M_NAMING], type[NEW_M2M_NAMING]] = "",
         embed_through: Union[str, Literal[False]] = False,
         **kwargs: Any,

@@ -8,11 +8,41 @@ tasks:
     cmds:
       - hatch shell
 
+  clean_ruff:
+    desc: "Remove all .ruff_cache directories"
+    cmds:
+      - |
+        find . \
+          -type d \
+          -name ".ruff_cache" \
+          -exec rm -rf {} +
+
+  clean_mypy:
+    desc: "Remove all .mypy_cache directories"
+    cmds:
+      - |
+        find . \
+          -type d \
+          -name ".mypy_cache" \
+          -exec rm -rf {} +
+
+  clean_pytest:
+    desc: "Remove all .pytest_cache directories"
+    cmds:
+      - |
+        find . \
+          -type d \
+          -name ".pytest_cache" \
+          -exec rm -rf {} +
+
   clean:
     desc: Cleans caching, pyc and pycache files
     cmds:
       - hatch run clean_pyc
       - hatch run clean_pycache
+      - task clean_ruff
+      - task clean_mypy
+      - task clean_pytest
 
   build_with_checks:
     desc: Builds the project with checks
@@ -35,6 +65,11 @@ tasks:
     desc: Runs the documentation in live mode
     cmds:
       - hatch run docs:serve
+
+  dashboard:
+    desc: Run BE for admin
+    cmds:
+      - cd edgy/contrib/admin && python -m serve
 
   # --------------------------- TEST ------------------------------------
 

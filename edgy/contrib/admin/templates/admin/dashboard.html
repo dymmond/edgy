@@ -1,0 +1,77 @@
+{% extends "admin/base.html" %}
+
+{% block header %}Welcome to Edgy Admin{% endblock %}
+
+{% block content %}
+<div class="space-y-10">
+    <!-- Overview -->
+    <div class="text-center">
+        <h1 class="text-3xl font-bold text-edgy-pink">Edgy Admin Dashboard</h1>
+        <p class="text-gray-600 mt-1">Manage your application efficiently and intuitively.</p>
+    </div>
+
+    <!-- Stats Overview -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+        <div class="bg-white border rounded shadow p-4">
+            <div class="text-sm text-gray-500">Models</div>
+            <div class="text-2xl font-bold">{{ models|length }}</div>
+        </div>
+        <div class="bg-white border rounded shadow p-4">
+            <div class="text-sm text-gray-500">Total Records</div>
+            <div class="text-2xl font-bold">{{ total_records }}</div>
+        </div>
+        <div class="bg-white border rounded shadow p-4">
+            <div class="text-sm text-gray-500">Top Model</div>
+            <div class="text-md font-semibold">{{ top_model.verbose }}</div>
+        </div>
+        <div class="bg-white border rounded shadow p-4">
+            <div class="text-sm text-gray-500">Recently Accessed</div>
+            <div class="text-md font-semibold">{{ recent_models | join(', ') }}</div>
+        </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="space-y-2">
+        <h2 class="text-xl font-semibold text-gray-700">Quick Actions</h2>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {% for model in models[:8] %}
+            <a href="{{ url_prefix }}/models/{{ model.name }}/create"
+               class="bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded shadow-sm p-4 flex flex-col items-center text-sm font-medium text-blue-700">
+                ➕ New {{ model.verbose }}
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- All Models (as List) -->
+    <div class="space-y-2">
+        <h2 class="text-xl font-semibold text-gray-700">All Models</h2>
+        <div class="overflow-x-auto bg-white rounded-lg shadow border">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Verbose</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Count</th>
+                        <th class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-100 bg-white">
+                    {% for model in models %}
+                    <tr class="hover:bg-gray-50 transition">
+                        <td class="px-6 py-4 text-sm text-gray-800">{{ model.name }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-800">{{ model.verbose }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-800">{{ model.count }}</td>
+                        <td class="px-6 py-4 text-sm">
+                            <a href="{{ url_prefix }}/models/{{ model.name }}" class="text-blue-600 hover:underline">View</a>
+                            <span class="text-gray-400 mx-1">|</span>
+                            <a href="{{ url_prefix }}/models/{{ model.name }}/create" class="text-green-600 hover:underline">Add</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
