@@ -22,7 +22,7 @@
     <a href="{{ url_prefix }}/models/{{ model_name }}/{{ object.id }}/edit" class="inline-block px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
         Edit
     </a>
-    <form method="post" action="?delete=true" onsubmit="return confirm('Are you sure you want to delete this?');">
+    <form method="post" action="{{ url_prefix }}/models/{{ model_name }}/{{ object.id }}/delete" onsubmit="return confirm('Are you sure you want to delete this?');">
         <button type="submit" class="px-5 py-2 bg-red-600 text-white text-sm font-medium rounded hover:bg-red-700">
             Delete
         </button>
