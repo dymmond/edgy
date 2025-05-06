@@ -1,3 +1,5 @@
+from typing import Any
+
 from lilya.requests import Request
 
 
@@ -10,7 +12,7 @@ def add_message(request: Request, level: str, message: str) -> None:
     session.append({"level": level, "text": message})
 
 
-def get_messages(request: Request) -> list[dict[str, str]]:
+def get_messages(request: Request) -> Any:
     """
     Retrieves and clears messages from the session.
     """
