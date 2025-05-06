@@ -1,112 +1,170 @@
 {% extends "admin/base.html" %}
 
-{% block header %}Create {{ model_name | replace('_', ' ') | title }}{% endblock %}
+{% block header %}
+  Create {{ model_name | replace('_', ' ') | title }}
+{% endblock %}
 
 {% block content %}
-<form method="post" class="bg-white rounded-lg shadow p-6 min-w-full mx-auto space-y-6">
+<form id="model-form" method="post"
+      class="bg-white rounded-lg shadow p-6 min-w-full mx-auto space-y-6">
 
     {# Regular fields (non-relationship) #}
     {% for field, field_info in model.model_fields.items() %}
-        {% if field != "id" and not field_info.primary_key and not relationship_fields.get(field) %}
+      {% if field not in ['id','pk']
+            and not field_info.primary_key
+            and not relationship_fields.get(field) %}
+        {% set type = get_input_type(field_info.annotation) %}
+
         <div class="flex flex-col gap-1">
-            <label class="text-sm font-semibold text-gray-700" for="{{ field }}">
-                {{ field.replace('_', ' ') | title }}
-                {% if not field_info.null %}
-                  <span class="text-red-500 ml-1" title="Required">*</span>
-                {% endif %}
-            </label>
+          <label for="{{ field }}"
+                 class="text-sm font-semibold text-gray-700">
+            {{ field.replace('_', ' ') | title }}
+            {% if not field_info.null %}
+              <span class="text-red-500 ml-1" title="Required">*</span>
+            {% endif %}
+          </label>
 
-            {% set annotation = field_info.annotation.__name__ %}
-            {% set type = get_input_type(field_info.annotation) %}
-
-            {% if type == "bool" %}
-            <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">
-                <option value="">Select...</option>
-                <option value="1">True</option>
-                <option value="0">False</option>
+          {% if type == "bool" %}
+            <select name="{{ field }}" id="{{ field }}"
+                    class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900"
+                    {% if not field_info.null %}required{% endif %}>
+              <option value="">Select...</option>
+              <option value="1">True</option>
+              <option value="0">False</option>
             </select>
 
-            {% elif type == "date" %}
+          {% elif type == "date" %}
             <input
-                type="date"
-                name="{{ field }}"
-                id="{{ field }}"
-                class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
-            />
+              type="date"
+              name="{{ field }}"
+              id="{{ field }}"
+              class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+              {% if not field_info.null %}required{% endif %}/>
 
-            {% elif type == "datetime" %}
+          {% elif type == "datetime" %}
             <input
-                type="datetime-local"
-                name="{{ field }}"
-                id="{{ field }}"
-                class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
-            />
+              type="datetime-local"
+              name="{{ field }}"
+              id="{{ field }}"
+              class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+              {% if not field_info.null %}required{% endif %}/>
 
-            {% else %}
+          {% else %}
             <input
-                type="text"
-                name="{{ field }}"
-                id="{{ field }}"
-                class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
-            />
-            {% endif %}
+              type="text"
+              name="{{ field }}"
+              id="{{ field }}"
+              class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+              {% if not field_info.null %}required{% endif %}/>
+          {% endif %}
         </div>
-        {% endif %}
+      {% endif %}
     {% endfor %}
 
     {# Relationship fields (FK and M2M) #}
     {% for field, rel in relationship_fields.items() %}
-    <div class="flex flex-col gap-1">
-        <label class="text-sm font-semibold text-gray-700" for="{{ field }}">
-            {{ field.replace('_', ' ') | title }}
+      <div class="flex flex-col gap-1">
+        <label for="{{ field }}"
+               class="text-sm font-semibold text-gray-700">
+          {{ field.replace('_', ' ') | title }}
+          {% if not model.model_fields[field].null %}
+            <span class="text-red-500 ml-1" title="Required">*</span>
+          {% endif %}
         </label>
 
         {% if rel["type"] == "foreign_key" %}
-        <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">
+          <select name="{{ field }}" id="{{ field }}"
+                  class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900"
+                  {% if not model.model_fields[field].null %}required{% endif %}>
             <option value="">Select...</option>
             {% for obj in rel["items"] %}
-                <option value="{{ obj.id }}">{{ obj }}</option>
+              <option value="{{ obj.id }}">{{ obj }}</option>
             {% endfor %}
-        </select>
+          </select>
 
         {% elif rel["type"] == "many_to_many" %}
-        <div class="flex gap-4 items-center">
-            <select id="{{ field }}_available" class="w-full border rounded h-48 text-sm" multiple>
-                {% for obj in rel["items"] %}
-                    <option value="{{ obj.id }}">{{ obj }}</option>
-                {% endfor %}
+          {# Hidden input will be filled dynamically on submit #}
+          <input type="hidden" name="_{{ field }}_initial" id="_{{ field }}_initial" value="">
+
+          <div class="flex gap-4 items-center">
+            <select id="{{ field }}_available"
+                    class="w-full border rounded h-48 text-sm"
+                    multiple>
+              {% for obj in rel["items"] %}
+                <option value="{{ obj.id }}">{{ obj }}</option>
+              {% endfor %}
             </select>
 
             <div class="flex flex-col gap-2">
-                <button type="button" onclick="moveSelected('{{ field }}_available', '{{ field }}_selected')" class="text-sm bg-gray-300 rounded px-2 py-1 hover:bg-gray-400">→</button>
-                <button type="button" onclick="moveSelected('{{ field }}_selected', '{{ field }}_available')" class="text-sm bg-gray-300 rounded px-2 py-1 hover:bg-gray-400">←</button>
+              <button type="button"
+                      onclick="moveSelected('{{ field }}_available','{{ field }}_selected')"
+                      class="px-2 py-1 bg-gray-300 rounded text-sm hover:bg-gray-400">→</button>
+              <button type="button"
+                      onclick="moveSelected('{{ field }}_selected','{{ field }}_available')"
+                      class="px-2 py-1 bg-gray-300 rounded text-sm hover:bg-gray-400">←</button>
             </div>
 
-            <select id="{{ field }}_selected" name="{{ field }}" multiple class="w-full border rounded h-48 text-sm">
-                {# Empty on create, pre-filled on edit #}
+            <select id="{{ field }}_selected"
+                    name="{{ field }}"
+                    multiple
+                    class="w-full border rounded h-48 text-sm">
+              {# Initially empty on create #}
             </select>
-        </div>
+          </div>
         {% endif %}
-    </div>
+      </div>
     {% endfor %}
 
     <div class="pt-6 flex gap-4">
-        <button type="submit" class="px-5 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700">
-            Create
-        </button>
-        <a href="{{ url_prefix }}/models/{{ model_name }}" class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:bg-gray-300">
-            Cancel
-        </a>
+      <button type="submit"
+              class="px-5 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700">
+        Create
+      </button>
+      <a href="{{ url_prefix }}/models/{{ model_name }}"
+         class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:bg-gray-300">
+        Cancel
+      </a>
     </div>
 </form>
 
 <script>
 function moveSelected(fromId, toId) {
-    const from = document.getElementById(fromId);
-    const to = document.getElementById(toId);
-    Array.from(from.selectedOptions).forEach(option => {
-        to.appendChild(option);
-    });
+  const from = document.getElementById(fromId),
+        to   = document.getElementById(toId);
+  Array.from(from.selectedOptions).forEach(opt => to.appendChild(opt));
 }
+
+document.getElementById('model-form').addEventListener('submit', function () {
+  const form = this;
+
+  document.querySelectorAll("select[multiple]").forEach(select => {
+    const name = select.name;
+    const selectedValues = Array.from(select.options).map(opt => opt.value);
+    const hiddenFieldName = `_${name}_initial`;
+
+    // Update or create hidden input for many-to-many
+    let hiddenInput = document.getElementById(hiddenFieldName);
+    if (!hiddenInput) {
+      hiddenInput = document.createElement("input");
+      hiddenInput.type = "hidden";
+      hiddenInput.name = hiddenFieldName;
+      hiddenInput.id = hiddenFieldName;
+      form.appendChild(hiddenInput);
+    }
+    hiddenInput.value = selectedValues.join(",");
+
+    // Ensure options are selected to be submitted
+    Array.from(select.options).forEach(opt => opt.selected = true);
+
+    // Dummy hidden input if empty
+    if (selectedValues.length === 0 && name) {
+      const dummy = document.createElement("input");
+      dummy.type = "hidden";
+      dummy.name = name;
+      dummy.value = "";
+      form.appendChild(dummy);
+    }
+  });
+});
 </script>
 {% endblock %}

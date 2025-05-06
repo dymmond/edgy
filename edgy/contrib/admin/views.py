@@ -18,7 +18,7 @@ from edgy.contrib.admin.model_registry import get_registered_models
 from edgy.core.db.relationships.related_field import RelatedField
 
 
-def get_input_type(annotation) -> str:
+def get_input_type(annotation: Any) -> str:
     """
     Unwraps Optional/Union[..., None] to find the real type,
     then returns one of: 'bool', 'date', 'datetime', or 'text'.
@@ -37,7 +37,6 @@ def get_input_type(annotation) -> str:
     if annotation is datetime:
         return "datetime"
     return "text"
-
 
 
 class AdminDashboard(AdminMixin, TemplateController):
@@ -358,6 +357,8 @@ class BaseObjectView:
                     data[key] = await instance.meta.fields.get(key).target.query.get(
                         id=self.parse_object_id(value)
                     )
+            elif key in instance.meta.many_to_many_fields:
+                continue
             else:
                 if attribute.annotation is bool:
                     data[key] = await self.validate_boolean(value)
@@ -372,34 +373,35 @@ class BaseObjectView:
 
         # Handle ManyToMany sync
         for key in instance.meta.many_to_many_fields:
-            # What user submitted now
             submitted_ids = {int(v) for v in form_data.getall(key) if v.strip().isdigit()}
-
-            # What was selected before (from hidden input)
-            initial_raw = form_data.get(f"_{key}_initial")
-            initial_ids = {int(i) for i in initial_raw.split(",")} if initial_raw else set()
-
-            to_add = submitted_ids - initial_ids
-            to_remove = initial_ids - submitted_ids
             m2m_field = getattr(instance, key)
+            model_target: edgy.Model = instance.meta.fields[key].target
 
-            if to_remove:
-                model_instances = (
-                    await instance.meta.fields.get(key)
-                    .target.query.filter(id__in=list(to_remove))
-                    .all()
-                )
-                for model_instance in model_instances:
-                    await m2m_field.remove(model_instance)
+            if create:
+                # Just add all submitted
+                if submitted_ids:
+                    model_instances = await model_target.query.filter(
+                        id__in=list(submitted_ids)
+                    ).all()
+                    for model_instance in model_instances:
+                        await m2m_field.add(model_instance)
+            else:
+                # Update: compute diff from initial
+                initial_raw = form_data.get(f"_{key}_initial")
+                initial_ids = {int(i) for i in initial_raw.split(",")} if initial_raw else set()
 
-            if to_add:
-                model_instances = (
-                    await instance.meta.fields.get(key)
-                    .target.query.filter(id__in=list(to_add))
-                    .all()
-                )
-                for model_instance in model_instances:
-                    await m2m_field.add(model_instance)
+                to_add = submitted_ids - initial_ids
+                to_remove = initial_ids - submitted_ids
+
+                if to_remove:
+                    model_instances = await model_target.query.filter(id__in=list(to_remove)).all()
+                    for model_instance in model_instances:
+                        await m2m_field.remove(model_instance)
+
+                if to_add:
+                    model_instances = await model_target.query.filter(id__in=list(to_add)).all()
+                    for model_instance in model_instances:
+                        await m2m_field.add(model_instance)
 
         return cast(edgy.Model, instance)
 
@@ -574,7 +576,6 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
                 "model_name": model_name,
                 "relationship_fields": relationship_fields,
                 "get_input_type": get_input_type,
-
             }
         )
         return context
