@@ -1,0 +1,30 @@
+{% extends "admin/base.html" %}
+
+{% block header %}Create {{ model_name | capitalize }}{% endblock %}
+
+{% block content %}
+<form method="post" class="bg-white rounded-lg shadow p-6 min-w-full mx-auto space-y-6">
+
+    {% for field, field_info in model.__fields__.items() %}
+        {% if field != "id" and field != "pk" %}
+        <div class="flex flex-col gap-1">
+            <label class="text-sm font-semibold text-gray-700">{{ field }}</label>
+            <input
+                type="text"
+                name="{{ field }}"
+                class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+            />
+        </div>
+        {% endif %}
+    {% endfor %}
+
+    <div class="pt-6 flex gap-4">
+        <button type="submit" class="px-5 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700">
+            Create
+        </button>
+        <a href="{{ url_prefix }}/models/{{ model_name }}" class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:bg-gray-300">
+            Cancel
+        </a>
+    </div>
+</form>
+{% endblock %}

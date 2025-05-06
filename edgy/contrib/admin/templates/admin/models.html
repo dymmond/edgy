@@ -3,12 +3,25 @@
 {% block header %}Registered Models{% endblock %}
 
 {% block content %}
-<div class="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3">
+<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
     {% for name, model in models.items() %}
-    <a href="{{ url_prefix}}/models/{{ name }}" class="block bg-white rounded shadow hover:shadow-md transition p-4">
-        <h2 class="text-lg font-semibold text-edgy-pink capitalize">{{ name }}</h2>
-        <p class="text-sm text-gray-500">{{ model.__module__ }}.{{ model.__name__ }}</p>
-    </a>
+    <div class="bg-white rounded-lg shadow hover:shadow-md transition p-5 flex flex-col justify-between h-full">
+        <div>
+            <h2 class="text-lg font-semibold text-edgy-pink capitalize">{{ name }}</h2>
+            <p class="text-sm text-gray-500">{{ model.__module__ }}.{{ model.__name__ }}</p>
+        </div>
+        <div class="mt-4 flex justify-between items-center">
+            <a href="{{ url_prefix }}/models/{{ name }}" class="text-blue-600 text-sm font-medium hover:underline">
+                View Records →
+            </a>
+            <a href="{{ url_prefix }}/models/{{ name }}/create" class="inline-flex items-center gap-1 text-sm px-3 py-1 bg-green-600 text-white rounded-md hover:bg-green-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Create
+            </a>
+        </div>
+    </div>
     {% endfor %}
 </div>
 {% endblock %}

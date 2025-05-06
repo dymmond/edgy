@@ -473,3 +473,93 @@ class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
 
         await instance.delete()
         return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}")
+
+
+class ModelCreateView(AdminMixin, TemplateController):
+    """
+    View for displaying and processing the form to create a new model instance.
+    """
+    template_name = "admin/model_create.html"
+
+    async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
+        """
+        Prepares the context data for the model creation template.
+
+        Retrieves the model name from the request, finds the corresponding
+        model class, and adds it to the context.
+
+        Args:
+            request: The incoming Starlette Request object.
+            **kwargs: Additional keyword arguments from the path parameters.
+
+        Returns:
+            A dictionary containing context data, including the page title,
+            the model class, and the model name.
+
+        Raises:
+            NotFound: If the model name is not found in the registered models.
+        """
+        context = await super().get_context_data(request, **kwargs)
+        model_name = request.path_params.get("name")
+
+        models = get_registered_models()
+        model = models.get(model_name)
+        if not model:
+            raise NotFound()
+
+        context.update({
+            "title": f"Create {model_name.capitalize()}",
+            "model": model,
+            "model_name": model_name,
+        })
+        return context
+
+    async def get(self, request: Request, **kwargs: Any) -> Any:
+        """
+        Handles GET requests to display the model creation form.
+
+        Renders the template configured for this view, populated with
+        context data prepared by `get_context_data`.
+
+        Args:
+            request: The incoming Starlette Request object.
+            **kwargs: Additional keyword arguments from the path parameters.
+
+        Returns:
+            The rendered template response containing the creation form.
+        """
+        return await self.render_template(request, **kwargs)
+
+    async def post(self, request: Request, **kwargs: Any) -> RedirectResponse:
+        """
+        Handles POST requests to create a new model instance.
+
+        Retrieves the model name and form data from the request, finds the
+        corresponding model class, creates a new instance from the form data,
+        saves it to the database, and redirects to the detail page of the
+        newly created object.
+
+        Args:
+            request: The incoming Starlette Request object.
+            **kwargs: Additional keyword arguments from the path parameters.
+
+        Returns:
+            A RedirectResponse to the detail page of the newly created object.
+
+        Raises:
+            NotFound: If the model name is not found in the registered models.
+        """
+        model_name = request.path_params.get("name")
+        form_data = await request.form()
+
+        models = get_registered_models()
+        model = models.get(model_name)
+        if not model:
+            raise NotFound()
+
+        data_dump = {k: v for k, v in form_data.dump().items() if v is not None and v != ""}
+        model_instance = model(**data_dump)
+        model_dump = model_instance.model_dump(exclude_unset=True, exclude_none=True)
+
+        instance = await model.query.create(**model_dump)
+        return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{instance.id}")
