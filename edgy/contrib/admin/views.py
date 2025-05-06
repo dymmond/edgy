@@ -12,6 +12,7 @@ import edgy
 from edgy.conf import settings
 from edgy.contrib.admin.mixins import AdminMixin
 from edgy.contrib.admin.model_registry import get_registered_models
+from edgy.core.db.relationships.related_field import RelatedField
 
 
 class AdminDashboard(AdminMixin, TemplateController):
@@ -202,6 +203,67 @@ class BaseObjectView:
             return int(obj_id)
         return obj_id
 
+    async def get_model_from_foreign_key(self, model_name: str, obj_id: int):
+        """
+        Gets the object from the foreign key field.
+        then queries the database for the object with the given id.
+
+        Args:
+            model_name: The name of the related model.
+            obj_id: The ID of the related object.
+
+        Returns:
+            The instance of the related model.
+
+        Raises:
+            NotFound: If the model or object is not found.
+        """
+        models: dict[str, Any] = get_registered_models()
+        model: edgy.Model = models.get(model_name)
+
+        if not model:
+            raise NotFound()
+
+        instance = await model.query.get(id=self.parse_object_id(obj_id))
+        if not instance:
+            raise NotFound()
+        return instance
+
+    async def save_model(self, instance: type[edgy.Model], form_data: FormData, create: bool = False) -> edgy.Model:
+        """
+        Saves an Edgy model instance based on form data.
+
+        This function updates the fields of a given Edgy model instance
+        using data from a FormData object. It specifically handles foreign key
+        fields by fetching the related model instance before updating.
+        Finally, it saves the updated model instance.
+
+        Args:
+            instance: The Edgy model instance to be updated and saved.
+                      Note: The type hint 'type[edgy.Model]' might be intended
+                      as the instance itself, not the class type.
+            form_data: A FormData object containing the data to update the model.
+        """
+        # Update fields
+        form_to_dict = {k: v for k, v in form_data.items() if k not in ["pk", "id"]}
+
+        # Make sure if one of the fields is not a primary key
+        data: dict[str, Any] = {}
+        for key, value in form_to_dict.items():
+            if key in instance.meta.foreign_key_fields:
+                attribute = instance.meta.fields.get(key)
+
+                # Check if its a ManyToMany field
+                if not attribute.is_m2m:
+                    data[key] = await self.get_model_from_foreign_key(key, self.parse_object_id(value))
+            else:
+                data[key] = value
+
+        if not create:
+            return await instance.update(**data)
+        else:
+            return await instance.query.create(**data)
+
 class ModelObjectView(AdminMixin, BaseObjectView, TemplateController):
     """
     View for displaying the details of a single object of a specific model.
@@ -340,65 +402,6 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
         """
         return await self.render_template(request, **kwargs)
 
-    async def get_model_from_foreign_key(self, model_name: str, obj_id: int):
-        """
-        Gets the object from the foreign key field.
-        then queries the database for the object with the given id.
-
-        Args:
-            model_name: The name of the related model.
-            obj_id: The ID of the related object.
-
-        Returns:
-            The instance of the related model.
-
-        Raises:
-            NotFound: If the model or object is not found.
-        """
-        models: dict[str, Any] = get_registered_models()
-        model: edgy.Model = models.get(model_name)
-
-        if not model:
-            raise NotFound()
-
-        instance = await model.query.get(id=self.parse_object_id(obj_id))
-        if not instance:
-            raise NotFound()
-        return instance
-
-    async def save_model(self, instance: type[edgy.Model], form_data: FormData):
-        """
-        Saves an Edgy model instance based on form data.
-
-        This function updates the fields of a given Edgy model instance
-        using data from a FormData object. It specifically handles foreign key
-        fields by fetching the related model instance before updating.
-        Finally, it saves the updated model instance.
-
-        Args:
-            instance: The Edgy model instance to be updated and saved.
-                      Note: The type hint 'type[edgy.Model]' might be intended
-                      as the instance itself, not the class type.
-            form_data: A FormData object containing the data to update the model.
-        """
-        # Update fields
-        form_to_dict = {k: v for k, v in form_data.items() if k not in ["pk", "id"]}
-
-        # Make sure if one of the fields is not a primary key
-        data: dict[str, Any] = {}
-        for key, value in form_to_dict.items():
-            if key in instance.meta.foreign_key_fields:
-                attribute = instance.meta.fields.get(key)
-
-                # Check if its a ManyToMany field
-                if not attribute.is_m2m:
-                    data[key] = await self.get_model_from_foreign_key(key, self.parse_object_id(value))
-            else:
-                data[key] = value
-
-        await instance.update(**data)
-        await instance.save()
-
 
     async def post(self, request: Request, **kwargs: Any) -> RedirectResponse:
         """
@@ -475,7 +478,7 @@ class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
         return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}")
 
 
-class ModelCreateView(AdminMixin, TemplateController):
+class ModelCreateView(AdminMixin, BaseObjectView, TemplateController):
     """
     View for displaying and processing the form to create a new model instance.
     """
@@ -507,10 +510,22 @@ class ModelCreateView(AdminMixin, TemplateController):
         if not model:
             raise NotFound()
 
+        relationship_fields = {}
+        for field, field_info in model.model_fields.items():
+            if hasattr(field_info, "is_m2m") and field_info.is_m2m and not isinstance(field_info, RelatedField):
+                related_model = field_info.target
+                items = await related_model.query.limit(100).all()
+                relationship_fields[field] = {"type": "many_to_many", "items": items}
+            elif hasattr(field_info, "is_m2m") and not field_info.is_m2m and not isinstance(field_info, RelatedField):
+                related_model = field_info.target
+                items = await related_model.query.limit(100).all()
+                relationship_fields[field] = {"type": "foreign_key", "items": items}
+
         context.update({
             "title": f"Create {model_name.capitalize()}",
             "model": model,
             "model_name": model_name,
+            "relationship_fields": relationship_fields
         })
         return context
 
@@ -557,9 +572,5 @@ class ModelCreateView(AdminMixin, TemplateController):
         if not model:
             raise NotFound()
 
-        data_dump = {k: v for k, v in form_data.dump().items() if v is not None and v != ""}
-        model_instance = model(**data_dump)
-        model_dump = model_instance.model_dump(exclude_unset=True, exclude_none=True)
-
-        instance = await model.query.create(**model_dump)
+        instance = await self.save_model(model, form_data, create=True)
         return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{instance.id}")

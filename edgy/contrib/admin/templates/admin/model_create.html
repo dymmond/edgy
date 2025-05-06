@@ -5,17 +5,42 @@
 {% block content %}
 <form method="post" class="bg-white rounded-lg shadow p-6 min-w-full mx-auto space-y-6">
 
-    {% for field, field_info in model.__fields__.items() %}
-        {% if field != "id" and field != "pk" %}
+    {# Regular fields (not M2M or FK) #}
+    {% for field, field_info in model.model_fields.items() %}
+        {% if field != "id" and not field_info.primary_key and not relationship_fields.get(field) %}
         <div class="flex flex-col gap-1">
-            <label class="text-sm font-semibold text-gray-700">{{ field }}</label>
+            <label class="text-sm font-semibold text-gray-700 capitalize" for="{{ field }}">{{ field }}</label>
             <input
                 type="text"
                 name="{{ field }}"
+                id="{{ field }}"
                 class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
             />
         </div>
         {% endif %}
+    {% endfor %}
+
+    {# ForeignKey and ManyToMany fields #}
+    {% for field, rel in relationship_fields.items() %}
+    <div class="flex flex-col gap-1">
+        <label class="text-sm font-semibold text-gray-700 capitalize" for="{{ field }}">{{ field }}</label>
+
+        {% if rel["type"] == "foreign_key" %}
+        <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">
+            <option value="">Select...</option>
+            {% for obj in rel["items"] %}
+                <option value="{{ obj.id }}">{{ obj }}</option>
+            {% endfor %}
+        </select>
+
+        {% elif rel["type"] == "many_to_many" %}
+        <select name="{{ field }}" id="{{ field }}" multiple class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">
+            {% for obj in rel["items"] %}
+                <option value="{{ obj.id }}">{{ obj }}</option>
+            {% endfor %}
+        </select>
+        {% endif %}
+    </div>
     {% endfor %}
 
     <div class="pt-6 flex gap-4">
