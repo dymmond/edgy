@@ -19,6 +19,7 @@ class AdminMixin:
         context.update(
             {
                 "title": settings.admin_config.title,
+                "dasboard_title": settings.admin_config.dashboard_title,
                 "menu_title": settings.admin_config.menu_title,
                 "favicon": settings.admin_config.favicon,
                 "sidebar_bg_colour": settings.admin_config.sidebar_bg_colour,

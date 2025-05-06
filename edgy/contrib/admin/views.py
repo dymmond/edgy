@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
+import anyio
 from lilya.datastructures import FormData
 from lilya.exceptions import NotFound  # noqa
 from lilya.requests import Request
@@ -19,7 +20,7 @@ class AdminDashboard(AdminMixin, TemplateController):
     """
     View for the administration dashboard page.
     """
-    template_name = "admin/base.html"
+    template_name = "admin/dashboard.html"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         """
@@ -33,12 +34,38 @@ class AdminDashboard(AdminMixin, TemplateController):
             A dictionary containing context data, including the page title.
         """
         context = await super().get_context_data(request, **kwargs)
-        context.update(
-            {
-                "title": "Dashboard",
-            }
-        )
+
+        models = get_registered_models()
+        model_stats: list[dict] = []
+
+        async with anyio.create_task_group() as tg:
+            for name, model in models.items():
+                tg.start_soon(self._add_model_stat, model_stats, name, model) # noqa
+
+        total_records = sum(m["count"] for m in model_stats)
+        top_model = max(model_stats, key=lambda m: m["count"], default={"verbose": "N/A", "count": 0})
+
+        context.update({
+            "title": "Dashboard",
+            "models": sorted(model_stats, key=lambda m: m["verbose"]),
+            "total_records": total_records,
+            "top_model": top_model,
+            "recent_models": ["user", "album", "track"],  # TODO: make dynamic later
+            "url_prefix": settings.admin_config.admin_prefix_url,
+        })
         return context
+
+    async def _add_model_stat(self, model_stats: list, name: str, model: edgy.Model) -> None:
+        try:
+            count = await model.query.count()
+        except Exception:
+            count = 0
+
+        model_stats.append({
+            "name": name,
+            "verbose": model.__name__,
+            "count": count,
+        })
 
     async def get(self, request: Request) -> Any:
         """

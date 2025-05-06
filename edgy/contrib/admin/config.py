@@ -8,3 +8,4 @@ class AdminConfig(BaseSettings):
     menu_title: str = "Edgy Admin"
     favicon: str = "https://raw.githubusercontent.com/dymmond/edgy/refs/heads/main/docs/statics/images/favicon.ico"
     sidebar_bg_colour: str = "#EC417A"
+    dashboard_title: str = "Edgy Admin Dashboard"
