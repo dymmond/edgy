@@ -15,6 +15,7 @@ import edgy
 from edgy.conf import settings
 from edgy.contrib.admin.mixins import AdminMixin
 from edgy.contrib.admin.model_registry import get_registered_models
+from edgy.contrib.admin.utils.messages import add_message
 from edgy.core.db.relationships.related_field import RelatedField
 
 
@@ -627,9 +628,18 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
 
         instance = await model.query.get(id=self.get_object_id(request))
         if not instance:
-            raise NotFound()
+            add_message(request, "error", f"Model {model_name} with ID {obj_id} not found.")
+            return RedirectResponse(
+                f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
+            )
 
         await self.save_model(instance, form_data)
+
+        add_message(
+            request,
+            "success",
+            f"{model_name.capitalize()} #{obj_id} has been updated successfully.",
+        )
         return RedirectResponse(
             f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
         )
@@ -658,6 +668,7 @@ class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
             NotFound: If the model name or the specific instance is not found.
         """
         model_name = request.path_params.get("name")
+        obj_id = request.path_params.get("id")
 
         models = get_registered_models()
         model = models.get(model_name)
@@ -666,9 +677,18 @@ class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
 
         instance = await model.query.get(id=self.get_object_id(request))
         if not instance:
-            raise NotFound()
+            add_message(request, "error", f"There is no record with this ID: '{obj_id}'.")
+            return RedirectResponse(
+                f"{settings.admin_config.admin_prefix_url}/models/{model_name}"
+            )
 
         await instance.delete()
+
+        add_message(
+            request,
+            "success",
+            f"{model_name.capitalize()} #{obj_id} has been deleted successfully.",
+        )
         return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}")
 
 
@@ -779,6 +799,11 @@ class ModelCreateView(AdminMixin, BaseObjectView, TemplateController):
             raise NotFound()
 
         instance = await self.save_model(model, form_data, create=True)
+        add_message(
+            request,
+            "success",
+            f"{model_name.capitalize()} #{instance.id} has been created successfully.",
+        )
         return RedirectResponse(
             f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{instance.id}"
         )

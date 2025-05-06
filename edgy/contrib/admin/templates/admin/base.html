@@ -35,6 +35,39 @@
   <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-70 z-50 flex items-center justify-center hidden">
     <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-12 w-12"></div>
   </div>
+  {% if messages %}
+    <div class="w-full">
+  <div class="space-y-2">
+    {% for message in messages %}
+      <div class="flex items-start gap-3 px-4 py-3 rounded-md shadow-sm text-sm font-medium w-full relative
+                  {% if message.level == 'success' %}bg-green-100 text-green-800
+                  {% elif message.level == 'error' %}bg-red-100 text-red-800
+                  {% elif message.level == 'warning' %}bg-yellow-100 text-yellow-800
+                  {% elif message.level == 'info' %}bg-blue-100 text-blue-800
+                  {% endif %}">
+        <i data-lucide="{% if message.level == 'success' %}check-circle
+                        {% elif message.level == 'error' %}x-circle
+                        {% elif message.level == 'warning' %}alert-triangle
+                        {% elif message.level == 'info' %}info
+                        {% endif %}" class="w-5 h-5 mt-0.5 shrink-0"></i>
+
+        <div class="text-base leading-snug flex-1">
+          {{ message.text }}
+        </div>
+
+        <button type="button"
+                class="absolute px-4 top-3 right-2 text-base text-inherit hover:opacity-70 focus:outline-none"
+                onclick="this.parentElement.remove()"
+                title="Dismiss">
+          ×
+        </button>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+  {% endif %}
+
     <div class="flex min-h-screen">
         <!-- Sidebar -->
         <aside class="w-64 bg-edgy-pink shadow-md flex flex-col text-white">
