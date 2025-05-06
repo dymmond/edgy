@@ -229,6 +229,9 @@ class BaseObjectView:
             raise NotFound()
         return instance
 
+    async def validate_boolean(self, value: str) -> bool:
+        return value.lower() in ["true", "1", "yes", "y"]
+
     async def save_model(self, instance: type[edgy.Model], form_data: FormData, create: bool = False) -> edgy.Model:
         """
         Saves an Edgy model instance based on form data.
@@ -244,25 +247,59 @@ class BaseObjectView:
                       as the instance itself, not the class type.
             form_data: A FormData object containing the data to update the model.
         """
-        # Update fields
-        form_to_dict = {k: v for k, v in form_data.items() if k not in ["pk", "id"]}
+        form_to_dict = {
+            k: v for k, v in form_data.items()
+            if k not in ["pk", "id"] and v is not None and v != ""
+        }
 
-        # Make sure if one of the fields is not a primary key
         data: dict[str, Any] = {}
-        for key, value in form_to_dict.items():
-            if key in instance.meta.foreign_key_fields:
-                attribute = instance.meta.fields.get(key)
 
+        for key, value in form_to_dict.items():
+            attribute = instance.meta.fields.get(key)
+
+            if attribute is None:
+                continue
+
+            if key in instance.meta.foreign_key_fields:
                 # Check if its a ManyToMany field
                 if not attribute.is_m2m:
-                    data[key] = await self.get_model_from_foreign_key(key, self.parse_object_id(value))
+                    data[key] = await instance.meta.fields.get(key).target.query.get(id=self.parse_object_id(value))
             else:
+                if attribute.annotation is bool:
+                    data[key] = await self.validate_boolean(value)
+                    continue
                 data[key] = value
 
+        # Save basic fields first
         if not create:
-            return await instance.update(**data)
+            await instance.update(**data)
         else:
-            return await instance.query.create(**data)
+            instance = await instance.query.create(**data)
+
+        # Handle ManyToMany sync
+        for key in instance.meta.many_to_many_fields:
+            # What user submitted now
+            submitted_ids = {int(v) for v in form_data.getall(key) if v.strip().isdigit()}
+
+            # What was selected before (from hidden input)
+            initial_raw = form_data.get(f"_{key}_initial")
+            initial_ids = {int(i) for i in initial_raw.split(",")} if initial_raw else set()
+
+            to_add = submitted_ids - initial_ids
+            to_remove = initial_ids - submitted_ids
+            m2m_field = getattr(instance, key)
+
+            if to_remove:
+                model_instances = await instance.meta.fields.get(key).target.query.filter(id__in=list(to_remove)).all()
+                for model_instance in model_instances:
+                    await m2m_field.remove(model_instance)
+
+            if to_add:
+                model_instances = await instance.meta.fields.get(key).target.query.filter(id__in=list(to_add)).all()
+                for model_instance in model_instances:
+                    await m2m_field.add(model_instance)
+
+        return instance
 
 class ModelObjectView(AdminMixin, BaseObjectView, TemplateController):
     """
@@ -302,11 +339,26 @@ class ModelObjectView(AdminMixin, BaseObjectView, TemplateController):
         if not instance:
             raise NotFound()
 
+
+        relationship_fields = {}
+        m2m_values = {}
+
+        for field, _ in model.model_fields.items():
+            attr = model.meta.fields.get(field)
+
+            if hasattr(attr, "is_m2m") and attr.is_m2m and not isinstance(attr, RelatedField):
+                relationship_fields[field] = "many_to_many"
+                m2m_values[field] = await getattr(instance, field).all()
+            elif hasattr(attr, "is_m2m") and not attr.is_m2m and not isinstance(attr, RelatedField):
+                relationship_fields[field] = "foreign_key"
+
         context.update({
             "title": f"{model_name.capitalize()} #{obj_id}",
             "object": instance,
             "model": model,
             "model_name": model_name,
+            "relationship_fields": relationship_fields,
+            "m2m_values": m2m_values,
         })
         return context
 
@@ -364,7 +416,7 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
         Raises:
             NotFound: If the model name or the specific instance is not found.
         """
-        context = await super().get_context_data(request, **kwargs)
+        context = await super().get_context_data(request, **kwargs) # noqa
         model_name = request.path_params.get("name")
         obj_id = request.path_params.get("id")
 
@@ -378,11 +430,38 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
         if not instance:
             raise NotFound()
 
+        relationship_fields = {}
+
+        for field, _ in model.model_fields.items():
+            attr = model.meta.fields.get(field)
+
+            # ManyToMany
+            if hasattr(attr, "is_m2m") and attr.is_m2m and not isinstance(attr, RelatedField):
+                related_model = attr.target
+                all_items = await related_model.query.limit(100).all()
+                selected_items = await getattr(instance, field).all()
+                selected_ids = [item.id for item in selected_items]
+                relationship_fields[field] = {
+                    "type": "many_to_many",
+                    "items": all_items,
+                    "selected": selected_ids,
+                }
+
+            # ForeignKey
+            elif hasattr(attr, "is_m2m") and not attr.is_m2m and not isinstance(attr, RelatedField):
+                related_model = attr.target
+                all_items = await related_model.query.limit(100).all()
+                relationship_fields[field] = {
+                    "type": "foreign_key",
+                    "items": all_items,
+                }
+
         context.update({
             "title": f"Edit {model_name.capitalize()} #{obj_id}",
             "object": instance,
             "model": model,
             "model_name": model_name,
+            "relationship_fields": relationship_fields,
         })
         return context
 
@@ -435,7 +514,6 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
         instance = await model.query.get(id=self.get_object_id(request))
         if not instance:
             raise NotFound()
-
 
         await self.save_model(instance, form_data)
         return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}")

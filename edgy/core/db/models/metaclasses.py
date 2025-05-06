@@ -22,6 +22,7 @@ from typing import (
 import sqlalchemy
 from pydantic._internal._model_construction import ModelMetaclass
 
+from edgy import ManyToManyField
 from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
@@ -76,6 +77,11 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             self.meta.foreign_key_fields.add(name)
         if isinstance(field, RelationshipField):
             self.meta.relationship_fields.add(name)
+
+            # This is particularly useful for M2M distinguish
+            # Mostly for the admin manipulation
+            if isinstance(field, ManyToManyField):
+                self.meta.many_to_many_fields.add(name)
         if isinstance(field, BaseRefForeignKey):
             self.meta.ref_foreign_key_fields.add(name)
 
@@ -207,6 +213,7 @@ _trigger_attributes_field_stats_MetaInfo = {
     "excluded_fields",
     "secret_fields",
     "relationship_fields",
+    "many_to_many_fields",
     "ref_foreign_key_fields",
 }
 
@@ -240,6 +247,7 @@ class MetaInfo:
         "excluded_fields",
         "secret_fields",
         "relationship_fields",
+        "many_to_many_fields",
         "ref_foreign_key_fields",
         "_needs_special_serialization",
         "_fields_are_initialized",
@@ -406,6 +414,7 @@ class MetaInfo:
         self.post_delete_fields: set[str] = set()
         self.foreign_key_fields: set[str] = set()
         self.relationship_fields: set[str] = set()
+        self.many_to_many_fields: set[str] = set()
         self.ref_foreign_key_fields: set[str] = set()
         self._field_stats_are_initialized = True
         for key, field in self.fields.items():

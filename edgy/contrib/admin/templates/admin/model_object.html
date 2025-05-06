@@ -12,7 +12,33 @@
                 {{ field.replace('_', ' ') | title }}
             </dt>
             <dd class="text-sm text-gray-900 bg-gray-50 px-4 py-2 rounded-md border border-gray-100 w-full sm:w-3/4 break-words">
-                {{ getattr(object, field) }}
+                {% set value = getattr(object, field) %}
+                {% set rel_type = relationship_fields.get(field) %}
+
+                {% if rel_type == "many_to_many" %}
+                    {% set items = m2m_values.get(field, []) %}
+                    {% if items %}
+                        {% for item in items %}
+                            {{ item }}{% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        —
+                    {% endif %}
+
+                {% elif rel_type == "foreign_key" %}
+                    {% if value %}
+                        {{ value }}
+                    {% else %}
+                        —
+                    {% endif %}
+
+                {% else %}
+                    {% if value is not none %}
+                        {{ value }}
+                    {% else %}
+                        —
+                    {% endif %}
+                {% endif %}
             </dd>
         </div>
         {% endfor %}
