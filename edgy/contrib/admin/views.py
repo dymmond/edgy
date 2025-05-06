@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from math import ceil
-from typing import Any
+from typing import Any, cast
 
 import anyio
 from lilya.datastructures import FormData
@@ -21,6 +21,7 @@ class AdminDashboard(AdminMixin, TemplateController):
     """
     View for the administration dashboard page.
     """
+
     template_name = "admin/dashboard.html"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
@@ -41,19 +42,23 @@ class AdminDashboard(AdminMixin, TemplateController):
 
         async with anyio.create_task_group() as tg:
             for name, model in models.items():
-                tg.start_soon(self._add_model_stat, model_stats, name, model) # noqa
+                tg.start_soon(self._add_model_stat, model_stats, name, model)  # type: ignore
 
         total_records = sum(m["count"] for m in model_stats)
-        top_model = max(model_stats, key=lambda m: m["count"], default={"verbose": "N/A", "count": 0})
+        top_model = max(
+            model_stats, key=lambda m: m["count"], default={"verbose": "N/A", "count": 0}
+        )
 
-        context.update({
-            "title": "Dashboard",
-            "models": sorted(model_stats, key=lambda m: m["verbose"]),
-            "total_records": total_records,
-            "top_model": top_model,
-            "recent_models": ["user", "album", "track"],  # TODO: make dynamic later
-            "url_prefix": settings.admin_config.admin_prefix_url,
-        })
+        context.update(
+            {
+                "title": "Dashboard",
+                "models": sorted(model_stats, key=lambda m: m["verbose"]),
+                "total_records": total_records,
+                "top_model": top_model,
+                "recent_models": ["user", "album", "track"],  # TODO: make dynamic later
+                "url_prefix": settings.admin_config.admin_prefix_url,
+            }
+        )
         return context
 
     async def _add_model_stat(self, model_stats: list, name: str, model: edgy.Model) -> None:
@@ -62,11 +67,13 @@ class AdminDashboard(AdminMixin, TemplateController):
         except Exception:
             count = 0
 
-        model_stats.append({
-            "name": name,
-            "verbose": model.__name__,
-            "count": count,
-        })
+        model_stats.append(
+            {
+                "name": name,
+                "verbose": model.__name__,
+                "count": count,
+            }
+        )
 
     async def get(self, request: Request) -> Any:
         """
@@ -85,6 +92,7 @@ class ModelListView(AdminMixin, TemplateController):
     """
     View for listing all registered models in the admin interface.
     """
+
     template_name = "admin/models.html"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
@@ -122,6 +130,7 @@ class ModelDetailView(AdminMixin, TemplateController):
     """
     View for displaying details of a specific model, typically listing its objects.
     """
+
     template_name = "admin/model_detail.html"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
@@ -176,17 +185,19 @@ class ModelDetailView(AdminMixin, TemplateController):
         objects = await queryset.limit(per_page).offset(offset).all()
         total_pages = ceil(total_records / per_page) if total_records else 1
 
-        context.update({
-            "title": f"{model.__name__} Details",
-            "model": model,
-            "objects": objects,
-            "model_name": model_name,
-            "query": query,
-            "page": page,
-            "per_page": per_page,
-            "total_pages": total_pages,
-            "url_prefix": settings.admin_config.admin_prefix_url,
-        })
+        context.update(
+            {
+                "title": f"{model.__name__} Details",
+                "model": model,
+                "objects": objects,
+                "model_name": model_name,
+                "query": query,
+                "page": page,
+                "per_page": per_page,
+                "total_pages": total_pages,
+                "url_prefix": settings.admin_config.admin_prefix_url,
+            }
+        )
         return context
 
     async def get(self, request: Request, **kwargs: Any) -> Any:
@@ -258,7 +269,7 @@ class BaseObjectView:
             return int(obj_id)
         return obj_id
 
-    async def get_model_from_foreign_key(self, model_name: str, obj_id: int):
+    async def get_model_from_foreign_key(self, model_name: str, obj_id: int) -> edgy.Model:
         """
         Gets the object from the foreign key field.
         then queries the database for the object with the given id.
@@ -282,12 +293,14 @@ class BaseObjectView:
         instance = await model.query.get(id=self.parse_object_id(obj_id))
         if not instance:
             raise NotFound()
-        return instance
+        return cast(edgy.Model, instance)
 
     async def validate_boolean(self, value: str) -> bool:
         return value.lower() in ["true", "1", "yes", "y"]
 
-    async def save_model(self, instance: type[edgy.Model], form_data: FormData, create: bool = False) -> edgy.Model:
+    async def save_model(
+        self, instance: type[edgy.Model], form_data: FormData, create: bool = False
+    ) -> edgy.Model:
         """
         Saves an Edgy model instance based on form data.
 
@@ -303,7 +316,8 @@ class BaseObjectView:
             form_data: A FormData object containing the data to update the model.
         """
         form_to_dict = {
-            k: v for k, v in form_data.items()
+            k: v
+            for k, v in form_data.items()
             if k not in ["pk", "id"] and v is not None and v != ""
         }
 
@@ -318,7 +332,9 @@ class BaseObjectView:
             if key in instance.meta.foreign_key_fields:
                 # Check if its a ManyToMany field
                 if not attribute.is_m2m:
-                    data[key] = await instance.meta.fields.get(key).target.query.get(id=self.parse_object_id(value))
+                    data[key] = await instance.meta.fields.get(key).target.query.get(
+                        id=self.parse_object_id(value)
+                    )
             else:
                 if attribute.annotation is bool:
                     data[key] = await self.validate_boolean(value)
@@ -345,21 +361,31 @@ class BaseObjectView:
             m2m_field = getattr(instance, key)
 
             if to_remove:
-                model_instances = await instance.meta.fields.get(key).target.query.filter(id__in=list(to_remove)).all()
+                model_instances = (
+                    await instance.meta.fields.get(key)
+                    .target.query.filter(id__in=list(to_remove))
+                    .all()
+                )
                 for model_instance in model_instances:
                     await m2m_field.remove(model_instance)
 
             if to_add:
-                model_instances = await instance.meta.fields.get(key).target.query.filter(id__in=list(to_add)).all()
+                model_instances = (
+                    await instance.meta.fields.get(key)
+                    .target.query.filter(id__in=list(to_add))
+                    .all()
+                )
                 for model_instance in model_instances:
                     await m2m_field.add(model_instance)
 
-        return instance
+        return cast(edgy.Model, instance)
+
 
 class ModelObjectView(AdminMixin, BaseObjectView, TemplateController):
     """
     View for displaying the details of a single object of a specific model.
     """
+
     template_name = "admin/model_object.html"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
@@ -381,7 +407,7 @@ class ModelObjectView(AdminMixin, BaseObjectView, TemplateController):
         Raises:
             NotFound: If the model name or the specific instance is not found.
         """
-        context = await super().get_context_data(request, **kwargs) # noqa
+        context = await super().get_context_data(request, **kwargs)  # noqa
         model_name = request.path_params.get("name")
         obj_id = request.path_params.get("id")
 
@@ -394,7 +420,6 @@ class ModelObjectView(AdminMixin, BaseObjectView, TemplateController):
         if not instance:
             raise NotFound()
 
-
         relationship_fields = {}
         m2m_values = {}
 
@@ -404,17 +429,21 @@ class ModelObjectView(AdminMixin, BaseObjectView, TemplateController):
             if hasattr(attr, "is_m2m") and attr.is_m2m and not isinstance(attr, RelatedField):
                 relationship_fields[field] = "many_to_many"
                 m2m_values[field] = await getattr(instance, field).all()
-            elif hasattr(attr, "is_m2m") and not attr.is_m2m and not isinstance(attr, RelatedField):
+            elif (
+                hasattr(attr, "is_m2m") and not attr.is_m2m and not isinstance(attr, RelatedField)
+            ):
                 relationship_fields[field] = "foreign_key"
 
-        context.update({
-            "title": f"{model_name.capitalize()} #{obj_id}",
-            "object": instance,
-            "model": model,
-            "model_name": model_name,
-            "relationship_fields": relationship_fields,
-            "m2m_values": m2m_values,
-        })
+        context.update(
+            {
+                "title": f"{model_name.capitalize()} #{obj_id}",
+                "object": instance,
+                "model": model,
+                "model_name": model_name,
+                "relationship_fields": relationship_fields,
+                "m2m_values": m2m_values,
+            }
+        )
         return context
 
     async def get(self, request: Request, **kwargs: Any) -> Any:
@@ -449,6 +478,7 @@ class ModelObjectView(AdminMixin, BaseObjectView, TemplateController):
         """
         return await self.render_template(request, **kwargs)
 
+
 class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
     template_name = "admin/model_edit.html"
 
@@ -471,7 +501,7 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
         Raises:
             NotFound: If the model name or the specific instance is not found.
         """
-        context = await super().get_context_data(request, **kwargs) # noqa
+        context = await super().get_context_data(request, **kwargs)  # noqa
         model_name = request.path_params.get("name")
         obj_id = request.path_params.get("id")
 
@@ -503,7 +533,9 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
                 }
 
             # ForeignKey
-            elif hasattr(attr, "is_m2m") and not attr.is_m2m and not isinstance(attr, RelatedField):
+            elif (
+                hasattr(attr, "is_m2m") and not attr.is_m2m and not isinstance(attr, RelatedField)
+            ):
                 related_model = attr.target
                 all_items = await related_model.query.limit(100).all()
                 relationship_fields[field] = {
@@ -511,13 +543,15 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
                     "items": all_items,
                 }
 
-        context.update({
-            "title": f"Edit {model_name.capitalize()} #{obj_id}",
-            "object": instance,
-            "model": model,
-            "model_name": model_name,
-            "relationship_fields": relationship_fields,
-        })
+        context.update(
+            {
+                "title": f"Edit {model_name.capitalize()} #{obj_id}",
+                "object": instance,
+                "model": model,
+                "model_name": model_name,
+                "relationship_fields": relationship_fields,
+            }
+        )
         return context
 
     async def get(self, request: Request, **kwargs: Any) -> Any:
@@ -535,7 +569,6 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
             The rendered template response containing the edit form.
         """
         return await self.render_template(request, **kwargs)
-
 
     async def post(self, request: Request, **kwargs: Any) -> RedirectResponse:
         """
@@ -571,7 +604,9 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
             raise NotFound()
 
         await self.save_model(instance, form_data)
-        return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}")
+        return RedirectResponse(
+            f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
+        )
 
 
 class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
@@ -615,6 +650,7 @@ class ModelCreateView(AdminMixin, BaseObjectView, TemplateController):
     """
     View for displaying and processing the form to create a new model instance.
     """
+
     template_name = "admin/model_create.html"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
@@ -645,21 +681,31 @@ class ModelCreateView(AdminMixin, BaseObjectView, TemplateController):
 
         relationship_fields = {}
         for field, field_info in model.model_fields.items():
-            if hasattr(field_info, "is_m2m") and field_info.is_m2m and not isinstance(field_info, RelatedField):
+            if (
+                hasattr(field_info, "is_m2m")
+                and field_info.is_m2m
+                and not isinstance(field_info, RelatedField)
+            ):
                 related_model = field_info.target
                 items = await related_model.query.limit(100).all()
                 relationship_fields[field] = {"type": "many_to_many", "items": items}
-            elif hasattr(field_info, "is_m2m") and not field_info.is_m2m and not isinstance(field_info, RelatedField):
+            elif (
+                hasattr(field_info, "is_m2m")
+                and not field_info.is_m2m
+                and not isinstance(field_info, RelatedField)
+            ):
                 related_model = field_info.target
                 items = await related_model.query.limit(100).all()
                 relationship_fields[field] = {"type": "foreign_key", "items": items}
 
-        context.update({
-            "title": f"Create {model_name.capitalize()}",
-            "model": model,
-            "model_name": model_name,
-            "relationship_fields": relationship_fields
-        })
+        context.update(
+            {
+                "title": f"Create {model_name.capitalize()}",
+                "model": model,
+                "model_name": model_name,
+                "relationship_fields": relationship_fields,
+            }
+        )
         return context
 
     async def get(self, request: Request, **kwargs: Any) -> Any:
@@ -706,4 +752,6 @@ class ModelCreateView(AdminMixin, BaseObjectView, TemplateController):
             raise NotFound()
 
         instance = await self.save_model(model, form_data, create=True)
-        return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{instance.id}")
+        return RedirectResponse(
+            f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{instance.id}"
+        )

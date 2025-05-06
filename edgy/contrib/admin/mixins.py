@@ -6,10 +6,9 @@ from lilya.templating import Jinja2Template
 
 from edgy.conf import settings
 
-templates = Jinja2Template(
-    directory=str(Path(__file__).resolve().parent / "templates")
-)
+templates = Jinja2Template(directory=str(Path(__file__).resolve().parent / "templates"))
 templates.env.globals["getattr"] = getattr
+
 
 class AdminMixin:
     templates = templates
