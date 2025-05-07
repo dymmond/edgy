@@ -172,6 +172,42 @@ Result:
 }
 ```
 
+## Interopability with plain pydantic
+
+You can also add plain pydantic fields. They are without any features and can be used for different signalling.
+
+## Partial Marshalls.
+
+Sometimes you want to use marshalls for only updates of some attributes.
+You can just define the attributes you want to update and assign the instance later.
+If the fields you ignore are required, it is an error to not assign the instance and call save.
+
+``` python
+class User(edgy.Model):
+    # this is required
+    name: str = edgy.CharField(max_length=100, primary_key=True)
+    email: str = edgy.EmailField(max_length=100, null=True)
+
+    class Meta:
+        registry = models
+
+class EmailUpdateMarshall(Marshall):
+    marshall_config = ConfigMarshall(model=User, fields=["email"])
+
+@post("/update_email/{id}")
+async def update_email(id: int, data: EmailUpdateMarshall) -> EmailUpdateMarshall:
+    data.instance = await User.query.get(id=id)
+    await data.save()
+    return data
+
+## the following would crash when saving or accessing instance, because "name" is required
+
+# @post("/create_user")
+# async def create_user(id: int, data: EmailUpdateMarshall) -> EmailUpdateMarshall:
+#     await data.save()
+#     return data
+```
+
 ## `save()` Method
 
 Since `Marshall` is a Pydantic base model, similar to Edgy models, you can persist data directly using the marshall.

@@ -5,7 +5,7 @@ import pytest
 from anyio import from_thread, sleep, to_thread
 from esmerald import Esmerald, Gateway, post
 from httpx import ASGITransport, AsyncClient
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import edgy
 from edgy.core.marshalls import Marshall, fields
@@ -67,6 +67,8 @@ class UserMarshall(Marshall):
     age: fields.MarshallField = fields.MarshallField(int, source="age")
     data: fields.MarshallMethodField = fields.MarshallMethodField(dict[str, Any])
 
+    shall_save: bool = Field(default=False, exclude=True)
+
     def get_details(self, instance) -> str:
         return instance.get_name()
 
@@ -77,6 +79,8 @@ class UserMarshall(Marshall):
 
 @post("/create")
 async def create_user(data: UserMarshall) -> UserMarshall:
+    if data.shall_save:
+        await data.save()
     return data
 
 
@@ -116,3 +120,30 @@ async def test_marshall_all_with_custom_fields(async_client):
         "age": 2,
         "data": {"sku": "1234", "name": "laptop", "age": 1},
     }
+
+
+async def test_marshall_all_with_custom_fields_and_extra(async_client):
+    data = {
+        "name": "Edgy",
+        "email": "edgy@esmerald.dev",
+        "language": "EN",
+        "description": "A description",
+        "shall_save": True
+    }
+    response = await async_client.post("/create", json=data)
+    assert response.status_code == 201
+    assert response.json() == {
+        "id": 1,
+        "name": "Edgy",
+        "email": "edgy@esmerald.dev",
+        "language": "EN",
+        "description": "A description",
+        "details": "Details about Edgy",
+        "age": 2,
+        "data": {"sku": "1234", "name": "laptop", "age": 1},
+    }
+
+
+async def test_seperate_pydantic_and_custom():
+    assert "shall_save" in UserMarshall.model_fields
+    assert "shall_save" not in UserMarshall.__custom_fields__

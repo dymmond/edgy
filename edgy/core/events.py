@@ -1,4 +1,3 @@
-import functools
 import inspect
 import typing
 from collections.abc import Sequence
@@ -11,15 +10,6 @@ Receive = typing.Callable[[], typing.Awaitable[Message]]
 Send = typing.Callable[[Message], typing.Awaitable[None]]
 
 _T = TypeVar("_T")
-
-
-def is_async_callable(obj: typing.Any) -> bool:
-    while isinstance(obj, functools.partial):
-        obj = obj.func
-
-    return inspect.iscoroutinefunction(obj) or (
-        callable(obj) and inspect.iscoroutinefunction(obj.__call__)
-    )
 
 
 class AyncLifespanContextManager:
@@ -50,18 +40,16 @@ class AyncLifespanContextManager:
     async def __aenter__(self) -> None:
         """Runs the functions on startup"""
         for handler in self.on_startup:
-            if is_async_callable(handler):
-                await handler()
-            else:
-                handler()
+            result = handler()
+            if inspect.isawaitable(result):
+                await result
 
     async def __aexit__(self, scope: Scope, receive: Receive, send: Send, **kwargs: Any) -> None:
         """Runs the functions on shutdown"""
         for handler in self.on_shutdown:
-            if is_async_callable(handler):
-                await handler()
-            else:
-                handler()
+            result = handler()
+            if inspect.isawaitable(result):
+                await result
 
 
 def handle_lifespan_events(

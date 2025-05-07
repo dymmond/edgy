@@ -1,5 +1,4 @@
-import contextlib
-from typing import TYPE_CHECKING, Any, Union, cast
+from typing import TYPE_CHECKING, Any, Union
 
 from monkay import load
 from pydantic._internal._model_construction import ModelMetaclass
@@ -79,7 +78,6 @@ class MarshallMeta(ModelMetaclass):
             base_model_fields = {
                 k: v for k, v in model.model_fields.items() if k in base_fields_include
             }
-
         base_model_fields.update(model_fields)
 
         # Handles with the fields not declared in the model.
@@ -103,11 +101,12 @@ class MarshallMeta(ModelMetaclass):
                     f"Field '{name}' declared but no 'get_{name}' found in '{model_class.__name__}'."
                 )
 
-        # required since pydantic 2.10
-        model_class.__pydantic_fields__ = model_fields
-        # error since pydantic 2.10
-        with contextlib.suppress(AttributeError):
-            model_class.model_fields = model_fields  # type: ignore
+        model_fields_on_class = getattr(model_class, "__pydantic_fields__", None)
+        if model_fields_on_class is None:
+            model_fields_on_class = model_class.model_fields
+        for key in model_fields:
+            del model_fields_on_class[key]
+        model_fields_on_class.update(base_model_fields)
 
         # Handle annotations
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
@@ -115,17 +114,12 @@ class MarshallMeta(ModelMetaclass):
         model_class.__show_pk__ = show_pk
         model_class.__custom_fields__ = custom_fields
         model_class.marshall_config = marshall_config
-        model_class.model_fields.update(base_model_fields)
         model_class.model_rebuild(force=True)
 
         # Raise for error if any of the required fields is not in the Marshall
-        required_fields: set[str] = {
-            f"{k}" for k, v in model.model_fields.items() if v.is_required()
-        }
+        required_fields: set[str] = {k for k, v in model.model_fields.items() if v.is_required()}
         model_fields = model_class.model_fields
-        if any(value not in cast(dict, model_fields) for value in required_fields):
-            fields = ", ".join(f"'{x}'" for x in sorted(required_fields))
-            raise MarshallFieldDefinitionError(
-                f"'{model.__name__}' model requires the following mandatory fields: [{fields}]."
-            )
+        model_class.__incomplete_fields__ = tuple(
+            sorted(name for name in required_fields if name not in model_fields_on_class)
+        )
         return model_class

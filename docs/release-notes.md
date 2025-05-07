@@ -6,6 +6,13 @@ hide:
 
 # Release Notes
 
+## 0.32.0
+
+### Added
+
+- Allow partial Marshalls.
+
+
 ## 0.31.3
 
 ### Fixed

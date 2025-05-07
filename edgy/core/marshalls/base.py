@@ -1,11 +1,12 @@
-from typing import TYPE_CHECKING, Any, ClassVar, cast
+import inspect
+from asyncio import gather
+from collections.abc import Awaitable
+from typing import TYPE_CHECKING, Any, ClassVar, Optional, cast
 
 from pydantic import BaseModel, ConfigDict
 
-from edgy.core.events import is_async_callable
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
-from edgy.core.marshalls.helpers import MarshallFieldMapping
 from edgy.core.marshalls.metaclasses import MarshallMeta
 from edgy.core.utils.sync import run_sync
 
@@ -22,13 +23,22 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     __show_pk__: ClassVar[bool] = False
+    __incomplete_fields__: ClassVar[tuple[str, ...]] = ()
     __custom_fields__: ClassVar[dict[str, BaseMarshallField]] = {}
+    _setup_used: bool
 
     def __init__(self, /, **kwargs: Any) -> None:
         _context = kwargs.pop("context", {})
+        _instance = kwargs.pop("instance", None)
         super().__init__(**kwargs)
         self._context = _context
-        self._instance: Model = self._setup()
+        self._instance: Optional[Model] = None
+        if _instance is not None:
+            self.instance = _instance
+        elif not type(self).__incomplete_fields__:
+            self._instance = self._setup()
+            self._resolve_serializer(self._instance)
+            self._setup_used = True
 
     def _setup(self) -> "Model":
         """
@@ -37,62 +47,79 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         Returns:
             Model or None: The assembled model instance, or None if the assembly fails.
         """
-        column = cast("Model", self.marshall_config["model"]).table.autoincrement_column
+        klass = type(self)
+        if klass.__incomplete_fields__:
+            raise RuntimeError(
+                f"'{klass.__name__}' is an incomplete Marshall. "
+                f"For creating new instances, it lacks following fields: [{', '.join(klass.__incomplete_fields__)}]."
+            )
+        model = cast("Model", self.marshall_config["model"])
+        column = model.table.autoincrement_column
         exclude: set[str] = set()
         if column is not None:
             exclude.add(column.key)
-        data = self.model_dump(exclude=exclude)
+        data = self.model_dump(include=set(model.meta.fields.keys()).difference(exclude))
         data["__show_pk__"] = self.__show_pk__
         data["__drop_extra_kwargs__"] = True
-        instance: Model = self.marshall_config["model"](**data)  # type: ignore
-        self._resolve_serializer(instance=instance)
-        return instance
+        return self.marshall_config["model"](**data)  # type: ignore
 
     @property
     def instance(self) -> "Model":
+        if self._instance is None:
+            _instance = self._setup()
+            self._resolve_serializer(_instance)
+            self._instance = _instance
+            self._setup_used = True
         return self._instance
 
     @instance.setter
     def instance(self, value: "Model") -> None:
         self._instance = value
+        self._setup_used = False
+        self._resolve_serializer(instance=value)
 
     @property
     def context(self) -> dict:
         return getattr(self, "_context", {})
+
+    async def _resolve_async(self, name: str, awaitable: Awaitable) -> None:
+        setattr(self, name, await awaitable)
 
     def _resolve_serializer(self, instance: "Model") -> "BaseMarshall":
         """
         Resolve serializer fields and populate them with data from the provided instance.
 
         Args:
-            instance (Model or None, optional): The instance to extract data from. Defaults to None.
+            instance (Model): The instance to extract data from.
 
         Returns:
             BaseMarshall: The resolved serializer instance.
         """
         # Dump model data excluding fields extracted above
-        data = self.model_dump(exclude=set(self.__custom_fields__.keys()))
-
+        async_resolvers = []
         # Iterate over fields to populate them with data
         for name, field in self.__custom_fields__.items():
-            if field.source and field.source in data:
-                setattr(self, name, getattr(instance, field.source))
-            elif field.source and not field.__is_method__:
+            if not field.__is_method__:
                 # For primary key exceptions
                 if name in instance.pknames:
                     attribute = getattr(instance, name)
                 else:
-                    attribute = getattr(instance, field.source)
+                    attribute = getattr(instance, field.source or name)
 
                 # If attribute is callable, execute it and set the value
                 if callable(attribute):
-                    value = run_sync(attribute()) if is_async_callable(attribute) else attribute()
+                    value = attribute()
+                    if inspect.isawaitable(value):
+                        async_resolvers.append(self._resolve_async(name, value))
+                        continue
                 else:
                     value = attribute
                 setattr(self, name, value)
             elif field.__is_method__:
                 value = self._get_method_value(name, instance)
                 setattr(self, name, value)
+        if async_resolvers:
+            run_sync(gather(*async_resolvers))
         return self
 
     def _get_method_value(self, name: str, instance: "Model") -> Any:
@@ -115,29 +142,24 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         Handles the field of a the primary key if present in the
         fields.
         """
-        # Dump model data excluding fields extracted above
-        data = self.model_dump(exclude=set(self.__custom_fields__.keys()))
+        data = self.model_dump(include=set(instance.pknames))
 
-        pk_attribute_in_data = False
-        for pk_attribute in instance.pknames:
-            if pk_attribute in data:
-                pk_attribute_in_data = True
-                break
-
-        if pk_attribute_in_data:
+        # fix incomplete data
+        if data:
             for pk_attribute in instance.pknames:
                 # bypass __setattr__ method
                 object.__setattr__(self, pk_attribute, getattr(instance, pk_attribute))
 
     @property
-    def fields(self) -> MarshallFieldMapping:
+    def fields(self) -> dict[str, BaseMarshallField]:
         """
-        Returns all the fields of the Marshall.
+        Returns all the Marshall fields of the Marshall.
         """
-        fields = MarshallFieldMapping(self)
+        fields = {}
         # copy fields from model_fields
         for k, v in type(self).model_fields.items():
-            fields[k] = v
+            if isinstance(v, BaseMarshallField):
+                fields[k] = v
         return fields
 
     async def save(self) -> Any:
@@ -156,7 +178,18 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
             All the field and model validations **are still performed**
             in the model level, not in a marshall level.
         """
-        instance = await self.instance.save()
+        model = cast("Model", self.marshall_config["model"])
+        if self._setup_used:
+            # use defaults of Marshall, save completely
+            instance = await self.instance.save()
+        else:
+            column = model.table.autoincrement_column
+            exclude: set[str] = set()
+            if column is not None:
+                exclude.add(column.key)
+            data = self.model_dump(include=set(model.meta.fields.keys()).difference(exclude), exclude_unset=True)
+            # update without using defaults
+            instance = await self.instance.save(values=data)
         self._handle_primary_key(instance=instance)
         return self
 
