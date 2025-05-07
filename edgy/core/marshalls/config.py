@@ -14,8 +14,8 @@ class ConfigMarshall(TypedDict, total=False):
     model: Union[type[Model], str]
     """The model from there the marshall will read from."""
 
-    fields: Union[list[str], None]
+    fields: Union[list[str], None] = None
     """A list of fields to be serialized"""
 
-    exclude: Union[list[str], None]
+    exclude: Union[list[str], None] = None
     """A list of fields to be excluded from the serialization."""

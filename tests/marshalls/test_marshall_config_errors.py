@@ -1,5 +1,4 @@
 import pytest
-from anyio import from_thread, sleep
 
 import edgy
 from edgy.core.marshalls import Marshall, fields
@@ -27,10 +26,6 @@ async def create_test_database():
 async def rollback_connections():
     async with models:
         yield
-
-
-def blocking_function():
-    from_thread.run(sleep, 0.1)
 
 
 class User(edgy.Model):
@@ -96,13 +91,14 @@ def test_raises_error_on_missing_declared_function_on_method_field():
     )
 
 
-def test_raises_error_on_missing_required_fields():
-    with pytest.raises(MarshallFieldDefinitionError) as raised:
+def test_raises_error_on_incomplete_fields():
+    class ProfileMarshall(Marshall):
+        marshall_config = ConfigMarshall(model=Profile, fields=["email"])
 
-        class ProfileMarshall(Marshall):
-            marshall_config = ConfigMarshall(model=Profile, fields=["email"])
+    with pytest.raises(RuntimeError) as raised:
+        ProfileMarshall(email="foo@example.com").instance  # noqa
 
     assert (
         raised.value.args[0]
-        == "'Profile' model requires the following mandatory fields: ['email', 'name']."
+        == "'ProfileMarshall' is an incomplete Marshall. For creating new instances, it lacks following fields: [name]."
     )
