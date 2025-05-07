@@ -3,7 +3,7 @@ from asyncio import gather
 from collections.abc import Awaitable
 from typing import TYPE_CHECKING, Any, ClassVar, Optional, cast
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
@@ -28,10 +28,8 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
     _setup_used: bool
 
     def __init__(self, /, **kwargs: Any) -> None:
-        _context = kwargs.pop("context", {})
         _instance = kwargs.pop("instance", None)
         super().__init__(**kwargs)
-        self._context = _context
         self._instance: Optional[Model] = None
         if _instance is not None:
             self.instance = _instance
@@ -77,10 +75,6 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         self._instance = value
         self._setup_used = False
         self._resolve_serializer(instance=value)
-
-    @property
-    def context(self) -> dict:
-        return getattr(self, "_context", {})
 
     async def _resolve_async(self, name: str, awaitable: Awaitable) -> None:
         setattr(self, name, await awaitable)
@@ -198,6 +192,7 @@ class Marshall(BaseMarshall):
     """
     Model marshall where the `__model__` is required.
     """
+    context: dict = Field(exclude=True, default_factory=dict)
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__}: {self}>"
