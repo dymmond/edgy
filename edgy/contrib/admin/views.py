@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from datetime import date, datetime
 from math import ceil
-from typing import Any, cast
+from typing import Any, Union, cast, get_args, get_origin
 
 import anyio
 from lilya.datastructures import FormData
@@ -14,7 +15,29 @@ import edgy
 from edgy.conf import settings
 from edgy.contrib.admin.mixins import AdminMixin
 from edgy.contrib.admin.model_registry import get_registered_models
+from edgy.contrib.admin.utils.messages import add_message
 from edgy.core.db.relationships.related_field import RelatedField
+
+
+def get_input_type(annotation: Any) -> str:
+    """
+    Unwraps Optional/Union[..., None] to find the real type,
+    then returns one of: 'bool', 'date', 'datetime', or 'text'.
+    """
+    origin = get_origin(annotation)
+    if origin is Union:
+        # strip out NoneType
+        args = [a for a in get_args(annotation) if a is not type(None)]
+        if len(args) == 1:
+            annotation = args[0]
+
+    if annotation is bool:
+        return "bool"
+    if annotation is date:
+        return "date"
+    if annotation is datetime:
+        return "datetime"
+    return "text"
 
 
 class AdminDashboard(AdminMixin, TemplateController):
@@ -335,6 +358,8 @@ class BaseObjectView:
                     data[key] = await instance.meta.fields.get(key).target.query.get(
                         id=self.parse_object_id(value)
                     )
+            elif key in instance.meta.many_to_many_fields:
+                continue
             else:
                 if attribute.annotation is bool:
                     data[key] = await self.validate_boolean(value)
@@ -349,34 +374,35 @@ class BaseObjectView:
 
         # Handle ManyToMany sync
         for key in instance.meta.many_to_many_fields:
-            # What user submitted now
             submitted_ids = {int(v) for v in form_data.getall(key) if v.strip().isdigit()}
-
-            # What was selected before (from hidden input)
-            initial_raw = form_data.get(f"_{key}_initial")
-            initial_ids = {int(i) for i in initial_raw.split(",")} if initial_raw else set()
-
-            to_add = submitted_ids - initial_ids
-            to_remove = initial_ids - submitted_ids
             m2m_field = getattr(instance, key)
+            model_target: edgy.Model = instance.meta.fields[key].target
 
-            if to_remove:
-                model_instances = (
-                    await instance.meta.fields.get(key)
-                    .target.query.filter(id__in=list(to_remove))
-                    .all()
-                )
-                for model_instance in model_instances:
-                    await m2m_field.remove(model_instance)
+            if create:
+                # Just add all submitted
+                if submitted_ids:
+                    model_instances = await model_target.query.filter(
+                        id__in=list(submitted_ids)
+                    ).all()
+                    for model_instance in model_instances:
+                        await m2m_field.add(model_instance)
+            else:
+                # Update: compute diff from initial
+                initial_raw = form_data.get(f"_{key}_initial")
+                initial_ids = {int(i) for i in initial_raw.split(",")} if initial_raw else set()
 
-            if to_add:
-                model_instances = (
-                    await instance.meta.fields.get(key)
-                    .target.query.filter(id__in=list(to_add))
-                    .all()
-                )
-                for model_instance in model_instances:
-                    await m2m_field.add(model_instance)
+                to_add = submitted_ids - initial_ids
+                to_remove = initial_ids - submitted_ids
+
+                if to_remove:
+                    model_instances = await model_target.query.filter(id__in=list(to_remove)).all()
+                    for model_instance in model_instances:
+                        await m2m_field.remove(model_instance)
+
+                if to_add:
+                    model_instances = await model_target.query.filter(id__in=list(to_add)).all()
+                    for model_instance in model_instances:
+                        await m2m_field.add(model_instance)
 
         return cast(edgy.Model, instance)
 
@@ -550,6 +576,7 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
                 "model": model,
                 "model_name": model_name,
                 "relationship_fields": relationship_fields,
+                "get_input_type": get_input_type,
             }
         )
         return context
@@ -601,9 +628,18 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
 
         instance = await model.query.get(id=self.get_object_id(request))
         if not instance:
-            raise NotFound()
+            add_message(request, "error", f"Model {model_name} with ID {obj_id} not found.")
+            return RedirectResponse(
+                f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
+            )
 
         await self.save_model(instance, form_data)
+
+        add_message(
+            request,
+            "success",
+            f"{model_name.capitalize()} #{obj_id} has been updated successfully.",
+        )
         return RedirectResponse(
             f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
         )
@@ -632,6 +668,7 @@ class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
             NotFound: If the model name or the specific instance is not found.
         """
         model_name = request.path_params.get("name")
+        obj_id = request.path_params.get("id")
 
         models = get_registered_models()
         model = models.get(model_name)
@@ -640,9 +677,18 @@ class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
 
         instance = await model.query.get(id=self.get_object_id(request))
         if not instance:
-            raise NotFound()
+            add_message(request, "error", f"There is no record with this ID: '{obj_id}'.")
+            return RedirectResponse(
+                f"{settings.admin_config.admin_prefix_url}/models/{model_name}"
+            )
 
         await instance.delete()
+
+        add_message(
+            request,
+            "success",
+            f"{model_name.capitalize()} #{obj_id} has been deleted successfully.",
+        )
         return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}")
 
 
@@ -704,6 +750,7 @@ class ModelCreateView(AdminMixin, BaseObjectView, TemplateController):
                 "model": model,
                 "model_name": model_name,
                 "relationship_fields": relationship_fields,
+                "get_input_type": get_input_type,
             }
         )
         return context
@@ -752,6 +799,11 @@ class ModelCreateView(AdminMixin, BaseObjectView, TemplateController):
             raise NotFound()
 
         instance = await self.save_model(model, form_data, create=True)
+        add_message(
+            request,
+            "success",
+            f"{model_name.capitalize()} #{instance.id} has been created successfully.",
+        )
         return RedirectResponse(
             f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{instance.id}"
         )
