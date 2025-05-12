@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from math import ceil
-from typing import Any, Union, cast, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Union, cast, get_args, get_origin
 
 import anyio
 from lilya.datastructures import FormData
@@ -14,9 +14,15 @@ from lilya.templating.controllers import TemplateController
 import edgy
 from edgy.conf import settings
 from edgy.contrib.admin.mixins import AdminMixin
-from edgy.contrib.admin.model_registry import get_registered_models
 from edgy.contrib.admin.utils.messages import add_message
 from edgy.core.db.relationships.related_field import RelatedField
+
+if TYPE_CHECKING:
+    from edgy.core.db.models.model import Model
+
+
+def get_registered_models() -> dict[str, type[Model]]:
+    return edgy.monkay.instance.registry.admin_models
 
 
 def get_input_type(annotation: Any) -> str:
@@ -628,7 +634,7 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
 
         instance = await model.query.get(id=self.get_object_id(request))
         if not instance:
-            add_message(request, "error", f"Model {model_name} with ID {obj_id} not found.")
+            add_message("error", f"Model {model_name} with ID {obj_id} not found.")
             return RedirectResponse(
                 f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
             )
@@ -636,7 +642,6 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
         await self.save_model(instance, form_data)
 
         add_message(
-            request,
             "success",
             f"{model_name.capitalize()} #{obj_id} has been updated successfully.",
         )
@@ -677,7 +682,7 @@ class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
 
         instance = await model.query.get(id=self.get_object_id(request))
         if not instance:
-            add_message(request, "error", f"There is no record with this ID: '{obj_id}'.")
+            add_message("error", f"There is no record with this ID: '{obj_id}'.")
             return RedirectResponse(
                 f"{settings.admin_config.admin_prefix_url}/models/{model_name}"
             )
@@ -685,7 +690,6 @@ class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
         await instance.delete()
 
         add_message(
-            request,
             "success",
             f"{model_name.capitalize()} #{obj_id} has been deleted successfully.",
         )
@@ -800,7 +804,6 @@ class ModelCreateView(AdminMixin, BaseObjectView, TemplateController):
 
         instance = await self.save_model(model, form_data, create=True)
         add_message(
-            request,
             "success",
             f"{model_name.capitalize()} #{instance.id} has been created successfully.",
         )
