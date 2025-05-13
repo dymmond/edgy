@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     from edgy.conf.global_settings import EdgySettings
     from edgy.contrib.autoreflection.models import AutoReflectionModel
     from edgy.core.db.fields.types import BaseFieldType
-    from edgy.core.db.models.model import Model
     from edgy.core.db.models.types import BaseModelType
 
 
@@ -100,7 +99,6 @@ class Registry:
 
     model_registry_types: ClassVar[tuple[str, ...]] = (
         "models",
-        "admin_models",
         "reflected",
         "tenant_models",
         "pattern_models",
@@ -128,7 +126,8 @@ class Registry:
             database if isinstance(database, Database) else Database(database, **kwargs)
         )
         self.models: dict[str, type[BaseModelType]] = {}
-        self.admin_models: dict[str, type[Model]] = {}
+        # set later during adding to registry
+        self.admin_models: set[str] = set()
         self.reflected: dict[str, type[BaseModelType]] = {}
         self.tenant_models: dict[str, type[BaseModelType]] = {}
         self.pattern_models: dict[str, type[AutoReflectionModel]] = {}
@@ -426,6 +425,7 @@ class Registry:
         raise LookupError(f'Registry doesn\'t have a "{model_name}" model.') from None
 
     def delete_model(self, model_name: str) -> bool:
+        self.admin_models.discard(model_name)
         for model_dict_name in self.model_registry_types:
             model_dict: dict = getattr(self, model_dict_name)
             if model_name in model_dict:
