@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from math import ceil
-from typing import TYPE_CHECKING, Any, Union, cast, get_args, get_origin
+from typing import Any, Union, cast, get_args, get_origin
 
 import anyio
 from lilya.datastructures import FormData
@@ -17,12 +17,7 @@ from edgy.contrib.admin.mixins import AdminMixin
 from edgy.contrib.admin.utils.messages import add_message
 from edgy.core.db.relationships.related_field import RelatedField
 
-if TYPE_CHECKING:
-    from edgy.core.db.models.model import Model
-
-
-def get_registered_models() -> dict[str, type[Model]]:
-    return edgy.monkay.instance.registry.admin_models
+from .utils.models import get_registered_models
 
 
 def get_input_type(annotation: Any) -> str:
