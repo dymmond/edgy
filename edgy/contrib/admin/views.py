@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 from datetime import date, datetime
 from math import ceil
 from typing import TYPE_CHECKING, Any, Union, cast, get_args, get_origin
 
 import anyio
+import orjson
 from lilya.datastructures import FormData
 from lilya.exceptions import NotFound  # noqa
 from lilya.requests import Request
@@ -272,7 +274,7 @@ class BaseObjectView:
     Provides utility methods for extracting and parsing object IDs.
     """
 
-    def get_object_id(self, request: Request) -> int:
+    def get_object_pk(self, request: Request) -> dict:
         """
         Extracts the object ID from the request's path parameters.
 
@@ -284,7 +286,21 @@ class BaseObjectView:
         Returns:
             The object ID as an integer.
         """
-        return int(request.path_params.get("id"))
+        return cast(dict, orjson.loads(urlsafe_b64decode(request.path_params.get("id"))))
+
+    def create_object_pk(self, pk: dict) -> str:
+        """
+        Extracts the object ID from the request's path parameters.
+
+        Assumes the object ID is present in the path parameters under the key "id".
+
+        Args:
+            request: The incoming Starlette Request object.
+
+        Returns:
+            The object ID as an integer.
+        """
+        return urlsafe_b64encode(orjson.dumps(pk)).decode()
 
     def parse_object_id(self, obj_id: str | int) -> int:
         """
@@ -323,9 +339,7 @@ class BaseObjectView:
             form_data: A FormData object containing the data to update the model.
         """
         form_to_dict = {
-            k: v
-            for k, v in form_data.items()
-            if k not in ["pk", "id"] and v is not None and v != ""
+            k: v for k, v in form_data.items() if k != "pk" and v is not None and v != ""
         }
 
         data: dict[str, Any] = {}
@@ -422,7 +436,7 @@ class ModelObjectView(AdminMixin, BaseObjectView, TemplateController):
 
         model = get_registered_model(model_name)
 
-        instance = await model.query.get_or_none(id=self.get_object_id(request))
+        instance = await model.query.get_or_none(pk=self.get_object_pk(request))
         if not instance:
             raise NotFound()
 
@@ -509,7 +523,7 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
 
         model = get_registered_model(model_name)
 
-        instance = await model.query.get(id=self.get_object_id(request))
+        instance = await model.query.get_or_none(pk=self.get_object_pk(request))
         if not instance:
             raise NotFound()
 
@@ -595,7 +609,7 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
         model = get_registered_model(model_name)
 
         try:
-            instance = await model.query.get(id=self.get_object_id(request))
+            instance = await model.query.get(pk=self.get_object_pk(request))
         except ObjectNotFound:
             add_message("error", f"Model {model_name} with ID {obj_id} not found.")
             return RedirectResponse(
@@ -641,7 +655,7 @@ class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
         model = get_registered_model(model_name)
 
         try:
-            instance = await model.query.get(id=self.get_object_id(request))
+            instance = await model.query.get(pk=self.get_object_pk(request))
         except ObjectNotFound:
             add_message("error", f"There is no record with this ID: '{obj_id}'.")
             return RedirectResponse(
