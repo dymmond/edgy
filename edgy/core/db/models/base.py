@@ -17,7 +17,6 @@ from typing import (
 
 import orjson
 from pydantic import BaseModel, ConfigDict, PrivateAttr
-from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
 from edgy.core.db.context_vars import (
     CURRENT_FIELD_CONTEXT,

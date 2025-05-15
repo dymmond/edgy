@@ -1,11 +1,29 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
+
+from pydantic.json_schema import GenerateJsonSchema, NoDefault
 
 import edgy
 
 if TYPE_CHECKING:
     from edgy.core.db.models.model import Model
+
+
+class CallableDefaultJsonSchema(GenerateJsonSchema):
+    def get_default_value(self, schema) -> Any:
+        value = super().get_default_value(schema)
+        if callable(value):
+            value = value()
+        return value
+
+
+class NoCallableDefaultJsonSchema(GenerateJsonSchema):
+    def get_default_value(self, schema) -> Any:
+        value = super().get_default_value(schema)
+        if callable(value):
+            value = NoDefault
+        return value
 
 
 def get_registered_models() -> dict[str, type[Model]]:
@@ -21,6 +39,13 @@ def get_model(model_name: str) -> type[Model]:
 
 
 def get_model_json_schema(
-    model_name: str, mode: Literal["validation", "serialization"] = "validation"
+    model_name: str,
+    mode: Literal["validation", "serialization"] = "validation",
+    include_callable_defaults: bool = False,
 ) -> dict:
-    return get_model(model_name).model_json_schema(mode=mode)
+    return get_model(model_name).model_json_schema(
+        schema_generator=CallableDefaultJsonSchema
+        if include_callable_defaults
+        else NoCallableDefaultJsonSchema,
+        mode=mode,
+    )

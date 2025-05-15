@@ -13,8 +13,9 @@ from typing import (
 )
 
 import sqlalchemy
-from pydantic import BaseModel
+from pydantic import BaseModel, SkipValidation
 from pydantic.fields import FieldInfo
+from pydantic.json_schema import WithJsonSchema
 
 from edgy.conf import settings
 from edgy.core.db.context_vars import CURRENT_PHASE, FORCE_FIELDS_NULLABLE, MODEL_GETATTR_BEHAVIOR
@@ -26,14 +27,6 @@ if TYPE_CHECKING:
     from edgy.core.connection.database import Database
     from edgy.core.connection.registry import Registry
     from edgy.core.db.models.types import BaseModelType
-
-
-def _removesuffix(text: str, suffix: str) -> str:
-    # TODO: replace with _removesuffix when python3.9 is minimum
-    if text.endswith(suffix):
-        return text[: -len(suffix)]
-    else:
-        return text
 
 
 class BaseField(BaseFieldType, FieldInfo):
@@ -304,7 +297,7 @@ class BaseCompositeField(BaseField):
         """
         Runs the checks for the fields being validated.
         """
-        prefix = _removesuffix(field_name, self.name)
+        prefix = field_name.removesuffix(self.name)
         result = {}
         ErrorType: type[Exception] = KeyError
         if not isinstance(value, dict):
@@ -371,6 +364,8 @@ class PKField(BaseCompositeField):
         kwargs["default"] = None
         kwargs["field_type"] = kwargs["annotation"] = Any
         super().__init__(**kwargs)
+        self.metadata.append(SkipValidation())
+        self.metadata.append(WithJsonSchema(mode="validation", json_schema=None))
 
     def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[dict[str, Any], Any]:
         pkcolumns = self.owner.pkcolumns
@@ -416,7 +411,7 @@ class PKField(BaseCompositeField):
     def clean(self, field_name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         pkcolumns = self.owner.pkcolumns
         pknames = self.owner.pknames
-        prefix = _removesuffix(field_name, self.name)
+        prefix = field_name.removesuffix(self.name)
         assert len(pkcolumns) >= 1
         if (
             len(pknames) == 1

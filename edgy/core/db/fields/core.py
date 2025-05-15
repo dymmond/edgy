@@ -428,18 +428,17 @@ class UUIDField(FieldFactory, uuid.UUID):
 class ChoiceField(FieldFactory):
     """Representation of an Enum"""
 
-    field_type = enum.Enum
-
     def __new__(  # type: ignore
         cls,
-        choices: enum.Enum,
+        choices: type[enum.Enum],
         **kwargs: Any,
     ) -> BaseFieldType:
-        kwargs = {
-            **kwargs,
-            **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
-        }
-        return super().__new__(cls, **kwargs)
+        return super().__new__(cls, choices=choices, **kwargs)
+
+    @classmethod
+    def get_pydantic_type(cls, kwargs: dict[str, Any]) -> Any:
+        """Returns the type for pydantic"""
+        return kwargs["choices"]
 
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
