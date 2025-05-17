@@ -1,14 +1,11 @@
 import os
 from enum import Enum
 
-import pytest
-
 import edgy
 from edgy import Instance
 from edgy.contrib.permissions import BasePermission
 from tests.settings import TEST_DATABASE
 
-pytestmark = pytest.mark.anyio
 models = edgy.Registry(
     database=TEST_DATABASE,
     with_content_type=os.environ.get("TEST_NO_CONTENT_TYPE", "false") != "true",

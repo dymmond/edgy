@@ -7,6 +7,7 @@ import click
 from edgy import __version__
 from edgy.cli.decorators import add_app_module_option
 from edgy.cli.operations import (
+    admin_serve,
     check,
     current,
     downgrade,
@@ -49,3 +50,4 @@ edgy_cli.add_command(stamp, name="stamp")
 edgy_cli.add_command(check, name="check")
 edgy_cli.add_command(shell, name="shell")
 edgy_cli.add_command(inspect_db, name="inspectdb")
+edgy_cli.add_command(admin_serve, name="admin_serve")
