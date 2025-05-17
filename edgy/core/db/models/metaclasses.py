@@ -227,6 +227,7 @@ class MetaInfo:
         "fields",
         "registry",
         "no_copy",
+        "in_admin",
         "tablename",
         "unique_together",
         "indexes",
@@ -286,6 +287,7 @@ class MetaInfo:
         self.no_copy: bool = getattr(meta, "no_copy", False)
         # for embedding
         self.inherit: bool = getattr(meta, "inherit", True)
+        self.in_admin: bool = getattr(meta, "in_admin", True)
         self.registry: Union[Registry, Literal[False], None] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         for attr in ["unique_together", "indexes", "constraints"]:

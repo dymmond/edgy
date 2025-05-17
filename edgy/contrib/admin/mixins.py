@@ -24,7 +24,7 @@ class AdminMixin:
                 "favicon": settings.admin_config.favicon,
                 "sidebar_bg_colour": settings.admin_config.sidebar_bg_colour,
                 "url_prefix": settings.admin_config.admin_prefix_url,
-                "messages": get_messages(request),
+                "messages": get_messages(),
             }
         )
         return context

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 from pydantic import ConfigDict
 
@@ -59,6 +59,14 @@ class Model(
         abstract = True
         # registry = False, stops the retrieval of the registry from base classes
         registry = False
+
+    @classmethod
+    def real_add_to_registry(cls, **kwargs: Any) -> type[Model]:
+        in_admin = cls.meta.in_admin
+        result = cast(type[Model], super().real_add_to_registry(**kwargs))
+        if in_admin and result.meta.registry:
+            result.meta.registry.admin_models.add(result.__name__)
+        return result
 
     @classmethod
     def generate_proxy_model(cls) -> type[Model]:

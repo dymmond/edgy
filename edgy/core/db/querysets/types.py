@@ -278,7 +278,7 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     @abstractmethod
     def extra_select(
         self,
-        *extra: sqlalchemy.expression.ClauseElement,
+        *extra: sqlalchemy.ClauseElement,
     ) -> QuerySetType: ...
 
     @abstractmethod

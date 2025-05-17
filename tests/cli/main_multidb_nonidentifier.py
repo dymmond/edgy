@@ -1,13 +1,10 @@
 import os
 
-import pytest
-
 import edgy
 from edgy import Instance
 from edgy.contrib.permissions import BasePermission
 from tests.settings import TEST_ALTERNATIVE_DATABASE, TEST_DATABASE
 
-pytestmark = pytest.mark.anyio
 models = edgy.Registry(
     database=TEST_DATABASE,
     extra={"ano ther ": TEST_ALTERNATIVE_DATABASE},

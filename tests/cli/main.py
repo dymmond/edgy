@@ -1,6 +1,5 @@
 import os
 
-import pytest
 import sqlalchemy
 
 import edgy
@@ -10,7 +9,6 @@ from edgy.core.db.context_vars import CURRENT_MODEL_INSTANCE
 from edgy.core.signals import post_migrate, pre_migrate
 from tests.settings import TEST_DATABASE
 
-pytestmark = pytest.mark.anyio
 models = edgy.Registry(
     database=TEST_DATABASE,
     with_content_type=os.environ.get("TEST_NO_CONTENT_TYPE", "false") != "true",

@@ -15,3 +15,4 @@ from .revision import revision as revision  # noqa
 from .shell import shell as shell  # noqa
 from .show import show as show  # noqa
 from .stamp import stamp as stamp  # noqa
+from .admin_serve import admin_serve as admin_serve  # noqa

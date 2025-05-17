@@ -7,6 +7,7 @@ from enum import Enum
 import pytest
 
 import edgy
+from edgy.contrib.admin.utils.models import NoCallableDefaultJsonSchema
 from edgy.core.db import fields
 from edgy.exceptions import FieldDefinitionError
 from edgy.testclient import DatabaseTestClient
@@ -83,6 +84,62 @@ async def rollback_transactions():
     # this rolls back
     async with models:
         yield
+
+
+async def test_model_schema():
+    schema = Product.model_json_schema(
+        schema_generator=NoCallableDefaultJsonSchema, mode="validation"
+    )
+    assert schema == {
+        "$defs": {
+            "StatusEnum": {"enum": ["Draft", "Released"], "title": "StatusEnum", "type": "string"}
+        },
+        "additionalProperties": False,
+        "properties": {
+            "created": {"format": "date-time", "title": "Created", "type": "string"},
+            "created_date": {"format": "date", "title": "Created Date", "type": "string"},
+            "created_datetime": {
+                "format": "date-time",
+                "title": "Created Datetime",
+                "type": "string",
+            },
+            "created_day": {"format": "date", "title": "Created Day", "type": "string"},
+            "created_time": {"format": "time", "title": "Created Time", "type": "string"},
+            "data": {"title": "Data"},
+            "description": {
+                "anyOf": [{"maxLength": 255, "type": "string"}, {"type": "null"}],
+                "default": None,
+                "title": "Description",
+            },
+            "huge_number": {"default": 0, "title": "Huge Number", "type": "integer"},
+            "id": {"default": None, "title": "Id", "type": "integer"},
+            "price": {
+                "anyOf": [{"type": "number"}, {"type": "string"}, {"type": "null"}],
+                "default": None,
+                "title": "Price",
+            },
+            "status": {"$ref": "#/$defs/StatusEnum", "default": "Draft"},
+            "status2": {"$ref": "#/$defs/StatusEnum", "default": "Draft"},
+            "updated_date": {"format": "date", "title": "Updated Date", "type": "string"},
+            "updated_datetime": {
+                "format": "date-time",
+                "title": "Updated Datetime",
+                "type": "string",
+            },
+            "uuid": {
+                "anyOf": [{"format": "uuid", "type": "string"}, {"type": "null"}],
+                "default": None,
+                "title": "Uuid",
+            },
+            "value": {
+                "anyOf": [{"type": "number"}, {"type": "null"}],
+                "default": None,
+                "title": "Value",
+            },
+        },
+        "title": "Product",
+        "type": "object",
+    }
 
 
 async def test_model_crud():

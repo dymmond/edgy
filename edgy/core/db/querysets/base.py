@@ -124,7 +124,7 @@ class BaseQuerySet(
         using_schema: Union[str, None, Any] = Undefined,
         table: Optional[sqlalchemy.Table] = None,
         exclude_secrets: bool = False,
-        extra_select: Optional[Iterable[sqlalchemy.expression.ClauseElement]] = None,
+        extra_select: Optional[Iterable[sqlalchemy.ClauseElement]] = None,
         reference_select: Optional[reference_select_type] = None,
     ) -> None:
         # Making sure for queries we use the main class and not the proxy
@@ -1262,7 +1262,7 @@ class QuerySet(BaseQuerySet):
 
     def extra_select(
         self,
-        *extra: sqlalchemy.expression.ColumnClause,
+        *extra: sqlalchemy.ColumnClause,
     ) -> QuerySetType:
         queryset = self._clone()
         queryset._extra_select.extend(extra)
