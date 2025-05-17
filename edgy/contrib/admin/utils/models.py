@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pydantic.json_schema import GenerateJsonSchema, NoDefault
+from pydantic_core import core_schema
 
 import edgy
 
@@ -11,7 +12,7 @@ if TYPE_CHECKING:
 
 
 class CallableDefaultJsonSchema(GenerateJsonSchema):
-    def get_default_value(self, schema) -> Any:
+    def get_default_value(self, schema: core_schema.WithDefaultSchema) -> Any:
         value = super().get_default_value(schema)
         if callable(value):
             value = value()
@@ -19,7 +20,7 @@ class CallableDefaultJsonSchema(GenerateJsonSchema):
 
 
 class NoCallableDefaultJsonSchema(GenerateJsonSchema):
-    def get_default_value(self, schema) -> Any:
+    def get_default_value(self, schema: core_schema.WithDefaultSchema) -> Any:
         value = super().get_default_value(schema)
         if callable(value):
             value = NoDefault

@@ -96,7 +96,7 @@ def run_migrations_offline() -> Any:
 
 
 def do_run_migrations(
-    connection: Any, url: str, orig_url: DatabaseURL, name: str, metadata: "sqlalchemy.Metadata"
+    connection: Any, url: str, orig_url: DatabaseURL, name: str, metadata: "sqlalchemy.MetaData"
 ) -> Any:
     # this callback is used to prevent an auto-migration from being generated
     # when there are no changes to the schema
