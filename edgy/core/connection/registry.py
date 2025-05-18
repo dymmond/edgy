@@ -5,7 +5,7 @@ import contextlib
 import re
 import warnings
 from collections import defaultdict
-from collections.abc import Container, Generator, Iterable, Sequence
+from collections.abc import Container, Generator, Iterable, Mapping, Sequence
 from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
@@ -114,7 +114,7 @@ class Registry:
         *,
         with_content_type: Union[bool, type[BaseModelType]] = False,
         schema: Union[str, None] = None,
-        extra: Optional[dict[str, Database]] = None,
+        extra: Optional[Mapping[str, Union[Database, str]]] = None,
         automigrate_config: Union[EdgySettings, None] = None,
         **kwargs: Any,
     ) -> None:

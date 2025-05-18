@@ -196,7 +196,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         return sep.join(pkl)
 
     def __repr__(self) -> str:
-        return f"<{type(self).__name__}: ({self.join_identifiers_to_string()})>"
+        return f"<{type(self).__name__}: {self}>"
 
     def __str__(self) -> str:
         return f"{type(self).__name__}({self.join_identifiers_to_string()})"

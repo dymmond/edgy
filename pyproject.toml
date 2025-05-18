@@ -204,17 +204,16 @@ max-line-length = 99
 max-doc-length = 120
 
 [[tool.mypy.overrides]]
-module = "edgy.tests.*"
-ignore_missing_imports = true
-check_untyped_defs = true
-
-[[tool.mypy.overrides]]
 module = ["sqlalchemy.*", "asyncpg", "alembic", "ptpython.*"]
 ignore_missing_imports = true
 ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = "docs_src.*"
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
 ignore_errors = true
 
 [tool.pytest.ini_options]
