@@ -1,9 +1,11 @@
+from __future__ import annotations
+
 import asyncio
 import contextlib
 import re
 import warnings
 from collections import defaultdict
-from collections.abc import Container, Generator, Iterable, Sequence
+from collections.abc import Container, Generator, Iterable, Mapping, Sequence
 from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
@@ -31,7 +33,7 @@ if TYPE_CHECKING:
 
 
 class MetaDataDict(defaultdict[str, sqlalchemy.MetaData]):
-    def __init__(self, registry: "Registry") -> None:
+    def __init__(self, registry: Registry) -> None:
         self.registry = registry
         super().__init__(sqlalchemy.MetaData)
 
@@ -46,7 +48,7 @@ class MetaDataDict(defaultdict[str, sqlalchemy.MetaData]):
         except KeyError:
             return default
 
-    def __copy__(self) -> "MetaDataDict":
+    def __copy__(self) -> MetaDataDict:
         _copy = MetaDataDict(registry=self.registry)
         for k, v in self.items():
             _copy[k] = shallow_copy(v)
@@ -56,7 +58,7 @@ class MetaDataDict(defaultdict[str, sqlalchemy.MetaData]):
 
 
 class MetaDataByUrlDict(dict):
-    def __init__(self, registry: "Registry") -> None:
+    def __init__(self, registry: Registry) -> None:
         self.registry = registry
         super().__init__()
         self.process()
@@ -84,7 +86,7 @@ class MetaDataByUrlDict(dict):
         """Return name to url or raise a KeyError in case it isn't available."""
         return cast(Optional[str], super().__getitem__(key))
 
-    def __copy__(self) -> "MetaDataByUrlDict":
+    def __copy__(self) -> MetaDataByUrlDict:
         return MetaDataByUrlDict(registry=self.registry)
 
     copy = __copy__
@@ -103,17 +105,17 @@ class Registry:
     )
 
     db_schema: Union[str, None] = None
-    content_type: Union[type["BaseModelType"], None] = None
+    content_type: Union[type[BaseModelType], None] = None
     dbs_reflected: set[Union[str, None]]
 
     def __init__(
         self,
         database: Union[Database, str, DatabaseURL],
         *,
-        with_content_type: Union[bool, type["BaseModelType"]] = False,
+        with_content_type: Union[bool, type[BaseModelType]] = False,
         schema: Union[str, None] = None,
-        extra: Optional[dict[str, Database]] = None,
-        automigrate_config: Union["EdgySettings", None] = None,
+        extra: Optional[Mapping[str, Union[Database, str]]] = None,
+        automigrate_config: Union[EdgySettings, None] = None,
         **kwargs: Any,
     ) -> None:
         self.db_schema = schema
@@ -124,6 +126,8 @@ class Registry:
             database if isinstance(database, Database) else Database(database, **kwargs)
         )
         self.models: dict[str, type[BaseModelType]] = {}
+        # set later during adding to registry
+        self.admin_models: set[str] = set()
         self.reflected: dict[str, type[BaseModelType]] = {}
         self.tenant_models: dict[str, type[BaseModelType]] = {}
         self.pattern_models: dict[str, type[AutoReflectionModel]] = {}
@@ -207,7 +211,7 @@ class Registry:
             filter_kwargs = dict.fromkeys(field_set)
 
             async def wrapper_fn(
-                _model: type["BaseModelType"] = model,
+                _model: type[BaseModelType] = model,
                 _model_specific_defaults: dict = model_specific_defaults,
                 _filter_kwargs: dict = filter_kwargs,
                 _field_set: set[str] = field_set,
@@ -262,7 +266,7 @@ class Registry:
             )
         return True
 
-    def __copy__(self) -> "Registry":
+    def __copy__(self) -> Registry:
         content_type: Union[bool, type[BaseModelType]] = False
         if self.content_type is not None:
             try:
@@ -291,8 +295,8 @@ class Registry:
 
     def _set_content_type(
         self,
-        with_content_type: Union[Literal[True], type["BaseModelType"]],
-        old_content_type_to_replace: Optional[type["BaseModelType"]] = None,
+        with_content_type: Union[Literal[True], type[BaseModelType]],
+        old_content_type_to_replace: Optional[type[BaseModelType]] = None,
     ) -> None:
         from edgy.contrib.contenttypes.fields import BaseContentTypeField, ContentTypeField
         from edgy.contrib.contenttypes.models import ContentType
@@ -323,7 +327,7 @@ class Registry:
             real_content_type.add_to_registry(self, name="ContentType")
         self.content_type = real_content_type
 
-        def callback(model_class: type["BaseModelType"]) -> None:
+        def callback(model_class: type[BaseModelType]) -> None:
             # they are not updated, despite this shouldn't happen anyway
             if issubclass(model_class, ContentType):
                 return
@@ -405,7 +409,7 @@ class Registry:
         *,
         include_content_type_attr: bool = True,
         exclude: Container[str] = (),
-    ) -> type["BaseModelType"]:
+    ) -> type[BaseModelType]:
         if (
             include_content_type_attr
             and model_name == "ContentType"
@@ -421,6 +425,7 @@ class Registry:
         raise LookupError(f'Registry doesn\'t have a "{model_name}" model.') from None
 
     def delete_model(self, model_name: str) -> bool:
+        self.admin_models.discard(model_name)
         for model_dict_name in self.model_registry_types:
             model_dict: dict = getattr(self, model_dict_name)
             if model_name in model_dict:
@@ -433,7 +438,7 @@ class Registry:
         *,
         update_only: bool = False,
         multi_schema: Union[bool, re.Pattern, str] = False,
-        ignore_schema_pattern: Union[None, "re.Pattern", str] = "information_schema",
+        ignore_schema_pattern: Union[None, re.Pattern, str] = "information_schema",
     ) -> None:
         if not update_only:
             for val in self.metadata_by_name.values():
@@ -489,8 +494,8 @@ class Registry:
 
     def register_callback(
         self,
-        name_or_class: Union[type["BaseModelType"], str, None],
-        callback: Callable[[type["BaseModelType"]], None],
+        name_or_class: Union[type[BaseModelType], str, None],
+        callback: Callable[[type[BaseModelType]], None],
         one_time: Optional[bool] = None,
     ) -> None:
         if one_time is None:
@@ -528,7 +533,7 @@ class Registry:
         else:
             self._callbacks[name_or_class].append(callback)
 
-    def execute_model_callbacks(self, model_class: type["BaseModelType"]) -> None:
+    def execute_model_callbacks(self, model_class: type[BaseModelType]) -> None:
         name = model_class.__name__
         callbacks = self._onetime_callbacks.get(name)
         while callbacks:
@@ -600,7 +605,7 @@ class Registry:
 
     def _automigrate_update(
         self,
-        migration_settings: "EdgySettings",
+        migration_settings: EdgySettings,
     ) -> None:
         from edgy import Instance, monkay
         from edgy.cli.base import upgrade
@@ -625,7 +630,7 @@ class Registry:
 
         await asyncio.to_thread(self._automigrate_update, migration_settings)
 
-    async def _connect_and_init(self, name: Union[str, None], database: "Database") -> None:
+    async def _connect_and_init(self, name: Union[str, None], database: Database) -> None:
         from edgy.core.db.models.metaclasses import MetaInfo
 
         await database.connect()
@@ -678,7 +683,7 @@ class Registry:
             await database.disconnect()
             raise exc
 
-    async def __aenter__(self) -> "Registry":
+    async def __aenter__(self) -> Registry:
         dbs: list[tuple[Union[str, None], Database]] = [(None, self.database)]
         for name, db in self.extra.items():
             dbs.append((name, db))
@@ -710,7 +715,7 @@ class Registry:
     @contextlib.contextmanager
     def with_async_env(
         self, loop: Optional[asyncio.AbstractEventLoop] = None
-    ) -> Generator["Registry", None, None]:
+    ) -> Generator[Registry, None, None]:
         close: bool = False
         if loop is None:
             try:

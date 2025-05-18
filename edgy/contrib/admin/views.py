@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from base64 import urlsafe_b64decode, urlsafe_b64encode
 from datetime import date, datetime
 from math import ceil
-from typing import Any, Union, cast, get_args, get_origin
+from typing import TYPE_CHECKING, Any, Union, cast, get_args, get_origin
 
 import anyio
+import orjson
 from lilya.datastructures import FormData
 from lilya.exceptions import NotFound  # noqa
 from lilya.requests import Request
@@ -14,9 +16,22 @@ from lilya.templating.controllers import TemplateController
 import edgy
 from edgy.conf import settings
 from edgy.contrib.admin.mixins import AdminMixin
-from edgy.contrib.admin.model_registry import get_registered_models
 from edgy.contrib.admin.utils.messages import add_message
 from edgy.core.db.relationships.related_field import RelatedField
+from edgy.exceptions import ObjectNotFound
+
+from .utils.models import get_model as _get_model
+from .utils.models import get_registered_models
+
+if TYPE_CHECKING:
+    from edgy.core.db.models.model import Model
+
+
+def get_registered_model(model: str) -> type[Model]:
+    try:
+        return _get_model(model)
+    except KeyError:
+        raise NotFound() from None
 
 
 def get_input_type(annotation: Any) -> str:
@@ -186,10 +201,7 @@ class ModelDetailView(AdminMixin, TemplateController):
 
         offset = (page - 1) * per_page
 
-        models = get_registered_models()
-        model = models.get(model_name)
-        if not model:
-            raise NotFound()
+        model = get_registered_model(model_name)
 
         queryset = model.query
 
@@ -262,7 +274,7 @@ class BaseObjectView:
     Provides utility methods for extracting and parsing object IDs.
     """
 
-    def get_object_id(self, request: Request) -> int:
+    def get_object_pk(self, request: Request) -> dict:
         """
         Extracts the object ID from the request's path parameters.
 
@@ -274,7 +286,21 @@ class BaseObjectView:
         Returns:
             The object ID as an integer.
         """
-        return int(request.path_params.get("id"))
+        return cast(dict, orjson.loads(urlsafe_b64decode(request.path_params.get("id"))))
+
+    def create_object_pk(self, pk: dict) -> str:
+        """
+        Extracts the object ID from the request's path parameters.
+
+        Assumes the object ID is present in the path parameters under the key "id".
+
+        Args:
+            request: The incoming Starlette Request object.
+
+        Returns:
+            The object ID as an integer.
+        """
+        return urlsafe_b64encode(orjson.dumps(pk)).decode()
 
     def parse_object_id(self, obj_id: str | int) -> int:
         """
@@ -291,32 +317,6 @@ class BaseObjectView:
         if isinstance(obj_id, str):
             return int(obj_id)
         return obj_id
-
-    async def get_model_from_foreign_key(self, model_name: str, obj_id: int) -> edgy.Model:
-        """
-        Gets the object from the foreign key field.
-        then queries the database for the object with the given id.
-
-        Args:
-            model_name: The name of the related model.
-            obj_id: The ID of the related object.
-
-        Returns:
-            The instance of the related model.
-
-        Raises:
-            NotFound: If the model or object is not found.
-        """
-        models: dict[str, Any] = get_registered_models()
-        model: edgy.Model = models.get(model_name)
-
-        if not model:
-            raise NotFound()
-
-        instance = await model.query.get(id=self.parse_object_id(obj_id))
-        if not instance:
-            raise NotFound()
-        return cast(edgy.Model, instance)
 
     async def validate_boolean(self, value: str) -> bool:
         return value.lower() in ["true", "1", "yes", "y"]
@@ -339,9 +339,7 @@ class BaseObjectView:
             form_data: A FormData object containing the data to update the model.
         """
         form_to_dict = {
-            k: v
-            for k, v in form_data.items()
-            if k not in ["pk", "id"] and v is not None and v != ""
+            k: v for k, v in form_data.items() if k != "pk" and v is not None and v != ""
         }
 
         data: dict[str, Any] = {}
@@ -435,34 +433,27 @@ class ModelObjectView(AdminMixin, BaseObjectView, TemplateController):
         """
         context = await super().get_context_data(request, **kwargs)  # noqa
         model_name = request.path_params.get("name")
-        obj_id = request.path_params.get("id")
 
-        models = get_registered_models()
-        model = models.get(model_name)
-        if not model:
-            raise NotFound()
+        model = get_registered_model(model_name)
 
-        instance = await model.query.get_or_none(id=self.get_object_id(request))
+        instance = await model.query.get_or_none(pk=self.get_object_pk(request))
         if not instance:
             raise NotFound()
 
         relationship_fields = {}
-        m2m_values = {}
+        m2m_values = {
+            await getattr(instance, name).all() for name in model.meta.many_to_many_fields
+        }
 
-        for field, _ in model.model_fields.items():
-            attr = model.meta.fields.get(field)
-
-            if hasattr(attr, "is_m2m") and attr.is_m2m and not isinstance(attr, RelatedField):
+        for field in model.meta.relationship_fields:
+            if field in m2m_values:
                 relationship_fields[field] = "many_to_many"
-                m2m_values[field] = await getattr(instance, field).all()
-            elif (
-                hasattr(attr, "is_m2m") and not attr.is_m2m and not isinstance(attr, RelatedField)
-            ):
+            elif field in model.meta.foreign_key_fields:
                 relationship_fields[field] = "foreign_key"
 
         context.update(
             {
-                "title": f"{model_name.capitalize()} #{obj_id}",
+                "title": f"{model_name.capitalize()} #{instance}",
                 "object": instance,
                 "model": model,
                 "model_name": model_name,
@@ -529,25 +520,22 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
         """
         context = await super().get_context_data(request, **kwargs)  # noqa
         model_name = request.path_params.get("name")
-        obj_id = request.path_params.get("id")
 
-        models = get_registered_models()
-        model = models.get(model_name)
+        model = get_registered_model(model_name)
 
-        if not model:
-            raise NotFound()
-
-        instance = await model.query.get(id=self.get_object_id(request))
+        instance = await model.query.get_or_none(pk=self.get_object_pk(request))
         if not instance:
             raise NotFound()
 
         relationship_fields = {}
 
-        for field, _ in model.model_fields.items():
+        for field in model.meta.relationship_fields:
             attr = model.meta.fields.get(field)
+            if isinstance(attr, RelatedField):
+                continue
 
             # ManyToMany
-            if hasattr(attr, "is_m2m") and attr.is_m2m and not isinstance(attr, RelatedField):
+            if hasattr(attr, "is_m2m") and attr.is_m2m:
                 related_model = attr.target
                 all_items = await related_model.query.limit(100).all()
                 selected_items = await getattr(instance, field).all()
@@ -559,9 +547,7 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
                 }
 
             # ForeignKey
-            elif (
-                hasattr(attr, "is_m2m") and not attr.is_m2m and not isinstance(attr, RelatedField)
-            ):
+            elif hasattr(attr, "is_m2m") and not attr.is_m2m:
                 related_model = attr.target
                 all_items = await related_model.query.limit(100).all()
                 relationship_fields[field] = {
@@ -571,7 +557,7 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
 
         context.update(
             {
-                "title": f"Edit {model_name.capitalize()} #{obj_id}",
+                "title": f"Edit {instance}",
                 "object": instance,
                 "model": model,
                 "model_name": model_name,
@@ -620,15 +606,12 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
         obj_id = request.path_params.get("id")
         form_data = await request.form()
 
-        models = get_registered_models()
-        model = models.get(model_name)
+        model = get_registered_model(model_name)
 
-        if not model:
-            raise NotFound()
-
-        instance = await model.query.get(id=self.get_object_id(request))
-        if not instance:
-            add_message(request, "error", f"Model {model_name} with ID {obj_id} not found.")
+        try:
+            instance = await model.query.get(pk=self.get_object_pk(request))
+        except ObjectNotFound:
+            add_message("error", f"Model {model_name} with ID {obj_id} not found.")
             return RedirectResponse(
                 f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
             )
@@ -636,9 +619,8 @@ class ModelEditView(AdminMixin, BaseObjectView, TemplateController):
         await self.save_model(instance, form_data)
 
         add_message(
-            request,
             "success",
-            f"{model_name.capitalize()} #{obj_id} has been updated successfully.",
+            f"{instance} has been updated successfully.",
         )
         return RedirectResponse(
             f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
@@ -670,14 +652,12 @@ class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
         model_name = request.path_params.get("name")
         obj_id = request.path_params.get("id")
 
-        models = get_registered_models()
-        model = models.get(model_name)
-        if not model:
-            raise NotFound()
+        model = get_registered_model(model_name)
 
-        instance = await model.query.get(id=self.get_object_id(request))
-        if not instance:
-            add_message(request, "error", f"There is no record with this ID: '{obj_id}'.")
+        try:
+            instance = await model.query.get(pk=self.get_object_pk(request))
+        except ObjectNotFound:
+            add_message("error", f"There is no record with this ID: '{obj_id}'.")
             return RedirectResponse(
                 f"{settings.admin_config.admin_prefix_url}/models/{model_name}"
             )
@@ -685,7 +665,6 @@ class ModelDeleteView(AdminMixin, BaseObjectView, TemplateController):
         await instance.delete()
 
         add_message(
-            request,
             "success",
             f"{model_name.capitalize()} #{obj_id} has been deleted successfully.",
         )
@@ -720,26 +699,19 @@ class ModelCreateView(AdminMixin, BaseObjectView, TemplateController):
         context = await super().get_context_data(request, **kwargs)
         model_name = request.path_params.get("name")
 
-        models = get_registered_models()
-        model = models.get(model_name)
-        if not model:
-            raise NotFound()
+        model = get_registered_model(model_name)
 
         relationship_fields = {}
-        for field, field_info in model.model_fields.items():
-            if (
-                hasattr(field_info, "is_m2m")
-                and field_info.is_m2m
-                and not isinstance(field_info, RelatedField)
-            ):
+        for field in model.meta.relationship_fields:
+            field_info = model.meta.fields.get(field)
+            if isinstance(field_info, RelatedField):
+                continue
+
+            if hasattr(field_info, "is_m2m") and field_info.is_m2m:
                 related_model = field_info.target
                 items = await related_model.query.limit(100).all()
                 relationship_fields[field] = {"type": "many_to_many", "items": items}
-            elif (
-                hasattr(field_info, "is_m2m")
-                and not field_info.is_m2m
-                and not isinstance(field_info, RelatedField)
-            ):
+            elif hasattr(field_info, "is_m2m") and not field_info.is_m2m:
                 related_model = field_info.target
                 items = await related_model.query.limit(100).all()
                 relationship_fields[field] = {"type": "foreign_key", "items": items}
@@ -793,14 +765,10 @@ class ModelCreateView(AdminMixin, BaseObjectView, TemplateController):
         model_name = request.path_params.get("name")
         form_data = await request.form()
 
-        models = get_registered_models()
-        model = models.get(model_name)
-        if not model:
-            raise NotFound()
+        model = get_registered_model(model_name)
 
         instance = await self.save_model(model, form_data, create=True)
         add_message(
-            request,
             "success",
             f"{model_name.capitalize()} #{instance.id} has been created successfully.",
         )

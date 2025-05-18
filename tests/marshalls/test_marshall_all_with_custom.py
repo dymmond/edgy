@@ -128,7 +128,7 @@ async def test_marshall_all_with_custom_fields_and_extra(async_client):
         "email": "edgy@esmerald.dev",
         "language": "EN",
         "description": "A description",
-        "shall_save": True
+        "shall_save": True,
     }
     response = await async_client.post("/create", json=data)
     assert response.status_code == 201

@@ -90,7 +90,7 @@ def run_migrations_offline() -> Any:
             context.run_migrations(edgy_dbname=name or "")
 
 
-def do_run_migrations(connection: Any, name: str, metadata: "sqlalchemy.Metadata") -> Any:
+def do_run_migrations(connection: Any, name: str, metadata: "sqlalchemy.MetaData") -> Any:
     # this callback is used to prevent an auto-migration from being generated
     # when there are no changes to the schema
     # reference: http://alembic.zzzcomputing.com/en/latest/cookbook.html

@@ -78,8 +78,8 @@ def test_column_type():
         (BigIntegerField(), int),
         (SmallIntegerField(), int),
         (DecimalField(max_digits=20, decimal_places=2), decimal.Decimal),
-        (ChoiceField(choices=Choices), enum.Enum),
-        (CharChoiceField(choices=Choices), enum.Enum),
+        (ChoiceField(choices=Choices), Choices),
+        (CharChoiceField(choices=Choices), Choices),
     ],
 )
 def test_field_annotation(field, annotation):

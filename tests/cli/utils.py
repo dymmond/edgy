@@ -2,9 +2,13 @@ import asyncio
 import os
 import subprocess
 
+from tests.settings import TEST_DATABASE
+
 
 def run_cmd(app, cmd, with_app_environment=True, extra_env=None):
     env = dict(os.environ)
+    # for main.py
+    env["TEST_DATABASE"] = TEST_DATABASE
     env.setdefault("PYTHONPATH", env["PWD"])
     if with_app_environment:
         env["EDGY_DEFAULT_APP"] = app
@@ -21,6 +25,8 @@ def run_cmd(app, cmd, with_app_environment=True, extra_env=None):
 
 async def arun_cmd(app, cmd, with_app_environment=True, extra_env=None):
     env = dict(os.environ)
+    # for main.py
+    env["TEST_DATABASE"] = TEST_DATABASE
     env.setdefault("PYTHONPATH", env["PWD"])
     if with_app_environment:
         env["EDGY_DEFAULT_APP"] = app

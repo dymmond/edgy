@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
-from lilya.apps import Lilya
+from lilya.apps import ChildLilya
 from lilya.requests import Request
-from lilya.routing import Include, RoutePath
-from lilya.templating.controllers import templates  # noqa
+from lilya.routing import RoutePath
+from lilya.templating import Jinja2Template
 
-from edgy.conf import settings
 from edgy.contrib.admin.views import (
     AdminDashboard,
     ModelCreateView,
@@ -18,6 +18,9 @@ from edgy.contrib.admin.views import (
     ModelObjectView,
 )
 
+templates = Jinja2Template(directory=str(Path(__file__).resolve().parent / "templates"))
+templates.env.globals["getattr"] = getattr
+
 
 async def not_found(request: Request, exc: Exception) -> Any:
     return templates.get_template_response(
@@ -27,30 +30,24 @@ async def not_found(request: Request, exc: Exception) -> Any:
     )
 
 
-app = Lilya(
-    debug=True,
+app = ChildLilya(
     routes=[
-        Include(
-            path=settings.admin_config.admin_prefix_url,
-            routes=[
-                RoutePath("/", handler=AdminDashboard, name="admin"),
-                RoutePath("/models", handler=ModelListView, name="models"),
-                RoutePath("/models/{name}", handler=ModelDetailView, name="model-details"),
-                RoutePath("/models/{name}/create", handler=ModelCreateView, name="model-create"),
-                RoutePath("/models/{name}/{id}", handler=ModelObjectView, name="model-object"),
-                RoutePath(
-                    "/models/{name}/{id}/edit",
-                    handler=ModelEditView,
-                    name="model-edit",
-                    methods=["GET", "POST"],
-                ),
-                RoutePath(
-                    "/models/{name}/{id}/delete",
-                    handler=ModelDeleteView,
-                    name="model-delete",
-                    methods=["POST"],
-                ),
-            ],
+        RoutePath("/", handler=AdminDashboard, name="admin"),
+        RoutePath("/models", handler=ModelListView, name="models"),
+        RoutePath("/models/{name}", handler=ModelDetailView, name="model-details"),
+        RoutePath("/models/{name}/create", handler=ModelCreateView, name="model-create"),
+        RoutePath("/models/{name}/{id}", handler=ModelObjectView, name="model-object"),
+        RoutePath(
+            "/models/{name}/{id}/edit",
+            handler=ModelEditView,
+            name="model-edit",
+            methods=["GET", "POST"],
+        ),
+        RoutePath(
+            "/models/{name}/{id}/delete",
+            handler=ModelDeleteView,
+            name="model-delete",
+            methods=["POST"],
         ),
     ],
     exception_handlers={404: not_found},

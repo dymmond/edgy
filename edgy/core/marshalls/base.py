@@ -181,7 +181,9 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
             exclude: set[str] = set()
             if column is not None:
                 exclude.add(column.key)
-            data = self.model_dump(include=set(model.meta.fields.keys()).difference(exclude), exclude_unset=True)
+            data = self.model_dump(
+                include=set(model.meta.fields.keys()).difference(exclude), exclude_unset=True
+            )
             # update without using defaults
             instance = await self.instance.save(values=data)
         self._handle_primary_key(instance=instance)
@@ -192,6 +194,7 @@ class Marshall(BaseMarshall):
     """
     Model marshall where the `__model__` is required.
     """
+
     context: dict = Field(exclude=True, default_factory=dict)
 
     def __repr__(self) -> str:

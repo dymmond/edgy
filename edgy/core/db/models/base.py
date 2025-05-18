@@ -17,7 +17,6 @@ from typing import (
 
 import orjson
 from pydantic import BaseModel, ConfigDict, PrivateAttr
-from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
 
 from edgy.core.db.context_vars import (
     CURRENT_FIELD_CONTEXT,
@@ -183,21 +182,24 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             CURRENT_INSTANCE.reset(token)
         return new_kwargs
 
-    def __repr__(self) -> str:
-        return f"<{type(self).__name__}: {str(self)}>"
-
-    def __str__(self) -> str:
+    def join_identifiers_to_string(self, *, sep: str = ", ", sep_inner: str = "=") -> str:
         pkl = []
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
         try:
             for identifier in self.identifying_db_fields:
-                pkl.append(f"{identifier}={getattr(self, identifier, None)}")
+                pkl.append(f"{identifier}{sep_inner}{getattr(self, identifier, None)}")
         except AttributeError:
             # for abstract embedded
             pass
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
-        return f"{type(self).__name__}({', '.join(pkl)})"
+        return sep.join(pkl)
+
+    def __repr__(self) -> str:
+        return f"<{type(self).__name__}: {self}>"
+
+    def __str__(self) -> str:
+        return f"{type(self).__name__}({self.join_identifiers_to_string()})"
 
     @cached_property
     def identifying_db_fields(self) -> Any:

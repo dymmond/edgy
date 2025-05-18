@@ -7,7 +7,7 @@
 
     {# Regular fields (non-relationship) #}
     {% for field, field_info in model.model_fields.items() %}
-        {% if field != "id" and field != "pk" and not relationship_fields.get(field) %}
+        {% if field != "pk" and not relationship_fields.get(field) %}
         <div class="flex flex-col gap-1">
             <label class="text-sm font-semibold text-gray-700" for="{{ field }}">
                 {{ field.replace('_', ' ') | title }}
@@ -20,7 +20,7 @@
             {% set type = get_input_type(field_info.annotation) %}
 
             {% if type == "bool" %}
-            <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">
+            <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900" {% if field_info.read_only %}disabled{% endif %}>
                 <option value="1" {% if value is sameas true %}selected{% endif %}>True</option>
                 <option value="0" {% if value is sameas false %}selected{% endif %}>False</option>
             </select>
@@ -32,6 +32,7 @@
                 id="{{ field }}"
                 value="{{ value }}"
                 class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+                {% if field_info.read_only %}disabled{% endif %}
             />
 
             {% elif type == "datetime" %}
@@ -41,6 +42,7 @@
                 id="{{ field }}"
                 value="{{ value.isoformat() if value else '' }}"
                 class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+                {% if field_info.read_only %}disabled{% endif %}
             />
 
             {% else %}
@@ -50,6 +52,7 @@
                 id="{{ field }}"
                 value="{{ value }}"
                 class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900 focus:ring focus:ring-blue-200"
+                {% if field_info.read_only %}disabled{% endif %}
             />
             {% endif %}
         </div>
@@ -64,7 +67,7 @@
         </label>
 
         {% if rel["type"] == "foreign_key" %}
-        <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900">
+        <select name="{{ field }}" id="{{ field }}" class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900" {% if field_info.read_only %}disabled{% endif %}>
             <option value="">Select...</option>
             {% for obj in rel["items"] %}
                 <option value="{{ obj.id }}" {% if getattr(object, field).id == obj.id %}selected{% endif %}>{{ obj }}</option>
@@ -76,7 +79,7 @@
         <input type="hidden" name="_{{ field }}_initial" value="{{ selected | join(',') }}">
 
         <div class="flex gap-4 items-center">
-            <select id="{{ field }}_available" class="w-full border rounded h-48 text-sm" multiple>
+            <select id="{{ field }}_available" class="w-full border rounded h-48 text-sm" multiple {% if field_info.read_only %}disabled{% endif %}>
                 {% for obj in rel["items"] %}
                     {% if obj.id not in selected %}
                     <option value="{{ obj.id }}">{{ obj }}</option>
@@ -89,7 +92,7 @@
                 <button type="button" onclick="moveSelected('{{ field }}_selected', '{{ field }}_available')" class="text-sm bg-gray-300 rounded px-2 py-1 hover:bg-gray-400">←</button>
             </div>
 
-            <select id="{{ field }}_selected" name="{{ field }}" multiple class="w-full border rounded h-48 text-sm">
+            <select id="{{ field }}_selected" name="{{ field }}" multiple class="w-full border rounded h-48 text-sm" {% if field_info.read_only %}disabled{% endif %}>
                 {% for obj in rel["items"] %}
                     {% if obj.id in selected %}
                     <option value="{{ obj.id }}">{{ obj }}</option>

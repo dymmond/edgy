@@ -1,20 +1,27 @@
-from typing import Any
+from typing import cast
 
-from lilya.requests import Request
+from lilya.context import g
 
 
-def add_message(request: Request, level: str, message: str) -> None:
+def add_message(level: str, message: str) -> None:
     """
     Stores a message in the session for rendering in the next request.
     Level can be: success, info, warning, error.
     """
-    session = request.session.setdefault("_messages", [])
-    session.append({"level": level, "text": message})
+    if not hasattr(g, "messages"):
+        g.messages = []
+    cast(list, g.messages).append({"level": level, "text": message})
 
 
-def get_messages(request: Request) -> Any:
+def get_messages(peek: bool = False) -> list:
     """
     Retrieves and clears messages from the session.
     """
-    messages = request.session.pop("_messages", [])
-    return messages
+    if not hasattr(g, "messages"):
+        return []
+    messages = cast(list, g.messages)
+    if peek:
+        return messages
+    _messages = messages.copy()
+    messages.clear()
+    return _messages
