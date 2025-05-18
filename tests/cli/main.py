@@ -7,10 +7,9 @@ from edgy import Instance
 from edgy.contrib.permissions import BasePermission
 from edgy.core.db.context_vars import CURRENT_MODEL_INSTANCE
 from edgy.core.signals import post_migrate, pre_migrate
-from tests.settings import TEST_DATABASE
 
 models = edgy.Registry(
-    database=TEST_DATABASE,
+    database=os.environ.get("TEST_DATABASE", "sqlite:///test_db.sqlite"),
     with_content_type=os.environ.get("TEST_NO_CONTENT_TYPE", "false") != "true",
 )
 

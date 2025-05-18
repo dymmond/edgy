@@ -3,14 +3,8 @@ from __future__ import annotations
 from typing import Any
 
 import click
-from lilya.apps import Lilya
-from lilya.cli.exceptions import DirectiveError
-from lilya.middleware.base import DefineMiddleware
-from lilya.middleware.cors import CORSMiddleware
-from lilya.routing import Include
 
 import edgy
-from edgy.contrib.admin.application import app as admin_app
 
 
 @click.option(
@@ -63,29 +57,47 @@ def admin_serve(
     """
 
     try:
+        from lilya.apps import Lilya
+        from lilya.middleware.base import DefineMiddleware
+        from lilya.middleware.cors import CORSMiddleware
+        from lilya.routing import Include
+    except ImportError:
+        raise RuntimeError("Lilya needs to be installed to run admin_serve.") from None
+    try:
+        import jinja2  # noqa
+    except ImportError:
+        raise RuntimeError("Jinja2 needs to be installed to run admin_serve.") from None
+    try:
         import uvicorn
     except ImportError:
-        raise DirectiveError(detail="Uvicorn needs to be installed to run Lilya.") from None
+        raise RuntimeError("Uvicorn needs to be installed to run admin_serve.") from None
 
     old_instance = edgy.monkay.instance
 
     if old_instance is None:
-        raise DirectiveError(
-            detail='You need to specify an app which registry is used. For experimenting use: "tests.cli.main"'
+        raise RuntimeError(
+            'You need to specify an app which registry is used. For experimenting use: "tests.cli.main"'
         )
+    from edgy.contrib.admin.application import app as admin_app
 
-    app: Any = Lilya(
-        routes=[Include(path="/", app=admin_app)],
-        middleware=[
-            DefineMiddleware(
-                CORSMiddleware,
-                allow_origins=["*"],
-                allow_methods=["*"],
-                allow_headers=["*"],
-                allow_credentials=True,
-            )
-        ],
-    )
+    routes = [
+        Include(
+            path="/admin",
+            app=admin_app,
+            middleware=[
+                DefineMiddleware(
+                    CORSMiddleware,
+                    allow_origins=["*"],
+                    allow_methods=["*"],
+                    allow_headers=["*"],
+                    allow_credentials=True,
+                )
+            ],
+        ),
+    ]
+    if old_instance.app is not None:
+        routes.append(Include(path="/", app=old_instance.app))
+    app: Any = Lilya(routes=routes)
     if debug:
         app.debug = debug
     app = old_instance.registry.asgi(app)

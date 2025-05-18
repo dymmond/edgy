@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from lilya.apps import Lilya
 from lilya.requests import Request
 from lilya.routing import Include, RoutePath
-from lilya.templating.controllers import templates  # noqa
+from lilya.templating import Jinja2Template
 
 from edgy.conf import settings
 from edgy.contrib.admin.views import (
@@ -17,6 +18,9 @@ from edgy.contrib.admin.views import (
     ModelListView,
     ModelObjectView,
 )
+
+template_directory = Path(__file__).parent / "templates"
+templates = Jinja2Template(directory=template_directory)
 
 
 async def not_found(request: Request, exc: Exception) -> Any:
