@@ -5,6 +5,7 @@ from typing import Any
 import click
 
 import edgy
+from edgy.conf import settings
 
 
 @click.option(
@@ -82,7 +83,7 @@ def admin_serve(
 
     routes = [
         Include(
-            path="/admin",
+            path=settings.admin_config.admin_prefix_url,
             app=admin_app,
             middleware=[
                 DefineMiddleware(
