@@ -18,8 +18,8 @@ from edgy.contrib.admin.views import (
     ModelObjectView,
 )
 
-template_directory = Path(__file__).parent / "templates"
-templates = Jinja2Template(directory=template_directory)
+templates = Jinja2Template(directory=str(Path(__file__).resolve().parent / "templates"))
+templates.env.globals["getattr"] = getattr
 
 
 async def not_found(request: Request, exc: Exception) -> Any:
@@ -31,7 +31,6 @@ async def not_found(request: Request, exc: Exception) -> Any:
 
 
 app = ChildLilya(
-    debug=True,
     routes=[
         RoutePath("/", handler=AdminDashboard, name="admin"),
         RoutePath("/models", handler=ModelListView, name="models"),

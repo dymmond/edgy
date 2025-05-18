@@ -25,7 +25,6 @@ from edgy.conf import settings
 )
 @click.option(
     "--debug",
-    default=True,
     help="Start the application in debug mode.",
     show_default=True,
     is_flag=True,
@@ -33,7 +32,7 @@ from edgy.conf import settings
 @click.option(
     "--log-level",
     type=str,
-    default="debug",
+    default="info",
     help="What log level should uvicorn run.",
     show_default=True,
 )
@@ -100,7 +99,8 @@ def admin_serve(
         routes.append(Include(path="/", app=old_instance.app))
     app: Any = Lilya(routes=routes)
     if debug:
-        app.debug = debug
+        app.debug = True
+        admin_app.debug = True
     app = old_instance.registry.asgi(app)
     edgy.monkay.set_instance(edgy.Instance(registry=old_instance.registry, app=app))
 
