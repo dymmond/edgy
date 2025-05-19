@@ -30,6 +30,12 @@ from edgy.conf import settings
     is_flag=True,
 )
 @click.option(
+    "--create-all",
+    help="Create all models when not existent.",
+    show_default=True,
+    is_flag=True,
+)
+@click.option(
     "--log-level",
     type=str,
     default="info",
@@ -41,6 +47,7 @@ def admin_serve(
     port: int,
     host: str,
     debug: bool,
+    create_all: bool,
     log_level: str,
 ) -> None:
     """Starts the Edgy admin development server.
@@ -78,8 +85,9 @@ def admin_serve(
         raise RuntimeError(
             'You need to specify an app which registry is used. For experimenting use: "tests.cli.main"'
         )
-    from edgy.contrib.admin.application import app as admin_app
+    from edgy.contrib.admin.application import create_application
 
+    admin_app = create_application()
     routes = [
         Include(
             path=settings.admin_config.admin_prefix_url,
@@ -102,6 +110,8 @@ def admin_serve(
         app.debug = True
         admin_app.debug = True
     app = old_instance.registry.asgi(app)
+    if create_all:
+        edgy.run_sync(old_instance.registry.create_all())
     edgy.monkay.set_instance(edgy.Instance(registry=old_instance.registry, app=app))
 
     uvicorn.run(

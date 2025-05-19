@@ -73,7 +73,7 @@
         {% if rel["type"] == "foreign_key" %}
           <select name="{{ field }}" id="{{ field }}"
                   class="border border-gray-300 rounded px-3 py-2 text-sm text-gray-900"
-                  {% if not model.model_fields[field].null %}required{% endif %} {% if field_info.read_only %}disabled{% endif %}>
+                  {% if not model.model_fields[field].null %}required{% endif %} {% if field.read_only %}disabled{% endif %}>
             <option value="">Select...</option>
             {% for obj in rel["items"] %}
               <option value="{{ obj.id }}">{{ obj }}</option>
@@ -82,7 +82,7 @@
 
         {% elif rel["type"] == "many_to_many" %}
           {# Hidden input will be filled dynamically on submit #}
-          <input type="hidden" name="_{{ field }}_initial" id="_{{ field }}_initial" value="" {% if field_info.read_only %}disabled{% endif %}>
+          <input type="hidden" name="_{{ field }}_initial" id="_{{ field }}_initial" value="" {% if field.read_only %}disabled{% endif %}>
 
           <div class="flex gap-4 items-center">
             <select id="{{ field }}_available"

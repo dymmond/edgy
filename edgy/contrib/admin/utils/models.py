@@ -40,13 +40,18 @@ def get_model(model_name: str) -> type[Model]:
 
 
 def get_model_json_schema(
-    model_name: str,
+    model: str | type[Model],
+    /,
     mode: Literal["validation", "serialization"] = "validation",
     include_callable_defaults: bool = False,
+    **kwargs: Any,
 ) -> dict:
-    return get_model(model_name).model_json_schema(
+    if isinstance(model, str):
+        model = get_model(model)
+    return model.model_json_schema(
         schema_generator=CallableDefaultJsonSchema
         if include_callable_defaults
         else NoCallableDefaultJsonSchema,
         mode=mode,
+        **kwargs,
     )
