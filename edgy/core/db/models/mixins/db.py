@@ -680,7 +680,7 @@ class DatabaseMixin:
             return False
 
         # Build the select expression.
-        expression = self.table.select().where(*clauses).exists()
+        expression = self.table.select().where(*clauses).exists().select()
 
         # Perform the fetch.
         check_db_connection(self.database)
