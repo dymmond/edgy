@@ -9,7 +9,7 @@ import orjson
 from lilya.controllers import Controller
 from lilya.exceptions import NotFound  # noqa
 from lilya.requests import Request
-from lilya.responses import RedirectResponse
+from lilya.responses import JSONResponse, RedirectResponse
 from lilya.templating.controllers import TemplateController
 
 import edgy
@@ -56,12 +56,17 @@ def get_input_type(annotation: Any) -> str:
 
 
 class JSONSchemaView(Controller):
-    def get(self, request: Request) -> bytes:
+    def get(self, request: Request) -> JSONResponse:
         with_defaults = request.query_params.get("cdefaults") == "true"
         model_name = request.path_params.get("name")
-        return orjson.dumps(
-            get_model_json_schema(model_name, include_callable_defaults=with_defaults)
-        )
+        with JSONResponse.with_transform_kwargs({"json_encode_fn": orjson.dumps}):
+            return JSONResponse(
+                get_model_json_schema(
+                    model_name,
+                    include_callable_defaults=with_defaults,
+                    ref_template="../{model}/json",
+                )
+            )
 
 
 class AdminDashboard(AdminMixin, TemplateController):

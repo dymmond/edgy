@@ -1,6 +1,8 @@
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Union, cast
 
+from pydantic.json_schema import WithJsonSchema
+
 from edgy.core.db.constants import CASCADE
 from edgy.core.db.context_vars import CURRENT_FIELD_CONTEXT, CURRENT_MODEL_INSTANCE
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField, ForeignKey
@@ -16,6 +18,13 @@ terminal = Print()
 
 
 class BaseContentTypeField(BaseForeignKeyField):
+    def __init__(
+        self,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(**kwargs)
+        self.metadata.append(WithJsonSchema(mode="validation", json_schema=None))
+
     async def pre_save_callback(
         self, value: Any, original_value: Any, is_update: bool
     ) -> dict[str, Any]:

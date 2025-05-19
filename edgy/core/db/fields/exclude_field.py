@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
+from pydantic.json_schema import SkipJsonSchema
+
 from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields.factories import FieldFactory
 
@@ -22,7 +24,10 @@ class ExcludeField(FieldFactory, type[None]):
         kwargs["exclude"] = True
         kwargs["null"] = True
         kwargs["primary_key"] = False
-        return super().__new__(cls, **kwargs)
+        field = super().__new__(cls, **kwargs)
+        field.metadata.append(SkipJsonSchema())
+
+        return field
 
     @classmethod
     def clean(
