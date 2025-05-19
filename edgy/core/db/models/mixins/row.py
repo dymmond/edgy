@@ -250,7 +250,8 @@ class ModelRowMixin:
         )
         # mark a model as completely loaded when no deferred is active
         if not is_defer_fields and not only_fields:
-            model._loaded_or_deleted = True
+            model._db_deleted = False
+            model._db_loaded = True
         # hard exclude secrets from triggering load
         if exclude_secrets:
             model.__no_load_trigger_attrs__.update(cls.meta.secret_fields)

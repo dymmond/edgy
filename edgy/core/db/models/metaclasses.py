@@ -22,13 +22,13 @@ from typing import (
 import sqlalchemy
 from pydantic._internal._model_construction import ModelMetaclass
 
-from edgy import ManyToManyField
 from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.base import BaseForeignKey, PKField, RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
+from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKey
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.models.managers import BaseManager
@@ -80,7 +80,7 @@ class Fields(UserDict, dict[str, BaseFieldType]):
 
             # This is particularly useful for M2M distinguish
             # Mostly for the admin manipulation
-            if isinstance(field, ManyToManyField):
+            if isinstance(field, BaseManyToManyForeignKeyField):
                 self.meta.many_to_many_fields.add(name)
         if isinstance(field, BaseRefForeignKey):
             self.meta.ref_foreign_key_fields.add(name)

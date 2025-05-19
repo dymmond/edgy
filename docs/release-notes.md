@@ -11,7 +11,17 @@ hide:
 ### Added
 
 - Allow partial Marshalls.
+- Add admin_serve for modifying db.
 
+### Changed
+
+- `_loaded_or_deleted` is now `_db_loaded_or_deleted`. The former name is now deprecated.
+- `_loaded_or_deleted` is splitted in `_db_loaded` and `_db_deleted`.
+
+
+### Fixed
+
+- Recursive saving.
 
 ## 0.31.3
 

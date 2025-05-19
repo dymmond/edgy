@@ -372,7 +372,7 @@ class BaseForeignKeyField(BaseForeignKey):
         return constraints
 
 
-class ForeignKey(ForeignKeyFieldFactory):
+class ForeignKey(ForeignKeyFieldFactory, cast(Any, object)):
     field_bases = (BaseForeignKeyField,)
     field_type: Any = Any
 

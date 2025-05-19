@@ -247,14 +247,8 @@ class DecimalField(FieldFactory, decimal.Decimal):
             raise FieldDefinitionError("decimal_places are required for DecimalField")
 
 
-# in python it is not possible to subclass bool. So only use bool for type checking
-if TYPE_CHECKING:
-    bool_type = bool
-else:
-    bool_type = int
-
-
-class BooleanField(FieldFactory, bool_type):
+# in python it is not possible to subclass bool. So only use bool for type checking.
+class BooleanField(FieldFactory, cast(bool, int)):
     """Representation of a boolean"""
 
     field_type = bool

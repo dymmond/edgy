@@ -377,7 +377,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         await value.save_related()
 
 
-class ManyToManyField(ForeignKeyFieldFactory):
+class ManyToManyField(ForeignKeyFieldFactory, list):
     field_type: Any = Any
     field_bases = (BaseManyToManyForeignKeyField,)
 

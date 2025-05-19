@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import copy
 import inspect
+import sys
 import warnings
 from collections.abc import Awaitable, Callable, Collection, Sequence
 from functools import partial
@@ -34,6 +35,11 @@ from edgy.core.utils.models import create_edgy_model
 from edgy.exceptions import ForeignKeyBadConfigured, ModelCollisionError, ObjectNotFound
 from edgy.types import Undefined
 
+if sys.version_info >= (3, 11):  # pragma: no cover
+    from typing import Self
+else:  # pragma: no cover
+    from typing_extensions import Self
+
 if TYPE_CHECKING:
     from databasez.core.transaction import Transaction
 
@@ -52,7 +58,8 @@ class _EmptyClass: ...
 
 _removed_copy_keys = {
     *BaseModel.__dict__.keys(),
-    "_loaded_or_deleted",
+    "_db_loaded",
+    "_db_deleted",
     "_pkcolumns",
     "_table",
     "_db_schemas",
@@ -318,7 +325,7 @@ class DatabaseMixin:
         unlink_same_registry: bool = True,
         on_conflict: Literal["keep", "replace", "error"] = "error",
         **kwargs: Any,
-    ) -> type[Model]:
+    ) -> type[Self]:
         """Copy the model class and optionally add it to another registry."""
         # removes private pydantic stuff, except the prefixed ones
         attrs = {
@@ -399,7 +406,7 @@ class DatabaseMixin:
                     else True
                 ),
             )
-        return _copy
+        return cast("type[Self]", _copy)
 
     @property
     def table(self) -> sqlalchemy.Table:
@@ -475,7 +482,7 @@ class DatabaseMixin:
         pre_fn: Callable[..., Awaitable],
         post_fn: Callable[..., Awaitable],
         instance: Union[BaseModelType, QuerySet],
-    ) -> Any:
+    ) -> Optional[int]:
         """
         Update operation of the database fields.
         """
@@ -498,6 +505,7 @@ class DatabaseMixin:
         )
         # empty updates shouldn't cause an error. E.g. only model references are updated
         clauses = self.identifying_clauses()
+        row_count: Optional[int] = None
         if column_values and clauses:
             check_db_connection(self.database, stacklevel=4)
             async with self.database as database, database.transaction():
@@ -506,7 +514,7 @@ class DatabaseMixin:
                     await self.execute_pre_save_hooks(column_values, kwargs, is_update=True)
                 )
                 expression = self.table.update().values(**column_values).where(*clauses)
-                await database.execute(expression)
+                row_count = cast(int, await database.execute(expression))
 
             # Update the model instance.
             new_kwargs = self.transform_input(column_values, phase="post_update", instance=self)
@@ -517,7 +525,8 @@ class DatabaseMixin:
 
         if column_values or kwargs:
             # Ensure on access refresh the results is active
-            self._loaded_or_deleted = False
+            self._db_deleted = False if row_count is None else row_count == 0
+            self._db_loaded = False
         await post_fn(
             real_class,
             model_instance=self,
@@ -525,8 +534,9 @@ class DatabaseMixin:
             values=kwargs,
             column_values=column_values,
         )
+        return row_count
 
-    async def update(self: Model, **kwargs: Any) -> Model:
+    async def update(self: Model, **kwargs: Any) -> Self:
         token = EXPLICIT_SPECIFIED_VALUES.set(set(kwargs.keys()))
         token2 = CURRENT_INSTANCE.set(self)
         try:
@@ -545,12 +555,14 @@ class DatabaseMixin:
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token)
             CURRENT_INSTANCE.reset(token2)
-        return self
+        return cast("Self", self)
 
     async def raw_delete(
         self: Model, *, skip_post_delete_hooks: bool, remove_referenced_call: Union[bool, str]
     ) -> int:
         """Delete operation from the database"""
+        if self._db_deleted:
+            return 0
         instance = CURRENT_INSTANCE.get()
         real_class = self.get_real_class()
         # remove_referenced_call = called from a deleter of another field or model
@@ -591,8 +603,8 @@ class DatabaseMixin:
             check_db_connection(self.database)
             async with self.database as database:
                 row_count = cast(int, await database.execute(expression))
-        # we cannot load anymore
-        self._loaded_or_deleted = True
+        # we cannot load anymore afterwards
+        self._db_deleted = True
         # now cleanup with the saved values
         if field_values:
             token_instance = CURRENT_MODEL_INSTANCE.set(self)
@@ -635,7 +647,7 @@ class DatabaseMixin:
         )
 
     async def load(self, only_needed: bool = False) -> None:
-        if only_needed and self._loaded_or_deleted:
+        if only_needed and self._db_loaded_or_deleted:
             return
         row = None
         clauses = self.identifying_clauses()
@@ -649,10 +661,33 @@ class DatabaseMixin:
                 row = await database.fetch_one(expression)
         # check if is in system
         if row is None:
+            self._db_deleted = True
+            self._db_loaded = True
             raise ObjectNotFound("row does not exist anymore")
         # Update the instance.
         self.__dict__.update(self.transform_input(dict(row._mapping), phase="load", instance=self))
-        self._loaded_or_deleted = True
+        self._db_deleted = False
+        self._db_loaded = True
+
+    async def check_exist_in_db(self, only_needed: bool = False) -> bool:
+        if only_needed:
+            if self._db_deleted:
+                return False
+            if self._db_loaded:
+                return True
+        clauses = self.identifying_clauses()
+        if not clauses:
+            return False
+
+        # Build the select expression.
+        expression = self.table.select().where(*clauses).exists()
+
+        # Perform the fetch.
+        check_db_connection(self.database)
+        async with self.database as database:
+            result = cast(bool, await database.fetch_val(expression))
+            self._db_deleted = not result
+            return result
 
     async def _insert(
         self: Model,
@@ -661,7 +696,7 @@ class DatabaseMixin:
         pre_fn: Callable[..., Awaitable],
         post_fn: Callable[..., Awaitable],
         instance: Union[BaseModelType, QuerySet],
-    ) -> Model:
+    ) -> None:
         """
         Performs the save instruction.
         """
@@ -705,7 +740,8 @@ class DatabaseMixin:
         if self.meta.post_save_fields:
             await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()), is_update=False)
         # Ensure on access refresh the results is active
-        self._loaded_or_deleted = False
+        self._db_loaded = False
+        self._db_deleted = False
         await post_fn(
             real_class,
             model_instance=self,
@@ -714,13 +750,11 @@ class DatabaseMixin:
             values=kwargs,
         )
 
-        return self
-
     async def real_save(
-        self: Model,
+        self,
         force_insert: bool,
         values: Union[dict[str, Any], set[str], None],
-    ) -> Model:
+    ) -> Self:
         instance: Union[BaseModelType, QuerySet] = CURRENT_INSTANCE.get()
         extracted_fields = self.extract_db_fields()
         if values is None:
@@ -748,6 +782,9 @@ class DatabaseMixin:
                     # we create a new revision.
                     force_insert = True
                     # Note: we definitely want this because it is easy for forget a force_insert
+            # check if it exists
+            if not force_insert and not await self.check_exist_in_db(only_needed=True):
+                force_insert = True
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
 
