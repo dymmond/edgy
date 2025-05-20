@@ -185,6 +185,26 @@ def _set_related_name_for_foreign_keys(
         registry.register_callback(foreign_key.to, related_field_fn, one_time=True)
 
 
+def _fixup_rel_annotation(target: type[BaseModelType], field: BaseFieldType) -> None:
+    if field.is_m2m:
+        field.field_type = field.annotation = list[target]  # type: ignore
+    elif field.null:
+        field.field_type = field.annotation = Optional[target]  # type: ignore
+    else:
+        field.field_type = field.annotation = target  # type: ignore
+
+
+def _fixup_rel_annotations(meta: MetaInfo) -> None:
+    for name in chain(meta.foreign_key_fields, meta.many_to_many_fields):
+        field = meta.fields[name]
+        registry: Registry = field.target_registry
+        with contextlib.suppress(Exception):
+            registry = cast("Registry", field.target.registry)
+        registry.register_callback(
+            field.to, partial(_fixup_rel_annotation, field=field), one_time=True
+        )
+
+
 class DatabaseMixin:
     _removed_copy_keys: ClassVar[set[str]] = _removed_copy_keys
 
@@ -267,6 +287,9 @@ class DatabaseMixin:
                     _set_related_name_for_foreign_keys(
                         meta, cls, replace_related_field=replace_related_field
                     )
+                # fixup annotations required for validation
+                if meta.foreign_key_fields or meta.many_to_many_fields:
+                    _fixup_rel_annotations(meta)
                 registry.execute_model_callbacks(cls)
 
         # finalize

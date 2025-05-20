@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import functools
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Optional, cast
+
+from pydantic.json_schema import SkipJsonSchema
 
 from edgy.core.db.context_vars import CURRENT_MODEL_INSTANCE
 from edgy.core.db.fields.base import RelationshipField
@@ -22,7 +26,7 @@ class RelatedField(RelationshipField):
         self,
         *,
         foreign_key_name: str,
-        related_from: type["BaseModelType"],
+        related_from: type[BaseModelType],
         **kwargs: Any,
     ) -> None:
         self.foreign_key_name = foreign_key_name
@@ -30,18 +34,20 @@ class RelatedField(RelationshipField):
         super().__init__(
             inherit=False,
             exclude=True,
-            field_type=Any,
-            annotation=Any,
+            field_type=list[related_from],  # type: ignore
+            annotation=list[related_from],  # type: ignore
             column_type=None,
             null=True,
             no_copy=True,
             **kwargs,
         )
+        # skip for now, we don't know if it is a m2m through model
+        self.metadata.append(SkipJsonSchema())
         if self.foreign_key.relation_has_post_delete_callback:
             self.post_delete_callback = self._notset_post_delete_callback
 
     @property
-    def related_to(self) -> type["BaseModelType"]:
+    def related_to(self) -> type[BaseModelType]:
         return self.owner
 
     @property
@@ -68,7 +74,7 @@ class RelatedField(RelationshipField):
             relation_instance = self.get_relation(refs=value)
         return {field_name: relation_instance}
 
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> ManyRelationProtocol:
+    def __get__(self, instance: BaseModelType, owner: Any = None) -> ManyRelationProtocol:
         if not instance:
             raise ValueError("missing instance")
 
@@ -88,7 +94,7 @@ class RelatedField(RelationshipField):
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         return self.foreign_key.get_relation(**kwargs)
 
-    def is_cross_db(self, owner_database: Optional["Database"] = None) -> bool:
+    def is_cross_db(self, owner_database: Optional[Database] = None) -> bool:
         if owner_database is None:
             owner_database = self.owner.database
         return str(owner_database.url) != str(self.foreign_key.owner.database.url)
