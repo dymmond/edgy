@@ -4,6 +4,7 @@ import functools
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, Optional, cast
 
+from pydantic import SkipValidation
 from pydantic.json_schema import SkipJsonSchema
 
 from edgy.core.db.context_vars import CURRENT_MODEL_INSTANCE
@@ -41,6 +42,8 @@ class RelatedField(RelationshipField):
             no_copy=True,
             **kwargs,
         )
+        # use edgy validation instead, we have an extended logic
+        self.metadata.append(SkipValidation())
         # skip for now, we don't know if it is a m2m through model
         self.metadata.append(SkipJsonSchema())
         if self.foreign_key.relation_has_post_delete_callback:

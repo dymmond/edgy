@@ -10,7 +10,7 @@ from typing import (
 )
 
 import sqlalchemy
-from pydantic import BaseModel
+from pydantic import BaseModel, SkipValidation
 
 from edgy.core.db.constants import SET_DEFAULT, SET_NULL
 from edgy.core.db.context_vars import CURRENT_FIELD_CONTEXT, CURRENT_INSTANCE, CURRENT_PHASE
@@ -65,6 +65,8 @@ class BaseForeignKeyField(BaseForeignKey):
         if remove_referenced:
             self.post_delete_callback = self._notset_post_delete_callback
         super().__init__(**kwargs, null=null)
+        # use edgy validation instead, we have an extended logic
+        self.metadata.append(SkipValidation())
         if self.on_delete == SET_DEFAULT and self.server_default is None:
             terminal.write_warning(
                 "Declaring on_delete `SET DEFAULT` but providing no server_default."

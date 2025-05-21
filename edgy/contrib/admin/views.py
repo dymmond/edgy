@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 def get_registered_model(model: str) -> type[Model]:
     try:
         return _get_model(model)
-    except KeyError:
+    except LookupError:
         raise NotFound() from None
 
 
@@ -59,14 +59,17 @@ class JSONSchemaView(Controller):
     def get(self, request: Request) -> JSONResponse:
         with_defaults = request.query_params.get("cdefaults") == "true"
         model_name = request.path_params.get("name")
-        with JSONResponse.with_transform_kwargs({"json_encode_fn": orjson.dumps}):
-            return JSONResponse(
-                get_model_json_schema(
-                    model_name,
-                    include_callable_defaults=with_defaults,
-                    ref_template="../{model}/json",
+        try:
+            with JSONResponse.with_transform_kwargs({"json_encode_fn": orjson.dumps}):
+                return JSONResponse(
+                    get_model_json_schema(
+                        model_name,
+                        include_callable_defaults=with_defaults,
+                        ref_template="../{model}/json",
+                    )
                 )
-            )
+        except LookupError:
+            raise NotFound() from None
 
 
 class AdminDashboard(AdminMixin, TemplateController):

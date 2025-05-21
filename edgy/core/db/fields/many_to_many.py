@@ -3,6 +3,8 @@ from collections.abc import Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal, Union, cast
 
+from pydantic import SkipValidation
+
 from edgy.core.db.constants import CASCADE, NEW_M2M_NAMING, OLD_M2M_NAMING
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import BaseForeignKey
@@ -40,6 +42,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
+        # use edgy validation instead, we have an extended logic
+        self.metadata.append(SkipValidation())
         self.to_fields = to_fields
         self.to_foreign_key = to_foreign_key
         self.from_fields = from_fields
