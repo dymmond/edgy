@@ -68,6 +68,7 @@ class JSONSchemaView(Controller):
                         model_name,
                         include_callable_defaults=with_defaults,
                         ref_template=reftemplate,
+                        no_check_admin_models=True,
                     )
                 )
         except LookupError:
