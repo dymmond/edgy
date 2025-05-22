@@ -17,7 +17,6 @@ from edgy.conf import settings
 from edgy.contrib.admin.mixins import AdminMixin
 from edgy.contrib.admin.utils.messages import add_message
 from edgy.contrib.pagination import Paginator
-from edgy.core.db.relationships.related_field import RelatedField
 from edgy.exceptions import ObjectNotFound
 
 from .utils.models import get_model as _get_model
@@ -59,13 +58,16 @@ class JSONSchemaView(Controller):
     def get(self, request: Request) -> JSONResponse:
         with_defaults = request.query_params.get("cdefaults") == "true"
         model_name = request.path_params.get("name")
+        reftemplate = "../{model}/json"
+        if with_defaults:
+            reftemplate += "?cdefaults=true"
         try:
             with JSONResponse.with_transform_kwargs({"json_encode_fn": orjson.dumps}):
                 return JSONResponse(
                     get_model_json_schema(
                         model_name,
                         include_callable_defaults=with_defaults,
-                        ref_template="../{model}/json",
+                        ref_template=reftemplate,
                     )
                 )
         except LookupError:
@@ -378,7 +380,7 @@ class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
     View for displaying the details of a single object of a specific model.
     """
 
-    template_name = "admin/model_object.html"
+    template_name = "admin/model_object_detail.html"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         """
@@ -495,42 +497,13 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
         if not instance:
             raise NotFound()
 
-        relationship_fields = {}
-
-        for field in model.meta.relationship_fields:
-            attr = model.meta.fields.get(field)
-            if isinstance(attr, RelatedField):
-                continue
-
-            # ManyToMany
-            if hasattr(attr, "is_m2m") and attr.is_m2m:
-                related_model = attr.target
-                all_items = await related_model.query.limit(100).all()
-                selected_items = await getattr(instance, field).all()
-                selected_ids = [item.id for item in selected_items]
-                relationship_fields[field] = {
-                    "type": "many_to_many",
-                    "items": all_items,
-                    "selected": selected_ids,
-                }
-
-            # ForeignKey
-            elif hasattr(attr, "is_m2m") and not attr.is_m2m:
-                related_model = attr.target
-                all_items = await related_model.query.limit(100).all()
-                relationship_fields[field] = {
-                    "type": "foreign_key",
-                    "items": all_items,
-                }
-
         context.update(
             {
                 "title": f"Edit {instance}",
                 "object": instance,
                 "model": model,
                 "model_name": model_name,
-                "relationship_fields": relationship_fields,
-                "get_input_type": get_input_type,
+                "schema": get_model_json_schema(model, ref_template="../{model}/json"),
             }
         )
         return context
@@ -643,7 +616,7 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
     View for displaying and processing the form to create a new model instance.
     """
 
-    template_name = "admin/model_create.html"
+    template_name = "admin/model_object_create.html"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         """
@@ -668,28 +641,12 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
 
         model = get_registered_model(model_name)
 
-        relationship_fields = {}
-        for field in model.meta.relationship_fields:
-            field_info = model.meta.fields.get(field)
-            if isinstance(field_info, RelatedField):
-                continue
-
-            if hasattr(field_info, "is_m2m") and field_info.is_m2m:
-                related_model = field_info.target
-                items = await related_model.query.limit(100).all()
-                relationship_fields[field] = {"type": "many_to_many", "items": items}
-            elif hasattr(field_info, "is_m2m") and not field_info.is_m2m:
-                related_model = field_info.target
-                items = await related_model.query.limit(100).all()
-                relationship_fields[field] = {"type": "foreign_key", "items": items}
-
         context.update(
             {
                 "title": f"Create {model_name.capitalize()}",
                 "model": model,
                 "model_name": model_name,
-                "relationship_fields": relationship_fields,
-                "get_input_type": get_input_type,
+                "schema": get_model_json_schema(model, ref_template="../{model}/json"),
             }
         )
         return context
@@ -733,7 +690,9 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
 
         model = get_registered_model(model_name)
 
-        instance = await self.save_model(model, orjson.loads(await request.data()), create=True)
+        instance = await self.save_model(
+            model, orjson.loads((await request.form())["editor_data"]), create=True
+        )
         add_message(
             "success",
             f"{model_name.capitalize()} #{instance.id} has been created successfully.",

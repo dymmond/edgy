@@ -1,0 +1,41 @@
+{% extends "admin/base.html" %}
+
+{% block header %}
+  Create {{ model_name | replace('_', ' ') | title }}
+{% endblock %}
+
+{% block content %}
+<div id="editor_holder"></div>
+<div class="pt-6 flex gap-4">
+  <form>
+    <button
+            class="px-5 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700">
+      Create
+    </button>
+
+    <input type="hidden" name="editor_data" id="editor_data" value="">
+  </form>
+  <a href="{{ url_prefix }}/models/{{ model_name }}"
+      class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:bg-gray-300">
+    Cancel
+  </a>
+</div>
+<script>
+
+      var editor = new JSONEditor(document.getElementById('editor_holder'),{
+        // Enable fetching schemas via ajax
+        ajax: true,
+
+        // The schema for the editor
+        schema: {
+          $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true",
+          format: "grid"
+        },
+      });
+
+      const editor_data = document.getElementById("editor_data")
+      editor.on('change',() => {
+        editor_data.value = JSON.stringify(editor.getValue())
+      });
+</script>
+{% endblock %}

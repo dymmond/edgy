@@ -115,34 +115,26 @@
 </form>
 
 <script>
-function moveSelected(fromId, toId) {
-    const from = document.getElementById(fromId);
-    const to = document.getElementById(toId);
-    Array.from(from.selectedOptions).forEach(option => {
-        to.appendChild(option);
+
+    var editor = new JSONEditor(document.getElementById('editor_holder'),{
+    // Enable fetching schemas via ajax
+    ajax: true,
+
+    // The schema for the editor
+    schema: {
+        $ref: "person.json",
+        format: "grid"
+    },
+
+    // Seed the form with a starting value
+    startval: starting_value
     });
-}
 
-// Ensure selected values are actually marked as selected + submit dummy field if none
-document.querySelector("form").addEventListener("submit", function (event) {
-    const form = this;
-
-    document.querySelectorAll("select[multiple]").forEach(select => {
-        const name = select.name;
-
-        // Force all options inside the select to be selected
-        Array.from(select.options).forEach(option => option.selected = true);
-
-        // If no options exist at all, manually add a dummy hidden input
-        if (name && select.options.length === 0) {
-            const hidden = document.createElement("input");
-            hidden.type = "hidden";
-            hidden.name = name;
-            hidden.value = "";
-            form.appendChild(hidden);
-        }
+    // Hook up the submit button to log to the console
+    document.getElementById('submit').addEventListener('click',function() {
+    // Get the value from the editor
+    console.log(editor.getValue());
     });
-});
 </script>
 
 
