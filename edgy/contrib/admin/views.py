@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from base64 import urlsafe_b64decode, urlsafe_b64encode
+from base64 import urlsafe_b64decode
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Union, cast, get_args, get_origin
 
@@ -305,25 +305,8 @@ class BaseObjectView:
         """
         return cast(dict, orjson.loads(urlsafe_b64decode(request.path_params.get("id"))))
 
-    def create_object_pk(self, pk: dict) -> str:
-        """
-        Extracts the object ID from the request's path parameters.
-
-        Assumes the object ID is present in the path parameters under the key "id".
-
-        Args:
-            request: The incoming Starlette Request object.
-
-        Returns:
-            The object ID as a string.
-        """
-        return urlsafe_b64encode(orjson.dumps(pk)).decode()
-
-    async def validate_boolean(self, value: str) -> bool:
-        return value.lower() in ["true", "1", "yes", "y"]
-
     async def save_model(
-        self, instance: type[edgy.Model], json_data: dict, create: bool = False
+        self, instance: edgy.Model | type[edgy.Model], json_data: dict, create: bool = False
     ) -> edgy.Model:
         """
         Saves an Edgy model instance based on form data.
@@ -375,6 +358,21 @@ class BaseObjectView:
 
         return cast(edgy.Model, instance)
 
+    async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
+        context: dict = await super().get_context_data(request, **kwargs)
+
+        model_name = request.path_params.get("name")
+
+        model = get_registered_model(model_name)
+
+        context.update(
+            {
+                "model": model,
+                "model_name": model_name,
+            }
+        )
+        return context
+
 
 class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
     """
@@ -403,14 +401,11 @@ class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
             NotFound: If the model name or the specific instance is not found.
         """
         context = await super().get_context_data(request, **kwargs)  # noqa
-        model_name = request.path_params.get("name")
-
-        model = get_registered_model(model_name)
+        model: type[Model] = context["model"]
 
         instance = await model.query.get_or_none(pk=self.get_object_pk(request))
         if not instance:
             raise NotFound()
-
         relationship_fields = {}
         m2m_values = {
             await getattr(instance, name).all() for name in model.meta.many_to_many_fields
@@ -424,10 +419,9 @@ class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
 
         context.update(
             {
-                "title": f"{model_name.capitalize()} #{instance}",
+                "title": f"{model.__name__.capitalize()} #{instance}",
                 "object": instance,
-                "model": model,
-                "model_name": model_name,
+                "object_pk": self.create_object_pk(instance.pk),
                 "relationship_fields": relationship_fields,
                 "m2m_values": m2m_values,
             }
@@ -468,7 +462,7 @@ class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
 
 
 class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
-    template_name = "admin/model_edit.html"
+    template_name = "admin/model_object_edit.html"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         """
@@ -490,23 +484,13 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
             NotFound: If the model name or the specific instance is not found.
         """
         context = await super().get_context_data(request, **kwargs)  # noqa
-        model_name = request.path_params.get("name")
-
-        model = get_registered_model(model_name)
-
+        model: type[Model] = context["model"]
         instance = await model.query.get_or_none(pk=self.get_object_pk(request))
         if not instance:
             raise NotFound()
-
-        context.update(
-            {
-                "title": f"Edit {instance}",
-                "object": instance,
-                "model": model,
-                "model_name": model_name,
-                "schema": get_model_json_schema(model, ref_template="../{model}/json"),
-            }
-        )
+        context["title"] = f"Edit {instance}"
+        context["object"] = instance
+        context["object_pk"] = self.create_object_pk(instance.pk)
         return context
 
     async def get(self, request: Request, **kwargs: Any) -> Any:
@@ -557,7 +541,7 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
                 f"{settings.admin_config.admin_prefix_url}/models/{model_name}"
             )
 
-        await self.save_model(instance, orjson.loads(await request.data()))
+        await self.save_model(instance, orjson.loads((await request.form())["editor_data"]))
 
         add_message(
             "success",
@@ -569,7 +553,7 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
 
 
 class ModelObjectDeleteView(BaseObjectView, AdminMixin, TemplateController):
-    template_name = "admin/model_edit.html"
+    template_name = "admin/model_object_edit.html"
 
     async def post(self, request: Request, **kwargs: Any) -> RedirectResponse:
         """
@@ -638,16 +622,11 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
             NotFound: If the model name is not found in the registered models.
         """
         context = await super().get_context_data(request, **kwargs)
-        model_name = request.path_params.get("name")
-
-        model = get_registered_model(model_name)
+        model_name: str = context["model_name"]
 
         context.update(
             {
                 "title": f"Create {model_name.capitalize()}",
-                "model": model,
-                "model_name": model_name,
-                "schema": get_model_json_schema(model, ref_template="../{model}/json"),
             }
         )
         return context
@@ -694,10 +673,11 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
         instance = await self.save_model(
             model, orjson.loads((await request.form())["editor_data"]), create=True
         )
+        obj_id = self.create_object_pk(instance.pk)
         add_message(
             "success",
-            f"{model_name.capitalize()} #{instance.id} has been created successfully.",
+            f"{model_name.capitalize()} #{instance} has been created successfully.",
         )
         return RedirectResponse(
-            f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{instance.id}"
+            f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
         )
