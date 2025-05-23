@@ -1,9 +1,6 @@
 from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
 
-from edgy.core.db.models.metaclasses import (
-    BaseModelMeta,
-    MetaInfo,
-)
+from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo, get_model_meta_attr
 
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
@@ -22,13 +19,13 @@ def _check_model_inherited_tenancy(bases: tuple[type, ...]) -> bool:
 
 class TenantMeta(MetaInfo):
     __slots__ = ("is_tenant", "register_default")
-    register_default: bool
+    register_default: Optional[bool]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self.is_tenant = getattr(meta, "is_tenant", None)
         # register in models too, so there is a default
         # otherwise they only exist as tenant models
-        self.register_default: bool = getattr(meta, "register_default", True)
+        self.register_default = getattr(meta, "register_default", None)
 
         # must be last
         super().__init__(meta, **kwargs)
@@ -66,7 +63,9 @@ class BaseTenantMeta(BaseModelMeta):
             **kwargs,
         )
         if new_model.meta.is_tenant is None:
-            new_model.meta.is_tenant = _check_model_inherited_tenancy(bases)
+            new_model.meta.is_tenant = get_model_meta_attr("is_tenant", bases)
+        if new_model.meta.register_default is None:
+            new_model.meta.register_default = get_model_meta_attr("register_default", bases)
 
         if (
             not skip_registry

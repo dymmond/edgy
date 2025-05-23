@@ -1,0 +1,42 @@
+{% extends "admin/base.html" %}
+
+{% block header %}Edit {{ model_name | replace('_', ' ') | title }} #{{ object }}{% endblock %}
+
+{% block content %}
+<div id="editor_holder"></div>
+<div class="pt-6 flex gap-4">
+  <form method="post" id="submit_form">
+        <button type="submit" class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+            Save Changes
+        </button>
+        <input type="hidden" name="editor_data" id="editor_data" value=''>
+    </form>
+    <a href=".." class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:bg-gray-300">
+        Cancel
+    </a>
+</div>
+<script>
+
+      var editor = new JSONEditor(document.getElementById('editor_holder'),{
+        ajax: true,
+        ajax_cache_responses: true,
+        required_by_default: false,
+        show_opt_in: true,
+        collapsed: true,
+        disable_properties: true,
+
+        // The schema for the editor
+        schema: {
+          $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true",
+          format: "grid",
+        },
+        startval: JSON.parse('{{object.model_dump_json() | safe}}')
+      });
+
+      const editor_data = document.getElementById("editor_data")
+      document.getElementById("submit_form").addEventListener("submit", async function(ev){
+        editor_data.value = JSON.stringify(editor.getValue())
+
+      })
+</script>
+{% endblock %}

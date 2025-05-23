@@ -310,9 +310,11 @@ class Registry:
         real_content_type: type[BaseModelType] = with_content_type
 
         if real_content_type.meta.abstract:
+            in_admin = real_content_type.meta.in_admin
             meta_args = {
                 "tablename": "contenttypes",
                 "registry": self,
+                "in_admin": False if in_admin is None else in_admin,
             }
 
             new_meta: MetaInfo = MetaInfo(None, **meta_args)

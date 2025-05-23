@@ -147,7 +147,7 @@ class ConcreteCompositeField(BaseCompositeField):
             try:
                 return getattr(instance, self.inner_field_names[0])
             except AttributeError:
-                if not instance._loaded_or_deleted:
+                if not instance._db_loaded_or_deleted:
                     raise AttributeError("not loaded") from None
                 return None
         if MODEL_GETATTR_BEHAVIOR.get() == "coro":
@@ -158,7 +158,7 @@ class ConcreteCompositeField(BaseCompositeField):
             try:
                 d[translated_name] = getattr(instance, key)
             except (AttributeError, KeyError):
-                if not instance._loaded_or_deleted:
+                if not instance._db_loaded_or_deleted:
                     raise AttributeError("not loaded") from None
                 pass
         if self.model is not None and self.model is not ConditionalRedirect:

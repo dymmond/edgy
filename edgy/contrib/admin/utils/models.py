@@ -32,21 +32,27 @@ def get_registered_models() -> dict[str, type[Model]]:
     return {name: registry.get_model(name) for name in registry.admin_models}
 
 
-def get_model(model_name: str) -> type[Model]:
+def get_model(model_name: str, *, no_check_admin_models: bool = False) -> type[Model]:
     registry = edgy.monkay.instance.registry
-    if model_name not in registry.admin_models:
+    if not no_check_admin_models and model_name not in registry.admin_models:
         raise LookupError()
     return cast("type[Model]", registry.get_model(model_name, exclude={"pattern_models"}))
 
 
 def get_model_json_schema(
-    model_name: str,
+    model: str | type[Model],
+    /,
     mode: Literal["validation", "serialization"] = "validation",
     include_callable_defaults: bool = False,
+    no_check_admin_models: bool = False,
+    **kwargs: Any,
 ) -> dict:
-    return get_model(model_name).model_json_schema(
+    if isinstance(model, str):
+        model = get_model(model, no_check_admin_models=no_check_admin_models)
+    return model.model_json_schema(
         schema_generator=CallableDefaultJsonSchema
         if include_callable_defaults
         else NoCallableDefaultJsonSchema,
         mode=mode,
+        **kwargs,
     )

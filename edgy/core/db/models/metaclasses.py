@@ -22,13 +22,13 @@ from typing import (
 import sqlalchemy
 from pydantic._internal._model_construction import ModelMetaclass
 
-from edgy import ManyToManyField
 from edgy.core import signals as signals_module
 from edgy.core.connection.registry import Registry
 from edgy.core.db import fields as edgy_fields
 from edgy.core.db.datastructures import Index, UniqueConstraint
 from edgy.core.db.fields.base import BaseForeignKey, PKField, RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
+from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.fields.ref_foreign_key import BaseRefForeignKey
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.core.db.models.managers import BaseManager
@@ -80,7 +80,7 @@ class Fields(UserDict, dict[str, BaseFieldType]):
 
             # This is particularly useful for M2M distinguish
             # Mostly for the admin manipulation
-            if isinstance(field, ManyToManyField):
+            if isinstance(field, BaseManyToManyForeignKeyField):
                 self.meta.many_to_many_fields.add(name)
         if isinstance(field, BaseRefForeignKey):
             self.meta.ref_foreign_key_fields.add(name)
@@ -287,7 +287,7 @@ class MetaInfo:
         self.no_copy: bool = getattr(meta, "no_copy", False)
         # for embedding
         self.inherit: bool = getattr(meta, "inherit", True)
-        self.in_admin: bool = getattr(meta, "in_admin", True)
+        self.in_admin: Optional[bool] = getattr(meta, "in_admin", None)
         self.registry: Union[Registry, Literal[False], None] = getattr(meta, "registry", None)
         self.tablename: Optional[str] = getattr(meta, "tablename", None)
         for attr in ["unique_together", "indexes", "constraints"]:
@@ -472,6 +472,30 @@ class MetaInfo:
             return cast(Sequence["sqlalchemy.Column"], _empty_set)
 
 
+def get_model_meta_attr(
+    attr: str, bases: tuple[type, ...], meta_class: Optional[Union[object, MetaInfo]] = None
+) -> Optional[Any]:
+    """
+    When an enabled attr is missing or None from the Meta class, it should look up for the bases
+    and obtain the first found attr.
+    """
+    if meta_class is not None:
+        direct_attr: Any = getattr(meta_class, attr, None)
+        if direct_attr is not None:
+            return direct_attr
+
+    for base in bases:
+        meta: MetaInfo = getattr(base, "meta", None)
+        # now check meta
+        if meta is None:
+            continue
+        found_attr: Any = getattr(meta, attr, None)
+
+        if found_attr is not None:
+            return found_attr
+    return None
+
+
 def get_model_registry(
     bases: tuple[type, ...], meta_class: Optional[Union[object, MetaInfo]] = None
 ) -> Union[Registry, None, Literal[False]]:
@@ -479,23 +503,10 @@ def get_model_registry(
     When a registry is missing from the Meta class, it should look up for the bases
     and obtain the first found registry.
     """
-    if meta_class is not None:
-        direct_registry: Union[Registry, None, Literal[False]] = getattr(
-            meta_class, "registry", None
-        )
-        if direct_registry is not None:
-            return direct_registry
-
-    for base in bases:
-        meta: MetaInfo = getattr(base, "meta", None)
-        # now check meta
-        if meta is None:
-            continue
-        found_registry: Union[Registry, None, Literal[False]] = getattr(meta, "registry", None)
-
-        if found_registry is not None:
-            return found_registry
-    return None
+    return cast(
+        "Union[Registry, None, Literal[False]]",
+        get_model_meta_attr("registry", bases=bases, meta_class=meta_class),
+    )
 
 
 def _handle_annotations(base: type, base_annotations: dict[str, Any]) -> None:

@@ -39,7 +39,12 @@ if TYPE_CHECKING:
     from edgy.core.signals import Broadcaster
 
 _empty = cast(set[str], frozenset())
-_excempted_attrs: set[str] = {"_loaded_or_deleted", "_edgy_namespace", "_edgy_private_attrs"}
+_excempted_attrs: set[str] = {
+    "_db_loaded",
+    "_db_deleted",
+    "_edgy_namespace",
+    "_edgy_private_attrs",
+}
 
 
 class EdgyBaseModel(BaseModel, BaseModelType):
@@ -70,7 +75,9 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     __no_load_trigger_attrs__: ClassVar[set[str]] = _empty
     database: ClassVar[Database] = None
     # private attributes
-    _loaded_or_deleted: bool = PrivateAttr(default=False)
+    _db_loaded: bool = PrivateAttr(default=False)
+    # not in db anymore or deleted
+    _db_deleted: bool = PrivateAttr(default=False)
     _db_schemas: ClassVar[dict[str, type[BaseModelType]]]
 
     def __init__(
@@ -81,8 +88,9 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         __drop_extra_kwargs__: bool = False,
         **kwargs: Any,
     ) -> None:
-        # always set _loaded_or_deleted in __dict__ to prevent __getattr__ loop
-        self.__dict__["_loaded_or_deleted"] = False
+        # always set _db_loaded and _db_deleted in __dict__ to prevent __getattr__ loop
+        self.__dict__["_db_loaded"] = False
+        self.__dict__["_db_deleted"] = False
         klass = self.__class__
         self.__dict__["_edgy_namespace"] = _edgy_namespace = {
             "__show_pk__": klass.__show_pk__,
@@ -128,10 +136,12 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         )
         # remove the stub attributes in dict
         del self.__dict__["_edgy_namespace"]
-        _loaded_or_deleted = self.__dict__.pop("_loaded_or_deleted")
+        _db_loaded = self.__dict__.pop("_db_loaded")
+        _db_deleted = self.__dict__.pop("_db_deleted")
         super().__init__(**kwargs)
         # and set them properly
-        self._loaded_or_deleted = _loaded_or_deleted
+        self._db_loaded = _db_loaded
+        self._db_deleted = _db_deleted
         self._edgy_namespace = _edgy_namespace
         # move to dict (e.g. reflected or subclasses which allow extra attributes)
         if self.__pydantic_extra__ is not None:
@@ -143,6 +153,19 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         for field_name in self.meta.fields:
             if field_name not in kwargs:
                 self.__dict__.pop(field_name, None)
+
+    @property
+    def _db_loaded_or_deleted(self) -> bool:
+        return self._db_loaded or self._db_deleted
+
+    @property
+    def _loaded_or_deleted(self) -> bool:
+        warnings.warn(
+            '"_loaded_or_deleted" is deprecated use "_db_loaded_or_deleted" instead.',
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._db_loaded_or_deleted
 
     @classmethod
     def transform_input(
@@ -232,10 +255,10 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 return
             else:
                 _seen.add(model_key)
-        _loaded_or_deleted = self._loaded_or_deleted
+        _db_loaded_or_deleted = self._db_loaded_or_deleted
         if self.can_load:
             await self.load(only_needed)
-        if only_needed_nest and _loaded_or_deleted:
+        if only_needed_nest and _db_loaded_or_deleted:
             return
         for field_name in self.meta.foreign_key_fields:
             value = getattr(self, field_name, None)
@@ -602,8 +625,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             if (
                 name not in self.__dict__
                 and behavior != "passdown"
-                # is already loaded
-                and not self._loaded_or_deleted
+                # is already loaded or deleted
+                and not self._db_loaded_or_deleted
                 # only load when it is a field except for reflected
                 and (field is not None or self.__reflected__)
                 # exclude attr names from triggering load

@@ -54,12 +54,14 @@ class Tenant(edgy.Model):
         self,
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], None] = None,
-    ) -> Type[Model]:
-        tenant = await super().save(force_insert, values)
+    ) -> Model:
+        tenant = await super().real_save(force_insert, values)
         try:
-            await self.create_schema(schema=tenant.schema_name, if_not_exists=True)
-            await self.create_tables(
-                registry, registry.models, tenant.schema_name, exclude=["Tenant", "TenantUser"]
+            await registry.schema.create_schema(
+                schema=tenant.schema_name,
+                if_not_exists=True,
+                init_tenant_models=True,
+                update_cache=False,
             )
         except Exception as e:
             message = f"Rolling back... {str(e)}"

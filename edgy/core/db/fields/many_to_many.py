@@ -3,6 +3,8 @@ from collections.abc import Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal, Union, cast
 
+from pydantic import SkipValidation
+
 from edgy.core.db.constants import CASCADE, NEW_M2M_NAMING, OLD_M2M_NAMING
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import BaseForeignKey
@@ -40,6 +42,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
+        # use edgy validation instead, we have an extended logic
+        self.metadata.append(SkipValidation())
         self.to_fields = to_fields
         self.to_foreign_key = to_foreign_key
         self.from_fields = from_fields
@@ -182,6 +186,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             or getattr(self.target.meta, "is_tenant", False)
             else ()
         )
+        in_admin_default = False
         pknames = set()
         if self.through:
             through = self.through
@@ -232,6 +237,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 return
             pknames = set(through.pknames)
             __bases__ = (through,)
+            if through.meta.in_admin is not None:
+                in_admin_default = through.meta.in_admin
             del through
         assert self.owner.meta.registry, "no registry set"
         owner_name = self.owner.__name__
@@ -271,8 +278,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             no_copy=True,
             is_tenant=getattr(self.owner.meta, "is_tenant", False)
             or getattr(self.target.meta, "is_tenant", False),
-            register_default=getattr(self.owner.meta, "register_default", False),
-            in_admin=False,
+            register_default=getattr(self.owner.meta, "register_default", None),
+            in_admin=in_admin_default,
             **meta_args,
         )
 
@@ -377,7 +384,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         await value.save_related()
 
 
-class ManyToManyField(ForeignKeyFieldFactory):
+class ManyToManyField(ForeignKeyFieldFactory, list):
     field_type: Any = Any
     field_bases = (BaseManyToManyForeignKeyField,)
 

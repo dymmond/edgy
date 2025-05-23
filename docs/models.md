@@ -60,6 +60,14 @@ For this the `StrictModel` model can be used. Otherwise it behaves like a normal
 
 There is no strict version of a `ReflectModel` because the laxness is required.
 
+### Admin
+
+There is an admin interface via `edgy admin_serve`. It includes most models (with `meta.in_admin` not `False`).
+It is currently experimental. You may want to include the underlying lilya application in your real project to have an admin interface.
+
+!!! Note
+    Never expose to 0.0.0.0. We have no security as well as user permission management yet. So it is highly recommended
+    to protect the admin interface by including it in your project.
 
 ### Loading models
 

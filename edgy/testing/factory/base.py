@@ -252,7 +252,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
             )
         )
         # we don't want to trigger loads.
-        result._loaded_or_deleted = True
+        result._db_loaded = True
         if database is not None:
             result.database = self.database
         if schema is not None:

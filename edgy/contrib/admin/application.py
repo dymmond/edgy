@@ -3,19 +3,24 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from lilya.apps import ChildLilya
+from lilya.apps import ChildLilya, Lilya
+from lilya.middleware import DefineMiddleware
+from lilya.middleware.session_context import SessionContextMiddleware
+from lilya.middleware.sessions import SessionMiddleware
 from lilya.requests import Request
 from lilya.routing import RoutePath
 from lilya.templating import Jinja2Template
 
+from edgy.conf import settings
 from edgy.contrib.admin.views import (
     AdminDashboard,
-    ModelCreateView,
-    ModelDeleteView,
+    JSONSchemaView,
     ModelDetailView,
-    ModelEditView,
-    ModelListView,
-    ModelObjectView,
+    ModelObjectCreateView,
+    ModelObjectDeleteView,
+    ModelObjectDetailView,
+    ModelObjectEditView,
+    ModelOverview,
 )
 
 templates = Jinja2Template(directory=str(Path(__file__).resolve().parent / "templates"))
@@ -30,25 +35,31 @@ async def not_found(request: Request, exc: Exception) -> Any:
     )
 
 
-app = ChildLilya(
-    routes=[
-        RoutePath("/", handler=AdminDashboard, name="admin"),
-        RoutePath("/models", handler=ModelListView, name="models"),
-        RoutePath("/models/{name}", handler=ModelDetailView, name="model-details"),
-        RoutePath("/models/{name}/create", handler=ModelCreateView, name="model-create"),
-        RoutePath("/models/{name}/{id}", handler=ModelObjectView, name="model-object"),
-        RoutePath(
-            "/models/{name}/{id}/edit",
-            handler=ModelEditView,
-            name="model-edit",
-            methods=["GET", "POST"],
-        ),
-        RoutePath(
-            "/models/{name}/{id}/delete",
-            handler=ModelDeleteView,
-            name="model-delete",
-            methods=["POST"],
-        ),
-    ],
-    exception_handlers={404: not_found},
-)
+def create_application() -> Lilya:
+    return ChildLilya(
+        routes=[
+            RoutePath("/", handler=AdminDashboard, name="admin"),
+            RoutePath("/models", handler=ModelOverview, name="models"),
+            RoutePath("/models/{name}", handler=ModelDetailView, name="model-details"),
+            RoutePath("/models/{name}/json", handler=JSONSchemaView, name="model-schema"),
+            RoutePath("/models/{name}/create", handler=ModelObjectCreateView, name="model-create"),
+            RoutePath("/models/{name}/{id}", handler=ModelObjectDetailView, name="model-object"),
+            RoutePath(
+                "/models/{name}/{id}/edit",
+                handler=ModelObjectEditView,
+                name="model-edit",
+                methods=["GET", "POST"],
+            ),
+            RoutePath(
+                "/models/{name}/{id}/delete",
+                handler=ModelObjectDeleteView,
+                name="model-delete",
+                methods=["POST"],
+            ),
+        ],
+        middleware=[
+            DefineMiddleware(SessionMiddleware, secret_key=settings.admin_config.SECRET_KEY),
+            DefineMiddleware(SessionContextMiddleware),
+        ],
+        exception_handlers={404: not_found},
+    )

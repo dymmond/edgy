@@ -34,7 +34,7 @@ class TenantModel(Model, metaclass=BaseTenantMeta):
                 "Reflected models are not compatible with multi_tenancy"
             )
 
-            if not cls.meta.register_default:
+            if cls.meta.register_default is False:
                 # remove from models
                 cls.meta.registry.models.pop(cls.__name__, None)
             cls.meta.registry.tenant_models[cls.__name__] = cls

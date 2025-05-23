@@ -8,9 +8,9 @@ if TYPE_CHECKING:
     import sqlalchemy
 
     from edgy.core.connection.database import Database
-    from edgy.core.db.models.base import BaseModel
     from edgy.core.db.models.managers import BaseManager
     from edgy.core.db.models.metaclasses import MetaInfo
+    from edgy.core.db.models.model import Model
     from edgy.core.db.querysets.base import QuerySet
     from edgy.protocols.transaction_call import TransactionCallProtocol
 
@@ -84,7 +84,7 @@ class BaseModelType(ABC):
 
     @classmethod
     @abstractmethod
-    def generate_proxy_model(cls) -> type[BaseModel]:
+    def generate_proxy_model(cls) -> type[Model]:
         """
         Generates a proxy model for each model. This proxy model is a simple
         shallow copy of the original model being generated.
@@ -95,7 +95,7 @@ class BaseModelType(ABC):
         """Load model"""
 
     @abstractmethod
-    async def update(self, **kwargs: Any) -> Any:
+    async def update(self, **kwargs: Any) -> BaseModelType:
         """
         Update operation of the database fields.
         """
@@ -106,7 +106,7 @@ class BaseModelType(ABC):
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], list[str], None] = None,
     ) -> BaseModelType:
-        """Save model"""
+        """Save model. For customizations used by querysets and direct calls."""
 
     @abstractmethod
     async def save(
@@ -114,7 +114,7 @@ class BaseModelType(ABC):
         force_insert: bool = False,
         values: Union[dict[str, Any], set[str], list[str], None] = None,
     ) -> BaseModelType:
-        """Save model"""
+        """Save model. For customizations only by direct calls."""
 
     @abstractmethod
     async def raw_delete(
