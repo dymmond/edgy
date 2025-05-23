@@ -167,6 +167,7 @@ Querying the API should return data corresponding to the specified tenant:
 ##### Tenant Only Models
 
 To prevent models from being created in the non-tenant schema, set `register_default` to `False` in the model's Meta.
+This is inherited.
 
 ##### Notes
 

@@ -18,10 +18,11 @@ hide:
 - `_loaded_or_deleted` is now `_db_loaded_or_deleted`. The former name is now deprecated.
 - `_loaded_or_deleted` is splitted in `_db_loaded` and `_db_deleted`.
 
-
 ### Fixed
 
 - Recursive saving.
+- Various json schema fixes.
+- Inherit register_default.
 
 ## 0.31.3
 
