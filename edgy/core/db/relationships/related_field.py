@@ -102,6 +102,14 @@ class RelatedField(RelationshipField):
             owner_database = self.owner.database
         return str(owner_database.url) != str(self.foreign_key.owner.database.url)
 
+    def get_related_model_for_admin(self) -> Optional[type[BaseModelType]]:
+        related_from_registry = self.related_from.meta.registry
+        assert related_from_registry is not None and related_from_registry is not False
+        if self.related_from.__name__ in related_from_registry.admin_models:
+            # FIXME: handle embedded
+            return self.related_from
+        return None
+
     @property
     def is_m2m(self) -> bool:
         return self.foreign_key.is_m2m

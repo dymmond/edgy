@@ -16,19 +16,35 @@
                     {% set value = getattr(object, field) %}
                     {% set rel_type = relationship_fields.get(field) %}
 
-                    {% if rel_type == "many_to_many" %}
+                    {% if rel_type == "many_to_many" or rel_type == "related_field" %}
                         {% set items = m2m_values.get(field, []) %}
+                        {% set related_model = field_info.get_related_model_for_admin() %}
                         {% if items %}
-                            {% for item in items %}
-                                {{ item }}{% if not loop.last %}, {% endif %}
-                            {% endfor %}
+                            {% if related_model %}
+                                {% for item in items %}
+                                    <a href="{{ url_prefix }}/models/{{ related_model.__name__ }}/{{ create_object_pk(item) }}" class="text-blue-600">
+                                        {{ item }}
+                                    </a>{% if not loop.last %}, {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                {% for item in items %}
+                                    {{ item }}{% if not loop.last %}, {% endif %}
+                                {% endfor %}
+                            {% endif %}
                         {% else %}
                             —
                         {% endif %}
 
                     {% elif rel_type == "foreign_key" %}
+                        {% set related_model = field_info.get_related_model_for_admin() %}
                         {% if value %}
-                            {{ value }}
+                            {% if related_model %}
+                                <a href="{{ url_prefix }}/models/{{ field_info.target.__name__ }}/{{ create_object_pk(value) }}" class="text-blue-600">
+                                    {{ value }}
+                                </a>
+                            {% else %}
+                                {{ value}}
+                            {% endif %}
                         {% else %}
                             —
                         {% endif %}

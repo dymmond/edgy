@@ -354,6 +354,9 @@ class RelationshipField(BaseField):
     def is_cross_db(self, owner_database: Optional["Database"] = None) -> bool:
         raise NotImplementedError()
 
+    def get_related_model_for_admin(self) -> Optional["BaseModelType"]:
+        raise NotImplementedError()
+
 
 class PKField(BaseCompositeField):
     """
@@ -532,6 +535,11 @@ class BaseForeignKey(RelationshipField):
         if owner_database is None:
             owner_database = self.owner.database
         return str(owner_database.url) != str(self.target.database.url)
+
+    def get_related_model_for_admin(self) -> Optional[type["BaseModelType"]]:
+        if self.target.__name__ in self.target_registry.admin_models:
+            return cast("type[BaseModelType]", self.target)
+        return None
 
     @abstractmethod
     def reverse_clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]: ...

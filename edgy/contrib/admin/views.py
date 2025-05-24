@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from base64 import urlsafe_b64decode
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any, Union, cast, get_args, get_origin
 
@@ -17,6 +16,8 @@ from edgy.conf import settings
 from edgy.contrib.admin.mixins import AdminMixin
 from edgy.contrib.admin.utils.messages import add_message
 from edgy.contrib.pagination import Paginator
+from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
+from edgy.core.db.relationships.related_field import RelatedField
 from edgy.exceptions import ObjectNotFound
 
 from .utils.models import get_model as _get_model
@@ -291,20 +292,6 @@ class BaseObjectView:
     Provides utility methods for extracting and parsing object IDs.
     """
 
-    def get_object_pk(self, request: Request) -> dict:
-        """
-        Extracts the object ID from the request's path parameters.
-
-        Assumes the object ID is present in the path parameters under the key "id".
-
-        Args:
-            request: The incoming Starlette Request object.
-
-        Returns:
-            The object ID as dict.
-        """
-        return cast(dict, orjson.loads(urlsafe_b64decode(request.path_params.get("id"))))
-
     async def save_model(
         self, instance: edgy.Model | type[edgy.Model], json_data: dict, create: bool = False
     ) -> edgy.Model:
@@ -408,12 +395,16 @@ class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
             raise NotFound()
         relationship_fields = {}
         m2m_values = {
-            await getattr(instance, name).all() for name in model.meta.many_to_many_fields
+            name: await getattr(instance, name).all()
+            for name in model.meta.relationship_fields
+            if isinstance(model.meta.fields[name], (BaseManyToManyForeignKeyField, RelatedField))
         }
 
         for field in model.meta.relationship_fields:
-            if field in m2m_values:
+            if isinstance(model.meta.fields[field], BaseManyToManyForeignKeyField):
                 relationship_fields[field] = "many_to_many"
+            elif isinstance(model.meta.fields[field], RelatedField):
+                relationship_fields[field] = "related_field"
             elif field in model.meta.foreign_key_fields:
                 relationship_fields[field] = "foreign_key"
 
@@ -421,7 +412,7 @@ class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
             {
                 "title": f"{model.__name__.capitalize()} #{instance}",
                 "object": instance,
-                "object_pk": self.create_object_pk(instance.pk),
+                "object_pk": self.create_object_pk(instance),
                 "relationship_fields": relationship_fields,
                 "m2m_values": m2m_values,
             }
@@ -490,7 +481,7 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
             raise NotFound()
         context["title"] = f"Edit {instance}"
         context["object"] = instance
-        context["object_pk"] = self.create_object_pk(instance.pk)
+        context["object_pk"] = self.create_object_pk(instance)
         return context
 
     async def get(self, request: Request, **kwargs: Any) -> Any:
@@ -552,9 +543,7 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
         )
 
 
-class ModelObjectDeleteView(BaseObjectView, AdminMixin, TemplateController):
-    template_name = "admin/model_object_edit.html"
-
+class ModelObjectDeleteView(AdminMixin, Controller):
     async def post(self, request: Request, **kwargs: Any) -> RedirectResponse:
         """
         Handles POST requests to delete a model instance.
@@ -586,12 +575,12 @@ class ModelObjectDeleteView(BaseObjectView, AdminMixin, TemplateController):
             return RedirectResponse(
                 f"{settings.admin_config.admin_prefix_url}/models/{model_name}"
             )
-
+        instance_name = str(instance)
         await instance.delete()
 
         add_message(
             "success",
-            f"{model_name.capitalize()} #{obj_id} has been deleted successfully.",
+            f"{model_name.capitalize()} #{instance_name} has been deleted successfully.",
         )
         return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}")
 
@@ -673,7 +662,7 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
         instance = await self.save_model(
             model, orjson.loads((await request.form())["editor_data"]), create=True
         )
-        obj_id = self.create_object_pk(instance.pk)
+        obj_id = self.create_object_pk(instance)
         add_message(
             "success",
             f"{model_name.capitalize()} #{instance} has been created successfully.",
