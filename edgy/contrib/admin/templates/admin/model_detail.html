@@ -53,7 +53,7 @@
         </thead>
         <tbody class="divide-y divide-gray-100 bg-white">
             {% for obj in page.content %}
-            <tr class="hover:bg-gray-50 transition cursor-pointer" onclick="window.location='{{ url_prefix }}/models/{{ model_name }}/{{ create_object_pk(obj.pk) }}'">
+            <tr class="hover:bg-gray-50 transition cursor-pointer" onclick="window.location='{{ url_prefix }}/models/{{ model_name }}/{{ create_object_pk(obj) }}'">
                 {% for field in model.__fields__.keys() if field != 'pk' %}
                 <td class="px-6 py-4 text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-xs">
                     {{ getattr(obj, field) }}

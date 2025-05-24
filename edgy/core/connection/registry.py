@@ -314,7 +314,7 @@ class Registry:
             meta_args = {
                 "tablename": "contenttypes",
                 "registry": self,
-                "in_admin": False if in_admin is None else in_admin,
+                "in_admin": True if in_admin is None else in_admin,
             }
 
             new_meta: MetaInfo = MetaInfo(None, **meta_args)

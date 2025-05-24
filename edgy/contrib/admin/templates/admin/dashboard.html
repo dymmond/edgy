@@ -59,7 +59,11 @@
                 <tbody class="divide-y divide-gray-100 bg-white">
                     {% for model in models %}
                     <tr class="hover:bg-gray-50 transition">
-                        <td class="px-6 py-4 text-sm text-gray-800">{{ model.name }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-800">
+                            <a href="{{ url_prefix }}/models/{{ model.name }}" class="hover:underline">
+                            {{ model.name }}
+                            </a>
+                        </td>
                         <td class="px-6 py-4 text-sm text-gray-800">{{ model.verbose }}</td>
                         <td class="px-6 py-4 text-sm text-gray-800">{{ model.count }}</td>
                         <td class="px-6 py-4 text-sm">
