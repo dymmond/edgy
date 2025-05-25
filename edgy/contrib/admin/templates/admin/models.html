@@ -7,7 +7,11 @@
     {% for name, model in models.items() %}
     <div class="bg-white rounded-lg shadow hover:shadow-md transition p-5 flex flex-col justify-between h-full">
         <div>
-            <h2 class="text-lg font-semibold text-edgy-pink capitalize">{{ name }}</h2>
+            <h2 class="text-lg font-semibold text-edgy-pink capitalize">
+                <a href="{{ url_prefix }}/models/{{ model.__name__ }}" class="hover:underline">
+                {{ name }}
+                </a>
+            </h2>
             <p class="text-sm text-gray-500">{{ model.__module__ }}.{{ model.__name__ }}</p>
         </div>
         <div class="mt-4 flex justify-between items-center">

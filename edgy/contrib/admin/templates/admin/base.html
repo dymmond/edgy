@@ -113,10 +113,13 @@
 
   <script>
     // Show loading on form submit
+    const loading_overlay = document.getElementById("loading-overlay")
     document.addEventListener("DOMContentLoaded", function () {
+      // reset in case of navigation
+      loading_overlay.classList.add("hidden");
       document.querySelectorAll("form").forEach(form => {
         form.addEventListener("submit", function () {
-          document.getElementById("loading-overlay").classList.remove("hidden");
+          loading_overlay.classList.remove("hidden");
         });
       });
 
@@ -124,7 +127,7 @@
       document.querySelectorAll("a").forEach(link => {
         link.addEventListener("click", function (e) {
           if (link.getAttribute("href") && !link.getAttribute("href").startsWith("#")) {
-            document.getElementById("loading-overlay").classList.remove("hidden");
+            loading_overlay.classList.remove("hidden");
           }
         });
       });

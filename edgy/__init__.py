@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__version__ = "0.31.3"
+__version__ = "0.32.0"
 from typing import TYPE_CHECKING
 
 from ._monkay import Instance, create_monkay

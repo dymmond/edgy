@@ -20,8 +20,13 @@ from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.exceptions import ObjectNotFound
 
+from .utils.models import (
+    add_to_recent_models,
+    get_model_json_schema,
+    get_recent_models,
+    get_registered_models,
+)
 from .utils.models import get_model as _get_model
-from .utils.models import get_model_json_schema, get_registered_models
 
 if TYPE_CHECKING:
     from edgy.core.db.models.model import Model
@@ -114,7 +119,7 @@ class AdminDashboard(AdminMixin, TemplateController):
                 "models": sorted(model_stats, key=lambda m: m["verbose"]),
                 "total_records": total_records,
                 "top_model": top_model,
-                "recent_models": ["user", "album", "track"],  # TODO: make dynamic later
+                "recent_models": get_recent_models(),
                 "url_prefix": settings.admin_config.admin_prefix_url,
             }
         )
@@ -221,6 +226,7 @@ class ModelDetailView(AdminMixin, TemplateController):
         page_size = min(max(page_size, 1), 250)
 
         model = get_registered_model(model_name)
+        add_to_recent_models(model)
 
         queryset = model.query.all()
 
@@ -351,6 +357,7 @@ class BaseObjectView:
         model_name = request.path_params.get("name")
 
         model = get_registered_model(model_name)
+        add_to_recent_models(model)
 
         context.update(
             {

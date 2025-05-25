@@ -41,6 +41,9 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
         if remove_referenced_call:
             return
         reverse_name = f"reverse_{self.name.lower()}"
+        if not hasattr(self, reverse_name):
+            # e.g. model was removed from registry
+            return
         referenced_obs = cast("QuerySet", getattr(self, reverse_name))
         fk = cast("BaseForeignKeyField", self.meta.fields[reverse_name].foreign_key)
         if fk.force_cascade_deletion_relation:
