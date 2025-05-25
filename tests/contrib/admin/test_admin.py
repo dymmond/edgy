@@ -108,7 +108,7 @@ async def test_models(async_client):
 
 
 @pytest.mark.parametrize("model", models.admin_models)
-async def test_models_create(async_client, model):
+async def test_models_create_and_delete(async_client, model):
     response = await async_client.post(
         f"/models/{model}/create",
         data={"editor_data": '{"name": "foo1234"}'},
@@ -122,6 +122,13 @@ async def test_models_create(async_client, model):
     obj = await models.get_model(model).query.get(
         pk=json.loads(urlsafe_b64decode(response.url.path.rsplit("/")[-1]))
     )
-    if model in {"Permission", "Group", "ContentType"}:
-        return
-    assert obj.content_type is not None
+    assert await obj.check_exist_in_db()
+    if model not in {"Permission", "Group", "ContentType"}:
+        assert obj.content_type is not None
+
+    response = await async_client.post(
+        f"/models/{model}/{response.url.path.rsplit('/')[-1]}/delete",
+        follow_redirects=True,
+    )
+    assert response.url.path.rsplit("/")[-1] == model
+    assert not await obj.check_exist_in_db()
