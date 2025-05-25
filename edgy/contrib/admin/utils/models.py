@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Literal, cast
 
+from lilya.context import session
 from pydantic.json_schema import GenerateJsonSchema, NoDefault
 from pydantic_core import core_schema
 
@@ -56,3 +57,19 @@ def get_model_json_schema(
         mode=mode,
         **kwargs,
     )
+
+
+def add_to_recent_models(model: type[Model]) -> None:
+    if not model.meta.registry:
+        return
+    if hasattr(session, "recent_models"):
+        recent_models = [name for name in session.recent_models[:10] if name != model.__name__]
+    else:
+        recent_models = []
+    recent_models.insert(0, model.__name__)
+
+
+def get_recent_models() -> list[str]:
+    if not getattr(session, "recent_models", None):
+        return []
+    return cast(list[str], session.recent_models)

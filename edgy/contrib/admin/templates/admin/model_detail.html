@@ -44,7 +44,12 @@
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
-                {% for field in model.__fields__.keys() if field != 'pk' %}
+                {% for field in model.pknames if not model.meta.fields[field].exclude %}
+                <th scope="col" class="px-6 py-3 text-left text-xs font-extrabold text-gray-800 uppercase tracking-wider">
+                    {{ field.replace('_', ' ') | title }}
+                </th>
+                {% endfor %}
+                {% for field, field_info in model.__fields__.items() if not field_info.exclude and field not in model.pknames and field not in model.meta.relationship_fields %}
                 <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     {{ field.replace('_', ' ') | title }}
                 </th>
@@ -54,7 +59,12 @@
         <tbody class="divide-y divide-gray-100 bg-white">
             {% for obj in page.content %}
             <tr class="hover:bg-gray-50 transition cursor-pointer" onclick="window.location='{{ url_prefix }}/models/{{ model_name }}/{{ create_object_pk(obj) }}'">
-                {% for field in model.__fields__.keys() if field != 'pk' %}
+                {% for field in model.pknames if not model.meta.fields[field].exclude %}
+                <td class="px-6 py-4 text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-xs">
+                    {{ getattr(obj, field) }}
+                </td>
+                {% endfor %}
+                {% for field, field_info in model.__fields__.items() if not field_info.exclude and field not in model.pknames and field not in model.meta.relationship_fields %}
                 <td class="px-6 py-4 text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-xs">
                     {{ getattr(obj, field) }}
                 </td>
