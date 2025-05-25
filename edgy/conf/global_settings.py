@@ -55,6 +55,6 @@ class EdgySettings(MediaSettings, MigrationSettings):
     ipython_args: Union[list[str], tuple[str, ...]] = ("--no-banner",)
     ptpython_config_file: str = "~/.config/ptpython/config.py"
 
-    @property
+    @cached_property
     def admin_config(self) -> AdminConfig:
         return AdminConfig()

@@ -35,7 +35,7 @@ async def not_found(request: Request, exc: Exception) -> Any:
     )
 
 
-def create_application() -> Lilya:
+def create_admin_app() -> Lilya:
     return ChildLilya(
         routes=[
             RoutePath("/", handler=AdminDashboard, name="admin"),

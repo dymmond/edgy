@@ -6,7 +6,7 @@
 <div class="bg-white border border-gray-200 rounded-lg shadow-sm w-full px-6 py-6">
 
     <div class="space-y-6">
-        {% for field, field_info in model.__fields__.items() %}
+        {% for field, field_info in model.model_fields.items() %}
         {% if not field_info.exclude %}
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                 <dt class="text-sm {% if field_info.primary_key  %}font-extrabold{% else %}font-semibold{% endif %} text-gray-800 w-full sm:w-1/4">
