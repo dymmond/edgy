@@ -45,6 +45,7 @@ class Product(edgy.StrictModel):
     status = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
     status2 = fields.CharChoiceField(StatusEnum, default=StatusEnum.DRAFT)
     value = fields.FloatField(null=True)
+    manual = fields.FileField(null=True)
 
     class Meta:
         registry = models
@@ -113,6 +114,27 @@ async def test_model_schema():
             },
             "huge_number": {"default": 0, "title": "Huge Number", "type": "integer"},
             "id": {"default": None, "title": "Id", "type": "integer"},
+            "manual": {
+                "additionalProperties": False,
+                "default": None,
+                "properties": {
+                    "content": {
+                        "format": "base64",
+                        "title": "Content",
+                        "type": "string",
+                    },
+                    "name": {
+                        "title": "Name",
+                        "type": "string",
+                    },
+                },
+                "required": [
+                    "name",
+                    "content",
+                ],
+                "title": "Manual",
+                "type": "object",
+            },
             "price": {
                 "anyOf": [{"type": "number"}, {"type": "string"}, {"type": "null"}],
                 "default": None,

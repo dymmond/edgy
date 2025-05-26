@@ -13,8 +13,6 @@ models = edgy.Registry(
     with_content_type=os.environ.get("TEST_NO_CONTENT_TYPE", "false") != "true",
 )
 
-basedir = os.path.abspath(os.path.dirname(__file__))
-
 if os.environ.get("TEST_ADD_NULLABLE_FIELDS", "false") == "true":
 
     class Profile(edgy.StrictModel):
@@ -31,6 +29,7 @@ if os.environ.get("TEST_ADD_NULLABLE_FIELDS", "false") == "true":
 
 class User(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100)
+    cv = edgy.fields.FileField(null=True)
     if os.environ.get("TEST_ADD_NULLABLE_FIELDS", "false") == "true":
         # simple default
         active = edgy.fields.BooleanField(server_default=sqlalchemy.text("true"), default=False)

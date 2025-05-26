@@ -524,7 +524,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         fields = self.meta.fields
         field = fields.get(key, None)
         token = CURRENT_INSTANCE.set(self)
-        token2 = CURRENT_PHASE.set("set")
+        token2 = CURRENT_MODEL_INSTANCE.set(self)
+        token3 = CURRENT_PHASE.set("set")
         if field is not None:
             token_field_ctx = CURRENT_FIELD_CONTEXT.set(
                 cast("FIELD_CONTEXT_TYPE", {"field": field})
@@ -555,7 +556,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             if field is not None:
                 CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
             CURRENT_INSTANCE.reset(token)
-            CURRENT_PHASE.reset(token2)
+            CURRENT_MODEL_INSTANCE.reset(token2)
+            CURRENT_PHASE.reset(token3)
 
     async def _agetattr_helper(self, name: str, getter: Any) -> Any:
         await self.load()

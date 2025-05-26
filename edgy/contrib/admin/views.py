@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from typing import TYPE_CHECKING, Any, Union, cast, get_args, get_origin
+from typing import TYPE_CHECKING, Any, cast
 
 import anyio
 import orjson
@@ -37,27 +36,6 @@ def get_registered_model(model: str) -> type[Model]:
         return _get_model(model)
     except LookupError:
         raise NotFound() from None
-
-
-def get_input_type(annotation: Any) -> str:
-    """
-    Unwraps Optional/Union[..., None] to find the real type,
-    then returns one of: 'bool', 'date', 'datetime', or 'text'.
-    """
-    origin = get_origin(annotation)
-    if origin is Union:
-        # strip out NoneType
-        args = [a for a in get_args(annotation) if a is not type(None)]
-        if len(args) == 1:
-            annotation = args[0]
-
-    if annotation is bool:
-        return "bool"
-    if annotation is date:
-        return "date"
-    if annotation is datetime:
-        return "datetime"
-    return "text"
 
 
 class JSONSchemaView(Controller):
@@ -120,7 +98,7 @@ class AdminDashboard(AdminMixin, TemplateController):
                 "total_records": total_records,
                 "top_model": top_model,
                 "recent_models": get_recent_models(),
-                "url_prefix": settings.admin_config.admin_prefix_url,
+                "url_prefix": str(request.path_for("admin")).rstrip("/"),
             }
         )
         return context

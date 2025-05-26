@@ -188,6 +188,7 @@ async def test_rev_unsafe_without_document():
     await obj.update(
         name="bar", rev=obj.rev, document=edgy.files.ContentFile(b"zar", name="foo.bytes")
     )
+    assert obj.document.storage.exists(obj.document.name)
     assert obj.rev == 2
     await objs[1].load()
     assert objs[1].document.open().read() == b"zar"

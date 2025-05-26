@@ -19,6 +19,8 @@ from typing import (
     cast,
 )
 
+from pydantic import Base64Bytes, BaseModel, ConfigDict
+
 from edgy.exceptions import FileOperationError, SuspiciousFileOperation
 
 if TYPE_CHECKING:
@@ -43,6 +45,12 @@ def _get_storage(storage: str) -> Storage:
     from .storage import storages
 
     return storages[storage]
+
+
+class FileStruct(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    content: Base64Bytes
 
 
 class File:
@@ -74,6 +82,7 @@ class File:
             name = getattr(file, "name", "")
 
         self.name = name or ""
+        assert isinstance(self.name, str)
 
         if hasattr(file, "mode"):
             self.mode = file.mode
@@ -351,7 +360,7 @@ class FieldFile(File):
 
     def save(
         self,
-        content: Union[BinaryIO, bytes, None, File],
+        content: Union[BinaryIO, bytes, None, File, FileStruct],
         *,
         name: str = "",
         delete_old: bool = True,
@@ -370,11 +379,17 @@ class FieldFile(File):
         if content is None:
             self.delete()
             return
+        direct_name = True
+        if isinstance(content, FileStruct):
+            if not name:
+                name = content.name
+                direct_name = False
+            assert isinstance(name, str)
+            content = content.content
         # we can force multi_process_safe to add the process id also for overwrites
         if multi_process_safe is None:
             multi_process_safe = False if overwrite else self.multi_process_safe
 
-        direct_name = True
         if not name:
             direct_name = False
             name = getattr(content, "name", "")
@@ -389,6 +404,7 @@ class FieldFile(File):
             name = self.generate_name_fn(name, content, direct_name)
 
         assert name, "no name found"
+        assert isinstance(name, str)
 
         if storage is None:
             storage = self.storage

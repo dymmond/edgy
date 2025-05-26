@@ -1,6 +1,6 @@
 import mimetypes
 from collections.abc import Sequence
-from functools import partial
+from functools import cached_property, partial
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -9,14 +9,14 @@ from typing import (
     Literal,
     Optional,
     Union,
-    cast,
 )
 
 import orjson
 import sqlalchemy
+from pydantic import PlainSerializer
+from pydantic.json_schema import SkipJsonSchema, WithJsonSchema
 
 from edgy.core.db.context_vars import (
-    CURRENT_INSTANCE,
     CURRENT_MODEL_INSTANCE,
     CURRENT_PHASE,
     EXPLICIT_SPECIFIED_VALUES,
@@ -25,7 +25,7 @@ from edgy.core.db.fields.base import BaseCompositeField
 from edgy.core.db.fields.core import BigIntegerField, BooleanField, JSONField
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.core.db.fields.types import ColumnDefinitionModel
-from edgy.core.files.base import FieldFile, File
+from edgy.core.files.base import FieldFile, File, FileStruct
 from edgy.core.files.storage import storages
 from edgy.exceptions import FieldDefinitionError
 
@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
     from edgy.core.files.storage import Storage
 
-IGNORED = ["cls", "__class__", "kwargs", "generate_name_fn"]
+IGNORED = ["cls", "__class__", "kwargs", "generate_name_fn", "storage"]
 
 
 class ConcreteFileField(BaseCompositeField):
@@ -44,6 +44,17 @@ class ConcreteFileField(BaseCompositeField):
     _generate_name_fn: Optional[
         Callable[[Union["BaseModelType", None], Union[File, BinaryIO], str, bool], str]
     ] = None
+    _storage: Union[str, "Storage", None]
+
+    @cached_property
+    def storage(self) -> "Storage":
+        storage = self._storage
+        if not storage:
+            return storages["default"]
+        elif isinstance(storage, str):
+            return storages[storage]
+        else:
+            return storage
 
     def modify_input(self, name: str, kwargs: dict[str, Any]) -> None:
         # we are empty
@@ -73,58 +84,44 @@ class ConcreteFileField(BaseCompositeField):
             return name
         return self._generate_name_fn(instance, file, name, direct_name)
 
-    def to_model(
+    def extract_file_instance(
         self,
         field_name: str,
         value: Any,
-    ) -> dict[str, Any]:
-        """
-        Inverse of clean. Transforms column(s) to a field for edgy.Model.
-        Validation happens later.
-
-        Args:
-            field_name: the field name (can be different from name)
-            value: the field value
-        Kwargs:
-            phase: the phase (set, creation, ...)
-
-        """
+    ) -> FieldFile:
         phase = CURRENT_PHASE.get()
-        instance = CURRENT_INSTANCE.get()
         model_instance = CURRENT_MODEL_INSTANCE.get()
+        explicit_values = EXPLICIT_SPECIFIED_VALUES.get()
+        # unpack when not from db
         if (
-            phase in {"post_update", "post_insert"}
-            and instance is not None
-            and isinstance(instance.__dict__.get(self.name), FieldFile)
+            isinstance(value, dict)
+            and field_name in value
+            and not isinstance(value[field_name], str)
         ):
-            # use old one, when instance is no queryset
-            field_instance_or_value: Any = cast(FieldFile, instance.__dict__[self.name])
+            value = value[field_name]
+        # load should refresh the state
+        if (
+            phase != "load"
+            and model_instance is not None
+            and isinstance(model_instance.__dict__.get(self.name), FieldFile)
+        ):
+            # use old one, when model_instance is available
+            field_instance_or_value = model_instance.__dict__[self.name]
         else:
             field_instance_or_value = value
-        # unpack when not from db
-        if isinstance(field_instance_or_value, dict) and not isinstance(
-            field_instance_or_value.get(field_name), str
-        ):
-            field_instance_or_value = field_instance_or_value[field_name]
+        skip_save = False
         if isinstance(field_instance_or_value, FieldFile):
             file_instance = field_instance_or_value
-            if isinstance(value, dict):
-                # update after post_insert/post_update, so just update some limited values
-                # which does not affect operation
-                if f"{field_name}_size" in value:
-                    file_instance.size = value[f"{field_name}_size"]
-                if value.get(f"{field_name}_metadata") is not None:
-                    file_instance.metadata = value[f"{field_name}_metadata"]
-                if value.get(f"{field_name}_approved") is not None:
-                    file_instance.approved = value[f"{field_name}_approved"]
         else:
-            # init, load, post_insert, post_update
-            if isinstance(field_instance_or_value, dict):
+            # init_db, load, post_insert, post_update
+            if isinstance(field_instance_or_value, dict) and isinstance(
+                field_instance_or_value.get(field_name), (str, type(None))
+            ):
                 if phase == "set":
                     raise ValueError("Cannot set dict to FileField")
                 file_instance = self.field_file_class(
                     self,
-                    name=field_instance_or_value[field_name],
+                    name=field_instance_or_value[field_name] or "",
                     # can be empty string after migrations or when unset
                     # string or Storage instance are both ok for FieldFile
                     storage=field_instance_or_value.get(f"{field_name}_storage") or self.storage,
@@ -137,22 +134,56 @@ class ConcreteFileField(BaseCompositeField):
                     change_removes_approval=self.with_approval,
                     generate_name_fn=partial(self.generate_name_fn, model_instance),
                 )
+                skip_save = True
             else:
-                if instance is not None and self.name in instance.__dict__:
-                    # use old one
-                    file_instance = cast(FieldFile, instance.__dict__[self.name])
-                else:
-                    # not initialized yet
-                    file_instance = self.field_file_class(
-                        self,
-                        multi_process_safe=self.multi_process_safe,
-                        generate_name_fn=partial(self.generate_name_fn, model_instance),
-                        storage=self.storage,
-                        approved=not self.with_approval,
-                        change_removes_approval=self.with_approval,
-                    )
-                # file creation if value is not None otherwise deletion
-                file_instance.save(field_instance_or_value, delete_old=phase == "post_update")
+                # not initialized yet
+                file_instance = self.field_file_class(
+                    self,
+                    multi_process_safe=self.multi_process_safe,
+                    generate_name_fn=partial(self.generate_name_fn, model_instance),
+                    storage=self.storage,
+                    approved=not self.with_approval,
+                    change_removes_approval=self.with_approval,
+                )
+        if phase in {"post_insert", "post_update"}:
+            assert isinstance(value, dict), value
+            # update after post_insert/post_update, so just update some limited values
+            # which does not affect operation
+            if f"{field_name}_size" in value:
+                file_instance.size = value[f"{field_name}_size"]
+            if value.get(f"{field_name}_metadata") is not None:
+                file_instance.metadata = value[f"{field_name}_metadata"]
+            if value.get(f"{field_name}_approved") is not None:
+                file_instance.approved = value[f"{field_name}_approved"]
+        elif (
+            phase == "prepare_insert"
+            and explicit_values is not None
+            and field_name not in explicit_values
+        ):
+            # revision
+            file_instance.save(file_instance.to_file(), delete_old=False)
+        elif value is not file_instance and not skip_save:
+            if isinstance(value, dict):
+                value = FileStruct.model_validate(value)
+            # file creation if value is not None otherwise deletion
+            file_instance.save(value, delete_old=phase == "prepare_update")
+        return file_instance
+
+    def to_model(
+        self,
+        field_name: str,
+        value: Any,
+    ) -> dict[str, Any]:
+        """
+        Inverse of clean. Transforms column(s) to a field for edgy.Model.
+        Validation happens later.
+
+        Args:
+            field_name: the field name (can be different from name)
+            value: the field value
+
+        """
+        file_instance = self.extract_file_instance(field_name, value)
         retdict: Any = {field_name: file_instance}
         if self.with_size:
             retdict[f"{field_name}_size"] = file_instance.size
@@ -207,6 +238,7 @@ class ConcreteFileField(BaseCompositeField):
                     column_name=f"{column_name}_size",
                     owner=self.owner,
                 )
+                retdict[size_name].metadata.append(SkipJsonSchema())
         if self.with_approval:
             approval_name = f"{name}_approved"
             if approval_name not in fields:
@@ -219,6 +251,7 @@ class ConcreteFileField(BaseCompositeField):
                     name=approval_name,
                     owner=self.owner,
                 )
+                retdict[approval_name].metadata.append(SkipJsonSchema())
         if self.with_metadata:
             metadata_name = f"{name}_metadata"
             if metadata_name not in fields:
@@ -231,6 +264,7 @@ class ConcreteFileField(BaseCompositeField):
                     # for migrations
                     server_default=sqlalchemy.text("'{}'"),
                 )
+                retdict[metadata_name].metadata.append(SkipJsonSchema())
         return retdict
 
     def get_composite_fields(self) -> dict[str, "BaseFieldType"]:
@@ -252,6 +286,15 @@ class ConcreteFileField(BaseCompositeField):
         value.delete(instant=True)
 
 
+def json_serializer(field_file: FieldFile) -> Optional[FileStruct]:
+    if not field_file.name:
+        return None
+    with field_file.open("rb") as f:
+        fstruct = FileStruct(name=field_file.name, content=b"")
+        fstruct.__dict__["content"] = f.read()
+        return fstruct
+
+
 class FileField(FieldFactory):
     field_type = Any
     field_bases = (ConcreteFileField,)
@@ -270,16 +313,21 @@ class FileField(FieldFactory):
         ] = None,
         **kwargs: Any,
     ) -> "BaseFieldType":
-        if not storage:
-            storage = storages["default"]
-        elif isinstance(storage, str):
-            storage = storages[storage]
-
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in IGNORED},
         }
-        return super().__new__(cls, _generate_name_fn=generate_name_fn, **kwargs)
+        result_field = super().__new__(
+            cls, _generate_name_fn=generate_name_fn, _storage=storage, **kwargs
+        )
+        # result_field.metadata.append(SkipValidation())
+        schema = FileStruct.model_json_schema()
+        del schema["title"]
+        result_field.metadata.append(WithJsonSchema(schema))
+        result_field.metadata.append(
+            PlainSerializer(json_serializer, return_type=FileStruct, when_used="json-unless-none")
+        )
+        return result_field
 
     @classmethod
     def validate(cls, kwargs: dict[str, Any]) -> None:
@@ -351,33 +399,28 @@ class FileField(FieldFactory):
             for_query: is used for querying. Should have all columns used for querying set.
         """
         assert field_obj.owner
+        model_instance = CURRENT_MODEL_INSTANCE.get()
         # unpack
-        if isinstance(value, dict) and field_name in value:
-            if for_query:
-                if isinstance(value[field_name], (FieldFile, str, type(None))):
-                    value = value[field_name]
-            else:
-                # to_model is assumed to be called already
-                phase = CURRENT_PHASE.get()
-                explicit_values = EXPLICIT_SPECIFIED_VALUES.get()
-                if isinstance(value[field_name], FieldFile):
-                    value = value[field_name]
-                    if (
-                        phase == "prepare_insert"
-                        and explicit_values is not None
-                        and field_name not in explicit_values
-                    ):
-                        cast(FileField, value).save(
-                            cast(FileField, value).to_file(), delete_old=False
-                        )
-                else:
-                    instance = CURRENT_MODEL_INSTANCE.get()
-                    assert instance is not None, "No model instance found"
-                    # use model instance
-                    to_save = value[field_name]
-                    value = cast("FieldFile", getattr(instance, field_name))
-                    # set the file and file name
-                    value.save(to_save, delete_old=phase == "prepare_update")
+        if for_query:
+            if (
+                isinstance(value, dict)
+                and field_name in value
+                and isinstance(value[field_name], (FieldFile, str, type(None)))
+            ):
+                value = value[field_name]
+        elif value is None:
+            pass
+        elif isinstance(value, dict) and field_name in value and value[field_name] is None:
+            value = None
+        else:
+            value = file_instance = field_obj.extract_file_instance(field_name, value)
+            # save in model instance, so it can be retrieved in hook
+            if model_instance is not None:
+                model_instance.__dict__[field_name] = file_instance
+            elif file_instance.operation != "none":
+                raise RuntimeError(
+                    f"Cannot use QuerySet update to update FileFields ({field_name})."
+                )
 
         # handle None
         if value is None:
@@ -407,7 +450,7 @@ class FileField(FieldFactory):
             if not isinstance(value, FieldFile):
                 raise ValueError(f"invalid value for for_query=False: {value} ({value!r})")
             retdict: dict[str, Any] = {
-                field_name: value.name,
+                field_name: value.name or None,
             }
             retdict[f"{field_name}_storage"] = value.storage.name
             if field_obj.with_approval:
