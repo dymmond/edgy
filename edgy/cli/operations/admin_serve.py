@@ -65,8 +65,6 @@ def admin_serve(
 
     try:
         from lilya.apps import Lilya
-        from lilya.middleware.base import DefineMiddleware
-        from lilya.middleware.cors import CORSMiddleware
         from lilya.routing import Include
     except ImportError:
         raise RuntimeError("Lilya needs to be installed to run admin_serve.") from None
@@ -85,22 +83,13 @@ def admin_serve(
         raise RuntimeError(
             'You need to specify an app which registry is used. For experimenting use: "tests.cli.main"'
         )
-    from edgy.contrib.admin.application import create_application
+    from edgy.contrib.admin.application import create_admin_app
 
-    admin_app = create_application()
+    admin_app = create_admin_app()
     routes = [
         Include(
             path=settings.admin_config.admin_prefix_url,
             app=admin_app,
-            middleware=[
-                DefineMiddleware(
-                    CORSMiddleware,
-                    allow_origins=["*"],
-                    allow_methods=["*"],
-                    allow_headers=["*"],
-                    allow_credentials=True,
-                )
-            ],
         ),
     ]
     if old_instance.app is not None:
