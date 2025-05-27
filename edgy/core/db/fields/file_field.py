@@ -146,15 +146,17 @@ class ConcreteFileField(BaseCompositeField):
                     change_removes_approval=self.with_approval,
                 )
         if phase in {"post_insert", "post_update"}:
-            assert isinstance(value, dict), value
-            # update after post_insert/post_update, so just update some limited values
-            # which does not affect operation
-            if f"{field_name}_size" in value:
-                file_instance.size = value[f"{field_name}_size"]
-            if value.get(f"{field_name}_metadata") is not None:
-                file_instance.metadata = value[f"{field_name}_metadata"]
-            if value.get(f"{field_name}_approved") is not None:
-                file_instance.approved = value[f"{field_name}_approved"]
+            # migrations
+            if value is not None:
+                assert isinstance(value, dict), value
+                # update after post_insert/post_update, so just update some limited values
+                # which does not affect operation
+                if f"{field_name}_size" in value:
+                    file_instance.size = value[f"{field_name}_size"]
+                if value.get(f"{field_name}_metadata") is not None:
+                    file_instance.metadata = value[f"{field_name}_metadata"]
+                if value.get(f"{field_name}_approved") is not None:
+                    file_instance.approved = value[f"{field_name}_approved"]
         elif (
             phase == "prepare_insert"
             and explicit_values is not None

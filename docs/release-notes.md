@@ -12,11 +12,13 @@ hide:
 
 - Allow partial Marshalls.
 - Add admin_serve for modifying db.
+- FileFields have now a json-schema mode. You can pass a FileStruct like dict.
 
 ### Changed
 
 - `_loaded_or_deleted` is now `_db_loaded_or_deleted`. The former name is now deprecated.
 - `_loaded_or_deleted` is splitted in `_db_loaded` and `_db_deleted`.
+- Migrations show now tracebacks when manual migration of objects fails.
 
 ### Fixed
 

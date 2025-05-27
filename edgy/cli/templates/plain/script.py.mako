@@ -10,6 +10,8 @@ Create Date: ${create_date}
 %>
 from __future__ import annotations
 
+import traceback
+
 import sqlalchemy as sa
 from alembic import context, op
 from edgy import monkay, run_sync
@@ -57,6 +59,7 @@ def ${f"upgrade_{db_name or ''}"}(db_name: str=""):
                 )
         except Exception as exc:
             print("failure migrating defaults", exc)
+            traceback.print_exception(exc)
 
 
 def ${f"downgrade_{db_name or ''}"}():
