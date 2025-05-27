@@ -1625,7 +1625,7 @@ class QuerySet(BaseQuerySet):
                     new_objs.append(obj)
             original = obj.extract_db_fields()
             col_values: dict[str, Any] = obj.extract_column_values(
-                original, phase="prepare_insert", instance=self
+                original, phase="prepare_insert", instance=self, model_instance=obj
             )
             col_values.update(
                 await obj.execute_pre_save_hooks(col_values, original, is_update=False)

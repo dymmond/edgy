@@ -11,6 +11,8 @@ Create Date: ${create_date}
 %>
 from __future__ import annotations
 
+import traceback
+
 from typing import TYPE_CHECKING, Optional
 
 import sqlalchemy as sa
@@ -82,6 +84,7 @@ def ${f"upgrade{hash_to_identifier(url_for_name(db_name))}"}(url: DatabaseURL):
                 )
         except Exception as exc:
             print("failure migrating defaults", exc)
+            traceback.print_exception(exc)
 
 
 def ${f"downgrade{hash_to_identifier(url_for_name(db_name))}"}():

@@ -51,7 +51,13 @@
 
                     {% else %}
                         {% if value is not none %}
-                            {{ value }}
+                            {% if isinstance(field_info, ConcreteFileField) and value.storage.base_url %}
+                                <a href="{{ value.storage.url(value.name) }}" class="text-blue-600">
+                                    {{ value }}
+                                </a>
+                            {% else %}
+                                {{ value }}
+                            {% endif %}
                         {% else %}
                             —
                         {% endif %}

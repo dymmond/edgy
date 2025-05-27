@@ -96,6 +96,7 @@ nav:
       - Transactions: "transactions.md"
   - Features:
       - Signals: "signals.md"
+      - Admin: "admin/admin.md"
       - Relationships: "relationships.md"
       - Pagination & Linked Lists: "pagination.md"
       - Reference ForeignKey: "reference-foreignkey.md"

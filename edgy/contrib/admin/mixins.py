@@ -10,6 +10,7 @@ from lilya.templating import Jinja2Template
 
 from edgy.conf import settings
 from edgy.contrib.admin.utils.messages import get_messages
+from edgy.core.db.fields.file_field import ConcreteFileField
 from edgy.exceptions import ObjectNotFound
 
 templates = Jinja2Template(directory=str(Path(__file__).resolve().parent / "templates"))
@@ -26,6 +27,8 @@ class AdminMixin:
         context = {}
         context.update(
             {
+                "isinstance": isinstance,
+                "ConcreteFileField": ConcreteFileField,
                 "title": settings.admin_config.title,
                 "dasboard_title": settings.admin_config.dashboard_title,
                 "menu_title": settings.admin_config.menu_title,
