@@ -7,7 +7,7 @@ name = "edgy"
 description = "🔥 The perfect ORM to work with complex databases 🔥"
 long_description = "🔥 The perfect ORM to work with complex databases 🔥"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dynamic = ['version']
 authors = [{ name = "Tiago Silva", email = "tiago.arasilva@gmail.com" }]
 classifiers = [
@@ -47,6 +47,8 @@ dependencies = [
     "pydantic-settings>=2.0.0,<3.0.0",
     "rich>=14.0.0",
     "blinker>=1.8,<2.0",
+    'typing_extensions>=4.0; python_version<"3.11"'
+
 ]
 keywords = [
     "api",

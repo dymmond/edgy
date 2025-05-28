@@ -4,7 +4,7 @@ import logging
 import os
 from collections.abc import Generator
 from logging.config import fileConfig
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union
+from typing import TYPE_CHECKING, Any, Literal
 
 from alembic import context
 from rich.console import Console
@@ -30,8 +30,8 @@ MAIN_DATABASE_NAME: str = " "
 
 
 def iter_databases(registry: Registry) -> Generator[tuple[str, Database, "sqlalchemy.MetaData"]]:
-    url: Optional[str] = os.environ.get("EDGY_DATABASE_URL")
-    name: Union[str, Literal[False], None] = os.environ.get("EDGY_DATABASE") or False
+    url: str | None = os.environ.get("EDGY_DATABASE_URL")
+    name: str | Literal[False] | None = os.environ.get("EDGY_DATABASE") or False
     if url and not name:
         try:
             name = registry.metadata_by_url.get_name(url)

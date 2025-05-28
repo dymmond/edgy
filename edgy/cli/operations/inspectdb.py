@@ -1,5 +1,3 @@
-from typing import Union
-
 import click
 
 from edgy.utils.inspect import InspectDB
@@ -18,7 +16,7 @@ from edgy.utils.inspect import InspectDB
 @click.command()
 def inspect_db(
     database: str,
-    schema: Union[str, None] = None,
+    schema: str | None = None,
 ) -> None:
     """
     Inspects an existing database and generates the Edgy reflect models.

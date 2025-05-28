@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from monkay import load
 from pydantic._internal._model_construction import ModelMetaclass
@@ -43,7 +43,7 @@ class MarshallMeta(ModelMetaclass):
             )
 
         # The declared model
-        _model: Union[type[Model], str, None] = marshall_config.get("model", None)
+        _model: type[Model] | str | None = marshall_config.get("model", None)
         assert _model is not None, "'model' must be declared in the 'ConfigMarshall'."
 
         if isinstance(_model, str):

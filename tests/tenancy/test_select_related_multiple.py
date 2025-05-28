@@ -1,5 +1,3 @@
-from typing import Optional
-
 import pytest
 
 import edgy
@@ -44,8 +42,8 @@ class AppModule(EdgyTenantBaseModel):
 
 
 class Permission(EdgyTenantBaseModel):
-    module: Optional[AppModule] = edgy.ForeignKey(AppModule)
-    designation: Optional[Designation] = edgy.ForeignKey("Designation")
+    module: AppModule | None = edgy.ForeignKey(AppModule)
+    designation: Designation | None = edgy.ForeignKey("Designation")
     can_read: bool = edgy.BooleanField(default=False)
     can_write: bool = edgy.BooleanField(default=False)
     can_update: bool = edgy.BooleanField(default=False)

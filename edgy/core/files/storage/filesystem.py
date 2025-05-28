@@ -3,7 +3,7 @@ import os
 from datetime import datetime, timezone
 from functools import cached_property
 from threading import Lock
-from typing import Any, BinaryIO, Union, cast
+from typing import Any, BinaryIO, cast
 from urllib.parse import urljoin
 
 from edgy.conf import settings
@@ -19,10 +19,10 @@ class FileSystemStorage(Storage):
 
     def __init__(
         self,
-        location: Union[str, os.PathLike, None] = None,
-        base_url: Union[str, None] = None,
-        file_permissions_mode: Union[int, None] = None,
-        directory_permissions_mode: Union[int, None] = None,
+        location: str | os.PathLike | None = None,
+        base_url: str | None = None,
+        file_permissions_mode: int | None = None,
+        directory_permissions_mode: int | None = None,
     ) -> None:
         self._location = location
         self._base_url = base_url

@@ -19,12 +19,18 @@ hide:
 - `_loaded_or_deleted` is now `_db_loaded_or_deleted`. The former name is now deprecated.
 - `_loaded_or_deleted` is splitted in `_db_loaded` and `_db_deleted`.
 - Migrations show now tracebacks when manual migration of objects fails.
+- Bump python requirement to python 3.10 to align with (optional) dependencies.
 
 ### Fixed
 
 - Recursive saving.
 - Various json schema fixes.
 - Inherit register_default.
+
+### Breaking
+
+- Python 3.9 is no longer supported.
+- Remove long-deprecated `edgy_setattr` alias for `object.__setattr__`.
 
 ## 0.31.3
 

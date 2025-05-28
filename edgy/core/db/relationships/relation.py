@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
@@ -24,12 +26,12 @@ class ManyRelation(ManyRelationProtocol):
         *,
         from_foreign_key: str,
         to_foreign_key: str,
-        to: type["BaseModelType"],
-        through: type["BaseModelType"],
+        to: type[BaseModelType],
+        through: type[BaseModelType],
         reverse: bool = False,
-        embed_through: Union[Literal[False], str] = "",
+        embed_through: Literal[False] | str = "",
         refs: Any = (),
-        instance: Optional[Union["BaseModelType"]] = None,
+        instance: BaseModelType | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -45,7 +47,7 @@ class ManyRelation(ManyRelationProtocol):
             refs = [refs]
         self.stage(*refs)
 
-    def get_queryset(self) -> "QuerySet":
+    def get_queryset(self) -> QuerySet:
         # we need to check tenant every request
         queryset = self.through.meta.managers["query_related"].get_queryset()
         assert self.instance, "instance not initialized"
@@ -80,14 +82,14 @@ class ManyRelation(ManyRelationProtocol):
 
         return attr
 
-    def all(self, clear_cache: bool = False) -> "QuerySet":
+    def all(self, clear_cache: bool = False) -> QuerySet:
         # get_queryset returns already a fresh queryset. Skip making a copy.
         return self.get_queryset()
 
     def expand_relationship(self, value: Any) -> Any:
         through = self.through
 
-        if isinstance(value, (through, through.proxy_model)):  # type: ignore
+        if isinstance(value, through | through.proxy_model):
             return value
         instance = through.proxy_model(
             **{self.from_foreign_key: self.instance, self.to_foreign_key: value}
@@ -97,22 +99,22 @@ class ManyRelation(ManyRelationProtocol):
             instance.__using_schema__ = self.instance.get_active_instance_schema()  # type: ignore
         return instance
 
-    def stage(self, *children: "BaseModelType") -> None:
+    def stage(self, *children: BaseModelType) -> None:
         for child in children:
             if not isinstance(
                 child,
-                (self.to, self.to.proxy_model, self.through, self.through.proxy_model, dict),  # type: ignore
+                self.to | self.to.proxy_model | self.through | self.through.proxy_model | dict,
             ):
                 raise RelationshipIncompatible(
                     f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
                 )
             self.refs.append(self.expand_relationship(child))
 
-    async def create(self, *args: Any, **kwargs: Any) -> Optional["BaseModelType"]:
+    async def create(self, *args: Any, **kwargs: Any) -> BaseModelType | None:
         """Creates and add a child"""
         return await self.add(self.to(*args, **kwargs))
 
-    async def add(self, child: "BaseModelType") -> Optional["BaseModelType"]:
+    async def add(self, child: BaseModelType) -> BaseModelType | None:
         """
         Adds a child to the model as a list
 
@@ -122,7 +124,7 @@ class ManyRelation(ManyRelationProtocol):
         """
         if not isinstance(
             child,
-            (self.to, self.to.proxy_model, self.through, self.through.proxy_model, dict),  # type: ignore
+            self.to | self.to.proxy_model | self.through | self.through.proxy_model | dict,
         ):
             raise RelationshipIncompatible(
                 f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
@@ -135,7 +137,7 @@ class ManyRelation(ManyRelationProtocol):
             pass
         return None
 
-    async def remove(self, child: Optional["BaseModelType"] = None) -> None:
+    async def remove(self, child: BaseModelType | None = None) -> None:
         """Removes a child from the list of many to many.
 
         . Validates if there is a relationship between the entities.
@@ -155,7 +157,7 @@ class ManyRelation(ManyRelationProtocol):
                 raise RelationshipNotFound(detail="No child specified.")
         if not isinstance(
             child,
-            (self.to, self.to.proxy_model, self.through, self.through.proxy_model),  # type: ignore
+            self.to | self.to.proxy_model | self.through | self.through.proxy_model,
         ):
             raise RelationshipIncompatible(
                 f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
@@ -175,7 +177,7 @@ class ManyRelation(ManyRelationProtocol):
     def __str__(self) -> str:
         return f"{self.through.__name__}"
 
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> ManyRelationProtocol:
+    def __get__(self, instance: BaseModelType, owner: Any = None) -> ManyRelationProtocol:
         self.instance = instance
         return self
 
@@ -190,10 +192,10 @@ class SingleRelation(ManyRelationProtocol):
         self,
         *,
         to_foreign_key: str,
-        to: type["BaseModelType"],
-        embed_parent: Optional[tuple[str, str]] = None,
+        to: type[BaseModelType],
+        embed_parent: tuple[str, str] | None = None,
         refs: Any = (),
-        instance: Optional["BaseModelType"] = None,
+        instance: BaseModelType | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -206,7 +208,7 @@ class SingleRelation(ManyRelationProtocol):
             refs = [refs]
         self.stage(*refs)
 
-    def get_queryset(self) -> "QuerySet":
+    def get_queryset(self) -> QuerySet:
         # we need to check tenant every request
         queryset = self.to.meta.managers["query_related"].get_queryset()
         fk = self.to.meta.fields[self.to_foreign_key]
@@ -226,17 +228,17 @@ class SingleRelation(ManyRelationProtocol):
             queryset.embed_parent_filters = queryset.embed_parent
         return queryset
 
-    def all(self, clear_cache: bool = False) -> "QuerySet":
+    def all(self, clear_cache: bool = False) -> QuerySet:
         # get_queryset returns already a fresh queryset. Skip making a copy.
         return self.get_queryset()
 
     def expand_relationship(self, value: Any) -> Any:
         target = self.to
 
-        if isinstance(value, (target, target.proxy_model)):  # type: ignore
+        if isinstance(value, target | target.proxy_model):
             return value
         related_columns = self.to.meta.fields[self.to_foreign_key].related_columns.keys()
-        if len(related_columns) == 1 and not isinstance(value, (dict, BaseModel)):
+        if len(related_columns) == 1 and not isinstance(value, dict | BaseModel):
             value = {next(iter(related_columns)): value}
         instance = target.proxy_model(**value)
         instance.identifying_db_fields = related_columns  # type: ignore
@@ -244,9 +246,9 @@ class SingleRelation(ManyRelationProtocol):
             instance.__using_schema__ = self.instance.get_active_instance_schema()  # type: ignore
         return instance
 
-    def stage(self, *children: "BaseModelType") -> None:
+    def stage(self, *children: BaseModelType) -> None:
         for child in children:
-            if not isinstance(child, (self.to, self.to.proxy_model, dict)):  # type: ignore
+            if not isinstance(child, self.to | self.to.proxy_model | dict):
                 raise RelationshipIncompatible(
                     f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
                 )
@@ -268,12 +270,12 @@ class SingleRelation(ManyRelationProtocol):
         while self.refs:
             await self.add(self.refs.pop())
 
-    async def create(self, *args: Any, **kwargs: Any) -> Optional["BaseModelType"]:
+    async def create(self, *args: Any, **kwargs: Any) -> BaseModelType | None:
         """Creates and add a child"""
         kwargs[self.to_foreign_key] = self.instance
         return await cast("QuerySet", self.to.query).create(*args, **kwargs)
 
-    async def add(self, child: "BaseModelType") -> Optional["BaseModelType"]:
+    async def add(self, child: BaseModelType) -> BaseModelType | None:
         """
         Adds a child to the model as a list
 
@@ -281,13 +283,13 @@ class SingleRelation(ManyRelationProtocol):
         if the type is wrong.
         . Checks if the middle table already contains the record being added. Raises error if yes.
         """
-        if not isinstance(child, (self.to, self.to.proxy_model, dict)):  # type: ignore
+        if not isinstance(child, self.to | self.to.proxy_model | dict):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
         child = self.expand_relationship(child)
         await child.save(values={self.to_foreign_key: self.instance})
         return child
 
-    async def remove(self, child: Optional["BaseModelType"] = None) -> None:
+    async def remove(self, child: BaseModelType | None = None) -> None:
         """Removes a child from the list of one to many.
 
         . Validates if there is a relationship between the entities.
@@ -313,7 +315,7 @@ class SingleRelation(ManyRelationProtocol):
     def __str__(self) -> str:
         return f"{self.to.__name__}"
 
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> ManyRelationProtocol:
+    def __get__(self, instance: BaseModelType, owner: Any = None) -> ManyRelationProtocol:
         self.instance = instance
         return self
 

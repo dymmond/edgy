@@ -8,7 +8,7 @@ import warnings
 from collections.abc import Awaitable, Callable, Collection, Sequence
 from functools import partial
 from itertools import chain
-from typing import TYPE_CHECKING, Any, ClassVar, Literal, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
 import sqlalchemy
 from pydantic import BaseModel
@@ -73,17 +73,15 @@ _removed_copy_keys.difference_update(
 
 
 def _check_replace_related_field(
-    replace_related_field: Union[
-        bool,
-        type[BaseModelType],
-        tuple[type[BaseModelType], ...],
-        list[type[BaseModelType]],
-    ],
+    replace_related_field: bool
+    | type[BaseModelType]
+    | tuple[type[BaseModelType], ...]
+    | list[type[BaseModelType]],
     model: type[BaseModelType],
 ) -> bool:
     if isinstance(replace_related_field, bool):
         return replace_related_field
-    if not isinstance(replace_related_field, (tuple, list)):
+    if not isinstance(replace_related_field, tuple | list):
         replace_related_field = (replace_related_field,)
     return any(refmodel is model for refmodel in replace_related_field)
 
@@ -94,12 +92,10 @@ def _set_related_field(
     foreign_key_name: str,
     related_name: str,
     source: type[BaseModelType],
-    replace_related_field: Union[
-        bool,
-        type[BaseModelType],
-        tuple[type[BaseModelType], ...],
-        list[type[BaseModelType]],
-    ],
+    replace_related_field: bool
+    | type[BaseModelType]
+    | tuple[type[BaseModelType], ...]
+    | list[type[BaseModelType]],
 ) -> None:
     if replace_related_field is not True and related_name in target.meta.fields:
         # is already correctly set, required for migrate of model_apps with registry set
@@ -139,12 +135,10 @@ def _set_related_field(
 def _set_related_name_for_foreign_keys(
     meta: MetaInfo,
     model_class: type[BaseModelType],
-    replace_related_field: Union[
-        bool,
-        type[BaseModelType],
-        tuple[type[BaseModelType], ...],
-        list[type[BaseModelType]],
-    ] = False,
+    replace_related_field: bool
+    | type[BaseModelType]
+    | tuple[type[BaseModelType], ...]
+    | list[type[BaseModelType]] = False,
 ) -> None:
     """
     Sets the related name for the foreign keys.
@@ -189,7 +183,7 @@ def _fixup_rel_annotation(target: type[BaseModelType], field: BaseFieldType) -> 
     if field.is_m2m:
         field.field_type = field.annotation = list[target]  # type: ignore
     elif field.null:
-        field.field_type = field.annotation = Optional[target]  # type: ignore
+        field.field_type = field.annotation = None | target  # type: ignore
     else:
         field.field_type = field.annotation = target  # type: ignore
 
@@ -219,13 +213,11 @@ class DatabaseMixin:
         registry: Registry,
         registry_type_name: str = "models",
         name: str = "",
-        database: Union[bool, Database, Literal["keep"]] = "keep",
-        replace_related_field: Union[
-            bool,
-            type[BaseModelType],
-            tuple[type[BaseModelType], ...],
-            list[type[BaseModelType]],
-        ] = False,
+        database: bool | Database | Literal["keep"] = "keep",
+        replace_related_field: bool
+        | type[BaseModelType]
+        | tuple[type[BaseModelType], ...]
+        | list[type[BaseModelType]] = False,
         on_conflict: Literal["keep", "replace", "error"] = "error",
     ) -> type[BaseModelType]:
         """For customizations."""
@@ -301,14 +293,12 @@ class DatabaseMixin:
         cls,
         registry: Registry,
         name: str = "",
-        database: Union[bool, Database, Literal["keep"]] = "keep",
+        database: bool | Database | Literal["keep"] = "keep",
         *,
-        replace_related_field: Union[
-            bool,
-            type[BaseModelType],
-            tuple[type[BaseModelType], ...],
-            list[type[BaseModelType]],
-        ] = False,
+        replace_related_field: bool
+        | type[BaseModelType]
+        | tuple[type[BaseModelType], ...]
+        | list[type[BaseModelType]] = False,
         on_conflict: Literal["keep", "replace", "error"] = "error",
     ) -> type[BaseModelType]:
         return cls.real_add_to_registry(
@@ -321,9 +311,9 @@ class DatabaseMixin:
 
     def get_active_instance_schema(
         self, check_schema: bool = True, check_tenant: bool = True
-    ) -> Union[str, None]:
+    ) -> str | None:
         if self._edgy_namespace["__using_schema__"] is not Undefined:
-            return cast(Union[str, None], self._edgy_namespace["__using_schema__"])
+            return cast(str | None, self._edgy_namespace["__using_schema__"])
         return type(self).get_active_class_schema(
             check_schema=check_schema, check_tenant=check_tenant
         )
@@ -331,19 +321,19 @@ class DatabaseMixin:
     @classmethod
     def get_active_class_schema(cls, check_schema: bool = True, check_tenant: bool = True) -> str:
         if cls.__using_schema__ is not Undefined:
-            return cast(Union[str, None], cls.__using_schema__)
+            return cast(str | None, cls.__using_schema__)
         if check_schema:
             schema = get_schema(check_tenant=check_tenant)
             if schema is not None:
                 return schema
-        db_schema: Optional[str] = cls.get_db_schema()
+        db_schema: str | None = cls.get_db_schema()
         # sometime "" is ok, sometimes not, sqlalchemy logic
         return db_schema or None
 
     @classmethod
     def copy_edgy_model(
         cls: type[Model],
-        registry: Optional[Registry] = None,
+        registry: Registry | None = None,
         name: str = "",
         unlink_same_registry: bool = True,
         on_conflict: Literal["keep", "replace", "error"] = "error",
@@ -442,7 +432,7 @@ class DatabaseMixin:
         return cast("sqlalchemy.Table", self._edgy_namespace["_table"])
 
     @table.setter
-    def table(self, value: Optional[sqlalchemy.Table]) -> None:
+    def table(self, value: sqlalchemy.Table | None) -> None:
         self._edgy_namespace.pop("_pkcolumns", None)
         self._edgy_namespace["_table"] = value
 
@@ -504,8 +494,8 @@ class DatabaseMixin:
         kwargs: dict[str, Any],
         pre_fn: Callable[..., Awaitable],
         post_fn: Callable[..., Awaitable],
-        instance: Union[BaseModelType, QuerySet],
-    ) -> Optional[int]:
+        instance: BaseModelType | QuerySet,
+    ) -> int | None:
         """
         Update operation of the database fields.
         """
@@ -528,7 +518,7 @@ class DatabaseMixin:
         )
         # empty updates shouldn't cause an error. E.g. only model references are updated
         clauses = self.identifying_clauses()
-        row_count: Optional[int] = None
+        row_count: int | None = None
         if column_values and clauses:
             check_db_connection(self.database, stacklevel=4)
             async with self.database as database, database.transaction():
@@ -581,7 +571,7 @@ class DatabaseMixin:
         return cast("Self", self)
 
     async def raw_delete(
-        self: Model, *, skip_post_delete_hooks: bool, remove_referenced_call: Union[bool, str]
+        self: Model, *, skip_post_delete_hooks: bool, remove_referenced_call: bool | str
     ) -> int:
         """Delete operation from the database"""
         if self._db_deleted:
@@ -718,7 +708,7 @@ class DatabaseMixin:
         kwargs: dict[str, Any],
         pre_fn: Callable[..., Awaitable],
         post_fn: Callable[..., Awaitable],
-        instance: Union[BaseModelType, QuerySet],
+        instance: BaseModelType | QuerySet,
     ) -> None:
         """
         Performs the save instruction.
@@ -776,9 +766,9 @@ class DatabaseMixin:
     async def real_save(
         self,
         force_insert: bool,
-        values: Union[dict[str, Any], set[str], None],
+        values: dict[str, Any] | set[str] | None,
     ) -> Self:
-        instance: Union[BaseModelType, QuerySet] = CURRENT_INSTANCE.get()
+        instance: BaseModelType | QuerySet = CURRENT_INSTANCE.get()
         extracted_fields = self.extract_db_fields()
         if values is None:
             explicit_values: set[str] = set()
@@ -848,8 +838,8 @@ class DatabaseMixin:
     async def save(
         self: Model,
         force_insert: bool = False,
-        values: Union[dict[str, Any], set[str], None] = None,
-        force_save: Optional[bool] = None,
+        values: dict[str, Any] | set[str] | None = None,
+        force_save: bool | None = None,
     ) -> Model:
         """
         Performs a save of a given model instance.
@@ -872,8 +862,8 @@ class DatabaseMixin:
     @classmethod
     def build(
         cls,
-        schema: Optional[str] = None,
-        metadata: Optional[sqlalchemy.MetaData] = None,
+        schema: str | None = None,
+        metadata: sqlalchemy.MetaData | None = None,
     ) -> sqlalchemy.Table:
         """
         Builds the SQLAlchemy table representation from the loaded fields.
@@ -935,8 +925,8 @@ class DatabaseMixin:
     @classmethod
     def add_global_field_constraints(
         cls,
-        schema: Optional[str] = None,
-        metadata: Optional[sqlalchemy.MetaData] = None,
+        schema: str | None = None,
+        metadata: sqlalchemy.MetaData | None = None,
     ) -> sqlalchemy.Table:
         """
         Add global constraints to table. Required for tenants.
@@ -964,8 +954,8 @@ class DatabaseMixin:
 
     @classmethod
     def _get_unique_constraints(
-        cls, fields: Union[Collection[str], str, UniqueConstraint]
-    ) -> Optional[sqlalchemy.UniqueConstraint]:
+        cls, fields: Collection[str] | str | UniqueConstraint
+    ) -> sqlalchemy.UniqueConstraint | None:
         """
         Returns the unique constraints for the model.
 
@@ -997,7 +987,7 @@ class DatabaseMixin:
         )
 
     @classmethod
-    def _get_indexes(cls, index: Index) -> Optional[sqlalchemy.Index]:
+    def _get_indexes(cls, index: Index) -> sqlalchemy.Index | None:
         """
         Creates the index based on the Index fields
         """

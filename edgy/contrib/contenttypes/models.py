@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, ClassVar, Union, cast
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import edgy
 
@@ -32,7 +32,7 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
         )
 
     async def raw_delete(
-        self, *, skip_post_delete_hooks: bool, remove_referenced_call: Union[bool, str]
+        self, *, skip_post_delete_hooks: bool, remove_referenced_call: bool | str
     ) -> None:
         await super().raw_delete(
             skip_post_delete_hooks=skip_post_delete_hooks,

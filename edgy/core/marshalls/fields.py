@@ -1,4 +1,4 @@
-from typing import Any, ClassVar, Union
+from typing import Any, ClassVar
 
 from pydantic.fields import FieldInfo
 
@@ -11,7 +11,7 @@ class BaseMarshallField(FieldInfo):
     def __init__(
         self,
         field_type: type,
-        source: Union[str, None] = None,
+        source: str | None = None,
         allow_null: bool = False,
         default: Any = Undefined,
         **kwargs: Any,
@@ -57,7 +57,7 @@ class MarshallField(BaseMarshallField):
     def __init__(
         self,
         field_type: type,
-        source: Union[str, None] = None,
+        source: str | None = None,
         **kwargs: dict[str, Any],
     ) -> None:
         kwargs.pop("default", None)

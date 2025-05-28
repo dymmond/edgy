@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 import warnings
-from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Generator, Iterable, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Generator,
+    Iterable,
+    Sequence,
+)
 from contextvars import ContextVar
 from functools import cached_property
 from inspect import isawaitable
@@ -9,10 +17,7 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Literal,
-    Optional,
-    Union,
     cast,
 )
 
@@ -52,12 +57,12 @@ if TYPE_CHECKING:  # pragma: no cover
 
 _empty_set = cast(Sequence[Any], frozenset())
 # get current row during iteration. Used for prefetching.
-_current_row_holder: ContextVar[Optional[list[Optional[sqlalchemy.Row]]]] = ContextVar(
+_current_row_holder: ContextVar[list[sqlalchemy.Row | None] | None] = ContextVar(
     "_current_row_holder", default=None
 )
 
 
-def get_table_key_or_name(table: Union[sqlalchemy.Table, sqlalchemy.Alias]) -> str:
+def get_table_key_or_name(table: sqlalchemy.Table | sqlalchemy.Alias) -> str:
     try:
         return table.key  # type: ignore
     except AttributeError:
@@ -65,7 +70,7 @@ def get_table_key_or_name(table: Union[sqlalchemy.Table, sqlalchemy.Alias]) -> s
         return table.name
 
 
-def _extract_unique_lookup_key(obj: Any, unique_fields: Sequence[str]) -> Union[tuple, None]:
+def _extract_unique_lookup_key(obj: Any, unique_fields: Sequence[str]) -> tuple | None:
     lookup_key = []
     if isinstance(obj, dict):
         for field in unique_fields:
@@ -74,7 +79,7 @@ def _extract_unique_lookup_key(obj: Any, unique_fields: Sequence[str]) -> Union[
             value = obj[field]
             lookup_key.append(
                 orjson.dumps(value, option=orjson.OPT_SORT_KEYS)
-                if isinstance(value, (dict, list))
+                if isinstance(value, dict | list)
                 else value
             )
     else:
@@ -84,7 +89,7 @@ def _extract_unique_lookup_key(obj: Any, unique_fields: Sequence[str]) -> Union[
             value = getattr(obj, field)
             lookup_key.append(
                 orjson.dumps(value, option=orjson.OPT_SORT_KEYS)
-                if isinstance(value, (dict, list))
+                if isinstance(value, dict | list)
                 else value
             )
     return tuple(lookup_key)
@@ -100,32 +105,32 @@ class BaseQuerySet(
 
     def __init__(
         self,
-        model_class: Union[type[BaseModelType], None] = None,
+        model_class: type[BaseModelType] | None = None,
         *,
-        database: Union[Database, None] = None,
+        database: Database | None = None,
         filter_clauses: Iterable[Any] = _empty_set,
         select_related: Iterable[str] = _empty_set,
         prefetch_related: Iterable[Prefetch] = _empty_set,
-        limit_count: Optional[int] = None,
-        limit: Optional[int] = None,
-        limit_offset: Optional[int] = None,
-        offset: Optional[int] = None,
-        batch_size: Optional[int] = None,
+        limit_count: int | None = None,
+        limit: int | None = None,
+        limit_offset: int | None = None,
+        offset: int | None = None,
+        batch_size: int | None = None,
         order_by: Iterable[str] = _empty_set,
         group_by: Iterable[str] = _empty_set,
-        distinct_on: Union[None, Literal[True], Iterable[str]] = None,
-        distinct: Union[None, Literal[True], Iterable[str]] = None,
-        only_fields: Optional[Iterable[str]] = None,
+        distinct_on: None | Literal[True] | Iterable[str] = None,
+        distinct: None | Literal[True] | Iterable[str] = None,
+        only_fields: Iterable[str] | None = None,
         only: Iterable[str] = _empty_set,
-        defer_fields: Optional[Sequence[str]] = None,
+        defer_fields: Sequence[str] | None = None,
         defer: Iterable[str] = _empty_set,
-        embed_parent: Optional[tuple[str, Union[str, str]]] = None,
-        embed_parent_filters: Optional[tuple[str, str]] = None,
-        using_schema: Union[str, None, Any] = Undefined,
-        table: Optional[sqlalchemy.Table] = None,
+        embed_parent: tuple[str, str | str] | None = None,
+        embed_parent_filters: tuple[str, str] | None = None,
+        using_schema: str | None | Any = Undefined,
+        table: sqlalchemy.Table | None = None,
         exclude_secrets: bool = False,
-        extra_select: Optional[Iterable[sqlalchemy.ClauseElement]] = None,
-        reference_select: Optional[reference_select_type] = None,
+        extra_select: Iterable[sqlalchemy.ClauseElement] | None = None,
+        reference_select: reference_select_type | None = None,
     ) -> None:
         # Making sure for queries we use the main class and not the proxy
         # And enable the parent
@@ -188,12 +193,9 @@ class BaseQuerySet(
         # is empty
         self._clear_cache(keep_result_cache=False)
         # this is not cleared, because the expression is immutable
-        self._cached_select_related_expression: Optional[
-            tuple[
-                Any,
-                dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
-            ]
-        ] = None
+        self._cached_select_related_expression: (
+            tuple[Any, dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]] | None
+        ) = None
         # initialize
         self.active_schema = self.get_schema()
 
@@ -245,12 +247,12 @@ class BaseQuerySet(
         if not keep_result_cache:
             self._cache.clear()
         if not keep_cached_selected:
-            self._cached_select_with_tables: Optional[
-                tuple[Any, dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]]
-            ] = None
-        self._cache_count: Optional[int] = None
-        self._cache_first: Optional[tuple[BaseModelType, Any]] = None
-        self._cache_last: Optional[tuple[BaseModelType, Any]] = None
+            self._cached_select_with_tables: (
+                tuple[Any, dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]] | None
+            ) = None
+        self._cache_count: int | None = None
+        self._cache_first: tuple[BaseModelType, Any] | None = None
+        self._cache_last: tuple[BaseModelType, Any] | None = None
         # fetch all is in cache
         self._cache_fetch_all: bool = False
 
@@ -265,10 +267,10 @@ class BaseQuerySet(
         return expression
 
     async def build_where_clause(
-        self, _: Any = None, tables_and_models: Optional[tables_and_models_type] = None
+        self, _: Any = None, tables_and_models: tables_and_models_type | None = None
     ) -> Any:
         """Build a where clause from the filters which can be passed in a where function."""
-        joins: Optional[Any] = None
+        joins: Any | None = None
         if tables_and_models is None:
             joins, tables_and_models = self._build_tables_join_from_relationship()
         # ignored args for passing build_where_clause in filter_clauses
@@ -309,7 +311,7 @@ class BaseQuerySet(
             )
         )
 
-    def _build_select_distinct(self, distinct_on: Optional[Sequence[str]], expression: Any) -> Any:
+    def _build_select_distinct(self, distinct_on: Sequence[str] | None, expression: Any) -> Any:
         """Filters selects only specific fields. Leave empty to use simple distinct"""
         # using with columns is not supported by all databases
         if distinct_on:
@@ -323,7 +325,7 @@ class BaseQuerySet(
         join_clause: Any,
         current_transition: tuple[str, str, str],
         *,
-        transitions: dict[tuple[str, str, str], tuple[Any, Optional[tuple[str, str, str]], str]],
+        transitions: dict[tuple[str, str, str], tuple[Any, tuple[str, str, str] | None, str]],
         tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
     ) -> Any:
         if current_transition not in transitions:
@@ -371,7 +373,7 @@ class BaseQuerySet(
                 "": (select_from, self.model_class)
             }
             transitions: dict[
-                tuple[str, str, str], tuple[Any, Optional[tuple[str, str, str]], str]
+                tuple[str, str, str], tuple[Any, tuple[str, str, str] | None, str]
             ] = {}
 
             # Select related
@@ -389,8 +391,8 @@ class BaseQuerySet(
                 # string: add a custom prefix instead of the calculated one and skip adding the next field to the
                 #         public prefix.
 
-                injected_prefix: Union[bool, str] = False
-                model_database: Optional[Database] = self.database
+                injected_prefix: bool | str = False
+                model_database: Database | None = self.database
                 while select_path:
                     field_name = select_path.split("__", 1)[0]
                     try:
@@ -655,7 +657,7 @@ class BaseQuerySet(
                     *,
                     _field: BaseFieldType = field,
                     _value: Any = value,
-                    _op: Optional[str] = op,
+                    _op: str | None = op,
                     _prefix: str = related_str,
                     # generic field has no field name
                     _field_name: str = field_name,
@@ -681,12 +683,12 @@ class BaseQuerySet(
         return self.table.columns[distinct_on]
 
     async def _embed_parent_in_result(
-        self, result: Union[EdgyModel, Awaitable[EdgyModel]]
+        self, result: EdgyModel | Awaitable[EdgyModel]
     ) -> tuple[EdgyModel, Any]:
         if isawaitable(result):
             result = await result
         if not self.embed_parent:
-            return (cast(EdgyModel, result), result)
+            return result, result
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
             new_result: Any = result
@@ -698,7 +700,7 @@ class BaseQuerySet(
             MODEL_GETATTR_BEHAVIOR.reset(token)
         if self.embed_parent[1]:
             setattr(new_result, self.embed_parent[1], result)
-        return cast(EdgyModel, result), new_result
+        return result, new_result
 
     async def _get_or_cache_row(
         self,
@@ -732,7 +734,7 @@ class BaseQuerySet(
                 setattr(self, attr, result_tuple)
         return result_tuple
 
-    def get_schema(self) -> Optional[str]:
+    def get_schema(self) -> str | None:
         # Differs from get_schema global
         schema = self.using_schema
         if schema is Undefined:
@@ -766,7 +768,7 @@ class BaseQuerySet(
                 QuerySetError(
                     detail=("Creating a reverse path is not possible, unidirectional fields used.")
                 )
-            prefetch_queryset: Optional[QuerySet] = prefetch.queryset
+            prefetch_queryset: QuerySet | None = prefetch.queryset
 
             clauses = [
                 {
@@ -822,7 +824,7 @@ class BaseQuerySet(
         )
 
     @property
-    def _current_row(self) -> Optional[sqlalchemy.Row]:
+    def _current_row(self) -> sqlalchemy.Row | None:
         """Get async safe the current row when in _execute_iterate"""
         row_holder = _current_row_holder.get()
         if not row_holder:
@@ -864,9 +866,9 @@ class BaseQuerySet(
                 fetch_all_at_once = True
 
         counter = 0
-        last_element: Optional[tuple[BaseModelType, BaseModelType]] = None
+        last_element: tuple[BaseModelType, BaseModelType] | None = None
         check_db_connection(queryset.database, stacklevel=4)
-        current_row: list[Optional[sqlalchemy.Row]] = [None]
+        current_row: list[sqlalchemy.Row | None] = [None]
         token = _current_row_holder.set(current_row)
         try:
             if fetch_all_at_once:
@@ -925,18 +927,14 @@ class BaseQuerySet(
         self,
         kwargs: Any,
         clauses: Sequence[
-            Union[
-                sqlalchemy.sql.expression.BinaryExpression,
-                Callable[
-                    [QuerySetType],
-                    Union[
-                        sqlalchemy.sql.expression.BinaryExpression,
-                        Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                    ],
-                ],
-                dict[str, Any],
-                QuerySet,
+            sqlalchemy.sql.expression.BinaryExpression
+            | Callable[
+                [QuerySetType],
+                sqlalchemy.sql.expression.BinaryExpression
+                | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
             ]
+            | dict[str, Any]
+            | QuerySet
         ],
         exclude: bool = False,
         or_: bool = False,
@@ -949,15 +947,11 @@ class BaseQuerySet(
         if kwargs:
             clauses = [*clauses, kwargs]
         converted_clauses: Sequence[
-            Union[
-                sqlalchemy.sql.expression.BinaryExpression,
-                Callable[
-                    [QuerySetType],
-                    Union[
-                        sqlalchemy.sql.expression.BinaryExpression,
-                        Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                    ],
-                ],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Callable[
+                [QuerySetType],
+                sqlalchemy.sql.expression.BinaryExpression
+                | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
             ]
         ] = []
         for raw_clause in clauses:
@@ -1011,7 +1005,7 @@ class BaseQuerySet(
             queryset.filter_clauses.extend(converted_clauses)
         return queryset
 
-    async def _model_based_delete(self, remove_referenced_call: Union[str, bool]) -> int:
+    async def _model_based_delete(self, remove_referenced_call: str | bool) -> int:
         queryset = self.limit(self._batch_size) if not self._cache_fetch_all else self
         # we set embed_parent on the copy to None to get raw instances
         # embed_parent_filters is not affected
@@ -1033,7 +1027,7 @@ class BaseQuerySet(
         return row_count
 
     async def raw_delete(
-        self, use_models: bool = False, remove_referenced_call: Union[str, bool] = False
+        self, use_models: bool = False, remove_referenced_call: str | bool = False
     ) -> int:
         if (
             self.model_class.__require_model_based_deletion__
@@ -1064,7 +1058,7 @@ class BaseQuerySet(
 
         if kwargs:
             cached = cast(
-                Optional[tuple[BaseModelType, Any]], self._cache.get(self.model_class, kwargs)
+                tuple[BaseModelType, Any] | None, self._cache.get(self.model_class, kwargs)
             )
             if cached is not None:
                 return cached
@@ -1115,18 +1109,14 @@ class QuerySet(BaseQuerySet):
 
     def filter(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            dict[str, Any],
-            QuerySet,
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | dict[str, Any]
+        | QuerySet,
         **kwargs: Any,
     ) -> QuerySet:
         """
@@ -1145,18 +1135,14 @@ class QuerySet(BaseQuerySet):
 
     def or_(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            dict[str, Any],
-            QuerySet,
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | dict[str, Any]
+        | QuerySet,
         **kwargs: Any,
     ) -> QuerySet:
         """
@@ -1166,18 +1152,14 @@ class QuerySet(BaseQuerySet):
 
     def local_or(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            dict[str, Any],
-            QuerySet,
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | dict[str, Any]
+        | QuerySet,
         **kwargs: Any,
     ) -> QuerySet:
         """
@@ -1189,17 +1171,13 @@ class QuerySet(BaseQuerySet):
 
     def and_(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            dict[str, Any],
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | dict[str, Any],
         **kwargs: Any,
     ) -> QuerySet:
         """
@@ -1209,18 +1187,14 @@ class QuerySet(BaseQuerySet):
 
     def not_(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            dict[str, Any],
-            QuerySet,
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | dict[str, Any]
+        | QuerySet,
         **kwargs: Any,
     ) -> QuerySet:
         """
@@ -1230,18 +1204,14 @@ class QuerySet(BaseQuerySet):
 
     def exclude(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            dict[str, Any],
-            QuerySet,
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | dict[str, Any]
+        | QuerySet,
         **kwargs: Any,
     ) -> QuerySet:
         """
@@ -1275,7 +1245,7 @@ class QuerySet(BaseQuerySet):
 
     def batch_size(
         self,
-        batch_size: Optional[int] = None,
+        batch_size: int | None = None,
     ) -> QuerySet:
         """
         Set batch/chunk size. Used for iterate
@@ -1298,7 +1268,7 @@ class QuerySet(BaseQuerySet):
         search_fields = [
             name
             for name, field in queryset.model_class.meta.fields.items()
-            if isinstance(field, (CharField, TextField))
+            if isinstance(field, CharField | TextField)
         ]
         search_clauses = [queryset.table.columns[name].ilike(value) for name in search_fields]
 
@@ -1363,7 +1333,7 @@ class QuerySet(BaseQuerySet):
         queryset._group_by = group_by
         return queryset
 
-    def distinct(self, first: Union[bool, str] = True, *distinct_on: str) -> QuerySet:
+    def distinct(self, first: bool | str = True, *distinct_on: str) -> QuerySet:
         """
         Returns a queryset with distinct results.
         """
@@ -1428,8 +1398,8 @@ class QuerySet(BaseQuerySet):
 
     async def values(
         self,
-        fields: Union[Sequence[str], str, None] = None,
-        exclude: Union[Sequence[str], set[str]] = None,
+        fields: Sequence[str] | str | None = None,
+        exclude: Sequence[str] | set[str] = None,
         exclude_none: bool = False,
     ) -> list[Any]:
         """
@@ -1455,8 +1425,8 @@ class QuerySet(BaseQuerySet):
 
     async def values_list(
         self,
-        fields: Union[Sequence[str], str, None] = None,
-        exclude: Union[Sequence[str], set[str]] = None,
+        fields: Sequence[str] | str | None = None,
+        exclude: Sequence[str] | set[str] = None,
         exclude_none: bool = False,
         flat: bool = False,
     ) -> list[Any]:
@@ -1509,7 +1479,7 @@ class QuerySet(BaseQuerySet):
             self._cache_count = count = cast("int", await database.fetch_val(expression))
         return count
 
-    async def get_or_none(self, **kwargs: Any) -> Union[EdgyEmbedTarget, None]:
+    async def get_or_none(self, **kwargs: Any) -> EdgyEmbedTarget | None:
         """
         Fetch one object matching the parameters or returns None.
         """
@@ -1524,7 +1494,7 @@ class QuerySet(BaseQuerySet):
         """
         return cast(EdgyEmbedTarget, (await self._get_raw(**kwargs))[1])
 
-    async def first(self) -> Union[EdgyEmbedTarget, None]:
+    async def first(self) -> EdgyEmbedTarget | None:
         """
         Returns the first record of a given queryset.
         """
@@ -1546,7 +1516,7 @@ class QuerySet(BaseQuerySet):
             )[1]
         return None
 
-    async def last(self) -> Union[EdgyEmbedTarget, None]:
+    async def last(self) -> EdgyEmbedTarget | None:
         """
         Returns the last record of a given queryset.
         """
@@ -1603,7 +1573,7 @@ class QuerySet(BaseQuerySet):
         finally:
             CHECK_DB_CONNECTION_SILENCED.reset(token)
 
-    async def bulk_create(self, objs: Iterable[Union[dict[str, Any], EdgyModel]]) -> None:
+    async def bulk_create(self, objs: Iterable[dict[str, Any] | EdgyModel]) -> None:
         """
         Bulk creates records in a table
         """
@@ -1611,7 +1581,7 @@ class QuerySet(BaseQuerySet):
 
         new_objs: list[EdgyModel] = []
 
-        async def _iterate(obj_or_dict: Union[EdgyModel, dict[str, Any]]) -> dict[str, Any]:
+        async def _iterate(obj_or_dict: EdgyModel | dict[str, Any]) -> dict[str, Any]:
             if isinstance(obj_or_dict, dict):
                 obj: EdgyModel = queryset.model_class(**obj_or_dict)
                 if (
@@ -1710,8 +1680,8 @@ class QuerySet(BaseQuerySet):
 
     async def bulk_get_or_create(
         self,
-        objs: list[Union[dict[str, Any], EdgyModel]],
-        unique_fields: Union[list[str], None] = None,
+        objs: list[dict[str, Any] | EdgyModel],
+        unique_fields: list[str] | None = None,
     ) -> list[EdgyModel]:
         """
         Bulk gets or creates records in a table.
@@ -1859,7 +1829,7 @@ class QuerySet(BaseQuerySet):
         self._clear_cache()
 
     async def get_or_create(
-        self, defaults: Union[dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
+        self, defaults: dict[str, Any] | Any | None = None, *args: Any, **kwargs: Any
     ) -> tuple[EdgyEmbedTarget, bool]:
         """
         Creates a record in a specific table or updates if already exists.
@@ -1897,7 +1867,7 @@ class QuerySet(BaseQuerySet):
         return cast(EdgyEmbedTarget, get_instance), False
 
     async def update_or_create(
-        self, defaults: Union[dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
+        self, defaults: dict[str, Any] | Any | None = None, *args: Any, **kwargs: Any
     ) -> tuple[EdgyEmbedTarget, bool]:
         """
         Updates a record in a specific table or creates a new one.

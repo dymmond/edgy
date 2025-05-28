@@ -97,7 +97,10 @@ async def test_pagination_int_count_no_leak():
     assert all(hasattr(entry, "next") for entry in entries_paginator)
     assert all(hasattr(entry, "prev") for entry in entries_paginator)
     assert len(entries_ordered) == len(entries_paginator)
-    assert all(entry1 == entry2 for entry1, entry2 in zip(entries_ordered, entries_paginator))
+    assert all(
+        entry1 == entry2
+        for entry1, entry2 in zip(entries_ordered, entries_paginator, strict=False)
+    )
 
 
 async def test_pagination_int_count_no_copy():

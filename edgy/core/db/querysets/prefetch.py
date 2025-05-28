@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from edgy.exceptions import QuerySetError
 
@@ -18,17 +20,17 @@ class Prefetch:
         self,
         related_name: str,
         to_attr: str,
-        queryset: Optional["QuerySet"] = None,
+        queryset: QuerySet | None = None,
     ) -> None:
         self.related_name = related_name
         self.to_attr = to_attr
-        self.queryset: Optional[QuerySet] = queryset
+        self.queryset: QuerySet | None = queryset
         self._is_finished = False
         self._bake_prefix: str = ""
         self._baked_results: dict[tuple[str, ...], list[Any]] = defaultdict(list)
         self._baked = False
 
-    async def init_bake(self, model_class: type["Model"]) -> None:
+    async def init_bake(self, model_class: type[Model]) -> None:
         if self._baked or not self._is_finished or self.queryset is None:
             return
         self._baked = True
@@ -41,7 +43,7 @@ class Prefetch:
             self._baked_results[model_key].append(result)
 
 
-def check_prefetch_collision(model: "BaseModelType", related: Prefetch) -> Prefetch:
+def check_prefetch_collision(model: BaseModelType, related: Prefetch) -> Prefetch:
     if (
         hasattr(model, related.to_attr)
         or related.to_attr in model.meta.fields
@@ -59,7 +61,7 @@ class PrefetchMixin:
     subsequent queries.
     """
 
-    def prefetch_related(self, *prefetch: Prefetch) -> "QuerySet":
+    def prefetch_related(self, *prefetch: Prefetch) -> QuerySet:
         """
         Performs a reverse lookup for the foreignkeys. This is different
         from the select_related. Select related performs a follows the SQL foreign relation

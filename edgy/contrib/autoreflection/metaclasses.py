@@ -1,10 +1,8 @@
 import re
+from collections.abc import Callable
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Optional,
-    Union,
     cast,
 )
 
@@ -17,10 +15,10 @@ if TYPE_CHECKING:
 class AutoReflectionMetaInfo(MetaInfo):
     __slots__ = ("include_pattern", "exclude_pattern", "template", "databases", "schemes")
     include_pattern: re.Pattern
-    exclude_pattern: Optional[re.Pattern]
+    exclude_pattern: re.Pattern | None
     template: Callable[["Table"], str]
-    databases: frozenset[Union[str, None]]
-    schemes: frozenset[Union[str, None]]
+    databases: frozenset[str | None]
+    schemes: frozenset[str | None]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self.include_pattern = getattr(meta, "include_pattern", None)

@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
 
 from edgy.core.db.querysets.base import QuerySet
 
@@ -10,10 +12,10 @@ class BaseManager:
     def __init__(
         self,
         *,
-        owner: Optional[Union[type["BaseModelType"]]] = None,
+        owner: type[BaseModelType] | None = None,
         inherit: bool = True,
         name: str = "",
-        instance: Optional[Union["BaseModelType"]] = None,
+        instance: BaseModelType | None = None,
     ):
         self.owner = owner
         self.inherit = inherit
@@ -60,7 +62,7 @@ class Manager(BaseManager):
     ```
     """
 
-    def get_queryset(self) -> "QuerySet":
+    def get_queryset(self) -> QuerySet:
         """
         Returns the queryset object.
 
@@ -99,5 +101,5 @@ class RedirectManager(BaseManager):
             return super().__getattr__(name)
         return getattr(self.owner.meta.managers[self.redirect_name], name)
 
-    def get_queryset(self) -> "QuerySet":
+    def get_queryset(self) -> QuerySet:
         return cast("QuerySet", self.__getattr__("get_queryset")())

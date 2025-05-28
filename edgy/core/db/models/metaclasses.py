@@ -13,8 +13,6 @@ from typing import (
     Any,
     ClassVar,
     Literal,
-    Optional,
-    Union,
     cast,
     get_origin,
 )
@@ -52,7 +50,7 @@ _seen_table_names: ContextVar[set[str]] = ContextVar("_seen_table_names", defaul
 class Fields(UserDict, dict[str, BaseFieldType]):
     """Smart wrapper which tries to prevent invalidation as far as possible"""
 
-    def __init__(self, meta: MetaInfo, data: Optional[dict[str, BaseFieldType]] = None):
+    def __init__(self, meta: MetaInfo, data: dict[str, BaseFieldType] | None = None):
         self.meta = meta
         super().__init__(data)
 
@@ -274,25 +272,25 @@ class MetaInfo:
     field_to_column_names: FieldToColumnNames
     columns_to_field: ColumnsToField
 
-    unique_together: list[Union[str, tuple, UniqueConstraint]]
+    unique_together: list[str | tuple | UniqueConstraint]
     indexes: list[Index]
     constraints: list[sqlalchemy.Constraint]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self._fields_are_initialized = False
         self._field_stats_are_initialized = False
-        self.model: Optional[type[BaseModelType]] = None
+        self.model: type[BaseModelType] | None = None
         #  Difference between meta extraction and kwargs: meta attributes are copied
         self.abstract: bool = getattr(meta, "abstract", False)
         self.no_copy: bool = getattr(meta, "no_copy", False)
         # for embedding
         self.inherit: bool = getattr(meta, "inherit", True)
-        self.in_admin: Optional[bool] = getattr(meta, "in_admin", None)
-        self.registry: Union[Registry, Literal[False], None] = getattr(meta, "registry", None)
-        self.tablename: Optional[str] = getattr(meta, "tablename", None)
+        self.in_admin: bool | None = getattr(meta, "in_admin", None)
+        self.registry: Registry | Literal[False] | None = getattr(meta, "registry", None)
+        self.tablename: str | None = getattr(meta, "tablename", None)
         for attr in ["unique_together", "indexes", "constraints"]:
             attr_val: Any = getattr(meta, attr, [])
-            if not isinstance(attr_val, (list, tuple)):
+            if not isinstance(attr_val, list | tuple):
                 raise ImproperlyConfigured(
                     f"{attr} must be a tuple or list. Got {type(attr_val).__name__} instead."
                 )
@@ -307,8 +305,8 @@ class MetaInfo:
         self.load_dict(kwargs)
 
     @property
-    def pk(self) -> Optional[PKField]:
-        return cast(Optional[PKField], self.fields.get("pk"))
+    def pk(self) -> PKField | None:
+        return cast(PKField | None, self.fields.get("pk"))
 
     @property
     def needs_special_serialization(self) -> bool:
@@ -473,8 +471,8 @@ class MetaInfo:
 
 
 def get_model_meta_attr(
-    attr: str, bases: tuple[type, ...], meta_class: Optional[Union[object, MetaInfo]] = None
-) -> Optional[Any]:
+    attr: str, bases: tuple[type, ...], meta_class: object | MetaInfo | None = None
+) -> Any | None:
     """
     When an enabled attr is missing or None from the Meta class, it should look up for the bases
     and obtain the first found attr.
@@ -497,14 +495,14 @@ def get_model_meta_attr(
 
 
 def get_model_registry(
-    bases: tuple[type, ...], meta_class: Optional[Union[object, MetaInfo]] = None
-) -> Union[Registry, None, Literal[False]]:
+    bases: tuple[type, ...], meta_class: object | MetaInfo | None = None
+) -> Registry | None | Literal[False]:
     """
     When a registry is missing from the Meta class, it should look up for the bases
     and obtain the first found registry.
     """
     return cast(
-        "Union[Registry, None, Literal[False]]",
+        "Registry | None | Literal[False]",
         get_model_meta_attr("registry", bases=bases, meta_class=meta_class),
     )
 
@@ -515,8 +513,7 @@ def _handle_annotations(base: type, base_annotations: dict[str, Any]) -> None:
     if hasattr(base, "__init_annotations__") and base.__init_annotations__:
         base_annotations.update(base.__init_annotations__)
     elif hasattr(base, "__annotations__") and base.__annotations__:
-        # python 3.9 has no get_annotations
-        base_annotations.update(base.__annotations__)
+        base_annotations.update(inspect.get_annotations(base, eval_str=False))
 
 
 def handle_annotations(
@@ -544,7 +541,7 @@ _occluded_sentinel = object()
 def _extract_fields_and_managers(base: type, attrs: dict[str, Any]) -> None:
     from edgy.core.db.fields.composite_field import CompositeField
 
-    meta: Union[MetaInfo, None] = getattr(base, "meta", None)
+    meta: MetaInfo | None = getattr(base, "meta", None)
     if not meta:
         # Mixins and other classes
         # Note: from mixins BaseFields and BaseManagers are imported despite inherit=False until a model in the
@@ -610,7 +607,7 @@ def _extract_fields_and_managers(base: type, attrs: dict[str, Any]) -> None:
 
 
 def extract_fields_and_managers(
-    bases: Sequence[type], attrs: Optional[dict[str, Any]] = None
+    bases: Sequence[type], attrs: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     """
     Search for fields and managers and return them.
@@ -653,7 +650,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         bases: tuple[type, ...],
         attrs: dict[str, Any],
         meta_info_class: type[MetaInfo] = MetaInfo,
-        skip_registry: Union[bool, Literal["allow_search"]] = False,
+        skip_registry: bool | Literal["allow_search"] = False,
         on_conflict: Literal["error", "replace", "keep"] = "error",
         **kwargs: Any,
     ) -> Any:
@@ -671,7 +668,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         attrs.pop("_pkcolumns", None)
         attrs.pop("_pknames", None)
         attrs.pop("_table", None)
-        database: Union[Literal["keep"], None, Database, bool] = attrs.pop("database", "keep")
+        database: Literal["keep"] | None | Database | bool = attrs.pop("database", "keep")
 
         # Extract fields and managers and include them in attrs
         attrs = extract_fields_and_managers(bases, attrs)
@@ -827,7 +824,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         if meta.unique_together:
             unique_together = meta.unique_together
             for value in unique_together:
-                if not isinstance(value, (str, tuple, UniqueConstraint)):
+                if not isinstance(value, str | tuple | UniqueConstraint):
                     raise ValueError(
                         "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
                     )
@@ -866,7 +863,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         # Now find a registry and add it to the meta.
         if meta.registry is None and skip_registry is not True:
-            registry: Union[Registry, None, Literal[False]] = get_model_registry(bases, meta_class)
+            registry: Registry | None | Literal[False] = get_model_registry(bases, meta_class)
             meta.registry = registry or None
         # don't add automatically to registry. Useful for subclasses which modify the registry itself.
         # `skip_registry="allow_search"` is trueish so it works.
@@ -877,7 +874,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         new_class.add_to_registry(meta.registry, database=database, on_conflict=on_conflict)
         return new_class
 
-    def get_db_schema(cls) -> Union[str, None]:
+    def get_db_schema(cls) -> str | None:
         """
         Returns a db_schema from registry if any is passed.
         """
@@ -885,7 +882,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             return cls.meta.registry.db_schema  # type: ignore
         return None
 
-    def get_db_shema(cls) -> Union[str, None]:
+    def get_db_shema(cls) -> str | None:
         warnings.warn(
             "'get_db_shema' has been deprecated, use 'get_db_schema' instead.",
             DeprecationWarning,
@@ -893,7 +890,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         )
         return cls.get_db_schema()
 
-    def _build_table(cls, metadata: Optional[sqlalchemy.MetaData] = None) -> None:
+    def _build_table(cls, metadata: sqlalchemy.MetaData | None = None) -> None:
         try:
             cls._table = cls.build(cls.get_db_schema(), metadata=metadata)
         except AttributeError as exc:
@@ -968,9 +965,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
     def table_schema(
         cls,
-        schema: Union[str, None] = None,
+        schema: str | None = None,
         *,
-        metadata: Optional[sqlalchemy.MetaData] = None,
+        metadata: sqlalchemy.MetaData | None = None,
         update_cache: bool = False,
     ) -> sqlalchemy.Table:
         """

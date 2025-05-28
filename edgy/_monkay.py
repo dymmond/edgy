@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from importlib import import_module
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from monkay import Monkay
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 @dataclass
 class Instance:
     registry: Registry
-    app: Optional[Any] = None
+    app: Any | None = None
     storages: StorageHandler = field(default_factory=StorageHandler)
 
 

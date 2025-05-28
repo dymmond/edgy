@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Sequence
-from typing import TYPE_CHECKING, Any, ClassVar, Optional, Union
+from collections.abc import Container, Iterable, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
     import sqlalchemy
@@ -55,7 +55,7 @@ class BaseModelType(ABC):
     Meta: ClassVar[DescriptiveMeta] = DescriptiveMeta()
     transaction: ClassVar[TransactionCallProtocol]
 
-    __parent__: ClassVar[Union[type[BaseModelType], None]] = None
+    __parent__: ClassVar[type[BaseModelType] | None] = None
     __is_proxy_model__: ClassVar[bool] = False
     __require_model_based_deletion__: ClassVar[bool] = False
     __reflected__: ClassVar[bool] = False
@@ -104,7 +104,7 @@ class BaseModelType(ABC):
     async def real_save(
         self,
         force_insert: bool = False,
-        values: Union[dict[str, Any], set[str], list[str], None] = None,
+        values: dict[str, Any] | set[str] | list[str] | None = None,
     ) -> BaseModelType:
         """Save model. For customizations used by querysets and direct calls."""
 
@@ -112,13 +112,13 @@ class BaseModelType(ABC):
     async def save(
         self,
         force_insert: bool = False,
-        values: Union[dict[str, Any], set[str], list[str], None] = None,
+        values: dict[str, Any] | set[str] | list[str] | None = None,
     ) -> BaseModelType:
         """Save model. For customizations only by direct calls."""
 
     @abstractmethod
     async def raw_delete(
-        self, *, skip_post_delete_hooks: bool, remove_referenced_call: Union[bool, str]
+        self, *, skip_post_delete_hooks: bool, remove_referenced_call: bool | str
     ) -> None:
         """
         Delete Model. Raw version called by QuerySet and delete.
@@ -145,7 +145,7 @@ class BaseModelType(ABC):
         """Load model and all models referenced by foreign keys."""
 
     @abstractmethod
-    def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> dict[str, Any]:
+    def model_dump(self, show_pk: bool | None = None, **kwargs: Any) -> dict[str, Any]:
         """
         An updated version of the model dump.
         It can show the pk always and handles the exclude attribute on fields correctly and
@@ -159,8 +159,8 @@ class BaseModelType(ABC):
     @abstractmethod
     def build(
         cls,
-        schema: Optional[str] = None,
-        metadata: Optional[sqlalchemy.MetaData] = None,
+        schema: str | None = None,
+        metadata: sqlalchemy.MetaData | None = None,
     ) -> sqlalchemy.Table:
         """
         Builds the SQLAlchemy table representation from the loaded fields.
@@ -188,8 +188,9 @@ class BaseModelType(ABC):
         extracted_values: dict[str, Any],
         is_update: bool = False,
         is_partial: bool = False,
-        instance: Optional[Union[BaseModelType, QuerySet]] = None,
-        model_instance: Optional[BaseModelType] = None,
+        phase: str = "",
+        instance: BaseModelType | QuerySet | None = None,
+        model_instance: BaseModelType | None = None,
         evaluate_kwarg_values: bool = False,
     ) -> dict[str, Any]:
         """
@@ -202,7 +203,7 @@ class BaseModelType(ABC):
     def get_real_class(cls) -> BaseModelType:
         return cls.__parent__ if cls.__is_proxy_model__ else cls  # type: ignore
 
-    def extract_db_fields(self, only: Optional[Sequence[str]] = None) -> dict[str, Any]:
+    def extract_db_fields(self, only: Container[str] | None = None) -> dict[str, Any]:
         """
         Extracts all the db fields, model references and fields.
         Related fields are not included because they are disjoint.
@@ -211,6 +212,9 @@ class BaseModelType(ABC):
         columns = self.table.columns
 
         if only is not None:
+            assert all(k in fields or hasattr(columns, k) for k in only), (
+                f'"only" includes invalid fields, {only}'
+            )
             return {k: v for k, v in self.__dict__.items() if k in only}
 
         return {k: v for k, v in self.__dict__.items() if k in fields or hasattr(columns, k)}

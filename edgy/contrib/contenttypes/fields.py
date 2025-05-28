@@ -1,5 +1,5 @@
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic.json_schema import WithJsonSchema
 
@@ -33,7 +33,7 @@ class BaseContentTypeField(BaseForeignKeyField):
         if value is None or (isinstance(value, dict) and not value):
             value = original_value
         # e.g. default was a Model
-        if isinstance(value, (target, target.proxy_model)):
+        if isinstance(value, target | target.proxy_model):
             value.name = self.owner.__name__
             value.schema_name = instance.get_active_instance_schema()
         return await super().pre_save_callback(value, original_value, is_update=is_update)
@@ -68,7 +68,7 @@ class ContentTypeField(ForeignKey):
 
     def __new__(  # type: ignore
         cls,
-        to: Union[type["BaseModelType"], str] = "ContentType",
+        to: type["BaseModelType"] | str = "ContentType",
         on_delete: str = CASCADE,
         no_constraint: bool = False,
         remove_referenced: bool = True,

@@ -55,7 +55,7 @@ _model_type = TypeVar("_model_type", bound="BaseModelType")
 def apply_instance_extras(
     model: _model_type,
     model_class: type["BaseModelType"],
-    schema: Optional[str] = None,
+    schema: str | None = None,
     database: Optional["Database"] = None,
     table: Optional["Table"] = None,
 ) -> _model_type:

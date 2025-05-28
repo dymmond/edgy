@@ -18,7 +18,7 @@ class HashableBaseModel(BaseModel):
         values: Any = {}
         for key, value in self.__dict__.items():
             values[key] = None
-            if isinstance(value, (list, set)):
+            if isinstance(value, list | set):
                 values[key] = tuple(value)
             else:
                 values[key] = value

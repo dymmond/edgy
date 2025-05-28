@@ -10,8 +10,6 @@ from typing import (
     Any,
     ClassVar,
     Literal,
-    Optional,
-    Union,
     cast,
 )
 
@@ -67,10 +65,10 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         }
     )
     _edgy_namespace: dict = PrivateAttr()
-    __proxy_model__: ClassVar[Union[type[Model], None]] = None
+    __proxy_model__: ClassVar[type[Model] | None] = None
     __reflected__: ClassVar[bool] = False
     __show_pk__: ClassVar[bool] = False
-    __using_schema__: ClassVar[Union[str, None, Any]] = Undefined
+    __using_schema__: ClassVar[str | None | Any] = Undefined
     __deletion_with_signals__: ClassVar[bool] = False
     __no_load_trigger_attrs__: ClassVar[set[str]] = _empty
     database: ClassVar[Database] = None
@@ -83,7 +81,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     def __init__(
         self,
         *args: Any,
-        __show_pk__: Optional[bool] = None,
+        __show_pk__: bool | None = None,
         __phase__: str = "init",
         __drop_extra_kwargs__: bool = False,
         **kwargs: Any,
@@ -172,7 +170,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         cls,
         kwargs: dict[str, Any],
         phase: str = "",
-        instance: Optional[BaseModelType] = None,
+        instance: BaseModelType | None = None,
         drop_extra_kwargs: bool = False,
     ) -> Any:
         """
@@ -245,7 +243,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         self,
         only_needed: bool = False,
         only_needed_nest: bool = False,
-        _seen: Optional[set[Any]] = None,
+        _seen: set[Any] | None = None,
     ) -> None:
         if _seen is None:
             _seen = {self.create_model_key()}
@@ -286,7 +284,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         )
         return self.meta.fields
 
-    def model_dump(self, show_pk: Union[bool, None] = None, **kwargs: Any) -> dict[str, Any]:
+    def model_dump(self, show_pk: bool | None = None, **kwargs: Any) -> dict[str, Any]:
         """
         An updated version of the model dump.
         It can show the pk always and handles the exclude attribute on fields correctly and
@@ -296,7 +294,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             show_pk: bool - Enforces showing the primary key in the model_dump.
         """
         # we want a copy
-        _exclude: Union[set[str], dict[str, Any], None] = kwargs.pop("exclude", None)
+        _exclude: set[str] | dict[str, Any] | None = kwargs.pop("exclude", None)
         if _exclude is None:
             initial_full_field_exclude: set[str] = _empty
             # must be a writable dict
@@ -328,8 +326,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             if field.target.meta.needs_special_serialization:
                 exclude_passed[field_name] = True
                 need_second_pass.add(field_name)
-        include: Union[set[str], dict[str, Any], None] = kwargs.pop("include", None)
-        mode: Union[Literal["json", "python"], str] = kwargs.pop("mode", "python")
+        include: set[str] | dict[str, Any] | None = kwargs.pop("include", None)
+        mode: Literal["json", "python"] | str = kwargs.pop("mode", "python")
 
         should_show_pk = self.__show_pk__ if show_pk is None else show_pk
         model = super().model_dump(exclude=exclude_passed, include=include, mode=mode, **kwargs)
@@ -444,8 +442,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         is_update: bool = False,
         is_partial: bool = False,
         phase: str = "",
-        instance: Optional[Union[BaseModelType, QuerySet]] = None,
-        model_instance: Optional[BaseModelType] = None,
+        instance: BaseModelType | QuerySet | None = None,
+        model_instance: BaseModelType | None = None,
         evaluate_values: bool = False,
     ) -> dict[str, Any]:
         validated: dict[str, Any] = {}

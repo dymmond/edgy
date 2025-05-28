@@ -1,7 +1,7 @@
 import inspect
 from asyncio import gather
 from collections.abc import Awaitable
-from typing import TYPE_CHECKING, Any, ClassVar, Optional, cast
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,7 +30,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
     def __init__(self, /, **kwargs: Any) -> None:
         _instance = kwargs.pop("instance", None)
         super().__init__(**kwargs)
-        self._instance: Optional[Model] = None
+        self._instance: Model | None = None
         if _instance is not None:
             self.instance = _instance
         elif not type(self).__incomplete_fields__:

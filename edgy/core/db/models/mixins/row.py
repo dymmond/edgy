@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.models.utils import apply_instance_extras
@@ -41,17 +41,17 @@ class ModelRowMixin:
         row: Row,
         # contain the mappings used for select
         tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
-        select_related: Optional[Sequence[Any]] = None,
-        prefetch_related: Optional[Sequence[Prefetch]] = None,
+        select_related: Sequence[Any] | None = None,
+        prefetch_related: Sequence[Prefetch] | None = None,
         only_fields: Sequence[str] = None,
         is_defer_fields: bool = False,
         exclude_secrets: bool = False,
-        using_schema: Optional[str] = None,
-        database: Optional[Database] = None,
+        using_schema: str | None = None,
+        database: Database | None = None,
         prefix: str = "",
-        old_select_related_value: Optional[Model] = None,
-        reference_select: Optional[reference_select_type] = None,
-    ) -> Optional[Model]:
+        old_select_related_value: Model | None = None,
+        reference_select: reference_select_type | None = None,
+    ) -> Model | None:
         """
         Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
 

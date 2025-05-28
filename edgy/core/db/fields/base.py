@@ -8,7 +8,6 @@ from typing import (
     Any,
     Literal,
     Optional,
-    Union,
     cast,
 )
 
@@ -53,7 +52,7 @@ class BaseField(BaseFieldType, FieldInfo):
         "lte": "__le__",
         "le": "__le__",
     }
-    auto_compute_server_default: Union[bool, None, Literal["ignore_null"]] = False
+    auto_compute_server_default: bool | None | Literal["ignore_null"] = False
 
     def __init__(
         self,
@@ -195,7 +194,7 @@ class BaseField(BaseFieldType, FieldInfo):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[type["BaseModelType"]] = None,
+        owner: type["BaseModelType"] | None = None,
         parent: Optional["BaseFieldType"] = None,
     ) -> Optional["BaseField"]:
         """
@@ -238,7 +237,7 @@ class Field(BaseField):
     """
 
     # safe here as we have only one column
-    auto_compute_server_default: Union[bool, None, Literal["ignore_null"]] = None
+    auto_compute_server_default: bool | None | Literal["ignore_null"] = None
 
     def check(self, value: Any) -> Any:
         """
@@ -252,7 +251,7 @@ class Field(BaseField):
         """
         return {name: self.check(value)}
 
-    def get_column(self, name: str) -> Optional[sqlalchemy.Column]:
+    def get_column(self, name: str) -> sqlalchemy.Column | None:
         """
         Return a single column for the field declared. Return None for meta fields.
         """
@@ -370,7 +369,7 @@ class PKField(BaseCompositeField):
         self.metadata.append(SkipValidation())
         self.metadata.append(WithJsonSchema(mode="validation", json_schema=None))
 
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[dict[str, Any], Any]:
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> dict[str, Any] | Any:
         pkcolumns = self.owner.pkcolumns
         pknames = self.owner.pknames
         assert len(pkcolumns) >= 1
@@ -406,9 +405,9 @@ class PKField(BaseCompositeField):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[type["BaseModelType"]] = None,
-        parent: Optional[BaseFieldType] = None,
-    ) -> Optional[BaseFieldType]:
+        owner: type["BaseModelType"] | None = None,
+        parent: BaseFieldType | None = None,
+    ) -> BaseFieldType | None:
         return None
 
     def clean(self, field_name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
@@ -419,7 +418,7 @@ class PKField(BaseCompositeField):
         if (
             len(pknames) == 1
             and not self.is_incomplete
-            and not isinstance(value, (dict, BaseModel))
+            and not isinstance(value, dict | BaseModel)
         ):
             pkname = pknames[0]
             field = self.owner.meta.fields[pkname]
@@ -457,7 +456,7 @@ class PKField(BaseCompositeField):
         if (
             len(pknames) == 1
             # we first only redirect both
-            and not isinstance(value, (dict, BaseModel))
+            and not isinstance(value, dict | BaseModel)
         ):
             field = self.owner.meta.fields[pknames[0]]
             return field.to_model(pknames[0], value)
@@ -484,7 +483,7 @@ class PKField(BaseCompositeField):
 
 class BaseForeignKey(RelationshipField):
     is_m2m: bool = False
-    related_name: Union[str, Literal[False]] = ""
+    related_name: str | Literal[False] = ""
     # name used for backward relations
     # only useful if related_name = False because otherwise it gets overwritten
     reverse_name: str = ""
@@ -536,7 +535,7 @@ class BaseForeignKey(RelationshipField):
             owner_database = self.owner.database
         return str(owner_database.url) != str(self.target.database.url)
 
-    def get_related_model_for_admin(self) -> Optional[type["BaseModelType"]]:
+    def get_related_model_for_admin(self) -> type["BaseModelType"] | None:
         if self.target.__name__ in self.target_registry.admin_models:
             return cast("type[BaseModelType]", self.target)
         return None

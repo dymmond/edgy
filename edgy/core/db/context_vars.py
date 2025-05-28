@@ -14,7 +14,7 @@ FORCE_FIELDS_NULLABLE: ContextVar[set[tuple[str, str]]] = ContextVar(
     "FORCE_FIELDS_NULLABLE", default=_empty
 )
 CURRENT_FIELD_CONTEXT: ContextVar["FIELD_CONTEXT_TYPE"] = ContextVar("CURRENT_FIELD_CONTEXT")
-CURRENT_INSTANCE: ContextVar[Optional[Union["BaseModelType", "QuerySet"]]] = ContextVar(
+CURRENT_INSTANCE: ContextVar[Union["BaseModelType", "QuerySet"] | None] = ContextVar(
     "CURRENT_INSTANCE", default=None
 )
 CURRENT_MODEL_INSTANCE: ContextVar[Optional["BaseModelType"]] = ContextVar(
@@ -24,7 +24,7 @@ CURRENT_PHASE: ContextVar[str] = ContextVar("CURRENT_PHASE", default="")
 NO_GLOBAL_FIELD_CONSTRAINTS: ContextVar[bool] = ContextVar(
     "NO_GLOBAL_FIELD_CONSTRAINTS", default=False
 )
-EXPLICIT_SPECIFIED_VALUES: ContextVar[Optional[set[str]]] = ContextVar(
+EXPLICIT_SPECIFIED_VALUES: ContextVar[set[str] | None] = ContextVar(
     "EXPLICIT_SPECIFIED_VALUES", default=None
 )
 MODEL_GETATTR_BEHAVIOR: ContextVar[Literal["passdown", "load", "coro"]] = ContextVar(
@@ -36,14 +36,14 @@ SCHEMA: ContextVar[str] = ContextVar("SCHEMA", default=None)
 SHEMA = SCHEMA
 
 
-def get_tenant() -> Union[str, None]:
+def get_tenant() -> str | None:
     """
     Gets the current active tenant in the context.
     """
     return TENANT.get()
 
 
-def set_tenant(value: Union[str, None]) -> Token:
+def set_tenant(value: str | None) -> Token:
     """
     Sets the global tenant for the context of the queries.
     When a global tenant is set the `get_schema` -> `SCHEMA` is ignored.
@@ -59,7 +59,7 @@ def set_tenant(value: Union[str, None]) -> Token:
 
 
 @contextmanager
-def with_tenant(tenant: Union[str, None]) -> Generator[None, None, None]:
+def with_tenant(tenant: str | None) -> Generator[None, None, None]:
     """
     Sets the global tenant for the context of the queries.
     When a global tenant is set the `get_schema` -> `SCHEMA` is ignored.
@@ -75,7 +75,7 @@ def with_tenant(tenant: Union[str, None]) -> Generator[None, None, None]:
         TENANT.reset(token)
 
 
-def _process_force_field_nullable(item: Union[str, tuple[str, str]]) -> tuple[str, str]:
+def _process_force_field_nullable(item: str | tuple[str, str]) -> tuple[str, str]:
     result = item if isinstance(item, tuple) else tuple(item.split(":"))
     assert isinstance(result, tuple) and len(result) == 2
     assert isinstance(result[0], str)
@@ -85,7 +85,7 @@ def _process_force_field_nullable(item: Union[str, tuple[str, str]]) -> tuple[st
 
 @contextmanager
 def with_force_fields_nullable(
-    inp: Iterable[Union[str, tuple[str, str]]],
+    inp: Iterable[str | tuple[str, str]],
 ) -> Generator[None, None, None]:
     token = FORCE_FIELDS_NULLABLE.set({_process_force_field_nullable(item) for item in inp})
     try:
@@ -94,7 +94,7 @@ def with_force_fields_nullable(
         FORCE_FIELDS_NULLABLE.reset(token)
 
 
-def get_schema(check_tenant: bool = True) -> Union[str, None]:
+def get_schema(check_tenant: bool = True) -> str | None:
     if check_tenant:
         tenant = get_tenant()
         if tenant is not None:
@@ -102,14 +102,14 @@ def get_schema(check_tenant: bool = True) -> Union[str, None]:
     return SCHEMA.get()
 
 
-def set_schema(value: Union[str, None]) -> Token:
+def set_schema(value: str | None) -> Token:
     """Set the schema and return the token for resetting. Manual way of with_schema."""
 
     return SCHEMA.set(value)
 
 
 @contextmanager
-def with_schema(schema: Union[str, None]) -> Generator[None, None, None]:
+def with_schema(schema: str | None) -> Generator[None, None, None]:
     token = SCHEMA.set(schema)
     try:
         yield

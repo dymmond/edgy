@@ -1,7 +1,7 @@
 import inspect
 import typing
-from collections.abc import Sequence
-from typing import Any, Callable, Optional, TypeVar
+from collections.abc import Callable, Sequence
+from typing import Any, TypeVar
 
 Scope = typing.MutableMapping[str, typing.Any]
 Message = typing.MutableMapping[str, typing.Any]
@@ -28,8 +28,8 @@ class AyncLifespanContextManager:
 
     def __init__(
         self,
-        on_shutdown: Optional[Sequence[Callable[..., Any]]] = None,
-        on_startup: Optional[Sequence[Callable[..., Any]]] = None,
+        on_shutdown: Sequence[Callable[..., Any]] | None = None,
+        on_startup: Sequence[Callable[..., Any]] | None = None,
     ) -> None:
         self.on_startup = [] if on_startup is None else list(on_startup)
         self.on_shutdown = [] if on_shutdown is None else list(on_shutdown)
@@ -53,9 +53,9 @@ class AyncLifespanContextManager:
 
 
 def handle_lifespan_events(
-    on_startup: Optional[Sequence[Callable]] = None,
-    on_shutdown: Optional[Sequence[Callable]] = None,
-    lifespan: Optional[Any] = None,
+    on_startup: Sequence[Callable] | None = None,
+    on_shutdown: Sequence[Callable] | None = None,
+    lifespan: Any | None = None,
 ) -> Any:
     """Handles with the lifespan events in the new Starlette format of lifespan.
     This adds a mask that keeps the old `on_startup` and `on_shutdown` events variable

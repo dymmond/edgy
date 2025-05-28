@@ -1,6 +1,7 @@
 import inspect
 import sys
-from typing import Any, Callable, NoReturn, Optional, Union
+from collections.abc import Callable
+from typing import Any, NoReturn
 
 import sqlalchemy
 from loguru import logger
@@ -59,7 +60,7 @@ class InspectDB:
     Class that builds the inspection of a database.
     """
 
-    def __init__(self, database: str, schema: Optional[str] = None) -> None:
+    def __init__(self, database: str, schema: str | None = None) -> None:
         """
         Creates an instance of an InspectDB and triggers the proccess.
         """
@@ -135,7 +136,7 @@ class InspectDB:
 
     @classmethod
     def get_foreign_keys(
-        cls, table_or_column: Union[sqlalchemy.Table, sqlalchemy.Column]
+        cls, table_or_column: sqlalchemy.Table | sqlalchemy.Column
     ) -> list[dict[str, Any]]:
         """
         Extracts all the information needed of the foreign keys.
@@ -271,7 +272,7 @@ class InspectDB:
 
     @classmethod
     def write_output(
-        cls, table_details: list[Any], connection_string: str, schema: Union[str, None] = None
+        cls, table_details: list[Any], connection_string: str, schema: str | None = None
     ) -> NoReturn:
         """
         Writes to stdout and runs some internal validations.

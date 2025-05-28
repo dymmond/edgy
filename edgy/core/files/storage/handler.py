@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Union
+from typing import TYPE_CHECKING, Any
 
 from monkay import load
 
@@ -15,7 +15,7 @@ class StorageHandler:
     of the system.
     """
 
-    def __init__(self, backends: Union[dict[str, Any], None] = None) -> None:
+    def __init__(self, backends: dict[str, Any] | None = None) -> None:
         self._backends = backends
         self._storages: dict[str, Storage] = {}
 

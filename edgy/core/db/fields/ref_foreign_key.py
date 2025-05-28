@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Optional, cast
 
 import edgy
 from edgy.core.db.context_vars import CURRENT_MODEL_INSTANCE, CURRENT_PHASE
@@ -37,7 +37,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[type["BaseModelType"]] = None,
+        owner: type["BaseModelType"] | None = None,
         parent: Optional["BaseFieldType"] = None,
     ) -> Optional["BaseFieldType"]:
         return None
@@ -58,7 +58,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
     async def post_save_callback(
         cls,
         field_obj: "BaseFieldType",
-        value: Optional[list],
+        value: list | None,
         is_update: bool,
         original_fn: Any = None,
     ) -> None:
@@ -80,7 +80,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
             extra_params[relation_field.foreign_key.name] = instance
         relation = getattr(instance, model_ref.__related_name__)
         while value:
-            instance_or_dict: Union[dict, ModelRef] = value.pop()
+            instance_or_dict: dict | ModelRef = value.pop()
             if isinstance(instance_or_dict, dict):
                 instance_or_dict = model_ref(**instance_or_dict)
             model = target_model_class(

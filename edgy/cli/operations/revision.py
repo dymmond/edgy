@@ -1,4 +1,4 @@
-from typing import Any, Union
+from typing import Any
 
 import click
 
@@ -51,7 +51,7 @@ def revision(
     version_path: str,
     rev_id: str,
     arg: Any,
-    null_field: Union[list[str], tuple[str, ...]],
+    null_field: list[str] | tuple[str, ...],
 ) -> None:
     """Create a new revision file."""
     _revision(

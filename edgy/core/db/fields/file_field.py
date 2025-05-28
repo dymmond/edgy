@@ -1,13 +1,11 @@
 import mimetypes
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import cached_property, partial
 from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Callable,
     Literal,
-    Optional,
     Union,
 )
 
@@ -41,9 +39,9 @@ class ConcreteFileField(BaseCompositeField):
     column_name: str = ""
     multi_process_safe: bool = True
     field_file_class: type[FieldFile]
-    _generate_name_fn: Optional[
-        Callable[[Union["BaseModelType", None], Union[File, BinaryIO], str, bool], str]
-    ] = None
+    _generate_name_fn: (
+        Callable[[Union["BaseModelType", None], File | BinaryIO, str, bool], str] | None
+    ) = None
     _storage: Union[str, "Storage", None]
 
     @cached_property
@@ -77,7 +75,7 @@ class ConcreteFileField(BaseCompositeField):
         self,
         instance: Union["BaseModelType", None],
         name: str,
-        file: Union[File, BinaryIO],
+        file: File | BinaryIO,
         direct_name: bool,
     ) -> str:
         if self._generate_name_fn is None:
@@ -115,7 +113,7 @@ class ConcreteFileField(BaseCompositeField):
         else:
             # init_db, load, post_insert, post_update
             if isinstance(field_instance_or_value, dict) and isinstance(
-                field_instance_or_value.get(field_name), (str, type(None))
+                field_instance_or_value.get(field_name), str | type(None)
             ):
                 if phase == "set":
                     raise ValueError("Cannot set dict to FileField")
@@ -288,7 +286,7 @@ class ConcreteFileField(BaseCompositeField):
         value.delete(instant=True)
 
 
-def json_serializer(field_file: FieldFile) -> Optional[FileStruct]:
+def json_serializer(field_file: FieldFile) -> FileStruct | None:
     if not field_file.name:
         return None
     with field_file.open("rb") as f:
@@ -307,12 +305,11 @@ class FileField(FieldFactory):
         with_size: bool = True,
         with_metadata: bool = True,
         with_approval: bool = False,
-        extract_mime: Union[bool, Literal["approved_only"]] = True,
+        extract_mime: bool | Literal["approved_only"] = True,
         mime_use_magic: bool = False,
         field_file_class: type[FieldFile] = FieldFile,
-        generate_name_fn: Optional[
-            Callable[[Union["BaseModelType", None], Union[File, BinaryIO], str, bool], str]
-        ] = None,
+        generate_name_fn: Callable[[Union["BaseModelType", None], File | BinaryIO, str, bool], str]
+        | None = None,
         **kwargs: Any,
     ) -> "BaseFieldType":
         kwargs = {
@@ -357,7 +354,7 @@ class FileField(FieldFactory):
 
     @classmethod
     def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
-        max_length: Optional[int] = kwargs.get("max_length", 255)
+        max_length: int | None = kwargs.get("max_length", 255)
         return (
             sqlalchemy.Text(collation=kwargs.get("collation"))
             if max_length is None
@@ -387,7 +384,7 @@ class FileField(FieldFactory):
         cls,
         field_obj: "BaseFieldType",
         field_name: str,
-        value: Union[FieldFile, str, dict],
+        value: FieldFile | str | dict,
         for_query: bool = False,
         original_fn: Any = None,
     ) -> dict[str, Any]:
@@ -407,7 +404,7 @@ class FileField(FieldFactory):
             if (
                 isinstance(value, dict)
                 and field_name in value
-                and isinstance(value[field_name], (FieldFile, str, type(None)))
+                and isinstance(value[field_name], FieldFile | str | type(None))
             ):
                 value = value[field_name]
         elif value is None:

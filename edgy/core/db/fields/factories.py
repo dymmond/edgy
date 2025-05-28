@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from functools import lru_cache, partial
-from typing import Any, Literal, Union, cast
+from typing import Any, Literal, cast
 
 from edgy.core.db.constants import CASCADE, RESTRICT, SET_NULL
 from edgy.core.db.fields.base import Field
@@ -172,7 +172,7 @@ class ForeignKeyFieldFactory(FieldFactory):
         to: Any = None,
         on_update: str = CASCADE,
         on_delete: str = RESTRICT,
-        related_name: Union[str, Literal[False]] = "",
+        related_name: str | Literal[False] = "",
         **kwargs: Any,
     ) -> BaseFieldType:
         kwargs = {
