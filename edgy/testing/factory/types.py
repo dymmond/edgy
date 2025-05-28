@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, Protocol, TypedDict
+from typing import TYPE_CHECKING, Any, Protocol, TypeAlias, TypedDict
 
 if TYPE_CHECKING:
     from faker import Faker
@@ -34,7 +34,7 @@ FactoryParameterCallback = Callable[
     ],
     Any,
 ]
-FactoryParameters = dict[str, Any | FactoryParameterCallback]
-FactoryCallback = Callable[["FactoryField", ModelFactoryContext, dict[str, Any]], Any]
-FieldFactoryCallback = str | FactoryCallback
-FactoryFieldType = str | "BaseFieldType" | type["BaseFieldType"]
+FactoryParameters: TypeAlias = dict[str, Any | FactoryParameterCallback]
+FactoryCallback: TypeAlias = Callable[["FactoryField", ModelFactoryContext, dict[str, Any]], Any]
+FieldFactoryCallback: TypeAlias = str | FactoryCallback
+FactoryFieldType: TypeAlias = str | "BaseFieldType" | type["BaseFieldType"]
