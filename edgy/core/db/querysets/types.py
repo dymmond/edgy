@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Awaitable, Callable, Generator, Iterable, Sequence
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Union
 
 from edgy.types import Undefined
 
@@ -19,7 +19,7 @@ EdgyEmbedTarget = TypeVar("EdgyEmbedTarget")
 
 tables_and_models_type: TypeAlias = dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]]
 reference_select_type: TypeAlias = dict[
-    str, dict[str, "reference_select_type"] | str | None | "sqlalchemy.Column"
+    str, Union[dict[str, "reference_select_type"], str, None, "sqlalchemy.Column"]
 ]
 
 

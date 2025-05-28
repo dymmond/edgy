@@ -513,8 +513,7 @@ def _handle_annotations(base: type, base_annotations: dict[str, Any]) -> None:
     if hasattr(base, "__init_annotations__") and base.__init_annotations__:
         base_annotations.update(base.__init_annotations__)
     elif hasattr(base, "__annotations__") and base.__annotations__:
-        # python 3.9 has no get_annotations
-        base_annotations.update(base.__annotations__)
+        base_annotations.update(inspect.get_annotations(base, eval_str=False))
 
 
 def handle_annotations(
