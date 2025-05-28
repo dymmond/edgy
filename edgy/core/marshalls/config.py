@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 from typing_extensions import TypedDict
 
@@ -11,11 +11,11 @@ if TYPE_CHECKING:
 class ConfigMarshall(TypedDict, total=False):
     """A TypedDict for configuring Marshall behaviour."""
 
-    model: Union[type[Model], str]
+    model: type[Model] | str
     """The model from there the marshall will read from."""
 
-    fields: Union[list[str], None] = None
+    fields: list[str] | None = None
     """A list of fields to be serialized"""
 
-    exclude: Union[list[str], None] = None
+    exclude: list[str] | None = None
     """A list of fields to be excluded from the serialization."""

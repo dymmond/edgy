@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import SkipValidation
 from pydantic.json_schema import SkipJsonSchema
@@ -97,12 +97,12 @@ class RelatedField(RelationshipField):
     def get_relation(self, **kwargs: Any) -> ManyRelationProtocol:
         return self.foreign_key.get_relation(**kwargs)
 
-    def is_cross_db(self, owner_database: Optional[Database] = None) -> bool:
+    def is_cross_db(self, owner_database: Database | None = None) -> bool:
         if owner_database is None:
             owner_database = self.owner.database
         return str(owner_database.url) != str(self.foreign_key.owner.database.url)
 
-    def get_related_model_for_admin(self) -> Optional[type[BaseModelType]]:
+    def get_related_model_for_admin(self) -> type[BaseModelType] | None:
         related_from_registry = self.related_from.meta.registry
         assert related_from_registry is not None and related_from_registry is not False
         if self.related_from.__name__ in related_from_registry.admin_models:

@@ -36,9 +36,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         to_foreign_key: str = "",
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
-        through: Union[str, type["BaseModelType"]] = "",
-        through_tablename: Union[str, type[OLD_M2M_NAMING], type[NEW_M2M_NAMING]],
-        embed_through: Union[str, Literal[False]] = False,
+        through: str | type["BaseModelType"] = "",
+        through_tablename: str | type[OLD_M2M_NAMING] | type[NEW_M2M_NAMING],
+        embed_through: str | Literal[False] = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -163,12 +163,10 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
     def create_through_model(
         self,
         *,
-        replace_related_field: Union[
-            bool,
-            type["BaseModelType"],
-            tuple[type["BaseModelType"], ...],
-            list[type["BaseModelType"]],
-        ] = False,
+        replace_related_field: bool
+        | type["BaseModelType"]
+        | tuple[type["BaseModelType"], ...]
+        | list[type["BaseModelType"]] = False,
     ) -> None:
         """
         Creates the default empty through model.
@@ -283,7 +281,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             **meta_args,
         )
 
-        to_related_name: Union[str, Literal[False]]
+        to_related_name: str | Literal[False]
         if self.related_name is False:
             to_related_name = False
         elif self.related_name:
@@ -396,9 +394,9 @@ class ManyToManyField(ForeignKeyFieldFactory, list):
         to_foreign_key: str = "",
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
-        through: Union[str, type["BaseModelType"], type["Model"]] = "",
-        through_tablename: Union[str, type[OLD_M2M_NAMING], type[NEW_M2M_NAMING]] = "",
-        embed_through: Union[str, Literal[False]] = False,
+        through: str | type["BaseModelType"] | type["Model"] = "",
+        through_tablename: str | type[OLD_M2M_NAMING] | type[NEW_M2M_NAMING] = "",
+        embed_through: str | Literal[False] = False,
         **kwargs: Any,
     ) -> "BaseFieldType":
         kwargs = {
@@ -434,7 +432,7 @@ class ManyToManyField(ForeignKeyFieldFactory, list):
         kwargs["exclude"] = True
         kwargs["on_delete"] = CASCADE
         kwargs["on_update"] = CASCADE
-        through_tablename: Union[str, type[OLD_M2M_NAMING], type[NEW_M2M_NAMING]] = kwargs.get(
+        through_tablename: str | type[OLD_M2M_NAMING] | type[NEW_M2M_NAMING] = kwargs.get(
             "through_tablename"
         )
         if not through_tablename or (

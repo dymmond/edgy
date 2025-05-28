@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import sys
-from collections.abc import Awaitable, Sequence
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Optional, Union
+from collections.abc import Awaitable, Callable, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import sqlalchemy
 from pydantic import ConfigDict, model_validator
@@ -27,8 +27,8 @@ class Index:
 
     suffix: str = "idx"
     __max_name_length__: ClassVar[int] = 63
-    name: Optional[str] = None
-    fields: Optional[Sequence[Union[str, sqlalchemy.TextClause]]] = None
+    name: str | None = None
+    fields: Sequence[str | sqlalchemy.TextClause] | None = None
 
     @model_validator(mode="before")
     def validate_data(cls, values: Any) -> Any:
@@ -40,10 +40,10 @@ class Index:
             )
 
         fields = values.kwargs.get("fields")
-        if not isinstance(fields, (tuple, list)):
+        if not isinstance(fields, tuple | list):
             raise ValueError("Index.fields must be a list or a tuple.")
 
-        if fields and not all(isinstance(field, (str, sqlalchemy.TextClause)) for field in fields):
+        if fields and not all(isinstance(field, str | sqlalchemy.TextClause) for field in fields):
             raise ValueError(
                 "Index.fields must contain only strings with field names or text() clauses."
             )
@@ -61,9 +61,9 @@ class UniqueConstraint:
     """
 
     fields: list[str]
-    name: Optional[str] = None
-    deferrable: Optional[bool] = None
-    initially: Optional[str] = None
+    name: str | None = None
+    deferrable: bool | None = None
+    initially: str | None = None
     __max_name_length__: ClassVar[int] = 63
 
     @model_validator(mode="before")
@@ -76,7 +76,7 @@ class UniqueConstraint:
             )
 
         fields = values.kwargs.get("fields")
-        if not isinstance(fields, (tuple, list)):
+        if not isinstance(fields, tuple | list):
             raise ValueError("UniqueConstraint.fields must be a list or a tuple.")
 
         if fields and not all(isinstance(field, str) for field in fields):
@@ -94,7 +94,7 @@ class QueryModelResultCache:
         self,
         attrs: Sequence[str],
         prefix: str = "",
-        cache: Optional[dict[str, dict[tuple[Any, ...], Any]]] = None,
+        cache: dict[str, dict[tuple[Any, ...], Any]] | None = None,
     ) -> None:
         if cache is None:
             cache = {}
@@ -102,9 +102,7 @@ class QueryModelResultCache:
         self.attrs = attrs
         self.prefix = prefix
 
-    def create_category(
-        self, model_class: type[BaseModelType], prefix: Optional[str] = None
-    ) -> str:
+    def create_category(self, model_class: type[BaseModelType], prefix: str | None = None) -> str:
         prefix = self.prefix if prefix is None else prefix
         return f"{prefix}_{model_class.__name__}"
 
@@ -112,7 +110,7 @@ class QueryModelResultCache:
         return self.__class__(attrs, prefix=prefix, cache=self.cache)
 
     def clear(
-        self, model_class: Optional[type[BaseModelType]] = None, prefix: Optional[str] = None
+        self, model_class: type[BaseModelType] | None = None, prefix: str | None = None
     ) -> None:
         cache: Any = self.cache
         if model_class is not None:
@@ -124,8 +122,8 @@ class QueryModelResultCache:
         self,
         model_class: type[BaseModelType],
         instance: Any,
-        attrs: Optional[Sequence[str]] = None,
-        prefix: Optional[str] = None,
+        attrs: Sequence[str] | None = None,
+        prefix: str | None = None,
     ) -> tuple:
         """
         Build a cache key for the model.
@@ -143,15 +141,15 @@ class QueryModelResultCache:
                 cache_key_list.append(str(getattr(instance, attr)))
         return tuple(cache_key_list)
 
-    def get_category(self, model_class: type[BaseModelType], prefix: Optional[str] = None) -> dict:
+    def get_category(self, model_class: type[BaseModelType], prefix: str | None = None) -> dict:
         return self.cache.setdefault(self.create_category(model_class, prefix=prefix), {})
 
     def update(
         self,
         model_class: type[BaseModelType],
         values: Sequence[Any],
-        cache_keys: Optional[Sequence[tuple]] = None,
-        prefix: Optional[str] = None,
+        cache_keys: Sequence[tuple] | None = None,
+        prefix: str | None = None,
     ) -> None:
         if cache_keys is None:
             cache_keys = []
@@ -162,7 +160,7 @@ class QueryModelResultCache:
                     cache_key = _empty_tuple
                 cache_keys.append(cache_key)
 
-        for cache_key, instance in zip(cache_keys, values):
+        for cache_key, instance in zip(cache_keys, values, strict=False):
             if len(cache_key) <= 1:
                 continue
             _category_cache = self.cache.setdefault(cache_key[0], {})
@@ -171,9 +169,9 @@ class QueryModelResultCache:
     def get_for_cache_key(
         self,
         cache_key: tuple,
-        prefix: Optional[str] = None,
-        old_cache: Optional[QueryModelResultCache] = None,
-    ) -> Optional[Any]:
+        prefix: str | None = None,
+        old_cache: QueryModelResultCache | None = None,
+    ) -> Any | None:
         cache = self.cache if old_cache is None else old_cache.cache
         _category_cache = cache.get(cache_key[0])
         if _category_cache is None:
@@ -190,9 +188,9 @@ class QueryModelResultCache:
         self,
         model_class: type[BaseModelType],
         row_or_model: Any,
-        prefix: Optional[str] = None,
-        old_cache: Optional[QueryModelResultCache] = None,
-    ) -> Optional[Any]:
+        prefix: str | None = None,
+        old_cache: QueryModelResultCache | None = None,
+    ) -> Any | None:
         try:
             cache_key = self.create_cache_key(model_class, row_or_model, prefix=prefix)
         except (AttributeError, KeyError):
@@ -203,14 +201,14 @@ class QueryModelResultCache:
         self,
         model_class: type[BaseModelType],
         row_or_models: Sequence[Any],
-        cache_fn: Optional[Callable[[Any], Optional[BaseModelType]]] = None,
-        transform_fn: Optional[Callable[[Optional[BaseModelType]], Any]] = None,
-        prefix: Optional[str] = None,
-        old_cache: Optional[QueryModelResultCache] = None,
+        cache_fn: Callable[[Any], BaseModelType | None] | None = None,
+        transform_fn: Callable[[BaseModelType | None], Any] | None = None,
+        prefix: str | None = None,
+        old_cache: QueryModelResultCache | None = None,
     ) -> Sequence[Any]:
         cache_update_keys: list[tuple] = []
         cache_update: list[BaseModelType] = []
-        results: list[Optional[Any]] = []
+        results: list[Any | None] = []
         for row_or_model in row_or_models:
             try:
                 cache_key = self.create_cache_key(model_class, row_or_model, prefix=prefix)
@@ -240,14 +238,14 @@ class QueryModelResultCache:
         self,
         model_class: type[BaseModelType],
         row_or_models: Sequence[Any],
-        cache_fn: Optional[Callable[[Any], Awaitable[Optional[BaseModelType]]]] = None,
-        transform_fn: Optional[Callable[[Optional[BaseModelType]], Awaitable[Any]]] = None,
-        prefix: Optional[str] = None,
-        old_cache: Optional[QueryModelResultCache] = None,
+        cache_fn: Callable[[Any], Awaitable[BaseModelType | None]] | None = None,
+        transform_fn: Callable[[BaseModelType | None], Awaitable[Any]] | None = None,
+        prefix: str | None = None,
+        old_cache: QueryModelResultCache | None = None,
     ) -> Sequence[Any]:
         cache_update_keys: list[tuple] = []
         cache_update: list[Any] = []
-        results: list[Optional[BaseModelType]] = []
+        results: list[BaseModelType | None] = []
         for row_or_model in row_or_models:
             try:
                 cache_key = self.create_cache_key(model_class, row_or_model, prefix=prefix)

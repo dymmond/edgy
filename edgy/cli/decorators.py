@@ -3,7 +3,7 @@ from contextlib import suppress
 from functools import wraps
 from importlib import import_module
 from pathlib import Path
-from typing import Any, NoReturn, Optional, TypeVar
+from typing import Any, NoReturn, TypeVar
 
 from alembic.util import CommandError
 from loguru import logger
@@ -28,7 +28,7 @@ def catch_errors(fn: T) -> T:
 def add_migration_directory_option(fn: Any) -> Any:
     import click
 
-    def callback(ctx: Any, param: str, value: Optional[str]) -> None:
+    def callback(ctx: Any, param: str, value: str | None) -> None:
         import edgy
 
         if value is not None:
@@ -60,7 +60,7 @@ def add_force_field_nullable_option(fn: Any) -> Any:
 def add_app_module_option(fn: Any) -> Any:
     import click
 
-    def callback(ctx: click.Context, param: str, value: Optional[str]) -> None:
+    def callback(ctx: click.Context, param: str, value: str | None) -> None:
         import edgy
 
         # before importing anything inject the cwd

@@ -3,8 +3,8 @@ from __future__ import annotations
 import asyncio
 import select
 import sys
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from collections.abc import Callable, Sequence
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -75,9 +75,9 @@ async def run_shell(app: Any, lifespan: Any, registry: Registry, kernel: str) ->
 
 
 def handle_lifespan_events(
-    on_startup: Optional[Sequence[Callable]] = None,
-    on_shutdown: Optional[Sequence[Callable]] = None,
-    lifespan: Optional[Any] = None,
+    on_startup: Sequence[Callable] | None = None,
+    on_shutdown: Sequence[Callable] | None = None,
+    lifespan: Any | None = None,
 ) -> Any:
     """Handles with the lifespan events in the new Starlette format of lifespan.
     This adds a mask that keeps the old `on_startup` and `on_shutdown` events variable

@@ -27,9 +27,9 @@ class ManyRelation(ManyRelationProtocol):
         to: type["BaseModelType"],
         through: type["BaseModelType"],
         reverse: bool = False,
-        embed_through: Union[Literal[False], str] = "",
+        embed_through: Literal[False] | str = "",
         refs: Any = (),
-        instance: Optional[Union["BaseModelType"]] = None,
+        instance: Union["BaseModelType"] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -87,7 +87,7 @@ class ManyRelation(ManyRelationProtocol):
     def expand_relationship(self, value: Any) -> Any:
         through = self.through
 
-        if isinstance(value, (through, through.proxy_model)):  # type: ignore
+        if isinstance(value, through | through.proxy_model):  # type: ignore
             return value
         instance = through.proxy_model(
             **{self.from_foreign_key: self.instance, self.to_foreign_key: value}
@@ -101,7 +101,7 @@ class ManyRelation(ManyRelationProtocol):
         for child in children:
             if not isinstance(
                 child,
-                (self.to, self.to.proxy_model, self.through, self.through.proxy_model, dict),  # type: ignore
+                self.to | self.to.proxy_model | self.through | self.through.proxy_model | dict,  # type: ignore
             ):
                 raise RelationshipIncompatible(
                     f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
@@ -122,7 +122,7 @@ class ManyRelation(ManyRelationProtocol):
         """
         if not isinstance(
             child,
-            (self.to, self.to.proxy_model, self.through, self.through.proxy_model, dict),  # type: ignore
+            self.to | self.to.proxy_model | self.through | self.through.proxy_model | dict,  # type: ignore
         ):
             raise RelationshipIncompatible(
                 f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
@@ -155,7 +155,7 @@ class ManyRelation(ManyRelationProtocol):
                 raise RelationshipNotFound(detail="No child specified.")
         if not isinstance(
             child,
-            (self.to, self.to.proxy_model, self.through, self.through.proxy_model),  # type: ignore
+            self.to | self.to.proxy_model | self.through | self.through.proxy_model,  # type: ignore
         ):
             raise RelationshipIncompatible(
                 f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
@@ -191,7 +191,7 @@ class SingleRelation(ManyRelationProtocol):
         *,
         to_foreign_key: str,
         to: type["BaseModelType"],
-        embed_parent: Optional[tuple[str, str]] = None,
+        embed_parent: tuple[str, str] | None = None,
         refs: Any = (),
         instance: Optional["BaseModelType"] = None,
         **kwargs: Any,
@@ -233,10 +233,10 @@ class SingleRelation(ManyRelationProtocol):
     def expand_relationship(self, value: Any) -> Any:
         target = self.to
 
-        if isinstance(value, (target, target.proxy_model)):  # type: ignore
+        if isinstance(value, target | target.proxy_model):  # type: ignore
             return value
         related_columns = self.to.meta.fields[self.to_foreign_key].related_columns.keys()
-        if len(related_columns) == 1 and not isinstance(value, (dict, BaseModel)):
+        if len(related_columns) == 1 and not isinstance(value, dict | BaseModel):
             value = {next(iter(related_columns)): value}
         instance = target.proxy_model(**value)
         instance.identifying_db_fields = related_columns  # type: ignore
@@ -246,7 +246,7 @@ class SingleRelation(ManyRelationProtocol):
 
     def stage(self, *children: "BaseModelType") -> None:
         for child in children:
-            if not isinstance(child, (self.to, self.to.proxy_model, dict)):  # type: ignore
+            if not isinstance(child, self.to | self.to.proxy_model | dict):  # type: ignore
                 raise RelationshipIncompatible(
                     f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
                 )
@@ -281,7 +281,7 @@ class SingleRelation(ManyRelationProtocol):
         if the type is wrong.
         . Checks if the middle table already contains the record being added. Raises error if yes.
         """
-        if not isinstance(child, (self.to, self.to.proxy_model, dict)):  # type: ignore
+        if not isinstance(child, self.to | self.to.proxy_model | dict):  # type: ignore
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
         child = self.expand_relationship(child)
         await child.save(values={self.to_foreign_key: self.instance})

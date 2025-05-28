@@ -224,7 +224,7 @@ async def test_model_crud():
     )
 
     user = await User.query.get()
-    assert isinstance(user.ipaddress, (ipaddress.IPv4Address, ipaddress.IPv6Address))
+    assert isinstance(user.ipaddress, ipaddress.IPv4Address | ipaddress.IPv6Address)
     assert user.password == "12345"
 
     assert user.url == "https://edgy.com/"

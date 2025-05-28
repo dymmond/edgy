@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, ClassVar, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, ClassVar, Union, cast
 
 import sqlalchemy
 from pydantic_core._pydantic_core import SchemaValidator as SchemaValidator
@@ -28,8 +28,8 @@ class ReflectedModelMixin:
     @classmethod
     def build(
         cls,
-        schema: Optional[str] = None,
-        metadata: Optional[sqlalchemy.MetaData] = None,
+        schema: str | None = None,
+        metadata: sqlalchemy.MetaData | None = None,
     ) -> Any:
         """
         The inspect is done in an async manner and reflects the objects from the database.
@@ -71,7 +71,7 @@ class ReflectedModelMixin:
         registry: Union["Registry", "Database"],
         tablename: str,
         metadata: sqlalchemy.MetaData,
-        schema: Union[str, None] = None,
+        schema: str | None = None,
     ) -> sqlalchemy.Table:
         """
         Reflect a table from the database and return its SQLAlchemy Table object.

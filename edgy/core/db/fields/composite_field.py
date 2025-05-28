@@ -4,8 +4,6 @@ from collections.abc import Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Optional,
-    Union,
     cast,
 )
 
@@ -31,16 +29,14 @@ class ConcreteCompositeField(BaseCompositeField):
     prefix_column_name: str = ""
     unsafe_json_serialization: bool = False
     absorb_existing_fields: bool = False
-    model: Union[type[BaseModel], type[ConditionalRedirect], None] = None
+    model: type[BaseModel] | type[ConditionalRedirect] | None = None
 
     def __init__(
         self,
         *,
-        inner_fields: Union[
-            Sequence[Union[str, tuple[str, BaseFieldType]]],
-            type["BaseModelType"],
-            dict[str, BaseFieldType],
-        ] = (),
+        inner_fields: Sequence[str | tuple[str, BaseFieldType]]
+        | type["BaseModelType"]
+        | dict[str, BaseFieldType] = (),
         **kwargs: Any,
     ) -> None:
         self.inner_field_names: list[str] = []
@@ -91,8 +87,8 @@ class ConcreteCompositeField(BaseCompositeField):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[type["BaseModelType"]] = None,
-        parent: Optional[BaseFieldType] = None,
+        owner: type["BaseModelType"] | None = None,
+        parent: BaseFieldType | None = None,
     ) -> BaseFieldType:
         field_copy = cast(
             BaseFieldType, super().embed_field(prefix, new_fieldname, owner=owner, parent=parent)
@@ -123,9 +119,7 @@ class ConcreteCompositeField(BaseCompositeField):
                 field_copy.embedded_field_defs[field_def.name] = field_def
         return field_copy
 
-    async def aget(
-        self, instance: "BaseModelType", owner: Any = None
-    ) -> Union[dict[str, Any], Any]:
+    async def aget(self, instance: "BaseModelType", owner: Any = None) -> dict[str, Any] | Any:
         d = {}
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
@@ -141,7 +135,7 @@ class ConcreteCompositeField(BaseCompositeField):
             return self.model(**d)
         return d
 
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Union[dict[str, Any], Any]:
+    def __get__(self, instance: "BaseModelType", owner: Any = None) -> dict[str, Any] | Any:
         assert len(self.inner_field_names) >= 1
         if self.model is ConditionalRedirect and len(self.inner_field_names) == 1:
             try:
@@ -171,7 +165,7 @@ class ConcreteCompositeField(BaseCompositeField):
             self.model is ConditionalRedirect
             and len(self.inner_field_names) == 1
             # we first only redirect both
-            and not isinstance(value, (dict, BaseModel))
+            and not isinstance(value, dict | BaseModel)
         ):
             field = self.owner.meta.fields[self.inner_field_names[0]]
             return field.clean(self.inner_field_names[0], value, for_query=for_query)
@@ -187,7 +181,7 @@ class ConcreteCompositeField(BaseCompositeField):
             self.model is ConditionalRedirect
             and len(self.inner_field_names) == 1
             # we first only redirect both
-            and not isinstance(value, (dict, BaseModel))
+            and not isinstance(value, dict | BaseModel)
         ):
             field = self.owner.meta.fields[self.inner_field_names[0]]
             return field.to_model(self.inner_field_names[0], value)

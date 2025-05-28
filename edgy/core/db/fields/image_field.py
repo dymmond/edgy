@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from edgy.core.db.fields.file_field import FileField
 from edgy.core.files import ImageFieldFile
@@ -13,9 +13,9 @@ class ImageField(FileField):
     def __new__(  # type: ignore
         cls,
         # image formats without approval
-        image_formats: Optional[Sequence[str]] = (),
+        image_formats: Sequence[str] | None = (),
         # extra image formats after approval
-        approved_image_formats: Optional[Sequence[str]] = None,
+        approved_image_formats: Sequence[str] | None = None,
         field_file_class: type[ImageFieldFile] = ImageFieldFile,
         **kwargs: Any,
     ) -> "BaseFieldType":

@@ -1,7 +1,5 @@
-from typing import Union
-
 from edgy import EdgySettings
 
 
 class TestSettings(EdgySettings):
-    migrate_databases: list[Union[str, None]] = [None, "another"]
+    migrate_databases: list[str | None] = [None, "another"]

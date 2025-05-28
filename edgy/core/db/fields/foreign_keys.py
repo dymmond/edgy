@@ -1,11 +1,8 @@
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import cached_property
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
-    Optional,
-    Union,
     cast,
 )
 
@@ -38,7 +35,7 @@ class BaseForeignKeyField(BaseForeignKey):
     force_cascade_deletion_relation: bool = False
     relation_has_post_delete_callback: bool = False
     # overwrite for sondercharacters
-    column_name: Optional[str] = None
+    column_name: str | None = None
 
     def __init__(
         self,
@@ -47,9 +44,9 @@ class BaseForeignKeyField(BaseForeignKey):
         on_delete: str,
         related_fields: Sequence[str] = (),
         no_constraint: bool = False,
-        embed_parent: Optional[tuple[str, str]] = None,
-        relation_fn: Optional[Callable[..., ManyRelationProtocol]] = None,
-        reverse_path_fn: Optional[Callable[[str], tuple[Any, str, str]]] = None,
+        embed_parent: tuple[str, str] | None = None,
+        relation_fn: Callable[..., ManyRelationProtocol] | None = None,
+        reverse_path_fn: Callable[[str], tuple[Any, str, str]] | None = None,
         remove_referenced: bool = False,
         null: bool = False,
         **kwargs: Any,
@@ -96,7 +93,7 @@ class BaseForeignKeyField(BaseForeignKey):
         if value is None or (isinstance(value, dict) and not value):
             value = original_value
         # e.g. default was a Model
-        if isinstance(value, (target, target.proxy_model)):
+        if isinstance(value, target | target.proxy_model):
             await value.save()
             return self.clean(self.name, value, for_query=False, hook_call=True)
         elif isinstance(value, dict):
@@ -132,9 +129,9 @@ class BaseForeignKeyField(BaseForeignKey):
         return self.owner, self.name, path.removeprefix(self.reverse_name).removeprefix("__")
 
     @cached_property
-    def related_columns(self) -> dict[str, Optional[sqlalchemy.Column]]:
+    def related_columns(self) -> dict[str, sqlalchemy.Column | None]:
         target = self.target
-        columns: dict[str, Optional[sqlalchemy.Column]] = {}
+        columns: dict[str, sqlalchemy.Column | None] = {}
         if self.related_fields:
             for field_name in self.related_fields:
                 if field_name in target.meta.fields:
@@ -160,14 +157,14 @@ class BaseForeignKeyField(BaseForeignKey):
             return None
         target = self.target
         related_columns = self.related_columns.keys()
-        if isinstance(value, (target, target.proxy_model)):
+        if isinstance(value, target | target.proxy_model):
             # if all related columns are set to None
             if all(
                 key in value.__dict__ and getattr(value, key) is None for key in related_columns
             ):
                 return None
             return value
-        if len(related_columns) == 1 and not isinstance(value, (dict, BaseModel)):
+        if len(related_columns) == 1 and not isinstance(value, dict | BaseModel):
             value = {next(iter(related_columns)): value}
         elif isinstance(value, BaseModel):
             return self.expand_relationship({col: getattr(value, col) for col in related_columns})
@@ -191,7 +188,7 @@ class BaseForeignKeyField(BaseForeignKey):
                 translated_name = self.from_fk_field_name(name, column_name)
                 if translated_name in value:
                     retdict[column_name] = value[translated_name]
-        elif isinstance(value, (target, target.proxy_model)):
+        elif isinstance(value, target | target.proxy_model):
             for column_name in column_names:
                 translated_name = self.from_fk_field_name(name, column_name)
                 if hasattr(value, translated_name):
@@ -329,9 +326,9 @@ class BaseForeignKeyField(BaseForeignKey):
         name: str,
         columns: Sequence[sqlalchemy.Column],
         schemes: Sequence[str] = (),
-        no_constraint: Optional[bool] = None,
-    ) -> Sequence[Union[sqlalchemy.Constraint, sqlalchemy.Index]]:
-        constraints: list[Union[sqlalchemy.Constraint, sqlalchemy.Index]] = []
+        no_constraint: bool | None = None,
+    ) -> Sequence[sqlalchemy.Constraint | sqlalchemy.Index]:
+        constraints: list[sqlalchemy.Constraint | sqlalchemy.Index] = []
         no_constraint = bool(
             no_constraint
             or self.no_constraint
@@ -380,7 +377,7 @@ class ForeignKey(ForeignKeyFieldFactory, cast(Any, object)):
 
     def __new__(  # type: ignore
         cls,
-        to: Union[type["BaseModelType"], str],
+        to: type["BaseModelType"] | str,
         **kwargs: Any,
     ) -> BaseFieldType:
         return super().__new__(cls, to=to, **kwargs)

@@ -59,12 +59,12 @@ class BlogPage(BaseModel):
     content: list[BlogEntry]
     is_first: bool
     is_last: bool
-    current_cursor: Optional[int]
-    next_cursor: Optional[int]
+    current_cursor: int | None
+    next_cursor: int | None
     pages: int
 
 
-async def _get_blogpost(item: int) -> Optional[BlogEntry]:
+async def _get_blogpost(item: int) -> BlogEntry | None:
     # order by is required for paginators
     paginator = CursorPaginator(
         BlogEntry.query.order_by("-id"),
@@ -80,7 +80,7 @@ async def _get_blogpost(item: int) -> Optional[BlogEntry]:
 
 
 @get("/blog/item/{item}")
-async def get_blogpost(item: int) -> Optional[BlogEntry]:
+async def get_blogpost(item: int) -> BlogEntry | None:
     return await _get_blogpost(item)
 
 
@@ -127,7 +127,7 @@ async def get_last_blogpost_page(reverse_cursor: int) -> BlogPage:
 
 
 @post("/search")
-async def search_blogpost(string: str, cursor: Optional[int] = None) -> BlogPage:
+async def search_blogpost(string: str, cursor: int | None = None) -> BlogPage:
     # order by is required for paginators
     paginator = CursorPaginator(
         BlogEntry.query.or_({"title__icontains": string}, {"content__icontains": string}).order_by(

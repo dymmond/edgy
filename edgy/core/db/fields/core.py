@@ -9,7 +9,7 @@ from collections.abc import Callable
 from enum import Enum, EnumMeta
 from re import Pattern
 from secrets import compare_digest
-from typing import TYPE_CHECKING, Annotated, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Annotated, Any, Optional, cast
 
 import orjson
 import pydantic
@@ -44,9 +44,9 @@ class CharField(FieldFactory, str):
     def __new__(  # type: ignore
         cls,
         *,
-        min_length: Optional[int] = None,
-        regex: Union[str, Pattern] = None,
-        pattern: Union[str, Pattern] = None,
+        min_length: int | None = None,
+        regex: str | Pattern = None,
+        pattern: str | Pattern = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         if pattern is None:
@@ -70,11 +70,11 @@ class CharField(FieldFactory, str):
 
         assert min_length is None or isinstance(min_length, int)
         assert max_length is None or isinstance(max_length, int)
-        assert pattern is None or isinstance(pattern, (str, Pattern))
+        assert pattern is None or isinstance(pattern, str | Pattern)
 
     @classmethod
     def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
-        max_length: Optional[int] = kwargs.get("max_length")
+        max_length: int | None = kwargs.get("max_length")
         return (
             sqlalchemy.Text(collation=kwargs.get("collation"))
             if max_length is None
@@ -102,11 +102,11 @@ class IntegerField(FieldFactory, int):
     def __new__(  # type: ignore
         cls,
         *,
-        ge: Union[int, float, decimal.Decimal, None] = None,
-        gt: Union[int, float, decimal.Decimal, None] = None,
-        le: Union[int, float, decimal.Decimal, None] = None,
-        lt: Union[int, float, decimal.Decimal, None] = None,
-        multiple_of: Optional[int] = None,
+        ge: int | float | decimal.Decimal | None = None,
+        gt: int | float | decimal.Decimal | None = None,
+        le: int | float | decimal.Decimal | None = None,
+        lt: int | float | decimal.Decimal | None = None,
+        multiple_of: int | None = None,
         increment_on_save: int = 0,
         **kwargs: Any,
     ) -> BaseFieldType:
@@ -158,11 +158,11 @@ class FloatField(FieldFactory, float):
     def __new__(  # type: ignore
         cls,
         *,
-        max_digits: Optional[int] = None,
-        ge: Union[int, float, decimal.Decimal, None] = None,
-        gt: Union[int, float, decimal.Decimal, None] = None,
-        le: Union[int, float, decimal.Decimal, None] = None,
-        lt: Union[int, float, decimal.Decimal, None] = None,
+        max_digits: int | None = None,
+        ge: int | float | decimal.Decimal | None = None,
+        gt: int | float | decimal.Decimal | None = None,
+        le: int | float | decimal.Decimal | None = None,
+        lt: int | float | decimal.Decimal | None = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         # pydantic doesn't support max_digits for float, so rename it
@@ -177,7 +177,7 @@ class FloatField(FieldFactory, float):
 
     @classmethod
     def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
-        precision: Optional[int] = kwargs.get("precision")
+        precision: int | None = kwargs.get("precision")
         if precision is None:
             return sqlalchemy.Float(asdecimal=False)
         return sqlalchemy.Float(precision=precision, asdecimal=False).with_variant(
@@ -217,13 +217,13 @@ class DecimalField(FieldFactory, decimal.Decimal):
     def __new__(  # type: ignore
         cls,
         *,
-        ge: Union[int, float, decimal.Decimal, None] = None,
-        gt: Union[int, float, decimal.Decimal, None] = None,
-        le: Union[int, float, decimal.Decimal, None] = None,
-        lt: Union[int, float, decimal.Decimal, None] = None,
-        multiple_of: Union[int, decimal.Decimal, None] = None,
-        max_digits: Optional[int] = None,
-        decimal_places: Optional[int] = None,
+        ge: int | float | decimal.Decimal | None = None,
+        gt: int | float | decimal.Decimal | None = None,
+        le: int | float | decimal.Decimal | None = None,
+        lt: int | float | decimal.Decimal | None = None,
+        multiple_of: int | decimal.Decimal | None = None,
+        max_digits: int | None = None,
+        decimal_places: int | None = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         kwargs = {
@@ -267,8 +267,8 @@ class DateTimeField(_AutoNowMixin, datetime.datetime):
     def __new__(  # type: ignore
         cls,
         *,
-        auto_now: Optional[bool] = False,
-        auto_now_add: Optional[bool] = False,
+        auto_now: bool | None = False,
+        auto_now_add: bool | None = False,
         default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         remove_timezone: bool = False,
@@ -309,8 +309,8 @@ class DateField(_AutoNowMixin, datetime.date):
     def __new__(  # type: ignore
         cls,
         *,
-        auto_now: Optional[bool] = False,
-        auto_now_add: Optional[bool] = False,
+        auto_now: bool | None = False,
+        auto_now_add: bool | None = False,
         default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         **kwargs: Any,
@@ -369,7 +369,7 @@ class JSONField(FieldFactory, pydantic.Json):  # type: ignore
     def get_default_value(cls, field_obj: BaseFieldType, original_fn: Any = None) -> Any:
         default = original_fn()
         # copy mutable structures
-        if isinstance(default, (list, dict)):
+        if isinstance(default, list | dict):
             default = copy.deepcopy(default)
         return default
 
@@ -389,7 +389,7 @@ class BinaryField(FieldFactory, bytes):
 
     field_type = bytes
 
-    def __new__(cls, *, max_length: Optional[int] = None, **kwargs: Any) -> BaseFieldType:  # type: ignore
+    def __new__(cls, *, max_length: int | None = None, **kwargs: Any) -> BaseFieldType:  # type: ignore
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -473,7 +473,7 @@ class CharChoiceField(ChoiceField):
 
     @classmethod
     def get_column_type(cls, kwargs: dict[str, Any]) -> Any:
-        max_length: Optional[int] = kwargs.get("key_max_length")
+        max_length: int | None = kwargs.get("key_max_length")
         return (
             sqlalchemy.Text(collation=kwargs.get("collation"))
             if max_length is None
@@ -521,7 +521,7 @@ class PasswordField(CharField):
 
     def __new__(  # type: ignore
         cls,
-        derive_fn: Optional[Callable[[str], str]] = None,
+        derive_fn: Callable[[str], str] | None = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         kwargs.setdefault("keep_original", derive_fn is not None)
@@ -558,7 +558,7 @@ class PasswordField(CharField):
     def to_model(
         cls, field_obj: BaseFieldType, field_name: str, value: Any, original_fn: Any = None
     ) -> dict[str, Any]:
-        if isinstance(value, (tuple, list)):
+        if isinstance(value, tuple | list):
             # despite an != should not be a problem here, make sure that strange logics
             # doesn't leak timings of the password
             if not compare_digest(value[0], value[1]):
@@ -567,7 +567,7 @@ class PasswordField(CharField):
                 value = value[0]
         retval: dict[str, Any] = {}
         phase = CURRENT_PHASE.get()
-        derive_fn = cast(Optional[Callable[[str], str]], field_obj.derive_fn)
+        derive_fn = cast(Callable[[str], str] | None, field_obj.derive_fn)
         if phase in {"set", "init"} and derive_fn is not None:
             retval[field_name] = derive_fn(value)
             if getattr(field_obj, "keep_original", False):
@@ -630,7 +630,7 @@ class IPAddressField(FieldFactory, str):
 
     @staticmethod
     def is_native_type(value: str) -> bool:
-        return isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address))
+        return isinstance(value, ipaddress.IPv4Address | ipaddress.IPv6Address)
 
     # overwrite
     @classmethod

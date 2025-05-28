@@ -382,7 +382,7 @@ class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
         m2m_values = {
             name: await getattr(instance, name).all()
             for name in model.meta.relationship_fields
-            if isinstance(model.meta.fields[name], (BaseManyToManyForeignKeyField, RelatedField))
+            if isinstance(model.meta.fields[name], BaseManyToManyForeignKeyField | RelatedField)
         }
 
         for field in model.meta.relationship_fields:

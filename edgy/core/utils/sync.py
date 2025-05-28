@@ -3,15 +3,15 @@ import weakref
 from collections.abc import Awaitable
 from contextvars import ContextVar, copy_context
 from threading import Event, Thread
-from typing import Any, Optional
+from typing import Any
 
 # for registry with
-current_eventloop: ContextVar[Optional[asyncio.AbstractEventLoop]] = ContextVar(
+current_eventloop: ContextVar[asyncio.AbstractEventLoop | None] = ContextVar(
     "current_eventloop", default=None
 )
 
 
-async def _coro_helper(awaitable: Awaitable, timeout: Optional[float]) -> Any:
+async def _coro_helper(awaitable: Awaitable, timeout: float | None) -> Any:
     if timeout is not None and timeout > 0:
         return await asyncio.wait_for(awaitable, timeout)
     return await awaitable
@@ -70,9 +70,9 @@ def get_subloop(loop: asyncio.AbstractEventLoop) -> asyncio.AbstractEventLoop:
 
 def run_sync(
     awaitable: Awaitable,
-    timeout: Optional[float] = None,
+    timeout: float | None = None,
     *,
-    loop: Optional[asyncio.AbstractEventLoop] = None,
+    loop: asyncio.AbstractEventLoop | None = None,
 ) -> Any:
     """
     Runs the queries in sync mode

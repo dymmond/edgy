@@ -1,5 +1,5 @@
 import warnings
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 
 import sqlalchemy
 from loguru import logger
@@ -47,7 +47,7 @@ async def create_tables(
 async def create_schema(
     registry: "Registry",
     schema_name: str,
-    models: Union[dict[str, type["BaseModelType"]], None] = None,
+    models: dict[str, type["BaseModelType"]] | None = None,
     if_not_exists: bool = False,
     should_create_tables: bool = False,
 ) -> None:

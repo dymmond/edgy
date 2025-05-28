@@ -1,7 +1,7 @@
 import asyncio
 import warnings
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING
 
 import sqlalchemy
 from sqlalchemy.exc import DBAPIError, ProgrammingError
@@ -21,7 +21,7 @@ class Schema:
     All the operations regarding a schema are placed in one object
     """
 
-    _default_schema: Optional[str]
+    _default_schema: str | None
 
     def __init__(self, registry: "Registry") -> None:
         self.registry = registry
@@ -30,7 +30,7 @@ class Schema:
     def database(self) -> "Database":
         return self.registry.database
 
-    def get_default_schema(self) -> Optional[str]:
+    def get_default_schema(self) -> str | None:
         """
         Returns the default schema which is usually None
         """
@@ -63,7 +63,7 @@ class Schema:
         init_models: bool = False,
         init_tenant_models: bool = False,
         update_cache: bool = True,
-        databases: Sequence[Union[str, None]] = (None,),
+        databases: Sequence[str | None] = (None,),
     ) -> None:
         """
         Creates a model schema if it does not exist.
@@ -83,7 +83,7 @@ class Schema:
             for model_class in self.registry.tenant_models.values():
                 model_class.add_global_field_constraints(schema=schema)
 
-        def execute_create(connection: sqlalchemy.Connection, name: Optional[str]) -> None:
+        def execute_create(connection: sqlalchemy.Connection, name: str | None) -> None:
             try:
                 connection.execute(
                     sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists)
@@ -117,7 +117,7 @@ class Schema:
         schema: str,
         cascade: bool = False,
         if_exists: bool = False,
-        databases: Sequence[Union[str, None]] = (None,),
+        databases: Sequence[str | None] = (None,),
     ) -> None:
         """
         Drops an existing model schema.
@@ -174,8 +174,8 @@ class Schema:
 
     async def get_schemes_tree(
         self, *, no_reflect: bool = False
-    ) -> dict[Union[str, None], tuple[str, sqlalchemy.MetaData, list[str]]]:
-        schemes_tree: dict[Union[str, None], tuple[str, sqlalchemy.MetaData, list[str]]] = {
+    ) -> dict[str | None, tuple[str, sqlalchemy.MetaData, list[str]]]:
+        schemes_tree: dict[str | None, tuple[str, sqlalchemy.MetaData, list[str]]] = {
             None: (
                 str(self.database.url),
                 *(

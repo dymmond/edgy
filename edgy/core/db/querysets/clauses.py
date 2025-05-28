@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from functools import partial
 from inspect import Parameter, Signature, isawaitable
 from itertools import islice
-from typing import TYPE_CHECKING, Any, Optional, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy
 
@@ -65,8 +65,8 @@ async def parse_clause_args(
 def clean_query_kwargs(
     model_class: type[BaseModelType],
     kwargs: dict[str, Any],
-    embed_parent: Optional[tuple[str, str]] = None,
-    model_database: Optional[Database] = None,
+    embed_parent: tuple[str, str] | None = None,
+    model_database: Database | None = None,
 ) -> dict[str, Any]:
     new_kwargs: dict[str, Any] = {}
     for key, val in kwargs.items():

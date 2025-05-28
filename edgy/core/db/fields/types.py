@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Optional, TypedDict, Union, cast
+from typing import TYPE_CHECKING, Any, TypedDict, cast
 
 import sqlalchemy
 from pydantic import BaseModel, Field
@@ -30,26 +30,26 @@ class _ColumnDefinition:
     autoincrement: bool = False
     index: bool = False
     unique: bool = False
-    comment: Optional[str] = None
+    comment: str | None = None
     # keep any, so multi-column field authors can set a dict
-    server_onupdate: Optional[Any] = None
+    server_onupdate: Any | None = None
 
 
 # for preventing shadowing warnings
 class ColumnDefinition(_ColumnDefinition):
     null: bool = False
-    column_name: Optional[str] = None
+    column_name: str | None = None
     column_type: Any = None
     constraints: Sequence[sqlalchemy.Constraint] = ()
     # keep any, so multi-column field authors can set a dict
-    server_default: Optional[Any] = Undefined
+    server_default: Any | None = Undefined
 
 
 class ColumnDefinitionModel(
     _ColumnDefinition, BaseModel, extra="ignore", arbitrary_types_allowed=True
 ):
     # no default and null extraction, edgy uses a custom logic
-    column_name: Optional[str] = Field(exclude=True, default=None)
+    column_name: str | None = Field(exclude=True, default=None)
     column_type: Any = Field(exclude=True, default=None)
     constraints: Sequence[sqlalchemy.Constraint] = Field(exclude=True, default=())
 
@@ -62,7 +62,7 @@ class BaseFieldDefinitions:
     skip_absorption_check: bool = False
     skip_reflection_type_check: bool = False
     field_type: Any = Any
-    factory: Optional[FieldFactory] = None
+    factory: FieldFactory | None = None
 
     __original_type__: Any = None
     name: str = ""
@@ -142,7 +142,7 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         name: str,
         columns: Sequence[sqlalchemy.Column],
         schemes: Sequence[str] = (),
-    ) -> Sequence[Union[sqlalchemy.Constraint, sqlalchemy.Index]]:
+    ) -> Sequence[sqlalchemy.Constraint | sqlalchemy.Index]:
         """Return global constraints and indexes.
         Useful for multicolumn fields
         """
@@ -180,9 +180,9 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: Optional[BaseModelType] = None,
-        parent: Optional[BaseFieldType] = None,
-    ) -> Optional[BaseFieldType]:
+        owner: BaseModelType | None = None,
+        parent: BaseFieldType | None = None,
+    ) -> BaseFieldType | None:
         """
         Embed this field or return None to prevent embedding.
         Must return a copy with name and owner set when not returning None.

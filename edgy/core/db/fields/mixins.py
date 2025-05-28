@@ -1,6 +1,6 @@
 import datetime
 from functools import partial
-from typing import TYPE_CHECKING, Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Optional
 
 from edgy.core.db.context_vars import (
     CURRENT_FIELD_CONTEXT,
@@ -83,9 +83,7 @@ class TimezonedField:
     force_timezone: Optional["zoneinfo.ZoneInfo"]
     remove_timezone: bool
 
-    def _convert_datetime(
-        self, value: datetime.datetime
-    ) -> Union[datetime.datetime, datetime.date]:
+    def _convert_datetime(self, value: datetime.datetime) -> datetime.datetime | datetime.date:
         if value.tzinfo is None and self.default_timezone is not None:
             value = value.replace(tzinfo=self.default_timezone)
         if self.force_timezone is not None and value.tzinfo != self.force_timezone:
@@ -99,12 +97,12 @@ class TimezonedField:
             return value.date()
         return value
 
-    def check(self, value: Any) -> Optional[Union[datetime.datetime, datetime.date]]:
+    def check(self, value: Any) -> datetime.datetime | datetime.date | None:
         if value is None:
             return None
         elif isinstance(value, datetime.datetime):
             return self._convert_datetime(value)
-        elif isinstance(value, (int, float)):
+        elif isinstance(value, int | float):
             return self._convert_datetime(
                 datetime.datetime.fromtimestamp(value, self.default_timezone)
             )
@@ -126,7 +124,7 @@ class TimezonedField:
         self,
         field_name: str,
         value: Any,
-    ) -> dict[str, Optional[Union[datetime.datetime, datetime.date]]]:
+    ) -> dict[str, datetime.datetime | datetime.date | None]:
         """
         Convert input object to datetime
         """
@@ -140,8 +138,8 @@ class AutoNowMixin(FieldFactory):
     def __new__(  # type: ignore
         cls,
         *,
-        auto_now: Optional[bool] = False,
-        auto_now_add: Optional[bool] = False,
+        auto_now: bool | None = False,
+        auto_now_add: bool | None = False,
         default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
         **kwargs: Any,
     ) -> BaseFieldType:

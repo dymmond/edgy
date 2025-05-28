@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Awaitable, Generator, Iterable, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Generator, Iterable, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
-    Callable,
     Generic,
     Literal,
-    Optional,
     TypeVar,
     Union,
 )
@@ -41,24 +39,20 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
 
     @abstractmethod
     async def build_where_clause(
-        self, _: Any = None, tables_and_models: Optional[tables_and_models_type] = None
+        self, _: Any = None, tables_and_models: tables_and_models_type | None = None
     ) -> Any: ...
 
     @abstractmethod
     def filter(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            dict[str, Any],
-            QuerySetType,
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | dict[str, Any]
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySetType: ...
 
@@ -68,17 +62,13 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     @abstractmethod
     def or_(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            QuerySetType,
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySetType:
         """
@@ -88,17 +78,13 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     @abstractmethod
     def local_or(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            QuerySetType,
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySetType:
         """
@@ -108,18 +94,14 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     @abstractmethod
     def and_(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            dict[str, Any],
-            QuerySetType,
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | dict[str, Any]
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySetType:
         """
@@ -129,18 +111,14 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     @abstractmethod
     def not_(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            dict[str, Any],
-            QuerySetType,
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | dict[str, Any]
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySetType:
         """
@@ -151,18 +129,14 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     @abstractmethod
     def exclude(
         self,
-        *clauses: Union[
-            sqlalchemy.sql.expression.BinaryExpression,
-            Callable[
-                [QuerySetType],
-                Union[
-                    sqlalchemy.sql.expression.BinaryExpression,
-                    Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-                ],
-            ],
-            dict[str, Any],
-            QuerySetType,
-        ],
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | dict[str, Any]
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySetType: ...
 
@@ -203,22 +177,22 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     async def count(self) -> int: ...
 
     @abstractmethod
-    async def get_or_none(self, **kwargs: Any) -> Union[EdgyEmbedTarget, None]: ...
+    async def get_or_none(self, **kwargs: Any) -> EdgyEmbedTarget | None: ...
 
     @abstractmethod
     async def get(self, **kwargs: Any) -> EdgyEmbedTarget: ...
 
     @abstractmethod
-    async def first(self) -> Union[EdgyEmbedTarget, None]: ...
+    async def first(self) -> EdgyEmbedTarget | None: ...
 
     @abstractmethod
-    async def last(self) -> Union[EdgyEmbedTarget, None]: ...
+    async def last(self) -> EdgyEmbedTarget | None: ...
 
     @abstractmethod
     async def create(self, *args: Any, **kwargs: Any) -> EdgyEmbedTarget: ...
 
     @abstractmethod
-    async def bulk_create(self, objs: Iterable[Union[dict[str, Any], EdgyModel]]) -> None: ...
+    async def bulk_create(self, objs: Iterable[dict[str, Any] | EdgyModel]) -> None: ...
 
     @abstractmethod
     async def bulk_update(self, objs: Sequence[EdgyModel], fields: list[str]) -> None: ...
@@ -232,8 +206,8 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     @abstractmethod
     async def values(
         self,
-        fields: Union[Sequence[str], str, None],
-        exclude: Union[Sequence[str], set[str]],
+        fields: Sequence[str] | str | None,
+        exclude: Sequence[str] | set[str],
         exclude_none: bool,
         **kwargs: Any,
     ) -> list[Any]: ...
@@ -241,8 +215,8 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     @abstractmethod
     async def values_list(
         self,
-        fields: Union[Sequence[str], str, None],
-        exclude: Union[Sequence[str], set[str]],
+        fields: Sequence[str] | str | None,
+        exclude: Sequence[str] | set[str],
         exclude_none: bool,
         flat: bool,
     ) -> list[Any]: ...
@@ -250,14 +224,14 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     @abstractmethod
     async def get_or_create(
         self,
-        defaults: Union[dict[str, Any], Any, None] = None,
+        defaults: dict[str, Any] | Any | None = None,
         *args: Any,
         **kwargs: Any,
     ) -> tuple[EdgyEmbedTarget, bool]: ...
 
     @abstractmethod
     async def update_or_create(
-        self, defaults: Union[dict[str, Any], Any, None] = None, *args: Any, **kwargs: Any
+        self, defaults: dict[str, Any] | Any | None = None, *args: Any, **kwargs: Any
     ) -> tuple[EdgyEmbedTarget, bool]: ...
 
     @abstractmethod
@@ -271,8 +245,8 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
     def using(
         self,
         *,
-        database: Union[str, Any, None, Database] = Undefined,
-        schema: Union[str, Any, None, Literal[False]] = Undefined,
+        database: str | Any | None | Database = Undefined,
+        schema: str | Any | None | Literal[False] = Undefined,
     ) -> QuerySetType: ...
 
     @abstractmethod

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Literal, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo, get_model_meta_attr
 
@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 def _check_model_inherited_tenancy(bases: tuple[type, ...]) -> bool:
     for base in bases:
-        meta: Optional[MetaInfo] = getattr(base, "meta", None)
+        meta: MetaInfo | None = getattr(base, "meta", None)
         if meta is None:
             continue
         if hasattr(meta, "is_tenant"):
@@ -19,7 +19,7 @@ def _check_model_inherited_tenancy(bases: tuple[type, ...]) -> bool:
 
 class TenantMeta(MetaInfo):
     __slots__ = ("is_tenant", "register_default")
-    register_default: Optional[bool]
+    register_default: bool | None
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
         self.is_tenant = getattr(meta, "is_tenant", None)
@@ -48,11 +48,11 @@ class BaseTenantMeta(BaseModelMeta):
         bases: tuple[type, ...],
         attrs: Any,
         on_conflict: Literal["error", "replace", "keep"] = "error",
-        skip_registry: Union[bool, Literal["allow_search"]] = False,
+        skip_registry: bool | Literal["allow_search"] = False,
         meta_info_class: type[TenantMeta] = TenantMeta,
         **kwargs: Any,
     ) -> Any:
-        database: Union[Literal["keep"], None, Database, bool] = attrs.get("database", "keep")
+        database: Literal["keep"] | None | Database | bool = attrs.get("database", "keep")
         new_model = super().__new__(
             cls,
             name,

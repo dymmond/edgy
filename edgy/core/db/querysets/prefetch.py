@@ -22,7 +22,7 @@ class Prefetch:
     ) -> None:
         self.related_name = related_name
         self.to_attr = to_attr
-        self.queryset: Optional[QuerySet] = queryset
+        self.queryset: QuerySet | None = queryset
         self._is_finished = False
         self._bake_prefix: str = ""
         self._baked_results: dict[tuple[str, ...], list[Any]] = defaultdict(list)

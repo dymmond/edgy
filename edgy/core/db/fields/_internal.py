@@ -21,6 +21,6 @@ class IPAddress(sqlalchemy.TypeDecorator):
     def process_result_value(self, value: Any, dialect: Any) -> Any:
         if value is None:
             return value
-        if not isinstance(value, (ipaddress.IPv4Address, ipaddress.IPv6Address)):
+        if not isinstance(value, ipaddress.IPv4Address | ipaddress.IPv6Address):
             value = ipaddress.ip_address(value)
         return value

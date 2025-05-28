@@ -14,14 +14,14 @@ if TYPE_CHECKING:
 def create_edgy_model(
     __name__: str,
     __module__: str,
-    __definitions__: Optional[dict[str, Any]] = None,
+    __definitions__: dict[str, Any] | None = None,
     __metadata__: Optional["MetaInfo"] = None,
-    __qualname__: Optional[str] = None,
+    __qualname__: str | None = None,
     __config__: Optional["ConfigDict"] = None,
-    __bases__: Optional[tuple[type["BaseModelType"], ...]] = None,
+    __bases__: tuple[type["BaseModelType"], ...] | None = None,
     __proxy__: bool = False,
     __pydantic_extra__: Any = None,
-    __type_kwargs__: Optional[dict] = None,
+    __type_kwargs__: dict | None = None,
 ) -> type["Model"]:
     """
     Generates an `edgy.Model` with all the required definitions to generate the pydantic

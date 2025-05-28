@@ -1,7 +1,7 @@
 import uuid
 import warnings
 from datetime import date
-from typing import Any, Optional, Union, cast
+from typing import Any, cast
 from uuid import UUID
 
 from loguru import logger
@@ -49,8 +49,8 @@ class TenantMixin(edgy.Model):
     async def real_save(
         self,
         force_insert: bool = False,
-        values: Union[dict[str, Any], set[str], None] = None,
-        force_save: Optional[bool] = None,
+        values: dict[str, Any] | set[str] | None = None,
+        force_save: bool | None = None,
     ) -> Model:
         """
         Creates a tenant record and generates a schema in the database.
@@ -129,8 +129,8 @@ class DomainMixin(edgy.Model):
     async def real_save(
         self: Any,
         force_insert: bool = False,
-        values: Union[dict[str, Any], set[str], None] = None,
-        force_save: Optional[bool] = None,
+        values: dict[str, Any] | set[str] | None = None,
+        force_save: bool | None = None,
     ) -> Model:
         if force_save is not None:
             force_insert = force_save
@@ -180,7 +180,7 @@ class TenantUserMixin(edgy.Model):
         abstract = True
 
     @classmethod
-    async def get_active_user_tenant(cls, user: edgy.Model) -> Union[edgy.Model, None]:
+    async def get_active_user_tenant(cls, user: edgy.Model) -> edgy.Model | None:
         """
         Obtains the active user tenant.
         """

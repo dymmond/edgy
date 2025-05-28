@@ -4,7 +4,7 @@ import re
 import secrets
 import string
 from os.path import abspath, dirname, join, normcase, sep
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import quote
 
 from edgy.exceptions import SuspiciousFileOperation
@@ -122,7 +122,7 @@ def validate_file_name(name: str, allow_relative_path: bool = False) -> str:
     return name
 
 
-def filepath_to_uri(path: Optional[str]) -> str:
+def filepath_to_uri(path: str | None) -> str:
     """
     Convert a file system path to a URI portion suitable for inclusion in a URL.
 

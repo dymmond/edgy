@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-import sys
-from collections.abc import Generator, Sequence
+from collections.abc import Callable, Generator, Sequence
 from copy import copy
 from functools import cached_property
 from io import BytesIO
@@ -11,11 +10,9 @@ from typing import (
     TYPE_CHECKING,
     Any,
     BinaryIO,
-    Callable,
     ClassVar,
     Literal,
-    Optional,
-    Union,
+    ParamSpec,
     cast,
 )
 
@@ -25,11 +22,6 @@ from edgy.exceptions import FileOperationError, SuspiciousFileOperation
 
 if TYPE_CHECKING:
     from .storage import Storage
-
-if sys.version_info >= (3, 10):  # pragma: no cover
-    from typing import ParamSpec
-else:  # pragma: no cover
-    from typing_extensions import ParamSpec
 
 if TYPE_CHECKING:
     from PIL.ImageFile import ImageFile  # pyright: ignore[reportMissingImports]
@@ -55,16 +47,16 @@ class FileStruct(BaseModel):
 
 class File:
     name: str
-    file: Optional[BinaryIO]
+    file: BinaryIO | None
     storage: Storage
     DEFAULT_CHUNK_SIZE: ClassVar[int] = 64 * 2**10
     mode: str = "rb"
 
     def __init__(
         self,
-        file: Union[BinaryIO, bytes, None, File] = None,
+        file: BinaryIO | bytes | None | File = None,
         name: str = "",
-        storage: Union[Storage, str, None] = None,
+        storage: Storage | str | None = None,
     ) -> None:
         if isinstance(file, File):
             file = file.open("rb").file
@@ -87,7 +79,7 @@ class File:
         if hasattr(file, "mode"):
             self.mode = file.mode
 
-    def __eq__(self, other: Union[str, File]) -> bool:
+    def __eq__(self, other: str | File) -> bool:
         if hasattr(other, "name"):
             return self.name == other.name
         return self.name == other
@@ -140,7 +132,7 @@ class File:
     def url(self) -> str:
         return self.storage.url(self.name)
 
-    def chunks(self, chunk_size: Union[int, None] = None) -> Generator[bytes, None, None]:
+    def chunks(self, chunk_size: int | None = None) -> Generator[bytes, None, None]:
         """
         Read the file and yield chunks of ``chunk_size`` bytes (defaults to
         ``File.DEFAULT_CHUNK_SIZE``).
@@ -168,7 +160,7 @@ class File:
                     break
                 yield data
 
-    def multiple_chunks(self, chunk_size: Union[int, None] = None) -> bool:
+    def multiple_chunks(self, chunk_size: int | None = None) -> bool:
         """
         Return ``True`` if you can expect multiple chunks.
 
@@ -190,7 +182,7 @@ class File:
     def __exit__(self, exc_type: Exception, exc_value: Any, tb: Any) -> None:
         self.close()
 
-    def open(self, mode: Union[str, None] = None) -> File:
+    def open(self, mode: str | None = None) -> File:
         """
         Open the file with the specified mode.
 
@@ -247,7 +239,7 @@ class File:
         assert self.file is not None
         return self.file.tell()
 
-    def read(self, amount: Optional[int] = None) -> bytes:
+    def read(self, amount: int | None = None) -> bytes:
         assert self.file is not None
         return self.file.read(amount)
 
@@ -275,7 +267,7 @@ class ContentFile(File):
     def __str__(self) -> str:
         return "Raw content"
 
-    def open(self, mode: Union[str, Any] = None) -> ContentFile:
+    def open(self, mode: str | Any = None) -> ContentFile:
         self.file.seek(0)
         return self
 
@@ -286,8 +278,8 @@ class ContentFile(File):
 
 class FieldFile(File):
     operation: Literal["none", "save", "save_delete", "delete"] = "none"
-    old: Optional[tuple[Storage, str, bool]] = None
-    instance: Union[BaseModelType, None] = None
+    old: tuple[Storage, str, bool] | None = None
+    instance: BaseModelType | None = None
     # can extract metadata
     approved: bool
     metadata: dict[str, Any]
@@ -295,12 +287,12 @@ class FieldFile(File):
     def __init__(
         self,
         field: BaseFieldType,
-        content: Union[BinaryIO, bytes, None, File] = None,
+        content: BinaryIO | bytes | None | File = None,
         name: str = "",
-        size: Optional[int] = None,
-        storage: Union[Storage, str, None] = None,
-        generate_name_fn: Optional[Callable[[str, Union[BinaryIO, File], bool], str]] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        size: int | None = None,
+        storage: Storage | str | None = None,
+        generate_name_fn: Callable[[str, BinaryIO | File, bool], str] | None = None,
+        metadata: dict[str, Any] | None = None,
         multi_process_safe: bool = True,
         approved: bool = True,
         # only usable with correct approval handling
@@ -317,7 +309,7 @@ class FieldFile(File):
             # set value to cached_property
             self.size = size
 
-    def to_file(self) -> Optional[File]:
+    def to_file(self) -> File | None:
         """Cloak FileField so it looks like a regular File. Required for copies."""
         if self:
             return File(cast(BinaryIO, copy(self)), name=self.name, storage=self.storage)
@@ -360,13 +352,13 @@ class FieldFile(File):
 
     def save(
         self,
-        content: Union[BinaryIO, bytes, None, File, FileStruct],
+        content: BinaryIO | bytes | None | File | FileStruct,
         *,
         name: str = "",
         delete_old: bool = True,
-        multi_process_safe: Optional[bool] = None,
-        approved: Optional[bool] = None,
-        storage: Optional[Storage] = None,
+        multi_process_safe: bool | None = None,
+        approved: bool | None = None,
+        storage: Storage | None = None,
         overwrite: bool = False,
     ) -> None:
         """
@@ -446,7 +438,7 @@ class FieldFile(File):
             self.old = None
         self.operation = "none"
 
-    def delete(self, *, approved: Optional[bool] = None, instant: bool = False) -> None:
+    def delete(self, *, approved: bool | None = None, instant: bool = False) -> None:
         """
         Mark the file associated with this object for deletion from storage.
         """
@@ -486,9 +478,9 @@ class ImageFieldFile(FieldFile):
     def open_image(self) -> ImageFile:
         from PIL import Image  # pyright: ignore[reportMissingImports]
 
-        allowed_formats: Optional[Sequence[str]] = getattr(self.field, "image_formats", ())
+        allowed_formats: Sequence[str] | None = getattr(self.field, "image_formats", ())
         if self.approved and allowed_formats is not None:
-            approved_image_formats: Optional[Sequence[str]] = getattr(
+            approved_image_formats: Sequence[str] | None = getattr(
                 self.field, "approved_image_formats", ()
             )
             if approved_image_formats is None:

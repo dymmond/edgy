@@ -1,7 +1,5 @@
 from inspect import isclass
-from typing import Any
-
-from typing_extensions import get_origin
+from typing import Any, get_origin
 
 
 def is_class_and_subclass(value: Any, _type: Any) -> bool:

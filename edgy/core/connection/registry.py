@@ -5,11 +5,11 @@ import contextlib
 import re
 import warnings
 from collections import defaultdict
-from collections.abc import Container, Generator, Iterable, Mapping, Sequence
+from collections.abc import Callable, Container, Generator, Iterable, Mapping, Sequence
 from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Literal, Optional, Union, cast, overload
+from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, overload
 
 import sqlalchemy
 from loguru import logger
@@ -37,7 +37,7 @@ class MetaDataDict(defaultdict[str, sqlalchemy.MetaData]):
         self.registry = registry
         super().__init__(sqlalchemy.MetaData)
 
-    def __getitem__(self, key: Union[str, None]) -> sqlalchemy.MetaData:
+    def __getitem__(self, key: str | None) -> sqlalchemy.MetaData:
         if key not in self.registry.extra and key is not None:
             raise KeyError(f'Extra database "{key}" does not exist.')
         return super().__getitem__(key)
@@ -82,9 +82,9 @@ class MetaDataByUrlDict(dict):
         except KeyError:
             return default
 
-    def get_name(self, key: str) -> Optional[str]:
+    def get_name(self, key: str) -> str | None:
         """Return name to url or raise a KeyError in case it isn't available."""
-        return cast(Optional[str], super().__getitem__(key))
+        return cast(str | None, super().__getitem__(key))
 
     def __copy__(self) -> MetaDataByUrlDict:
         return MetaDataByUrlDict(registry=self.registry)
@@ -104,18 +104,18 @@ class Registry:
         "pattern_models",
     )
 
-    db_schema: Union[str, None] = None
-    content_type: Union[type[BaseModelType], None] = None
-    dbs_reflected: set[Union[str, None]]
+    db_schema: str | None = None
+    content_type: type[BaseModelType] | None = None
+    dbs_reflected: set[str | None]
 
     def __init__(
         self,
-        database: Union[Database, str, DatabaseURL],
+        database: Database | str | DatabaseURL,
         *,
-        with_content_type: Union[bool, type[BaseModelType]] = False,
-        schema: Union[str, None] = None,
-        extra: Optional[Mapping[str, Union[Database, str]]] = None,
-        automigrate_config: Union[EdgySettings, None] = None,
+        with_content_type: bool | type[BaseModelType] = False,
+        schema: str | None = None,
+        extra: Mapping[str, Database | str] | None = None,
+        automigrate_config: EdgySettings | None = None,
         **kwargs: Any,
     ) -> None:
         self.db_schema = schema
@@ -136,10 +136,10 @@ class Registry:
         self.schema = Schema(registry=self)
         # when setting a Model or Reflected Model execute the callbacks
         # Note: they are only executed if the Model is not in Registry yet
-        self._onetime_callbacks: dict[
-            Union[str, None], list[Callable[[type[BaseModelType]], None]]
-        ] = defaultdict(list)
-        self._callbacks: dict[Union[str, None], list[Callable[[type[BaseModelType]], None]]] = (
+        self._onetime_callbacks: dict[str | None, list[Callable[[type[BaseModelType]], None]]] = (
+            defaultdict(list)
+        )
+        self._callbacks: dict[str | None, list[Callable[[type[BaseModelType]], None]]] = (
             defaultdict(list)
         )
 
@@ -158,10 +158,10 @@ class Registry:
     async def apply_default_force_nullable_fields(
         self,
         *,
-        force_fields_nullable: Optional[Iterable[tuple[str, str]]] = None,
-        model_defaults: Optional[dict[str, dict[str, Any]]] = None,
-        filter_db_url: Optional[str] = None,
-        filter_db_name: Union[str, None] = None,
+        force_fields_nullable: Iterable[tuple[str, str]] | None = None,
+        model_defaults: dict[str, dict[str, Any]] | None = None,
+        filter_db_url: str | None = None,
+        filter_db_name: str | None = None,
     ) -> None:
         """For online migrations and after migrations to apply defaults."""
         if force_fields_nullable is None:
@@ -267,7 +267,7 @@ class Registry:
         return True
 
     def __copy__(self) -> Registry:
-        content_type: Union[bool, type[BaseModelType]] = False
+        content_type: bool | type[BaseModelType] = False
         if self.content_type is not None:
             try:
                 content_type = self.get_model(
@@ -295,8 +295,8 @@ class Registry:
 
     def _set_content_type(
         self,
-        with_content_type: Union[Literal[True], type[BaseModelType]],
-        old_content_type_to_replace: Optional[type[BaseModelType]] = None,
+        with_content_type: Literal[True] | type[BaseModelType],
+        old_content_type_to_replace: type[BaseModelType] | None = None,
     ) -> None:
         from edgy.contrib.contenttypes.fields import BaseContentTypeField, ContentTypeField
         from edgy.contrib.contenttypes.models import ContentType
@@ -439,15 +439,15 @@ class Registry:
         self,
         *,
         update_only: bool = False,
-        multi_schema: Union[bool, re.Pattern, str] = False,
-        ignore_schema_pattern: Union[None, re.Pattern, str] = "information_schema",
+        multi_schema: bool | re.Pattern | str = False,
+        ignore_schema_pattern: None | re.Pattern | str = "information_schema",
     ) -> None:
         if not update_only:
             for val in self.metadata_by_name.values():
                 val.clear()
         maindatabase_url = str(self.database.url)
         if multi_schema is not False:
-            schemes_tree: dict[str, tuple[Optional[str], list[str]]] = {
+            schemes_tree: dict[str, tuple[str | None, list[str]]] = {
                 v[0]: (key, v[2])
                 for key, v in run_sync(self.schema.get_schemes_tree(no_reflect=True)).items()
             }
@@ -496,9 +496,9 @@ class Registry:
 
     def register_callback(
         self,
-        name_or_class: Union[type[BaseModelType], str, None],
+        name_or_class: type[BaseModelType] | str | None,
         callback: Callable[[type[BaseModelType]], None],
-        one_time: Optional[bool] = None,
+        one_time: bool | None = None,
     ) -> None:
         if one_time is None:
             # True for model specific callbacks, False for general callbacks
@@ -632,7 +632,7 @@ class Registry:
 
         await asyncio.to_thread(self._automigrate_update, migration_settings)
 
-    async def _connect_and_init(self, name: Union[str, None], database: Database) -> None:
+    async def _connect_and_init(self, name: str | None, database: Database) -> None:
         from edgy.core.db.models.metaclasses import MetaInfo
 
         await database.connect()
@@ -663,7 +663,7 @@ class Registry:
                     if pattern_model.fields_not_supported_by_table(table):
                         continue
                     new_name = pattern_model.meta.template(table)
-                    old_model: Optional[type[BaseModelType]] = None
+                    old_model: type[BaseModelType] | None = None
                     with contextlib.suppress(LookupError):
                         old_model = self.get_model(
                             new_name, include_content_type_attr=False, exclude=("pattern_models",)
@@ -686,13 +686,11 @@ class Registry:
             raise exc
 
     async def __aenter__(self) -> Registry:
-        dbs: list[tuple[Union[str, None], Database]] = [(None, self.database)]
+        dbs: list[tuple[str | None, Database]] = [(None, self.database)]
         for name, db in self.extra.items():
             dbs.append((name, db))
         ops = [self._connect_and_init(name, db) for name, db in dbs]
-        results: list[Union[BaseException, bool]] = await asyncio.gather(
-            *ops, return_exceptions=True
-        )
+        results: list[BaseException | bool] = await asyncio.gather(*ops, return_exceptions=True)
         if any(isinstance(x, BaseException) for x in results):
             ops2 = []
             for num, value in enumerate(results):
@@ -705,9 +703,9 @@ class Registry:
 
     async def __aexit__(
         self,
-        exc_type: Optional[type[BaseException]] = None,
-        exc_value: Optional[BaseException] = None,
-        traceback: Optional[TracebackType] = None,
+        exc_type: type[BaseException] | None = None,
+        exc_value: BaseException | None = None,
+        traceback: TracebackType | None = None,
     ) -> None:
         ops = [self.database.disconnect()]
         for value in self.extra.values():
@@ -716,7 +714,7 @@ class Registry:
 
     @contextlib.contextmanager
     def with_async_env(
-        self, loop: Optional[asyncio.AbstractEventLoop] = None
+        self, loop: asyncio.AbstractEventLoop | None = None
     ) -> Generator[Registry, None, None]:
         close: bool = False
         if loop is None:
@@ -756,16 +754,16 @@ class Registry:
 
     def asgi(
         self,
-        app: Optional[ASGIApp] = None,
+        app: ASGIApp | None = None,
         handle_lifespan: bool = False,
-    ) -> Union[ASGIHelper, Callable[[ASGIApp], ASGIHelper]]:
+    ) -> ASGIHelper | Callable[[ASGIApp], ASGIHelper]:
         """Return wrapper for asgi integration."""
         if app is not None:
             return ASGIHelper(app=app, registry=self, handle_lifespan=handle_lifespan)
         return partial(ASGIHelper, registry=self, handle_lifespan=handle_lifespan)
 
     async def create_all(
-        self, refresh_metadata: bool = True, databases: Sequence[Union[str, None]] = (None,)
+        self, refresh_metadata: bool = True, databases: Sequence[str | None] = (None,)
     ) -> None:
         # otherwise old references to non-existing tables, fks can lurk around
         if refresh_metadata:
@@ -784,7 +782,7 @@ class Registry:
                     with db.force_rollback(False):
                         await db.create_all(self.metadata_by_name[database])
 
-    async def drop_all(self, databases: Sequence[Union[str, None]] = (None,)) -> None:
+    async def drop_all(self, databases: Sequence[str | None] = (None,)) -> None:
         if self.db_schema:
             await self.schema.drop_schema(
                 self.db_schema, cascade=True, if_exists=True, databases=databases

@@ -1,6 +1,6 @@
 from collections.abc import Callable
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from edgy.core.db.fields.base import BaseField
 from edgy.core.db.fields.types import BaseFieldType
@@ -12,13 +12,13 @@ if TYPE_CHECKING:
 class ComputedField(BaseField):
     def __init__(
         self,
-        getter: Union[
-            Callable[[BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any], str
-        ],
-        setter: Union[Callable[[BaseFieldType, "BaseModelType", Any], None], str, None] = None,
-        fallback_getter: Optional[
-            Callable[[BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any]
-        ] = None,
+        getter: Callable[[BaseFieldType, "BaseModelType", type["BaseModelType"] | None], Any]
+        | str,
+        setter: Callable[[BaseFieldType, "BaseModelType", Any], None] | str | None = None,
+        fallback_getter: Callable[
+            [BaseFieldType, "BaseModelType", type["BaseModelType"] | None], Any
+        ]
+        | None = None,
         **kwargs: Any,
     ) -> None:
         kwargs.setdefault("exclude", True)
@@ -35,14 +35,11 @@ class ComputedField(BaseField):
     @cached_property
     def compute_getter(
         self,
-    ) -> Callable[[BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any]:
+    ) -> Callable[[BaseFieldType, "BaseModelType", type["BaseModelType"] | None], Any]:
         if isinstance(self.getter, str):
             fn = cast(
-                Optional[
-                    Callable[
-                        [BaseFieldType, "BaseModelType", Optional[type["BaseModelType"]]], Any
-                    ]
-                ],
+                Callable[[BaseFieldType, "BaseModelType", type["BaseModelType"] | None], Any]
+                | None,
                 getattr(self.owner, self.getter, None),
             )
         else:
@@ -57,7 +54,7 @@ class ComputedField(BaseField):
     def compute_setter(self) -> Callable[[BaseFieldType, "BaseModelType", Any], None]:
         if isinstance(self.setter, str):
             fn = cast(
-                Optional[Callable[[BaseFieldType, "BaseModelType", Any], None]],
+                Callable[[BaseFieldType, "BaseModelType", Any], None] | None,
                 getattr(self.owner, self.setter, None),
             )
         else:

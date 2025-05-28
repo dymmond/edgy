@@ -1,6 +1,5 @@
 import os
 import re
-from typing import Union
 
 MIGRATIONS_DIR = "migrations/versions"
 FILENAME_PATTERN = re.compile(r"(\d{4})_(.*)\.py")
@@ -38,7 +37,7 @@ def get_sequencial_revision_number() -> str:
     return f"{next_number:04d}"
 
 
-def create_migration_filename(slug: Union[str, None] = None, with_extension: bool = False) -> str:
+def create_migration_filename(slug: str | None = None, with_extension: bool = False) -> str:
     """
     Generates a migration filename based on the next migration number and a given slug.
     Args:

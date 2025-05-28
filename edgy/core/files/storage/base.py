@@ -2,7 +2,7 @@ import os
 import pathlib
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from edgy.core.files.base import ContentFile, File
 from edgy.exceptions import SuspiciousFileOperation
@@ -24,13 +24,13 @@ class Storage(ABC):
 
     # private helper
     @staticmethod
-    def value_or_setting(value: _arg_val, setting: _arg_setting) -> Union[_arg_val, _arg_setting]:
+    def value_or_setting(value: _arg_val, setting: _arg_setting) -> _arg_val | _arg_setting:
         return setting if value is None else value
 
     @abstractmethod
     def _open(self, name: str, mode: str) -> Any: ...
 
-    def open(self, name: str, mode: Union[str, None] = None) -> Any:
+    def open(self, name: str, mode: str | None = None) -> Any:
         if mode is None:
             mode = "rb"
         return self._open(name, mode)
@@ -83,9 +83,9 @@ class Storage(ABC):
     def get_available_name(
         self,
         name: str,
-        max_length: Union[int, None] = None,
+        max_length: int | None = None,
         overwrite: bool = False,
-        multi_process_safe: Union[bool] = None,
+        multi_process_safe: bool = None,
     ) -> str:
         """
         Return a filename that's free on the target storage system and

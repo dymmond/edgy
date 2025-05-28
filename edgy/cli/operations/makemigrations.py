@@ -2,7 +2,7 @@
 Client to interact with Edgy models and migrations.
 """
 
-from typing import Any, Union
+from typing import Any
 
 import click
 
@@ -46,7 +46,7 @@ def makemigrations(
     version_path: str,
     rev_id: str,
     arg: Any,
-    null_field: Union[list[str], tuple[str, ...]],
+    null_field: list[str] | tuple[str, ...],
 ) -> None:
     """Autogenerate a new revision file (Alias for 'revision --autogenerate')"""
     _migrate(

@@ -5,7 +5,7 @@ import typing
 import warnings
 from collections.abc import Awaitable, Callable
 from importlib import import_module
-from typing import TYPE_CHECKING, Any, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from alembic import __version__ as __alembic_version__
 from alembic import command
@@ -42,8 +42,8 @@ class Config(AlembicConfig):
     @classmethod
     def get_instance(
         cls,
-        args: Optional[typing.Sequence] = None,
-        options: Optional[typing.Any] = None,
+        args: typing.Sequence | None = None,
+        options: typing.Any | None = None,
     ) -> Any:
         directory = str(edgy.settings.migration_directory)
         config = cls(os.path.join(directory, "alembic.ini"))
@@ -58,7 +58,7 @@ class Config(AlembicConfig):
         if not hasattr(config.cmd_opts, "x"):
             if args is not None:
                 config.cmd_opts.x = []
-                if isinstance(args, (list, tuple)):
+                if isinstance(args, list | tuple):
                     for arg in args:
                         config.cmd_opts.x.append(arg)
                 else:
@@ -88,7 +88,7 @@ class Migrate:
         self,
         app: typing.Any,
         registry: "Registry",
-        model_apps: Union[dict[str, str], tuple[str], list[str], None] = None,
+        model_apps: dict[str, str] | tuple[str] | list[str] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__()
@@ -97,7 +97,7 @@ class Migrate:
         self.registry = registry
         self.model_apps = model_apps or {}
 
-        assert isinstance(self.model_apps, (dict, tuple, list)), (
+        assert isinstance(self.model_apps, dict | tuple | list), (
             "`model_apps` must be a dict of 'app_name:location' format or a list/tuple of strings."
         )
 
@@ -117,7 +117,7 @@ class Migrate:
         self.set_edgy_extension(app)
 
     def check_db_models(
-        self, model_apps: Union[dict[str, str], tuple[str], list[str]]
+        self, model_apps: dict[str, str] | tuple[str] | list[str]
     ) -> dict[str, Any]:
         """
         Goes through all the model applications declared in the migrate and
@@ -160,7 +160,7 @@ def list_templates() -> None:
 
 @catch_errors
 def init(
-    template: Optional[str] = None,
+    template: str | None = None,
     package: bool = False,
 ) -> None:
     """Creates a new migration folder"""
@@ -182,16 +182,16 @@ def init(
 
 @catch_errors
 def revision(
-    message: Optional[str] = None,
+    message: str | None = None,
     autogenerate: bool = False,
     sql: bool = False,
     head: str = "head",
     splice: bool = False,
-    branch_label: Optional[str] = None,
-    version_path: Optional[str] = None,
-    revision_id: Optional[typing.Any] = None,
-    arg: Optional[typing.Any] = None,
-    null_fields: Union[list[str], tuple[str, ...]] = (),
+    branch_label: str | None = None,
+    version_path: str | None = None,
+    revision_id: typing.Any | None = None,
+    arg: typing.Any | None = None,
+    null_fields: list[str] | tuple[str, ...] = (),
 ) -> None:
     """
     Creates a new revision file
@@ -239,15 +239,15 @@ def revision(
 
 
 def migrate(
-    message: Optional[str] = None,
+    message: str | None = None,
     sql: bool = False,
     head: str = "head",
     splice: bool = False,
-    branch_label: Optional[str] = None,
-    version_path: Optional[str] = None,
-    revision_id: Optional[typing.Any] = None,
-    arg: Optional[typing.Any] = None,
-    null_fields: Union[list[str], tuple[str, ...]] = (),
+    branch_label: str | None = None,
+    version_path: str | None = None,
+    revision_id: typing.Any | None = None,
+    arg: typing.Any | None = None,
+    null_fields: list[str] | tuple[str, ...] = (),
 ) -> None:
     """Alias for 'revision --autogenerate'"""
     return revision(
@@ -277,9 +277,9 @@ def edit(revision: str = "current") -> None:
 @catch_errors
 def merge(
     revisions: str = "",
-    message: Optional[str] = None,
-    branch_label: Optional[str] = None,
-    revision_id: Optional[str] = None,
+    message: str | None = None,
+    branch_label: str | None = None,
+    revision_id: str | None = None,
 ) -> None:
     """Merge two revisions together.  Creates a new migration file"""
     config = Config.get_instance()
@@ -292,8 +292,8 @@ def merge(
 def upgrade(
     revision: str = "head",
     sql: bool = False,
-    tag: Optional[str] = None,
-    arg: Optional[typing.Any] = None,
+    tag: str | None = None,
+    arg: typing.Any | None = None,
 ) -> None:
     """Upgrade to a later version"""
     config = Config.get_instance(args=arg)
@@ -320,8 +320,8 @@ def upgrade(
 def downgrade(
     revision: str = "-1",
     sql: bool = False,
-    tag: Optional[str] = None,
-    arg: Optional[typing.Any] = None,
+    tag: str | None = None,
+    arg: typing.Any | None = None,
 ) -> None:
     """Revert to a previous version"""
     config = Config.get_instance(args=arg)
@@ -357,7 +357,7 @@ def show(
 
 @catch_errors
 def history(
-    rev_range: Optional[typing.Any] = None,
+    rev_range: typing.Any | None = None,
     verbose: bool = False,
     indicate_current: bool = False,
 ) -> None:
@@ -394,7 +394,7 @@ def current(verbose: bool = False) -> None:
 def stamp(
     revision: str = "head",
     sql: bool = False,
-    tag: Optional[typing.Any] = None,
+    tag: typing.Any | None = None,
 ) -> None:
     """'stamp' the revision table with the given revision; don't run any
     migrations"""
