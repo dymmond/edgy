@@ -2,15 +2,14 @@
 All functional common to Edgy
 """
 
-from typing import Any
+from __future__ import annotations
 
-from pydantic.fields import FieldInfo
+from typing import TYPE_CHECKING, Any
 
 from edgy.core.db.fields.types import BaseFieldType
 
-# deprecate, it can lead to circular imports and is an one-liner anyway
-# bypass __setattr__ method
-edgy_setattr = object.__setattr__
+if TYPE_CHECKING:
+    from pydantic.fields import FieldInfo
 
 
 def extract_field_annotations_and_defaults(

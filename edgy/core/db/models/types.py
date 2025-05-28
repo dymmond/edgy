@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Iterable, Sequence
+from collections.abc import Container, Iterable, Sequence
 from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
@@ -188,6 +188,7 @@ class BaseModelType(ABC):
         extracted_values: dict[str, Any],
         is_update: bool = False,
         is_partial: bool = False,
+        phase: str = "",
         instance: BaseModelType | QuerySet | None = None,
         model_instance: BaseModelType | None = None,
         evaluate_kwarg_values: bool = False,
@@ -202,7 +203,7 @@ class BaseModelType(ABC):
     def get_real_class(cls) -> BaseModelType:
         return cls.__parent__ if cls.__is_proxy_model__ else cls  # type: ignore
 
-    def extract_db_fields(self, only: Sequence[str] | None = None) -> dict[str, Any]:
+    def extract_db_fields(self, only: Container[str] | None = None) -> dict[str, Any]:
         """
         Extracts all the db fields, model references and fields.
         Related fields are not included because they are disjoint.
@@ -211,6 +212,9 @@ class BaseModelType(ABC):
         columns = self.table.columns
 
         if only is not None:
+            assert all(k in fields or hasattr(columns, k) for k in only), (
+                f'"only" includes invalid fields, {only}'
+            )
             return {k: v for k, v in self.__dict__.items() if k in only}
 
         return {k: v for k, v in self.__dict__.items() if k in fields or hasattr(columns, k)}

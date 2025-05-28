@@ -30,6 +30,7 @@ hide:
 ### Breaking
 
 - Python 3.9 is no longer supported.
+- Remove long-deprecated `edgy_setattr` alias for `object.__setattr__`.
 
 ## 0.31.3
 

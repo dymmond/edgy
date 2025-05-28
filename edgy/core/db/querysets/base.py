@@ -688,7 +688,7 @@ class BaseQuerySet(
         if isawaitable(result):
             result = await result
         if not self.embed_parent:
-            return (cast(EdgyModel, result), result)
+            return result, result
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
             new_result: Any = result
@@ -700,7 +700,7 @@ class BaseQuerySet(
             MODEL_GETATTR_BEHAVIOR.reset(token)
         if self.embed_parent[1]:
             setattr(new_result, self.embed_parent[1], result)
-        return cast(EdgyModel, result), new_result
+        return result, new_result
 
     async def _get_or_cache_row(
         self,

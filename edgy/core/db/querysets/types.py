@@ -2,14 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import AsyncIterator, Awaitable, Callable, Generator, Iterable, Sequence
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Generic,
-    Literal,
-    TypeVar,
-    Union,
-)
+from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar
 
 from edgy.types import Undefined
 
@@ -18,15 +11,15 @@ if TYPE_CHECKING:
     from databasez.core.transaction import Transaction
 
     from edgy.core.connection import Database
-    from edgy.core.db.models import BaseModelType
+    from edgy.core.db.models.types import BaseModelType
 
 # Create a var type for the Edgy Model
 EdgyModel = TypeVar("EdgyModel", bound="BaseModelType")
 EdgyEmbedTarget = TypeVar("EdgyEmbedTarget")
 
-tables_and_models_type = dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]]
-reference_select_type = dict[
-    str, Union[dict[str, "reference_select_type"], str, None, "sqlalchemy.Column"]
+tables_and_models_type: TypeAlias = dict[str, tuple["sqlalchemy.Table", type["BaseModelType"]]]
+reference_select_type: TypeAlias = dict[
+    str, dict[str, "reference_select_type"] | str | None | "sqlalchemy.Column"
 ]
 
 
