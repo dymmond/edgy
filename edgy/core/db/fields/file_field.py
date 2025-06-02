@@ -299,7 +299,7 @@ class FileField(FieldFactory):
     field_type = Any
     field_bases = (ConcreteFileField,)
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         storage: Union[str, "Storage", None] = None,
         with_size: bool = True,

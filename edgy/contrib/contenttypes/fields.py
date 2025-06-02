@@ -66,7 +66,7 @@ def default_fn() -> Any:
 class ContentTypeField(ForeignKey):
     field_bases = (BaseContentTypeField,)
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         to: type["BaseModelType"] | str = "ContentType",
         on_delete: str = CASCADE,

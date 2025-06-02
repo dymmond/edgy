@@ -386,7 +386,7 @@ class ManyToManyField(ForeignKeyFieldFactory, list):
     field_type: Any = Any
     field_bases = (BaseManyToManyForeignKeyField,)
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         to: Union["BaseModelType", type["Model"], str],
         *,

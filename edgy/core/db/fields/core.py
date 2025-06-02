@@ -41,7 +41,7 @@ class CharField(FieldFactory, str):
 
     field_type = str
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         *,
         min_length: int | None = None,
@@ -99,7 +99,7 @@ class IntegerField(FieldFactory, int):
     field_type = int
     field_bases = (IncrementOnSaveBaseField,)
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         *,
         ge: int | float | decimal.Decimal | None = None,
@@ -155,7 +155,7 @@ class FloatField(FieldFactory, float):
 
     field_type = float
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         *,
         max_digits: int | None = None,
@@ -214,7 +214,7 @@ class SmallIntegerField(IntegerField):
 class DecimalField(FieldFactory, decimal.Decimal):
     field_type = decimal.Decimal
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         *,
         ge: int | float | decimal.Decimal | None = None,
@@ -264,7 +264,7 @@ class DateTimeField(_AutoNowMixin, datetime.datetime):
     field_type = datetime.datetime
     field_bases = (TimezonedField, Field)
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         *,
         auto_now: bool | None = False,
@@ -306,7 +306,7 @@ class DateField(_AutoNowMixin, datetime.date):
     field_type = datetime.date
     field_bases = (TimezonedField, Field)
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         *,
         auto_now: bool | None = False,
@@ -344,7 +344,7 @@ class TimeField(FieldFactory, datetime.time):
 
     field_type = datetime.time
 
-    def __new__(cls, with_timezone: bool = False, **kwargs: Any) -> BaseFieldType:  # type: ignore
+    def __new__(cls, with_timezone: bool = False, **kwargs: Any) -> BaseFieldType:
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -356,7 +356,7 @@ class TimeField(FieldFactory, datetime.time):
         return sqlalchemy.Time(kwargs.get("with_timezone") or False)
 
 
-class JSONField(FieldFactory, pydantic.Json):  # type: ignore
+class JSONField(FieldFactory, pydantic.Json):
     """Representation of a JSONField"""
 
     field_type = Any
@@ -389,7 +389,7 @@ class BinaryField(FieldFactory, bytes):
 
     field_type = bytes
 
-    def __new__(cls, *, max_length: int | None = None, **kwargs: Any) -> BaseFieldType:  # type: ignore
+    def __new__(cls, *, max_length: int | None = None, **kwargs: Any) -> BaseFieldType:
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -406,7 +406,7 @@ class UUIDField(FieldFactory, uuid.UUID):
 
     field_type = uuid.UUID
 
-    def __new__(cls, **kwargs: Any) -> BaseFieldType:  # type: ignore
+    def __new__(cls, **kwargs: Any) -> BaseFieldType:
         kwargs = {
             **kwargs,
             **{k: v for k, v in locals().items() if k not in CLASS_DEFAULTS},
@@ -422,7 +422,7 @@ class UUIDField(FieldFactory, uuid.UUID):
 class ChoiceField(FieldFactory):
     """Representation of an Enum"""
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         choices: type[enum.Enum],
         **kwargs: Any,
@@ -519,7 +519,7 @@ class PasswordField(CharField):
     Representation of a Password
     """
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         derive_fn: Callable[[str], str] | None = None,
         **kwargs: Any,
@@ -613,7 +613,7 @@ class URLField(CharField):
 class IPAddressField(FieldFactory, str):
     field_type = IPvAnyAddress
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         **kwargs: Any,
     ) -> BaseFieldType:

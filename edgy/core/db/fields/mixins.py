@@ -135,7 +135,7 @@ class TimezonedField:
 
 
 class AutoNowMixin(FieldFactory):
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         *,
         auto_now: bool | None = False,

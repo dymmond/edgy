@@ -7,7 +7,7 @@ from edgy.core.db.fields.types import BaseFieldType
 class PlaceholderField(FieldFactory):
     """Placeholder field, without db column"""
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         *,
         pydantic_field_type: Any = Any,

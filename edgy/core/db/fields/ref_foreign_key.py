@@ -42,7 +42,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
     ) -> Optional["BaseFieldType"]:
         return None
 
-    def __new__(cls, to: "ModelRef", null: bool = False) -> "BaseFieldType":  # type: ignore
+    def __new__(cls, to: "ModelRef", null: bool = False) -> "BaseFieldType":
         if not is_class_and_subclass(to, edgy.ModelRef):
             raise ModelReferenceError(
                 detail="A model reference must be an object of type ModelRef"
