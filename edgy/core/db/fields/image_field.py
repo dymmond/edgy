@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 
 class ImageField(FileField):
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         # image formats without approval
         image_formats: Sequence[str] | None = (),

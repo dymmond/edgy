@@ -41,7 +41,7 @@ class FactoryField:
         self.no_copy = no_copy
         self.name = name
         self.parameters = parameters or {}
-        self.field_type = field_type  # type: ignore
+        self.field_type = field_type
         if isinstance(callback, str):
             callback_name = callback
             callback = lambda field, context, parameters: getattr(context["faker"], callback_name)(  # noqa

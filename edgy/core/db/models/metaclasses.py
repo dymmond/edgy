@@ -106,14 +106,14 @@ class Fields(UserDict, dict[str, BaseFieldType]):
         self.data[name] = value
         self.add_field_to_meta(name, value)
         if self.meta.model is not None:
-            self.meta.model.model_fields[name] = value  # type: ignore
+            self.meta.model.model_fields[name] = value
         self.meta.invalidate(invalidate_stats=False)
 
     def __delitem__(self, name: str) -> None:
         if self.data.pop(name, None) is not None:
             self.discard_field_from_meta(name)
             if self.meta.model is not None:
-                self.meta.model.model_fields.pop(name, None)  # type: ignore
+                self.meta.model.model_fields.pop(name, None)
             self.meta.invalidate(invalidate_stats=False)
 
 
@@ -653,7 +653,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         skip_registry: bool | Literal["allow_search"] = False,
         on_conflict: Literal["error", "replace", "keep"] = "error",
         **kwargs: Any,
-    ) -> Any:
+    ) -> type:
         fields: dict[str, BaseFieldType] = {}
         managers: dict[str, BaseManager] = {}
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))

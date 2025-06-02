@@ -375,7 +375,7 @@ class ForeignKey(ForeignKeyFieldFactory, cast(Any, object)):
     field_bases = (BaseForeignKeyField,)
     field_type: Any = Any
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         to: type["BaseModelType"] | str,
         **kwargs: Any,

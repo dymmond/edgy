@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable, Collection
 from inspect import isclass
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Literal
 
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
@@ -76,7 +76,7 @@ def edgy_field_param_extractor(
                     if callable(value) and not isclass(value):
                         value = value(field, context, name)
                     kwargs[name] = value
-        return cast("FactoryCallback", factory_fn)(field, context, kwargs)
+        return factory_fn(field, context, kwargs)
 
     return mapper_fn
 

@@ -409,7 +409,7 @@ class BaseQuerySet(
                             detail=f'Selected field "{field_name}" is not a RelationshipField on {model_class}.'
                         )
                     if isinstance(field, BaseForeignKey):
-                        foreign_key = field
+                        foreign_key: BaseForeignKey = field
                         reverse = False
                     else:
                         foreign_key = model_class.meta.fields[reverse_part]
@@ -427,7 +427,7 @@ class BaseQuerySet(
                     _select_prefix = (
                         f"{_select_prefix}__{field_name}" if _select_prefix else f"{field_name}"
                     )
-                    if foreign_key.is_m2m and foreign_key.embed_through != "":  # type: ignore
+                    if foreign_key.is_m2m and foreign_key.embed_through != "":
                         # we need to inject the through model for the select
                         model_class = foreign_key.through
                         if foreign_key.embed_through is False:

@@ -51,7 +51,7 @@ class BaseTenantMeta(BaseModelMeta):
         skip_registry: bool | Literal["allow_search"] = False,
         meta_info_class: type[TenantMeta] = TenantMeta,
         **kwargs: Any,
-    ) -> Any:
+    ) -> type:
         database: Literal["keep"] | None | Database | bool = attrs.get("database", "keep")
         new_model = super().__new__(
             cls,

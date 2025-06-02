@@ -16,7 +16,7 @@ class PGArrayField(FieldFactory, list):
 
     field_type = list
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         item_type: "sqlalchemy.types.TypeEngine",
         **kwargs: Any,

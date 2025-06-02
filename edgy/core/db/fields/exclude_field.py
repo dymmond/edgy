@@ -17,7 +17,7 @@ class ExcludeField(FieldFactory, type[None]):
 
     field_type: Any = Any
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         **kwargs: Any,
     ) -> "BaseFieldType":

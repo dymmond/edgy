@@ -18,7 +18,7 @@ class OneToOneField(ForeignKey):
     Representation of a one to one field.
     """
 
-    def __new__(  # type: ignore
+    def __new__(
         cls,
         to: type[BaseModelType] | str,
         **kwargs: Any,

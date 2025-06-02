@@ -69,7 +69,7 @@ class AutoReflectionMeta(BaseModelMeta):
         attrs: dict[str, Any],
         meta_info_class: type[AutoReflectionMetaInfo] = AutoReflectionMetaInfo,
         **kwargs: Any,
-    ) -> Any:
+    ) -> type:
         return super().__new__(
             cls,
             name,

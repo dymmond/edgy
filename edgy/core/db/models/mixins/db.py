@@ -183,9 +183,9 @@ def _fixup_rel_annotation(target: type[BaseModelType], field: BaseFieldType) -> 
     if field.is_m2m:
         field.field_type = field.annotation = list[target]  # type: ignore
     elif field.null:
-        field.field_type = field.annotation = None | target  # type: ignore
+        field.field_type = field.annotation = None | target
     else:
-        field.field_type = field.annotation = target  # type: ignore
+        field.field_type = field.annotation = target
 
 
 def _fixup_rel_annotations(meta: MetaInfo) -> None:
