@@ -1,20 +1,34 @@
+from __future__ import annotations
+
 import inspect
+import sys
 from asyncio import gather
 from collections.abc import Awaitable
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from pydantic import BaseModel, ConfigDict, Field
+from pydantic.fields import FieldInfo
+from pydantic.json_schema import SkipJsonSchema
 
+from edgy.core.db.models.mixins.dump import DumpMixin
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
 from edgy.core.marshalls.metaclasses import MarshallMeta
 from edgy.core.utils.sync import run_sync
 
 if TYPE_CHECKING:
+    from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.db.models.model import Model
 
 
-class BaseMarshall(BaseModel, metaclass=MarshallMeta):
+if sys.version_info >= (3, 11):  # pragma: no cover
+    from typing import Self
+else:  # pragma: no cover
+    from typing_extensions import Self
+
+
+class BaseMarshall(DumpMixin, BaseModel, metaclass=MarshallMeta):
     """
     Base for all the marshalls of Edgy.
     """
@@ -23,22 +37,33 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
 
     __show_pk__: ClassVar[bool] = False
+    __lazy__: ClassVar[bool] = False
     __incomplete_fields__: ClassVar[tuple[str, ...]] = ()
     __custom_fields__: ClassVar[dict[str, BaseMarshallField]] = {}
     _setup_used: bool
 
     def __init__(self, /, **kwargs: Any) -> None:
         _instance = kwargs.pop("instance", None)
-        super().__init__(**kwargs)
+        lazy = kwargs.pop("__lazy__", type(self).__lazy__)
+        data: dict = {}
+        if _instance is not None:
+            data.update(
+                _instance.model_dump(
+                    exclude_defaults=True,
+                    exclude_unset=True,
+                )
+            )
+        data.update(kwargs)
+        super().__init__(**data)
         self._instance: Model | None = None
         if _instance is not None:
             self.instance = _instance
-        elif not type(self).__incomplete_fields__:
+        elif not lazy:
             self._instance = self._setup()
             self._resolve_serializer(self._instance)
             self._setup_used = True
 
-    def _setup(self) -> "Model":
+    def _setup(self) -> Model:
         """
         Assemble the Marshall object with all the given details.
 
@@ -56,13 +81,28 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         exclude: set[str] = set()
         if column is not None:
             exclude.add(column.key)
-        data = self.model_dump(include=set(model.meta.fields.keys()).difference(exclude))
+        data = self.model_dump(
+            include=set(model.meta.fields.keys()).difference(exclude),
+        )
+        for k in list(data.keys()):
+            # callable defaults are not handled in marshall but can leak from models fields
+            if callable(data[k]):
+                data.pop(k)
+
         data["__show_pk__"] = self.__show_pk__
         data["__drop_extra_kwargs__"] = True
         return self.marshall_config["model"](**data)  # type: ignore
 
     @property
-    def instance(self) -> "Model":
+    def meta(self) -> MetaInfo:
+        return cast("Model", self.marshall_config["model"]).meta
+
+    @property
+    def has_instance(self) -> bool:
+        return self._instance is not None
+
+    @property
+    def instance(self) -> Model:
         if self._instance is None:
             _instance = self._setup()
             self._resolve_serializer(_instance)
@@ -71,7 +111,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         return self._instance
 
     @instance.setter
-    def instance(self, value: "Model") -> None:
+    def instance(self, value: Model) -> None:
         self._instance = value
         self._setup_used = False
         self._resolve_serializer(instance=value)
@@ -79,7 +119,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
     async def _resolve_async(self, name: str, awaitable: Awaitable) -> None:
         setattr(self, name, await awaitable)
 
-    def _resolve_serializer(self, instance: "Model") -> "BaseMarshall":
+    def _resolve_serializer(self, instance: Model) -> Self:
         """
         Resolve serializer fields and populate them with data from the provided instance.
 
@@ -116,7 +156,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
             run_sync(gather(*async_resolvers))
         return self
 
-    def _get_method_value(self, name: str, instance: "Model") -> Any:
+    def _get_method_value(self, name: str, instance: Model) -> Any:
         """
         Retrieve the value for a method-based field.
 
@@ -131,7 +171,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
         func = getattr(self, func_name)
         return func(instance)
 
-    def _handle_primary_key(self, instance: "Model") -> None:
+    def _handle_primary_key(self, instance: Model) -> None:
         """
         Handles the field of a the primary key if present in the
         fields.
@@ -144,10 +184,19 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
                 # bypass __setattr__ method
                 object.__setattr__(self, pk_attribute, getattr(instance, pk_attribute))
 
-    @property
+    @cached_property
+    def valid_fields(self) -> dict[str, FieldInfo]:
+        """
+        Returns all valid fields (not excluded). Overwritable and can be manually set.
+        """
+        return {
+            k: v for k, v in type(self).model_fields.items() if not getattr(v, "exclude", True)
+        }
+
+    @cached_property
     def fields(self) -> dict[str, BaseMarshallField]:
         """
-        Returns all the Marshall fields of the Marshall.
+        Returns all the Marshall fields of the Marshall. Overwritable and can be manually set.
         """
         fields = {}
         # copy fields from model_fields
@@ -156,7 +205,7 @@ class BaseMarshall(BaseModel, metaclass=MarshallMeta):
                 fields[k] = v
         return fields
 
-    async def save(self) -> Any:
+    async def save(self) -> BaseMarshall:
         """
         This save is not actually performing any specific action,
         in fact, its using the Edgy saving method and nothing else.
@@ -195,10 +244,13 @@ class Marshall(BaseMarshall):
     Model marshall where the `__model__` is required.
     """
 
-    context: dict = Field(exclude=True, default_factory=dict)
+    context: SkipJsonSchema[dict] = Field(exclude=True, default_factory=dict)
+
+    async def save(self) -> Self:
+        return cast("Self", await super().save())
 
     def __repr__(self) -> str:
         return f"<{type(self).__name__}: {self}>"
 
     def __str__(self) -> str:
-        return f"{type(self).__name__}()"
+        return f"{type(self).__name__}({self.marshall_config.model.__name__})"

@@ -39,6 +39,8 @@ def create_monkay(global_dict: dict, all_var: list[str]) -> Monkay[Instance, Edg
             "EdgySettings": "edgy.conf.global_settings:EdgySettings",
             "fields": lambda: import_module("edgy.core.db.fields"),
             "files": lambda: import_module("edgy.core.files"),
+            "Marshall": "edgy.core.marshalls.Marshall",
+            "ConfigMarshall": "edgy.core.marshalls.ConfigMarshall",
             "Signal": "edgy.core.signals:Signal",
             "MultipleObjectsReturned": "edgy.exceptions:MultipleObjectsReturned",
             "ObjectNotFound": "edgy.exceptions:ObjectNotFound",

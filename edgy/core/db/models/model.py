@@ -1,23 +1,37 @@
 from __future__ import annotations
 
+import sys
 from typing import Any, ClassVar, cast
 
 from pydantic import ConfigDict
 
 from edgy.core.db.models.base import EdgyBaseModel
-from edgy.core.db.models.managers import Manager, RedirectManager
+from edgy.core.db.models.managers import BaseManager, Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
 from edgy.core.db.models.mixins import (
+    AdminMixin,
     DatabaseMixin,
     DeclarativeMixin,
+    DumpMixin,
     ModelRowMixin,
     ReflectedModelMixin,
 )
 from edgy.core.utils.models import create_edgy_model, generify_model_fields
 
+if sys.version_info >= (3, 11):  # pragma: no cover
+    from typing import Self
+else:  # pragma: no cover
+    from typing_extensions import Self
+
 
 class Model(
-    ModelRowMixin, DeclarativeMixin, DatabaseMixin, EdgyBaseModel, metaclass=BaseModelMeta
+    ModelRowMixin,
+    DeclarativeMixin,
+    DatabaseMixin,
+    AdminMixin,
+    DumpMixin,
+    EdgyBaseModel,
+    metaclass=BaseModelMeta,
 ):
     """
     Representation of an Edgy `Model`.
@@ -50,8 +64,11 @@ class Model(
     ```
     """
 
-    query: ClassVar[Manager] = Manager()
-    query_related: ClassVar[RedirectManager] = RedirectManager(redirect_name="query")
+    # update typings
+    proxy_model: ClassVar[type[Self]]
+    __parent__: ClassVar[type[Self] | None]
+    query: ClassVar[BaseManager] = Manager()
+    query_related: ClassVar[BaseManager] = RedirectManager(redirect_name="query")
     # registry = False, stops the retrieval of the registry from base classes
     meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True, registry=False)
 

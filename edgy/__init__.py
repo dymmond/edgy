@@ -70,6 +70,7 @@ if TYPE_CHECKING:
         StrictModel,
     )
     from .core.db.querysets import Prefetch, Q, QuerySet, and_, not_, or_
+    from .core.marshalls import ConfigMarshall, Marshall
     from .core.signals import Signal
     from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
@@ -150,6 +151,9 @@ __all__ = [
     "RefForeignKey",
     "IPAddressField",
     "PGArrayField",
+    # marshalls
+    "ConfigMarshall",
+    "Marshall",
     # base connection
     "Database",
     "DatabaseURL",

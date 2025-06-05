@@ -29,6 +29,7 @@ from .utils.models import get_model as _get_model
 
 if TYPE_CHECKING:
     from edgy.core.db.models.model import Model
+    from edgy.core.db.querysets.base import QuerySet
 
 
 def get_registered_model(model: str) -> type[Model]:
@@ -291,43 +292,27 @@ class BaseObjectView:
             instance: The Edgy model instance to be updated and saved.
                       Note: The type hint 'type[edgy.Model]' might be intended
                       as the instance itself, not the class type.
-            form_data: A FormData object containing the data to update the model.
+            json_data: A json dict to update the model.
+            create: Is it an update or creation.
         """
-        data: dict[str, Any] = {}
+        marshall_class = instance.get_admin_marshall_class()
+        model_fields = marshall_class.model_fields
+        data: dict = {}
 
         for key, value in json_data.items():
-            field = instance.meta.fields.get(key)
+            field = model_fields.get(key)
 
-            if field is None or field.read_only:
+            if field is None or getattr(field, "read_only", False):
                 continue
+            data[key] = value
 
-            if key in instance.meta.foreign_key_fields:
-                # Check if its a ManyToMany m2m field
-                if not field.is_m2m:
-                    target = instance.meta.fields.get(key).target
-                    data[key] = await target.query.first(pk=self.get_object_pk(value))
-                    if data[key] is None:
-                        data[key] = target(**value)
-            elif key in instance.meta.many_to_many_fields:
-                continue
-            else:
-                data[key] = value
-
-        # Save basic fields first
-        if not create:
-            await instance.update(**data)
+        if create:
+            marshall = instance.get_admin_marshall_for_save(**data)
         else:
-            instance = await instance.query.create(**data)
-
-        # Handle ManyToMany sync
-        for key in instance.meta.many_to_many_fields:
-            m2m_data = json_data.get(key, [])
-            if m2m_data:
-                rel = getattr(instance, key)
-                for dataob in m2m_data:
-                    await rel.add(dataob)
-
-        return cast(edgy.Model, instance)
+            marshall = instance.get_admin_marshall_for_save(
+                instance=cast("edgy.Model", instance), **data
+            )
+        return (await marshall.save()).instance
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         context: dict = await super().get_context_data(request, **kwargs)
@@ -460,12 +445,17 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
             NotFound: If the model name or the specific instance is not found.
         """
         context = await super().get_context_data(request, **kwargs)  # noqa
-        model: type[Model] = context["model"]
-        instance = await model.query.get_or_none(pk=self.get_object_pk(request))
+        model = cast("type[Model]", context["model"])
+        instance: Model | None = await cast("QuerySet", model.query).get_or_none(
+            pk=self.get_object_pk(request)
+        )
         if not instance:
             raise NotFound()
         context["title"] = f"Edit {instance}"
         context["object"] = instance
+        marshall = instance.get_admin_marshall_class()(instance=instance)
+        json_values = marshall.model_dump_json()
+        context["values_as_json"] = json_values
         context["object_pk"] = self.create_object_pk(instance)
         return context
 
@@ -510,7 +500,9 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
         model = get_registered_model(model_name)
 
         try:
-            instance = await model.query.get(pk=self.get_object_pk(request))
+            instance: Model = await cast("QuerySet", model.query).get(
+                pk=self.get_object_pk(request)
+            )
         except ObjectNotFound:
             add_message("error", f"Model {model_name} with ID {obj_id} not found.")
             return RedirectResponse(

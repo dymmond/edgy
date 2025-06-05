@@ -67,11 +67,15 @@ class MarshallMeta(ModelMetaclass):
         # Define the fields for the Marshall
         if base_fields_exclude is not None:
             base_model_fields = {
-                k: v for k, v in model.model_fields.items() if k not in base_fields_exclude
+                k: v
+                for k, v in model.model_fields.items()
+                if k not in base_fields_exclude and not getattr(v, "exclude", False)
             }
         elif base_fields_include is not None and "__all__" in base_fields_include:
             base_model_fields = {
-                k: v for k, v in model.meta.fields.items() if k not in model_fields
+                k: v
+                for k, v in model.meta.fields.items()
+                if k not in model_fields and not getattr(v, "exclude", False)
             }
             show_pk = True
         else:
@@ -114,12 +118,15 @@ class MarshallMeta(ModelMetaclass):
         model_class.__show_pk__ = show_pk
         model_class.__custom_fields__ = custom_fields
         model_class.marshall_config = marshall_config
-        model_class.model_rebuild(force=True)
 
-        # Raise for error if any of the required fields is not in the Marshall
-        required_fields: set[str] = {k for k, v in model.model_fields.items() if v.is_required()}
-        model_fields = model_class.model_fields
+        # Fields which are required for a setup
+        required_fields: set[str] = {
+            k for k, v in model_fields_on_class.items() if v.is_required()
+        }
         model_class.__incomplete_fields__ = tuple(
             sorted(name for name in required_fields if name not in model_fields_on_class)
         )
+        if model_class.__incomplete_fields__:
+            model_class.__lazy__ = True
+        model_class.model_rebuild(force=True)
         return model_class
