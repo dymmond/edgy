@@ -4,13 +4,17 @@ import pytest
 
 import edgy
 from edgy.core.db.datastructures import Index
+from edgy.testing import DatabaseTestClient
 from tests.cli.utils import arun_cmd, run_cmd
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = edgy.Database(DATABASE_URL, full_isolation=False)
-models = edgy.Registry(database=database)
+models = edgy.Registry(
+    database=DatabaseTestClient(
+        DATABASE_URL, force_rollback=False, drop_database=False, test_prefix=""
+    )
+)
 
 
 class User(edgy.StrictModel):

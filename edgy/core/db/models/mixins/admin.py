@@ -16,7 +16,7 @@ class AdminMixin:
     """
 
     @classmethod
-    def get_admin_marshall_class(cls: type[Model]) -> type[Marshall]:
+    def get_admin_marshall_class(cls: type[Model], *, phase: str) -> type[Marshall]:
         """
         Generate a marshall class for the admin.
 
@@ -27,14 +27,19 @@ class AdminMixin:
             model_config: ClassVar[ConfigDict] = ConfigDict(title=cls.__name__)
             marshall_config = ConfigMarshall(model=cls, fields=["__all__"])
 
+        if phase == "schema":
+            # this triggers additionalProperties=false
+            AdminMarshall.model_config["extra"] = "forbid"
         return AdminMarshall
 
     @classmethod
     def get_admin_marshall_for_save(
-        cls: type[Model], *, instance: Model | None = None, **kwargs: Any
+        cls: type[Model], instance: Model | None = None, /, **kwargs: Any
     ) -> Marshall:
         """Generate a marshall instance from an instance for the admin.
 
         Can be dynamic for the current user. Called in the create/edit path.
         """
-        return cls.get_admin_marshall_class()(instance=instance, **kwargs)
+        return cls.get_admin_marshall_class(phase="update" if instance is not None else "create")(
+            instance, **kwargs
+        )

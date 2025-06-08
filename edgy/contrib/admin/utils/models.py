@@ -50,17 +50,14 @@ def get_model_json_schema(
 ) -> dict:
     if isinstance(model, str):
         model = get_model(model, no_check_admin_models=no_check_admin_models)
-    marshall_class = model.get_admin_marshall_class()
-    # for additionalProperties=false
-    marshall_class.model_config["extra"] = "forbid"
-    schema = marshall_class.model_json_schema(
+    marshall_class = model.get_admin_marshall_class(phase="schema")
+    return marshall_class.model_json_schema(
         schema_generator=CallableDefaultJsonSchema
         if include_callable_defaults
         else NoCallableDefaultJsonSchema,
         mode=mode,
         **kwargs,
     )
-    return schema
 
 
 def add_to_recent_models(model: type[Model]) -> None:

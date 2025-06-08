@@ -295,7 +295,8 @@ class BaseObjectView:
             json_data: A json dict to update the model.
             create: Is it an update or creation.
         """
-        marshall_class = instance.get_admin_marshall_class()
+        # retrieve fields for extraction, should be broader then get_admin_marshall_for_save
+        marshall_class = instance.get_admin_marshall_class(phase="extraction")
         model_fields = marshall_class.model_fields
         data: dict = {}
 
@@ -309,9 +310,7 @@ class BaseObjectView:
         if create:
             marshall = instance.get_admin_marshall_for_save(**data)
         else:
-            marshall = instance.get_admin_marshall_for_save(
-                instance=cast("edgy.Model", instance), **data
-            )
+            marshall = instance.get_admin_marshall_for_save(cast("edgy.Model", instance), **data)
         return (await marshall.save()).instance
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
@@ -453,7 +452,7 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
             raise NotFound()
         context["title"] = f"Edit {instance}"
         context["object"] = instance
-        marshall = instance.get_admin_marshall_class()(instance=instance)
+        marshall = instance.get_admin_marshall_class(phase="view")(instance)
         json_values = marshall.model_dump_json()
         context["values_as_json"] = json_values
         context["object_pk"] = self.create_object_pk(instance)

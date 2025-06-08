@@ -6,6 +6,13 @@ hide:
 
 # Release Notes
 
+
+## 0.32.1
+
+### Added
+
+- Customization hooks for admin.
+
 ## 0.32.0
 
 ### Added

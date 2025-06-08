@@ -27,3 +27,8 @@ See edgy/cli/operations/admin_serve.py to get an idea.
 ## Excluding models
 
 Just set in Meta, the flag `in_admin` to `False`. This flag is inherited.
+
+
+## Hooks
+
+- **get_admin_marshall_class(phase) -> Marshall** - Customize the fields seen when editing/creating a new model instance.

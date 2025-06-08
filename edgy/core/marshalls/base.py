@@ -27,6 +27,8 @@ if sys.version_info >= (3, 11):  # pragma: no cover
 else:  # pragma: no cover
     from typing_extensions import Self
 
+excludes_marshall: set = {"instance", "_instance", "context"}
+
 
 class BaseMarshall(DumpMixin, BaseModel, metaclass=MarshallMeta):
     """
@@ -42,22 +44,22 @@ class BaseMarshall(DumpMixin, BaseModel, metaclass=MarshallMeta):
     __custom_fields__: ClassVar[dict[str, BaseMarshallField]] = {}
     _setup_used: bool
 
-    def __init__(self, /, **kwargs: Any) -> None:
-        _instance = kwargs.pop("instance", None)
+    def __init__(self, instance: None | Model = None, **kwargs: Any) -> None:
         lazy = kwargs.pop("__lazy__", type(self).__lazy__)
         data: dict = {}
-        if _instance is not None:
+        if instance is not None:
             data.update(
-                _instance.model_dump(
+                instance.model_dump(
                     exclude_defaults=True,
                     exclude_unset=True,
+                    exclude=excludes_marshall,
                 )
             )
         data.update(kwargs)
         super().__init__(**data)
         self._instance: Model | None = None
-        if _instance is not None:
-            self.instance = _instance
+        if instance is not None:
+            self.instance = instance
         elif not lazy:
             self._instance = self._setup()
             self._resolve_serializer(self._instance)
@@ -78,7 +80,7 @@ class BaseMarshall(DumpMixin, BaseModel, metaclass=MarshallMeta):
             )
         model = cast("Model", self.marshall_config["model"])
         column = model.table.autoincrement_column
-        exclude: set[str] = set()
+        exclude: set[str] = {*excludes_marshall}
         if column is not None:
             exclude.add(column.key)
         data = self.model_dump(

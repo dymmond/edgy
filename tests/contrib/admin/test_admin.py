@@ -4,7 +4,6 @@ from base64 import urlsafe_b64decode
 from collections.abc import AsyncGenerator
 
 import pytest
-import sqlalchemy
 from httpx import ASGITransport, AsyncClient
 
 import edgy
@@ -50,7 +49,7 @@ async def async_client(app) -> AsyncGenerator:
 class User(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100)
     # simple default
-    active = edgy.fields.BooleanField(server_default=sqlalchemy.text("true"), default=False)
+    active = edgy.fields.BooleanField(default=False)
 
     class Meta:
         registry = models
