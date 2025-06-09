@@ -25,6 +25,11 @@ if TYPE_CHECKING:
 class AdminMixin:
     templates = templates
 
+    def get_admin_prefix_url(self, request: Request) -> str:
+        if settings.admin_config.admin_prefix_url is not None:
+            return settings.admin_config.admin_prefix_url
+        return str(request.path_for("admin")).rstrip("/")
+
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:  # noqa
         context = {}
         user: Any = None
@@ -40,7 +45,7 @@ class AdminMixin:
                 "menu_title": settings.admin_config.menu_title,
                 "favicon": settings.admin_config.favicon,
                 "sidebar_bg_colour": settings.admin_config.sidebar_bg_colour,
-                "url_prefix": settings.admin_config.admin_prefix_url,
+                "url_prefix": self.get_admin_prefix_url(request),
                 "messages": get_messages(),
                 "create_object_pk": self.create_object_pk,
             }

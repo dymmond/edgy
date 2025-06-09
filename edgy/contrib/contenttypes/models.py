@@ -51,13 +51,3 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
             await referenced_obs.using(schema=self.schema_name).raw_delete(
                 use_models=fk.use_model_based_deletion, remove_referenced_call=reverse_name
             )
-
-    @classmethod
-    def get_admin_marshall_config(cls, *, phase: str, for_schema: bool) -> dict:
-        """
-        Shortcut for updating the marshall_config of the admin marshall.
-        """
-        if phase == "create":
-            return {"fields": []}
-
-        return super().get_admin_marshall_config(phase=phase, for_schema=for_schema)

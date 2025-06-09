@@ -25,6 +25,13 @@ from edgy.conf import settings
     show_default=True,
 )
 @click.option(
+    "--admin-path",
+    type=str,
+    default=None,
+    help='The sub-path under which the admin is available. Defaults to "/admin" if unset in settings',
+    show_default=True,
+)
+@click.option(
     "--auth-name",
     type=str,
     default="admin",
@@ -66,6 +73,7 @@ def admin_serve(
     log_level: str,
     auth_name: str,
     auth_pw: str | None,
+    admin_path: str | None,
 ) -> None:
     """Starts the Edgy admin development server.
 
@@ -96,6 +104,10 @@ def admin_serve(
     from edgy.contrib.admin.permissions import BasicAuthAccess
 
     old_instance = edgy.monkay.instance
+    if admin_path is not None:
+        edgy.monkay.settings.admin_prefix_url = admin_path
+    if edgy.monkay.settings.admin_prefix_url is None:
+        edgy.monkay.settings.admin_prefix_url = "/admin"
 
     if old_instance is None:
         raise RuntimeError(

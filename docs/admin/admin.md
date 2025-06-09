@@ -2,29 +2,36 @@
 
 ## What is the admin feature?
 
-This is an **experimental** Web-GUI to expose the database for the webbrowser.
+This is an **experimental** Web-GUI to expose the database to the webbrowser.
 Admins can use the GUI to fix some problems.
-
-!!! Warning
-    Currently you are responsible for securing the powerful admin. Never expose to untrusted parties.
 
 ## Using Admin from cli
 
 Use something like:
 
+`edgy -admin_serve`
+
+or **only** if you want to test the feature:
+
 `edgy --app tests.cli.main admin_serve --create-all`
 
 and watch the console output for an automic generated password. It is required for
-accessing the admin. The default username is "admin".
+accessing the admin. The default username is `admin`.
 
 You can however customize them all via:
 
-`edgy --app tests.cli.main admin_serve --create-all --auth-name=edgy --auth-pw=123`
+`edgy admin_serve --auth-name=edgy --auth-pw=123`
 
 !!! Warning
     This only serves as an example. Please use stronger passwords! Your whole database is open this way!
 
+!!! Warning
+    Only use `--create-all` when not using migrations.
 
+### Limitations
+
+Despite this is a quite non-invasive way to use the admin feature, you have a quite limited
+way of integration. There is no user management only a basic auth.
 
 ## Embedding Admin
 
@@ -34,6 +41,10 @@ See edgy/cli/operations/admin_serve.py to get an idea.
 ## Excluding models
 
 Just set in Meta, the flag `in_admin` to `False`. This flag is inherited.
+If you just want to exclude models from the creation you can set `no_admin_create` to `True`.
+
+Both flags can be just inherited by using a value of `None`. The default behaviour for `in_admin` (when in the hierarchy nowhere was t)
+is True
 
 
 ## Hooks

@@ -11,7 +11,6 @@ from lilya.responses import JSONResponse, RedirectResponse
 from lilya.templating.controllers import TemplateController
 
 import edgy
-from edgy.conf import settings
 from edgy.contrib.admin.mixins import AdminMixin
 from edgy.contrib.admin.utils.messages import add_message
 from edgy.contrib.pagination import Paginator
@@ -102,7 +101,6 @@ class AdminDashboard(AdminMixin, TemplateController):
                 "total_records": total_records,
                 "top_model": top_model,
                 "recent_models": get_recent_models(),
-                "url_prefix": str(request.path_for("admin")).rstrip("/"),
             }
         )
         return context
@@ -237,7 +235,6 @@ class ModelDetailView(AdminMixin, TemplateController):
                 "query": query,
                 "per_page": page_size,
                 "total_pages": total_pages,
-                "url_prefix": settings.admin_config.admin_prefix_url,
             }
         )
         return context
@@ -510,9 +507,7 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
             )
         except ObjectNotFound:
             add_message("error", f"Model {model_name} with ID {obj_id} not found.")
-            return RedirectResponse(
-                f"{settings.admin_config.admin_prefix_url}/models/{model_name}"
-            )
+            return RedirectResponse(f"{self.get_admin_prefix_url(request)}/models/{model_name}")
 
         await self.save_model(instance, orjson.loads((await request.form())["editor_data"]))
 
@@ -521,7 +516,7 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
             f"{instance} has been updated successfully.",
         )
         return RedirectResponse(
-            f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
+            f"{self.get_admin_prefix_url(request)}/models/{model_name}/{obj_id}"
         )
 
 
@@ -554,9 +549,7 @@ class ModelObjectDeleteView(AdminMixin, Controller):
             instance = await model.query.get(pk=self.get_object_pk(request))
         except ObjectNotFound:
             add_message("error", f"There is no record with this ID: '{obj_id}'.")
-            return RedirectResponse(
-                f"{settings.admin_config.admin_prefix_url}/models/{model_name}"
-            )
+            return RedirectResponse(f"{self.get_admin_prefix_url(request)}/models/{model_name}")
         instance_name = str(instance)
         await instance.delete()
 
@@ -564,7 +557,7 @@ class ModelObjectDeleteView(AdminMixin, Controller):
             "success",
             f"{model_name.capitalize()} #{instance_name} has been deleted successfully.",
         )
-        return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}")
+        return RedirectResponse(f"{self.get_admin_prefix_url(request)}/models/{model_name}")
 
 
 class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
@@ -630,7 +623,7 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
                 f"For {model.__name__.capitalize()} we cannot create a new instance.",
             )
             return RedirectResponse(
-                f"{settings.admin_config.admin_prefix_url}/models/{model.__name__}"
+                f"{self.get_admin_prefix_url(request)}/models/{model.__name__}"
             )
 
         return await self.render_template(request, **kwargs)
@@ -657,6 +650,19 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
         model_name = request.path_params.get("name")
 
         model = get_registered_model(model_name)
+        if (
+            model.meta.no_admin_create
+            or model.get_admin_marshall_class(
+                phase="create", for_schema=False
+            ).__incomplete_fields__
+        ):
+            add_message(
+                "error",
+                f"For {model.__name__.capitalize()} we cannot create a new instance.",
+            )
+            return RedirectResponse(
+                f"{self.get_admin_prefix_url(request)}/models/{model.__name__}"
+            )
 
         instance = await self.save_model(
             model, orjson.loads((await request.form())["editor_data"]), create=True
@@ -667,5 +673,5 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
             f"{model_name.capitalize()} #{instance} has been created successfully.",
         )
         return RedirectResponse(
-            f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
+            f"{self.get_admin_prefix_url(request)}/models/{model_name}/{obj_id}"
         )

@@ -818,10 +818,20 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         for value in meta.managers.values():
             value.owner = new_class
 
-        # inherited unique_together
+        # extract attributes
         for base in new_class.__bases__:
-            if hasattr(base, "meta") and base.meta.unique_together:
-                meta.unique_together.extend(base.meta.unique_together)
+            if hasattr(base, "meta"):
+                if base.meta.unique_together:
+                    meta.unique_together.extend(base.meta.unique_together)
+
+                if base.meta.indexes:
+                    meta.indexes.extend(base.meta.indexes)
+
+                if base.meta.constraints:
+                    meta.constraints.extend(base.meta.constraints)
+        if not meta.abstract:
+            meta.in_admin = get_model_meta_attr("in_admin", bases, meta)
+            meta.no_admin_create = get_model_meta_attr("no_admin_create", bases, meta)
 
         if meta.unique_together:
             unique_together = meta.unique_together
@@ -830,23 +840,12 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                     raise ValueError(
                         "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
                     )
-
-        # inherited indexes
-        for base in new_class.__bases__:
-            if hasattr(base, "meta") and base.meta.indexes:
-                meta.indexes.extend(base.meta.indexes)
-
         # Handle indexes
         if meta.indexes:
             indexes = meta.indexes
             for value in indexes:
                 if not isinstance(value, Index):
                     raise ValueError("Meta.indexes must be a list of Index types.")
-
-        # inherited constraints
-        for base in new_class.__bases__:
-            if hasattr(base, "meta") and base.meta.constraints:
-                meta.constraints.extend(base.meta.constraints)
 
         # Handle constraints
         if meta.constraints:
