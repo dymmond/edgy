@@ -16,7 +16,20 @@ class AdminMixin:
     """
 
     @classmethod
-    def get_admin_marshall_class(cls: type[Model], *, phase: str) -> type[Marshall]:
+    def get_admin_marshall_config(
+        cls: type[Model], *, phase: str, for_schema: bool
+    ) -> dict[str, Any]:
+        """
+        Shortcut for updating the marshall_config of the admin marshall.
+
+        Can be dynamic for the current user.
+        """
+        return {"fields": ["__all__"]}
+
+    @classmethod
+    def get_admin_marshall_class(
+        cls: type[Model], *, phase: str, for_schema: bool = False
+    ) -> type[Marshall]:
         """
         Generate a marshall class for the admin.
 
@@ -25,9 +38,12 @@ class AdminMixin:
 
         class AdminMarshall(Marshall):
             model_config: ClassVar[ConfigDict] = ConfigDict(title=cls.__name__)
-            marshall_config = ConfigMarshall(model=cls, fields=["__all__"])
+            marshall_config = ConfigMarshall(
+                model=cls,
+                **cls.get_admin_marshall_config(phase=phase, for_schema=for_schema),  # type: ignore
+            )
 
-        if phase == "schema":
+        if for_schema:
             # this triggers additionalProperties=false
             AdminMarshall.model_config["extra"] = "forbid"
         return AdminMarshall
@@ -40,6 +56,6 @@ class AdminMixin:
 
         Can be dynamic for the current user. Called in the create/edit path.
         """
-        return cls.get_admin_marshall_class(phase="update" if instance is not None else "create")(
-            instance, **kwargs
-        )
+        return cls.get_admin_marshall_class(
+            phase="update" if instance is not None else "create", for_schema=False
+        )(instance, **kwargs)

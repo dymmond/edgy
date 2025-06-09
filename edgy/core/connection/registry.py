@@ -311,10 +311,14 @@ class Registry:
 
         if real_content_type.meta.abstract:
             in_admin = real_content_type.meta.in_admin
+            no_admin_create = real_content_type.meta.no_admin_create
             meta_args = {
                 "tablename": "contenttypes",
                 "registry": self,
+                # in admin
                 "in_admin": True if in_admin is None else in_admin,
+                # but disables the creation by default
+                "no_admin_create": True if no_admin_create is None else no_admin_create,
             }
 
             new_meta: MetaInfo = MetaInfo(None, **meta_args)

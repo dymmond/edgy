@@ -1,5 +1,4 @@
 import os
-from collections.abc import Callable
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -13,5 +12,4 @@ class AdminConfig(BaseSettings):
     favicon: str = "https://raw.githubusercontent.com/dymmond/edgy/refs/heads/main/docs/statics/images/favicon.ico"
     sidebar_bg_colour: str = "#1C4C74"
     dashboard_title: str = "Edgy Admin Dashboard"
-    default_permission: str | Callable | None = "edgy.contrib.admin.permissions.AuthorizedAccess"
     SECRET_KEY: str | bytes = Field(default_factory=lambda: os.urandom(64))

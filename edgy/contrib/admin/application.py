@@ -5,10 +5,8 @@ from typing import Any
 
 from lilya.apps import ChildLilya, Lilya
 from lilya.middleware import DefineMiddleware
-from lilya.middleware.authentication import AuthenticationMiddleware
 from lilya.middleware.session_context import SessionContextMiddleware
 from lilya.middleware.sessions import SessionMiddleware
-from lilya.permissions import DefinePermission
 from lilya.requests import Request
 from lilya.routing import RoutePath
 from lilya.templating import Jinja2Template
@@ -62,10 +60,6 @@ def create_admin_app() -> Lilya:
         middleware=[
             DefineMiddleware(SessionMiddleware, secret_key=settings.admin_config.SECRET_KEY),
             DefineMiddleware(SessionContextMiddleware),
-            DefineMiddleware(AuthenticationMiddleware),
         ],
-        permissions=[DefinePermission(settings.admin_config.default_permission)]
-        if settings.admin_config.default_permission
-        else [],
         exception_handlers={404: not_found},
     )

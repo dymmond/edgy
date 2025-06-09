@@ -31,7 +31,7 @@
 
         // The schema for the editor
         schema: {
-          $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true",
+          $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true&phase=create",
           format: "grid",
         },
       });

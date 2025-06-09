@@ -41,11 +41,13 @@ def get_registered_model(model: str) -> type[Model]:
 
 class JSONSchemaView(Controller):
     def get(self, request: Request) -> JSONResponse:
+        phase = request.query_params.get("phase", "view")
         with_defaults = request.query_params.get("cdefaults") == "true"
         model_name = request.path_params.get("name")
         reftemplate = "../{model}/json"
+        reftemplate = f"{reftemplate}?phase={phase}"
         if with_defaults:
-            reftemplate += "?cdefaults=true"
+            reftemplate = f"{reftemplate}&cdefaults=true"
         try:
             with JSONResponse.with_transform_kwargs({"json_encode_fn": orjson.dumps}):
                 return JSONResponse(
@@ -54,6 +56,7 @@ class JSONSchemaView(Controller):
                         include_callable_defaults=with_defaults,
                         ref_template=reftemplate,
                         no_check_admin_models=True,
+                        phase=phase,
                     )
                 )
         except LookupError:
@@ -115,6 +118,7 @@ class AdminDashboard(AdminMixin, TemplateController):
                 "name": name,
                 "verbose": model.__name__,
                 "count": count,
+                "no_admin_create": model.meta.no_admin_create,
             }
         )
 
@@ -296,7 +300,9 @@ class BaseObjectView:
             create: Is it an update or creation.
         """
         # retrieve fields for extraction, should be broader then get_admin_marshall_for_save
-        marshall_class = instance.get_admin_marshall_class(phase="extraction")
+        marshall_class = instance.get_admin_marshall_class(
+            phase="create" if create else "update", for_schema=False
+        )
         model_fields = marshall_class.model_fields
         data: dict = {}
 
@@ -452,8 +458,8 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
             raise NotFound()
         context["title"] = f"Edit {instance}"
         context["object"] = instance
-        marshall = instance.get_admin_marshall_class(phase="view")(instance)
-        json_values = marshall.model_dump_json()
+        marshall = instance.get_admin_marshall_class(phase="view", for_schema=False)(instance)
+        json_values = marshall.model_dump_json(exclude_none=True)
         context["values_as_json"] = json_values
         context["object_pk"] = self.create_object_pk(instance)
         return context
@@ -610,6 +616,23 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
         Returns:
             The rendered template response containing the creation form.
         """
+        model_name = request.path_params.get("name")
+
+        model = get_registered_model(model_name)
+        if (
+            model.meta.no_admin_create
+            or model.get_admin_marshall_class(
+                phase="create", for_schema=False
+            ).__incomplete_fields__
+        ):
+            add_message(
+                "error",
+                f"For {model.__name__.capitalize()} we cannot create a new instance.",
+            )
+            return RedirectResponse(
+                f"{settings.admin_config.admin_prefix_url}/models/{model.__name__}"
+            )
+
         return await self.render_template(request, **kwargs)
 
     async def post(self, request: Request, **kwargs: Any) -> RedirectResponse:

@@ -22,24 +22,18 @@
         </div>
         <div class="bg-white border rounded shadow p-4">
             <div class="text-sm text-gray-500">Top Model</div>
-            <div class="text-md font-semibold">{{ top_model.verbose }}</div>
+            <a class="text-md font-semibold hover:underline" href="{{ url_prefix }}/models/{{ top_model.name }}">{{ top_model.verbose }}</a>
         </div>
         <div class="bg-white border rounded shadow p-4">
             <div class="text-sm text-gray-500">Recently Accessed</div>
-            <div class="text-md font-semibold">{{ recent_models | join(', ') }}</div>
-        </div>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="space-y-2">
-        <h2 class="text-xl font-semibold text-gray-700">Quick Actions</h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {% for model in models[:8] %}
-            <a href="{{ url_prefix }}/models/{{ model.name }}/create"
-               class="bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded shadow-sm p-4 flex flex-col items-center text-sm font-medium text-blue-700">
-                ➕ New {{ model.verbose }}
-            </a>
-            {% endfor %}
+            <div class="text-md font-semibold">
+                {% for model_name in recent_models %}
+                    <a href="{{ url_prefix }}/models/{{ model_name }}" class="hover:underline">{{model_name}}</a>
+                    {% if not loop.last %}
+                        ,
+                    {% endif %}
+                {% endfor %}
+            </div>
         </div>
     </div>
 
@@ -69,7 +63,7 @@
                         <td class="px-6 py-4 text-sm">
                             <a href="{{ url_prefix }}/models/{{ model.name }}" class="text-blue-600 hover:underline">View</a>
                             <span class="text-gray-400 mx-1">|</span>
-                            <a href="{{ url_prefix }}/models/{{ model.name }}/create" class="text-green-600 hover:underline">Add</a>
+                            {% if not model.no_admin_create %}<a href="{{ url_prefix }}/models/{{ model.name }}/create" class="text-green-600 hover:underline">Add</a>{% else %}Add{% endif %}
                         </td>
                     </tr>
                     {% endfor %}

@@ -25,7 +25,7 @@
 
         // The schema for the editor
         schema: {
-          $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true",
+          $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true&phase=update",
           format: "grid",
         },
         startval: JSON.parse('{{values_as_json | safe}}')

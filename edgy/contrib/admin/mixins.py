@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from base64 import urlsafe_b64decode, urlsafe_b64encode
+from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import orjson
+from lilya.exceptions import ImproperlyConfigured
 from lilya.requests import Request
 from lilya.templating import Jinja2Template
 
@@ -25,8 +27,12 @@ class AdminMixin:
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:  # noqa
         context = {}
+        user: Any = None
+        with suppress(ImproperlyConfigured):
+            user = request.user
         context.update(
             {
+                "user": user,
                 "isinstance": isinstance,
                 "ConcreteFileField": ConcreteFileField,
                 "title": settings.admin_config.title,
