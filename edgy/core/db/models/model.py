@@ -70,16 +70,12 @@ class Model(
     query: ClassVar[BaseManager] = Manager()
     query_related: ClassVar[BaseManager] = RedirectManager(redirect_name="query")
     # registry = False, stops the retrieval of the registry from base classes
-    meta: ClassVar[MetaInfo] = MetaInfo(
-        None, abstract=True, registry=False, no_admin_create=False, in_admin=True
-    )
+    meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True, registry=False)
 
     class Meta:
         abstract = True
         # registry = False, stops the retrieval of the registry from base classes
         registry = False
-        no_admin_create = False
-        in_admin = True
 
     @classmethod
     def real_add_to_registry(cls, **kwargs: Any) -> type[Model]:

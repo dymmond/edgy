@@ -49,12 +49,20 @@ class User(edgy.StrictModel):
         registry = models
 
 
-class Group(edgy.StrictModel):
+class BaseGroup(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100)
+    content_type = edgy.fields.ExcludeField()
+
+    class Meta:
+        abstract = True
+        in_admin = True
+        no_admin_create = False
+
+
+class Group(BaseGroup):
     users = edgy.fields.ManyToMany(
         "User", embed_through=False, through_tablename=edgy.NEW_M2M_NAMING
     )
-    content_type = edgy.fields.ExcludeField()
 
     class Meta:
         registry = models
@@ -79,8 +87,13 @@ class Permission(BasePermission):
 async def test_settings(app):
     assert edgy.monkay.settings.admin_config.admin_prefix_url is None
     assert "ContentType" in models.admin_models
-    assert Permission.meta.in_admin is True
-    assert Permission.meta.no_admin_create is False
+
+
+async def test_inheritance(app):
+    assert Permission.meta.in_admin is None
+    assert Permission.meta.no_admin_create is None
+    assert Group.meta.in_admin is True
+    assert Group.meta.no_admin_create is False
 
 
 async def test_dashboard(async_client):
