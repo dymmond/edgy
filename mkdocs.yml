@@ -84,6 +84,7 @@ nav:
       - Fields:
           - "fields/index.md"
           - Postgresql fields: "fields/postgres.md"
+          - Customizing fields: "fields/custom.md"
       - File Handling: "file-handling.md"
       - Queries:
           - Queries: "queries/queries.md"

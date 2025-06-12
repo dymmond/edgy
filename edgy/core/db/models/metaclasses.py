@@ -821,7 +821,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # extract attributes
         for base in new_class.__bases__:
             if hasattr(base, "meta"):
-                # FIXME: deduplicate elements of shared ancestors
+                # FIXME: deduplicate and normalize (unique together) elements of shared ancestors
+                # here we can use sets
+                # we might want to undeprecate parents and use them
                 if base.meta.unique_together:
                     meta.unique_together.extend(base.meta.unique_together)
 

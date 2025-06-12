@@ -16,7 +16,7 @@ class User(edgy.Model):
 
     @classmethod
     def get_admin_marshall_config(cls, *, phase: str, for_schema: bool) -> dict:
-        return {"exclude": ["name"]}
+        return {"exclude": ["name"] if phase == "update" else []}
 
     @classmethod
     def get_admin_marshall_class(

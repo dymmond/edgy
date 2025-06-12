@@ -89,6 +89,8 @@ def admin_serve(
     """
     try:
         from lilya.apps import Lilya
+        from lilya.middleware import DefineMiddleware
+        from lilya.middleware.sessions import SessionMiddleware
         from lilya.permissions import DefinePermission
         from lilya.routing import Include
     except ImportError:
@@ -129,11 +131,20 @@ def admin_serve(
                     BasicAuthAccess, print_pw=print_pw, username=auth_name, password=auth_pw
                 )
             ],
+            middleware=[
+                DefineMiddleware(
+                    SessionMiddleware,
+                    secret_key=settings.admin_config.SECRET_KEY,
+                    session_cookie="admin_session",
+                ),
+            ],
         ),
     ]
     if old_instance.app is not None:
         routes.append(Include(path="/", app=old_instance.app))
-    app: Any = Lilya(routes=routes)
+    app: Any = Lilya(
+        routes=routes,
+    )
     if debug:
         app.debug = True
         admin_app.debug = True
