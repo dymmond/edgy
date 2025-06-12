@@ -128,8 +128,8 @@ async def test_models_create_and_delete(async_client, model):
         return
     else:
         assert model in response.text
-        assert "id" in response.text
-        assert "name" in response.text
+        assert "Id" in response.text
+        assert "Name" in response.text
         assert "foo1234" in response.text
     obj = await models.get_model(model).query.get(
         pk=json.loads(urlsafe_b64decode(response.url.path.rsplit("/")[-1]))

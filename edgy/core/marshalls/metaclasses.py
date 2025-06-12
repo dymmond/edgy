@@ -33,10 +33,7 @@ class MarshallMeta(ModelMetaclass):
         if not has_parents:
             return super().__new__(cls, name, bases, attrs)
 
-        model_class: type[Marshall] = super().__new__(cls, name, bases, attrs)
-        if name in ("Marshall",):
-            return model_class
-
+        marshall_class: type[Marshall] = super().__new__(cls, name, bases, attrs)
         if marshall_config is None:
             raise MarshallFieldDefinitionError(
                 "The 'marshall_config' was not found. Make sure it is declared and set."
@@ -62,27 +59,27 @@ class MarshallMeta(ModelMetaclass):
             "Either 'fields' or 'exclude' must be declared."
         )
 
-        base_model_fields: dict[str, Any] = {}
+        base_marshall_model_fields: dict[str, Any]
 
         # Define the fields for the Marshall
         if base_fields_exclude is not None:
-            base_model_fields = {
+            base_marshall_model_fields = {
                 k: v
                 for k, v in model.model_fields.items()
                 if k not in base_fields_exclude and not getattr(v, "exclude", False)
             }
         elif base_fields_include is not None and "__all__" in base_fields_include:
-            base_model_fields = {
+            base_marshall_model_fields = {
                 k: v
-                for k, v in model.meta.fields.items()
+                for k, v in model.model_fields.items()
                 if k not in model_fields and not getattr(v, "exclude", False)
             }
             show_pk = True
         else:
-            base_model_fields = {
+            base_marshall_model_fields = {
                 k: v for k, v in model.model_fields.items() if k in base_fields_include
             }
-        base_model_fields.update(model_fields)
+        base_marshall_model_fields.update(model_fields)
 
         # Handles with the fields not declared in the model.
         custom_fields: dict[str, BaseMarshallField] = {}
@@ -99,34 +96,33 @@ class MarshallMeta(ModelMetaclass):
             if (
                 field.__is_method__
                 and not field.source
-                and not hasattr(model_class, f"get_{name}")
+                and not hasattr(marshall_class, f"get_{name}")
             ):
                 raise MarshallFieldDefinitionError(
-                    f"Field '{name}' declared but no 'get_{name}' found in '{model_class.__name__}'."
+                    f"Field '{name}' declared but no 'get_{name}' found in '{marshall_class.__name__}'."
                 )
 
-        model_fields_on_class = getattr(model_class, "__pydantic_fields__", None)
+        model_fields_on_class = getattr(marshall_class, "__pydantic_fields__", None)
         if model_fields_on_class is None:
-            model_fields_on_class = model_class.model_fields
+            model_fields_on_class = marshall_class.model_fields
+        assert model_fields_on_class is not model.model_fields
         for key in model_fields:
             del model_fields_on_class[key]
-        model_fields_on_class.update(base_model_fields)
+        model_fields_on_class.update(base_marshall_model_fields)
 
         # Handle annotations
         annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
-        model_class.__init_annotations__ = annotations
-        model_class.__show_pk__ = show_pk
-        model_class.__custom_fields__ = custom_fields
-        model_class.marshall_config = marshall_config
+        marshall_class.__init_annotations__ = annotations
+        marshall_class.__show_pk__ = show_pk
+        marshall_class.__custom_fields__ = custom_fields
+        marshall_class.marshall_config = marshall_config
 
         # Fields which are required for a setup
-        required_fields: set[str] = {
-            k for k, v in model_fields_on_class.items() if v.is_required()
-        }
-        model_class.__incomplete_fields__ = tuple(
+        required_fields: set[str] = {k for k, v in model.model_fields.items() if v.is_required()}
+        marshall_class.__incomplete_fields__ = tuple(
             sorted(name for name in required_fields if name not in model_fields_on_class)
         )
-        if model_class.__incomplete_fields__:
-            model_class.__lazy__ = True
-        model_class.model_rebuild(force=True)
-        return model_class
+        if marshall_class.__incomplete_fields__:
+            marshall_class.__lazy__ = True
+        marshall_class.model_rebuild(force=True)
+        return marshall_class

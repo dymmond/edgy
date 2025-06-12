@@ -12,6 +12,17 @@ hide:
 ### Added
 
 - Customization hooks for admin.
+- Expose marshalls in a global `edgy.marshalls` namespace.
+
+### Changed
+
+- Don't import mixins from sub-modules in `edgy.core.db.models.mixins` (to prevent import-cycles).
+- Move Metaclass from `BaseMarshall` to `Marshall`.
+
+### Fixed
+
+- Allow marshalls with the name `Marshall`.
+- Fix repr on marshalls.
 
 ## 0.32.0
 

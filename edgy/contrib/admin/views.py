@@ -14,6 +14,7 @@ import edgy
 from edgy.contrib.admin.mixins import AdminMixin
 from edgy.contrib.admin.utils.messages import add_message
 from edgy.contrib.pagination import Paginator
+from edgy.core.db.fields.file_field import ConcreteFileField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.exceptions import ObjectNotFound
@@ -207,6 +208,7 @@ class ModelDetailView(AdminMixin, TemplateController):
         page_size = min(max(page_size, 1), 250)
 
         model = get_registered_model(model_name)
+        marshall_class = model.get_admin_marshall_class(phase="list", for_schema=False)
         add_to_recent_models(model)
 
         queryset = model.query.all()
@@ -230,6 +232,7 @@ class ModelDetailView(AdminMixin, TemplateController):
             {
                 "title": f"{model.__name__} Details",
                 "model": model,
+                "marshall_class": marshall_class,
                 "page": page_obj,
                 "model_name": model_name,
                 "query": query,
@@ -365,28 +368,34 @@ class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
         instance = await model.query.get_or_none(pk=self.get_object_pk(request))
         if not instance:
             raise NotFound()
+        marshall_class = instance.get_admin_marshall_class(phase="view", for_schema=False)
+        marshall = marshall_class(instance=instance)
         relationship_fields = {}
-        m2m_values = {
-            name: await getattr(instance, name).all()
-            for name in model.meta.relationship_fields
-            if isinstance(model.meta.fields[name], BaseManyToManyForeignKeyField | RelatedField)
-        }
+        overwrite_values = {}
 
-        for field in model.meta.relationship_fields:
-            if isinstance(model.meta.fields[field], BaseManyToManyForeignKeyField):
-                relationship_fields[field] = "many_to_many"
-            elif isinstance(model.meta.fields[field], RelatedField):
-                relationship_fields[field] = "related_field"
-            elif field in model.meta.foreign_key_fields:
-                relationship_fields[field] = "foreign_key"
+        for name, field in marshall_class.model_fields.items():
+            if isinstance(field, BaseManyToManyForeignKeyField):
+                relationship_fields[name] = "many_to_many"
+                overwrite_values[name] = await getattr(instance, name).all()
+            elif isinstance(field, RelatedField):
+                relationship_fields[name] = "related_field"
+                overwrite_values[name] = await getattr(instance, name).all()
+            elif name in model.meta.foreign_key_fields:
+                relationship_fields[name] = "foreign_key"
+                overwrite_values[name] = getattr(instance, name)
+            elif isinstance(field, ConcreteFileField):
+                overwrite_values[name] = getattr(instance, name)
+
+        values = marshall.model_dump(exclude=overwrite_values.keys())
+        values.update(overwrite_values)
 
         context.update(
             {
                 "title": f"{model.__name__.capitalize()} #{instance}",
-                "object": instance,
+                "marshall_class": marshall_class,
+                "values": values,
                 "object_pk": self.create_object_pk(instance),
                 "relationship_fields": relationship_fields,
-                "m2m_values": m2m_values,
             }
         )
         return context

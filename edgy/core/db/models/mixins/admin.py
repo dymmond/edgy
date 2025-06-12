@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import ConfigDict
 
-from edgy.core.marshalls import ConfigMarshall, Marshall
+from edgy.core.marshalls.base import Marshall
+from edgy.core.marshalls.config import ConfigMarshall
 
 if TYPE_CHECKING:
     from edgy.core.db.models import Model
@@ -37,15 +38,15 @@ class AdminMixin:
         """
 
         class AdminMarshall(Marshall):
-            model_config: ClassVar[ConfigDict] = ConfigDict(title=cls.__name__)
+            # forbid triggers additionalProperties=false
+            model_config: ClassVar[ConfigDict] = ConfigDict(
+                title=cls.__name__, extra="forbid" if for_schema else None
+            )
             marshall_config = ConfigMarshall(
                 model=cls,
                 **cls.get_admin_marshall_config(phase=phase, for_schema=for_schema),  # type: ignore
             )
 
-        if for_schema:
-            # this triggers additionalProperties=false
-            AdminMarshall.model_config["extra"] = "forbid"
         return AdminMarshall
 
     @classmethod

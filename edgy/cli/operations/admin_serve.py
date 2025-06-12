@@ -105,9 +105,9 @@ def admin_serve(
 
     old_instance = edgy.monkay.instance
     if admin_path is not None:
-        edgy.monkay.settings.admin_prefix_url = admin_path
-    if edgy.monkay.settings.admin_prefix_url is None:
-        edgy.monkay.settings.admin_prefix_url = "/admin"
+        edgy.monkay.settings.admin_config.admin_prefix_url = admin_path
+    if edgy.monkay.settings.admin_config.admin_prefix_url is None:
+        edgy.monkay.settings.admin_config.admin_prefix_url = "/admin"
 
     if old_instance is None:
         raise RuntimeError(

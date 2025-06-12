@@ -30,7 +30,7 @@ else:  # pragma: no cover
 excludes_marshall: set = {"instance", "_instance", "context"}
 
 
-class BaseMarshall(DumpMixin, BaseModel, metaclass=MarshallMeta):
+class BaseMarshall(DumpMixin, BaseModel):
     """
     Base for all the marshalls of Edgy.
     """
@@ -52,7 +52,7 @@ class BaseMarshall(DumpMixin, BaseModel, metaclass=MarshallMeta):
                 instance.model_dump(
                     exclude_defaults=True,
                     exclude_unset=True,
-                    exclude=excludes_marshall,
+                    exclude=excludes_marshall.union(self.__custom_fields__),
                 )
             )
         data.update(kwargs)
@@ -153,6 +153,10 @@ class BaseMarshall(DumpMixin, BaseModel, metaclass=MarshallMeta):
                 setattr(self, name, value)
             elif field.__is_method__:
                 value = self._get_method_value(name, instance)
+                # allow async getters
+                if inspect.isawaitable(value):
+                    async_resolvers.append(self._resolve_async(name, value))
+                    continue
                 setattr(self, name, value)
         if async_resolvers:
             run_sync(gather(*async_resolvers))
@@ -241,7 +245,7 @@ class BaseMarshall(DumpMixin, BaseModel, metaclass=MarshallMeta):
         return self
 
 
-class Marshall(BaseMarshall):
+class Marshall(BaseMarshall, metaclass=MarshallMeta):
     """
     Model marshall where the `__model__` is required.
     """
@@ -255,4 +259,6 @@ class Marshall(BaseMarshall):
         return f"<{type(self).__name__}: {self}>"
 
     def __str__(self) -> str:
-        return f"{type(self).__name__}({self.marshall_config.model.__name__})"
+        return (
+            f"{type(self).__name__}({cast('type[Model]', self.marshall_config['model']).__name__})"
+        )

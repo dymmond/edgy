@@ -37,10 +37,9 @@ def create_monkay(global_dict: dict, all_var: list[str]) -> Monkay[Instance, Edg
         lazy_imports={
             "settings": lambda: monkay.settings,
             "EdgySettings": "edgy.conf.global_settings:EdgySettings",
+            "marshalls": lambda: import_module("edgy.core.marshalls"),
             "fields": lambda: import_module("edgy.core.db.fields"),
             "files": lambda: import_module("edgy.core.files"),
-            "Marshall": "edgy.core.marshalls.Marshall",
-            "ConfigMarshall": "edgy.core.marshalls.ConfigMarshall",
             "Signal": "edgy.core.signals:Signal",
             "MultipleObjectsReturned": "edgy.exceptions:MultipleObjectsReturned",
             "ObjectNotFound": "edgy.exceptions:ObjectNotFound",

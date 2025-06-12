@@ -154,8 +154,9 @@ async def test_models_create_and_delete(async_client, model, prefix_url):
     assert response.status_code == 200
     # here we can create contenttypes
     assert model in response.text
-    assert "id" in response.text
-    assert "name" in response.text
+    # titled
+    assert "Id" in response.text
+    assert "Name" in response.text
     assert "foo1234" in response.text
     assert response.url.path.startswith("/foobar")
     obj = await models.get_model(model).query.get(

@@ -32,6 +32,7 @@ You can however customize them all via:
 
 Despite this is a quite non-invasive way to use the admin feature, you have a quite limited
 way of integration. There is no user management only a basic auth.
+For more
 
 ## Embedding Admin
 
@@ -47,13 +48,18 @@ Both flags can be just inherited by using a value of `None`. The default behavio
 is True
 
 
-## Hooks
+## Customizing model admins
+
+TODO: reference docs_src
+
+### Hooks
 
 - **get_admin_marshall_class(phase, for_schema=False) -> type[Marshall]** - Customize the fields seen when editing/creating a new model instance by customizing the marshall returned or replace it at all.
 
 ### `get_admin_marshall_class` phases
 
-- `view`: Marshall used for the model view representation in admin.
+- `list`: Marshall used for the model list representation in admin. Only for viewing.
+- `view`: Marshall used for the model detail view representation in admin. Only for viewing.
 - `create`: Marshall used for creating new model instances in admin (when saving). You may can remove some fields you dislike.
 - `update`: Marshall used for updating model instances in admin (when saving). You may can remove some fields you dislike.
 

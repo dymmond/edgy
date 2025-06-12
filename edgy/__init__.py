@@ -8,7 +8,7 @@ from .core.utils.sync import run_sync
 
 if TYPE_CHECKING:
     from .conf.global_settings import EdgySettings
-    from .core import files
+    from .core import files, marshalls
     from .core.connection import Database, DatabaseURL, Registry
     from .core.db import fields
     from .core.db.constants import (
@@ -70,7 +70,6 @@ if TYPE_CHECKING:
         StrictModel,
     )
     from .core.db.querysets import Prefetch, Q, QuerySet, and_, not_, or_
-    from .core.marshalls import ConfigMarshall, Marshall
     from .core.signals import Signal
     from .exceptions import MultipleObjectsReturned, ObjectNotFound
 
@@ -152,8 +151,7 @@ __all__ = [
     "IPAddressField",
     "PGArrayField",
     # marshalls
-    "ConfigMarshall",
-    "Marshall",
+    "marshalls",
     # base connection
     "Database",
     "DatabaseURL",

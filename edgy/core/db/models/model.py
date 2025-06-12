@@ -8,14 +8,12 @@ from pydantic import ConfigDict
 from edgy.core.db.models.base import EdgyBaseModel
 from edgy.core.db.models.managers import BaseManager, Manager, RedirectManager
 from edgy.core.db.models.metaclasses import BaseModelMeta, MetaInfo
-from edgy.core.db.models.mixins import (
-    AdminMixin,
-    DatabaseMixin,
-    DeclarativeMixin,
-    DumpMixin,
-    ModelRowMixin,
-    ReflectedModelMixin,
-)
+from edgy.core.db.models.mixins.admin import AdminMixin
+from edgy.core.db.models.mixins.db import DatabaseMixin
+from edgy.core.db.models.mixins.dump import DumpMixin
+from edgy.core.db.models.mixins.generics import DeclarativeMixin
+from edgy.core.db.models.mixins.reflection import ReflectedModelMixin
+from edgy.core.db.models.mixins.row import ModelRowMixin
 from edgy.core.utils.models import create_edgy_model, generify_model_fields
 
 if sys.version_info >= (3, 11):  # pragma: no cover

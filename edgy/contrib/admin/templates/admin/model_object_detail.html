@@ -1,33 +1,32 @@
 {% extends "admin/base.html" %}
 
-{% block header %}{{ model_name | replace('_', ' ') | title }} #{{ object.id }}{% endblock %}
+{% block header %}{{ title }}{% endblock %}
 
 {% block content %}
 <div class="bg-white border border-gray-200 rounded-lg shadow-sm w-full px-6 py-6">
 
     <div class="space-y-6">
-        {% for field, field_info in model.model_fields.items() %}
+        {% for field, field_info in marshall_class.model_fields.items() %}
         {% if not field_info.exclude %}
             <div class="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
                 <dt class="text-sm {% if field_info.primary_key  %}font-extrabold{% else %}font-semibold{% endif %} text-gray-800 w-full sm:w-1/4">
                     {{ field.replace('_', ' ') | title }}
                 </dt>
                 <dd class="text-sm text-gray-900 bg-gray-50 px-4 py-2 rounded-md border border-gray-100 w-full sm:w-3/4 break-words">
-                    {% set value = getattr(object, field) %}
+                    {% set value = values[field] %}
                     {% set rel_type = relationship_fields.get(field) %}
 
                     {% if rel_type == "many_to_many" or rel_type == "related_field" %}
-                        {% set items = m2m_values.get(field, []) %}
                         {% set related_model = field_info.get_related_model_for_admin() %}
-                        {% if items %}
+                        {% if value %}
                             {% if related_model %}
-                                {% for item in items %}
+                                {% for item in value %}
                                     <a href="{{ url_prefix }}/models/{{ related_model.__name__ }}/{{ create_object_pk(item) }}" class="text-blue-600">
                                         {{ item }}
                                     </a>{% if not loop.last %}, {% endif %}
                                 {% endfor %}
                             {% else %}
-                                {% for item in items %}
+                                {% for item in value %}
                                     {{ item }}{% if not loop.last %}, {% endif %}
                                 {% endfor %}
                             {% endif %}
