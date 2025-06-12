@@ -8,7 +8,7 @@ from .core.utils.sync import run_sync
 
 if TYPE_CHECKING:
     from .conf.global_settings import EdgySettings
-    from .core import files
+    from .core import files, marshalls
     from .core.connection import Database, DatabaseURL, Registry
     from .core.db import fields
     from .core.db.constants import (
@@ -150,6 +150,8 @@ __all__ = [
     "RefForeignKey",
     "IPAddressField",
     "PGArrayField",
+    # marshalls
+    "marshalls",
     # base connection
     "Database",
     "DatabaseURL",

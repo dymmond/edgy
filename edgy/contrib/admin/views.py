@@ -11,10 +11,10 @@ from lilya.responses import JSONResponse, RedirectResponse
 from lilya.templating.controllers import TemplateController
 
 import edgy
-from edgy.conf import settings
 from edgy.contrib.admin.mixins import AdminMixin
 from edgy.contrib.admin.utils.messages import add_message
 from edgy.contrib.pagination import Paginator
+from edgy.core.db.fields.file_field import ConcreteFileField
 from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.exceptions import ObjectNotFound
@@ -29,6 +29,7 @@ from .utils.models import get_model as _get_model
 
 if TYPE_CHECKING:
     from edgy.core.db.models.model import Model
+    from edgy.core.db.querysets.base import QuerySet
 
 
 def get_registered_model(model: str) -> type[Model]:
@@ -40,11 +41,13 @@ def get_registered_model(model: str) -> type[Model]:
 
 class JSONSchemaView(Controller):
     def get(self, request: Request) -> JSONResponse:
+        phase = request.query_params.get("phase", "view")
         with_defaults = request.query_params.get("cdefaults") == "true"
         model_name = request.path_params.get("name")
         reftemplate = "../{model}/json"
+        reftemplate = f"{reftemplate}?phase={phase}"
         if with_defaults:
-            reftemplate += "?cdefaults=true"
+            reftemplate = f"{reftemplate}&cdefaults=true"
         try:
             with JSONResponse.with_transform_kwargs({"json_encode_fn": orjson.dumps}):
                 return JSONResponse(
@@ -53,6 +56,7 @@ class JSONSchemaView(Controller):
                         include_callable_defaults=with_defaults,
                         ref_template=reftemplate,
                         no_check_admin_models=True,
+                        phase=phase,
                     )
                 )
         except LookupError:
@@ -98,7 +102,6 @@ class AdminDashboard(AdminMixin, TemplateController):
                 "total_records": total_records,
                 "top_model": top_model,
                 "recent_models": get_recent_models(),
-                "url_prefix": str(request.path_for("admin")).rstrip("/"),
             }
         )
         return context
@@ -114,6 +117,7 @@ class AdminDashboard(AdminMixin, TemplateController):
                 "name": name,
                 "verbose": model.__name__,
                 "count": count,
+                "no_admin_create": model.meta.no_admin_create,
             }
         )
 
@@ -204,6 +208,7 @@ class ModelDetailView(AdminMixin, TemplateController):
         page_size = min(max(page_size, 1), 250)
 
         model = get_registered_model(model_name)
+        marshall_class = model.get_admin_marshall_class(phase="list", for_schema=False)
         add_to_recent_models(model)
 
         queryset = model.query.all()
@@ -227,12 +232,12 @@ class ModelDetailView(AdminMixin, TemplateController):
             {
                 "title": f"{model.__name__} Details",
                 "model": model,
+                "marshall_class": marshall_class,
                 "page": page_obj,
                 "model_name": model_name,
                 "query": query,
                 "per_page": page_size,
                 "total_pages": total_pages,
-                "url_prefix": settings.admin_config.admin_prefix_url,
             }
         )
         return context
@@ -291,43 +296,28 @@ class BaseObjectView:
             instance: The Edgy model instance to be updated and saved.
                       Note: The type hint 'type[edgy.Model]' might be intended
                       as the instance itself, not the class type.
-            form_data: A FormData object containing the data to update the model.
+            json_data: A json dict to update the model.
+            create: Is it an update or creation.
         """
-        data: dict[str, Any] = {}
+        # retrieve fields for extraction, should be broader then get_admin_marshall_for_save
+        marshall_class = instance.get_admin_marshall_class(
+            phase="create" if create else "update", for_schema=False
+        )
+        model_fields = marshall_class.model_fields
+        data: dict = {}
 
         for key, value in json_data.items():
-            field = instance.meta.fields.get(key)
+            field = model_fields.get(key)
 
-            if field is None or field.read_only:
+            if field is None or getattr(field, "read_only", False):
                 continue
+            data[key] = value
 
-            if key in instance.meta.foreign_key_fields:
-                # Check if its a ManyToMany m2m field
-                if not field.is_m2m:
-                    target = instance.meta.fields.get(key).target
-                    data[key] = await target.query.first(pk=self.get_object_pk(value))
-                    if data[key] is None:
-                        data[key] = target(**value)
-            elif key in instance.meta.many_to_many_fields:
-                continue
-            else:
-                data[key] = value
-
-        # Save basic fields first
-        if not create:
-            await instance.update(**data)
+        if create:
+            marshall = instance.get_admin_marshall_for_save(**data)
         else:
-            instance = await instance.query.create(**data)
-
-        # Handle ManyToMany sync
-        for key in instance.meta.many_to_many_fields:
-            m2m_data = json_data.get(key, [])
-            if m2m_data:
-                rel = getattr(instance, key)
-                for dataob in m2m_data:
-                    await rel.add(dataob)
-
-        return cast(edgy.Model, instance)
+            marshall = instance.get_admin_marshall_for_save(cast("edgy.Model", instance), **data)
+        return (await marshall.save()).instance
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         context: dict = await super().get_context_data(request, **kwargs)
@@ -378,28 +368,34 @@ class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
         instance = await model.query.get_or_none(pk=self.get_object_pk(request))
         if not instance:
             raise NotFound()
+        marshall_class = instance.get_admin_marshall_class(phase="view", for_schema=False)
+        marshall = marshall_class(instance=instance)
         relationship_fields = {}
-        m2m_values = {
-            name: await getattr(instance, name).all()
-            for name in model.meta.relationship_fields
-            if isinstance(model.meta.fields[name], BaseManyToManyForeignKeyField | RelatedField)
-        }
+        overwrite_values = {}
 
-        for field in model.meta.relationship_fields:
-            if isinstance(model.meta.fields[field], BaseManyToManyForeignKeyField):
-                relationship_fields[field] = "many_to_many"
-            elif isinstance(model.meta.fields[field], RelatedField):
-                relationship_fields[field] = "related_field"
-            elif field in model.meta.foreign_key_fields:
-                relationship_fields[field] = "foreign_key"
+        for name, field in marshall_class.model_fields.items():
+            if isinstance(field, BaseManyToManyForeignKeyField):
+                relationship_fields[name] = "many_to_many"
+                overwrite_values[name] = await getattr(instance, name).all()
+            elif isinstance(field, RelatedField):
+                relationship_fields[name] = "related_field"
+                overwrite_values[name] = await getattr(instance, name).all()
+            elif name in model.meta.foreign_key_fields:
+                relationship_fields[name] = "foreign_key"
+                overwrite_values[name] = getattr(instance, name)
+            elif isinstance(field, ConcreteFileField):
+                overwrite_values[name] = getattr(instance, name)
+
+        values = marshall.model_dump(exclude=overwrite_values.keys())
+        values.update(overwrite_values)
 
         context.update(
             {
                 "title": f"{model.__name__.capitalize()} #{instance}",
-                "object": instance,
+                "marshall_class": marshall_class,
+                "values": values,
                 "object_pk": self.create_object_pk(instance),
                 "relationship_fields": relationship_fields,
-                "m2m_values": m2m_values,
             }
         )
         return context
@@ -460,12 +456,17 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
             NotFound: If the model name or the specific instance is not found.
         """
         context = await super().get_context_data(request, **kwargs)  # noqa
-        model: type[Model] = context["model"]
-        instance = await model.query.get_or_none(pk=self.get_object_pk(request))
+        model = cast("type[Model]", context["model"])
+        instance: Model | None = await cast("QuerySet", model.query).get_or_none(
+            pk=self.get_object_pk(request)
+        )
         if not instance:
             raise NotFound()
         context["title"] = f"Edit {instance}"
         context["object"] = instance
+        marshall = instance.get_admin_marshall_class(phase="view", for_schema=False)(instance)
+        json_values = marshall.model_dump_json(exclude_none=True)
+        context["values_as_json"] = json_values
         context["object_pk"] = self.create_object_pk(instance)
         return context
 
@@ -510,12 +511,12 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
         model = get_registered_model(model_name)
 
         try:
-            instance = await model.query.get(pk=self.get_object_pk(request))
+            instance: Model = await cast("QuerySet", model.query).get(
+                pk=self.get_object_pk(request)
+            )
         except ObjectNotFound:
             add_message("error", f"Model {model_name} with ID {obj_id} not found.")
-            return RedirectResponse(
-                f"{settings.admin_config.admin_prefix_url}/models/{model_name}"
-            )
+            return RedirectResponse(f"{self.get_admin_prefix_url(request)}/models/{model_name}")
 
         await self.save_model(instance, orjson.loads((await request.form())["editor_data"]))
 
@@ -524,7 +525,7 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
             f"{instance} has been updated successfully.",
         )
         return RedirectResponse(
-            f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
+            f"{self.get_admin_prefix_url(request)}/models/{model_name}/{obj_id}"
         )
 
 
@@ -557,9 +558,7 @@ class ModelObjectDeleteView(AdminMixin, Controller):
             instance = await model.query.get(pk=self.get_object_pk(request))
         except ObjectNotFound:
             add_message("error", f"There is no record with this ID: '{obj_id}'.")
-            return RedirectResponse(
-                f"{settings.admin_config.admin_prefix_url}/models/{model_name}"
-            )
+            return RedirectResponse(f"{self.get_admin_prefix_url(request)}/models/{model_name}")
         instance_name = str(instance)
         await instance.delete()
 
@@ -567,7 +566,7 @@ class ModelObjectDeleteView(AdminMixin, Controller):
             "success",
             f"{model_name.capitalize()} #{instance_name} has been deleted successfully.",
         )
-        return RedirectResponse(f"{settings.admin_config.admin_prefix_url}/models/{model_name}")
+        return RedirectResponse(f"{self.get_admin_prefix_url(request)}/models/{model_name}")
 
 
 class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
@@ -619,6 +618,23 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
         Returns:
             The rendered template response containing the creation form.
         """
+        model_name = request.path_params.get("name")
+
+        model = get_registered_model(model_name)
+        if (
+            model.meta.no_admin_create
+            or model.get_admin_marshall_class(
+                phase="create", for_schema=False
+            ).__incomplete_fields__
+        ):
+            add_message(
+                "error",
+                f"For {model.__name__.capitalize()} we cannot create a new instance.",
+            )
+            return RedirectResponse(
+                f"{self.get_admin_prefix_url(request)}/models/{model.__name__}"
+            )
+
         return await self.render_template(request, **kwargs)
 
     async def post(self, request: Request, **kwargs: Any) -> RedirectResponse:
@@ -643,6 +659,19 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
         model_name = request.path_params.get("name")
 
         model = get_registered_model(model_name)
+        if (
+            model.meta.no_admin_create
+            or model.get_admin_marshall_class(
+                phase="create", for_schema=False
+            ).__incomplete_fields__
+        ):
+            add_message(
+                "error",
+                f"For {model.__name__.capitalize()} we cannot create a new instance.",
+            )
+            return RedirectResponse(
+                f"{self.get_admin_prefix_url(request)}/models/{model.__name__}"
+            )
 
         instance = await self.save_model(
             model, orjson.loads((await request.form())["editor_data"]), create=True
@@ -653,5 +682,5 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
             f"{model_name.capitalize()} #{instance} has been created successfully.",
         )
         return RedirectResponse(
-            f"{settings.admin_config.admin_prefix_url}/models/{model_name}/{obj_id}"
+            f"{self.get_admin_prefix_url(request)}/models/{model_name}/{obj_id}"
         )

@@ -44,13 +44,15 @@ def get_model_json_schema(
     model: str | type[Model],
     /,
     mode: Literal["validation", "serialization"] = "validation",
+    phase: str = "view",
     include_callable_defaults: bool = False,
     no_check_admin_models: bool = False,
     **kwargs: Any,
 ) -> dict:
     if isinstance(model, str):
         model = get_model(model, no_check_admin_models=no_check_admin_models)
-    return model.model_json_schema(
+    marshall_class = model.get_admin_marshall_class(phase=phase, for_schema=True)
+    return marshall_class.model_json_schema(
         schema_generator=CallableDefaultJsonSchema
         if include_callable_defaults
         else NoCallableDefaultJsonSchema,
@@ -67,6 +69,7 @@ def add_to_recent_models(model: type[Model]) -> None:
     else:
         recent_models = []
     recent_models.insert(0, model.__name__)
+    session.recent_models = recent_models
 
 
 def get_recent_models() -> list[str]:

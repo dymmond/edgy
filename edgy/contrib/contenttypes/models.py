@@ -14,6 +14,7 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
 
     class Meta:
         abstract = True
+        no_admin_create = True
 
     # NOTE: model_ is a private namespace of pydantic
     # model names shouldn't be so long, maybe a check would be appropriate

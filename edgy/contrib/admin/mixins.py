@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from base64 import urlsafe_b64decode, urlsafe_b64encode
+from contextlib import suppress
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 import orjson
+from lilya.exceptions import ImproperlyConfigured
 from lilya.requests import Request
 from lilya.templating import Jinja2Template
 
@@ -13,20 +16,42 @@ from edgy.contrib.admin.utils.messages import get_messages
 from edgy.core.db.fields.file_field import ConcreteFileField
 from edgy.exceptions import ObjectNotFound
 
-templates = Jinja2Template(directory=str(Path(__file__).resolve().parent / "templates"))
-templates.env.globals["getattr"] = getattr
+
+@lru_cache(maxsize=1)
+def get_templates() -> Jinja2Template:
+    templates = Jinja2Template(
+        directory=[
+            *settings.admin_config.admin_extra_templates,
+            Path(__file__).resolve().parent / "templates",
+        ]
+    )
+    templates.env.globals["getattr"] = getattr
+    templates.env.globals["isinstance"] = isinstance
+    return templates
+
 
 if TYPE_CHECKING:
     from edgy.core.db.models.model import Model
 
 
 class AdminMixin:
-    templates = templates
+    @property
+    def templates(self) -> Jinja2Template:
+        return get_templates()
+
+    def get_admin_prefix_url(self, request: Request) -> str:
+        if settings.admin_config.admin_prefix_url is not None:
+            return settings.admin_config.admin_prefix_url
+        return str(request.path_for("admin")).rstrip("/")
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:  # noqa
         context = {}
+        user: Any = None
+        with suppress(ImproperlyConfigured):
+            user = request.user
         context.update(
             {
+                "user": user,
                 "isinstance": isinstance,
                 "ConcreteFileField": ConcreteFileField,
                 "title": settings.admin_config.title,
@@ -34,7 +59,7 @@ class AdminMixin:
                 "menu_title": settings.admin_config.menu_title,
                 "favicon": settings.admin_config.favicon,
                 "sidebar_bg_colour": settings.admin_config.sidebar_bg_colour,
-                "url_prefix": settings.admin_config.admin_prefix_url,
+                "url_prefix": self.get_admin_prefix_url(request),
                 "messages": get_messages(),
                 "create_object_pk": self.create_object_pk,
             }

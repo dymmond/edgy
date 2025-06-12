@@ -37,6 +37,7 @@ def create_monkay(global_dict: dict, all_var: list[str]) -> Monkay[Instance, Edg
         lazy_imports={
             "settings": lambda: monkay.settings,
             "EdgySettings": "edgy.conf.global_settings:EdgySettings",
+            "marshalls": lambda: import_module("edgy.core.marshalls"),
             "fields": lambda: import_module("edgy.core.db.fields"),
             "files": lambda: import_module("edgy.core.files"),
             "Signal": "edgy.core.signals:Signal",

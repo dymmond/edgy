@@ -185,6 +185,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             else ()
         )
         in_admin_default = False
+        no_admin_create_default = True
         pknames = set()
         if self.through:
             through = self.through
@@ -237,6 +238,8 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             __bases__ = (through,)
             if through.meta.in_admin is not None:
                 in_admin_default = through.meta.in_admin
+            if through.meta.no_admin_create is not None:
+                no_admin_create_default = through.meta.no_admin_create
             del through
         assert self.owner.meta.registry, "no registry set"
         owner_name = self.owner.__name__
@@ -278,6 +281,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             or getattr(self.target.meta, "is_tenant", False),
             register_default=getattr(self.owner.meta, "register_default", None),
             in_admin=in_admin_default,
+            no_admin_create=no_admin_create_default,
             **meta_args,
         )
 

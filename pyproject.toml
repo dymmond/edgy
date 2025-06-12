@@ -126,6 +126,7 @@ dependencies = [
 ]
 [tool.hatch.envs.docs.scripts]
 build = "mkdocs build {args}"
+serve = "mkdocs serve --dev-addr localhost:8000"
 
 
 [tool.hatch.envs.test]

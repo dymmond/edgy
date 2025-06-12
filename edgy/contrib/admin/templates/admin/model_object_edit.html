@@ -16,7 +16,6 @@
     </a>
 </div>
 <script>
-
       var editor = new JSONEditor(document.getElementById('editor_holder'),{
         ajax: true,
         required_by_default: false,
@@ -26,10 +25,10 @@
 
         // The schema for the editor
         schema: {
-          $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true",
+          $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true&phase=update",
           format: "grid",
         },
-        startval: JSON.parse('{{object.model_dump_json() | safe}}')
+        startval: JSON.parse('{{values_as_json | safe}}')
       });
 
       const editor_data = document.getElementById("editor_data")

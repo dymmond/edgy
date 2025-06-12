@@ -244,7 +244,7 @@ class ModelRowMixin:
             # overwrite
             item[reference_target_main] = row._mapping[reference_source_main]
         model: Model = (
-            cls.proxy_model(**item, __phase__="init_db")  # type: ignore
+            cls.proxy_model(**item, __phase__="init_db")
             if exclude_secrets or is_defer_fields or only_fields
             else cls(**item, __phase__="init_db")
         )

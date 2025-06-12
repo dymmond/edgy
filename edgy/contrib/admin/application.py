@@ -6,12 +6,10 @@ from typing import Any
 from lilya.apps import ChildLilya, Lilya
 from lilya.middleware import DefineMiddleware
 from lilya.middleware.session_context import SessionContextMiddleware
-from lilya.middleware.sessions import SessionMiddleware
 from lilya.requests import Request
 from lilya.routing import RoutePath
 from lilya.templating import Jinja2Template
 
-from edgy.conf import settings
 from edgy.contrib.admin.views import (
     AdminDashboard,
     JSONSchemaView,
@@ -35,7 +33,12 @@ async def not_found(request: Request, exc: Exception) -> Any:
     )
 
 
-def create_admin_app() -> Lilya:
+def create_admin_app(*, session_sub_path: str = "") -> Lilya:
+    middleware = []
+    if session_sub_path:
+        middleware.append(DefineMiddleware(SessionContextMiddleware, sub_path=session_sub_path))
+    else:
+        middleware.append(DefineMiddleware(SessionContextMiddleware))
     return ChildLilya(
         routes=[
             RoutePath("/", handler=AdminDashboard, name="admin"),
@@ -57,9 +60,6 @@ def create_admin_app() -> Lilya:
                 methods=["POST"],
             ),
         ],
-        middleware=[
-            DefineMiddleware(SessionMiddleware, secret_key=settings.admin_config.SECRET_KEY),
-            DefineMiddleware(SessionContextMiddleware),
-        ],
+        middleware=middleware,
         exception_handlers={404: not_found},
     )

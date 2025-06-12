@@ -29,7 +29,7 @@
         <span class="text-sm text-gray-600">per page</span>
         <input type="hidden" name="q" value="{{ query or '' }}" />
     </form>
-
+    {% if not model.meta.no_admin_create %}
     <a href="{{ url_prefix }}/models/{{ model_name }}/create"
        class="inline-flex items-center gap-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-md hover:bg-green-700 transition">
         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -37,6 +37,7 @@
         </svg>
         Create {{ model_name | capitalize }}
     </a>
+    {% endif %}
 </div>
 
 {% if page.content %}
@@ -44,12 +45,12 @@
     <table class="min-w-full divide-y divide-gray-200">
         <thead class="bg-gray-50">
             <tr>
-                {% for field in model.pknames if not model.meta.fields[field].exclude %}
+                {% for field in model.pknames if not marshall_class.model_fields[field].exclude %}
                 <th scope="col" class="px-6 py-3 text-left text-xs font-extrabold text-gray-800 uppercase tracking-wider">
                     {{ field.replace('_', ' ') | title }}
                 </th>
                 {% endfor %}
-                {% for field, field_info in model.model_fields.items() if not field_info.exclude and field not in model.pknames and field not in model.meta.relationship_fields %}
+                {% for field, field_info in marshall_class.model_fields.items() if not field_info.exclude and field not in model.pknames and field not in model.meta.relationship_fields %}
                 <th scope="col" class="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                     {{ field.replace('_', ' ') | title }}
                 </th>
@@ -58,15 +59,16 @@
         </thead>
         <tbody class="divide-y divide-gray-100 bg-white">
             {% for obj in page.content %}
+            {% set marshall_object = marshall_class(instance=obj) %}
             <tr class="hover:bg-gray-50 transition cursor-pointer" onclick="window.location='{{ url_prefix }}/models/{{ model_name }}/{{ create_object_pk(obj) }}'">
-                {% for field in model.pknames if not model.meta.fields[field].exclude %}
+                {% for field in model.pknames if not  marshall_class.model_fields[field].exclude  %}
                 <td class="px-6 py-4 text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-xs">
-                    {{ getattr(obj, field) }}
+                    {{ getattr(marshall_object, field) }}
                 </td>
                 {% endfor %}
-                {% for field, field_info in model.model_fields.items() if not field_info.exclude and field not in model.pknames and field not in model.meta.relationship_fields %}
+                {% for field, field_info in marshall_class.model_fields.items() if not field_info.exclude and field not in model.pknames and field not in model.meta.relationship_fields %}
                 <td class="px-6 py-4 text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis max-w-xs">
-                    {{ getattr(obj, field) }}
+                    {{ getattr(marshall_object, field) }}
                 </td>
                 {% endfor %}
             </tr>
