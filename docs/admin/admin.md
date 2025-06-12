@@ -2,14 +2,14 @@
 
 ## What is the admin feature?
 
-This is an **experimental** Web-GUI to expose the database to the webbrowser.
-Admins can use the GUI to fix some problems.
+This is an Web-GUI to expose the database to the webbrowser.
+Admins can use the GUI to fix some problems or you can use it as an permissioned interface in your application.
 
 ## Using Admin from cli
 
 Use something like:
 
-`edgy -admin_serve`
+`edgy admin_serve`
 
 or **only** if you want to test the feature:
 
@@ -89,6 +89,12 @@ You can use user attributes or permissions (when used with a user setup) or simp
 {!> ../docs_src/admin/admin_permission.py !}
 ```
 
+### A word of customization
+
+Unlike django admin we don't pass around the contexts through the functions (despite there are some small exceptions like phase and for_schema).
+We use ContextVars instead. This allows us to keep the code lean and composable.
+So if you need some references to e.g. the `Request` or `Connection` you will need to use the `RequestContextMiddleware`.
+
 ### Hooks in detail
 
 - **get_admin_marshall_config(cls, *, phase, for_schema=False) -> dict:** - Customize quickly the marshall_config of the generated Marshall. Use this for excluding fields depending on the phase.
@@ -111,3 +117,8 @@ The `phase` parameter can contain following values:
 
 The `for_schema` parameter contains the information if the marshall is used for a json_schema or for validation. When used for a json_schema,
 we change in model_config the parameter extra to `forbid` so no arbitary editors are shown.
+
+## Customizing the admin templates
+
+You can customize the admin templates by providing `admin_extra_templates` to `settings.admin_config`.
+All templates specified here will be loaded first.

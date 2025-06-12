@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from base64 import urlsafe_b64decode, urlsafe_b64encode
 from contextlib import suppress
+from functools import lru_cache
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -15,15 +16,28 @@ from edgy.contrib.admin.utils.messages import get_messages
 from edgy.core.db.fields.file_field import ConcreteFileField
 from edgy.exceptions import ObjectNotFound
 
-templates = Jinja2Template(directory=str(Path(__file__).resolve().parent / "templates"))
-templates.env.globals["getattr"] = getattr
+
+@lru_cache(maxsize=1)
+def get_templates() -> Jinja2Template:
+    templates = Jinja2Template(
+        directory=[
+            *settings.admin_config.admin_extra_templates,
+            Path(__file__).resolve().parent / "templates",
+        ]
+    )
+    templates.env.globals["getattr"] = getattr
+    templates.env.globals["isinstance"] = isinstance
+    return templates
+
 
 if TYPE_CHECKING:
     from edgy.core.db.models.model import Model
 
 
 class AdminMixin:
-    templates = templates
+    @property
+    def templates() -> Jinja2Template:
+        return get_templates()
 
     def get_admin_prefix_url(self, request: Request) -> str:
         if settings.admin_config.admin_prefix_url is not None:
