@@ -62,11 +62,10 @@ class BaseTenantMeta(BaseModelMeta):
             meta_info_class=meta_info_class,
             **kwargs,
         )
-        if not new_model.meta.abstract:
-            new_model.meta.is_tenant = get_model_meta_attr("is_tenant", bases, new_model.meta)
-            new_model.meta.register_default = get_model_meta_attr(
-                "register_default", bases, new_model.meta
-            )
+        new_model.meta.is_tenant = get_model_meta_attr("is_tenant", bases, new_model.meta)
+        new_model.meta.register_default = get_model_meta_attr(
+            "register_default", bases, new_model.meta
+        )
 
         if (
             not skip_registry

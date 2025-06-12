@@ -830,9 +830,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
                 if base.meta.constraints:
                     meta.constraints.extend(base.meta.constraints)
-        if not meta.abstract:
-            meta.in_admin = get_model_meta_attr("in_admin", bases, meta)
-            meta.no_admin_create = get_model_meta_attr("no_admin_create", bases, meta)
+        meta.in_admin = get_model_meta_attr("in_admin", bases, meta)
+        meta.no_admin_create = get_model_meta_attr("no_admin_create", bases, meta)
 
         if meta.unique_together:
             unique_together = meta.unique_together
