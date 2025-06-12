@@ -53,6 +53,9 @@ You can multiplex the session via `sub_path` (will probably land in lilya 0.15.5
 {!> ../docs_src/admin/admin_embed_multiplexed.py !}
 ```
 
+By default the `admin_prefix_url` is automatically inferred. If you want an explicit url for the admin,
+you might want to set it.
+
 ## Excluding models
 
 Just set in Meta, the flag `in_admin` to `False`. This flag is inherited.
