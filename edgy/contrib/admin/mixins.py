@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 class AdminMixin:
     @property
-    def templates() -> Jinja2Template:
+    def templates(self) -> Jinja2Template:
         return get_templates()
 
     def get_admin_prefix_url(self, request: Request) -> str:

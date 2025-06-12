@@ -4,6 +4,10 @@ from collections.abc import AsyncGenerator
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from lilya.apps import Lilya
+from lilya.middleware import DefineMiddleware
+from lilya.middleware.sessions import SessionMiddleware
+from lilya.routing import Include
 
 import edgy
 from edgy.contrib.admin import create_admin_app
@@ -29,7 +33,16 @@ async def create_test_database():
 
 @pytest.fixture()
 async def app():
-    app = models.asgi(create_admin_app())
+    admin_app = create_admin_app()
+    app = Lilya(
+        routes=[Include("", admin_app)],
+        middleware=[
+            DefineMiddleware(
+                SessionMiddleware, secret_key=edgy.monkay.settings.admin_config.SECRET_KEY
+            )
+        ],
+    )
+    app = models.asgi(app)
     with edgy.monkay.with_full_overwrite(instance=edgy.Instance(registry=models, app=app)):
         yield app
 

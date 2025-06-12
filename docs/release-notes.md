@@ -19,7 +19,8 @@ hide:
 
 - Don't import mixins from sub-modules in `edgy.core.db.models.mixins` (to prevent import-cycles).
 - Move Metaclass from `BaseMarshall` to `Marshall`.
-- `admin_prefix_url` is automatically inferred
+- `admin_prefix_url` is automatically inferred.
+- Require `session` for embedding admin.
 
 ### Fixed
 

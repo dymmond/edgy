@@ -6,6 +6,8 @@ from collections.abc import AsyncGenerator
 import pytest
 from httpx import ASGITransport, AsyncClient
 from lilya.apps import Lilya
+from lilya.middleware import DefineMiddleware
+from lilya.middleware.sessions import SessionMiddleware
 from lilya.routing import Include
 
 import edgy
@@ -61,7 +63,12 @@ async def app():
                     path="/foobar",
                     app=admin_app,
                 ),
-            ]
+            ],
+            middleware=[
+                DefineMiddleware(
+                    SessionMiddleware, secret_key=edgy.monkay.settings.admin_config.SECRET_KEY
+                )
+            ],
         )
     )
     with edgy.monkay.with_full_overwrite(
