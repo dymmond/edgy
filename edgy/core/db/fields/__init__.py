@@ -38,6 +38,7 @@ if TYPE_CHECKING:
     from .many_to_many import ManyToMany, ManyToManyField
     from .one_to_one_keys import OneToOne, OneToOneField
     from .place_holder_field import PlaceholderField
+    from .postgres import PGArrayField
     from .ref_foreign_key import RefForeignKey
 
 __all__ = [
