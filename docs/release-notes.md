@@ -6,13 +6,21 @@ hide:
 
 # Release Notes
 
-
 ## 0.32.2
+
+### Added
+
+- Add model search in admin.
+
+### Changed
+
+- Split out base head from admin into an extra template. This improves the customizability and allows to self-host.
 
 ### Fixed
 
 - Circular import errors with marshalls.
 - Missing typing export for PGArrayField.
+- Proper escape json values.
 
 ## 0.32.1
 

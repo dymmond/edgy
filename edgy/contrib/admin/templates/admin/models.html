@@ -1,8 +1,17 @@
 {% extends "admin/base.html" %}
 
-{% block header %}Registered Models{% endblock %}
+{% block header %}Search Registered Models{% endblock %}
 
 {% block content %}
+
+<form method="get" class="flex gap-2 w-full max-w-md mb-8">
+    <input type="text" name="q" value="{{ query or '' }}" placeholder="Search..."
+            class="flex-grow px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring focus:ring-blue-200 text-sm" />
+    <button type="submit"
+            class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition">
+        Search
+    </button>
+</form>
 <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
     {% for name, model in models.items() %}
     <div class="bg-white rounded-lg shadow hover:shadow-md transition p-5 flex flex-col justify-between h-full">
