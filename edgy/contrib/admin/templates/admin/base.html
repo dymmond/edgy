@@ -1,38 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    {% block head %}
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <link rel="icon" href="{{ favicon }}"/>
     <title>{% block title %}Edgy Admin | {{ title }}{% endblock %}</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/@fortawesome/fontawesome-free@6.7.2/css/all.min.css"></link>
-    <script src="https://cdn.jsdelivr.net/npm/@json-editor/json-editor@latest/dist/jsoneditor.min.js"></script>
-    <script>
-        JSONEditor.defaults.theme = 'tailwind';
-        JSONEditor.defaults.iconlib = 'fontawesome5';
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        edgy: {
-                            pink: "{{ sidebar_bg_colour }}"
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-      .loader {
-        border-top-color: #3490dc;
-        animation: spin 1s linear infinite;
-      }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-</style>
+    {% include 'admin/base_head.html' %}
+    {% endblock %}
 </head>
 <body class="bg-gray-100 text-gray-900">
   <div id="loading-overlay" class="fixed inset-0 bg-white bg-opacity-70 z-50 flex items-center justify-center hidden">
@@ -87,7 +62,7 @@
                       <a href="{{ url_prefix }}/models"
                            class="flex items-center gap-3 px-4 py-2 rounded-md hover:bg-white/20 transition">
                           <i class="fa-solid fa-database w-5 h-5"></i>
-                          <span class="capitalize">Models</span>
+                          <span class="capitalize">Models (Search)</span>
                       </a>
                   </li>
                 </ul>
@@ -111,6 +86,7 @@
         </main>
     </div>
 
+  {% block endscripts %}
   <script>
     // Show loading on form submit
     const loading_overlay = document.getElementById("loading-overlay")
@@ -133,5 +109,6 @@
       });
     });
   </script>
+  {% endblock %}
 </body>
 </html>

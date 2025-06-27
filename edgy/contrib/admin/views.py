@@ -156,7 +156,23 @@ class ModelOverview(AdminMixin, TemplateController):
             and a list of registered models.
         """
         context = await super().get_context_data(request, **kwargs)
-        context.update({"title": "Models", "models": get_registered_models()})
+        # For the search
+        query = request.query_params.get("q", "").strip()
+        models = get_registered_models()
+        if query:
+            lquery = query.lower()
+            for mkey in list(models.keys()):
+                if lquery not in mkey.lower():
+                    models.pop(mkey)
+                elif not mkey.lower().startswith(lquery):
+                    # reorder back
+                    models[mkey] = models.pop(mkey)
+            # reorder back not exact start matches
+            for mkey in list(models.keys()):
+                if not mkey.startswith(query):
+                    # reorder back
+                    models[mkey] = models.pop(mkey)
+        context.update({"title": "Models", "models": models, "query": query})
         return context
 
     async def get(self, request: Request) -> Any:
@@ -466,7 +482,13 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
         context["object"] = instance
         marshall = instance.get_admin_marshall_class(phase="view", for_schema=False)(instance)
         json_values = marshall.model_dump_json(exclude_none=True)
-        context["values_as_json"] = json_values
+        context["values_as_json"] = (
+            # replace dangerous chars like in jinja
+            json_values.replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("&", "\\u0026")
+            .replace("'", "\\u0027")
+        )
         context["object_pk"] = self.create_object_pk(instance)
         return context
 
