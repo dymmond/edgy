@@ -1,8 +1,10 @@
 from inspect import isclass
-from typing import Any, get_origin
+from typing import Any, TypeGuard, TypeVar, get_origin
+
+T = TypeVar("T", bound=type)
 
 
-def is_class_and_subclass(value: Any, _type: Any) -> bool:
+def is_class_and_subclass(value: Any, _type: T | tuple[T, ...]) -> TypeGuard[T]:
     """
     Checks if a `value` is of type class and subclass.
     by checking the origin of the value against the type being

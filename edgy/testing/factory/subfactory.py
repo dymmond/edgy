@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 import monkay
 
@@ -26,7 +26,7 @@ def SubFactory(factory_class: Any, **kwargs: Any) -> FactoryField:
         raise ValueError(
             f"factory_class must be a subclass of ModelFactory or a string '.' dotted represented of the factory, got {type(factory_class)} instead."
         )
-    return cast(type[ModelFactory], factory_class)(**kwargs).to_factory_field()
+    return factory_class(**kwargs).to_factory_field()
 
 
 def ListSubFactory(factory_class: Any, min: int = 0, max: int = 10, **kwargs: Any) -> FactoryField:
@@ -44,6 +44,4 @@ def ListSubFactory(factory_class: Any, min: int = 0, max: int = 10, **kwargs: An
         raise ValueError(
             f"factory_class must be a subclass of ModelFactory or a string '.' dotted represented of the factory, got {type(factory_class)} instead."
         )
-    return cast(type[ModelFactory], factory_class)(**kwargs).to_list_factory_field(
-        min=min, max=max
-    )
+    return factory_class(**kwargs).to_list_factory_field(min=min, max=max)
