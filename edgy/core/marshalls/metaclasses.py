@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any
 from monkay import load
 from pydantic._internal._model_construction import ModelMetaclass
 
+from edgy.core.db.models import Model  # we need a real import because of pydantic
 from edgy.core.db.models.metaclasses import handle_annotations
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
@@ -10,7 +11,6 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import MarshallFieldDefinitionError
 
 if TYPE_CHECKING:
-    from edgy.core.db.models import Model
     from edgy.core.marshalls import Marshall
 
 

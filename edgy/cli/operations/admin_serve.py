@@ -122,6 +122,14 @@ def admin_serve(
         auth_pw = secrets.token_urlsafe()
         print_pw = True
     admin_app = create_admin_app()
+    admin_middleware = [
+        DefineMiddleware(
+            SessionMiddleware,
+            secret_key=settings.admin_config.SECRET_KEY,
+            session_cookie="admin_session",
+        ),
+    ]
+
     routes = [
         Include(
             path=settings.admin_config.admin_prefix_url,
@@ -131,13 +139,7 @@ def admin_serve(
                     BasicAuthAccess, print_pw=print_pw, username=auth_name, password=auth_pw
                 )
             ],
-            middleware=[
-                DefineMiddleware(
-                    SessionMiddleware,
-                    secret_key=settings.admin_config.SECRET_KEY,
-                    session_cookie="admin_session",
-                ),
-            ],
+            middleware=admin_middleware,
         ),
     ]
     if old_instance.app is not None:
