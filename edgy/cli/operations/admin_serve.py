@@ -64,7 +64,7 @@ from edgy.conf import settings
     help="What log level should uvicorn run.",
     show_default=True,
 )
-@click.command(name="runserver")
+@click.command(name="admin_serve")
 def admin_serve(
     port: int,
     host: str,
@@ -75,15 +75,12 @@ def admin_serve(
     auth_pw: str | None,
     admin_path: str | None,
 ) -> None:
-    """Starts the Edgy admin development server.
+    """Starts the Edgy db admin server.
 
     The --app can be passed in the form of <module>.<submodule>:<app> or be set
     as environment variable LILYA_DEFAULT_APP.
 
     Alternatively, if none is passed, Lilya will perform the application discovery.
-
-    It is strongly advised not to run this command in any pther environment but developmentyping.
-    This was designed to facilitate the development environment and should not be used in pr
 
     How to run: `edgy admin_serve`
     """
@@ -113,7 +110,8 @@ def admin_serve(
 
     if old_instance is None:
         raise RuntimeError(
-            'You need to specify an app which registry is used. For experimenting use: "tests.cli.main"'
+            "Auto-detection of app failed.\n"
+            'You need to specify an app which registry is used. For experimenting use: --app="tests.cli.main"'
         )
     from edgy.contrib.admin.application import create_admin_app
 
@@ -122,6 +120,14 @@ def admin_serve(
         auth_pw = secrets.token_urlsafe()
         print_pw = True
     admin_app = create_admin_app()
+    admin_middleware = [
+        DefineMiddleware(
+            SessionMiddleware,
+            secret_key=settings.admin_config.SECRET_KEY,
+            session_cookie="admin_session",
+        ),
+    ]
+
     routes = [
         Include(
             path=settings.admin_config.admin_prefix_url,
@@ -131,13 +137,7 @@ def admin_serve(
                     BasicAuthAccess, print_pw=print_pw, username=auth_name, password=auth_pw
                 )
             ],
-            middleware=[
-                DefineMiddleware(
-                    SessionMiddleware,
-                    secret_key=settings.admin_config.SECRET_KEY,
-                    session_cookie="admin_session",
-                ),
-            ],
+            middleware=admin_middleware,
         ),
     ]
     if old_instance.app is not None:

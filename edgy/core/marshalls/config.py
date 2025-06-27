@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
-    from edgy.core.db.models import Model
+    from edgy.core.db.models.model import Model
 
 
 class ConfigMarshall(TypedDict, total=False):
