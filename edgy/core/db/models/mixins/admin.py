@@ -4,8 +4,8 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from pydantic import ConfigDict
 
-from edgy.core.marshalls.base import Marshall
-from edgy.core.marshalls.config import ConfigMarshall
+# leverage lazy imports to break circular imports
+from edgy.core import marshalls
 
 if TYPE_CHECKING:
     from edgy.core.db.models import Model
@@ -30,19 +30,19 @@ class AdminMixin:
     @classmethod
     def get_admin_marshall_class(
         cls: type[Model], *, phase: str, for_schema: bool = False
-    ) -> type[Marshall]:
+    ) -> type[marshalls.Marshall]:
         """
         Generate a marshall class for the admin.
 
         Can be dynamic for the current user.
         """
 
-        class AdminMarshall(Marshall):
+        class AdminMarshall(marshalls.Marshall):
             # forbid triggers additionalProperties=false
             model_config: ClassVar[ConfigDict] = ConfigDict(
                 title=cls.__name__, extra="forbid" if for_schema else None
             )
-            marshall_config = ConfigMarshall(
+            marshall_config = marshalls.ConfigMarshall(
                 model=cls,
                 **cls.get_admin_marshall_config(phase=phase, for_schema=for_schema),  # type: ignore
             )
@@ -52,7 +52,7 @@ class AdminMixin:
     @classmethod
     def get_admin_marshall_for_save(
         cls: type[Model], instance: Model | None = None, /, **kwargs: Any
-    ) -> Marshall:
+    ) -> marshalls.Marshall:
         """Generate a marshall instance from an instance for the admin.
 
         Can be dynamic for the current user. Called in the create/edit path.

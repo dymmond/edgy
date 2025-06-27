@@ -7,6 +7,13 @@ hide:
 # Release Notes
 
 
+## 0.32.2
+
+### Fixed
+
+- Circular import errors with marshalls.
+- Missing typing export for PGArrayField.
+
 ## 0.32.1
 
 ### Added

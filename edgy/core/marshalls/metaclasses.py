@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any
 from monkay import load
 from pydantic._internal._model_construction import ModelMetaclass
 
-from edgy.core.db.models import Model  # we need a real import because of pydantic
+from edgy.core.db import models
 from edgy.core.db.models.metaclasses import handle_annotations
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
@@ -11,7 +11,7 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import MarshallFieldDefinitionError
 
 if TYPE_CHECKING:
-    from edgy.core.marshalls import Marshall
+    from edgy.core.marshalls.base import Marshall
 
 
 class MarshallMeta(ModelMetaclass):
@@ -40,11 +40,11 @@ class MarshallMeta(ModelMetaclass):
             )
 
         # The declared model
-        _model: type[Model] | str | None = marshall_config.get("model", None)
+        _model: type[models.Model] | str | None = marshall_config.get("model", None)
         assert _model is not None, "'model' must be declared in the 'ConfigMarshall'."
 
         if isinstance(_model, str):
-            model: type[Model] = load(_model)
+            model: type[models.Model] = load(_model)
             marshall_config["model"] = model
         else:
             model = _model
