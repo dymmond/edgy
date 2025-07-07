@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.32.3
+
+### Fixed
+
+- Another import problem with Marshalls.
+
 ## 0.32.2
 
 ### Added
