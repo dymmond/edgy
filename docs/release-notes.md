@@ -10,7 +10,7 @@ hide:
 
 ### Fixed
 
-- Another import problem with Marshalls.
+- Pydantic fails under some condition to import `Model` when using Marshalls.
 
 ## 0.32.2
 
