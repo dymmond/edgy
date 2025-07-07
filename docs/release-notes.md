@@ -10,7 +10,7 @@ hide:
 
 ### Fixed
 
-- Pydantic fails when forgetting to use the ClassVar annotation for marshalls ConfigDict.
+- Add proper error for python>=3.12, when marshall_config is added as instance annotation.
 
 ## 0.32.2
 
