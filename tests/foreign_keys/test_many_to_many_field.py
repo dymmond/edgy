@@ -47,7 +47,7 @@ class Studio(edgy.StrictModel):
         registry = models
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(scope="function")
 async def create_test_database():
     async with database:
         await models.create_all()
@@ -56,7 +56,7 @@ async def create_test_database():
             await models.drop_all()
 
 
-async def test_add_many_to_many():
+async def test_add_many_to_many(create_test_database):
     track1 = await Track.query.create(title="The Bird", position=1)
     track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
     track3 = await Track.query.create(title="The Waters", position=3)
@@ -72,7 +72,7 @@ async def test_add_many_to_many():
     assert len(total_tracks) == 3
 
 
-async def test_create_many_to_many():
+async def test_create_many_to_many(create_test_database):
     album = await Album.query.create(name="Malibu")
 
     await album.tracks.create(title="The Bird", position=1)
@@ -84,7 +84,7 @@ async def test_create_many_to_many():
     assert len(total_tracks) == 3
 
 
-async def test_add_many_to_many_with_repeated_field():
+async def test_add_many_to_many_with_repeated_field(create_test_database):
     track1 = await Track.query.create(title="The Bird", position=1)
     track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
     track3 = await Track.query.create(title="The Waters", position=3)
@@ -101,7 +101,7 @@ async def test_add_many_to_many_with_repeated_field():
     assert len(total_tracks) == 3
 
 
-async def test_delete_object_reflect_on_many_to_many():
+async def test_delete_object_reflect_on_many_to_many(create_test_database):
     track1 = await Track.query.create(title="The Bird", position=1)
     track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
     track3 = await Track.query.create(title="The Waters", position=3)
@@ -123,7 +123,7 @@ async def test_delete_object_reflect_on_many_to_many():
     assert len(total_tracks) == 2
 
 
-async def test_delete_child_from_many_to_many():
+async def test_delete_child_from_many_to_many(create_test_database):
     track1 = await Track.query.create(title="The Bird", position=1)
     track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
     track3 = await Track.query.create(title="The Waters", position=3)
@@ -149,7 +149,7 @@ async def test_delete_child_from_many_to_many():
     assert len(total_tracks) == 3
 
 
-async def test_raises_RelationshipIncompatible():
+async def test_raises_RelationshipIncompatible(create_test_database):
     user = await User.query.create(name="Saffier")
 
     album = await Album.query.create(name="Malibu")
@@ -160,7 +160,7 @@ async def test_raises_RelationshipIncompatible():
     assert raised.value.args[0] == "The child is not from the types 'Track', 'AlbumTracksThrough'."
 
 
-async def test_raises_RelationshipNotFound():
+async def test_raises_RelationshipNotFound(create_test_database):
     track1 = await Track.query.create(title="The Bird", position=1)
     track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
     track3 = await Track.query.create(title="The Waters", position=3)
@@ -179,7 +179,7 @@ async def test_raises_RelationshipNotFound():
     )
 
 
-async def test_many_to_many_many_fields():
+async def test_many_to_many_many_fields(create_test_database):
     track1 = await Track.query.create(title="The Bird", position=1)
     track2 = await Track.query.create(title="Heart don't stand a chance", position=2)
     track3 = await Track.query.create(title="The Waters", position=3)
@@ -232,7 +232,7 @@ async def test_many_to_many_many_fields():
     assert total_tracks_album3[0].pk == track3.pk
 
 
-async def test_related_name_query():
+async def test_related_name_query(create_test_database):
     album = await Album.query.create(name="Malibu")
     album2 = await Album.query.create(name="Santa Monica")
 
@@ -261,7 +261,7 @@ async def test_related_name_query():
     assert tracks_album[0].pk == album2.pk
 
 
-async def test_related_name_query_nested():
+async def test_related_name_query_nested(create_test_database):
     album = await Album.query.create(name="Malibu")
     album2 = await Album.query.create(name="Santa Monica")
 
@@ -300,7 +300,7 @@ async def test_related_name_query_nested():
     assert tracks_album[0].pk == album2.pk
 
 
-async def test_related_name_query_returns_nothing():
+async def test_related_name_query_returns_nothing(create_test_database):
     album = await Album.query.create(name="Malibu")
     album2 = await Album.query.create(name="Santa Monica")
 

@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.32.3
+
+### Fixed
+
+- Pydantic fails when forgetting to use the ClassVar annotation for marshalls ConfigDict.
+
 ## 0.32.2
 
 ### Added

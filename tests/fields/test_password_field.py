@@ -57,7 +57,7 @@ async def create_test_database():
             await models.drop_all()
 
 
-def test_can_create_password_field():
+async def test_can_create_password_field():
     class MyModel2(edgy.StrictModel):
         pass
 
@@ -74,7 +74,7 @@ def test_can_create_password_field():
     assert columns[0].type.__class__ == sqlalchemy.String
 
 
-def test_can_create_password_field2():
+async def test_can_create_password_field2():
     field = PasswordField(null=True, max_length=None, secret=False, derive_fn=hasher.derive)
 
     assert isinstance(field, BaseField)

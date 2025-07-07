@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any
 
 from monkay import load
@@ -105,6 +107,11 @@ class MarshallMeta(ModelMetaclass):
         model_fields_on_class = getattr(marshall_class, "__pydantic_fields__", None)
         if model_fields_on_class is None:
             model_fields_on_class = marshall_class.model_fields
+        if "marshall_config" in model_fields_on_class:
+            raise MarshallFieldDefinitionError(
+                f"'marshall_config' is part of the fields of '{marshall_class.__name__}'. "
+                "Did you forgot to annotate with 'ClassVar'?"
+            )
         assert model_fields_on_class is not model.model_fields
         for key in model_fields:
             del model_fields_on_class[key]

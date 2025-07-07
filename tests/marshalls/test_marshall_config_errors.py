@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 import edgy
@@ -11,21 +13,6 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 pytestmark = pytest.mark.anyio
-
-
-@pytest.fixture(autouse=True, scope="module")
-async def create_test_database():
-    async with database:
-        await models.create_all()
-        yield
-        if not database.drop:
-            await models.drop_all()
-
-
-@pytest.fixture(autouse=True, scope="function")
-async def rollback_connections():
-    async with models:
-        yield
 
 
 class User(edgy.Model):
@@ -101,4 +88,24 @@ def test_raises_error_on_incomplete_fields():
     assert (
         raised.value.args[0]
         == "'ProfileMarshall' is an incomplete Marshall. For creating new instances, it lacks following fields: [name]."
+    )
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 12),
+    reason=(
+        "requires python 3.12 or higher to get this error. "
+        "Otherwise it fails with a pydantic UserWarning because of incompatibilies "
+        "with a non-classVar, non-typing_extensions TypedDict."
+    ),
+)
+def test_raises_error_on_missing_classvar():
+    with pytest.raises(MarshallFieldDefinitionError) as raised:
+
+        class ProfileMarshall(Marshall):
+            marshall_config: ConfigMarshall = ConfigMarshall(model=Profile, fields=["__all__"])
+
+    assert (
+        raised.value.args[0]
+        == "'marshall_config' is part of the fields of 'ProfileMarshall'. Did you forgot to annotate with 'ClassVar'?"
     )

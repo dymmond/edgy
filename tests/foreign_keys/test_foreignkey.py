@@ -331,7 +331,7 @@ async def test_nullable_foreign_key():
     assert member.team is None
 
 
-def test_assertation_error_on_set_null():
+async def test_assertation_error_on_set_null():
     with pytest.raises(FieldDefinitionError) as raised:
 
         class MyModel(edgy.StrictModel):
@@ -343,7 +343,7 @@ def test_assertation_error_on_set_null():
     assert raised.value.args[0] == "When SET_NULL is enabled, null must be True."
 
 
-def test_assertation_error_on_missing_on_delete():
+async def test_assertation_error_on_missing_on_delete():
     with pytest.raises(FieldDefinitionError) as raised:
 
         class MyModel(edgy.StrictModel):
@@ -355,7 +355,7 @@ def test_assertation_error_on_missing_on_delete():
     assert raised.value.args[0] == "on_delete must not be null."
 
 
-def test_assertation_error_on_embed_parent_double_underscore_attr():
+async def test_assertation_error_on_embed_parent_double_underscore_attr():
     with pytest.raises(FieldDefinitionError) as raised:
 
         class MyModel(edgy.StrictModel):
