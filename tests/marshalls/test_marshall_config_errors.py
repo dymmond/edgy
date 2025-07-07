@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 import edgy
@@ -89,6 +91,14 @@ def test_raises_error_on_incomplete_fields():
     )
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 12),
+    reason=(
+        "requires python 3.12 or higher to get this error. "
+        "Otherwise it fails with a pydantic UserWarning because of incompatibilies "
+        "with a non-classVar, non-typing_extensions TypedDict."
+    ),
+)
 def test_raises_error_on_missing_classvar():
     with pytest.raises(MarshallFieldDefinitionError) as raised:
 
