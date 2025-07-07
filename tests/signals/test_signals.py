@@ -53,7 +53,7 @@ async def create_test_database():
             await models.drop_all()
 
 
-def test_invalid_signal():
+async def test_invalid_signal():
     broadcaster = Broadcaster()
     with pytest.raises(SignalError):
         broadcaster.save = 1

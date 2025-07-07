@@ -28,10 +28,6 @@ class Studio(edgy.StrictModel):
         registry = models
 
 
-def test_check_tablename():
-    assert Studio.meta.fields["users"].through.meta.tablename == "foo"
-
-
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     async with database:
@@ -39,6 +35,10 @@ async def create_test_database():
         yield
         if not database.drop:
             await models.drop_all()
+
+
+async def test_check_tablename():
+    assert Studio.meta.fields["users"].through.meta.tablename == "foo"
 
 
 async def test_many_to_many_many_fields():

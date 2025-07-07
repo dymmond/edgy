@@ -116,7 +116,7 @@ async def test_raises_ModelSchemaError_on_public_schema():
     )
 
 
-def test_deprecated_set_tenant():
+async def test_deprecated_set_tenant():
     with pytest.warns(DeprecationWarning):
         token = set_tenant("foo")
     token.var.reset(token)

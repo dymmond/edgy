@@ -10,7 +10,7 @@ hide:
 
 ### Fixed
 
-- Pydantic fails under some condition to import `Model` when using Marshalls.
+- Pydantic fails when forgetting to use the ClassVar annotation for marshalls ConfigDict.
 
 ## 0.32.2
 

@@ -32,7 +32,7 @@ class Product(edgy.StrictModel):
         name = "products"
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(scope="function")
 async def create_test_database():
     await models.create_all()
     async with models:
@@ -79,7 +79,7 @@ def test_model_pk():
     assert User.query.pknames[0] == "id"
 
 
-async def test_model_crud():
+async def test_model_crud(create_test_database):
     users = await User.query.all()
     assert users == []
 
@@ -105,7 +105,7 @@ async def test_model_crud():
     assert users == []
 
 
-async def test_model_get():
+async def test_model_get(create_test_database):
     with pytest.raises(ObjectNotFound):
         await User.query.get()
 
@@ -122,7 +122,7 @@ async def test_model_get():
     assert same_user.pk == user.pk
 
 
-async def test_eq():
+async def test_eq(create_test_database):
     user = await User.query.create(name="Test")
     assert user == user
     assert user != ""

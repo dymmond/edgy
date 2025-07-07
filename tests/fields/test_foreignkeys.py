@@ -28,22 +28,6 @@ class MyModel(StrictModel):
 #         registry = models
 
 
-@pytest.fixture(autouse=True, scope="module")
-async def create_test_database():
-    async with database:
-        await models.create_all()
-        yield
-        if not database.drop:
-            await models.drop_all()
-
-
-@pytest.fixture(autouse=True)
-async def rollback_transactions():
-    with database.force_rollback():
-        async with database:
-            yield
-
-
 @pytest.mark.parametrize("model", [ForeignKey, OneToOne, OneToOneField])
 def test_can_create_foreign_key(model):
     fk = model(to=MyModel)

@@ -34,11 +34,7 @@ async def not_found(request: Request, exc: Exception) -> Any:
 
 
 def create_admin_app(*, session_sub_path: str = "") -> Lilya:
-    middleware = []
-    if session_sub_path:
-        middleware.append(DefineMiddleware(SessionContextMiddleware, sub_path=session_sub_path))
-    else:
-        middleware.append(DefineMiddleware(SessionContextMiddleware))
+    middleware = [DefineMiddleware(SessionContextMiddleware, sub_path=session_sub_path)]
     return ChildLilya(
         routes=[
             RoutePath("/", handler=AdminDashboard, name="admin"),

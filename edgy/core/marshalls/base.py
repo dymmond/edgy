@@ -11,7 +11,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from pydantic.fields import FieldInfo
 from pydantic.json_schema import SkipJsonSchema
 
-from edgy.core.db import models
 from edgy.core.db.models.mixins.dump import DumpMixin
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
@@ -20,6 +19,7 @@ from edgy.core.utils.sync import run_sync
 
 if TYPE_CHECKING:
     from edgy.core.db.models.metaclasses import MetaInfo
+    from edgy.core.db.models.model import Model
 
 
 if sys.version_info >= (3, 11):  # pragma: no cover
@@ -44,7 +44,7 @@ class BaseMarshall(DumpMixin, BaseModel):
     __custom_fields__: ClassVar[dict[str, BaseMarshallField]] = {}
     _setup_used: bool
 
-    def __init__(self, instance: None | models.Model = None, **kwargs: Any) -> None:
+    def __init__(self, instance: None | Model = None, **kwargs: Any) -> None:
         lazy = kwargs.pop("__lazy__", type(self).__lazy__)
         data: dict = {}
         if instance is not None:
@@ -57,7 +57,7 @@ class BaseMarshall(DumpMixin, BaseModel):
             )
         data.update(kwargs)
         super().__init__(**data)
-        self._instance: models.Model | None = None
+        self._instance: Model | None = None
         if instance is not None:
             self.instance = instance
         elif not lazy:
@@ -65,7 +65,7 @@ class BaseMarshall(DumpMixin, BaseModel):
             self._resolve_serializer(self._instance)
             self._setup_used = True
 
-    def _setup(self) -> models.Model:
+    def _setup(self) -> Model:
         """
         Assemble the Marshall object with all the given details.
 
@@ -78,7 +78,7 @@ class BaseMarshall(DumpMixin, BaseModel):
                 f"'{klass.__name__}' is an incomplete Marshall. "
                 f"For creating new instances, it lacks following fields: [{', '.join(klass.__incomplete_fields__)}]."
             )
-        model = cast("models.Model", self.marshall_config["model"])
+        model = cast("Model", self.marshall_config["model"])
         column = model.table.autoincrement_column
         exclude: set[str] = {*excludes_marshall}
         if column is not None:
@@ -97,14 +97,14 @@ class BaseMarshall(DumpMixin, BaseModel):
 
     @property
     def meta(self) -> MetaInfo:
-        return cast("models.Model", self.marshall_config["model"]).meta
+        return cast("Model", self.marshall_config["model"]).meta
 
     @property
     def has_instance(self) -> bool:
         return self._instance is not None
 
     @property
-    def instance(self) -> models.Model:
+    def instance(self) -> Model:
         if self._instance is None:
             _instance = self._setup()
             self._resolve_serializer(_instance)
@@ -113,7 +113,7 @@ class BaseMarshall(DumpMixin, BaseModel):
         return self._instance
 
     @instance.setter
-    def instance(self, value: models.Model) -> None:
+    def instance(self, value: Model) -> None:
         self._instance = value
         self._setup_used = False
         self._resolve_serializer(instance=value)
@@ -121,12 +121,12 @@ class BaseMarshall(DumpMixin, BaseModel):
     async def _resolve_async(self, name: str, awaitable: Awaitable) -> None:
         setattr(self, name, await awaitable)
 
-    def _resolve_serializer(self, instance: models.Model) -> Self:
+    def _resolve_serializer(self, instance: Model) -> Self:
         """
         Resolve serializer fields and populate them with data from the provided instance.
 
         Args:
-            instance (models.Model): The instance to extract data from.
+            instance (Model): The instance to extract data from.
 
         Returns:
             BaseMarshall: The resolved serializer instance.
@@ -162,13 +162,13 @@ class BaseMarshall(DumpMixin, BaseModel):
             run_sync(gather(*async_resolvers))
         return self
 
-    def _get_method_value(self, name: str, instance: models.Model) -> Any:
+    def _get_method_value(self, name: str, instance: Model) -> Any:
         """
         Retrieve the value for a method-based field.
 
         Args:
             name (str): The name of the method-based field.
-            instance (models.Model): The instance to retrieve the value from.
+            instance (Model): The instance to retrieve the value from.
 
         Returns:
             Optional: The value retrieved from the method-based field.
@@ -177,7 +177,7 @@ class BaseMarshall(DumpMixin, BaseModel):
         func = getattr(self, func_name)
         return func(instance)
 
-    def _handle_primary_key(self, instance: models.Model) -> None:
+    def _handle_primary_key(self, instance: Model) -> None:
         """
         Handles the field of a the primary key if present in the
         fields.
@@ -227,7 +227,7 @@ class BaseMarshall(DumpMixin, BaseModel):
             All the field and model validations **are still performed**
             in the model level, not in a marshall level.
         """
-        model = cast("models.Model", self.marshall_config["model"])
+        model = cast("Model", self.marshall_config["model"])
         if self._setup_used:
             # use defaults of Marshall, save completely
             instance = await self.instance.save()
@@ -259,4 +259,6 @@ class Marshall(BaseMarshall, metaclass=MarshallMeta):
         return f"<{type(self).__name__}: {self}>"
 
     def __str__(self) -> str:
-        return f"{type(self).__name__}({cast('type[models.Model]', self.marshall_config['model']).__name__})"
+        return (
+            f"{type(self).__name__}({cast('type[Model]', self.marshall_config['model']).__name__})"
+        )
