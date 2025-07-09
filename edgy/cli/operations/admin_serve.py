@@ -25,6 +25,13 @@ from edgy.conf import settings
     show_default=True,
 )
 @click.option(
+    "--admin-prefix-url",
+    type=str,
+    default=None,
+    help="Overwrites the admin prefix url in the settings.",
+    show_default=True,
+)
+@click.option(
     "--admin-path",
     type=str,
     default=None,
@@ -73,6 +80,7 @@ def admin_serve(
     log_level: str,
     auth_name: str,
     auth_pw: str | None,
+    admin_prefix_url: str | None,
     admin_path: str | None,
 ) -> None:
     """Starts the Edgy db admin server.
@@ -103,10 +111,13 @@ def admin_serve(
     from edgy.contrib.admin.permissions import BasicAuthAccess
 
     old_instance = edgy.monkay.instance
-    if admin_path is not None:
-        edgy.monkay.settings.admin_config.admin_prefix_url = admin_path
-    if edgy.monkay.settings.admin_config.admin_prefix_url is None:
-        edgy.monkay.settings.admin_config.admin_prefix_url = "/admin"
+    if admin_prefix_url is not None:
+        edgy.monkay.settings.admin_config.admin_prefix_url = admin_prefix_url
+    if admin_path is None:
+        admin_path = edgy.monkay.settings.admin_config.admin_prefix_url
+
+    if admin_path is None:
+        admin_path = "/admin"
 
     if old_instance is None:
         raise RuntimeError(
@@ -130,7 +141,7 @@ def admin_serve(
 
     routes = [
         Include(
-            path=settings.admin_config.admin_prefix_url,
+            path=admin_path,
             app=admin_app,
             permissions=[
                 DefinePermission(
