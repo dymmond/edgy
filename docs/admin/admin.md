@@ -59,13 +59,11 @@ You can multiplex the session via `sub_path` (will probably land in lilya 0.15.5
 {!> ../docs_src/admin/admin_embed_multiplexed.py !}
 ```
 
-By default the `admin_prefix_url` is automatically inferred. If you want an explicit url for the admin,
-you might want to set it.
-
-You might need it in case of proxy passes.
+By default the `admin_prefix_url` is automatically inferred. For special cases like reverse proxies or preferring an url you might want to set it.
 
 !!! Warning
-    Previous examples used `settings.admin_config.admin_prefix_url` for the `Include`. This was wrong.
+    Prior to version 0.32.4 examples used `settings.admin_config.admin_prefix_url` for the `Include` `path` parameter.
+    This was inaccurate and let to problems for reverse proxy users.
 
 ## Excluding models
 
