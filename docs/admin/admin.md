@@ -22,6 +22,12 @@ You can however customize them all via:
 
 `edgy admin_serve --auth-name=edgy --auth-pw=123`
 
+When behind a reverse proxy you can use:
+
+`edgy admin_serve --admin-path /admin/ --admin-prefix-url /proxy_path/admin`
+
+You can leave out `--admin-prefix-url /proxy_path/admin` when `/` is passed to the proxy otherwise you need both parameters.
+
 !!! Warning
     This only serves as an example. Please use stronger passwords! Your whole database is open this way!
 
@@ -53,8 +59,11 @@ You can multiplex the session via `sub_path` (will probably land in lilya 0.15.5
 {!> ../docs_src/admin/admin_embed_multiplexed.py !}
 ```
 
-By default the `admin_prefix_url` is automatically inferred. If you want an explicit url for the admin,
-you might want to set it.
+By default the `admin_prefix_url` is automatically inferred. For special cases like reverse proxies or preferring an url you might want to set it.
+
+!!! Warning
+    Prior to version `0.32.4` examples used `settings.admin_config.admin_prefix_url` for the `Include` `path` parameter.
+    This was inaccurate and let to problems for reverse proxy users.
 
 ## Excluding models
 

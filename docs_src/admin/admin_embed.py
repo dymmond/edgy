@@ -29,7 +29,10 @@ def get_application() -> Any:
     # admin_app = create_admin_app(session_sub_path="admin")
     routes = [
         Include(
-            path=settings.admin_config.admin_prefix_url,
+            # you can use a path you want. By default the admin_prefix_url is automatically inferred.
+            # Note: in case of a reverse proxy with script path make sure to provide a
+            # value for settings.admin_config.admin_prefix_url which includes the path under which the app is hosted (if not /)
+            path="/admin",
             app=admin_app,
         ),
     ]

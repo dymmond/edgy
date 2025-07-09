@@ -6,6 +6,13 @@ hide:
 
 # Release Notes
 
+## 0.32.4
+
+### Fixed
+
+- Fix incorrect documentation for admin.
+- Fix admin_serve behind a reverse proxy.
+
 ## 0.32.3
 
 ### Fixed

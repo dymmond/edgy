@@ -23,7 +23,7 @@ def get_application() -> Any:
     admin_app = create_admin_app(session_sub_path="admin")
     routes = [
         Include(
-            path=settings.admin_config.admin_prefix_url,
+            path="/admin",
             app=admin_app,
         ),
     ]

@@ -21,7 +21,7 @@ def get_application() -> Any:
     admin_app = create_admin_app()
     routes = [
         Include(
-            path=settings.admin_config.admin_prefix_url,
+            path="/admin",
             app=admin_app,
             middleware=[
                 DefineMiddleware(
