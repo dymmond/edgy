@@ -62,7 +62,7 @@ You can multiplex the session via `sub_path` (will probably land in lilya 0.15.5
 By default the `admin_prefix_url` is automatically inferred. For special cases like reverse proxies or preferring an url you might want to set it.
 
 !!! Warning
-    Prior to version 0.32.4 examples used `settings.admin_config.admin_prefix_url` for the `Include` `path` parameter.
+    Prior to version `0.32.4` examples used `settings.admin_config.admin_prefix_url` for the `Include` `path` parameter.
     This was inaccurate and let to problems for reverse proxy users.
 
 ## Excluding models
