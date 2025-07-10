@@ -56,7 +56,7 @@ For finer control, you can use the methods of the `FieldFile` class.
 * `extract_mime`: (Default: `True`) Save MIME type in metadata. Set to `"approved_only"` to do this only for approved files.
 * `mime_use_magic`: (Default: `False`) Use the `python-magic` library to get the MIME type.
 * `field_file_class`: Provide a custom `FieldFile` class.
-* `generate_name_fn`: Customize name generation.
+* `generate_name_fn(Optional[Model], provided_name, direct)`: Customize name generation.
 * `multi_process_safe`: (Default: `True`) Prefix name with process ID.
 
 !!! Tip
@@ -64,6 +64,26 @@ For finer control, you can use the methods of the `FieldFile` class.
 
 !!! Note
     Process PID prefixing requires all processes to be in the same process namespace. Use `generate_name_fn` to add unique identifiers.
+
+#### Customize the storage path with `generate_name_fn`
+
+For having multiple subpaths in the storage you can use `generate_name_fn`.
+It takes three positional parameters:
+
+1. The model instance when available.
+2. The name extracted from the file.
+3. (direct) If the name was explicitly provided (`True`) or extracted from the file object (`False`).
+
+Example:
+
+``` python
+from uuid import uuid4
+
+def generate_name_fn(instance, name, direct):
+    return f"documents/{uuid4()}/{name}"
+```
+
+When `save(content, name="foo")` on the `FieldFile` is called, direct becomes `True`.
 
 #### FieldFile
 
