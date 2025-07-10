@@ -83,7 +83,20 @@ def generate_name_fn(instance, name, direct):
     return f"documents/{uuid4()}/{name}"
 ```
 
-When `save(content, name="foo")` on the `FieldFile` is called, direct becomes `True`.
+When `save(content, name="foo")` on the `FieldFile` is called, direct becomes `True`. This can be useful
+for implementing an overwrite logic, so no new filename is generated, when passing a name explicitly.
+
+``` python
+from uuid import uuid4
+
+def generate_name_fn(instance, name, direct):
+    if direct:
+        return name
+    return f"documents/{uuid4()}/{name}"
+```
+
+Note that there is a special input value named `FileStruct` which always set the direct name parameter to `False`.
+It is used whenever a file is uploaded.
 
 #### FieldFile
 
@@ -95,7 +108,7 @@ You can manipulate files by setting a file-like object or `None`, or use the fol
 * `delete(*, instant, approved)`: Stage file deletion.
 * `set_approved(bool)`: Set the approved flag.
 
-`content` supports file-like objects, bytes, and `File` instances.
+`content` supports file-like objects, bytes, `FileStruct`, and `File` instances.
 
 !!! Tip
     Overwrite files with `overwrite=True` and the old file name.
@@ -105,6 +118,26 @@ You can manipulate files by setting a file-like object or `None`, or use the fol
 
 !!! Tip
     Use `multi_process_safe` and `overwrite` together by specifying both parameters explicitly.
+
+#### FileStruct
+
+`FileStruct` is a simple pydantic model containing the `content` as base64 string and having an extra name field.
+The definition is:
+
+``` python
+from pydantic import Base64Bytes, BaseModel, ConfigDict
+
+class FileStruct(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+    content: Base64Bytes
+```
+
+This is quite useful for uploads and automatically exposed as json-schema field definition for FileFields.
+It is in use for edgy admin.
+
+There is something special: When passing this object to `save(...)` the direct parameter passed to `generate_name_fn` is always
+`False`.
 
 #### Metadata
 
