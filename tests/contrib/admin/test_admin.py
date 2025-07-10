@@ -97,6 +97,17 @@ class Permission(BasePermission):
         unique_together = [("name", "name_model", "obj")]
 
 
+class UserFK(edgy.StrictModel):
+    # model with revisioning active
+    user = edgy.ForeignKey("User", primary_key=True)
+    created = edgy.DateTimeField(auto_now_add=True, remove_timezone=True, primary_key=True)
+    revisioning = edgy.DateTimeField(auto_now=True, remove_timezone=True, primary_key=True)
+    name = edgy.fields.CharField(max_length=100, default="")
+
+    class Meta:
+        registry = models
+
+
 async def test_settings(app):
     assert edgy.monkay.settings.admin_config.admin_prefix_url is None
     assert "ContentType" in models.admin_models
@@ -130,9 +141,13 @@ async def test_models(async_client):
 
 @pytest.mark.parametrize("model", models.admin_models)
 async def test_models_create_and_delete(async_client, model):
+    editor_data = {"name": "foo1234"}
+    if model == "UserFK":
+        u = await User.query.create(**editor_data)
+        editor_data["user"] = u.id
     response = await async_client.post(
         f"/models/{model}/create",
-        data={"editor_data": '{"name": "foo1234"}'},
+        data={"editor_data": json.dumps(editor_data)},
         follow_redirects=True,
     )
     assert response.status_code == 200
@@ -144,9 +159,8 @@ async def test_models_create_and_delete(async_client, model):
         assert "Id" in response.text
         assert "Name" in response.text
         assert "foo1234" in response.text
-    obj = await models.get_model(model).query.get(
-        pk=json.loads(urlsafe_b64decode(response.url.path.rsplit("/")[-1]))
-    )
+    pkob = json.loads(urlsafe_b64decode(response.url.path.rsplit("/")[-1]))
+    obj = await models.get_model(model).query.get(pk=pkob)
     assert await obj.check_exist_in_db()
     if model not in {"Permission", "Group", "ContentType"}:
         assert obj.content_type is not None
