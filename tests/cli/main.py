@@ -40,6 +40,15 @@ class User(edgy.StrictModel):
             registry = models
 
 
+class UserPK(edgy.StrictModel):
+    user = edgy.fields.ForeignKey("User", primary_key=True)
+    user2 = edgy.fields.ForeignKey("User", unique=True)
+
+    class Meta:
+        if os.environ.get("TEST_NO_REGISTRY_SET", "false") != "true":
+            registry = models
+
+
 class Group(edgy.StrictModel):
     name = edgy.fields.CharField(max_length=100)
     users = edgy.fields.ManyToMany(

@@ -13,6 +13,7 @@ hide:
 - Admin with foreign keys as primary keys.
 - Revisioning with `auto_now` as primary key.
 - Fix crash with `auto_now_add` as primary key.
+- Fix "$defs" not matching def names. This fixes problems with enums which appear multiple times and reduces requests.
 
 ## 0.32.4
 
