@@ -19,16 +19,16 @@
       var editor = new JSONEditor(document.getElementById('editor_holder'),{
         ajax: true,
         required_by_default: false,
-        show_opt_in: true,
+        enable_array_copy: true,
         collapsed: true,
-        disable_properties: true,
+        disable_properties: false,
+        object_layout: "table",
 
         // The schema for the editor
         schema: {
           $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true&phase=update",
-          format: "grid",
         },
-        startval: JSON.parse('{{values_as_json | safe}}')
+        startval: removeNull(JSON.parse('{{values_as_json | safe}}'))
       });
 
       const editor_data = document.getElementById("editor_data")
