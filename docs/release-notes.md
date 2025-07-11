@@ -6,6 +6,14 @@ hide:
 
 # Release Notes
 
+## 0.32.5
+
+### Fixed
+
+- Admin with foreign keys as primary keys.
+- Revisioning with `auto_now` as primary key.
+- Fix crash with `auto_now_add` as primary key.
+
 ## 0.32.4
 
 ### Fixed

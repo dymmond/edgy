@@ -790,10 +790,18 @@ class DatabaseMixin:
                     extracted_fields.pop(pkcolumn, None)
                     force_insert = True
                 field = self.meta.fields.get(pkcolumn)
-                # this is an IntegerField with primary_key set
-                if field is not None and getattr(field, "increment_on_save", 0) != 0:
-                    # we create a new revision.
-                    force_insert = True
+                # this is an IntegerField/DateTime with primary_key set
+                if field is not None:
+                    if getattr(field, "increment_on_save", 0) != 0 or getattr(
+                        field, "auto_now", False
+                    ):
+                        # we create a new revision.
+                        force_insert = True
+                    elif getattr(field, "auto_now_add", False):  # noqa: SIM102
+                        # force_insert if auto_now_add field is empty
+                        if value is None:
+                            force_insert = True
+
                     # Note: we definitely want this because it is easy for forget a force_insert
             # check if it exists
             if not force_insert and not await self.check_exist_in_db(only_needed=True):

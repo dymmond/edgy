@@ -73,14 +73,19 @@ class AdminMixin:
         Assumes the object ID is present in the path parameters under the key "id".
 
         Args:
-            request: The incoming Starlette Request object.
+            instance: The model instance
 
         Returns:
             The object ID as a string.
         """
-        return urlsafe_b64encode(
-            orjson.dumps({name: getattr(instance, name) for name in instance.pknames})
-        ).decode()
+        pk_dict = {}
+        for name in instance.meta.fields["pk"].fieldless_pkcolumns:
+            pk_dict[name] = getattr(instance, name)
+        for name in instance.pknames:
+            pk_dict.update(
+                instance.meta.fields[name].clean(name, getattr(instance, name), for_query=True)
+            )
+        return urlsafe_b64encode(orjson.dumps(pk_dict)).decode()
 
     def get_object_pk(self, request: Request) -> dict:
         """
@@ -89,7 +94,7 @@ class AdminMixin:
         Assumes the object ID is present in the path parameters under the key "id".
 
         Args:
-            request: The incoming Starlette Request object.
+            request: The incoming lilya Request object.
 
         Returns:
             The object ID as dict.
