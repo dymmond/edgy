@@ -8,8 +8,9 @@ from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
-database = DatabaseTestClient(DATABASE_URL, force_rollback=False, drop_database=True)
-models = edgy.Registry(database=edgy.Database(database))
+models = edgy.Registry(
+    database=DatabaseTestClient(DATABASE_URL, force_rollback=False, drop_database=True)
+)
 
 
 class PlainModel(BaseModel):
@@ -74,10 +75,9 @@ class MyModelEmbedded2(edgy.StrictModel):
 
 @pytest.fixture()
 async def create_test_database():
-    async with database:
+    async with models:
         await models.create_all()
-        async with models:
-            yield
+        yield
 
 
 def test_column_type():

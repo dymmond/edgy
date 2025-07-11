@@ -365,48 +365,51 @@ class DatabaseMixin:
         if hasattr(cls, "database"):
             _copy.database = cls.database
         replaceable_models: list[type[BaseModelType]] = [cls]
-        for field_name in list(_copy.meta.fields):
-            src_field = cls.meta.fields.get(field_name)
-            if not isinstance(src_field, BaseForeignKey):
-                continue
-            # we use the target of source
-            replaceable_models.append(src_field.target)
+        if cls.meta.registry:
+            for field_name in list(_copy.meta.fields):
+                src_field = cls.meta.fields.get(field_name)
+                if not isinstance(src_field, BaseForeignKey):
+                    continue
+                # we use the target of source
+                replaceable_models.append(src_field.target)
 
-            if src_field.target_registry is cls.meta.registry:
-                # clear target_registry, for obvious registries
-                del _copy.meta.fields[field_name].target_registry
-            if unlink_same_registry and src_field.target_registry is cls.meta.registry:
-                # we need to unreference so the target is retrieved from the new registry
+                if src_field.target_registry is cls.meta.registry:
+                    # clear target_registry, for obvious registries
+                    del _copy.meta.fields[field_name].target_registry
+                if unlink_same_registry and src_field.target_registry is cls.meta.registry:
+                    # we need to unreference so the target is retrieved from the new registry
 
-                _copy.meta.fields[field_name].target = src_field.target.__name__
-            else:
-                # otherwise we need to disable backrefs
-                _copy.meta.fields[field_name].related_name = False
+                    _copy.meta.fields[field_name].target = src_field.target.__name__
+                else:
+                    # otherwise we need to disable backrefs
+                    _copy.meta.fields[field_name].related_name = False
 
-            if isinstance(src_field, BaseManyToManyForeignKeyField):
-                _copy.meta.fields[field_name].through = src_field.through_original
-                # clear through registry, we need a copy in the new registry
-                del _copy.meta.fields[field_name].through_registry
-                if (
-                    isinstance(_copy.meta.fields[field_name].through, type)
-                    and issubclass(_copy.meta.fields[field_name].through, BaseModelType)
-                    and not _copy.meta.fields[field_name].through.meta.abstract
-                ):
-                    # unreference
-                    _copy.meta.fields[field_name].through = through_model = _copy.meta.fields[
-                        field_name
-                    ].through.copy_edgy_model()
-                    # we want to set the registry explicit
-                    through_model.meta.registry = False
-                    if src_field.from_foreign_key in through_model.meta.fields:
-                        # explicit set
-                        through_model.meta.fields[src_field.from_foreign_key].target = _copy
-                        through_model.meta.fields[src_field.from_foreign_key].related_name = cast(
-                            BaseManyToManyForeignKeyField,
-                            cast(type[BaseModelType], src_field.through).meta.fields[
+                if isinstance(src_field, BaseManyToManyForeignKeyField):
+                    _copy.meta.fields[field_name].through = src_field.through_original
+                    # clear through registry, we need a copy in the new registry
+                    del _copy.meta.fields[field_name].through_registry
+                    if (
+                        isinstance(_copy.meta.fields[field_name].through, type)
+                        and issubclass(_copy.meta.fields[field_name].through, BaseModelType)
+                        and not _copy.meta.fields[field_name].through.meta.abstract
+                    ):
+                        # unreference
+                        _copy.meta.fields[field_name].through = through_model = _copy.meta.fields[
+                            field_name
+                        ].through.copy_edgy_model()
+                        # we want to set the registry explicit
+                        through_model.meta.registry = False
+                        if src_field.from_foreign_key in through_model.meta.fields:
+                            # explicit set
+                            through_model.meta.fields[src_field.from_foreign_key].target = _copy
+                            through_model.meta.fields[
                                 src_field.from_foreign_key
-                            ],
-                        ).related_name
+                            ].related_name = cast(
+                                BaseManyToManyForeignKeyField,
+                                cast(type[BaseModelType], src_field.through).meta.fields[
+                                    src_field.from_foreign_key
+                                ],
+                            ).related_name
         if registry is not None:
             # replace when old class otherwise old references can lead to issues
             _copy.add_to_registry(
