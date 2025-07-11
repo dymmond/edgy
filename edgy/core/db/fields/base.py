@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import contextlib
 import copy
 from abc import abstractmethod
@@ -7,7 +9,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
-    Optional,
     cast,
 )
 
@@ -17,7 +18,12 @@ from pydantic.fields import FieldInfo
 from pydantic.json_schema import WithJsonSchema
 
 from edgy.conf import settings
-from edgy.core.db.context_vars import CURRENT_PHASE, FORCE_FIELDS_NULLABLE, MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.context_vars import (
+    CURRENT_PHASE,
+    FALLBACK_TARGET_REGISTRY,
+    FORCE_FIELDS_NULLABLE,
+    MODEL_GETATTR_BEHAVIOR,
+)
 from edgy.types import Undefined
 
 from .types import BaseFieldType, ColumnDefinitionModel
@@ -37,7 +43,7 @@ class BaseField(BaseFieldType, FieldInfo):
     """
 
     # defs to simplify the life (can be None actually)
-    owner: type["BaseModelType"]
+    owner: type[BaseModelType]
     operator_mapping: dict[str, str] = {
         # aliases
         "is": "is_",
@@ -194,9 +200,9 @@ class BaseField(BaseFieldType, FieldInfo):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: type["BaseModelType"] | None = None,
-        parent: Optional["BaseFieldType"] = None,
-    ) -> Optional["BaseField"]:
+        owner: type[BaseModelType] | None = None,
+        parent: BaseFieldType | None = None,
+    ) -> BaseField | None:
         """
         Embed this field or return None to prevent embedding.
         Must return a copy with name and owner set when not returning None.
@@ -350,10 +356,10 @@ class RelationshipField(BaseField):
     def traverse_field(self, path: str) -> tuple[Any, str, str]:
         raise NotImplementedError()
 
-    def is_cross_db(self, owner_database: Optional["Database"] = None) -> bool:
+    def is_cross_db(self, owner_database: Database | None = None) -> bool:
         raise NotImplementedError()
 
-    def get_related_model_for_admin(self) -> Optional["BaseModelType"]:
+    def get_related_model_for_admin(self) -> BaseModelType | None:
         raise NotImplementedError()
 
 
@@ -369,7 +375,7 @@ class PKField(BaseCompositeField):
         self.metadata.append(SkipValidation())
         self.metadata.append(WithJsonSchema(mode="validation", json_schema=None))
 
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> dict[str, Any] | Any:
+    def __get__(self, instance: BaseModelType, owner: Any = None) -> dict[str, Any] | Any:
         pkcolumns = self.owner.pkcolumns
         pknames = self.owner.pknames
         assert len(pkcolumns) >= 1
@@ -405,7 +411,7 @@ class PKField(BaseCompositeField):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: type["BaseModelType"] | None = None,
+        owner: type[BaseModelType] | None = None,
         parent: BaseFieldType | None = None,
     ) -> BaseFieldType | None:
         return None
@@ -489,14 +495,20 @@ class BaseForeignKey(RelationshipField):
     reverse_name: str = ""
 
     @property
-    def target_registry(self) -> "Registry":
+    def target_registry(self) -> Registry:
         """Registry searched in case to is a string"""
 
         if not hasattr(self, "_target_registry"):
-            assert self.owner.meta.registry, (
-                f"{self.owner} ({self.name}): no registry found, neither 'target_registry' set"
+            target_registry: Registry | None | Literal[False] = self.owner.meta.registry
+            # when an abstract model is used for CompositeField we have no registry but a model() call
+            # this provides a fallback
+            if target_registry is None:
+                target_registry = FALLBACK_TARGET_REGISTRY.get()
+            assert target_registry, (
+                f"{self.owner} ({self.name}): no registry found, "
+                "nor FALLBACK_TARGET_REGISTRY found, nor 'target_registry' set"
             )
-            return self.owner.meta.registry
+            return target_registry
         return cast("Registry", self._target_registry)
 
     @target_registry.setter
@@ -532,12 +544,12 @@ class BaseForeignKey(RelationshipField):
         with contextlib.suppress(AttributeError):
             delattr(self, "_target")
 
-    def is_cross_db(self, owner_database: Optional["Database"] = None) -> bool:
+    def is_cross_db(self, owner_database: Database | None = None) -> bool:
         if owner_database is None:
             owner_database = self.owner.database
         return str(owner_database.url) != str(self.target.database.url)
 
-    def get_related_model_for_admin(self) -> type["BaseModelType"] | None:
+    def get_related_model_for_admin(self) -> type[BaseModelType] | None:
         if self.target.__name__ in self.target_registry.admin_models:
             return cast("type[BaseModelType]", self.target)
         return None

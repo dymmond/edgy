@@ -1,23 +1,30 @@
+from __future__ import annotations
+
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
-from typing import TYPE_CHECKING, Literal, Optional, Union, cast
+from typing import TYPE_CHECKING, Literal, cast
 from warnings import warn
 
 if TYPE_CHECKING:
+    from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import FIELD_CONTEXT_TYPE
     from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.querysets.base import QuerySet
 
 _empty: set = cast(set, frozenset())
+FALLBACK_TARGET_REGISTRY: ContextVar[Registry | None] = ContextVar(
+    "FALLBACK_TARGET_REGISTRY", default=None
+)
+
 FORCE_FIELDS_NULLABLE: ContextVar[set[tuple[str, str]]] = ContextVar(
     "FORCE_FIELDS_NULLABLE", default=_empty
 )
-CURRENT_FIELD_CONTEXT: ContextVar["FIELD_CONTEXT_TYPE"] = ContextVar("CURRENT_FIELD_CONTEXT")
-CURRENT_INSTANCE: ContextVar[Union["BaseModelType", "QuerySet"] | None] = ContextVar(
+CURRENT_FIELD_CONTEXT: ContextVar[FIELD_CONTEXT_TYPE] = ContextVar("CURRENT_FIELD_CONTEXT")
+CURRENT_INSTANCE: ContextVar[BaseModelType | QuerySet | None] = ContextVar(
     "CURRENT_INSTANCE", default=None
 )
-CURRENT_MODEL_INSTANCE: ContextVar[Optional["BaseModelType"]] = ContextVar(
+CURRENT_MODEL_INSTANCE: ContextVar[BaseModelType | None] = ContextVar(
     "CURRENT_MODEL_INSTANCE", default=None
 )
 CURRENT_PHASE: ContextVar[str] = ContextVar("CURRENT_PHASE", default="")

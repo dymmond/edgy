@@ -10,7 +10,7 @@ from typing import (
 from pydantic import BaseModel
 
 from edgy.core.db.constants import ConditionalRedirect
-from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.context_vars import FALLBACK_TARGET_REGISTRY, MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.fields.base import BaseCompositeField
 from edgy.core.db.fields.core import FieldFactory
 from edgy.core.db.fields.types import BaseFieldType
@@ -132,7 +132,13 @@ class ConcreteCompositeField(BaseCompositeField):
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
         if self.model is not None and self.model is not ConditionalRedirect:
-            return self.model(**d)
+            if FALLBACK_TARGET_REGISTRY.get() is not None:
+                return self.model(**d)
+            token2 = FALLBACK_TARGET_REGISTRY.set(self.owner.meta.registry or None)
+            try:
+                return self.model(**d)
+            finally:
+                FALLBACK_TARGET_REGISTRY.reset(token2)
         return d
 
     def __get__(self, instance: "BaseModelType", owner: Any = None) -> dict[str, Any] | Any:
@@ -156,7 +162,13 @@ class ConcreteCompositeField(BaseCompositeField):
                     raise AttributeError("not loaded") from None
                 pass
         if self.model is not None and self.model is not ConditionalRedirect:
-            return self.model(**d)
+            if FALLBACK_TARGET_REGISTRY.get() is not None:
+                return self.model(**d)
+            token2 = FALLBACK_TARGET_REGISTRY.set(self.owner.meta.registry or None)
+            try:
+                return self.model(**d)
+            finally:
+                FALLBACK_TARGET_REGISTRY.reset(token2)
         return d
 
     def clean(self, field_name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
