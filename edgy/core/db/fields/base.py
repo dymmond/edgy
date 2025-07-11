@@ -493,7 +493,9 @@ class BaseForeignKey(RelationshipField):
         """Registry searched in case to is a string"""
 
         if not hasattr(self, "_target_registry"):
-            assert self.owner.meta.registry, "no registry found neither 'target_registry' set"
+            assert self.owner.meta.registry, (
+                f"{self.owner} ({self.name}): no registry found, neither 'target_registry' set"
+            )
             return self.owner.meta.registry
         return cast("Registry", self._target_registry)
 
