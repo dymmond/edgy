@@ -15,6 +15,8 @@ hide:
 - Fix crash with `auto_now_add` as primary key.
 - Fix "$defs" not matching def names. This fixes problems with enums which appear multiple times and reduces requests.
 - Fix using ForeignKeys in embedded models/CompositeFields when the embedded model has no registry set (e.g. abstract).
+- Improve admin UI.
+- Add some extra filters and option to make primarykeys readonly in marshall.
 
 ## 0.32.4
 

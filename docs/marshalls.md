@@ -58,6 +58,9 @@ To work with marshalls, you need to declare a `marshall_config`, which is a type
 * **model:** The Edgy [model](./models.md) associated with the marshall, or a string `dotted.path` pointing to the model.
 * **fields:** A list of strings representing the fields to include in the marshall's serialization.
 * **exclude:** A list of strings representing the fields to exclude from the marshall's serialization.
+* **primary_key_read_only** Make primary key fields read-only.
+* **exclude_autoincrement** Post-filter autoincrement fields.
+* **exclude_read_only** Post-filter read-only fields. Removes also read-only made primary-keys.
 
 !!! warning
     **You can only declare either `fields` or `exclude`, but not both.** The `model` is mandatory, or an exception will be raised.

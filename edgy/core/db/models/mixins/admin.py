@@ -25,7 +25,12 @@ class AdminMixin:
 
         Can be dynamic for the current user.
         """
-        return {"fields": ["__all__"]}
+        return {
+            "fields": ["__all__"],
+            "exclude_read_only": phase in {"create", "update"},
+            "primary_key_read_only": phase != "create",
+            "exclude_autoincrement": phase == "create",
+        }
 
     @classmethod
     def get_admin_marshall_class(

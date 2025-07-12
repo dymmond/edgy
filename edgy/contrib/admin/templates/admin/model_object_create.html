@@ -8,8 +8,8 @@
 <div id="editor_holder"></div>
 <div class="pt-6 flex gap-4">
   <form method="post" id="submit_form">
-    <button type="submit"
-            class="px-5 py-2 bg-green-600 text-white text-sm font-medium rounded hover:bg-green-700">
+    <button type="submit" id="submit_button"
+            class="px-5 py-2 bg-green-600 text-white text-sm font-medium rounded hover:not-disabled:bg-green-700">
       Create
     </button>
 
@@ -35,9 +35,23 @@
         },
       });
 
-      var editor_data = document.getElementById("editor_data")
-      document.getElementById("submit_form").addEventListener("submit", async function(ev){
-        editor_data.value = JSON.stringify(editor.getValue())
+
+      const submit_form = document.getElementById("submit_form")
+      const submit_button = document.getElementById("submit_button")
+      const editor_data = document.getElementById("editor_data")
+      editor.on('change',function() {
+        if(!editor.validate().length){
+          editor_data.value = JSON.stringify(editor.getValue())
+          submit_button.removeAttribute("disabled")
+        } else {
+          submit_button.setAttribute("disabled", "disabled")
+        }
+      });
+
+      submit_form.addEventListener("submit", async function(ev){
+        if(editor.validate().length){
+          ev.preventDefault()
+        }
       })
 </script>
 {% endblock %}

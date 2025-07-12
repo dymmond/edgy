@@ -16,7 +16,7 @@ from typing import (
     cast,
 )
 
-from pydantic import Base64Bytes, BaseModel, ConfigDict
+from pydantic import Base64Bytes, BaseModel, ConfigDict, Field
 
 from edgy.exceptions import FileOperationError, SuspiciousFileOperation
 
@@ -41,7 +41,7 @@ def _get_storage(storage: str) -> Storage:
 
 class FileStruct(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    name: str
+    name: str = Field(min_length=1)
     content: Base64Bytes
 
 
@@ -395,8 +395,8 @@ class FieldFile(File):
         if self.generate_name_fn is not None:
             name = self.generate_name_fn(name, content, direct_name)
 
-        assert name, "no name found"
-        assert isinstance(name, str)
+        if not name:
+            raise ValueError("No name found")
 
         if storage is None:
             storage = self.storage

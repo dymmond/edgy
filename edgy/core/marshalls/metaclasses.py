@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 from typing import TYPE_CHECKING, Any
 
 from monkay import load
@@ -13,7 +14,16 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import MarshallFieldDefinitionError
 
 if TYPE_CHECKING:
+    from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.marshalls.base import Marshall
+
+
+def _make_pk_field_readonly(field: BaseFieldType) -> BaseFieldType:
+    if not getattr(field, "primary_key", False):
+        return field
+    field = copy.copy(field)
+    field.read_only = True
+    return field
 
 
 class MarshallMeta(ModelMetaclass):
@@ -80,6 +90,23 @@ class MarshallMeta(ModelMetaclass):
         else:
             base_marshall_model_fields = {
                 k: v for k, v in model.model_fields.items() if k in base_fields_include
+            }
+        if marshall_config.get("exclude_autoincrement", False):
+            base_marshall_model_fields = {
+                k: v
+                for k, v in base_marshall_model_fields.items()
+                if not getattr(v, "autoincrement", False)
+            }
+        if marshall_config.get("primary_key_read_only", False):
+            base_marshall_model_fields = {
+                k: _make_pk_field_readonly(v) for k, v in base_marshall_model_fields.items()
+            }
+
+        if marshall_config.get("exclude_read_only", False):
+            base_marshall_model_fields = {
+                k: v
+                for k, v in base_marshall_model_fields.items()
+                if not getattr(v, "read_only", False)
             }
         base_marshall_model_fields.update(model_fields)
 
