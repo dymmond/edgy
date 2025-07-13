@@ -23,6 +23,7 @@ hide:
 - Remove by default read-only fields from admin create/update.
 - Remove by default autoincrement fields from admin create.
 - Make PrimaryKeys read-only for update (they will be removed because they are read-only until we have a better solution).
+- `FileStruct` name have a minimal length of 1.
 
 ## 0.32.4
 
