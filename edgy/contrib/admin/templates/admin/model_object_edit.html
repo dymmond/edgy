@@ -20,8 +20,8 @@
 </div>
 <script>
       var startval = removeNull(JSON.parse('{{values_as_json | safe}}'))
+      var schema = JSON.parse('{{schema | safe}}')
       var editor = new JSONEditor(document.getElementById('editor_holder'),{
-        ajax: true,
         required_by_default: false,
         display_required_only: true,
         enable_array_copy: true,
@@ -30,9 +30,7 @@
         object_layout: "table",
 
         // The schema for the editor
-        schema: {
-          $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true&phase=update",
-        },
+        schema: schema,
         startval: startval
       });
       const submit_form = document.getElementById("submit_form")

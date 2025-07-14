@@ -16,6 +16,8 @@ from edgy.contrib.admin.utils.messages import get_messages
 from edgy.core.db.fields.file_field import ConcreteFileField
 from edgy.exceptions import ObjectNotFound
 
+from .utils.models import get_model_json_schema
+
 
 @lru_cache(maxsize=1)
 def get_templates() -> Jinja2Template:
@@ -106,3 +108,22 @@ class AdminMixin:
             return result
         except orjson.JSONDecodeError:
             raise ObjectNotFound() from None
+
+    def get_schema(
+        self, model: type[Model] | str, *, include_callable_defaults: bool, phase: str
+    ) -> str:
+        schema = orjson.dumps(
+            get_model_json_schema(
+                model,
+                include_callable_defaults=include_callable_defaults,
+                no_check_admin_models=True,
+                phase=phase,
+            )
+        ).decode()
+        # replace dangerous chars like in jinja
+        return (
+            schema.replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("&", "\\u0026")
+            .replace("'", "\\u0027")
+        )
