@@ -32,7 +32,7 @@ class Product(edgy.StrictModel):
         name = "products"
 
 
-@pytest.fixture(scope="function")
+@pytest.fixture()
 async def create_test_database():
     await models.create_all()
     async with models:

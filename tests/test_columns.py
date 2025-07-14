@@ -124,6 +124,7 @@ async def test_model_schema():
                         "type": "string",
                     },
                     "name": {
+                        "minLength": 1,
                         "title": "Name",
                         "type": "string",
                     },

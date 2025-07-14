@@ -1,0 +1,27 @@
+<script>
+
+    function removeNullArray(arr) {
+        return arr
+            .filter((item) => item != null)
+            .map((value) => removeNull(item))
+    }
+    function removeNull(obj) {
+        return Object.fromEntries(
+            Object.entries(obj)
+            .filter((item) => item[1] != null)
+            .map(([key, value]) => [
+                key,
+                value instanceof Array ?
+                    removeNullArray(value):
+                    value instanceof Object ?
+                    removeNull(value) : value,
+            ]),
+        );
+    }
+    function deepSub(superobj, subobj) {
+        return superobj && subobj && typeof superobj === 'object' && typeof superobj === typeof subobj ? (
+            Object.keys(superobj).length <= Object.keys(subobj).length &&
+            Object.keys(superobj).every(key => deepSub(superobj[key], subobj[key]))
+        ) : (superobj === subobj);
+    }
+</script>

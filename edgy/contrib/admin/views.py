@@ -9,6 +9,7 @@ from lilya.exceptions import NotFound  # noqa
 from lilya.requests import Request
 from lilya.responses import JSONResponse, RedirectResponse
 from lilya.templating.controllers import TemplateController
+from pydantic import ValidationError
 
 import edgy
 from edgy.contrib.admin.mixins import AdminMixin
@@ -519,7 +520,7 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
         """
         return await self.render_template(request, **kwargs)
 
-    async def post(self, request: Request, **kwargs: Any) -> RedirectResponse:
+    async def post(self, request: Request, **kwargs: Any) -> RedirectResponse | Any:
         """
         Handles POST requests to save the changes to a model instance.
 
@@ -551,7 +552,16 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
             add_message("error", f"Model {model_name} with ID {obj_id} not found.")
             return RedirectResponse(f"{self.get_admin_prefix_url(request)}/models/{model_name}")
 
-        await self.save_model(instance, orjson.loads((await request.form())["editor_data"]))
+        try:
+            await self.save_model(instance, orjson.loads((await request.form())["editor_data"]))
+        except ValidationError as exc:
+            for error in exc.errors():
+                for loc in error["loc"]:
+                    add_message(
+                        "error",
+                        f"{loc}: {error['msg']}",
+                    )
+            return await self.get(request, **kwargs)
 
         add_message(
             "success",
@@ -670,7 +680,7 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
 
         return await self.render_template(request, **kwargs)
 
-    async def post(self, request: Request, **kwargs: Any) -> RedirectResponse:
+    async def post(self, request: Request, **kwargs: Any) -> Any:
         """
         Handles POST requests to create a new model instance.
 
@@ -706,9 +716,18 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
                 f"{self.get_admin_prefix_url(request)}/models/{model.__name__}"
             )
 
-        instance = await self.save_model(
-            model, orjson.loads((await request.form())["editor_data"]), create=True
-        )
+        try:
+            instance = await self.save_model(
+                model, orjson.loads((await request.form())["editor_data"]), create=True
+            )
+        except ValidationError as exc:
+            for error in exc.errors():
+                for loc in error["loc"]:
+                    add_message(
+                        "error",
+                        f"{loc}: {error['msg']}",
+                    )
+            return await self.get(request, **kwargs)
         obj_id = self.create_object_pk(instance)
         add_message(
             "success",

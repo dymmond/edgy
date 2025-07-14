@@ -6,35 +6,61 @@
 <div id="editor_holder"></div>
 <div class="pt-6 flex gap-4">
   <form method="post" id="submit_form">
-        <button type="submit" class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700">
+        <button type="submit" disabled="disabled" id="submit_button" class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:not-disabled:bg-blue-700">
             Save Changes
         </button>
         <input type="hidden" name="editor_data" id="editor_data" value=''>
     </form>
+      <button disabled="disabled" id="reset_button" class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:not-disabled:bg-gray-300">
+          Reset
+      </button>
     <a href=".." class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:bg-gray-300">
         Cancel
     </a>
 </div>
 <script>
+      var startval = removeNull(JSON.parse('{{values_as_json | safe}}'))
       var editor = new JSONEditor(document.getElementById('editor_holder'),{
         ajax: true,
         required_by_default: false,
-        show_opt_in: true,
+        display_required_only: true,
+        enable_array_copy: true,
         collapsed: true,
-        disable_properties: true,
+        disable_properties: false,
+        object_layout: "table",
 
         // The schema for the editor
         schema: {
           $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true&phase=update",
-          format: "grid",
         },
-        startval: JSON.parse('{{values_as_json | safe}}')
+        startval: startval
       });
-
+      const submit_form = document.getElementById("submit_form")
+      const submit_button = document.getElementById("submit_button")
+      const reset_button = document.getElementById("reset_button")
       const editor_data = document.getElementById("editor_data")
-      document.getElementById("submit_form").addEventListener("submit", async function(ev){
-        editor_data.value = JSON.stringify(editor.getValue())
+      editor.on('change',function() {
+        submit_button.setAttribute("disabled", "disabled")
+        reset_button.setAttribute("disabled", "disabled")
+        const val = editor.getValue()
+        if(!deepSub(val,startval)){
+          reset_button.removeAttribute("disabled")
+        }
+        if(!editor.validate().length){
+          editor_data.value = JSON.stringify(val)
+          if(!deepSub(val, startval)){
+            submit_button.removeAttribute("disabled")
+          }
+        }
+      });
+      reset_button.addEventListener("click", ()=>{
+        editor.setValue(startval);
+      })
 
+      submit_form.addEventListener("submit", async function(ev){
+        if(editor.validate().length){
+          ev.preventDefault()
+        }
       })
 </script>
 {% endblock %}
