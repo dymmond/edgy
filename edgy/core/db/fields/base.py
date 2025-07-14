@@ -303,8 +303,12 @@ class BaseCompositeField(BaseField):
         Runs the checks for the fields being validated.
         """
         prefix = field_name.removesuffix(self.name)
-        result = {}
+        result: dict[str, Any] = {}
         ErrorType: type[Exception] = KeyError
+
+        # None has no __dict__
+        if value is None:
+            return result
         if not isinstance(value, dict):
             # simpler
             value = value.__dict__
