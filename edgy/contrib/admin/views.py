@@ -45,32 +45,15 @@ class JSONSchemaView(Controller):
         phase = request.query_params.get("phase", "view")
         with_defaults = request.query_params.get("cdefaults") == "true"
         model_name = request.path_params.get("name")
-        reftemplate = "../{model}/json"
-        # add phase via f-string
-        reftemplate = f"{reftemplate}?phase={phase}"
-        if with_defaults:
-            reftemplate = f"{reftemplate}&cdefaults=true"
         try:
             schema = get_model_json_schema(
                 model_name,
                 include_callable_defaults=with_defaults,
-                ref_template=reftemplate,
                 no_check_admin_models=True,
                 phase=phase,
             )
         except LookupError:
             raise NotFound() from None
-        # fix defs being plain model/enum names
-        if "$defs" in schema:
-            new_defs = {}
-            for name, model in schema["$defs"].items():
-                # is already a matching definition
-                if "/" in name:
-                    new_defs[name] = model
-                else:
-                    # let's adapt the plain model/enum name
-                    new_defs[reftemplate.format(model=name)] = model
-            schema["$defs"] = new_defs
         with JSONResponse.with_transform_kwargs({"json_encode_fn": orjson.dumps}):
             return JSONResponse(schema)
 
