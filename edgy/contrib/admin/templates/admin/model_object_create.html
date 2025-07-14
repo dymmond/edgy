@@ -21,7 +21,11 @@
   </a>
 </div>
 <script>
-      var schema = JSON.parse('{{schema | safe}}')
+    var schema = JSON.parse('{{schema | safe}}')
+    const submit_form = document.getElementById("submit_form")
+    const submit_button = document.getElementById("submit_button")
+    const editor_data = document.getElementById("editor_data")
+    document.addEventListener("DOMContentLoaded", function() {
       var editor = new JSONEditor(document.getElementById('editor_holder'),{
         required_by_default: false,
         enable_array_copy: true,
@@ -34,9 +38,6 @@
       });
 
 
-      const submit_form = document.getElementById("submit_form")
-      const submit_button = document.getElementById("submit_button")
-      const editor_data = document.getElementById("editor_data")
       editor.on('change',function() {
         if(!editor.validate().length){
           editor_data.value = JSON.stringify(editor.getValue())
@@ -51,5 +52,6 @@
           ev.preventDefault()
         }
       })
+    })
 </script>
 {% endblock %}

@@ -19,8 +19,13 @@
     </a>
 </div>
 <script>
-      var startval = removeNull(JSON.parse('{{values_as_json | safe}}'))
-      var schema = JSON.parse('{{schema | safe}}')
+    var startval = removeNull(JSON.parse('{{values_as_json | safe}}'))
+    var schema = JSON.parse('{{schema | safe}}')
+    const submit_form = document.getElementById("submit_form")
+    const submit_button = document.getElementById("submit_button")
+    const reset_button = document.getElementById("reset_button")
+    const editor_data = document.getElementById("editor_data")
+    document.addEventListener("DOMContentLoaded", function() {
       var editor = new JSONEditor(document.getElementById('editor_holder'),{
         required_by_default: false,
         display_required_only: true,
@@ -33,10 +38,6 @@
         schema: schema,
         startval: startval
       });
-      const submit_form = document.getElementById("submit_form")
-      const submit_button = document.getElementById("submit_button")
-      const reset_button = document.getElementById("reset_button")
-      const editor_data = document.getElementById("editor_data")
       editor.on('change',function() {
         submit_button.setAttribute("disabled", "disabled")
         reset_button.setAttribute("disabled", "disabled")
@@ -51,14 +52,18 @@
           }
         }
       });
-      reset_button.addEventListener("click", ()=>{
-        editor.setValue(startval);
-      })
 
-      submit_form.addEventListener("submit", async function(ev){
-        if(editor.validate().length){
-          ev.preventDefault()
-        }
+      editor.on('ready', function() {
+        reset_button.addEventListener("click", ()=>{
+          editor.setValue(startval);
+        })
+
+        submit_form.addEventListener("submit", async function(ev){
+          if(editor.validate().length){
+            ev.preventDefault()
+          }
+        })
       })
+    })
 </script>
 {% endblock %}
