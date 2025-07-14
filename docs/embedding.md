@@ -48,6 +48,9 @@ class AnotherModel(MyModel):
 * Automatic field prefixing: Prefixes prevent naming conflicts when multiple embeddables are used in a model.
 * Control over inheritance: The `inherit` parameter provides fine-grained control over which fields are inherited by submodels.
 
+!!! Warning
+    When not using `abstract=True` a field named `id` is maybe injected.
+
 ## 2. Explicit Control with CompositeField
 
 For more explicit control over the embedding process, you can use the `CompositeField` and pass models as its `inner_fields` argument. This method provides greater flexibility in defining how embedded models are handled.
