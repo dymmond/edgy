@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.32.6
+
+### Fixed
+
+- Status code when page in admin was not found.
+
 ## 0.32.5
 
 ### Fixed
