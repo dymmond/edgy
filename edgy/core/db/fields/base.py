@@ -306,6 +306,7 @@ class BaseCompositeField(BaseField):
         result: dict[str, Any] = {}
         ErrorType: type[Exception] = KeyError
 
+        # None has not __dict__
         if value is None:
             return result
         if not isinstance(value, dict):
