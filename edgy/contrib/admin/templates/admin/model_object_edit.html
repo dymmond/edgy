@@ -19,9 +19,14 @@
     </a>
 </div>
 <script>
-      var startval = removeNull(JSON.parse('{{values_as_json | safe}}'))
+    var startval = removeNull(JSON.parse('{{values_as_json | safe}}'))
+    var schema = JSON.parse('{{schema | safe}}')
+    const submit_form = document.getElementById("submit_form")
+    const submit_button = document.getElementById("submit_button")
+    const reset_button = document.getElementById("reset_button")
+    const editor_data = document.getElementById("editor_data")
+    document.addEventListener("DOMContentLoaded", function() {
       var editor = new JSONEditor(document.getElementById('editor_holder'),{
-        ajax: true,
         required_by_default: false,
         display_required_only: true,
         enable_array_copy: true,
@@ -30,15 +35,9 @@
         object_layout: "table",
 
         // The schema for the editor
-        schema: {
-          $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true&phase=update",
-        },
+        schema: schema,
         startval: startval
       });
-      const submit_form = document.getElementById("submit_form")
-      const submit_button = document.getElementById("submit_button")
-      const reset_button = document.getElementById("reset_button")
-      const editor_data = document.getElementById("editor_data")
       editor.on('change',function() {
         submit_button.setAttribute("disabled", "disabled")
         reset_button.setAttribute("disabled", "disabled")
@@ -53,14 +52,18 @@
           }
         }
       });
-      reset_button.addEventListener("click", ()=>{
-        editor.setValue(startval);
-      })
 
-      submit_form.addEventListener("submit", async function(ev){
-        if(editor.validate().length){
-          ev.preventDefault()
-        }
+      editor.on('ready', function() {
+        reset_button.addEventListener("click", ()=>{
+          editor.setValue(startval);
+        })
+
+        submit_form.addEventListener("submit", async function(ev){
+          if(editor.validate().length){
+            ev.preventDefault()
+          }
+        })
       })
+    })
 </script>
 {% endblock %}

@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from lilya import status
 from lilya.apps import ChildLilya, Lilya
 from lilya.middleware import DefineMiddleware
 from lilya.middleware.session_context import SessionContextMiddleware
@@ -27,9 +28,7 @@ templates.env.globals["getattr"] = getattr
 
 async def not_found(request: Request, exc: Exception) -> Any:
     return templates.get_template_response(
-        request,
-        "404.html",
-        context={"title": "Not Found"},
+        request, "404.html", context={"title": "Not Found"}, status_code=status.HTTP_404_NOT_FOUND
     )
 
 

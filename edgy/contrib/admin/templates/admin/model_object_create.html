@@ -21,8 +21,12 @@
   </a>
 </div>
 <script>
+    var schema = JSON.parse('{{schema | safe}}')
+    const submit_form = document.getElementById("submit_form")
+    const submit_button = document.getElementById("submit_button")
+    const editor_data = document.getElementById("editor_data")
+    document.addEventListener("DOMContentLoaded", function() {
       var editor = new JSONEditor(document.getElementById('editor_holder'),{
-        ajax: true,
         required_by_default: false,
         enable_array_copy: true,
         collapsed: true,
@@ -30,15 +34,10 @@
         object_layout: "table",
 
         // The schema for the editor
-        schema: {
-          $ref: "{{ url_prefix }}/models/{{ model_name }}/json?cdefaults=true&phase=create",
-        },
+        schema: schema,
       });
 
 
-      const submit_form = document.getElementById("submit_form")
-      const submit_button = document.getElementById("submit_button")
-      const editor_data = document.getElementById("editor_data")
       editor.on('change',function() {
         if(!editor.validate().length){
           editor_data.value = JSON.stringify(editor.getValue())
@@ -53,5 +52,6 @@
           ev.preventDefault()
         }
       })
+    })
 </script>
 {% endblock %}
