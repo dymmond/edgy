@@ -63,6 +63,15 @@ _current_row_holder: ContextVar[list[sqlalchemy.Row | None] | None] = ContextVar
 
 
 def get_table_key_or_name(table: sqlalchemy.Table | sqlalchemy.Alias) -> str:
+    """
+    Retrieves the key or name of a SQLAlchemy table or alias.
+
+    Args:
+        table (sqlalchemy.Table | sqlalchemy.Alias): The SQLAlchemy table or alias object.
+
+    Returns:
+        str: The key or name of the table/alias.
+    """
     try:
         return table.key  # type: ignore
     except AttributeError:
@@ -71,6 +80,17 @@ def get_table_key_or_name(table: sqlalchemy.Table | sqlalchemy.Alias) -> str:
 
 
 def _extract_unique_lookup_key(obj: Any, unique_fields: Sequence[str]) -> tuple | None:
+    """
+    Extracts a unique lookup key from an object or dictionary based on a sequence of fields.
+
+    Args:
+        obj (Any): The object or dictionary from which to extract the lookup key.
+        unique_fields (Sequence[str]): A sequence of field names that constitute the unique key.
+
+    Returns:
+        tuple | None: A tuple representing the unique lookup key, or None if any unique field
+                      is missing in the object/dictionary.
+    """
     lookup_key = []
     if isinstance(obj, dict):
         for field in unique_fields:
@@ -239,11 +259,23 @@ class BaseQuerySet(
 
     @cached_property
     def _has_dynamic_clauses(self) -> bool:
+        """
+        Indicates if the queryset has any dynamic (callable) filter or OR clauses.
+        """
         return any(callable(clause) for clause in chain(self.filter_clauses, self.or_clauses))
 
     def _clear_cache(
         self, *, keep_result_cache: bool = False, keep_cached_selected: bool = False
     ) -> None:
+        """
+        Clears the internal cache of the queryset.
+
+        Args:
+            keep_result_cache (bool): If True, the result cache (for fetched models) is preserved.
+                                      Defaults to False.
+            keep_cached_selected (bool): If True, the cached select expression and tables are preserved.
+                                         Defaults to False.
+        """
         if not keep_result_cache:
             self._cache.clear()
         if not keep_cached_selected:
@@ -269,7 +301,18 @@ class BaseQuerySet(
     async def build_where_clause(
         self, _: Any = None, tables_and_models: tables_and_models_type | None = None
     ) -> Any:
-        """Build a where clause from the filters which can be passed in a where function."""
+        """
+        Builds a SQLAlchemy WHERE clause from the queryset's filter and OR clauses.
+
+        Args:
+            _ (Any): Ignored. Used for compatibility with `clauses_mod.parse_clause_arg` signature.
+            tables_and_models (tables_and_models_type | None): A dictionary mapping table aliases to
+                                                               (table, model) tuples. If None, it's
+                                                               built internally. Defaults to None.
+
+        Returns:
+            Any: The combined SQLAlchemy WHERE clause.
+        """
         joins: Any | None = None
         if tables_and_models is None:
             joins, tables_and_models = self._build_tables_join_from_relationship()
@@ -328,6 +371,20 @@ class BaseQuerySet(
         transitions: dict[tuple[str, str, str], tuple[Any, tuple[str, str, str] | None, str]],
         tables_and_models: dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]],
     ) -> Any:
+        """
+        Recursively builds SQLAlchemy join clauses based on a transition map.
+
+        Args:
+            join_clause (Any): The current join clause to which new joins are added.
+            current_transition (tuple[str, str, str]): The key for the current transition.
+            transitions (dict[tuple[str, str, str], tuple[Any, tuple[str, str, str] | None, str]]):
+                A dictionary mapping transition keys to (join_condition, parent_transition_key, table_alias) tuples.
+            tables_and_models (dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]):
+                A dictionary mapping table aliases to (table, model) tuples.
+
+        Returns:
+            Any: The updated join clause.
+        """
         if current_transition not in transitions:
             return join_clause
         transition_value = transitions.pop(current_transition)
@@ -351,10 +408,20 @@ class BaseQuerySet(
         self,
     ) -> tuple[Any, tables_and_models_type]:
         """
-        Builds the tables relationships and joins.
-        When a table contains more than one foreign key pointing to the same
-        destination table, a lookup for the related field is made to understand
-        from which foreign key the table is looked up from.
+        Builds the table relationships and joins for `select_related` operations.
+
+        This method constructs a graph of table joins based on the `_select_related` paths.
+        It handles many-to-many relationships and aliasing of tables to ensure uniqueness.
+        The result is cached for performance.
+
+        Returns:
+            tuple[Any, tables_and_models_type]: A tuple containing:
+                - The SQLAlchemy join expression.
+                - A dictionary mapping table aliases (prefixes) to (table, model) tuples.
+
+        Raises:
+            QuerySetError: If a selected field does not exist or is not a RelationshipField,
+                           or if a selected model is on another database.
         """
 
         # How does this work?
@@ -501,6 +568,18 @@ class BaseQuerySet(
         reverse: bool,
         former_table: Any,
     ) -> Any:
+        """
+        Generates SQLAlchemy WHERE clauses for joining tables based on a foreign key relationship.
+
+        Args:
+            foreign_key (BaseForeignKey): The foreign key field defining the relationship.
+            table (Any): The SQLAlchemy table for the related model.
+            reverse (bool): True if the relationship is being traversed in reverse (from related to source model).
+            former_table (Any): The SQLAlchemy table for the source model.
+
+        Yields:
+            Any: SQLAlchemy binary expressions for the join condition.
+        """
         column_names = foreign_key.get_column_names(foreign_key.name)
         assert column_names, f"foreign key without column names detected: {foreign_key.name}"
         for col in column_names:
@@ -513,6 +592,12 @@ class BaseQuerySet(
                 )
 
     def _validate_only_and_defer(self) -> None:
+        """
+        Validates that .only() and .defer() are not used simultaneously.
+
+        Raises:
+            QuerySetError: If both .only() and .defer() are applied to the queryset.
+        """
         if self._only and self._defer:
             raise QuerySetError("You cannot use .only() and .defer() at the same time.")
 
@@ -520,7 +605,19 @@ class BaseQuerySet(
         self,
     ) -> tuple[Any, tables_and_models_type]:
         """
-        Builds the query select based on the given parameters and filters.
+        Builds the SQLAlchemy SELECT expression along with the mapping of tables and models,
+        based on the queryset's parameters and filters.
+
+        This method handles `only`, `defer`, `exclude_secrets`, `extra_select`, and
+        `reference_select` clauses, and incorporates `select_related` joins.
+
+        Returns:
+            tuple[Any, tables_and_models_type]: A tuple containing:
+                - The constructed SQLAlchemy SELECT expression.
+                - A dictionary mapping table aliases to (table, model) tuples.
+
+        Raises:
+            AssertionError: If no columns or extra_select elements are specified for the query.
         """
         self._validate_only_and_defer()
         joins, tables_and_models = self._build_tables_join_from_relationship()
@@ -593,7 +690,12 @@ class BaseQuerySet(
         self,
     ) -> tuple[Any, tables_and_models_type]:
         """
-        Builds the query select based on the given parameters and filters.
+        Builds the query select based on the given parameters and filters, including
+        the mapping of tables and models involved in the query. The result is cached.
+
+        Returns:
+            tuple[Any, tables_and_models_type]: A tuple containing the SQLAlchemy select
+                                                 expression and the tables and models dictionary.
         """
         if self._cached_select_with_tables is None:
             self._cached_select_with_tables = await self._as_select_with_tables()
@@ -602,12 +704,33 @@ class BaseQuerySet(
     async def as_select(
         self,
     ) -> Any:
+        """
+        Builds and returns only the SQLAlchemy select expression for the current queryset.
+
+        Returns:
+            Any: The SQLAlchemy select expression.
+        """
         return (await self.as_select_with_tables())[0]
 
     def _kwargs_to_clauses(
         self,
         kwargs: Any,
     ) -> tuple[list[Any], set[str]]:
+        """
+        Converts keyword arguments into a list of callable filter clauses and a set of
+        `select_related` paths.
+
+        This function handles relationship traversal and cross-database foreign keys,
+        generating appropriate SQLAlchemy expressions or wrapped async functions.
+
+        Args:
+            kwargs (Any): The keyword arguments representing the filter conditions.
+
+        Returns:
+            tuple[list[Any], set[str]]: A tuple containing:
+                - A list of SQLAlchemy binary expressions or async callable wrappers.
+                - A set of relationship paths for `select_related`.
+        """
         clauses = []
         select_related: set[str] = set()
         cleaned_kwargs = clauses_mod.clean_query_kwargs(
@@ -674,17 +797,49 @@ class BaseQuerySet(
         return clauses, select_related
 
     def _prepare_order_by(self, order_by: str) -> Any:
+        """
+        Prepares an order by expression from a string.
+
+        Args:
+            order_by (str): The field name for ordering, optionally prefixed with '-' for descending.
+
+        Returns:
+            Any: The SQLAlchemy column expression for ordering.
+        """
         reverse = order_by.startswith("-")
         order_by = order_by.lstrip("-")
         order_col = self.table.columns[order_by]
         return order_col.desc() if reverse else order_col
 
     def _prepare_fields_for_distinct(self, distinct_on: str) -> sqlalchemy.Column:
+        """
+        Prepares a field for use in a distinct-on clause.
+
+        Args:
+            distinct_on (str): The field name for distinctness.
+
+        Returns:
+            sqlalchemy.Column: The SQLAlchemy column object.
+        """
         return self.table.columns[distinct_on]
 
     async def _embed_parent_in_result(
         self, result: EdgyModel | Awaitable[EdgyModel]
     ) -> tuple[EdgyModel, Any]:
+        """
+        Embeds a parent model into the result if `embed_parent` is configured.
+
+        This allows accessing related models directly from the main model instance
+        as defined by the `embed_parent` setting.
+
+        Args:
+            result (EdgyModel | Awaitable[EdgyModel]): The model instance or an awaitable
+                                                        that resolves to a model instance.
+
+        Returns:
+            tuple[EdgyModel, Any]: A tuple where the first element is the original result
+                                   and the second is the potentially embedded result.
+        """
         if isawaitable(result):
             result = await result
         if not self.embed_parent:
@@ -709,6 +864,26 @@ class BaseQuerySet(
         extra_attr: str = "",
         raw: bool = False,
     ) -> tuple[EdgyModel, EdgyEmbedTarget]:
+        """
+        Retrieves or caches a single model instance from a SQLAlchemy row.
+
+        This method converts a SQLAlchemy row into a model instance, handles
+        `only_fields`, `defer_fields`, `prefetch_related`, and `embed_parent` configurations,
+        and optionally sets extra attributes on the queryset for caching.
+
+        Args:
+            row (Any): The SQLAlchemy row object.
+            tables_and_models (dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]):
+                A dictionary mapping table aliases to (table, model) tuples.
+            extra_attr (str): Comma-separated string of attributes to set on the queryset with the result.
+                              Defaults to "".
+            raw (bool): If True, returns the raw model instance without `embed_parent` transformation.
+                        Defaults to False.
+
+        Returns:
+            tuple[EdgyModel, EdgyEmbedTarget]: A tuple containing the raw model instance
+                                               and the potentially embedded target instance.
+        """
         is_defer_fields = bool(self._defer)
         result_tuple: tuple[EdgyModel, EdgyEmbedTarget] = (
             await self._cache.aget_or_cache_many(
@@ -735,6 +910,15 @@ class BaseQuerySet(
         return result_tuple
 
     def get_schema(self) -> str | None:
+        """
+        Retrieves the active database schema for the queryset.
+
+        The schema can be explicitly set via `using_schema`, obtained from the
+        current context variable, or derived from the model's metadata.
+
+        Returns:
+            str | None: The active schema name, or None if not applicable.
+        """
         # Differs from get_schema global
         schema = self.using_schema
         if schema is Undefined:
@@ -750,6 +934,25 @@ class BaseQuerySet(
         queryset: BaseQuerySet,
         new_cache: QueryModelResultCache,
     ) -> Sequence[tuple[BaseModelType, BaseModelType]]:
+        """
+        Handles a batch of SQLAlchemy rows, converting them to model instances and
+        performing prefetching operations.
+
+        Args:
+            batch (Sequence[sqlalchemy.Row]): A sequence of SQLAlchemy row objects.
+            tables_and_models (dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]):
+                A dictionary mapping table aliases to (table, model) tuples.
+            queryset (BaseQuerySet): The current queryset (used for its configuration).
+            new_cache (QueryModelResultCache): The cache to store the new batch results.
+
+        Returns:
+            Sequence[tuple[BaseModelType, BaseModelType]]: A sequence of tuples, each containing
+                                                            the raw model instance and the embedded target.
+
+        Raises:
+            NotImplementedError: If prefetching from another database is attempted.
+            QuerySetError: If creating a reverse path for prefetching is not possible.
+        """
         is_defer_fields = bool(queryset._defer)
         del queryset
         _prefetch_related: list[Prefetch] = []
@@ -835,7 +1038,21 @@ class BaseQuerySet(
         self, fetch_all_at_once: bool = False
     ) -> AsyncIterator[BaseModelType]:
         """
-        Executes the query, iterate.
+        Executes the query and yields model instances during iteration.
+
+        This method supports fetching all results at once or in batches, and handles
+        prefetching and embedding parent models. It also includes warnings for
+        `force_rollback` usage with iterations due to potential deadlocks.
+
+        Args:
+            fetch_all_at_once (bool): If True, all results are fetched before yielding.
+                                      Defaults to False.
+
+        Yields:
+            BaseModelType: A model instance for each row.
+
+        Warns:
+            UserWarning: If using queryset iterations with `Database`-level `force_rollback` enabled.
         """
         if self._cache_fetch_all:
             for result in cast(
@@ -921,6 +1138,9 @@ class BaseQuerySet(
         self._cache_last = last_element
 
     async def _execute_all(self) -> list[EdgyModel]:
+        """
+        Executes the query and returns all results as a list of model instances.
+        """
         return [result async for result in self._execute_iterate(fetch_all_at_once=True)]
 
     def _filter_or_exclude(
@@ -942,6 +1162,25 @@ class BaseQuerySet(
     ) -> QuerySet:
         """
         Filters or excludes a given clause for a specific QuerySet.
+
+        This is an internal method used by `filter`, `exclude`, `or_`, and `and_` to
+        construct the query's WHERE clauses. It handles various clause types including
+        dictionaries (kwargs), callable filters, and other QuerySet objects.
+
+        Args:
+            kwargs (Any): Additional keyword arguments to filter by.
+            clauses (Sequence[...]): A sequence of filter clauses.
+            exclude (bool): If True, the clauses are inverted for exclusion. Defaults to False.
+            or_ (bool): If True, the clauses are combined with OR. Defaults to False.
+            allow_global_or (bool): If True, and only one OR clause is provided, it can be
+                                    added to the queryset's global OR clauses. Defaults to True.
+
+        Returns:
+            QuerySet: A new QuerySet with the applied filters/exclusions.
+
+        Raises:
+            AssertionError: If `exclude` is True and `or_` is also True when adding to global OR.
+            AssertionError: If a `QuerySet` object is used as a clause with a different model class.
         """
         queryset: QuerySet = self._clone()
         if kwargs:
@@ -1006,6 +1245,18 @@ class BaseQuerySet(
         return queryset
 
     async def _model_based_delete(self, remove_referenced_call: str | bool) -> int:
+        """
+        Performs a model-based deletion, iterating through models and calling their `raw_delete` method.
+
+        This method is used when `__require_model_based_deletion__` or `post_delete_fields` are set
+        on the model, ensuring hooks and related object handling are executed.
+
+        Args:
+            remove_referenced_call (str | bool): Specifies how to handle referenced objects during deletion.
+
+        Returns:
+            int: The total number of records deleted.
+        """
         queryset = self.limit(self._batch_size) if not self._cache_fetch_all else self
         # we set embed_parent on the copy to None to get raw instances
         # embed_parent_filters is not affected
@@ -1029,6 +1280,21 @@ class BaseQuerySet(
     async def raw_delete(
         self, use_models: bool = False, remove_referenced_call: str | bool = False
     ) -> int:
+        """
+        Executes a raw delete operation on the database.
+
+        This method can either perform a direct SQL DELETE statement or iterate
+        through models and call their individual `raw_delete` methods based on
+        `use_models` and model configurations.
+
+        Args:
+            use_models (bool): If True, deletion is performed by iterating and
+                               deleting individual model instances. Defaults to False.
+            remove_referenced_call (str | bool): Specifies how to handle referenced objects during deletion.
+
+        Returns:
+            int: The number of rows deleted.
+        """
         if (
             self.model_class.__require_model_based_deletion__
             or self.model_class.meta.post_delete_fields
@@ -1054,6 +1320,20 @@ class BaseQuerySet(
     async def _get_raw(self, **kwargs: Any) -> tuple[BaseModelType, Any]:
         """
         Returns a single record based on the given kwargs.
+
+        This is an internal method that fetches a single row from the database,
+        handling caching and raising exceptions for no results or multiple results.
+
+        Args:
+            **kwargs (Any): Keyword arguments to filter the query.
+
+        Returns:
+            tuple[BaseModelType, Any]: A tuple containing the raw model instance and
+                                       the potentially embedded target instance.
+
+        Raises:
+            ObjectNotFound: If no object matches the given criteria.
+            MultipleObjectsReturned: If more than one object matches the criteria.
         """
 
         if kwargs:
@@ -1097,6 +1377,9 @@ class QuerySet(BaseQuerySet):
     """
 
     async def _sql_helper(self) -> Any:
+        """
+        Helper method to compile the SQL query into a string.
+        """
         async with self.database:
             return (await self.as_select()).compile(
                 self.database.engine, compile_kwargs={"literal_binds": True}
@@ -1234,11 +1517,29 @@ class QuerySet(BaseQuerySet):
         self,
         *extra: sqlalchemy.ColumnClause,
     ) -> QuerySetType:
+        """
+        Adds extra columns or expressions to the SELECT statement.
+
+        Args:
+            *extra (sqlalchemy.ColumnClause): Additional SQLAlchemy column clauses or expressions.
+
+        Returns:
+            QuerySetType: A new QuerySet with the extra select clauses.
+        """
         queryset = self._clone()
         queryset._extra_select.extend(extra)
         return queryset
 
     def reference_select(self, references: reference_select_type) -> QuerySetType:
+        """
+        Adds references to the SELECT statement, used for specific model field handling.
+
+        Args:
+            references (reference_select_type): A dictionary defining reference selections.
+
+        Returns:
+            QuerySetType: A new QuerySet with the added reference selections.
+        """
         queryset = self._clone()
         queryset._reference_select.update(references)
         return queryset
@@ -1256,7 +1557,7 @@ class QuerySet(BaseQuerySet):
 
     def lookup(self, term: Any) -> QuerySet:
         """
-        Broader way of searching for a given term
+        Broader way of searching for a given term on CharField and TextField instances.
         """
         queryset: QuerySet = self._clone()
         if not term:
@@ -1288,6 +1589,12 @@ class QuerySet(BaseQuerySet):
         return queryset
 
     def reverse(self) -> QuerySet:
+        """
+        Reverses the order of the QuerySet.
+
+        If no `order_by` is set, it defaults to ordering by primary key columns.
+        It also attempts to reverse the cached results for immediate consistency.
+        """
         if not self._order_by:
             queryset = self.order_by(*self.model_class.pkcolumns)
         else:
@@ -1336,6 +1643,14 @@ class QuerySet(BaseQuerySet):
     def distinct(self, first: bool | str = True, *distinct_on: str) -> QuerySet:
         """
         Returns a queryset with distinct results.
+
+        Args:
+            first (bool | str): If True, applies `DISTINCT`. If False, removes any distinct clause.
+                                If a string, applies `DISTINCT ON` to that field.
+            *distinct_on (str): Additional fields for `DISTINCT ON`.
+
+        Returns:
+            QuerySet: A new QuerySet with the distinct clause applied.
         """
         queryset: QuerySet = self._clone()
         if first is False:
@@ -1777,6 +2092,20 @@ class QuerySet(BaseQuerySet):
         return retrieved_objs
 
     async def delete(self, use_models: bool = False) -> int:
+        """
+        Deletes records from the database.
+
+        This method triggers `pre_delete` and `post_delete` signals.
+        If `use_models` is True or the model has specific deletion requirements,
+        it performs a model-based deletion.
+
+        Args:
+            use_models (bool): If True, deletion is performed by iterating and
+                               deleting individual model instances. Defaults to False.
+
+        Returns:
+            int: The number of rows deleted.
+        """
         await self.model_class.meta.signals.pre_delete.send_async(
             self.model_class, instance=self, model_instance=None
         )
