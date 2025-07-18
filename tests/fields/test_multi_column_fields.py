@@ -116,7 +116,10 @@ async def test_create_and_assign(create_test_database):
     assert obj.multi["normal"] == "edgy"
     assert obj.multi["inner"] == "edgytoo"
     assert hasattr(MyModel.table.columns, "multi_inner")
+
     assert await MyModel.query.filter(multi__exact={"normal": "edgy", "inner": "edgytoo"}).exists()
+    assert await MyModel.query.filter(multi__like={"normal": "edgy", "inner": "edgytoo"}).exists()
+
     assert await MyModel.query.filter(multi__startswith="edgy").exists()
     obj.multi = "test"
     assert obj.multi["normal"] == "test"

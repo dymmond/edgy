@@ -42,13 +42,10 @@ class BaseField(BaseFieldType, FieldInfo):
     Allows factories to overwrite methods.
     """
 
-    # defs to simplify the life (can be None actually)
     owner: type[BaseModelType]
     operator_mapping: dict[str, str] = {
-        # aliases
         "is": "is_",
         "in": "in_",
-        # these operators are not directly available and need their alias
         "exact": "__eq__",
         "not": "__ne__",
         "gt": "__gt__",
@@ -148,7 +145,7 @@ class BaseField(BaseFieldType, FieldInfo):
         # MUST raise an KeyError on missing columns, this code is used for the generic case if no field is available
         column = table.columns[field_name]
         operator = self.operator_mapping.get(operator, operator)
-        if operator == "iexact" or operator == "ilike":
+        if operator == "iexact":
             ESCAPE_CHARACTERS = ["%", "_"]
             has_escaped_character = any(c for c in ESCAPE_CHARACTERS if c in value)
             if has_escaped_character:

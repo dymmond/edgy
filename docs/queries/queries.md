@@ -201,7 +201,9 @@ The same special operators are also automatically added on every column.
 
 * **in** - SQL `IN` operator.
 * **exact** - Filter instances matching the exact value.
+* **like** - Alternative to `exact`.
 * **iexact** - Filter instances mathing the exact value but case-insensitive.
+* **ilike** - Alternative syntax to `iexact`.
 * **contains** - Filter instances that contains a specific value.
 * **icontains** - Filter instances that contains a specific value but case-insensitive.
 * **lt** - Filter instances having values `Less Than`.

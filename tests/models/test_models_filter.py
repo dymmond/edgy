@@ -103,6 +103,9 @@ async def test_model_filter():
     products = Product.query.exclude(name__iexact="100%-cotton")
     assert await products.count() == 5
 
+    products = Product.query.exclude(name__ilike="100%-cotton")
+    assert await products.count() == 5
+
     products = Product.query.exclude(name__contains="%")
     assert await products.count() == 3
 
