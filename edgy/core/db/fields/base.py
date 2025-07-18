@@ -158,6 +158,9 @@ class BaseField(BaseFieldType, FieldInfo):
                     value = value.replace(char, f"\\{char}")
             clause = column.ilike(value, escape="\\" if has_escaped_character else None)
             return clause
+        elif operator == "isnull":
+            clause = column.is_(None) if value is True else column.isnot(None)
+            return clause
         elif operator in {
             "contains",
             "icontains",

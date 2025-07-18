@@ -187,7 +187,6 @@ async for user in User.query.batch_size(30):
     pass
 ```
 
-
 ### Filter
 
 #### Django-style
@@ -209,6 +208,7 @@ The same special operators are also automatically added on every column.
 * **lte** - Filter instances having values `Less Than Equal`.
 * **gt** - Filter instances having values `Greater Than`.
 * **gte** - Filter instances having values `Greater Than Equal`.
+* **isnull** - Filer instances by checking if a given attribute is null `True` or `False`
 
 
 ##### Example

@@ -11,6 +11,7 @@ hide:
 ### Added
 
 - Django rest framework `NumberedPaginator` like for pagination of querysets.
+- Support for `isnull` operator for querysets on a field.
 
 ### Fixed
 
