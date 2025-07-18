@@ -8,10 +8,14 @@ hide:
 
 ## 0.32.6
 
+### Added
+
+- Django rest framework `NumberedPaginator` like for pagination of querysets.
+
 ### Fixed
 
 - Status code when page in admin was not found.
-- Finally fix issues with json-editor ajax and enums by simply inlining all schemas and disabling ajax.
+- Fix issues with json-editor ajax and enums by simply inlining all schemas and disabling ajax.
 - For the json schema view: don't use ref_template, it isn't well supported and leads to problems with enums.
 - Fix crash when `None` is passed to CompositeField.
 
