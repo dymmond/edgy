@@ -44,7 +44,7 @@ def create_admin_app(
     registry: Registry | None = None,
     settings: EdgySettings | None = None,
 ) -> Lilya:
-    middleware = [
+    middleware: list[DefineMiddleware] = [
         DefineMiddleware(EdgyMiddleware, registry=registry, settings=settings),
         DefineMiddleware(SessionContextMiddleware, sub_path=session_sub_path),
     ]
