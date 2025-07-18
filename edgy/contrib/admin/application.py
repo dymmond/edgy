@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from lilya import status
 from lilya.apps import ChildLilya, Lilya
@@ -11,7 +11,9 @@ from lilya.requests import Request
 from lilya.routing import RoutePath
 from lilya.templating import Jinja2Template
 
-from edgy.contrib.admin.views import (
+from edgy.contrib.lilya.middleware import EdgyMiddleware
+
+from .views import (
     AdminDashboard,
     JSONSchemaView,
     ModelDetailView,
@@ -21,6 +23,10 @@ from edgy.contrib.admin.views import (
     ModelObjectEditView,
     ModelOverview,
 )
+
+if TYPE_CHECKING:
+    from edgy.conf.global_settings import EdgySettings
+    from edgy.core.connection import Registry
 
 templates = Jinja2Template(directory=str(Path(__file__).resolve().parent / "templates"))
 templates.env.globals["getattr"] = getattr
@@ -32,8 +38,16 @@ async def not_found(request: Request, exc: Exception) -> Any:
     )
 
 
-def create_admin_app(*, session_sub_path: str = "") -> Lilya:
-    middleware = [DefineMiddleware(SessionContextMiddleware, sub_path=session_sub_path)]
+def create_admin_app(
+    *,
+    session_sub_path: str = "",
+    registry: Registry | None = None,
+    settings: EdgySettings | None = None,
+) -> Lilya:
+    middleware = [
+        DefineMiddleware(EdgyMiddleware, registry=registry, settings=settings),
+        DefineMiddleware(SessionContextMiddleware, sub_path=session_sub_path),
+    ]
     return ChildLilya(
         routes=[
             RoutePath("/", handler=AdminDashboard, name="admin"),

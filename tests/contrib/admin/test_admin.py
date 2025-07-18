@@ -11,40 +11,69 @@ from lilya.routing import Include
 
 import edgy
 from edgy.contrib.admin import create_admin_app
+from edgy.contrib.lilya.middleware import EdgyMiddleware
 from edgy.contrib.permissions import BasePermission
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
+database = DatabaseTestClient(DATABASE_URL, force_rollback=False)
 models = edgy.Registry(
-    database=DatabaseTestClient(DATABASE_URL, force_rollback=False, drop_database=True),
+    database=edgy.Database(database, force_rollback=True),
     with_content_type=True,
+)
+empty = edgy.Registry(
+    database=DatabaseTestClient("sqlite:///:memory:", force_rollback=False, drop_database=True),
 )
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    # this creates and drops the database
-    async with models:
+    async with database:
         await models.create_all()
+        yield
+        if not database.drop:
+            await models.drop_all()
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def rollback_connections():
+    async with models:
         yield
 
 
-@pytest.fixture()
-async def app():
-    admin_app = create_admin_app()
+@pytest.fixture(params=["ambient", "middleware", "both", "nowrap"])
+async def app(request):
+    params = {}
+    if request.param == "middleware" or request.param == "both":
+        params["registry"] = models
+    admin_app = create_admin_app(**params)
+    middleware = [
+        DefineMiddleware(
+            SessionMiddleware, secret_key=edgy.monkay.settings.admin_config.SECRET_KEY
+        )
+    ]
+    if request.param == "nowrap":
+        middleware.append(DefineMiddleware(EdgyMiddleware, registry=models, wrap_asgi_app=False))
     app = Lilya(
         routes=[Include("", admin_app)],
-        middleware=[
-            DefineMiddleware(
-                SessionMiddleware, secret_key=edgy.monkay.settings.admin_config.SECRET_KEY
-            )
-        ],
+        middleware=middleware,
     )
-    app = models.asgi(app)
-    with edgy.monkay.with_full_overwrite(instance=edgy.Instance(registry=models, app=app)):
-        yield app
+    match request.param:
+        case "middleware":
+            yield app
+        case "nowrap":
+            app = models.asgi(app)
+            yield app
+        case "ambient":
+            app = models.asgi(app)
+            with edgy.monkay.with_full_overwrite(instance=edgy.Instance(registry=models, app=app)):
+                yield app
+        case "both":
+            app = empty.asgi(app)
+            with edgy.monkay.with_full_overwrite(instance=edgy.Instance(registry=empty, app=app)):
+                yield app
 
 
 @pytest.fixture()

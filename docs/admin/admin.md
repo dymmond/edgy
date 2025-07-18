@@ -44,20 +44,30 @@ For more
 
 For embedding the admin you need a lilya session or something compatible (provide scope["session"] with a dict like interface).
 You can either declare a global session or provide a `session_cookie` name to prevent collisions.
+You can either use the ambient edgy instance or pass `registry` and/or `settings` to `create_admin_app`. This will cause an local overwrite, so you
+can have even more than one admin in the same application.
+When passing the `registry` argument, the registry is automatically wrapping the admin app, so you aren't required to use the idiomatic asgi way for every registry but it isn't a fault to do so.
 
 ```python title="Global session"
 {!> ../docs_src/admin/admin_embed.py !}
+```
+
+```python title="Global session no ambient edgy"
+{!> ../docs_src/admin/admin_embed_no_ambient.py !}
 ```
 
 ```python title="Different cookie"
 {!> ../docs_src/admin/admin_embed_different_cookie.py !}
 ```
 
-You can multiplex the session via `sub_path` (will probably land in lilya 0.15.5)
+You can multiplex the session via `sub_path`.
+Via passing `registry` and/or `settings` we can create admins for different registries
+so admins become really multiplexed
 
 ```python title="Multiplexed"
 {!> ../docs_src/admin/admin_embed_multiplexed.py !}
 ```
+
 
 By default the `admin_prefix_url` is automatically inferred. For special cases like reverse proxies or preferring an url you might want to set it.
 
