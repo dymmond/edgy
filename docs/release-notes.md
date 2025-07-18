@@ -6,18 +6,12 @@ hide:
 
 # Release Notes
 
-## 0.32.7
+## 0.32.6
 
 ### Added
 
 - Allow multiple admins.
 - Add asgi multiplexing middleware (`edgy.contrib.lilya.middleware.EdgyMiddleware`).
-
-
-## 0.32.6
-
-### Added
-
 - Support for `isnull` operator for querysets on a field.
 - Support `NumberedPaginator` as alias for `Paginator` (n fact `Paginator` is an alias of `NumberedPaginator`).
 
