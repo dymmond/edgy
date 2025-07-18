@@ -16,12 +16,30 @@ else:  # pragma: no cover
 
 
 class BasePage(BaseModel):
+    """
+    Base class for a page of results in a pagination scheme.
+
+    Attributes:
+        content (list[Any]): The list of items on the current page.
+        is_first (bool): True if this is the first page, False otherwise.
+        is_last (bool): True if this is the last page, False otherwise.
+    """
+
     content: list[Any]
     is_first: bool
     is_last: bool
 
 
 class Page(BasePage):
+    """
+    Represents a single page in offset-based pagination.
+
+    Attributes:
+        current_page (int): The current page number. Defaults to 1.
+        next_page (int | None): The next page number, or None if it's the last page.
+        previous_page (int | None): The previous page number, or None if it's the first page.
+    """
+
     current_page: int = 1
     next_page: int | None
     previous_page: int | None
@@ -31,6 +49,24 @@ PageType = TypeVar("PageType", bound=BasePage)
 
 
 class BasePaginator(Generic[PageType]):
+    """
+    A generic base class for paginators.
+
+    This class provides common pagination functionalities and manages the queryset,
+    page size, and ordering.
+
+    Args:
+        queryset (QuerySet): The queryset to paginate.
+        page_size (int): The maximum number of items per page.
+        next_item_attr (str): The attribute to link to the next item in the page.
+                              Useful for chained lists or linked items. Defaults to "".
+        previous_item_attr (str): The attribute to link to the previous item in the page.
+                                  Useful for chained lists or linked items. Defaults to "".
+
+    Raises:
+        ValueError: If `page_size` is negative or if the `queryset` does not have an `order_by` clause.
+    """
+
     order_by: tuple[str, ...]
 
     def __init__(
@@ -63,27 +99,79 @@ class BasePaginator(Generic[PageType]):
         self._page_cache: dict[Hashable, PageType] = {}
 
     def clear_caches(self) -> None:
+        """
+        Clears all internal caches associated with the paginator, including page caches
+        and the queryset's cache. Resets the reverse paginator.
+        """
         self._page_cache.clear()
         self.queryset.all(clear_cache=True)
         if self._reverse_paginator:
             self._reverse_paginator = None
 
     async def get_amount_pages(self) -> int:
+        """
+        Calculates the total number of pages based on the total count of items
+        and the page size.
+
+        Returns:
+            int: The total number of pages. Returns 1 if `page_size` is 0.
+        """
         if not self.page_size:
             return 1
         count, remainder = divmod(await self.get_total(), self.page_size)
         return count + (1 if remainder else 0)
 
     async def get_total(self) -> int:
+        """
+        Retrieves the total number of items in the queryset.
+
+        Returns:
+            int: The total count of items.
+        """
         return await self.queryset.count()
 
     async def get_page(self) -> PageType:
+        """
+        Abstract method to get a specific page of results.
+
+        This method must be implemented by subclasses.
+
+        Raises:
+            NotImplementedError: This method is not implemented in the base class.
+        """
         raise NotImplementedError()
 
     def shall_drop_first(self, is_first: bool) -> bool:
+        """
+        Determines if the first item fetched should be dropped.
+
+        This is typically relevant when using `previous_item_attr` to link items
+        and fetching a page that is not the very first one, where the first item
+        in the raw fetch might be the last item of the *previous* page.
+
+        Args:
+            is_first (bool): True if the current page is considered the very first page, False otherwise.
+
+        Returns:
+            bool: True if the first item should be dropped, False otherwise.
+        """
         return bool(self.next_item_attr and not is_first)
 
     def convert_to_page(self, inp: Iterable, /, is_first: bool, reverse: bool = False) -> PageType:
+        """
+        Converts an iterable of raw items into a `BasePage` (or a subclass thereof).
+
+        This method handles linking items using `next_item_attr` and `previous_item_attr`
+        and determines `is_first` and `is_last` properties of the page.
+
+        Args:
+            inp (Iterable): An iterable of items to be paginated.
+            is_first (bool): True if this is the first page of results, False otherwise.
+            reverse (bool): True if the items are being processed in reverse order, False otherwise.
+
+        Returns:
+            PageType: An instance of `BasePage` or its subclass containing the paginated content.
+        """
         last_item: Any = None
         drop_first = self.shall_drop_first(is_first)
         result_list = []
@@ -128,6 +216,23 @@ class BasePaginator(Generic[PageType]):
     async def paginate_queryset(
         self, queryset: QuerySet, is_first: bool = True, prefill: Iterable | None = None
     ) -> AsyncGenerator[BasePage, None]:
+        """
+        Asynchronously paginates a given queryset, yielding `BasePage` objects.
+
+        This is an internal helper method used by concrete paginator implementations.
+        It handles the core logic of fetching items in chunks and assembling them into pages.
+
+        Args:
+            queryset (QuerySet): The queryset to paginate.
+            is_first (bool): True if this is the very first chunk being processed, False otherwise.
+                             Defaults to True.
+            prefill (Iterable | None): An optional iterable of items to prepend to the first page's content.
+                                      Useful for handling boundary conditions in cursor-based pagination.
+                                      Defaults to None.
+
+        Yields:
+            AsyncGenerator[BasePage, None]: An asynchronous generator that yields `BasePage` objects.
+        """
         container: list = []
         if prefill is not None:
             container.extend(prefill)
@@ -159,9 +264,26 @@ class BasePaginator(Generic[PageType]):
             yield BasePaginator.convert_to_page(self, container, is_first=is_first)
 
     async def paginate(self) -> AsyncGenerator[PageType, None]:
+        """
+        Abstract method for concrete paginators to implement their specific pagination logic.
+
+        This asynchronous generator should yield `PageType` objects.
+
+        Raises:
+            NotImplementedError: This method is not implemented in the base class.
+        """
         raise NotImplementedError()
 
     def get_reverse_paginator(self) -> Self:
+        """
+        Returns a paginator instance that traverses the queryset in reverse order.
+
+        This is useful for implementing backward pagination. The reverse paginator
+        shares caches for efficiency.
+
+        Returns:
+            Self: A new paginator instance configured for reverse traversal.
+        """
         if self._reverse_paginator is None:
             self._reverse_paginator = type(self)(
                 self.queryset.reverse(),
@@ -174,7 +296,23 @@ class BasePaginator(Generic[PageType]):
 
 
 class Paginator(BasePaginator[Page]):
+    """
+    A concrete paginator implementation for traditional offset-based pagination.
+
+    This paginator returns `Page` objects with explicit `current_page`, `next_page`,
+    and `previous_page` numbers.
+    """
+
     async def paginate(self, start_page: int = 1) -> AsyncGenerator[Page, None]:
+        """
+        Paginates through the queryset using offset and limit, yielding `Page` objects.
+
+        Args:
+            start_page (int): The page number to start pagination from. Defaults to 1.
+
+        Yields:
+            AsyncGenerator[Page, None]: An asynchronous generator that yields `Page` objects.
+        """
         query = self.queryset
         if start_page > 1:
             offset = self.page_size * (start_page - 1)
@@ -195,6 +333,20 @@ class Paginator(BasePaginator[Page]):
     def convert_to_page(
         self, inp: Iterable, /, page: int, is_first: bool, reverse: bool = False
     ) -> Page:
+        """
+        Converts an iterable of items into a `Page` object, specifically for offset-based pagination.
+
+        This method extends the base `convert_to_page` by adding page number information.
+
+        Args:
+            inp (Iterable): The input iterable of items to convert into a page.
+            page (int): The current page number.
+            is_first (bool): True if this is considered the first page, False otherwise.
+            reverse (bool): True if the pagination is in reverse order, False otherwise.
+
+        Returns:
+            Page: The created Page object.
+        """
         page_obj: BasePage = super().convert_to_page(
             inp,
             is_first=is_first,
@@ -208,6 +360,18 @@ class Paginator(BasePaginator[Page]):
         )
 
     async def _get_page(self, page: int, reverse: bool = False) -> Page:
+        """
+        Internal method to fetch a specific page of results based on page number.
+
+        This method handles calculating the offset and limit for the database query.
+
+        Args:
+            page (int): The page number to fetch.
+            reverse (bool): True if fetching the page in reverse order, False otherwise.
+
+        Returns:
+            Page: The requested page of results.
+        """
         # this is a special intern reverse which really reverses a page
         if page < 0 and self.page_size:
             return await self.get_reverse_paginator()._get_page(-page, reverse=True)
@@ -229,6 +393,20 @@ class Paginator(BasePaginator[Page]):
         return self.convert_to_page(await query, page=page, is_first=offset == 0, reverse=reverse)
 
     async def get_page(self, page: int = 1) -> Page:
+        """
+        Retrieves a specific page of results by its page number.
+
+        Results are cached for subsequent requests.
+
+        Args:
+            page (int): The page number to retrieve. Defaults to 1.
+
+        Returns:
+            Page: The requested page of results.
+
+        Raises:
+            ValueError: If the `page` parameter is invalid (e.g., 0 or not an integer).
+        """
         if page == 0 or not isinstance(page, int):
             raise ValueError(f"Invalid page parameter value: {page!r}")
         if self.page_size == 0:
