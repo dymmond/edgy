@@ -6,6 +6,14 @@ hide:
 
 # Release Notes
 
+## 0.32.7
+
+### Added
+
+- Allow multiple admins.
+- Add asgi multiplexing middleware (`edgy.contrib.lilya.middleware.EdgyMiddleware`).
+
+
 ## 0.32.6
 
 ### Added

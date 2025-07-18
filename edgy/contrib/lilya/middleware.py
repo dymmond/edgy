@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
+
+from lilya.protocols.middleware import MiddlewareProtocol
 
 import edgy
 
 if TYPE_CHECKING:
-    from lilya.protocols.middleware import MiddlewareProtocol
     from lilya.types import ASGIApp, Receive, Scope, Send
 
     from edgy.conf.global_settings import EdgySettings
     from edgy.core.connection import Registry
-else:
-    MiddlewareProtocol = object
 
 
 class EdgyMiddleware(MiddlewareProtocol):
@@ -26,7 +25,7 @@ class EdgyMiddleware(MiddlewareProtocol):
         self.overwrite: dict = {}
         if registry is not None:
             if wrap_asgi_app:
-                self.app = cast("ASGIApp", registry.asgi(self.app))  # type: ignore
+                self.app = registry.asgi(self.app)
             self.overwrite["instance"] = edgy.Instance(registry=registry, app=self.app)
         if settings is not None:
             self.overwrite["settings"] = settings
