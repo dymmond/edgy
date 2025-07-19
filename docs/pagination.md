@@ -45,14 +45,6 @@ a single item like shown above:
 {!> ../docs_src/pagination/using_attributes.py !}
 ```
 
-## NumberedPaginator
-
-If you are more familiar with Django Rest Framework like NumberedPaginator, this does a similar job.
-
-```python
-{!> ../docs_src/pagination/number_pagination.py !}
-```
-
 ## Integration
 
 How would an application look like, using this feature?
