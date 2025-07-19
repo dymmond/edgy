@@ -4,30 +4,30 @@
 
 **High-performance** means smart caching is used, so if you reuse the paginator, you might even skip database access. This works because it reuses the order of the QuerySet, which may already have the entire query cached.
 
-However, **edgy** is not as flexible as Django's Paginator. It only accepts QuerySets.
+However, the **edgy** paginator is not as flexible as Django's Paginator. It only accepts QuerySets of edgy.
 
-## Counter-based
+## Counter-based (NumberedPaginator/Paginator)
 
-This is the classic way of pagination. You provide a page number, and it returns a specific set of items based on the order of the QuerySet.
+This is the classic way of pagination. You provide a page number, and it returns a specific set of items based on the order of the QuerySet. It is available under the name `NumberedPaginator` or `Paginator` (both names are valid).
 
 ```python
 {!> ../docs_src/pagination/simple_pagination.py !}
 ```
 
-You can also use attributes to get the previous or next item. For better performance, we use the CursorPaginator:
+You can also use attributes to get the previous or next item. For better performance, we can use the `CursorPaginator`:
 
 ```python
 {!> ../docs_src/pagination/using_attributes.py !}
 ```
 
-This example would be in the slow variant:
+This example would be in the slow variant with the `NumberedPaginator`:
 
 ```python
 {!> ../docs_src/pagination/using_attributes_slow.py !}
 ```
 
 !!! Note
-    If you use a StrictModel make sure you have placeholders in place.
+    If you use a StrictModel make sure you have placeholders in place when use attributes.
 
 ## Cursor-based
 
@@ -44,6 +44,11 @@ a single item like shown above:
 ```python
 {!> ../docs_src/pagination/using_attributes.py !}
 ```
+
+## Use dicts instead of Page objects
+
+All paginators support `get_page_as_dict` and `paginate_as_dict`. Both methods resolve the pages before returning them.
+They support the same arguments as `get_page` and `paginate` for the paginator (in fact they are a dict resolving forward) by default.
 
 ## Integration
 

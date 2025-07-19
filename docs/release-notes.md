@@ -11,6 +11,7 @@ hide:
 ### Added
 
 - Support for `isnull` operator for querysets on a field.
+- Support `NumberedPaginator` as alias for `Paginator` (n fact `Paginator` is an alias of `NumberedPaginator`).
 
 ### Fixed
 
