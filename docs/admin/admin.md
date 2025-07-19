@@ -44,7 +44,7 @@ For more
 
 For embedding the admin you need a lilya session or something compatible (provide scope["session"] with a dict like interface).
 You can either declare a global session or provide a `session_cookie` name to prevent collisions.
-You can either use the ambient edgy instance or pass `registry` and/or `settings` to `create_admin_app`. This will cause an local overwrite, so you
+You can either use the global edgy instance or pass `registry` and/or `settings` to `create_admin_app`. This will cause a local overwrite (and doesn't require a global instance), so you
 can have even more than one admin in the same application.
 When passing the `registry` argument, the registry is automatically wrapping the admin app, so you aren't required to use the idiomatic asgi way for every registry but it isn't a fault to do so.
 
