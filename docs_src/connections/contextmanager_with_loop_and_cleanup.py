@@ -1,12 +1,12 @@
 import asyncio
-from edgy import Registry, Instance, monkay, run_sync
+from edgy import Registry, Instance, monkay
 
 models = Registry(database="sqlite:///db.sqlite", echo=True)
 
 # load settings
 monkay.evaluate_settings(ignore_import_errors=False)
 # monkey-patch app so you can use edgy shell
-monkay.set_instance(Instance(registry=registry))
+monkay.set_instance(Instance(registry=models))
 
 loop = asyncio.new_event_loop()
 with models.with_loop(loop):

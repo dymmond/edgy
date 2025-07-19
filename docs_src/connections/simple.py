@@ -19,4 +19,4 @@ app = Esmerald(
 # now required
 monkay.evaluate_settings()
 # monkey-patch app so you can use edgy shell
-monkay.set_instance(Instance(app=app, registry=registry))
+monkay.set_instance(Instance(app=app, registry=models))

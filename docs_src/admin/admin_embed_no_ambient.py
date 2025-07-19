@@ -30,7 +30,7 @@ class User(UserInterface, edgy.Model):
 
 
 def get_application() -> Any:
-    admin_app = create_admin_app()
+    admin_app = create_admin_app(registry=models)
     # or
     # admin_app = create_admin_app(session_sub_path="admin")
     routes = [
@@ -49,8 +49,6 @@ def get_application() -> Any:
             DefineMiddleware(SessionMiddleware, secret_key=settings.admin_config.SECRET_KEY),
         ],
     )
-    app = models.asgi(app)
-    edgy.monkay.set_instance(edgy.Instance(registry=models, app=app))
     return app
 
 

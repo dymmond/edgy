@@ -12,19 +12,40 @@ models = edgy.Registry(
     database="...",
 )
 
+models1 = edgy.Registry(
+    database="...",
+)
 
-class User(edgy.Model):
-    username: str = edgy.fields.CharField(max_length=100, unique=True)
-    active: bool = edgy.fields.BooleanField(default=False)
+models2 = edgy.Registry(
+    database="...",
+)
+
+
+class MyModel1(edgy.Model):
+    name: str = edgy.fields.CharField(max_length=100, unique=True)
+
+    class Meta:
+        registry = models1
+
+
+class MyModel2(edgy.Model):
+    name: str = edgy.fields.CharField(max_length=100, unique=True)
+
+    class Meta:
+        registry = models2
 
 
 def get_application() -> Any:
-    # multiplexed with lilya 0.15.5
-    admin_app = create_admin_app(session_sub_path="admin")
+    admin_app1 = create_admin_app(session_sub_path="admin1", registry=models1)
+    admin_app2 = create_admin_app(session_sub_path="admin2", registry=models2)
     routes = [
         Include(
-            path="/admin",
-            app=admin_app,
+            path="/admin1",
+            app=admin_app1,
+        ),
+        Include(
+            path="/admin2",
+            app=admin_app2,
         ),
     ]
     app: Any = Lilya(
@@ -32,9 +53,11 @@ def get_application() -> Any:
         middleware=[
             # you can also use a different secret_key aside from settings.admin_config.SECRET_KEY
             DefineMiddleware(SessionMiddleware, secret_key=settings.admin_config.SECRET_KEY),
+            # the session context for the global app (optional)
             DefineMiddleware(SessionContextMiddleware),
         ],
     )
+    # models, a complete different registry is used globally (optional)
     app = models.asgi(app)
     edgy.monkay.set_instance(edgy.Instance(registry=models, app=app))
     return app

@@ -1,4 +1,3 @@
-from contextlib import asynccontextmanager
 from esmerald import Esmerald
 
 from edgy import Registry, Instance, monkay
@@ -14,4 +13,4 @@ app = Esmerald(
 # load settings
 monkay.evaluate_settings(ignore_import_errors=False)
 # monkey-patch app so you can use edgy shell
-monkay.set_instance(Instance(app=app, registry=registry))
+monkay.set_instance(Instance(app=app, registry=models))

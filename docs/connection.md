@@ -53,7 +53,6 @@ Django doesn't natively support the lifespan protocol. Therefore, we provide a k
 ```python
 {!> ../docs_src/connections/django.py !}
 ```
-
 ## Manual Integration
 
 The `__aenter__` and `__aexit__` methods can be called as `connect` and `disconnect`. However, using context managers is recommended for simpler error handling.
@@ -66,6 +65,15 @@ This approach is suitable for integration via `on_startup` and `on_shutdown`.
 
 ```python
 {!> ../docs_src/connections/manual_esmerald.py !}
+```
+
+## Integration via middleware (lilya/esmerald)
+
+Supposed you have a multi-app environment where multiple ASGI apps are stitched to together in one application.
+And you have multiple edgy registries. Here we can use the `edgy.contrib.lilya.middleware.EdgyMiddleware` middleware.
+
+```python
+{!> ../docs_src/connections/lilya_middleware.py !}
 ```
 
 ## `DatabaseNotConnectedWarning`

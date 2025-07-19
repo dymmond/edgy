@@ -25,6 +25,14 @@ class User(UserInterface, edgy.Model):
     # we still need an authenticating backend checking the pw
     pw: str = edgy.fields.PasswordField()
 
+    @property
+    def is_authenticated(self) -> bool:
+        return True
+
+    @property
+    def display_name(self) -> str:
+        return self.username
+
     class Meta:
         registry = models
 
