@@ -42,13 +42,10 @@ class BaseField(BaseFieldType, FieldInfo):
     Allows factories to overwrite methods.
     """
 
-    # defs to simplify the life (can be None actually)
     owner: type[BaseModelType]
     operator_mapping: dict[str, str] = {
-        # aliases
         "is": "is_",
         "in": "in_",
-        # this operators are not directly available and need their alias
         "exact": "__eq__",
         "not": "__ne__",
         "gt": "__gt__",
@@ -142,23 +139,49 @@ class BaseField(BaseFieldType, FieldInfo):
     def operator_to_clause(
         self, field_name: str, operator: str, table: sqlalchemy.Table, value: Any
     ) -> Any:
-        """Base implementation, adaptable"""
-        # Map the operation code onto SQLAlchemy's ColumnElement
-        # https://docs.sqlalchemy.org/en/latest/core/sqlelement.html#sqlalchemy.sql.expression.ColumnElement
-        # MUST raise an KeyError on missing columns, this code is used for the generic case if no field is available
+        """
+        Converts a given operator and value into a SQLAlchemy clause for filtering.
+
+        This method maps common operation codes to SQLAlchemy's ColumnElement methods,
+        allowing for dynamic construction of database queries. It handles special cases
+        like case-insensitive exact matches ('iexact') and null checks ('isnull'),
+        as well as various string containment operations.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
         column = table.columns[field_name]
-        operator = self.operator_mapping.get(operator, operator)
-        if operator == "iexact":
-            ESCAPE_CHARACTERS = ["%", "_"]
-            has_escaped_character = any(c for c in ESCAPE_CHARACTERS if c in value)
+        mapped_operator = self.operator_mapping.get(operator, operator)
+
+        if mapped_operator == "iexact":
+            # Handle case-insensitive exact matching with escape character logic
+            escape_characters = ["%", "_"]
+            has_escaped_character = any(char in value for char in escape_characters)
+
             if has_escaped_character:
-                value = value.replace("\\", "\\\\")
-                # enable escape modifier
-                for char in ESCAPE_CHARACTERS:
-                    value = value.replace(char, f"\\{char}")
-            clause = column.ilike(value, escape="\\" if has_escaped_character else None)
-            return clause
-        elif operator in {
+                # Escape backslashes first, then the specific escape characters
+                processed_value = value.replace("\\", "\\\\")
+                for char in escape_characters:
+                    processed_value = processed_value.replace(char, f"\\{char}")
+                return column.ilike(processed_value, escape="\\")
+            else:
+                return column.ilike(value)
+
+        elif mapped_operator == "isnull":
+            # Handle isnull/isnotnull operations
+            return column.is_(None) if value is True else column.isnot(None)
+
+        elif mapped_operator in {
             "contains",
             "icontains",
             "startswith",
@@ -166,8 +189,12 @@ class BaseField(BaseFieldType, FieldInfo):
             "istartswith",
             "iendswith",
         }:
-            return getattr(column, operator)(value, autoescape=True)
-        return getattr(column, operator)(value)
+            # Handle various string matching operations with autoescape
+            return getattr(column, mapped_operator)(value, autoescape=True)
+
+        else:
+            # Default case: directly apply the operator if it's a ColumnElement method
+            return getattr(column, mapped_operator)(value)
 
     def is_required(self) -> bool:
         """Check if the argument is required.

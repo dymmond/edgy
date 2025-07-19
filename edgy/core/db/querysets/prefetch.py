@@ -22,6 +22,17 @@ class Prefetch:
         to_attr: str,
         queryset: QuerySet | None = None,
     ) -> None:
+        """
+        Initializes a Prefetch object.
+
+        Args:
+            related_name (str): The name of the related field to prefetch.
+            to_attr (str): The attribute name on the main model to which the prefetched
+                           results will be attached.
+            queryset (QuerySet | None): An optional QuerySet to use for prefetching.
+                                         If not provided, the default queryset for the
+                                         related model will be used.
+        """
         self.related_name = related_name
         self.to_attr = to_attr
         self.queryset: QuerySet | None = queryset
@@ -31,6 +42,16 @@ class Prefetch:
         self._baked = False
 
     async def init_bake(self, model_class: type[Model]) -> None:
+        """
+        Initializes the baking process for prefetching.
+
+        This method populates `_baked_results` by executing the `queryset`
+        and mapping the results back to the appropriate model instances
+        using `model_key`.
+
+        Args:
+            model_class (type[Model]): The model class associated with the prefetch operation.
+        """
         if self._baked or not self._is_finished or self.queryset is None:
             return
         self._baked = True
@@ -44,6 +65,22 @@ class Prefetch:
 
 
 def check_prefetch_collision(model: BaseModelType, related: Prefetch) -> Prefetch:
+    """
+    Checks for potential attribute name collisions when prefetching.
+
+    Ensures that the `to_attr` specified in a Prefetch object does not conflict
+    with existing attributes, fields, or managers on the target model.
+
+    Args:
+        model (BaseModelType): The model class to which the prefetched results will be attached.
+        related (Prefetch): The Prefetch object to check.
+
+    Returns:
+        Prefetch: The Prefetch object if no collision is detected.
+
+    Raises:
+        QuerySetError: If `to_attr` conflicts with an existing attribute, field, or manager.
+    """
     if (
         hasattr(model, related.to_attr)
         or related.to_attr in model.meta.fields
@@ -66,6 +103,16 @@ class PrefetchMixin:
         Performs a reverse lookup for the foreignkeys. This is different
         from the select_related. Select related performs a follows the SQL foreign relation
         whereas the prefetch_related follows the python relations.
+
+        Args:
+            *prefetch (Prefetch): One or more Prefetch objects defining the relationships
+                                   to prefetch.
+
+        Returns:
+            QuerySet: A new QuerySet with the specified prefetch relationships configured.
+
+        Raises:
+            QuerySetError: If any argument in `prefetch` is not an instance of `Prefetch`.
         """
         queryset: QuerySet = self._clone()
 

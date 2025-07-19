@@ -44,6 +44,7 @@ a single item like shown above:
 ```python
 {!> ../docs_src/pagination/using_attributes.py !}
 ```
+
 ## Integration
 
 How would an application look like, using this feature?

@@ -25,32 +25,74 @@ class QuerySetPropsMixin:
 
     @property
     def database(self) -> Database:
+        """
+        Returns the database instance associated with the queryset.
+
+        If `_database` is not explicitly set, it defaults to the database
+        configured for the `model_class`.
+
+        Returns:
+            Database: The database instance.
+        """
         if self._database is None:
             return cast("Database", self.model_class.database)
         return self._database
 
     @database.setter
     def database(self: QuerySet, value: Database) -> None:
+        """
+        Sets the database instance for the queryset and clears the cache.
+
+        Args:
+            value (Database): The database instance to set.
+        """
         self._database = value
         self._clear_cache()
 
     @property
     def table(self) -> sqlalchemy.Table:
+        """
+        Returns the SQLAlchemy Table object associated with the queryset.
+
+        If `_table` is not explicitly set, it generates the table schema
+        for the `model_class` based on the `active_schema`.
+
+        Returns:
+            sqlalchemy.Table: The SQLAlchemy Table object.
+        """
         if self._table is None:
             return cast("sqlalchemy.Table", self.model_class.table_schema(self.active_schema))
         return self._table
 
     @table.setter
     def table(self: QuerySet, value: sqlalchemy.Table | None) -> None:
+        """
+        Sets the SQLAlchemy Table object for the queryset and clears the cache.
+
+        Args:
+            value (sqlalchemy.Table | None): The SQLAlchemy Table object to set, or None.
+        """
         self._table = value
         self._clear_cache()
 
     @property
     def pknames(self) -> Sequence[str]:
+        """
+        Returns a sequence of primary key names for the model class.
+
+        Returns:
+            Sequence[str]: A sequence of primary key names.
+        """
         return self.model_class.pknames  # type: ignore
 
     @property
     def pkcolumns(self) -> Sequence[str]:
+        """
+        Returns a sequence of primary key column names for the model class.
+
+        Returns:
+            Sequence[str]: A sequence of primary key column names.
+        """
         return self.model_class.pkcolumns  # type: ignore
 
 
@@ -77,6 +119,22 @@ class TenancyMixin:
 
         Use schema=False to unset the schema to the active default schema.
         Use database=None to use the default database again.
+
+        Args:
+            _positional (Any): Deprecated. Positional argument for schema.
+            database (str | Any | None | Database): The name of the database connection
+                                                    or a Database instance to use.
+                                                    If None, uses the default database.
+            schema (str | Any | None | Literal[False]): The schema name to use.
+                                                         If False, unsets the schema to
+                                                         the active default schema.
+                                                         If None, uses no specific schema.
+
+        Returns:
+            QuerySet: A new QuerySet instance with the specified database and/or schema.
+
+        Warnings:
+            DeprecationWarning: If positional arguments are passed for `_positional`.
         """
         if _positional is not _sentinel:
             warnings.warn(
@@ -115,6 +173,20 @@ class TenancyMixin:
     ) -> QuerySet:
         """
         Switches the database connection and schema
+
+        Args:
+            connection_name (str): The name of the database connection to switch to.
+            schema (str | Any | None | Literal[False]): The schema name to use.
+                                                         If False, unsets the schema to
+                                                         the active default schema.
+                                                         If None, uses no specific schema.
+
+        Returns:
+            QuerySet: A new QuerySet instance with the specified database connection and schema.
+
+        Warnings:
+            DeprecationWarning: This method is deprecated in favor of `using` with `database`
+                                and `schema` keyword arguments.
         """
         warnings.warn(
             "'using_with_db' is deprecated in favor of 'using' with schema, database arguments.",
@@ -127,6 +199,15 @@ class TenancyMixin:
 def activate_schema(tenant_name: str) -> None:
     """
     Activates the schema for the context of the query.
+
+    This function sets the schema for the current context, affecting subsequent
+    database operations.
+
+    Args:
+        tenant_name (str): The name of the tenant schema to activate.
+
+    Warnings:
+        DeprecationWarning: This function is deprecated. Use `with_schema` instead.
     """
     warnings.warn(
         "`activate_schema` is deprecated use `with_schema` instead.",
@@ -139,6 +220,12 @@ def activate_schema(tenant_name: str) -> None:
 def deactivate_schema() -> None:
     """
     Deactivates the schema for the context of the query.
+
+    This function unsets the current schema, reverting to no specific schema
+    for subsequent database operations.
+
+    Warnings:
+        DeprecationWarning: This function is deprecated. Use `with_schema` instead.
     """
     warnings.warn(
         "`activate_schema` is deprecated use `with_schema` instead.",

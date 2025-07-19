@@ -187,7 +187,6 @@ async for user in User.query.batch_size(30):
     pass
 ```
 
-
 ### Filter
 
 #### Django-style
@@ -202,13 +201,16 @@ The same special operators are also automatically added on every column.
 
 * **in** - SQL `IN` operator.
 * **exact** - Filter instances matching the exact value.
+* **like** - Alternative to `exact`.
 * **iexact** - Filter instances mathing the exact value but case-insensitive.
+* **ilike** - Alternative syntax to `iexact`.
 * **contains** - Filter instances that contains a specific value.
 * **icontains** - Filter instances that contains a specific value but case-insensitive.
 * **lt** - Filter instances having values `Less Than`.
 * **lte** - Filter instances having values `Less Than Equal`.
 * **gt** - Filter instances having values `Greater Than`.
 * **gte** - Filter instances having values `Greater Than Equal`.
+* **isnull** - Filer instances by checking if a given attribute is null `True` or `False`
 
 
 ##### Example

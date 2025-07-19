@@ -24,6 +24,19 @@ _forbidden_param_kinds = frozenset([Parameter.KEYWORD_ONLY, Parameter.VAR_KEYWOR
 
 
 def is_callable_queryset_filter(inp: Any) -> bool:
+    """
+    Checks if an input is a callable suitable for a queryset filter.
+
+    A callable is considered suitable if it has at least two positional parameters
+    and does not use keyword-only or variable keyword parameters for its first two arguments.
+    It also checks for a special `_edgy_force_callable_queryset_filter` attribute.
+
+    Args:
+        inp (Any): The input to check.
+
+    Returns:
+        bool: True if the input is a suitable callable filter, False otherwise.
+    """
     if getattr(inp, "_edgy_force_callable_queryset_filter", None) is not None:
         return cast(bool, inp._edgy_force_callable_queryset_filter)
     if not callable(inp):
@@ -43,6 +56,20 @@ def is_callable_queryset_filter(inp: Any) -> bool:
 async def parse_clause_arg(
     arg: Any, instance: QuerySetType, tables_and_models: tables_and_models_type
 ) -> Any:
+    """
+    Parses a single clause argument, handling callables and awaitables.
+
+    If the argument is a callable queryset filter, it's called with the queryset instance
+    and tables/models. If the result is awaitable, it's awaited.
+
+    Args:
+        arg (Any): The argument to parse.
+        instance (QuerySetType): The queryset instance.
+        tables_and_models (tables_and_models_type): A dictionary mapping table aliases to (table, model) tuples.
+
+    Returns:
+        Any: The parsed argument.
+    """
     if is_callable_queryset_filter(arg):
         arg = arg(instance, tables_and_models)
     if isawaitable(arg):
@@ -53,6 +80,20 @@ async def parse_clause_arg(
 async def parse_clause_args(
     args: Iterable[Any], queryset: QuerySetType, tables_and_models: tables_and_models_type
 ) -> list[Any]:
+    """
+    Parses a list of clause arguments asynchronously.
+
+    Each argument is processed by `parse_clause_arg`. If `queryset.database.force_rollback`
+    is True, arguments are awaited sequentially; otherwise, they are awaited concurrently.
+
+    Args:
+        args (Iterable[Any]): An iterable of arguments to parse.
+        queryset (QuerySetType): The queryset instance.
+        tables_and_models (tables_and_models_type): A dictionary mapping table aliases to (table, model) tuples.
+
+    Returns:
+        list[Any]: A list of parsed arguments.
+    """
     result: list[Any] = []
     for arg in args:
         result.append(parse_clause_arg(arg, queryset, tables_and_models))
@@ -68,6 +109,27 @@ def clean_query_kwargs(
     embed_parent: tuple[str, str] | None = None,
     model_database: Database | None = None,
 ) -> dict[str, Any]:
+    """
+    Cleans and normalizes query keyword arguments for a given model class.
+
+    This function processes keyword arguments, handling embedded parent filters,
+    crawling relationships to find the correct field and model, and cleaning
+    field values using the field's `clean` method.
+
+    Args:
+        model_class (type[BaseModelType]): The base model class for the query.
+        kwargs (dict[str, Any]): The raw keyword arguments for the query.
+        embed_parent (tuple[str, str] | None): A tuple (parent_alias, prefix) for embedded parent filters.
+                                                If provided, prefixes in kwargs are handled. Defaults to None.
+        model_database (Database | None): The database instance to use for relationship crawling.
+                                          Defaults to None.
+
+    Returns:
+        dict[str, Any]: A new dictionary with cleaned and normalized keyword arguments.
+
+    Raises:
+        AssertionError: If 'pk' is found in the cleaned kwargs, indicating a parsing issue.
+    """
     new_kwargs: dict[str, Any] = {}
     for key, val in kwargs.items():
         if embed_parent:
@@ -89,11 +151,36 @@ def clean_query_kwargs(
 
 
 class _DefaultClausesHelper:
+    """
+    Helper class for creating default SQLAlchemy clauses (AND/OR).
+    """
+
     def __init__(self, op: Any, default_empty: Any) -> None:
+        """
+        Initializes the helper with an SQLAlchemy operator and a default empty value.
+
+        Args:
+            op (Any): The SQLAlchemy operator (e.g., `sqlalchemy.and_`, `sqlalchemy.or_`).
+            default_empty (Any): The default value to return if no arguments are provided
+                                 (e.g., `sqlalchemy.true()`, `sqlalchemy.false()`).
+        """
         self.op = op
         self.default_empty = default_empty
 
     def __call__(self, *args: Any) -> Any:
+        """
+        Creates an SQLAlchemy clause from the given arguments.
+
+        If no arguments are provided, returns the `default_empty` value. If only
+        one argument is provided, returns that argument directly. Otherwise,
+        applies the operator to all arguments.
+
+        Args:
+            *args (Any): The expressions to combine.
+
+        Returns:
+            Any: The combined SQLAlchemy clause.
+        """
         # unpack, so there are no trues and falses or connectors without any relevance in the where query
         if len(args) == 0:
             return self.default_empty
@@ -103,6 +190,19 @@ class _DefaultClausesHelper:
 
 
 def _calculate_select_related(queryset: QuerySetType, *, kwargs: dict[str, Any]) -> set[str]:
+    """
+    Calculates the set of `select_related` paths based on query keyword arguments.
+
+    This function identifies relationships that need to be eagerly loaded based on
+    field access patterns within the kwargs.
+
+    Args:
+        queryset (QuerySetType): The queryset instance.
+        kwargs (dict[str, Any]): The query keyword arguments.
+
+    Returns:
+        set[str]: A set of relationship paths to be included in `select_related`.
+    """
     select_related: set[str] = set()
     cleaned_kwargs = clean_query_kwargs(
         queryset.model_class,
@@ -120,6 +220,17 @@ def _calculate_select_related(queryset: QuerySetType, *, kwargs: dict[str, Any])
 
 
 def _calculate_select_related_sum(queryset: QuerySetType, *, callables: Iterable[Any]) -> set[str]:
+    """
+    Aggregates `select_related` paths from multiple callable arguments.
+
+    Args:
+        queryset (QuerySetType): The queryset instance.
+        callables (Iterable[Any]): An iterable of callables, each potentially having a
+                                   `_edgy_calculate_select_related` attribute.
+
+    Returns:
+        set[str]: A combined set of `select_related` paths.
+    """
     select_related: set[str] = set()
     for callab in callables:
         select_related.update(callab(queryset))
@@ -127,10 +238,36 @@ def _calculate_select_related_sum(queryset: QuerySetType, *, callables: Iterable
 
 
 class _EnhancedClausesHelper:
+    """
+    Helper class for creating enhanced SQLAlchemy clauses that support async
+    and callable filter arguments, and `select_related` calculation.
+    """
+
     def __init__(self, op: Any) -> None:
+        """
+        Initializes the helper with an SQLAlchemy operator.
+
+        Args:
+            op (Any): The SQLAlchemy operator (e.g., `sqlalchemy.and_`, `sqlalchemy.or_`).
+        """
         self.op = op
 
     def __call__(self, *args: Any, no_select_related: bool = False) -> Any:
+        """
+        Creates an enhanced clause from the given arguments.
+
+        If any argument is a callable queryset filter or awaitable, it wraps the
+        operation in an asynchronous function that parses the arguments. It also
+        attaches a `_edgy_calculate_select_related` callable if necessary.
+
+        Args:
+            *args (Any): The expressions to combine.
+            no_select_related (bool): If True, skips the calculation of `select_related` paths.
+                                      Defaults to False.
+
+        Returns:
+            Any: The combined SQLAlchemy clause, potentially wrapped in an async callable.
+        """
         if all(not is_callable_queryset_filter(arg) and not isawaitable(arg) for arg in args):
             return self.op(*args)
         calculate_select_related_args: list[Any] = (
@@ -156,6 +293,23 @@ class _EnhancedClausesHelper:
         return wrapper
 
     def from_kwargs(self, _: Any = None, /, **kwargs: Any) -> Any:
+        """
+        Creates an enhanced clause from keyword arguments.
+
+        This method dynamically builds the SQLAlchemy WHERE clause from keyword
+        arguments, handling relationship traversal and cross-database relationships.
+        It also attaches a `_edgy_calculate_select_related` callable if necessary.
+
+        Args:
+            _ (Any): Ignored. Used for backward compatibility to absorb an unused positional argument.
+            **kwargs (Any): The keyword arguments representing the filter conditions.
+
+        Returns:
+            Any: The SQLAlchemy clause, wrapped in an async callable.
+
+        Warns:
+            DeprecationWarning: If a positional argument is passed to this method.
+        """
         # ignore first parameter for backward compatibility
         if _ is not None:
             warnings.warn(
@@ -217,19 +371,23 @@ class _EnhancedClausesHelper:
 or_sqlalchemy = _DefaultClausesHelper(sqlalchemy.or_, sqlalchemy.false())
 or_sqlalchemy.__doc__ = """
     Creates a SQL Alchemy OR clause for the expressions being passed.
+    Returns `sqlalchemy.false()` if no expressions are passed.
 """
 and_sqlalchemy = _DefaultClausesHelper(sqlalchemy.and_, sqlalchemy.true())
 and_sqlalchemy.__doc__ = """
     Creates a SQL Alchemy AND clause for the expressions being passed.
+    Returns `sqlalchemy.true()` if no expressions are passed.
 """
 
 or_ = _EnhancedClausesHelper(or_sqlalchemy)
 or_.__doc__ = """
     Creates an edgy OR clause for the expressions being passed.
+    This supports asynchronous functions and `select_related` inference.
 """
 and_ = _EnhancedClausesHelper(and_sqlalchemy)
 and_.__doc__ = """
     Creates an edgy AND clause for the expressions being passed.
+    This supports asynchronous functions and `select_related` inference.
 """
 
 # alias
@@ -239,6 +397,17 @@ Q = and_
 def not_(clause: Any, *, no_select_related: bool = False) -> Any:
     """
     Creates a SQL Alchemy NOT clause for the expressions being passed.
+
+    This function wraps the `sqlalchemy.not_` operator and can handle
+    asynchronous and callable clauses, propagating `select_related`
+    information if present.
+
+    Args:
+        clause (Any): The expression to negate.
+        no_select_related (bool): If True, skips `select_related` calculation. Defaults to False.
+
+    Returns:
+        Any: The negated SQLAlchemy clause, potentially wrapped in an async callable.
     """
     if not is_callable_queryset_filter(clause) and not isawaitable(clause):
         return sqlalchemy.not_(clause)
@@ -263,4 +432,5 @@ __all__ = [
     "parse_clause_arg",
     "parse_clause_args",
     "clean_query_kwargs",
+    "Q",
 ]
