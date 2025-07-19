@@ -1,6 +1,6 @@
 from __future__ import annotations
 import edgy
-from edgy.contrib.pagination import Paginator, CursorPaginator
+from edgy.contrib.pagination import NumberedPaginator
 from edgy import Registry
 
 models = Registry(database="sqlite:///db.sqlite")
@@ -18,7 +18,7 @@ class BlogEntry(edgy.Model):
 async def get_blogpost(id: int) -> BlogEntry | None:
     query = BlogEntry.query.order_by("-created", "-id")
     # order by is required for paginators
-    paginator = Paginator(
+    paginator = NumberedPaginator(
         query,
         page_size=30,
         next_item_attr="next_blogpost",

@@ -1,7 +1,8 @@
 import pytest
 
 import edgy
-from edgy.contrib.pagination import CursorPaginator, Paginator
+from edgy.contrib.pagination import CursorPaginator
+from edgy.contrib.pagination import NumberedPaginator as Paginator
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -112,12 +113,22 @@ async def test_pagination_int_count_no_copy():
 
 
 @pytest.mark.parametrize("paginator_class", [Paginator, CursorPaginator])
-async def test_page_model_dump(paginator_class):
+async def test_page_model_dump_as_dict(paginator_class):
     await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
     ordered = IntCounter.query.order_by("-id")
     paginator = paginator_class(ordered, page_size=0)
     counter_page = await paginator.get_page()
-    counter_page.model_dump()
+    assert counter_page.model_dump() == await paginator.get_page_as_dict()
+
+
+@pytest.mark.parametrize("paginator_class", [Paginator, CursorPaginator])
+async def test_pagignate_as_dict(paginator_class):
+    await IntCounter.query.bulk_create([{"id": i} for i in range(100)])
+    ordered = IntCounter.query.order_by("-id")
+    paginator = paginator_class(ordered, page_size=0)
+    arr1 = [item.model_dump() async for item in paginator.paginate()]
+    arr2 = [item async for item in paginator.paginate_as_dict()]
+    assert arr1 == arr2
 
 
 async def test_pagination_int_count():

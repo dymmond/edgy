@@ -141,6 +141,14 @@ class BasePaginator(Generic[PageType]):
         """
         raise NotImplementedError()
 
+    async def get_page_as_dict(self, *args: Any, **kwargs: Any) -> dict:
+        """
+        Alternative to get_page to yield dicts.
+
+        Has the same arguments as get_page.
+        """
+        return (await self.get_page(*args, **kwargs)).model_dump()
+
     def shall_drop_first(self, is_first: bool) -> bool:
         """
         Determines if the first item fetched should be dropped.
@@ -274,6 +282,15 @@ class BasePaginator(Generic[PageType]):
         """
         raise NotImplementedError()
 
+    async def paginate_as_dict(self, *args: Any, **kwargs: Any) -> AsyncGenerator[dict, None]:
+        """
+        Alternative to paginate to yield dicts.
+
+        Has the same arguments as paginate.
+        """
+        async for page in self.paginate(*args, **kwargs):
+            yield page.model_dump()
+
     def get_reverse_paginator(self) -> Self:
         """
         Returns a paginator instance that traverses the queryset in reverse order.
@@ -295,7 +312,7 @@ class BasePaginator(Generic[PageType]):
         return self._reverse_paginator
 
 
-class Paginator(BasePaginator[Page]):
+class NumberedPaginator(BasePaginator[Page]):
     """
     A concrete paginator implementation for traditional offset-based pagination.
 
@@ -418,3 +435,6 @@ class Paginator(BasePaginator[Page]):
 
         self._page_cache[page] = page_obj
         return page_obj
+
+
+Paginator = NumberedPaginator
