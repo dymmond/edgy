@@ -102,6 +102,24 @@ class CharField(FieldFactory, str):
             else sqlalchemy.String(length=max_length, collation=kwargs.get("collation"))
         )
 
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == "")
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
+
 
 class TextField(CharField):
     """
@@ -199,6 +217,24 @@ class IntegerField(FieldFactory, int):
             kwargs.setdefault("read_only", True)
             kwargs["inject_default_on_partial_update"] = True
 
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == 0)
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
+
 
 class FloatField(FieldFactory, float):
     """
@@ -252,6 +288,24 @@ class FloatField(FieldFactory, float):
             oracle.FLOAT(binary_precision=round(precision / 0.30103), asdecimal=False),  # type: ignore
             "oracle",
         )
+
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == 0.0)
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
 
 
 class BigIntegerField(IntegerField):
@@ -356,6 +410,24 @@ class DecimalField(FieldFactory, decimal.Decimal):
         if decimal_places is None or decimal_places < 0:
             raise FieldDefinitionError("decimal_places are required for DecimalField")
 
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == decimal.Decimal("0"))
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
+
 
 # in python it is not possible to subclass bool. So only use bool for type checking.
 class BooleanField(FieldFactory, cast(bool, int)):
@@ -374,6 +446,24 @@ class BooleanField(FieldFactory, cast(bool, int)):
         Returns the SQLAlchemy column type for a BooleanField.
         """
         return sqlalchemy.Boolean()
+
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column.is_(False))
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
 
 
 class DateTimeField(_AutoNowMixin, datetime.datetime):
@@ -497,6 +587,24 @@ class DurationField(FieldFactory, datetime.timedelta):
         """
         return sqlalchemy.Interval()
 
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == datetime.timedelta())
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
+
 
 class TimeField(FieldFactory, datetime.time):
     """
@@ -602,6 +710,24 @@ class BinaryField(FieldFactory, bytes):
         Uses `sqlalchemy.LargeBinary` with the specified maximum length.
         """
         return sqlalchemy.LargeBinary(length=kwargs.get("max_length"))
+
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == b"")
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
 
 
 class UUIDField(FieldFactory, uuid.UUID):
