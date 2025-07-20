@@ -31,10 +31,10 @@ from .mixins import AutoNowMixin as _AutoNowMixin
 from .mixins import IncrementOnSaveBaseField, TimezonedField
 from .place_holder_field import PlaceholderField as _PlaceholderField
 
-CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
-
 if TYPE_CHECKING:
     import zoneinfo
+
+CLASS_DEFAULTS = ["cls", "__class__", "kwargs"]
 
 
 class CharField(FieldFactory, str):
@@ -357,6 +357,7 @@ class DecimalField(FieldFactory, decimal.Decimal):
             raise FieldDefinitionError("decimal_places are required for DecimalField")
 
 
+# in python it is not possible to subclass bool. So only use bool for type checking.
 class BooleanField(FieldFactory, cast(bool, int)):
     """
     Represents a boolean field.

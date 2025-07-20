@@ -65,6 +65,7 @@ def remove_unparametrized_relationship_fields(
     # Extract 'parameters' and 'exclude' from kwargs, providing defaults if not present.
     parameters: dict[str, dict[str, Any]] = kwargs.get("parameters") or {}
     excluded: set[str | Literal[False]] = {*(kwargs.get("exclude") or []), *extra_exclude}
+    # cleanup related_name False
     # Remove any `False` literal that might be present in excluded (e.g., from Literal[False]).
     excluded.discard(False)
 

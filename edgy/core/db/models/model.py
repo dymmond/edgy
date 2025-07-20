@@ -84,6 +84,7 @@ class Model(
     # `query_related` is a redirect manager, pointing to the `query` manager for related queries.
     query_related: ClassVar[BaseManager] = RedirectManager(redirect_name="query")
     # `meta` holds metadata about the model, initialized as abstract and not registered by default.
+    # registry = False, stops the retrieval of the registry from base classes
     meta: ClassVar[MetaInfo] = MetaInfo(None, abstract=True, registry=False)
 
     class Meta:

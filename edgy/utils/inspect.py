@@ -180,23 +180,19 @@ class InspectDB:
                 and its properties (tablename, class_name, foreign_keys, indexes, constraints).
             -   A dictionary mapping SQLAlchemy table keys to generated model class names.
         """
-        tables_dict = dict(metadata.tables.items())
         tables = []
         models: dict[str, str] = {}  # To store mapping of table key to model class name.
 
-        for key, table in tables_dict.items():
+        for key, table in metadata.tables.items():
             table_details: dict[str, Any] = {}
             # Extract tablename, handling schema prefixes if present.
-            table_details["tablename"] = key.rsplit(".", 1)[-1]
+            table_name = table_details["tablename"] = key.rsplit(".", 1)[-1]
 
-            # Generate a suitable Python class name from the table name.
-            table_name_list: list[str] = key.split(".")
-            table_name = table_name_list[1] if len(table_name_list) > 1 else table_name_list[0]
-            table_details["class_name"] = table_name.replace("_", "").replace(".", "").capitalize()
+            models[key] = table_details["class_name"] = (
+                table_name.replace("_", "").replace(".", "").capitalize()
+            )
             table_details["class"] = None  # Placeholder for the actual class object.
             table_details["table"] = table  # Reference to the SQLAlchemy Table object.
-            models[key] = table_details["class_name"]
-
             # Get details for foreign keys, indexes, and constraints.
             table_details["foreign_keys"] = cls.get_foreign_keys(table)
             table_details["indexes"] = table.indexes
@@ -230,7 +226,9 @@ class InspectDB:
             fk["column"] = foreign_key.column  # The target Column object.
             fk["column_name"] = foreign_key.column.name  # Name of the target column.
             fk["tablename"] = foreign_key.column.table.name  # Name of the target table.
-            fk["class_name"] = foreign_key.column.table.name.replace("_", "").capitalize()
+            fk["class_name"] = (
+                foreign_key.column.table.name.replace("_", "").replace(".", "").capitalize()
+            )
             fk["on_delete"] = foreign_key.ondelete  # ON DELETE action.
             fk["on_update"] = foreign_key.onupdate  # ON UPDATE action.
             details.append(fk)
@@ -316,6 +314,7 @@ class InspectDB:
 
         # For FloatField, extract precision (handling different SQLAlchemy dialects).
         if field_type == "FloatField":
+            # Note: precision is maybe set to None when reflecting
             precision = getattr(real_field, "precision", None)
             if precision is None:
                 # Oracle specific precision.
@@ -387,7 +386,7 @@ class InspectDB:
         meta += [
             "    class Meta:\n",
             "        registry = registry\n",
-            "        tablename = '{}'\n".format(table_detail["tablename"]),
+            '        tablename = "{}"\n'.format(table_detail["tablename"]),
         ]
 
         if unique_together:
@@ -509,12 +508,8 @@ class InspectDB:
                 if is_fk:
                     fk_detail = foreign_keys[0]
                     field_params["to"] = fk_detail["class_name"]  # Target model class name.
-                    field_params["on_update"] = (
-                        fk_detail["on_update"] or "CASCADE"
-                    )  # Default to CASCADE if not specified
-                    field_params["on_delete"] = (
-                        fk_detail["on_delete"] or "CASCADE"
-                    )  # Default to CASCADE if not specified
+                    field_params["on_update"] = fk_detail["on_update"]
+                    field_params["on_delete"] = fk_detail["on_delete"]
                     # Generate a default related_name.
                     field_params["related_name"] = "{}_{}_set".format(
                         attr_name.lower(),
@@ -522,27 +517,20 @@ class InspectDB:
                     )
 
                 # Construct the field definition string.
-                field_type_str = field_type + "("
-                field_description = f"    {attr_name} = "
-                # Add DB_MODULE prefix if the field_type is not already a fully qualified path.
-                field_description += (
-                    f"{DB_MODULE}.{field_type_str}" if "." not in field_type else field_type_str
+                field_type += "("
+                field_description = "{} = {}{}".format(
+                    attr_name,
+                    "" if "." in field_type else f"{DB_MODULE}.",
+                    field_type,
                 )
 
                 if field_params:
-                    # Add parameters, using !r for proper representation of values.
-                    # Ensure commas are correctly placed.
-                    params_list = []
-                    for k, v in field_params.items():
-                        # Special handling for RawRepr to avoid extra quotes.
-                        if isinstance(v, RawRepr):
-                            params_list.append(f"{k}={v.inp}")
-                        else:
-                            params_list.append(f"{k}={v!r}")
-                    field_description += ", ".join(params_list)
+                    if not field_description.endswith("("):
+                        field_description += ", "
+                    field_description += ", ".join(f"{k}={v!r}" for k, v in field_params.items())
 
                 field_description += ")\n"
-                yield field_description
+                yield f"    {field_description}"
 
             yield "\n"
             # Yield the Meta class content.

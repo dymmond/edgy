@@ -68,16 +68,15 @@ class Manager(BaseManager):
 
     Example:
         ```python
-        from saffier.managers import ModelManager
-        from saffier.models import Model
+        from edgy import Manager, Model
 
 
-        class MyCustomManager(ModelManager):
+        class MyCustomManager(Manager):
             # Custom manager logic can be added here
             pass
 
 
-        class MyOtherManager(ModelManager):
+        class MyOtherManager(Manager):
             # Another custom manager
             pass
 

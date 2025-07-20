@@ -193,6 +193,7 @@ class Schema:
                 else self.registry.extra[database_name]
             )
             # Enter an asynchronous context for the database connection, disabling rollback.
+            # prevents warning of inperformance
             async with db as db:
                 with db.force_rollback(False):
                     # Append the run_sync operation to the list of operations.
@@ -249,6 +250,7 @@ class Schema:
                 else self.registry.extra[database_name]
             )
             # Enter an asynchronous context for the database connection, disabling rollback.
+            # prevents warning of inperformance
             async with db as db:
                 with db.force_rollback(False):
                     # Append the run_sync operation to the list of operations.

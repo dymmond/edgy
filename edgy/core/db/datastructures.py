@@ -281,11 +281,12 @@ class QueryModelResultCache:
         Returns:
             tuple: A unique tuple representing the cache key.
         """
-        # Start the cache key with the category name.
+        # we don't know if we get a row, a dict or a model, so use model_class
         cache_key_list: list[Any] = [self.create_category(model_class, prefix=prefix)]
         # Use the provided attrs or the instance's default attrs.
         if attrs is None:
             attrs = self.attrs
+        # there are no columns, only column results
 
         # Iterate over the attributes and append their values to the cache key list.
         # This handles both dictionary-like instances (rows) and model objects.
@@ -363,7 +364,7 @@ class QueryModelResultCache:
         self,
         cache_key: tuple,
         prefix: str | None = None,
-        old_cache: Self | None = None,
+        old_cache: QueryModelResultCache | None = None,
     ) -> Any | None:
         """
         Retrieves a cached entry using a pre-generated cache key. If an `old_cache`
@@ -406,7 +407,7 @@ class QueryModelResultCache:
         model_class: type[BaseModelType],
         row_or_model: Any,
         prefix: str | None = None,
-        old_cache: Self | None = None,
+        old_cache: QueryModelResultCache | None = None,
     ) -> Any | None:
         """
         Retrieves a cached entry for a given model class and an instance (or row).
@@ -443,7 +444,7 @@ class QueryModelResultCache:
         cache_fn: Callable[[Any], BaseModelType | None] | None = None,
         transform_fn: Callable[[BaseModelType | None], Any] | None = None,
         prefix: str | None = None,
-        old_cache: Self | None = None,
+        old_cache: QueryModelResultCache | None = None,
     ) -> Sequence[Any]:
         """
         Synchronously retrieves multiple cached entries or populates the cache

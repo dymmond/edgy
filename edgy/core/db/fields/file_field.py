@@ -8,7 +8,6 @@ from typing import (
     Any,
     BinaryIO,
     Literal,
-    cast,
 )
 
 import orjson
@@ -195,8 +194,6 @@ class ConcreteFileField(BaseCompositeField):
         ):
             value = value[field_name]
 
-        skip_save = False  # Flag to indicate if the file save operation should be skipped.
-
         # If it's not a 'load' phase and a model instance exists with an existing FieldFile,
         # reuse the old FieldFile instance.
         if (
@@ -207,11 +204,13 @@ class ConcreteFileField(BaseCompositeField):
             field_instance_or_value = model_instance.__dict__[self.name]
         else:
             field_instance_or_value = value
+        skip_save = False  # Flag to indicate if the file save operation should be skipped.
 
         if isinstance(field_instance_or_value, FieldFile):
             # If the value is already a FieldFile, use it directly.
             file_instance = field_instance_or_value
         else:
+            # init_db, load, post_insert, post_update path
             # Initialize FieldFile from database-loaded dict or create a new one.
             if isinstance(field_instance_or_value, dict) and isinstance(
                 field_instance_or_value.get(field_name), str | type(None)
@@ -299,7 +298,7 @@ class ConcreteFileField(BaseCompositeField):
                             associated properties, keyed by field name and related names.
         """
         file_instance = self.extract_file_instance(field_name, value)
-        retdict: Any = {field_name: file_instance}
+        retdict: dict[str, Any] = {field_name: file_instance}
 
         # Conditionally add size, approval, and metadata to the return dictionary.
         if self.with_size:
@@ -314,7 +313,7 @@ class ConcreteFileField(BaseCompositeField):
             if field.field_type is str:
                 metadata_result = orjson.dumps(metadata_result).decode("utf8")
             retdict[f"{field_name}_metadata"] = metadata_result
-        return cast(dict[str, Any], retdict)
+        return retdict
 
     def get_columns(self, field_name: str) -> Sequence[sqlalchemy.Column]:
         """
@@ -334,6 +333,7 @@ class ConcreteFileField(BaseCompositeField):
         # Validate the field definition against a ColumnDefinitionModel.
         model = ColumnDefinitionModel.model_validate(self, from_attributes=True)
         column_name = self.column_name or field_name
+        # TODO: check if it works in embedded settings or embed_field is required
 
         return [
             # Main column for the file path.
@@ -415,7 +415,7 @@ class ConcreteFileField(BaseCompositeField):
             if metadata_name not in fields:
                 retdict[metadata_name] = JSONField(
                     null=False,
-                    column_name=f"{column_name}_mname",  # Renamed for clarity in DB.
+                    column_name=f"{column_name}_mname",  # Renamed in db because of name length restrictions
                     name=metadata_name,
                     owner=self.owner,
                     default=dict,  # Default to an empty dictionary.
@@ -460,7 +460,7 @@ class ConcreteFileField(BaseCompositeField):
         # Execute the file operation (save/delete). `nodelete_old` ensures old file
         # is deleted only on update if specified.
         await value.execute_operation(nodelete_old=not is_update)
-        # Close the file, optionally keeping its size for later use.
+        # cleanup temp file, keeping its size for later use.
         value.close(keep_size=True)
 
     async def post_delete_callback(self, value: FieldFile) -> None:

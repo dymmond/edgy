@@ -39,22 +39,8 @@ def hash_to_identifier(key: str | bytes) -> str:
     # Ensure the key is in bytes format for hashing.
     if isinstance(key, str):
         key = key.encode()
-
-    # Use BLAKE2b with a digest size of 16 bytes for a short hash.
-    # BLAKE2b is a cryptographic hash function, but here it's used for its
-    # good distribution properties and speed, not for security.
-    digest = blake2b(key, digest_size=16).digest()
-
-    # Encode the binary hash to Base32. Base32 is preferred for identifiers
-    # as it's typically case-insensitive and more URL-friendly than Base64.
-    b32_encoded = b32encode(digest).decode()
-
-    # Remove any trailing '=' padding characters, as they are not needed for unique identifiers.
-    identifier = b32_encoded.rstrip("=")
-
-    # Prefix with '_' to ensure it's a valid Python identifier (cannot start with a number).
-    # This prefixing is also expected by Edgy's migration system.
-    return f"_{identifier}"
+    # calculate blake2b and b32 encode digest. Strip = afterwards
+    return f"_{b32encode(blake2b(key, digest_size=16).digest()).decode().rstrip('=')}"
 
 
 # This string representation of the function is kept for backward compatibility

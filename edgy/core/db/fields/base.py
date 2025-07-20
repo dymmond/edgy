@@ -59,7 +59,7 @@ class BaseField(BaseFieldType, FieldInfo):
         "gte": "__ge__",
         "lt": "__lt__",
         "lte": "__le__",
-        "le": "__le_",
+        "le": "__le__",
     }
     auto_compute_server_default: bool | None | Literal["ignore_null"] = False
 
@@ -403,6 +403,10 @@ class BaseField(BaseFieldType, FieldInfo):
             A dictionary containing the default value for the field if it's not
             already in `cleaned_data`, otherwise an empty dictionary.
         """
+        # for multidefaults overwrite in subclasses get_default_values to
+        # parse default values differently
+        # NOTE: multi value fields should always check here if defaults were already applied
+        # NOTE: when build meta fields without columns this should be empty
         # If the field_name is already in cleaned_data, no default is needed.
         if field_name in cleaned_data:
             return {}
@@ -1188,7 +1192,7 @@ class BaseForeignKey(RelationshipField):
     @target.deleter
     def target(self) -> None:
         """
-        Deletes the cached target model, forcing re-resolution on next access.
+        Deletes the cached target model, forcing re-query on next access.
         """
         # Clear the cache for _target.
         with contextlib.suppress(AttributeError):

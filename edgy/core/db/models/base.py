@@ -18,6 +18,7 @@ from edgy.core.db.context_vars import (
 )
 from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.utils.sync import run_sync
+from edgy.types import Undefined
 
 from .types import BaseModelType
 
@@ -56,11 +57,13 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     __proxy_model__: ClassVar[type[Model] | None] = None
     __reflected__: ClassVar[bool] = False
     __show_pk__: ClassVar[bool] = False
-    __using_schema__: ClassVar[str | None | Any] = None
+    __using_schema__: ClassVar[str | None | Any] = Undefined
     __deletion_with_signals__: ClassVar[bool] = False
     __no_load_trigger_attrs__: ClassVar[set[str]] = _empty
     database: ClassVar[Database] = None
+    # private attributes
     _db_loaded: bool = PrivateAttr(default=False)
+    # not in db anymore or deleted
     _db_deleted: bool = PrivateAttr(default=False)
     _db_schemas: ClassVar[dict[str, type[BaseModelType]]]
 
@@ -379,6 +382,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         :param is_update: True if the operation is an update, False for creation.
         :return: A dictionary of values returned by pre-save callbacks.
         """
+        # also handle defaults
         # Combine keys from new and original column values to identify affected fields.
         keys = {*column_values.keys(), *original.keys()}
         affected_fields = self.meta.pre_save_fields.intersection(keys)
@@ -697,8 +701,11 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             if (
                 name not in self.__dict__
                 and behavior != "passdown"
+                # is already loaded or deleted
                 and not self._db_loaded_or_deleted
+                # only load when it is a field except for reflected
                 and (field is not None or self.__reflected__)
+                # exclude attr names from triggering load
                 and name not in getattr(self, "__no_load_trigger_attrs__", _empty)
                 and name not in self.identifying_db_fields
                 and self.can_load

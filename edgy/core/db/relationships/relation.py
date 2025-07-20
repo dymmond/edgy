@@ -122,6 +122,7 @@ class ManyRelation(ManyRelationProtocol):
         This method iterates through the `refs` (staged children) and adds them
         to the relationship.
         """
+        # TODO: improve performance
         # Get the foreign key field on the 'through' model that points back to the 'from' model.
         fk = self.through.meta.fields[self.from_foreign_key]
         # Iterate while there are references in the list.

@@ -2,7 +2,7 @@ CASCADE = "CASCADE"
 RESTRICT = "RESTRICT"
 DO_NOTHING = "DO NOTHING"
 SET_NULL = "SET NULL"
-SET_DEFAULT = "SET_DEFAULT"
+SET_DEFAULT = "SET DEFAULT"
 PROTECT = "PROTECT"
 
 
@@ -13,8 +13,6 @@ class OLD_M2M_NAMING:
     it serves purely as a marker or type hint for configuration purposes.
     """
 
-    pass
-
 
 class NEW_M2M_NAMING:
     """
@@ -24,8 +22,6 @@ class NEW_M2M_NAMING:
     different M2M naming strategies.
     """
 
-    pass
-
 
 class ConditionalRedirect(dict):
     """
@@ -34,8 +30,6 @@ class ConditionalRedirect(dict):
     might depend on certain conditions. It inherits from `dict` and
     can therefore store key-value pairs representing redirect parameters.
     """
-
-    pass
 
 
 __all__ = [

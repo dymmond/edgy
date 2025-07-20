@@ -63,6 +63,7 @@ class BaseForeignKeyField(BaseForeignKey):
     use_model_based_deletion: bool = False
     force_cascade_deletion_relation: bool = False
     relation_has_post_delete_callback: bool = False
+    # allow db overwrite for e.g. sondercharacters
     column_name: str | None = None
 
     def __init__(
@@ -141,6 +142,7 @@ class BaseForeignKeyField(BaseForeignKey):
         and then calls its `raw_delete` method, skipping post-delete hooks for
         the related model unless specified by `reverse_name`.
         """
+        # FIXME: we are stuck on an old version of field before copy, so replace self
         # Retrieve the current field context (workaround for field copy issues).
         self = CURRENT_FIELD_CONTEXT.get()["field"]  # type: ignore
         # Expand the relationship to get the actual related model instance.
@@ -222,6 +224,7 @@ class BaseForeignKeyField(BaseForeignKey):
         if self.relation_fn is not None:
             return self.relation_fn(**kwargs)
 
+        # also set in db.py
         # Determine the relation class based on `force_cascade_deletion_relation`.
         if self.force_cascade_deletion_relation:
             relation: Any = VirtualCascadeDeletionSingleRelation
@@ -506,7 +509,7 @@ class BaseForeignKeyField(BaseForeignKey):
         for column_name in column_names:
             if column_name in kwargs:
                 to_add[self.from_fk_field_name(name, column_name)] = kwargs.pop(column_name)
-
+        # fake default
         # If no individual columns were found, handle default behavior.
         if not to_add:
             if phase in {"post_insert", "post_update", "load"}:

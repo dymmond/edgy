@@ -10,11 +10,11 @@ from edgy.core.db.context_vars import FORCE_FIELDS_NULLABLE
 from edgy.exceptions import DatabaseNotConnectedWarning
 from edgy.utils.hashing import hash_to_identifier
 
-# Context variable to control silencing of database connection warnings.
-CHECK_DB_CONNECTION_SILENCED = ContextVar("CHECK_DB_CONNECTION_SILENCED", default=False)
-
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
+
+# Context variable to control silencing of database connection warnings.
+CHECK_DB_CONNECTION_SILENCED = ContextVar("CHECK_DB_CONNECTION_SILENCED", default=False)
 
 
 def check_db_connection(db: Database, stacklevel: int = 3) -> None:

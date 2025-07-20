@@ -3,8 +3,6 @@ from __future__ import annotations
 import inspect
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy.orm import Mapped, relationship
-
 if TYPE_CHECKING:
     # TYPE_CHECKING is preserved as per instruction.
     # MetaInfo is likely used for `cls.meta.registry.declarative_base`
@@ -73,6 +71,9 @@ class DeclarativeMixin:
             An `Any` type representing the dynamically generated SQLAlchemy Declarative
             model class, complete with mapped relationships.
         """
+        # orm is heavy, so keep it in the function
+        from sqlalchemy.orm import Mapped, relationship
+
         # Retrieve the declarative base from the Edgy model's metadata registry.
         # This `Base` is the foundation for the new declarative model.
         Base = cls.meta.registry.declarative_base  # type: ignore

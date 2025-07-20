@@ -182,6 +182,8 @@ class DumpMixin:
                     # If the mode is 'json' and the field is not marked for unsafe JSON serialization,
                     # skip it. This prevents non-serializable types from breaking JSON output.
                     if mode == "json" and not getattr(field, "unsafe_json_serialization", False):
+                        # skip field if it isn't a BaseModel and the mode is json and
+                        # unsafe_json_serialization is not set
                         # Currently, `unsafe_json_serialization` exists only on `CompositeFields`.
                         continue
 

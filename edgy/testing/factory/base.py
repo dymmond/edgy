@@ -311,61 +311,59 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                     current_parameters_or_callback = _faker_callback
 
                 # Case 2: If the current_parameters_or_callback is callable (including Faker).
-                if callable(current_parameters_or_callback):
-                    params = field.get_parameters(context=context)
-                    # Handle 'randomly_unset' option.
-                    randomly_unset = params.pop("randomly_unset", None)
-                    if randomly_unset is not None and randomly_unset is not False:
-                        if randomly_unset is True:
-                            randomly_unset = 50
-                        if faker.pybool(randomly_unset):
-                            raise ExcludeValue  # Signal to exclude the field.
+                try:
+                    if callable(current_parameters_or_callback):
+                        params = field.get_parameters(context=context)
+                        # Handle 'randomly_unset' option.
+                        randomly_unset = params.pop("randomly_unset", None)
+                        if randomly_unset is not None and randomly_unset is not False:
+                            if randomly_unset is True:
+                                randomly_unset = 50
+                            if faker.pybool(randomly_unset):
+                                raise ExcludeValue  # Signal to exclude the field.
 
-                    # Handle 'randomly_nullify' option.
-                    randomly_nullify = params.pop("randomly_nullify", None)
-                    if randomly_nullify is not None and randomly_nullify is not False:
-                        if randomly_nullify is True:
-                            randomly_nullify = 50
-                        if faker.pybool(randomly_nullify):
-                            values[name] = None  # Set value to None and continue.
-                            continue
-                    field.inc_callcount()  # Increment call count for the field.
-                    values[name] = current_parameters_or_callback(
-                        field,
-                        context,
-                        params,
-                    )
-                else:
-                    # Case 3: Parameters are a dict or None, merge with field parameters.
-                    params = field.get_parameters(
-                        context=context,
-                        parameters=current_parameters_or_callback,
-                    )
-                    # Handle 'randomly_unset' option for this case.
-                    randomly_unset = params.pop("randomly_unset", None)
-                    if randomly_unset is not None and randomly_unset is not False:
-                        if randomly_unset is True:
-                            randomly_unset = 50
-                        if faker.pybool(randomly_unset):
-                            raise ExcludeValue  # Signal to exclude the field.
+                        # Handle 'randomly_nullify' option.
+                        randomly_nullify = params.pop("randomly_nullify", None)
+                        if randomly_nullify is not None and randomly_nullify is not False:
+                            if randomly_nullify is True:
+                                randomly_nullify = 50
+                            if faker.pybool(randomly_nullify):
+                                values[name] = None  # Set value to None and continue.
+                                continue
+                        field.inc_callcount()  # Increment call count for the field.
+                        values[name] = current_parameters_or_callback(
+                            field,
+                            context,
+                            params,
+                        )
+                    else:
+                        # Case 3: Parameters are a dict or None, merge with field parameters.
+                        params = field.get_parameters(
+                            context=context,
+                            parameters=current_parameters_or_callback,
+                        )
+                        # Handle 'randomly_unset' option for this case.
+                        randomly_unset = params.pop("randomly_unset", None)
+                        if randomly_unset is not None and randomly_unset is not False:
+                            if randomly_unset is True:
+                                randomly_unset = 50
+                            if faker.pybool(randomly_unset):
+                                raise ExcludeValue  # Signal to exclude the field.
 
-                    # Handle 'randomly_nullify' option for this case.
-                    randomly_nullify = params.pop("randomly_nullify", None)
-                    if randomly_nullify is not None and randomly_nullify is not False:
-                        if randomly_nullify is True:
-                            randomly_nullify = 50
-                        if faker.pybool(randomly_nullify):
-                            values[name] = None  # Set value to None and continue.
-                            continue
-                    field.inc_callcount()  # Increment call count for the field.
-                    # Execute the field's callback with merged parameters.
-                    values[name] = field(context=context, parameters=params)
-                # Catch ExcludeValue to silently skip the field.
-                # contextlib.suppress handles this better if it were a local variable.
-                # Given the 'raise' here, the outer try-except is appropriate.
+                        # Handle 'randomly_nullify' option for this case.
+                        randomly_nullify = params.pop("randomly_nullify", None)
+                        if randomly_nullify is not None and randomly_nullify is not False:
+                            if randomly_nullify is True:
+                                randomly_nullify = 50
+                            if faker.pybool(randomly_nullify):
+                                values[name] = None  # Set value to None and continue.
+                                continue
+                        field.inc_callcount()  # Increment call count for the field.
+                        # Execute the field's callback with merged parameters.
+                        values[name] = field(context=context, parameters=params)
+                except ExcludeValue:
+                    ...  # Field was explicitly excluded, continue to next field.
             values.update(kwargs)  # Apply remaining kwargs (overwrites).
-        except ExcludeValue:
-            pass  # Field was explicitly excluded, continue to next field.
         finally:
             model_factory_context.reset(token)  # Always reset the context var.
         return values

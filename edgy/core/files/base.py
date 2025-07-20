@@ -352,6 +352,7 @@ class File:
             bytes: The data read from the file.
 
         Raises:
+            AttributeError: If unable to seek to the beginning of the file.
             AssertionError: If the file is closed.
         """
         assert self.file is not None
@@ -745,6 +746,10 @@ class FieldFile(File):
             self.approved = approved
         elif self.change_removes_approval:
             self.approved = False
+
+    def close(self, keep_size: bool = False) -> None:
+        if self.operation == "none":
+            super().close(keep_size=keep_size)
 
 
 class ImageFieldFile(FieldFile):

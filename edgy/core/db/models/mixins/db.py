@@ -717,6 +717,8 @@ class DatabaseMixin:
         Raises:
             NotImplementedError: If a prefix is provided.
         """
+        # works only if the class of the model is the main class of the queryset
+        # TODO: implement prefix handling and return generic column without table attached
         if prefix:
             raise NotImplementedError()
         clauses: list[Any] = []

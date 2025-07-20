@@ -2,7 +2,6 @@ import ipaddress
 from typing import Any
 
 import sqlalchemy
-import sqlalchemy.dialects.postgresql
 
 
 class IPAddress(sqlalchemy.TypeDecorator):

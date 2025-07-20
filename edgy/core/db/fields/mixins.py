@@ -70,6 +70,7 @@ class IncrementOnSaveBaseField(Field):
             dict[str, Any]: A dictionary containing the field's name and its new value,
                             or an empty dictionary if no change is needed.
         """
+        # FIXME: we are stuck on an old version of field before copy, so replace self
         # Workaround for field copy issues, retrieve current field context.
         self = CURRENT_FIELD_CONTEXT.get()["field"]  # type: ignore
         explicit_values = EXPLICIT_SPECIFIED_VALUES.get()

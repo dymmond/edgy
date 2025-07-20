@@ -133,7 +133,6 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         Returns:
             `True` if the field must have a value, `False` otherwise.
         """
-        raise NotImplementedError()
 
     @abstractmethod
     def has_default(self) -> bool:
@@ -143,7 +142,6 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         Returns:
             `True` if a default is provided (Python-side or server-side), `False` otherwise.
         """
-        raise NotImplementedError()
 
     @abstractmethod
     def get_columns(self, field_name: str) -> Sequence[sqlalchemy.Column]:
@@ -158,7 +156,6 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         Returns:
             Sequence[sqlalchemy.Column]: A sequence of SQLAlchemy Column objects.
         """
-        raise NotImplementedError()
 
     def operator_to_clause(
         self, field_name: str, operator: str, table: sqlalchemy.Table, value: Any
@@ -279,7 +276,6 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
         Returns:
             Any: The default value(s) for the field.
         """
-        raise NotImplementedError()
 
     @abstractmethod
     def embed_field(
@@ -306,7 +302,6 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
             BaseFieldType | None: A copy of the field with updated properties, or `None`
                                  if embedding is not supported or desired.
         """
-        raise NotImplementedError()
 
     # helpers
 

@@ -22,8 +22,6 @@ class BaseRefForeignKey(BaseField):
     inheritance hierarchy for `RefForeignKey`.
     """
 
-    ...
-
 
 class RefForeignKey(ForeignKeyFieldFactory, list):
     """

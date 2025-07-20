@@ -109,7 +109,7 @@ class ConcreteCompositeField(BaseCompositeField):
             elif field[1].inherit:
                 # If the field should inherit (not excluded like PKField).
                 field_name = field[0]
-                # Check for invalid field names with prefix.
+                # Check for after the transformation invalid field names when adding prefix.
                 if self.prefix_embedded.endswith("_") and field_name.startswith("_"):
                     raise FieldDefinitionError(
                         f"_ prefixed fields are not supported: {field_name} with "

@@ -21,12 +21,13 @@ from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
 from edgy.core.db.context_vars import CURRENT_INSTANCE, FORCE_FIELDS_NULLABLE
 from edgy.core.utils.sync import current_eventloop, run_sync
+from edgy.types import Undefined
 
 from .asgi import ASGIApp, ASGIHelper
 
 if TYPE_CHECKING:
     from edgy.conf.global_settings import EdgySettings
-    from edgy.contrib.autoreflection.models import AutoReflectionModel
+    from edgy.contrib.autoreflection.models import AutoReflectModel
     from edgy.core.db.models.types import BaseModelType
 
 
@@ -266,7 +267,7 @@ class Registry:
         self.admin_models: set[str] = set()  # Set later during adding to registry
         self.reflected: dict[str, type[BaseModelType]] = {}
         self.tenant_models: dict[str, type[BaseModelType]] = {}
-        self.pattern_models: dict[str, type[AutoReflectionModel]] = {}
+        self.pattern_models: dict[str, type[AutoReflectModel]] = {}
         self.dbs_reflected = set()
 
         self.schema = Schema(registry=self)
@@ -760,8 +761,6 @@ class Registry:
                             continue
                         # Handle tenant models and explicit schema usage.
                         if not getattr(model_class.meta, "is_tenant", False):
-                            from edgy.types import Undefined
-
                             if (
                                 model_class.__using_schema__ is Undefined
                                 or model_class.__using_schema__ is None
@@ -1014,7 +1013,7 @@ class Registry:
         if not self.pattern_models or name in self.dbs_reflected:
             return  # No pattern models to reflect or already reflected.
 
-        schemes = set()
+        schemes: set[None | str] = set()
         for pattern_model in self.pattern_models.values():
             if name not in pattern_model.meta.databases:
                 continue
@@ -1036,7 +1035,7 @@ class Registry:
                         and pattern_model.meta.exclude_pattern.match(table.name)
                     ):
                         continue
-                    if pattern_model.fields_not_supported_by_table(table):
+                    if pattern_model.fields_not_supported_by_table(table):  # type: ignore
                         continue
 
                     new_name = pattern_model.meta.template(table)

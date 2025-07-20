@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 from inspect import getmro, isclass
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -23,6 +22,7 @@ if TYPE_CHECKING:
 terminal = Print()
 
 
+# this is not models MetaInfo
 class MetaInfo:
     """
     Stores metadata for a `ModelFactory` class.
@@ -138,10 +138,9 @@ class ModelFactoryMeta(type):
             return super().__new__(cls, factory_name, bases, attrs, **kwargs)  # type: ignore
 
         # Ensure Faker is installed.
-        with contextlib.suppress(ImportError):
+        try:
             from faker import Faker
-        # If Faker is not found, raise an ImportError.
-        if "Faker" not in locals():
+        except ImportError:
             raise ImportError('"Faker" is required for the ModelFactory.') from None
 
         faker = Faker()  # Initialize Faker.

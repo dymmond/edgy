@@ -5,6 +5,7 @@ from databasez.testclient import DatabaseTestClient as _DatabaseTestClient
 # Determine the default test prefix for database names from environment variables.
 # This allows users to customize how test databases are prefixed.
 default_test_prefix: str = "test_"
+# for allowing empty prefix
 if "EDGY_TESTCLIENT_TEST_PREFIX" in os.environ:
     default_test_prefix = os.environ["EDGY_TESTCLIENT_TEST_PREFIX"]
 

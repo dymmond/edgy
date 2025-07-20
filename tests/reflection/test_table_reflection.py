@@ -23,7 +23,7 @@ class Users(edgy.ReflectModel):
 
     class Meta:
         registry = registry
-        tablename = 'users'
+        tablename = "users"
 """.strip()
 
 expected_result2 = """
@@ -35,7 +35,7 @@ class Hubusers(edgy.ReflectModel):
 
     class Meta:
         registry = registry
-        tablename = 'hubusers'
+        tablename = "hubusers"
 """.strip()
 
 
