@@ -467,7 +467,7 @@ class NumberedPaginator(BasePaginator[Page]):
             if offset > 0:
                 query = query.offset(offset)  # Apply the offset to the queryset.
 
-        counter = start_page  # Initialize page counter.
+        counter = 1  # Initialize page counter.
         # Iterate asynchronously over the chunks yielded by `paginate_queryset`.
         async for page_obj in self.paginate_queryset(query, is_first=start_page == 1):
             # Yield a `Page` object, combining the base page data with numbered information.

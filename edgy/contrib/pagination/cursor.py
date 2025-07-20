@@ -464,7 +464,7 @@ class CursorPaginator(BasePaginator[CursorPage]):
             else self.vector_to_cursor(vector),  # The current cursor is the input cursor.
         )
         # Cache the fetched page in the reverse page cache.
-        self._reverse_page_cache[vector] = page_obj
+        self._reverse_page_cache[vector] = reverse_page
         return page_obj
 
     async def get_page(self, cursor: Hashable | None = None, backward: bool = False) -> CursorPage:

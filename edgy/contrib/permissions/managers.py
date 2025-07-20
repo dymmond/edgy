@@ -170,6 +170,7 @@ class PermissionManager(Manager):
 
         # If objects are specified but the list is empty, return an empty queryset for users.
         if objects is not None and len(objects) == 0:
+            # none
             return cast("QuerySet", UserField.target.query.filter(and_()))
 
         # Initialize clauses for direct user permissions.
@@ -304,6 +305,7 @@ class PermissionManager(Manager):
 
         # If objects are specified but the list is empty, return an empty queryset for groups.
         if objects is not None and len(objects) == 0:
+            # none
             return cast("QuerySet", GroupField.target.query.filter(and_()))
 
         # Initialize clauses for direct group permissions.

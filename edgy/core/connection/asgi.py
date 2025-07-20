@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Awaitable, Callable, MutableMapping
 from contextlib import suppress
 from dataclasses import dataclass
@@ -60,7 +62,7 @@ class ASGIHelper:
     """
 
     app: ASGIApp
-    registry: "Registry"
+    registry: Registry
     handle_lifespan: bool = False
 
     async def __call__(

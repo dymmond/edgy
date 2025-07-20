@@ -186,7 +186,7 @@ class MetaDataByUrlDict(dict):
         Raises:
             KeyError: If the URL is not found in the dictionary.
         """
-        return cast(str, super().__getitem__(key))
+        return cast(str | None, super().__getitem__(key))
 
     def __copy__(self) -> MetaDataByUrlDict:
         """
@@ -263,13 +263,15 @@ class Registry:
             database if isinstance(database, Database) else Database(database, **kwargs)
         )
         self.models: dict[str, type[BaseModelType]] = {}
-        self.admin_models: set[str] = set()  # Set during adding to registry
+        self.admin_models: set[str] = set()  # Set later during adding to registry
         self.reflected: dict[str, type[BaseModelType]] = {}
         self.tenant_models: dict[str, type[BaseModelType]] = {}
         self.pattern_models: dict[str, type[AutoReflectionModel]] = {}
         self.dbs_reflected = set()
 
         self.schema = Schema(registry=self)
+        # when setting a Model or Reflected Model execute the callbacks
+        # Note: they are only executed if the Model is not in Registry yet
         self._onetime_callbacks: dict[str | None, list[Callable[[type[BaseModelType]], None]]] = (
             defaultdict(list)
         )
@@ -281,6 +283,7 @@ class Registry:
             k: v if isinstance(v, Database) else Database(v) for k, v in extra.items()
         }
         # Validate names for extra databases.
+        # we want to get all problems before failing.
         assert all([self.extra_name_check(x) for x in self.extra]), (  # noqa
             "Invalid name in extra detected. See logs for details."
         )
@@ -299,7 +302,7 @@ class Registry:
     ) -> None:
         """
         Applies default values to nullable fields in models, primarily used
-        after migrations for online updates.
+        for online migrations.
 
         Args:
             force_fields_nullable (Iterable[tuple[str, str]] | None): A
@@ -508,7 +511,7 @@ class Registry:
         if with_content_type is True:
             with_content_type = ContentType
 
-        real_content_type: type[BaseModelType] = with_content_type  # type: ignore
+        real_content_type: type[BaseModelType] = with_content_type
 
         # If the provided content type model is abstract, create a concrete one.
         if real_content_type.meta.abstract:
@@ -527,7 +530,7 @@ class Registry:
                 "ContentType",
                 with_content_type.__module__,
                 __metadata__=new_meta,
-                __bases__=(with_content_type,),  # type: ignore
+                __bases__=(with_content_type,),
             )
         # If the content type model is not abstract but not yet in this registry.
         elif real_content_type.meta.registry is None:
@@ -669,7 +672,7 @@ class Registry:
                 continue
             model_dict: dict = getattr(self, model_dict_name)
             if model_name in model_dict:
-                return model_dict[model_name]  # type: ignore
+                return cast(type["BaseModelType"], model_dict[model_name])
         raise LookupError(f'Registry doesn\'t have a "{model_name}" model.') from None
 
     def delete_model(self, model_name: str) -> bool:
