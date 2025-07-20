@@ -60,7 +60,7 @@ class ASGIHelper:
     """
 
     app: ASGIApp
-    registry: Registry
+    registry: "Registry"
     handle_lifespan: bool = False
 
     async def __call__(

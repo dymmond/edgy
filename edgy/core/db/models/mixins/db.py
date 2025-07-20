@@ -79,6 +79,17 @@ def _check_replace_related_field(
     | list[type[BaseModelType]],
     model: type[BaseModelType],
 ) -> bool:
+    """
+    Checks if a related field should be replaced based on the provided configuration.
+
+    Args:
+        replace_related_field: A boolean, a model type, or a sequence of model types
+                               indicating whether the related field should be replaced.
+        model: The model type to check against the replacement configuration.
+
+    Returns:
+        True if the related field should be replaced, False otherwise.
+    """
     if isinstance(replace_related_field, bool):
         return replace_related_field
     if not isinstance(replace_related_field, tuple | list):
@@ -97,6 +108,28 @@ def _set_related_field(
     | tuple[type[BaseModelType], ...]
     | list[type[BaseModelType]],
 ) -> None:
+    """
+    Sets the related field on the target model.
+
+    This function creates a `RelatedField` instance and assigns it to the target
+    model's metadata. It also handles cascade deletion settings based on the
+    foreign key's configuration.
+
+    Args:
+        target: The model type to which the related field will be added.
+        foreign_key_name: The name of the foreign key field in the source model.
+        related_name: The name of the related field to be set on the target model.
+        source: The source model type that declares the foreign key.
+        replace_related_field: A boolean, a model type, or a sequence of model types
+                               indicating whether an existing related field should be
+                               replaced if a conflict occurs.
+
+    Raises:
+        ForeignKeyBadConfigured: If multiple related names with the same value are
+                                 found pointing to the same target, and replacement
+                                 is not explicitly allowed for the conflicting related
+                                 from model.
+    """
     if replace_related_field is not True and related_name in target.meta.fields:
         # is already correctly set, required for migrate of model_apps with registry set
         related_field = target.meta.fields[related_name]
@@ -110,7 +143,8 @@ def _set_related_field(
             replace_related_field, related_field.related_from
         ):
             raise ForeignKeyBadConfigured(
-                f"Multiple related_name with the same value '{related_name}' found to the same target. Related names must be different."
+                f"Multiple related_name with the same value '{related_name}' found to "
+                "the same target. Related names must be different."
             )
     # now we have enough data
     fk = source.meta.fields[foreign_key_name]
@@ -141,9 +175,18 @@ def _set_related_name_for_foreign_keys(
     | list[type[BaseModelType]] = False,
 ) -> None:
     """
-    Sets the related name for the foreign keys.
-    When a `related_name` is generated, creates a RelatedField from the table pointed
-    from the ForeignKey declaration and the the table declaring it.
+    Sets the related name for the foreign keys within a model's metadata.
+
+    When a `related_name` is generated or explicitly provided, this function
+    creates a `RelatedField` that links the model declaring the foreign key
+    to the target model of the foreign key. This allows for reverse relationships.
+
+    Args:
+        meta: The `MetaInfo` object of the model class, containing its fields.
+        model_class: The model class for which to set related names.
+        replace_related_field: A boolean, a model type, or a sequence of model types
+                               indicating whether an existing related field should be
+                               replaced if a conflict occurs during registration.
     """
     if not meta.foreign_key_fields:
         return
@@ -171,8 +214,6 @@ def _set_related_name_for_foreign_keys(
             related_name=related_name,
             replace_related_field=replace_related_field,
         )
-        # foreign_key.__dict__.pop("target", None)
-        # foreign_key.__dict__.pop("target_registry", None)
         registry: Registry = foreign_key.target_registry
         with contextlib.suppress(Exception):
             registry = cast("Registry", foreign_key.target.registry)
@@ -180,6 +221,13 @@ def _set_related_name_for_foreign_keys(
 
 
 def _fixup_rel_annotation(target: type[BaseModelType], field: BaseFieldType) -> None:
+    """
+    Adjusts the type annotation for a related field based on its type (M2M or nullable).
+
+    Args:
+        target: The target model type of the relationship.
+        field: The field whose annotation needs to be fixed.
+    """
     if field.is_m2m:
         field.field_type = field.annotation = list[target]  # type: ignore
     elif field.null:
@@ -189,6 +237,16 @@ def _fixup_rel_annotation(target: type[BaseModelType], field: BaseFieldType) -> 
 
 
 def _fixup_rel_annotations(meta: MetaInfo) -> None:
+    """
+    Fixes up the type annotations for all foreign key and many-to-many fields
+    within a model's metadata.
+
+    This ensures that the type hints correctly reflect the related model types,
+    which is crucial for validation and static analysis.
+
+    Args:
+        meta: The `MetaInfo` object of the model, containing its fields.
+    """
     for name in chain(meta.foreign_key_fields, meta.many_to_many_fields):
         field = meta.fields[name]
         registry: Registry = field.target_registry
@@ -200,9 +258,24 @@ def _fixup_rel_annotations(meta: MetaInfo) -> None:
 
 
 class DatabaseMixin:
+    """
+    A mixin class providing database-related functionalities for models.
+
+    This includes methods for interacting with the database such as saving,
+    updating, deleting, and loading model instances, as well as managing
+    database schemas and model registration.
+    """
+
     _removed_copy_keys: ClassVar[set[str]] = _removed_copy_keys
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Initializes the DatabaseMixin.
+
+        Args:
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+        """
         super().__init__(*args, **kwargs)
         self.transaction = self.not_set_transaction
 
@@ -220,7 +293,37 @@ class DatabaseMixin:
         | list[type[BaseModelType]] = False,
         on_conflict: Literal["keep", "replace", "error"] = "error",
     ) -> type[BaseModelType]:
-        """For customizations."""
+        """
+        Registers the model class with the provided registry.
+
+        This method handles the core logic for adding a model to a registry,
+        including managing database connections, resolving model name conflicts,
+        and setting up relationships (foreign keys and many-to-many fields).
+
+        Args:
+            registry: The `Registry` instance to which the model will be added.
+            registry_type_name: The name of the registry dictionary to use (e.g., "models").
+            name: An optional name to assign to the model in the registry. If not
+                  provided, the class's `__name__` will be used.
+            database: Specifies how the database connection should be handled.
+                      `True` means use the registry's database; `False` means no database;
+                      `"keep"` means retain the current database if set, otherwise use
+                      the registry's; a `Database` instance means use that specific database.
+            replace_related_field: A boolean, a model type, or a sequence of model types
+                                   indicating whether existing related fields should be
+                                   replaced if conflicts arise during registration.
+            on_conflict: Defines the behavior when a model with the same name is
+                         already registered. Can be "keep" (return existing model),
+                         "replace" (overwrite existing model), or "error" (raise
+                         `ModelCollisionError`).
+
+        Returns:
+            The registered model class.
+
+        Raises:
+            ModelCollisionError: If a model with the same name is already registered
+                                 and `on_conflict` is "error".
+        """
         # when called if registry is not set
         cls.meta.registry = registry
         if database is True:
@@ -301,6 +404,24 @@ class DatabaseMixin:
         | list[type[BaseModelType]] = False,
         on_conflict: Literal["keep", "replace", "error"] = "error",
     ) -> type[BaseModelType]:
+        """
+        A public wrapper for `real_add_to_registry`.
+
+        This method provides a convenient interface for registering a model class
+        with a given registry, forwarding all parameters to `real_add_to_registry`.
+
+        Args:
+            registry: The `Registry` instance to which the model will be added.
+            name: An optional name to assign to the model in the registry.
+            database: Specifies how the database connection should be handled.
+            replace_related_field: Indicates whether existing related fields should
+                                   be replaced.
+            on_conflict: Defines the behavior when a model with the same name is
+                         already registered.
+
+        Returns:
+            The registered model class.
+        """
         return cls.real_add_to_registry(
             registry=registry,
             name=name,
@@ -312,6 +433,20 @@ class DatabaseMixin:
     def get_active_instance_schema(
         self, check_schema: bool = True, check_tenant: bool = True
     ) -> str | None:
+        """
+        Retrieves the active schema for the current model instance.
+
+        This method first checks if a schema is explicitly set for the instance.
+        If not, it defers to `get_active_class_schema` to determine the schema
+        based on class-level configurations and global context.
+
+        Args:
+            check_schema: If True, checks for a global schema in the context.
+            check_tenant: If True, considers tenant-specific schemas.
+
+        Returns:
+            The active schema as a string, or None if no schema is found.
+        """
         if self._edgy_namespace["__using_schema__"] is not Undefined:
             return cast(str | None, self._edgy_namespace["__using_schema__"])
         return type(self).get_active_class_schema(
@@ -320,6 +455,20 @@ class DatabaseMixin:
 
     @classmethod
     def get_active_class_schema(cls, check_schema: bool = True, check_tenant: bool = True) -> str:
+        """
+        Retrieves the active schema for the model class.
+
+        This method determines the schema based on the class's `__using_schema__`
+        attribute, global schema context, and the model's configured database schema.
+
+        Args:
+            check_schema: If True, checks for a global schema in the context.
+            check_tenant: If True, considers tenant-specific schemas when checking
+                          the global schema.
+
+        Returns:
+            The active schema as a string.
+        """
         if cls.__using_schema__ is not Undefined:
             return cast(str | None, cls.__using_schema__)
         if check_schema:
@@ -339,7 +488,30 @@ class DatabaseMixin:
         on_conflict: Literal["keep", "replace", "error"] = "error",
         **kwargs: Any,
     ) -> type[Self]:
-        """Copy the model class and optionally add it to another registry."""
+        """
+        Copies the model class and optionally registers it with another registry.
+
+        This method creates a deep copy of the model, including its fields and
+        managers. It can also reconfigure foreign key and many-to-many relationships
+        to point to models within a new registry or disable backreferences.
+
+        Args:
+            registry: An optional `Registry` instance to which the copied model
+                      should be added. If `None`, the model is not added to any registry.
+            name: An optional new name for the copied model. If not provided,
+                  the original model's name is used.
+            unlink_same_registry: If True, and the `registry` is different from the
+                                  original model's registry, foreign key targets
+                                  that point to models within the original registry
+                                  will be unreferenced, forcing them to be resolved
+                                  within the new registry.
+            on_conflict: Defines the behavior if a model with the same name already
+                         exists in the target registry (if `registry` is provided).
+            **kwargs: Additional keyword arguments to pass to `create_edgy_model`.
+
+        Returns:
+            The newly created and copied model class.
+        """
         # removes private pydantic stuff, except the prefixed ones
         attrs = {
             key: val for key, val in cls.__dict__.items() if key not in cls._removed_copy_keys
@@ -426,6 +598,15 @@ class DatabaseMixin:
 
     @property
     def table(self) -> sqlalchemy.Table:
+        """
+        Returns the SQLAlchemy table associated with the model instance.
+
+        If the table is not already set on the instance, it will be built
+        dynamically based on the active schema.
+
+        Returns:
+            The SQLAlchemy `Table` object.
+        """
         if self._edgy_namespace.get("_table") is None:
             schema = self.get_active_instance_schema()
             return cast(
@@ -436,16 +617,37 @@ class DatabaseMixin:
 
     @table.setter
     def table(self, value: sqlalchemy.Table | None) -> None:
+        """
+        Sets the SQLAlchemy table for the model instance.
+
+        Clears cached primary key columns when the table is reset.
+
+        Args:
+            value: The SQLAlchemy `Table` object to set.
+        """
         self._edgy_namespace.pop("_pkcolumns", None)
         self._edgy_namespace["_table"] = value
 
     @table.deleter
     def table(self) -> None:
+        """
+        Deletes the SQLAlchemy table associated with the model instance.
+
+        Also clears cached primary key columns.
+        """
         self._edgy_namespace.pop("_pkcolumns", None)
         self._edgy_namespace.pop("_table", None)
 
     @property
     def pkcolumns(self) -> Sequence[str]:
+        """
+        Returns the names of the primary key columns for the model instance.
+
+        If not already cached, it builds them based on the model's table.
+
+        Returns:
+            A sequence of strings representing the primary key column names.
+        """
         if self._edgy_namespace.get("_pkcolumns") is None:
             if self._edgy_namespace.get("_table") is None:
                 self._edgy_namespace["_pkcolumns"] = type(self).pkcolumns
@@ -455,14 +657,39 @@ class DatabaseMixin:
 
     @property
     def pknames(self) -> Sequence[str]:
+        """
+        Returns the logical names of the primary key fields for the model.
+
+        Returns:
+            A sequence of strings representing the primary key field names.
+        """
         return cast(Sequence[str], type(self).pknames)
 
     def __setattr__(self, key: str, value: Any) -> None:
+        """
+        Custom `__setattr__` method to handle specific attribute assignments.
+
+        If the `__using_schema__` attribute is set, it clears the cached
+        `_table` to ensure the table is rebuilt with the new schema.
+
+        Args:
+            key: The name of the attribute to set.
+            value: The value to assign to the attribute.
+        """
         if key == "__using_schema__":
             self._edgy_namespace.pop("_table", None)
         super().__setattr__(key, value)
 
     def get_columns_for_name(self: Model, name: str) -> Sequence[sqlalchemy.Column]:
+        """
+        Retrieves the SQLAlchemy columns associated with a given field name.
+
+        Args:
+            name: The name of the field.
+
+        Returns:
+            A sequence of SQLAlchemy `Column` objects.
+        """
         table = self.table
         meta = self.meta
         if name in meta.field_to_columns:
@@ -470,11 +697,26 @@ class DatabaseMixin:
         elif name in table.columns:
             return (table.columns[name],)
         else:
-            return cast(Sequence["sqlalchemy.Column"], _empty)
+            return cast(Sequence[sqlalchemy.Column], _empty)
 
     def identifying_clauses(self, prefix: str = "") -> list[Any]:
-        # works only if the class of the model is the main class of the queryset
-        # TODO: implement prefix handling and return generic column without table attached
+        """
+        Generates SQLAlchemy clauses for identifying the current model instance.
+
+        These clauses are typically used in WHERE conditions for update and delete
+        operations, based on the model's identifying database fields (usually primary keys).
+
+        Args:
+            prefix: An optional prefix to apply to column names in the clauses.
+                    (Currently, this feature is not fully implemented and will
+                    raise a `NotImplementedError` if used.)
+
+        Returns:
+            A list of SQLAlchemy clause elements.
+
+        Raises:
+            NotImplementedError: If a prefix is provided.
+        """
         if prefix:
             raise NotImplementedError()
         clauses: list[Any] = []
@@ -495,12 +737,25 @@ class DatabaseMixin:
         self: Model,
         is_partial: bool,
         kwargs: dict[str, Any],
-        pre_fn: Callable[..., Awaitable],
-        post_fn: Callable[..., Awaitable],
+        pre_fn: Callable[..., Awaitable[Any]],
+        post_fn: Callable[..., Awaitable[Any]],
         instance: BaseModelType | QuerySet,
     ) -> int | None:
         """
-        Update operation of the database fields.
+        Internal method to perform an update operation on a model instance in the database.
+
+        This method handles the extraction of column values, execution of pre-save hooks,
+        database interaction for updating records, and post-save hook execution.
+
+        Args:
+            is_partial: A boolean indicating if this is a partial update.
+            kwargs: A dictionary of key-value pairs representing the fields to update.
+            pre_fn: An asynchronous callable to be executed before the update.
+            post_fn: An asynchronous callable to be executed after the update.
+            instance: The model instance or queryset initiating the update.
+
+        Returns:
+            The number of rows updated, or None if no update was performed.
         """
         real_class = self.get_real_class()
         column_values = self.extract_column_values(
@@ -553,6 +808,18 @@ class DatabaseMixin:
         return row_count
 
     async def update(self: Model, **kwargs: Any) -> Self:
+        """
+        Updates the current model instance in the database with the provided keyword arguments.
+
+        This method triggers pre-update and post-update signals.
+
+        Args:
+            **kwargs: Keyword arguments representing the fields and their new values
+                      to update.
+
+        Returns:
+            The updated model instance.
+        """
         token = EXPLICIT_SPECIFIED_VALUES.set(set(kwargs.keys()))
         token2 = CURRENT_INSTANCE.set(self)
         try:
@@ -576,7 +843,21 @@ class DatabaseMixin:
     async def raw_delete(
         self: Model, *, skip_post_delete_hooks: bool, remove_referenced_call: bool | str
     ) -> int:
-        """Delete operation from the database"""
+        """
+        Performs the low-level delete operation from the database.
+
+        This method handles pre-delete signals, cascades deletions (if configured),
+        and post-delete cleanup.
+
+        Args:
+            skip_post_delete_hooks: If True, post-delete hooks will not be executed.
+            remove_referenced_call: A boolean or string indicating if the deletion
+                                    is triggered by a referenced call (e.g., cascade delete).
+                                    If a string, it represents the field name that triggered it.
+
+        Returns:
+            The number of rows deleted.
+        """
         if self._db_deleted:
             return 0
         instance = CURRENT_INSTANCE.get()
@@ -645,7 +926,14 @@ class DatabaseMixin:
         return row_count
 
     async def delete(self: Model, skip_post_delete_hooks: bool = False) -> None:
-        """Delete operation from the database"""
+        """
+        Deletes the current model instance from the database.
+
+        This method triggers pre-delete and post-delete signals.
+
+        Args:
+            skip_post_delete_hooks: If True, post-delete hooks will not be executed.
+        """
         real_class = self.get_real_class()
         await self.meta.signals.pre_delete.send_async(
             real_class, instance=self, model_instance=self
@@ -663,6 +951,21 @@ class DatabaseMixin:
         )
 
     async def load(self, only_needed: bool = False) -> None:
+        """
+        Loads the current model instance's data from the database.
+
+        This method fetches the record corresponding to the instance's identifying
+        clauses and updates the instance's attributes. If `only_needed` is True,
+        it skips loading if the instance is already loaded or marked as deleted.
+
+        Args:
+            only_needed: If True, loads data only if the instance is not already
+                         loaded or deleted.
+
+        Raises:
+            ObjectNotFound: If no row is found in the database corresponding to
+                            the instance's identifying clauses.
+        """
         if only_needed and self._db_loaded_or_deleted:
             return
         row = None
@@ -686,6 +989,16 @@ class DatabaseMixin:
         self._db_loaded = True
 
     async def check_exist_in_db(self, only_needed: bool = False) -> bool:
+        """
+        Checks if the current model instance exists in the database.
+
+        Args:
+            only_needed: If True, performs the check only if the instance's loaded
+                         or deleted status is not conclusive.
+
+        Returns:
+            True if the instance exists in the database, False otherwise.
+        """
         if only_needed:
             if self._db_deleted:
                 return False
@@ -709,12 +1022,23 @@ class DatabaseMixin:
         self: Model,
         evaluate_values: bool,
         kwargs: dict[str, Any],
-        pre_fn: Callable[..., Awaitable],
-        post_fn: Callable[..., Awaitable],
+        pre_fn: Callable[..., Awaitable[Any]],
+        post_fn: Callable[..., Awaitable[Any]],
         instance: BaseModelType | QuerySet,
     ) -> None:
         """
-        Performs the save instruction.
+        Internal method to perform an insert operation for a model instance into the database.
+
+        This method handles the extraction of column values, execution of pre-save hooks,
+        database insertion, and post-save hook execution.
+
+        Args:
+            evaluate_values: A boolean indicating whether values should be evaluated
+                             before insertion (e.g., for default values).
+            kwargs: A dictionary of key-value pairs representing the fields to insert.
+            pre_fn: An asynchronous callable to be executed before the insert.
+            post_fn: An asynchronous callable to be executed after the insert.
+            instance: The model instance or queryset initiating the insert.
         """
         real_class = self.get_real_class()
         column_values: dict[str, Any] = self.extract_column_values(
@@ -771,6 +1095,23 @@ class DatabaseMixin:
         force_insert: bool,
         values: dict[str, Any] | set[str] | None,
     ) -> Self:
+        """
+        Performs the actual save operation, determining whether to insert or update.
+
+        This method checks for the existence of the instance in the database and
+        decides whether to perform an `_insert` or `_update` operation. It also
+        handles pre-save and post-save signals.
+
+        Args:
+            force_insert: If True, forces an insert operation regardless of whether
+                          the instance already exists in the database.
+            values: A dictionary of specific values to save, or a set of field
+                    names to explicitly mark as modified for a partial update.
+                    If None, all extracted database fields are considered.
+
+        Returns:
+            The saved model instance.
+        """
         instance: BaseModelType | QuerySet = CURRENT_INSTANCE.get()
         extracted_fields = self.extract_db_fields()
         if values is None:
@@ -805,7 +1146,6 @@ class DatabaseMixin:
                         if value is None:
                             force_insert = True
 
-                    # Note: we definitely want this because it is easy for forget a force_insert
             # check if it exists
             if not force_insert and not await self.check_exist_in_db(only_needed=True):
                 force_insert = True
@@ -853,9 +1193,22 @@ class DatabaseMixin:
         force_save: bool | None = None,
     ) -> Model:
         """
-        Performs a save of a given model instance.
-        When creating a user it will make sure it can update existing or
-        create a new one.
+        Saves the current model instance to the database.
+
+        This method acts as a public entry point for saving, encapsulating the
+        logic for deciding between an insert or update operation. It also handles
+        context variable management for the save process.
+
+        Args:
+            force_insert: If True, forces an insert operation even if the instance
+                          might already exist.
+            values: A dictionary of specific values to save, or a set of field
+                    names to explicitly mark as modified for a partial update.
+                    If None, all extracted database fields are considered.
+            force_save: Deprecated. Use `force_insert` instead.
+
+        Returns:
+            The saved model instance.
         """
         if force_save is not None:
             warnings.warn(
@@ -877,7 +1230,22 @@ class DatabaseMixin:
         metadata: sqlalchemy.MetaData | None = None,
     ) -> sqlalchemy.Table:
         """
-        Builds the SQLAlchemy table representation from the loaded fields.
+        Builds and returns the SQLAlchemy table representation for the model.
+
+        This method constructs the `sqlalchemy.Table` object, including columns,
+        unique constraints, indexes, and global constraints, based on the model's
+        meta information and specified schema.
+
+        Args:
+            schema: An optional schema name to apply to the table.
+            metadata: An optional `sqlalchemy.MetaData` object to use. If None,
+                      the registry's metadata is used.
+
+        Returns:
+            The constructed SQLAlchemy `Table` object.
+
+        Raises:
+            AssertionError: If the model's registry is not set.
         """
         tablename: str = cls.meta.tablename
         registry = cls.meta.registry
@@ -940,7 +1308,21 @@ class DatabaseMixin:
         metadata: sqlalchemy.MetaData | None = None,
     ) -> sqlalchemy.Table:
         """
-        Add global constraints to table. Required for tenants.
+        Adds global constraints to an existing SQLAlchemy table.
+
+        This method is particularly useful for applying schema-specific or
+        tenant-specific constraints to a table that has already been built.
+
+        Args:
+            schema: An optional schema name associated with the table.
+            metadata: An optional `sqlalchemy.MetaData` object. If None,
+                      the registry's metadata is used.
+
+        Returns:
+            The SQLAlchemy `Table` object with the added constraints.
+
+        Raises:
+            AssertionError: If the model's registry is not set.
         """
         tablename: str = cls.meta.tablename
         registry = cls.meta.registry
@@ -968,11 +1350,19 @@ class DatabaseMixin:
         cls, fields: Collection[str] | str | UniqueConstraint
     ) -> sqlalchemy.UniqueConstraint | None:
         """
-        Returns the unique constraints for the model.
+        Constructs and returns a SQLAlchemy `UniqueConstraint` object.
 
-        The columns must be a a list, tuple of strings or a UniqueConstraint object.
+        This method handles different input types for defining unique constraints,
+        including a single field name, a collection of field names, or a
+        `UniqueConstraint` object. It also generates a unique name for the constraint
+        if not explicitly provided.
 
-        :return: Model UniqueConstraint.
+        Args:
+            fields: The fields (or a `UniqueConstraint` object) for which to create
+                    the unique constraint.
+
+        Returns:
+            A SQLAlchemy `UniqueConstraint` object, or None if no fields are provided.
         """
         if isinstance(fields, str):
             return sqlalchemy.UniqueConstraint(
@@ -1000,7 +1390,13 @@ class DatabaseMixin:
     @classmethod
     def _get_indexes(cls, index: Index) -> sqlalchemy.Index | None:
         """
-        Creates the index based on the Index fields
+        Constructs and returns a SQLAlchemy `Index` object based on an `Index` definition.
+
+        Args:
+            index: The `Index` object containing the fields and name for the index.
+
+        Returns:
+            A SQLAlchemy `Index` object.
         """
         return sqlalchemy.Index(
             index.name,
@@ -1016,9 +1412,18 @@ class DatabaseMixin:
 
     def not_set_transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
         """
-        Return database transaction for the assigned database.
+        Returns a database transaction for the assigned database.
 
-        This method is automatically assigned to transaction masking the metaclass transaction for instances.
+        This method is designed to be assigned as the `transaction` property for
+        model instances, allowing them to initiate database transactions.
+
+        Args:
+            force_rollback: If True, forces the transaction to roll back.
+            **kwargs: Additional keyword arguments to pass to the database's
+                      transaction method.
+
+        Returns:
+            A `Transaction` object.
         """
         return cast(
             "Transaction",
