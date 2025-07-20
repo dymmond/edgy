@@ -508,7 +508,7 @@ class Registry:
         if with_content_type is True:
             with_content_type = ContentType
 
-        real_content_type: type[BaseModelType] = with_content_type
+        real_content_type: type[BaseModelType] = with_content_type  # type: ignore
 
         # If the provided content type model is abstract, create a concrete one.
         if real_content_type.meta.abstract:
@@ -527,7 +527,7 @@ class Registry:
                 "ContentType",
                 with_content_type.__module__,
                 __metadata__=new_meta,
-                __bases__=(with_content_type,),
+                __bases__=(with_content_type,),  # type: ignore
             )
         # If the content type model is not abstract but not yet in this registry.
         elif real_content_type.meta.registry is None:
