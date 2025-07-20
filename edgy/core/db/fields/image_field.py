@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -38,7 +40,7 @@ class ImageField(FileField):
         approved_image_formats: Sequence[str] | None = None,
         field_file_class: type[ImageFieldFile] = ImageFieldFile,
         **kwargs: Any,
-    ) -> "BaseFieldType":
+    ) -> BaseFieldType:
         """
         Creates a new `ImageField` instance.
 
@@ -67,7 +69,7 @@ class ImageField(FileField):
 
     @classmethod
     def extract_metadata(
-        cls, field_obj: "BaseFieldType", field_name: str, field_file: "ImageFieldFile"
+        cls, field_obj: BaseFieldType, field_name: str, field_file: ImageFieldFile
     ) -> dict[str, Any]:
         """
         Extracts metadata from an image file, including inherited file metadata.

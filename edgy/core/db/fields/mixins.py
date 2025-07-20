@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import datetime
 from functools import partial
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from edgy.core.db.context_vars import (
     CURRENT_FIELD_CONTEXT,
@@ -143,8 +145,8 @@ class TimezonedField:
     based on default, forced, or removal of timezones.
     """
 
-    default_timezone: Optional["zoneinfo.ZoneInfo"]
-    force_timezone: Optional["zoneinfo.ZoneInfo"]
+    default_timezone: zoneinfo.ZoneInfo | None
+    force_timezone: zoneinfo.ZoneInfo | None
     remove_timezone: bool
     field_type: Any  # Expected to be datetime.datetime or datetime.date
 
@@ -248,7 +250,7 @@ class AutoNowMixin(FieldFactory):
         *,
         auto_now: bool | None = False,
         auto_now_add: bool | None = False,
-        default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
+        default_timezone: zoneinfo.ZoneInfo | None = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         """

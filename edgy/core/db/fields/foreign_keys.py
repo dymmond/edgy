@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Callable, Sequence
 from functools import cached_property
 from typing import (
@@ -747,7 +749,7 @@ class ForeignKey(ForeignKeyFieldFactory, cast(Any, object)):
 
     def __new__(
         cls,
-        to: type["BaseModelType"] | str,
+        to: type[BaseModelType] | str,
         **kwargs: Any,
     ) -> BaseFieldType:
         """

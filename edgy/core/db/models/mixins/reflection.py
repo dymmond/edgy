@@ -53,7 +53,7 @@ class ReflectedModelMixin:
         # Set the registry type name to 'reflected' if not already specified.
         kwargs.setdefault("registry_type_name", "reflected")
         # Call the superclass method to complete the registration process.
-        return cast(type[BaseModelType], super().real_add_to_registry(**kwargs))
+        return cast(type["BaseModelType"], super().real_add_to_registry(**kwargs))
 
     @classmethod
     def build(

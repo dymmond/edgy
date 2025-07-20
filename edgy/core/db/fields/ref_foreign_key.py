@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Any, Optional, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, cast
 
 import edgy
 from edgy.core.db.context_vars import CURRENT_MODEL_INSTANCE, CURRENT_PHASE
@@ -48,7 +50,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
     @classmethod
     def modify_input(
         cls,
-        field_obj: "BaseFieldType",
+        field_obj: BaseFieldType,
         name: str,
         kwargs: dict[str, Any],
         original_fn: Any = None,
@@ -70,9 +72,9 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: type["BaseModelType"] | None = None,
-        parent: Optional["BaseFieldType"] = None,
-    ) -> Optional["BaseFieldType"]:
+        owner: type[BaseModelType] | None = None,
+        parent: BaseFieldType | None = None,
+    ) -> BaseFieldType | None:
         """
         Placeholder for embedding logic. `RefForeignKey` typically does not
         embed directly into queries in the same way as traditional foreign keys,
@@ -80,7 +82,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         """
         return None
 
-    def __new__(cls, to: "ModelRef", null: bool = False) -> "BaseFieldType":
+    def __new__(cls, to: ModelRef, null: bool = False) -> BaseFieldType:
         """
         Creates a new `RefForeignKey` instance.
 
@@ -116,7 +118,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
     @classmethod
     async def post_save_callback(
         cls,
-        field_obj: "BaseFieldType",
+        field_obj: BaseFieldType,
         value: list | None,
         is_update: bool,
         original_fn: Any = None,

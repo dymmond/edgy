@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import contextlib
 from collections.abc import Sequence
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Literal, Union, cast
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pydantic import SkipValidation
 
@@ -67,7 +69,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         to_foreign_key: str = "",
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
-        through: str | type["BaseModelType"] = "",
+        through: str | type[BaseModelType] = "",
         through_tablename: str | type[OLD_M2M_NAMING] | type[NEW_M2M_NAMING],
         embed_through: str | Literal[False] = False,
         **kwargs: Any,
@@ -113,7 +115,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         return f"{self.reverse_name}__{self.embed_through}"
 
     @property
-    def through_registry(self) -> "Registry":
+    def through_registry(self) -> Registry:
         """
         Returns the registry associated with the 'through' model.
 
@@ -240,9 +242,9 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         self,
         *,
         replace_related_field: bool
-        | type["BaseModelType"]
-        | tuple[type["BaseModelType"], ...]
-        | list[type["BaseModelType"]] = False,
+        | type[BaseModelType]
+        | tuple[type[BaseModelType], ...]
+        | list[type[BaseModelType]] = False,
     ) -> None:
         """
         Creates or configures the intermediate "through" model for the Many-to-Many relationship.
@@ -270,7 +272,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
             through = self.through
             if isinstance(through, str):
                 # If 'through' is a string, register a callback to resolve it later.
-                def callback(model_class: type["BaseModelType"]) -> None:
+                def callback(model_class: type[BaseModelType]) -> None:
                     self.through = model_class
                     self.create_through_model(replace_related_field=replace_related_field)
 
@@ -483,7 +485,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         return {}
 
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> ManyRelationProtocol:
+    def __get__(self, instance: BaseModelType, owner: Any = None) -> ManyRelationProtocol:
         """
         Descriptor method for accessing the Many-to-Many relationship on a model instance.
 
@@ -524,17 +526,17 @@ class ManyToManyField(ForeignKeyFieldFactory, list):
 
     def __new__(
         cls,
-        to: Union["BaseModelType", type["Model"], str],
+        to: BaseModelType | type[Model] | str,
         *,
         to_fields: Sequence[str] = (),
         to_foreign_key: str = "",
         from_fields: Sequence[str] = (),
         from_foreign_key: str = "",
-        through: str | type["BaseModelType"] | type["Model"] = "",
+        through: str | type[BaseModelType] | type[Model] = "",
         through_tablename: str | type[OLD_M2M_NAMING] | type[NEW_M2M_NAMING] = "",
         embed_through: str | Literal[False] = False,
         **kwargs: Any,
-    ) -> "BaseFieldType":
+    ) -> BaseFieldType:
         """
         Creates a new `ManyToManyField` instance.
 

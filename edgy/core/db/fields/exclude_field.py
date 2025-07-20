@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any
 
 from pydantic.json_schema import SkipJsonSchema
@@ -31,7 +33,7 @@ class ExcludeField(FieldFactory, type[None]):
     def __new__(
         cls,
         **kwargs: Any,
-    ) -> "BaseFieldType":
+    ) -> BaseFieldType:
         """
         Initializes a new instance of ExcludeField, configuring it for exclusion.
 
@@ -62,7 +64,7 @@ class ExcludeField(FieldFactory, type[None]):
     @classmethod
     def clean(
         cls,
-        obj: "BaseFieldType",
+        obj: BaseFieldType,
         name: str,
         value: Any,
         for_query: bool = False,
@@ -94,7 +96,7 @@ class ExcludeField(FieldFactory, type[None]):
     @classmethod
     def to_model(
         cls,
-        obj: "BaseFieldType",
+        obj: BaseFieldType,
         name: str,
         value: Any,
         original_fn: Any = None,
@@ -133,8 +135,8 @@ class ExcludeField(FieldFactory, type[None]):
     @classmethod
     def __get__(
         cls,
-        obj: "BaseFieldType",
-        instance: "BaseModelType",
+        obj: BaseFieldType,
+        instance: BaseModelType,
         owner: Any = None,
         original_fn: Any = None,
     ) -> None:

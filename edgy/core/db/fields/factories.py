@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Sequence
 from functools import lru_cache, partial
 from typing import Any, Literal, cast
@@ -289,7 +291,7 @@ class FieldFactory(metaclass=FieldFactoryMeta):
 
     @staticmethod
     @lru_cache(None)
-    def _get_field_cls(cls: "FieldFactory") -> BaseFieldType:
+    def _get_field_cls(cls: FieldFactory) -> BaseFieldType:
         """
         Internal static method to dynamically create and cache the actual field class.
 

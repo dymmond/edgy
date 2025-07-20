@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import mimetypes
 from collections.abc import Callable, Sequence
 from functools import cached_property, partial
@@ -69,7 +71,7 @@ class ConcreteFileField(BaseCompositeField):
     _storage: str | Storage | None
 
     @cached_property
-    def storage(self) -> "Storage":
+    def storage(self) -> Storage:
         """
         Retrieves the storage backend instance associated with this field.
 
@@ -353,8 +355,8 @@ class ConcreteFileField(BaseCompositeField):
         ]
 
     def get_embedded_fields(
-        self, name: str, fields: dict[str, "BaseFieldType"]
-    ) -> dict[str, "BaseFieldType"]:
+        self, name: str, fields: dict[str, BaseFieldType]
+    ) -> dict[str, BaseFieldType]:
         """
         Generates and returns embedded fields (size, approval, metadata) associated
         with the main file field.
@@ -422,7 +424,7 @@ class ConcreteFileField(BaseCompositeField):
                 retdict[metadata_name].metadata.append(SkipJsonSchema())
         return retdict
 
-    def get_composite_fields(self) -> dict[str, "BaseFieldType"]:
+    def get_composite_fields(self) -> dict[str, BaseFieldType]:
         """
         Returns a dictionary of all composite fields associated with this file field.
 
@@ -516,7 +518,7 @@ class FileField(FieldFactory):
 
     def __new__(
         cls,
-        storage: str | "Storage" | None = None,
+        storage: str | Storage | None = None,
         with_size: bool = True,
         with_metadata: bool = True,
         with_approval: bool = False,
@@ -527,7 +529,7 @@ class FileField(FieldFactory):
             Callable[[BaseModelType | None, File | BinaryIO, str, bool], str] | None
         ) = None,
         **kwargs: Any,
-    ) -> "BaseFieldType":
+    ) -> BaseFieldType:
         """
         Creates a new `FileField` instance, processing file-specific arguments.
 
@@ -643,7 +645,7 @@ class FileField(FieldFactory):
 
     @classmethod
     def extract_metadata(
-        cls, field_obj: "BaseFieldType", field_name: str, field_file: FieldFile
+        cls, field_obj: BaseFieldType, field_name: str, field_file: FieldFile
     ) -> dict[str, Any]:
         """
         Extracts metadata (like MIME type) from the file.
@@ -681,7 +683,7 @@ class FileField(FieldFactory):
     @classmethod
     def clean(
         cls,
-        field_obj: "BaseFieldType",
+        field_obj: BaseFieldType,
         field_name: str,
         value: FieldFile | str | dict,
         for_query: bool = False,

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Callable
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast
@@ -31,11 +33,10 @@ class ComputedField(BaseField):
 
     def __init__(
         self,
-        getter: Callable[[BaseFieldType, "BaseModelType", type["BaseModelType"] | None], Any]
-        | str,
-        setter: Callable[[BaseFieldType, "BaseModelType", Any], None] | str | None = None,
+        getter: Callable[[BaseFieldType, BaseModelType, type[BaseModelType] | None], Any] | str,
+        setter: Callable[[BaseFieldType, BaseModelType, Any], None] | str | None = None,
         fallback_getter: (
-            Callable[[BaseFieldType, "BaseModelType", type["BaseModelType"] | None], Any] | None
+            Callable[[BaseFieldType, BaseModelType, type[BaseModelType] | None], Any] | None
         ) = None,
         **kwargs: Any,
     ) -> None:
@@ -73,7 +74,7 @@ class ComputedField(BaseField):
     @cached_property
     def compute_getter(
         self,
-    ) -> Callable[[BaseFieldType, "BaseModelType", type["BaseModelType"] | None], Any]:
+    ) -> Callable[[BaseFieldType, BaseModelType, type[BaseModelType] | None], Any]:
         """
         Resolves and caches the actual getter callable for the computed field.
 
@@ -108,7 +109,7 @@ class ComputedField(BaseField):
         return fn
 
     @cached_property
-    def compute_setter(self) -> Callable[[BaseFieldType, "BaseModelType", Any], None]:
+    def compute_setter(self) -> Callable[[BaseFieldType, BaseModelType, Any], None]:
         """
         Resolves and caches the actual setter callable for the computed field.
 
@@ -180,7 +181,7 @@ class ComputedField(BaseField):
         """
         return {}
 
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> Any:
+    def __get__(self, instance: BaseModelType, owner: Any = None) -> Any:
         """
         Descriptor method to retrieve the computed field's value.
 
@@ -196,7 +197,7 @@ class ComputedField(BaseField):
         """
         return self.compute_getter(self, instance, owner)
 
-    def __set__(self, instance: "BaseModelType", value: Any) -> None:
+    def __set__(self, instance: BaseModelType, value: Any) -> None:
         """
         Descriptor method to set the computed field's value.
 

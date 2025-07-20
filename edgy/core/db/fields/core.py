@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import datetime
 import decimal
@@ -9,7 +11,7 @@ from collections.abc import Callable
 from enum import Enum, EnumMeta
 from re import Pattern
 from secrets import compare_digest
-from typing import TYPE_CHECKING, Annotated, Any, Optional, cast
+from typing import TYPE_CHECKING, Annotated, Any, cast
 
 import orjson
 import pydantic
@@ -389,8 +391,8 @@ class DateTimeField(_AutoNowMixin, datetime.datetime):
         *,
         auto_now: bool | None = False,
         auto_now_add: bool | None = False,
-        default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
-        force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
+        default_timezone: zoneinfo.ZoneInfo | None = None,
+        force_timezone: zoneinfo.ZoneInfo | None = None,
         remove_timezone: bool = False,
         **kwargs: Any,
     ) -> BaseFieldType:
@@ -453,8 +455,8 @@ class DateField(_AutoNowMixin, datetime.date):
         *,
         auto_now: bool | None = False,
         auto_now_add: bool | None = False,
-        default_timezone: Optional["zoneinfo.ZoneInfo"] = None,
-        force_timezone: Optional["zoneinfo.ZoneInfo"] = None,
+        default_timezone: zoneinfo.ZoneInfo | None = None,
+        force_timezone: zoneinfo.ZoneInfo | None = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         """
@@ -818,9 +820,9 @@ class PasswordField(CharField):
         cls,
         field_obj: BaseFieldType,
         name: str,
-        fields: dict[str, "BaseFieldType"],
+        fields: dict[str, BaseFieldType],
         original_fn: Any = None,
-    ) -> dict[str, "BaseFieldType"]:
+    ) -> dict[str, BaseFieldType]:
         """
         Retrieves any embedded fields associated with the PasswordField.
 

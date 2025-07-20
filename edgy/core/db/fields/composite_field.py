@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import copy
 import inspect
 from collections.abc import Sequence
@@ -52,7 +54,7 @@ class ConcreteCompositeField(BaseCompositeField):
         self,
         *,
         inner_fields: (
-            Sequence[str | tuple[str, BaseFieldType]] | type["BaseModelType"] | dict[str, Any]
+            Sequence[str | tuple[str, BaseFieldType]] | type[BaseModelType] | dict[str, Any]
         ) = (),
         **kwargs: Any,
     ) -> None:
@@ -151,7 +153,7 @@ class ConcreteCompositeField(BaseCompositeField):
         self,
         prefix: str,
         new_fieldname: str,
-        owner: type["BaseModelType"] | None = None,
+        owner: type[BaseModelType] | None = None,
         parent: BaseFieldType | None = None,
     ) -> BaseFieldType:
         """
@@ -214,7 +216,7 @@ class ConcreteCompositeField(BaseCompositeField):
                 field_copy.embedded_field_defs[field_def.name] = field_def
         return field_copy
 
-    async def aget(self, instance: "BaseModelType", owner: Any = None) -> dict[str, Any] | Any:
+    async def aget(self, instance: BaseModelType, owner: Any = None) -> dict[str, Any] | Any:
         """
         Asynchronously retrieves the values of the composite field's sub-fields.
 
@@ -259,7 +261,7 @@ class ConcreteCompositeField(BaseCompositeField):
                 FALLBACK_TARGET_REGISTRY.reset(token2)
         return d
 
-    def __get__(self, instance: "BaseModelType", owner: Any = None) -> dict[str, Any] | Any:
+    def __get__(self, instance: BaseModelType, owner: Any = None) -> dict[str, Any] | Any:
         """
         Descriptor method to retrieve the values of the composite field's sub-fields.
 
@@ -398,8 +400,8 @@ class ConcreteCompositeField(BaseCompositeField):
         return super().to_model(field_name, value)
 
     def get_embedded_fields(
-        self, name: str, fields: dict[str, "BaseFieldType"]
-    ) -> dict[str, "BaseFieldType"]:
+        self, name: str, fields: dict[str, BaseFieldType]
+    ) -> dict[str, BaseFieldType]:
         """
         Retrieves the fields that are to be embedded within this composite field.
 
@@ -499,7 +501,7 @@ class ConcreteCompositeField(BaseCompositeField):
         """
         return False
 
-    def __copy__(self) -> "ConcreteCompositeField":
+    def __copy__(self) -> ConcreteCompositeField:
         """
         Creates a shallow copy of the `ConcreteCompositeField` instance.
 
