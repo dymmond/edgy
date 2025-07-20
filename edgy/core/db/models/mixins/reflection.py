@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import sqlalchemy
@@ -141,7 +143,7 @@ class ReflectedModelMixin:
     @classmethod
     async def reflect(
         cls: type[BaseModelType],
-        registry: "Registry" | "Database",
+        registry: Registry | Database,
         tablename: str,
         metadata: sqlalchemy.MetaData,
         schema: str | None = None,

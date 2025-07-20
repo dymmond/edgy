@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import contextlib
 import re
@@ -36,7 +38,7 @@ class MetaDataDict(defaultdict[str, sqlalchemy.MetaData]):
     shallow copy mechanism for its contents.
     """
 
-    def __init__(self, registry: "Registry") -> None:
+    def __init__(self, registry: Registry) -> None:
         """
         Initializes the MetaDataDict with a reference to the parent Registry.
 
@@ -83,7 +85,7 @@ class MetaDataDict(defaultdict[str, sqlalchemy.MetaData]):
         except KeyError:
             return default
 
-    def __copy__(self) -> "MetaDataDict":
+    def __copy__(self) -> MetaDataDict:
         """
         Creates a shallow copy of the MetaDataDict.
 
@@ -107,7 +109,7 @@ class MetaDataByUrlDict(dict):
     metadata based on the database connection URL.
     """
 
-    def __init__(self, registry: "Registry") -> None:
+    def __init__(self, registry: Registry) -> None:
         """
         Initializes the MetaDataByUrlDict with a reference to the parent
         Registry and populates itself.
@@ -186,7 +188,7 @@ class MetaDataByUrlDict(dict):
         """
         return cast(str, super().__getitem__(key))
 
-    def __copy__(self) -> "MetaDataByUrlDict":
+    def __copy__(self) -> MetaDataByUrlDict:
         """
         Creates a shallow copy of the MetaDataByUrlDict.
 
@@ -214,17 +216,17 @@ class Registry:
         "pattern_models",
     )
     db_schema: str | None = None
-    content_type: type["BaseModelType"] | None = None
+    content_type: type[BaseModelType] | None = None
     dbs_reflected: set[str | None]
 
     def __init__(
         self,
         database: Database | str | DatabaseURL,
         *,
-        with_content_type: bool | type["BaseModelType"] = False,
+        with_content_type: bool | type[BaseModelType] = False,
         schema: str | None = None,
         extra: Mapping[str, Database | str] | None = None,
-        automigrate_config: "EdgySettings" | None = None,
+        automigrate_config: EdgySettings | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -374,7 +376,7 @@ class Registry:
             filter_kwargs = dict.fromkeys(field_set)
 
             async def wrapper_fn(
-                _model: type["BaseModelType"] = model,
+                _model: type[BaseModelType] = model,
                 _model_specific_defaults: dict = model_specific_defaults,
                 _filter_kwargs: dict = filter_kwargs,
                 _field_set: set[str] = field_set,
@@ -439,7 +441,7 @@ class Registry:
             )
         return True
 
-    def __copy__(self) -> "Registry":
+    def __copy__(self) -> Registry:
         """
         Creates a shallow copy of the Registry instance, including its models
         and their metadata.
@@ -479,8 +481,8 @@ class Registry:
 
     def _set_content_type(
         self,
-        with_content_type: Literal[True] | type["BaseModelType"],
-        old_content_type_to_replace: type["BaseModelType"] | None = None,
+        with_content_type: Literal[True] | type[BaseModelType],
+        old_content_type_to_replace: type[BaseModelType] | None = None,
     ) -> None:
         """
         Configures content type support within the registry. This involves
@@ -532,7 +534,7 @@ class Registry:
             real_content_type.add_to_registry(self, name="ContentType")
         self.content_type = real_content_type
 
-        def callback(model_class: type["BaseModelType"]) -> None:
+        def callback(model_class: type[BaseModelType]) -> None:
             """
             Callback function executed when a model is registered. It adds a
             'content_type' field to the model if not already present.
@@ -550,7 +552,7 @@ class Registry:
                         field.target_registry = self
                         field.target = real_content_type
                         # Simply overwrite the related field in ContentType.
-                        real_content_type.meta.fields[field.related_name] = RelatedField(  # type: ignore
+                        real_content_type.meta.fields[field.related_name] = RelatedField(
                             name=field.related_name,
                             foreign_key_name=field.name,
                             related_from=model_class,
@@ -582,7 +584,7 @@ class Registry:
             # Add the ContentTypeField to the model.
             model_class.meta.fields["content_type"] = ContentTypeField(**field_args)
             # Add the reverse related field to ContentType.
-            real_content_type.meta.fields[related_name] = RelatedField(  # type: ignore
+            real_content_type.meta.fields[related_name] = RelatedField(
                 name=related_name,
                 foreign_key_name="content_type",
                 related_from=model_class,
@@ -635,7 +637,7 @@ class Registry:
         *,
         include_content_type_attr: bool = True,
         exclude: Container[str] = (),
-    ) -> type["BaseModelType"]:
+    ) -> type[BaseModelType]:
         """
         Retrieves a registered model by its name.
 
@@ -776,8 +778,8 @@ class Registry:
 
     def register_callback(
         self,
-        name_or_class: type["BaseModelType"] | str | None,
-        callback: Callable[[type["BaseModelType"]], None],
+        name_or_class: type[BaseModelType] | str | None,
+        callback: Callable[[type[BaseModelType]], None],
         one_time: bool | None = None,
     ) -> None:
         """
@@ -834,7 +836,7 @@ class Registry:
         else:
             self._callbacks[name_or_class].append(callback)
 
-    def execute_model_callbacks(self, model_class: type["BaseModelType"]) -> None:
+    def execute_model_callbacks(self, model_class: type[BaseModelType]) -> None:
         """
         Executes all registered callbacks (one-time and persistent) for a
         given model class.
@@ -951,7 +953,7 @@ class Registry:
 
     def _automigrate_update(
         self,
-        migration_settings: "EdgySettings",
+        migration_settings: EdgySettings,
     ) -> None:
         """
         Internal synchronous method to run database migrations using Monkay.
@@ -1059,7 +1061,7 @@ class Registry:
             await database.disconnect()  # Ensure disconnection on error.
             raise exc
 
-    async def __aenter__(self) -> "Registry":
+    async def __aenter__(self) -> Registry:
         """
         Asynchronously connects to all registered databases (primary and extra)
         and initializes models. This method is designed to be used with `async with`.
@@ -1101,7 +1103,7 @@ class Registry:
     @contextlib.contextmanager
     def with_async_env(
         self, loop: asyncio.AbstractEventLoop | None = None
-    ) -> Generator["Registry", None, None]:
+    ) -> Generator[Registry, None, None]:
         """
         Provides a synchronous context manager for asynchronous operations,
         managing the event loop and registry lifecycle (`__aenter__` and

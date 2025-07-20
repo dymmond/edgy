@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
@@ -16,7 +18,7 @@ _empty: set = cast(set, frozenset())
 # Context variable to hold a fallback target registry. This is used when a specific
 # registry is not explicitly provided, allowing Edgy to locate models across different
 # registries or during specific operations that require a default registry.
-FALLBACK_TARGET_REGISTRY: ContextVar["Registry" | None] = ContextVar(
+FALLBACK_TARGET_REGISTRY: ContextVar[Registry | None] = ContextVar(
     "FALLBACK_TARGET_REGISTRY", default=None
 )
 
@@ -31,20 +33,20 @@ FORCE_FIELDS_NULLABLE: ContextVar[set[tuple[str, str]]] = ContextVar(
 # crucial for operations like field validation, serialization, or deserialization,
 # where the context of the field (e.g., whether it's part of a create or update operation)
 # influences its behavior.
-CURRENT_FIELD_CONTEXT: ContextVar["FIELD_CONTEXT_TYPE"] = ContextVar("CURRENT_FIELD_CONTEXT")
+CURRENT_FIELD_CONTEXT: ContextVar[FIELD_CONTEXT_TYPE] = ContextVar("CURRENT_FIELD_CONTEXT")
 
 # Context variable to hold the currently active model instance or QuerySet.
 # This is used for operations that need to know the context of the current model
 # or queryset, such as during relationship loading or method calls that operate
 # on the current object.
-CURRENT_INSTANCE: ContextVar["BaseModelType" | "QuerySet" | None] = ContextVar(
+CURRENT_INSTANCE: ContextVar[BaseModelType | QuerySet | None] = ContextVar(
     "CURRENT_INSTANCE", default=None
 )
 
 # Context variable specifically for the currently active BaseModelType instance.
 # This differentiates from CURRENT_INSTANCE by strictly holding a BaseModelType,
 # which is useful for operations directly related to a model's lifecycle.
-CURRENT_MODEL_INSTANCE: ContextVar["BaseModelType" | None] = ContextVar(
+CURRENT_MODEL_INSTANCE: ContextVar[BaseModelType | None] = ContextVar(
     "CURRENT_MODEL_INSTANCE", default=None
 )
 

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 from .context_vars import model_factory_context
 
-# Type checking block for preventing circular dependencies during development.
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.metaclasses import MetaInfo as ModelMetaInfo

@@ -5,8 +5,6 @@ from inspect import isclass
 from itertools import chain
 from typing import TYPE_CHECKING, Any, Literal
 
-# Type checking block to prevent circular imports during runtime while
-# allowing type checkers to see the correct types.
 if TYPE_CHECKING:
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType

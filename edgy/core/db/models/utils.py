@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
@@ -10,7 +12,7 @@ if TYPE_CHECKING:
     from edgy.core.db.models.model import Model
 
 
-def get_model(registry: "Registry", model_name: str) -> "Model":
+def get_model(registry: Registry, model_name: str) -> Model:
     """Retrieves a model instance from the registry based on its name.
 
     This function attempts to fetch a model from the provided registry. The
@@ -83,7 +85,7 @@ def build_pkcolumns(model_class: Any) -> tuple[str, ...]:
     return tuple(sorted(pkcolumns))
 
 
-def from_model_to_clauses(model: "BaseModelType") -> Iterable[Any]:
+def from_model_to_clauses(model: BaseModelType) -> Iterable[Any]:
     """Generates an iterable of SQLAlchemy equality clauses based on model columns.
 
     This function creates a series of equality expressions that compare the values
@@ -109,10 +111,10 @@ _model_type = TypeVar("_model_type", bound="BaseModelType")
 
 def apply_instance_extras(
     model: _model_type,
-    model_class: type["BaseModelType"],
+    model_class: type[BaseModelType],
     schema: str | None = None,
-    database: "Database" | None = None,
-    table: "Table" | None = None,
+    database: Database | None = None,
+    table: Table | None = None,
 ) -> _model_type:
     """Applies additional configuration to a model instance before it's used.
 

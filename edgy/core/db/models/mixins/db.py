@@ -155,7 +155,7 @@ def _set_related_field(
         fk.relation_has_post_delete_callback = True
         fk.force_cascade_deletion_relation = True
 
-    related_field = RelatedField(  # type: ignore
+    related_field = RelatedField(
         foreign_key_name=foreign_key_name,
         name=related_name,
         owner=target,

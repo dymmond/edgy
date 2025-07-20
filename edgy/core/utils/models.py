@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 import contextlib
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any
 
 from pydantic_core import PydanticUndefined
 
@@ -15,14 +17,14 @@ def create_edgy_model(
     __name__: str,
     __module__: str,
     __definitions__: dict[str, Any] | None = None,
-    __metadata__: Optional["MetaInfo"] = None,
+    __metadata__: MetaInfo | None = None,
     __qualname__: str | None = None,
-    __config__: Optional["ConfigDict"] = None,
-    __bases__: tuple[type["BaseModelType"], ...] | None = None,
+    __config__: ConfigDict | None = None,
+    __bases__: tuple[type[BaseModelType], ...] | None = None,
     __proxy__: bool = False,
     __pydantic_extra__: Any = None,
     __type_kwargs__: dict[str, Any] | None = None,
-) -> type["Model"]:
+) -> type[Model]:
     """
     Generates a dynamic `edgy.Model` class with specified definitions and metadata.
 
@@ -109,7 +111,7 @@ def create_edgy_model(
     return model
 
 
-def generify_model_fields(model: type["BaseModelType"]) -> dict[str, Any]:
+def generify_model_fields(model: type[BaseModelType]) -> dict[str, Any]:
     """
     Transforms the fields of a given Edgy model into a generic, unconstrained state.
 

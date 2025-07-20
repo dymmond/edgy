@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 from collections.abc import Iterable
 from contextvars import ContextVar
@@ -15,7 +17,7 @@ if TYPE_CHECKING:
     from edgy.core.connection.database import Database
 
 
-def check_db_connection(db: "Database", stacklevel: int = 3) -> None:
+def check_db_connection(db: Database, stacklevel: int = 3) -> None:
     """
     Checks the connection status of a database instance and raises warnings or errors.
 

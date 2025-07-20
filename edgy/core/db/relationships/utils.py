@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
@@ -26,7 +28,7 @@ class RelationshipCrawlResult(NamedTuple):
                                   relationship was encountered and traversal stopped.
     """
 
-    model_class: type["BaseModelType"]
+    model_class: type[BaseModelType]
     field_name: str
     operator: str | None
     forward_path: str
@@ -35,10 +37,10 @@ class RelationshipCrawlResult(NamedTuple):
 
 
 def crawl_relationship(
-    model_class: type["BaseModelType"],
+    model_class: type[BaseModelType],
     path: str,
     *,
-    model_database: "Database" | None = None,
+    model_database: Database | None = None,
     callback_fn: Any = None,
     traverse_last: bool = False,
 ) -> RelationshipCrawlResult:

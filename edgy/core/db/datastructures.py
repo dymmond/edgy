@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 from collections.abc import Awaitable, Callable, Sequence
 from typing import TYPE_CHECKING, Any, ClassVar

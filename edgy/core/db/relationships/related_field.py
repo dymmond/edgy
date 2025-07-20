@@ -324,3 +324,5 @@ class RelatedField(RelationshipField):
         if hasattr(value, "post_delete_callback"):
             # Await the post_delete_callback if it exists.
             await value.post_delete_callback()
+
+    def reverse_clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]: ...

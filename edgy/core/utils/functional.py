@@ -4,8 +4,6 @@ from typing import TYPE_CHECKING, Any
 
 from edgy.core.db.fields.types import BaseFieldType
 
-# TYPE_CHECKING is used to prevent circular imports during runtime while
-# allowing type checkers to see the correct types.
 if TYPE_CHECKING:
     from pydantic.fields import FieldInfo
 

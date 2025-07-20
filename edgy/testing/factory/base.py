@@ -10,7 +10,6 @@ from .context_vars import model_factory_context
 from .fields import FactoryField
 from .metaclasses import ModelFactoryMeta
 
-# Type checking block for preventing circular dependencies during development.
 if TYPE_CHECKING:
     from faker import Faker
 
