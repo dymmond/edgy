@@ -3,8 +3,6 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from pydantic_core import PydanticUndefined
 
-# Type checking block to prevent circular imports during runtime while
-# allowing type checkers to see the correct types.
 if TYPE_CHECKING:
     from pydantic import ConfigDict
 

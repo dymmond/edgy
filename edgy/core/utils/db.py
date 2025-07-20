@@ -11,7 +11,6 @@ from edgy.utils.hashing import hash_to_identifier
 # Context variable to control silencing of database connection warnings.
 CHECK_DB_CONNECTION_SILENCED = ContextVar("CHECK_DB_CONNECTION_SILENCED", default=False)
 
-# Type checking block to prevent circular dependencies during development.
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
 
