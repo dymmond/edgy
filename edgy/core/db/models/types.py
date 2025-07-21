@@ -426,6 +426,8 @@ class BaseModelType(ABC):
             dict[str, Any]: A dictionary containing the extracted and processed column values.
         """
 
+    # helper methods
+
     @classmethod
     def get_real_class(cls) -> type[BaseModelType]:
         """
