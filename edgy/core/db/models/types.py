@@ -427,7 +427,7 @@ class BaseModelType(ABC):
         """
 
     @classmethod
-    def get_real_class(cls) -> BaseModelType:
+    def get_real_class(cls) -> type[BaseModelType]:
         """
         Returns the concrete (non-proxy) class of the model instance.
 
