@@ -22,13 +22,30 @@ if TYPE_CHECKING:  # pragma: no cover
 
 class ModelRowMixin:
     """
-    Builds a row for a specific model
+    Mixin class responsible for building and populating model instances from SQLAlchemy row
+    results.
+
+    This class provides methods to convert raw database rows into Edgy ORM model objects,
+    handling relationships such as `select_related` and `prefetch_related`.
     """
 
     @classmethod
     def can_load_from_row(cls: type[Model], row: Row, table: Table) -> bool:
-        """Check if a model_class can be loaded from a row for the table."""
+        """
+        Checks if a model class can be instantiated and populated from a given SQLAlchemy row
+        and table.
 
+        This method verifies if the model's registry exists, if it's not an abstract model,
+        and if all primary key columns for the model are present and not None in the
+        provided row's mapping.
+
+        Args:
+            row (Row): The SQLAlchemy row object containing the data.
+            table (Table): The SQLAlchemy table object associated with the row.
+
+        Returns:
+            bool: True if the model can be loaded from the row, False otherwise.
+        """
         return bool(
             cls.meta.registry
             and not cls.meta.abstract
@@ -39,11 +56,10 @@ class ModelRowMixin:
     async def from_sqla_row(
         cls: type[Model],
         row: Row,
-        # contain the mappings used for select
         tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
         select_related: Sequence[Any] | None = None,
         prefetch_related: Sequence[Prefetch] | None = None,
-        only_fields: Sequence[str] = None,
+        only_fields: Sequence[str] | None = None,
         is_defer_fields: bool = False,
         exclude_secrets: bool = False,
         using_schema: str | None = None,
@@ -53,30 +69,67 @@ class ModelRowMixin:
         reference_select: reference_select_type | None = None,
     ) -> Model | None:
         """
-        Class method to convert a SQLAlchemy Row result into a EdgyModel row type.
+        Converts a SQLAlchemy `Row` object into an Edgy `Model` instance.
 
-        Looping through select_related fields if the query comes from a select_related operation.
-        Validates if exists the select_related and related_field inside the models.
+        This is a class method that processes a SQLAlchemy row, populating the model's
+        fields, including handling `select_related` and `prefetch_related` relationships.
+        It intelligently constructs the model instance by iterating through selected
+        fields, managing prefixes for joined tables, and applying deferred or secret
+        field exclusions.
 
-        When select_related and related_field exist for the same field being validated, the related
-        field is ignored as it won't override the value already collected from the select_related.
+        Args:
+            row (Row): The SQLAlchemy row result to convert.
+            tables_and_models (dict[str, tuple[Table, type[BaseModelType]]]): A dictionary
+                mapping prefixes to tuples of SQLAlchemy Table objects and Edgy Model types,
+                representing the tables and models involved in the query.
+            select_related (Sequence[Any] | None): An optional sequence of relationship
+                names to eager-load. These relationships will be joined in the main query.
+            prefetch_related (Sequence[Prefetch] | None): An optional sequence of `Prefetch`
+                objects for pre-fetching related data in separate queries.
+            only_fields (Sequence[str] | None): An optional sequence of field names to
+                include in the model instance. If specified, only these fields will be
+                populated.
+            is_defer_fields (bool): A boolean indicating whether fields are deferred. If
+                True, the model instance will be a proxy model with deferred field loading.
+            exclude_secrets (bool): A boolean indicating whether secret fields should be
+                excluded from the populated model instance.
+            using_schema (str | None): An optional schema name to use for the model.
+            database (Database | None): An optional database instance to associate with
+                the model.
+            prefix (str): An optional prefix used for columns in the row mapping,
+                typically for joined tables in `select_related`.
+            old_select_related_value (Model | None): An optional existing model instance
+                to update with the new row data, used in recursive `select_related` calls.
+            reference_select (reference_select_type | None): An optional dictionary
+                specifying how to map specific columns from the row to model fields,
+                especially for aliased columns or complex selects.
 
-        If there is no select_related, then goes through the related field where it **should**
-        only return the instance of the the ForeignKey with the ID, making it lazy loaded.
+        Returns:
+            Model | None: A fully populated Edgy Model instance, or None if the model
+            cannot be loaded from the row due to missing primary key values in joined
+            relationships.
 
-        :return: Model class.
+        Raises:
+            QuerySetError: If a field specified in `select_related` does not exist on
+                the model or is not a `RelationshipField`.
+            NotImplementedError: If prefetching from other databases is attempted, as
+                this feature is not yet supported.
         """
+        # Initialize reference_select if not provided.
         _reference_select: reference_select_type = (
             reference_select if reference_select is not None else {}
         )
-        item: dict[str, Any] = {}
+        item: dict[str, Any] = {}  # Dictionary to store the model's attributes.
         select_related = select_related or []
         prefetch_related = prefetch_related or []
         secret_columns: set[str] = set()
+
+        # If exclude_secrets is True, gather all column names corresponding to secret fields.
         if exclude_secrets:
             for name in cls.meta.secret_fields:
                 secret_columns.update(cls.meta.field_to_column_names[name])
 
+        # Process select_related relationships.
         for related in select_related:
             field_name = related.split("__", 1)[0]
             try:
@@ -85,7 +138,9 @@ class ModelRowMixin:
                 raise QuerySetError(
                     detail=f'Selected field "{field_name}cast("Model", " does not exist on {cls}.'
                 ) from None
+
             if isinstance(field, RelationshipField):
+                # Traverse the field to get the related model class and any remaining path.
                 model_class, _, remainder = field.traverse_field(related)
             else:
                 raise QuerySetError(
@@ -93,18 +148,22 @@ class ModelRowMixin:
                 ) from None
 
             _prefix = field_name if not prefix else f"{prefix}__{field_name}"
-            # stop selecting when None. Related models are not available.
+
+            # If the related model cannot be loaded from the current row (e.g., all FKs
+            # are None, indicating no join match), skip processing this relationship.
             if not model_class.can_load_from_row(
                 row,
                 tables_and_models[_prefix][0],
             ):
                 continue
+
+            # Get the nested reference_select for the current related field.
             reference_select_sub = _reference_select.get(field_name)
             if not isinstance(reference_select_sub, dict):
                 reference_select_sub = {}
 
             if remainder:
-                # don't pass table, it is only for the main model_class
+                # Recursively call from_sqla_row for nested select_related.
                 item[field_name] = await model_class.from_sqla_row(
                     row,
                     tables_and_models=tables_and_models,
@@ -119,7 +178,7 @@ class ModelRowMixin:
                     reference_select=reference_select_sub,
                 )
             else:
-                # don't pass table, it is only for the main model_class
+                # Call from_sqla_row for the direct related model.
                 item[field_name] = await model_class.from_sqla_row(
                     row,
                     tables_and_models=tables_and_models,
@@ -131,30 +190,36 @@ class ModelRowMixin:
                     old_select_related_value=item.get(field_name),
                     reference_select=reference_select_sub,
                 )
-        # don't overwrite, update with new values and return
+
+        # If an `old_select_related_value` (an existing model instance) is provided,
+        # update its attributes with the newly populated `item` and return it.
         if old_select_related_value:
             for k, v in item.items():
                 setattr(old_select_related_value, k, v)
             return old_select_related_value
+
         table_columns = tables_and_models[prefix][0].columns
-        # Populate the related names
-        # Making sure if the model being queried is not inside a select related
-        # This way it is not overritten by any value
+
+        # Populate the foreign key related names (lazy-loaded relationships).
         for related in cls.meta.foreign_key_fields:
             foreign_key = cls.meta.fields[related]
+
+            # Determine if this related field should be ignored (e.g., if it's already
+            # handled by select_related or is a secret field).
             ignore_related: bool = cls.__should_ignore_related_name(related, select_related)
             if ignore_related or related in cls.meta.secret_fields:
                 continue
-            if related in item:
+            if related in item:  # Skip if already populated by select_related.
                 continue
 
             if exclude_secrets and foreign_key.secret:
                 continue
+
             columns_to_check = foreign_key.get_column_names(related)
-
             model_related = foreign_key.target
-
             child_item = {}
+
+            # Collect foreign key column values from the row mapping.
             for column_name in columns_to_check:
                 column = getattr(table_columns, column_name, None)
                 if column_name is None:
@@ -168,6 +233,7 @@ class ModelRowMixin:
                         row._mapping[columnkeyhash]
                     )
 
+            # Process nested reference selects for the child model.
             reference_select_child = _reference_select.get(related)
             extra_no_trigger_child: set[str] = set()
             if isinstance(reference_select_child, dict):
@@ -184,15 +250,18 @@ class ModelRowMixin:
                             len(reference_source_child_parts) == 2
                             and reference_source_child_parts[0] in tables_and_models
                         ):
-                            reference_source_child = f"{tables_and_models[reference_source_child_parts[0]][0].name}_{reference_source_child_parts[1]}"
+                            reference_source_child = (
+                                f"{tables_and_models[reference_source_child_parts[0]][0].name}_"
+                                f"{reference_source_child_parts[1]}"
+                            )
                     child_item[reference_target_child] = row._mapping[reference_source_child]
 
-            # Make sure we generate a temporary reduced model
-            # For the related fields. We simply chnage the structure of the model
-            # and rebuild it with the new fields.
+            # Create a proxy model for the related field, representing a lazy-loaded
+            # instance containing only the foreign key(s).
             proxy_model = model_related.proxy_model(**child_item)
             proxy_database = database if model_related.database is cls.database else None
-            # don't pass a table. It is not in the row (select related path) and has not an explicit table
+
+            # Apply instance extras (schema, database, etc.) to the proxy model.
             proxy_model = apply_instance_extras(
                 proxy_model,
                 model_related,
@@ -206,23 +275,21 @@ class ModelRowMixin:
 
             item[related] = proxy_model
 
-        # Check for the only_fields
-        # Pull out the regular column values.
+        # Populate the regular column values for the main model.
         class_columns = cls.table.columns
         for column in table_columns:
+            # Skip if only_fields is specified and the column is not in it.
             if (
                 only_fields
                 and prefix not in only_fields
                 and (f"{prefix}__{column.key}" if prefix else column.key) not in only_fields
             ):
                 continue
-            if column.key in secret_columns:
+            if column.key in secret_columns:  # Skip if the column is a secret.
                 continue
-            if column.key not in class_columns:
-                # for supporting reflected we cannot use columns_to_field
+            if column.key not in class_columns:  # Skip if the column is not part of the model.
                 continue
-            # set if not of an foreign key with one column
-            if column.key in item:
+            if column.key in item:  # Skip if already populated (e.g., by select_related).
                 continue
             columnkeyhash = column.key
             if prefix:
@@ -230,6 +297,8 @@ class ModelRowMixin:
 
             if columnkeyhash in row._mapping:
                 item[column.key] = row._mapping[columnkeyhash]
+
+        # Apply any explicit column mappings from `reference_select`.
         for reference_target_main, reference_source_main in _reference_select.items():
             if isinstance(reference_source_main, dict) or not reference_source_main:
                 continue
@@ -240,22 +309,30 @@ class ModelRowMixin:
                     len(reference_source_main_parts) == 2
                     and reference_source_main_parts[0] in tables_and_models
                 ):
-                    reference_source_main = f"{tables_and_models[reference_source_main_parts[0]][0].name}_{reference_source_main_parts[1]}"
-            # overwrite
+                    reference_source_main = (
+                        f"{tables_and_models[reference_source_main_parts[0]][0].name}_"
+                        f"{reference_source_main_parts[1]}"
+                    )
+            # Overwrite existing item with the value from reference_select.
             item[reference_target_main] = row._mapping[reference_source_main]
+
+        # Instantiate the model (either as a proxy or a full model).
         model: Model = (
             cls.proxy_model(**item, __phase__="init_db")
             if exclude_secrets or is_defer_fields or only_fields
             else cls(**item, __phase__="init_db")
         )
-        # mark a model as completely loaded when no deferred is active
+
+        # Mark the model as fully loaded if no deferred or only_fields are active.
         if not is_defer_fields and not only_fields:
             model._db_deleted = False
             model._db_loaded = True
-        # hard exclude secrets from triggering load
+
+        # If excluding secrets, ensure these attributes do not trigger a load.
         if exclude_secrets:
             model.__no_load_trigger_attrs__.update(cls.meta.secret_fields)
-        # Apply the schema to the model
+
+        # Apply instance extras (schema, database, table, etc.) to the main model.
         model = apply_instance_extras(
             model,
             cls,
@@ -264,8 +341,8 @@ class ModelRowMixin:
             table=tables_and_models[prefix][0],
         )
 
+        # Handle prefetch_related fields if specified.
         if prefetch_related:
-            # Handle prefetch related fields.
             await cls.__handle_prefetch_related(
                 row=row,
                 prefix=prefix,
@@ -273,7 +350,7 @@ class ModelRowMixin:
                 tables_and_models=tables_and_models,
                 prefetch_related=prefetch_related,
             )
-        assert model.pk is not None, model
+        assert model.pk is not None, model  # Ensure the primary key is not None.
         return model
 
     @classmethod
@@ -281,7 +358,16 @@ class ModelRowMixin:
         cls, related_name: str, select_related: Sequence[str]
     ) -> bool:
         """
-        Validates if it should populate the related field if select related is not considered.
+        Determines whether a foreign key related name should be ignored during model
+        population, typically if it's already covered by a `select_related` statement.
+
+        Args:
+            related_name (str): The name of the foreign key relationship.
+            select_related (Sequence[str]): A sequence of strings representing the
+                `select_related` relationships.
+
+        Returns:
+            bool: True if the related name should be ignored, False otherwise.
         """
         for related_field in select_related:
             fields = related_field.split("__")
@@ -292,10 +378,20 @@ class ModelRowMixin:
     @classmethod
     def create_model_key_from_sqla_row(cls, row: Row, row_prefix: str = "") -> tuple:
         """
-        Build a cache key for the model.
+        Builds a unique cache key for a model instance based on its class name and
+        primary key values extracted from a SQLAlchemy row.
+
+        Args:
+            row (Row): The SQLAlchemy row object from which to extract primary key values.
+            row_prefix (str): An optional prefix for column names in the row mapping,
+                used when dealing with joined tables.
+
+        Returns:
+            tuple: A tuple representing the unique key for the model instance.
         """
         pk_key_list: list[Any] = [cls.__name__]
         for attr in cls.pkcolumns:
+            # Append the primary key value from the row to the key list.
             pk_key_list.append(str(row._mapping[f"{row_prefix}{attr}"]))
         return tuple(pk_key_list)
 
@@ -307,40 +403,72 @@ class ModelRowMixin:
         row_prefix: str,
         related: Prefetch,
     ) -> None:
+        """
+        Sets a prefetched relationship on a model instance. This method handles the logic
+        of retrieving and associating the prefetched data.
+
+        Args:
+            row (Row): The SQLAlchemy row from which the main model was constructed.
+            model (Model): The Edgy Model instance to which the prefetched data will be
+                attached.
+            row_prefix (str): The prefix used for columns in the SQLAlchemy row,
+                representing the main model's table.
+            related (Prefetch): The Prefetch object specifying the relationship to prefetch.
+
+        Raises:
+            QuerySetError: If creating a reverse path is not possible (e.g., for
+                unidirectional fields).
+            NotImplementedError: If prefetching from other databases is attempted.
+        """
         model_key = ()
         if related._is_finished:
-            # when force_rollback
-            # we can only bake after all rows are retrieved
-            # this is why it is here
+            # If the prefetch operation is marked as finished (meaning all rows for this
+            # prefetch have been collected), then bake the results. This allows for
+            # efficient retrieval of prefetched data.
             await related.init_bake(type(model))
             model_key = model.create_model_key()
+
+        # If the model's key exists in the baked results, retrieve and set the prefetched
+        # data directly.
         if model_key in related._baked_results:
             setattr(model, related.to_attr, related._baked_results[model_key])
         else:
+            # If not in baked results, or not finished, proceed with fetching.
+            # Crawl the relationship path to get details about the related model and
+            # reverse path.
             crawl_result = crawl_relationship(
                 model.__class__, related.related_name, traverse_last=True
             )
             if crawl_result.reverse_path is False:
-                QuerySetError(
-                    detail=("Creating a reverse path is not possible, unidirectional fields used.")
+                raise QuerySetError(
+                    detail="Creating a reverse path is not possible, unidirectional fields used."
                 )
             if crawl_result.cross_db_remainder:
                 raise NotImplementedError(
-                    "Cannot prefetch from other db yet. Maybe in future this feature will be added."
+                    "Cannot prefetch from other db yet. Maybe in future this feature will be "
+                    "added."
                 )
+
             queryset = related.queryset
             if related._is_finished:
                 assert queryset is not None, "Queryset is not set but _is_finished flag"
             else:
+                # Check for potential conflicts with existing attributes on the model.
                 check_prefetch_collision(model, related)
                 if queryset is None:
+                    # If no specific queryset is provided for prefetch, default to all.
                     queryset = crawl_result.model_class.query.all()
 
-                queryset = queryset.select_related(cast(str, crawl_result.reverse_path))
+                # Ensure the reverse path is selected to link back to the main model.
+                queryset = queryset.select_related(crawl_result.reverse_path)
+
+            # Construct the filter clause for the prefetched query using the main model's
+            # primary key(s).
             clause = {
                 f"{crawl_result.reverse_path}__{pkcol}": row._mapping[f"{row_prefix}{pkcol}"]
                 for pkcol in cls.pkcolumns
             }
+            # Execute the prefetched query and set the result on the model instance.
             setattr(model, related.to_attr, await queryset.filter(clause))
 
     @classmethod
@@ -353,22 +481,35 @@ class ModelRowMixin:
         prefetch_related: Sequence[Prefetch],
     ) -> None:
         """
-        Handles any prefetch related scenario from the model.
-        Loads in advance all the models needed for a specific record
+        Manages the execution of all `prefetch_related` queries for a given model instance.
+        This method iterates through the specified prefetch relationships, checks for
+        collisions, and initiates the asynchronous loading of related data.
 
-        Recursively checks for the related field and validates if there is any conflicting
-        attribute. If there is, a `QuerySetError` is raised.
+        Args:
+            row (Row): The SQLAlchemy row from which the main model was constructed.
+            model (Model): The Edgy Model instance for which prefetch relationships are
+                to be handled.
+            prefix (str): The prefix used for columns in the SQLAlchemy row,
+                representing the main model's table.
+            tables_and_models (dict[str, tuple[Table, type[BaseModelType]]]): A dictionary
+                mapping prefixes to tuples of SQLAlchemy Table objects and Edgy Model types,
+                representing the tables and models involved in the query.
+            prefetch_related (Sequence[Prefetch]): A sequence of `Prefetch` objects to
+                process.
+
+        Raises:
+            QuerySetError: If a conflicting attribute is found that would be
+                overwritten by a prefetch operation.
         """
-
         queries = []
 
         for related in prefetch_related:
-            # Check for conflicting names
-            # Check as early as possible
+            # Check for conflicting names early to prevent unexpected overwrites.
             check_prefetch_collision(model=model, related=related)
-            row_prefix = f"{tables_and_models[prefix].name}_" if prefix else ""
+            row_prefix = f"{tables_and_models[prefix][0].name}_" if prefix else ""
             queries.append(
                 cls.__set_prefetch(row=row, row_prefix=row_prefix, model=model, related=related)
             )
+        # Execute all prefetch queries concurrently if there are any.
         if queries:
             await asyncio.gather(*queries)

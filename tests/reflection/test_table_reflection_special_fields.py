@@ -34,7 +34,7 @@ class Products(edgy.ReflectModel):
 
     class Meta:
         registry = registry
-        tablename = 'products'
+        tablename = "products"
 """.strip()
 expected_result_full_info = """
 class Products(edgy.ReflectModel):
@@ -48,7 +48,7 @@ class Products(edgy.ReflectModel):
 
     class Meta:
         registry = registry
-        tablename = 'products'
+        tablename = "products"
 """.strip()
 
 
@@ -137,8 +137,6 @@ async def test_create_correct_inspect_db_with_full_info_avail():
             sys.stdout.writelines(line)  # type: ignore
     out.seek(0)
     generated = out.read()
-    generated = "\n".join(generated.splitlines()[:-1])
-    # remove indexes as they tend to be instable (last line)
     assert generated.strip().endswith(expected_result_full_info)
 
 

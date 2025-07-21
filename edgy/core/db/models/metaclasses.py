@@ -50,11 +50,27 @@ _seen_table_names: ContextVar[set[str]] = ContextVar("_seen_table_names", defaul
 class Fields(UserDict, dict[str, BaseFieldType]):
     """Smart wrapper which tries to prevent invalidation as far as possible"""
 
+    meta: MetaInfo
+
     def __init__(self, meta: MetaInfo, data: dict[str, BaseFieldType] | None = None):
+        """
+        Initializes the Fields object.
+
+        Args:
+            meta: The MetaInfo object associated with these fields.
+            data: An optional dictionary of initial field data.
+        """
         self.meta = meta
         super().__init__(data)
 
     def add_field_to_meta(self, name: str, field: BaseFieldType) -> None:
+        """
+        Adds a field to the MetaInfo's statistical sets if field stats are initialized.
+
+        Args:
+            name: The name of the field.
+            field: The field object to add.
+        """
         if not self.meta._field_stats_are_initialized:
             return
         if hasattr(field, "__get__"):
@@ -84,23 +100,64 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             self.meta.ref_foreign_key_fields.add(name)
 
     def discard_field_from_meta(self, name: str) -> None:
+        """
+        Discards a field from the MetaInfo's statistical sets if field stats are initialized.
+
+        Args:
+            name: The name of the field to discard.
+        """
         if self.meta._field_stats_are_initialized:
             for field_attr in _field_sets_to_clear:
                 getattr(self.meta, field_attr).discard(name)
 
     def __getitem__(self, name: str) -> BaseFieldType:
+        """
+        Retrieves a field by name.
+
+        Args:
+            name: The name of the field.
+
+        Returns:
+            The field object.
+        """
         return cast(BaseFieldType, self.data[name])
 
     def get(self, key: str, default: Any = None) -> Any:
+        """
+        Retrieves a field by key, with an optional default value.
+
+        Args:
+            key: The key of the field.
+            default: The default value to return if the key is not found.
+
+        Returns:
+            The field object or the default value.
+        """
         try:
             return self[key]
         except KeyError:
             return default
 
     def __contains__(self, key: str) -> bool:
+        """
+        Checks if a key exists in the fields.
+
+        Args:
+            key: The key to check.
+
+        Returns:
+            True if the key exists, False otherwise.
+        """
         return key in self.data
 
     def __setitem__(self, name: str, value: BaseFieldType) -> None:
+        """
+        Sets a field with the given name and value. Invalidates meta-information.
+
+        Args:
+            name: The name of the field.
+            value: The field object.
+        """
         if name in self.data:
             self.discard_field_from_meta(name)
         self.data[name] = value
@@ -110,6 +167,12 @@ class Fields(UserDict, dict[str, BaseFieldType]):
         self.meta.invalidate(invalidate_stats=False)
 
     def __delitem__(self, name: str) -> None:
+        """
+        Deletes a field by name. Invalidates meta-information.
+
+        Args:
+            name: The name of the field to delete.
+        """
         if self.data.pop(name, None) is not None:
             self.discard_field_from_meta(name)
             if self.meta.model is not None:
@@ -117,32 +180,81 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             self.meta.invalidate(invalidate_stats=False)
 
 
-class FieldToColumns(UserDict, dict[str, Sequence["sqlalchemy.Column"]]):
+class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
+    """
+    Manages the mapping from field names to their corresponding SQLAlchemy columns.
+    """
+
+    meta: MetaInfo
+
     def __init__(self, meta: MetaInfo):
+        """
+        Initializes the FieldToColumns object.
+
+        Args:
+            meta: The MetaInfo object associated with these columns.
+        """
         self.meta = meta
         super().__init__()
 
     def __getitem__(self, name: str) -> Sequence[sqlalchemy.Column]:
+        """
+        Retrieves the SQLAlchemy columns for a given field name.
+
+        Args:
+            name: The name of the field.
+
+        Returns:
+            A sequence of SQLAlchemy Column objects.
+        """
         if name in self.data:
-            return cast(Sequence["sqlalchemy.Column"], self.data[name])
+            return cast(Sequence[sqlalchemy.Column], self.data[name])
         field = self.meta.fields[name]
         result = self.data[name] = field.get_columns(name)
         return result
 
     def __setitem__(self, name: str, value: Any) -> None:
+        """
+        This method is not supported for FieldToColumns.
+
+        Raises:
+            Exception: Always raises an exception as setting items directly is not allowed.
+        """
         raise Exception("Cannot set item here")
 
     def __iter__(self) -> Any:
+        """
+        Initializes the columns_to_field mapping and returns an iterator over the keys.
+        """
         self.meta.columns_to_field.init()
         return super().__iter__()
 
     def get(self, key: str, default: Any = None) -> Any:
+        """
+        Retrieves the SQLAlchemy columns for a given key, with an optional default value.
+
+        Args:
+            key: The key of the field.
+            default: The default value to return if the key is not found.
+
+        Returns:
+            A sequence of SQLAlchemy Column objects or the default value.
+        """
         try:
             return self[key]
         except KeyError:
             return default
 
     def __contains__(self, key: str) -> bool:
+        """
+        Checks if a key exists in the mapping.
+
+        Args:
+            key: The key to check.
+
+        Returns:
+            True if the key exists, False otherwise.
+        """
         try:
             self[key]
             return True
@@ -151,7 +263,20 @@ class FieldToColumns(UserDict, dict[str, Sequence["sqlalchemy.Column"]]):
 
 
 class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
+    """
+    Manages the mapping from field names to their corresponding SQLAlchemy column names.
+    """
+
     def __getitem__(self, name: str) -> frozenset[str]:
+        """
+        Retrieves the SQLAlchemy column names for a given field name.
+
+        Args:
+            name: The name of the field.
+
+        Returns:
+            A frozenset of column names.
+        """
         if name in self.data:
             return cast(frozenset[str], self.data[name])
         column_names = frozenset(column.key for column in self.meta.field_to_columns[name])
@@ -160,12 +285,32 @@ class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
 
 
 class ColumnsToField(UserDict, dict[str, str]):
+    """
+    Manages the mapping from SQLAlchemy column names to their corresponding field names.
+    """
+
+    meta: MetaInfo
+    _init: bool
+
     def __init__(self, meta: MetaInfo):
+        """
+        Initializes the ColumnsToField object.
+
+        Args:
+            meta: The MetaInfo object associated with these mappings.
+        """
         self.meta = meta
         self._init = False
         super().__init__()
 
     def init(self) -> None:
+        """
+        Initializes the mapping from column names to field names.
+        This method ensures that the mapping is built only once.
+
+        Raises:
+            ValueError: If a column name collision is detected.
+        """
         if not self._init:
             self._init = True
             _columns_to_field: dict[str, str] = {}
@@ -175,34 +320,62 @@ class ColumnsToField(UserDict, dict[str, str]):
                 for column_name in column_names:
                     if column_name in _columns_to_field:
                         raise ValueError(
-                            f"column collision: {column_name} between field {field_name} and {_columns_to_field[column_name]}"
+                            f"column collision: {column_name} between field {field_name} "
+                            f"and {_columns_to_field[column_name]}"
                         )
                     _columns_to_field[column_name] = field_name
             self.data.update(_columns_to_field)
 
     def __getitem__(self, name: str) -> str:
+        """
+        Retrieves the field name for a given column name. Ensures initialization.
+
+        Args:
+            name: The name of the column.
+
+        Returns:
+            The name of the field.
+        """
         self.init()
         return cast(str, super().__getitem__(name))
 
     def __setitem__(self, name: str, value: Any) -> None:
+        """
+        This method is not supported for ColumnsToField.
+
+        Raises:
+            Exception: Always raises an exception as setting items directly is not allowed.
+        """
         raise Exception("Cannot set item here")
 
     def __contains__(self, name: str) -> bool:
+        """
+        Checks if a column name exists in the mapping. Ensures initialization.
+
+        Args:
+            name: The column name to check.
+
+        Returns:
+            True if the column name exists, False otherwise.
+        """
         self.init()
         return super().__contains__(name)
 
     def __iter__(self) -> Any:
+        """
+        Ensures initialization and returns an iterator over the keys.
+        """
         self.init()
         return super().__iter__()
 
 
-_trigger_attributes_fields_MetaInfo = {
+_trigger_attributes_fields_MetaInfo: set[str] = {
     "field_to_columns",
     "field_to_column_names",
     "columns_to_field",
 }
 
-_trigger_attributes_field_stats_MetaInfo = {
+_trigger_attributes_field_stats_MetaInfo: set[str] = {
     "foreign_key_fields",
     "special_getter_fields",
     "input_modifying_fields",
@@ -219,6 +392,11 @@ _field_sets_to_clear: set[str] = _trigger_attributes_field_stats_MetaInfo
 
 
 class MetaInfo:
+    """
+    Manages the metadata information for a model, including fields, managers,
+    table details, and various field-related statistics.
+    """
+
     __slots__ = (
         "abstract",
         "inherit",
@@ -253,7 +431,7 @@ class MetaInfo:
         "_fields_are_initialized",
         "_field_stats_are_initialized",
     )
-    _include_dump = (
+    _include_dump: tuple[str, ...] = (
         *filter(
             lambda x: x
             not in {
@@ -272,24 +450,60 @@ class MetaInfo:
     field_to_columns: FieldToColumns
     field_to_column_names: FieldToColumnNames
     columns_to_field: ColumnsToField
-
     unique_together: list[str | tuple | UniqueConstraint]
     indexes: list[Index]
     constraints: list[sqlalchemy.Constraint]
+    model: type[BaseModelType] | None
+    managers: dict[str, BaseManager]
+    signals: signals_module.Broadcaster
+    multi_related: set[tuple[str, str]]
+    abstract: bool
+    no_copy: bool
+    inherit: bool
+    in_admin: bool | None
+    no_admin_create: bool | None
+    registry: Registry | Literal[False] | None
+    tablename: str | None
+    _fields_are_initialized: bool
+    _field_stats_are_initialized: bool
+    _needs_special_serialization: bool | None
+    input_modifying_fields: set[str]
+    pre_save_fields: set[str]
+    post_save_fields: set[str]
+    post_delete_fields: set[str]
+    foreign_key_fields: set[str]
+    relationship_fields: set[str]
+    many_to_many_fields: set[str]
+    ref_foreign_key_fields: set[str]
+    special_getter_fields: set[str]
+    excluded_fields: set[str]
+    secret_fields: set[str]
 
     def __init__(self, meta: Any = None, **kwargs: Any) -> None:
+        """
+        Initializes the MetaInfo object, processing attributes from a given meta class
+        and keyword arguments.
+
+        Args:
+            meta: An optional meta class from which to extract attributes.
+            kwargs: Additional keyword arguments to load into the MetaInfo.
+
+        Raises:
+            ImproperlyConfigured: If 'unique_together', 'indexes', or 'constraints'
+                                  are not lists or tuples.
+        """
         self._fields_are_initialized = False
         self._field_stats_are_initialized = False
-        self.model: type[BaseModelType] | None = None
-        #  Difference between meta extraction and kwargs: meta attributes are copied
-        self.abstract: bool = getattr(meta, "abstract", False)
-        self.no_copy: bool = getattr(meta, "no_copy", False)
+        self.model = None
+        # Difference between meta extraction and kwargs: meta attributes are copied
+        self.abstract = getattr(meta, "abstract", False)
+        self.no_copy = getattr(meta, "no_copy", False)
         # for embedding
-        self.inherit: bool = getattr(meta, "inherit", True)
-        self.in_admin: bool | None = getattr(meta, "in_admin", None)
-        self.no_admin_create: bool | None = getattr(meta, "no_admin_create", None)
-        self.registry: Registry | Literal[False] | None = getattr(meta, "registry", None)
-        self.tablename: str | None = getattr(meta, "tablename", None)
+        self.inherit = getattr(meta, "inherit", True)
+        self.in_admin = getattr(meta, "in_admin", None)
+        self.no_admin_create = getattr(meta, "no_admin_create", None)
+        self.registry = getattr(meta, "registry", None)
+        self.tablename = getattr(meta, "tablename", None)
         for attr in ["unique_together", "indexes", "constraints"]:
             attr_val: Any = getattr(meta, attr, [])
             if not isinstance(attr_val, list | tuple):
@@ -302,16 +516,23 @@ class MetaInfo:
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
         self.fields = {**getattr(meta, "fields", _empty_dict)}  # type: ignore
-        self.managers: dict[str, BaseManager] = {**getattr(meta, "managers", _empty_dict)}
-        self.multi_related: set[tuple[str, str]] = {*getattr(meta, "multi_related", _empty_set)}
+        self.managers = {**getattr(meta, "managers", _empty_dict)}
+        self.multi_related = {*getattr(meta, "multi_related", _empty_set)}
         self.load_dict(kwargs)
 
     @property
     def pk(self) -> PKField | None:
+        """
+        Returns the primary key field of the model.
+        """
         return cast(PKField | None, self.fields.get("pk"))
 
     @property
     def needs_special_serialization(self) -> bool:
+        """
+        Determines if the model requires special serialization due to specific field types,
+        such as special getter fields or foreign key fields with nested special serialization.
+        """
         if getattr(self, "_needs_special_serialization", None) is None:
             _needs_special_serialization: bool = any(
                 not self.fields[field_name].exclude for field_name in self.special_getter_fields
@@ -342,6 +563,11 @@ class MetaInfo:
 
     @property
     def fields_mapping(self) -> dict[str, BaseFieldType]:
+        """
+        Returns a mapping of field names to field objects.
+
+        Deprecated: Use `fields` instead.
+        """
         warnings.warn(
             "'fields_mapping' has been deprecated, use 'fields' instead.",
             DeprecationWarning,
@@ -351,6 +577,11 @@ class MetaInfo:
 
     @property
     def is_multi(self) -> bool:
+        """
+        Checks if the model has multiple relationships.
+
+        Deprecated: Use `bool(meta.multi_related)` instead.
+        """
         warnings.warn(
             "`is_multi` is deprecated. Use bool(meta.multi_related) instead.",
             DeprecationWarning,
@@ -360,6 +591,11 @@ class MetaInfo:
 
     @property
     def parents(self) -> list[Any]:
+        """
+        Returns a list of parent models.
+
+        Deprecated: Will be removed without replacement.
+        """
         warnings.warn(
             "`parents` is deprecated and will be removed without replacement.",
             DeprecationWarning,
@@ -368,18 +604,32 @@ class MetaInfo:
         return [parent for parent in self.model.__bases__ if isinstance(parent, BaseModelMeta)]
 
     def model_dump(self) -> dict[Any, Any]:
+        """
+        Dumps the relevant metadata information into a dictionary.
+        """
         return {k: getattr(self, k, None) for k in self._include_dump}
 
     def load_dict(self, values: dict[str, Any]) -> None:
         """
         Loads the metadata from a dictionary.
-        You may want to overload it to create hooks to ensure types.
+        This method can be overloaded to create hooks to ensure types.
+
+        Args:
+            values: The dictionary containing metadata values.
         """
         for key, value in values.items():
             # we want triggering invalidate in case it is fields
             setattr(self, key, value)
 
     def __setattr__(self, name: str, value: Any) -> None:
+        """
+        Sets an attribute on the MetaInfo object. Special handling for 'fields'
+        to ensure proper initialization and invalidation.
+
+        Args:
+            name: The name of the attribute to set.
+            value: The value to set.
+        """
         if name == "fields":
             value = Fields(self, value)
         super().__setattr__(name, value)
@@ -387,6 +637,10 @@ class MetaInfo:
             self.invalidate()
 
     def __getattribute__(self, name: str) -> Any:
+        """
+        Custom attribute access to lazily initialize field mappings and field statistics
+        when certain attributes are accessed.
+        """
         # lazy execute
         if name in _trigger_attributes_fields_MetaInfo and not self._fields_are_initialized:
             self.init_fields_mapping()
@@ -398,7 +652,10 @@ class MetaInfo:
         return super().__getattribute__(name)
 
     def init_fields_mapping(self) -> None:
-        # when accessing the secret_fields in model_dump, this is triggered
+        """
+        Initializes the mappings between fields and columns, and column names.
+        This method is called lazily when relevant attributes are accessed.
+        """
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)
         self.columns_to_field = ColumnsToField(self)
@@ -407,17 +664,21 @@ class MetaInfo:
         self._fields_are_initialized = True
 
     def init_field_stats(self) -> None:
-        self.special_getter_fields: set[str] = set()
-        self.excluded_fields: set[str] = set()
-        self.secret_fields: set[str] = set()
-        self.input_modifying_fields: set[str] = set()
-        self.post_save_fields: set[str] = set()
-        self.pre_save_fields: set[str] = set()
-        self.post_delete_fields: set[str] = set()
-        self.foreign_key_fields: set[str] = set()
-        self.relationship_fields: set[str] = set()
-        self.many_to_many_fields: set[str] = set()
-        self.ref_foreign_key_fields: set[str] = set()
+        """
+        Initializes various sets for tracking field statistics, such as foreign keys,
+        special getters, excluded fields, etc. This method is called lazily.
+        """
+        self.special_getter_fields = set()
+        self.excluded_fields = set()
+        self.secret_fields = set()
+        self.input_modifying_fields = set()
+        self.post_save_fields = set()
+        self.pre_save_fields = set()
+        self.post_delete_fields = set()
+        self.foreign_key_fields = set()
+        self.relationship_fields = set()
+        self.many_to_many_fields = set()
+        self.ref_foreign_key_fields = set()
         self._field_stats_are_initialized = True
         for key, field in self.fields.items():
             self.fields.add_field_to_meta(key, field)
@@ -428,6 +689,15 @@ class MetaInfo:
         invalidate_fields: bool = True,
         invalidate_stats: bool = True,
     ) -> None:
+        """
+        Invalidates cached metadata information, optionally clearing class attributes,
+        field mappings, and field statistics.
+
+        Args:
+            clear_class_attrs: If True, clears cached class attributes like _table, _pknames.
+            invalidate_fields: If True, invalidates field mapping caches.
+            invalidate_stats: If True, invalidates field statistics caches.
+        """
         if invalidate_fields and self._fields_are_initialized:
             # prevent cycles and mem-leaks
             for attr in (
@@ -453,6 +723,14 @@ class MetaInfo:
             self.model._db_schemas = {}
 
     def full_init(self, init_column_mappers: bool = True, init_class_attrs: bool = True) -> None:
+        """
+        Performs a full initialization of the MetaInfo, including field mappings,
+        field statistics, column mappers, and class attributes.
+
+        Args:
+            init_column_mappers: If True, initializes the column to field mapping.
+            init_class_attrs: If True, initializes class attributes like table, pknames.
+        """
         if not self._fields_are_initialized:
             self.init_fields_mapping()
         if not self._field_stats_are_initialized:
@@ -464,20 +742,37 @@ class MetaInfo:
                 getattr(self.model, attr)
 
     def get_columns_for_name(self, name: str) -> Sequence[sqlalchemy.Column]:
+        """
+        Retrieves the SQLAlchemy columns associated with a given field name.
+
+        Args:
+            name: The name of the field.
+
+        Returns:
+            A sequence of SQLAlchemy Column objects.
+        """
         if name in self.field_to_columns:
             return self.field_to_columns[name]
         elif self.model and name in self.model.table.columns:
             return (self.model.table.columns[name],)
         else:
-            return cast(Sequence["sqlalchemy.Column"], _empty_set)
+            return cast(Sequence[sqlalchemy.Column], _empty_set)
 
 
 def get_model_meta_attr(
     attr: str, bases: tuple[type, ...], meta_class: object | MetaInfo | None = None
 ) -> Any | None:
     """
-    When an enabled attr is missing or None from the Meta class, it should look up for the bases
-    and obtain the first found attr.
+    Retrieves a specific attribute from the Meta class, looking up the inheritance
+    chain if the attribute is missing or None in the direct Meta class.
+
+    Args:
+        attr: The name of the attribute to retrieve.
+        bases: A tuple of base classes to check for the attribute.
+        meta_class: An optional Meta class instance or object to check first.
+
+    Returns:
+        The value of the attribute if found, otherwise None.
     """
     if meta_class is not None:
         direct_attr: Any = getattr(meta_class, attr, None)
@@ -500,8 +795,15 @@ def get_model_registry(
     bases: tuple[type, ...], meta_class: object | MetaInfo | None = None
 ) -> Registry | None | Literal[False]:
     """
-    When a registry is missing from the Meta class, it should look up for the bases
-    and obtain the first found registry.
+    Retrieves the Registry from the Meta class, looking up the inheritance
+    chain if the registry is missing in the direct Meta class.
+
+    Args:
+        bases: A tuple of base classes to check for the registry.
+        meta_class: An optional Meta class instance or object to check first.
+
+    Returns:
+        The Registry instance if found, otherwise None or False.
     """
     return cast(
         "Registry | None | Literal[False]",
@@ -510,6 +812,13 @@ def get_model_registry(
 
 
 def _handle_annotations(base: type, base_annotations: dict[str, Any]) -> None:
+    """
+    Recursively handles and updates annotations from base classes into `base_annotations`.
+
+    Args:
+        base: The current base class being processed.
+        base_annotations: The dictionary to accumulate annotations.
+    """
     for parent in base.__mro__[1:]:
         _handle_annotations(parent, base_annotations)
     if hasattr(base, "__init_annotations__") and base.__init_annotations__:
@@ -522,8 +831,16 @@ def handle_annotations(
     bases: tuple[type, ...], base_annotations: dict[str, Any], attrs: Any
 ) -> dict[str, Any]:
     """
-    Handles and copies some of the annotations for
-    initialisation.
+    Handles and copies annotations for initialisation, merging annotations from
+    base classes and the current class attributes.
+
+    Args:
+        bases: A tuple of base classes.
+        base_annotations: A dictionary to store annotations from base classes.
+        attrs: The attributes of the current class being created.
+
+    Returns:
+        A dictionary containing the combined annotations.
     """
     for base in bases:
         _handle_annotations(base, base_annotations)
@@ -541,14 +858,21 @@ _occluded_sentinel = object()
 
 
 def _extract_fields_and_managers(base: type, attrs: dict[str, Any]) -> None:
+    """
+    Recursively extracts fields and managers from base classes and updates the
+    `attrs` dictionary. Handles inheritance and occlusion.
+
+    Args:
+        base: The current base class being processed.
+        attrs: The dictionary of attributes for the current class being built.
+    """
     from edgy.core.db.fields.composite_field import CompositeField
 
     meta: MetaInfo | None = getattr(base, "meta", None)
     if not meta:
         # Mixins and other classes
-        # Note: from mixins BaseFields and BaseManagers are imported despite inherit=False until a model in the
-        # hierarchy uses them
-        # Here is _occluded_sentinel not overwritten
+        # Note: from mixins BaseFields and BaseManagers are imported despite inherit=False until
+        # a model in the hierarchy uses them. Here is _occluded_sentinel not overwritten.
         for key, value in inspect.getmembers(base):
             if key not in attrs:
                 if isinstance(value, BaseFieldType):
@@ -612,11 +936,18 @@ def extract_fields_and_managers(
     bases: Sequence[type], attrs: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     """
-    Search for fields and managers and return them.
-
+    Searches for fields and managers in base classes and returns them.
     Managers are copied.
 
-    Note: managers and fields with inherit=False are still extracted from mixins as long there is no intermediate model
+    Note: managers and fields with inherit=False are still extracted from mixins
+    as long as there is no intermediate model.
+
+    Args:
+        bases: A sequence of base classes to extract from.
+        attrs: An optional dictionary of attributes to start with.
+
+    Returns:
+        A dictionary containing extracted fields and managers.
     """
 
     from edgy.core.db.fields.composite_field import CompositeField
@@ -644,6 +975,11 @@ def extract_fields_and_managers(
 
 
 class BaseModelMeta(ModelMetaclass, ABCMeta):
+    """
+    Metaclass for Edgy models, handling the creation and registration of models,
+    processing fields, managers, and metadata.
+    """
+
     __slots__ = ()
 
     def __new__(
@@ -656,6 +992,34 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         on_conflict: Literal["error", "replace", "keep"] = "error",
         **kwargs: Any,
     ) -> type:
+        """
+        Creates a new Edgy model class. This method processes model fields, managers,
+        metadata, and handles inheritance.
+
+        Args:
+            name: The name of the new class.
+            bases: A tuple of base classes.
+            attrs: A dictionary of attributes for the new class.
+            meta_info_class: The class to use for storing meta information.
+            skip_registry: If True, skips adding the model to the registry.
+                           If "allow_search", it allows searching for a registry
+                           but won't automatically add it if found.
+            on_conflict: Strategy to handle conflicts when adding to the registry
+                         ("error", "replace", "keep").
+            kwargs: Additional keyword arguments passed to the Pydantic ModelMetaclass.
+
+        Returns:
+            The newly created model class.
+
+        Raises:
+            ImproperlyConfigured: If a field named 'pk' is added but is not a PKField,
+                                  or if managers are not type annotated with ClassVar,
+                                  or if a model is reflected without a primary key.
+            ValueError: If a sub-field uses the reserved name 'pk' or if a sub-field
+                        name collision occurs, or if `unique_together` values are invalid,
+                        or if `indexes` are not `Index` types, or `constraints` are not
+                        `sqlalchemy.Constraint` types.
+        """
         fields: dict[str, BaseFieldType] = {}
         managers: dict[str, BaseManager] = {}
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
@@ -697,8 +1061,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                 # stored also as a field to be able later or to access anywhere in the model
                 # and use the value for the creation of the records via RefForeignKey.
                 # saving a reference foreign key.
-                # We split the keys (store them) in different places to be able to easily maintain and
-                #  what is what.
+                # We split the keys (store them) in different places to be able to easily maintain
+                # and what is what.
                 fields[key] = value
                 model_fields[key] = value
             elif isinstance(value, BaseManager):
@@ -730,7 +1094,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                         fieldnames_to_check.appendleft(sub_field_name)
                         fields[sub_field_name] = sub_field
                         model_fields[sub_field_name] = sub_field
-            # Handle with multiple primary keys and auto generated field if no primary key is provided
+            # Handle with multiple primary keys and auto generated field if no primary key
+            # is provided
             if not is_abstract and has_parents and not has_explicit_primary_key:
                 if "id" not in fields:
                     if attrs.get("__reflected__", False):
@@ -747,7 +1112,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                         )
                 if not isinstance(fields["id"], BaseFieldType) or not fields["id"].primary_key:
                     raise ImproperlyConfigured(
-                        f"Cannot create model {name} without explicit primary key if field 'id' is already present."
+                        f"Cannot create model {name} without explicit primary key if field 'id' "
+                        "is already present."
                     )
 
         for field_name, field_value in fields.items():
@@ -781,10 +1147,12 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             if annotations:
                 if k not in annotations:
                     raise ImproperlyConfigured(
-                        f"Managers must be type annotated and '{k}' is not annotated. Managers must be annotated with ClassVar."
+                        f"Managers must be type annotated and '{k}' is not annotated. Managers "
+                        "must be annotated with ClassVar."
                     )
                 # evaluate annotation which can be a string reference.
-                # because we really import ClassVar to check against it is safe to assume a ClassVar is available.
+                # because we really import ClassVar to check against it is safe to assume a
+                # ClassVar is available.
                 if isinstance(annotations[k], str):
                     annotations[k] = eval(annotations[k])
                 if get_origin(annotations[k]) is not ClassVar:
@@ -840,7 +1208,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             for value in unique_together:
                 if not isinstance(value, str | tuple | UniqueConstraint):
                     raise ValueError(
-                        "The values inside the unique_together must be a string, a tuple of strings or an instance of UniqueConstraint."
+                        "The values inside the unique_together must be a string, a tuple of strings"
+                        " or an instance of UniqueConstraint."
                     )
         # Handle indexes
         if meta.indexes:
@@ -879,13 +1248,18 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
     def get_db_schema(cls) -> str | None:
         """
-        Returns a db_schema from registry if any is passed.
+        Returns the database schema from the model's registry, if available.
         """
         if hasattr(cls, "meta") and getattr(cls.meta, "registry", None):
             return cls.meta.registry.db_schema  # type: ignore
         return None
 
     def get_db_shema(cls) -> str | None:
+        """
+        Returns the database schema from the model's registry, if available.
+
+        Deprecated: Use `get_db_schema` instead.
+        """
         warnings.warn(
             "'get_db_shema' has been deprecated, use 'get_db_schema' instead.",
             DeprecationWarning,
@@ -894,6 +1268,15 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return cls.get_db_schema()
 
     def _build_table(cls, metadata: sqlalchemy.MetaData | None = None) -> None:
+        """
+        Internal method to build the SQLAlchemy table for the model.
+
+        Args:
+            metadata: An optional SQLAlchemy MetaData object to associate with the table.
+
+        Raises:
+            TableBuildError: If an AttributeError occurs during table building.
+        """
         try:
             cls._table = cls.build(cls.get_db_schema(), metadata=metadata)
         except AttributeError as exc:
@@ -902,15 +1285,18 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
     @property
     def table(cls) -> sqlalchemy.Table:
         """
-        Making sure the tables on inheritance state, creates the new
-        one properly.
+        Returns the SQLAlchemy Table object associated with the model.
+        Handles table creation based on inheritance and registry schema.
 
         Making sure the following scenarios are met:
 
         1. If there is a context_db_schema, it will return for those, which means, the `using`
-        if being utilised.
+        is being utilised.
         2. If a db_schema in the `registry` is passed, then it will use that as a default.
         3. If none is passed, defaults to the shared schema of the database connected.
+
+        Raises:
+            AttributeError: If no registry is found for the model, preventing table creation.
         """
         if cls.__is_proxy_model__:
             return cls.__parent__.table  # type: ignore
@@ -919,7 +1305,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             # raising is required
             raise AttributeError("No registry.")
         table = getattr(cls, "_table", None)
-        # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} != {cls.meta.tablename}"
+        # assert table.name.lower() == cls.meta.tablename, f"{table.name.lower()} !=
+        # {cls.meta.tablename}"
         # fix assigned table
         if table is None or table.name.lower() != cls.meta.tablename:
             cls._build_table()
@@ -928,7 +1315,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
     def __getattr__(cls, name: str) -> Any:
         """
-        For controlling inheritance we cannot have manager descriptors, so fake them
+        Custom attribute access to provide manager descriptors, allowing managers
+        to be accessed directly as attributes of the model.
         """
         manager = cls.meta.managers.get(name)
         if manager is not None:
@@ -937,12 +1325,18 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
     @property
     def pkcolumns(cls) -> Sequence[str]:
+        """
+        Returns a sequence of primary key column names for the model.
+        """
         if cls.__dict__.get("_pkcolumns", None) is None:
             cls._pkcolumns = build_pkcolumns(cls)
         return cast(Sequence[str], cls._pkcolumns)
 
     @property
     def pknames(cls) -> Sequence[str]:
+        """
+        Returns a sequence of primary key field names for the model.
+        """
         if cls.__dict__.get("_pknames", None) is None:
             cls._pknames = build_pknames(cls)
         return cast(Sequence[str], cls._pknames)
@@ -950,7 +1344,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
     @property
     def signals(cls) -> signals_module.Broadcaster:
         """
-        Returns the signals of a class
+        Returns the signals broadcaster associated with the model.
+
+        Deprecated: Use `meta.signals` instead.
         """
         warnings.warn(
             "'signals' has been deprecated, use 'meta.signals' instead.",
@@ -961,7 +1357,16 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         return meta.signals
 
     def transaction(cls, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
-        """Return database transaction for the assigned database"""
+        """
+        Returns a database transaction for the assigned database.
+
+        Args:
+            force_rollback: If True, forces the transaction to rollback.
+            kwargs: Additional keyword arguments for the transaction.
+
+        Returns:
+            A Transaction object.
+        """
         return cast(
             "Transaction", cls.database.transaction(force_rollback=force_rollback, **kwargs)
         )
@@ -974,8 +1379,16 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         update_cache: bool = False,
     ) -> sqlalchemy.Table:
         """
-        Retrieve table for schema (nearly the same as build with scheme argument).
-        Cache per class via a primitive LRU cache.
+        Retrieves or builds the SQLAlchemy table for a specific schema.
+        Uses a primitive LRU cache for schema-specific tables.
+
+        Args:
+            schema: The database schema name. If None, uses the default schema.
+            metadata: An optional SQLAlchemy MetaData object.
+            update_cache: If True, forces an update of the cache for the given schema.
+
+        Returns:
+            The SQLAlchemy Table object for the specified schema.
         """
         if cls.__is_proxy_model__:
             return cls.__parent__.table_schema(  # type: ignore
@@ -1002,7 +1415,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
     @property
     def proxy_model(cls: type[Model]) -> type[Model]:
         """
-        Returns the proxy_model from the Model when called using the cache.
+        Returns the proxy model for the current model, creating it if it doesn't exist.
+        The proxy model is cached on the class.
         """
         if cls.__is_proxy_model__:
             return cls
@@ -1015,10 +1429,18 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
     @property
     def columns(cls) -> sqlalchemy.sql.ColumnCollection:
+        """
+        Returns the SQLAlchemy ColumnCollection for the model's table.
+        """
         return cast("sqlalchemy.sql.ColumnCollection", cls.table.columns)
 
     @property
     def fields(cls) -> dict[str, BaseFieldType]:
+        """
+        Returns a dictionary of field names to BaseFieldType objects for the model.
+
+        Deprecated: Use `meta.fields` instead.
+        """
         warnings.warn(
             "'fields' has been deprecated, use 'meta.fields' instead.",
             DeprecationWarning,

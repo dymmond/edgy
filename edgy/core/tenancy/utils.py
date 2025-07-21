@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 from typing import TYPE_CHECKING
 
@@ -14,7 +16,7 @@ if TYPE_CHECKING:
     from edgy.core.db.models.types import BaseModelType
 
 
-def table_schema(model_class: type["Model"], schema: str) -> sqlalchemy.Table:
+def table_schema(model_class: type[Model], schema: str) -> sqlalchemy.Table:
     warnings.warn(
         "'table_schema' has been deprecated, use '<model>.table_schema' instead.",
         DeprecationWarning,
@@ -24,7 +26,7 @@ def table_schema(model_class: type["Model"], schema: str) -> sqlalchemy.Table:
 
 
 async def create_tables(
-    registry: "Registry", models: dict[str, type["BaseModelType"]], schema: str
+    registry: Registry, models: dict[str, type[BaseModelType]], schema: str
 ) -> None:
     """
     Creates the table models for a specific schema just generated.
@@ -45,9 +47,9 @@ async def create_tables(
 
 
 async def create_schema(
-    registry: "Registry",
+    registry: Registry,
     schema_name: str,
-    models: dict[str, type["BaseModelType"]] | None = None,
+    models: dict[str, type[BaseModelType]] | None = None,
     if_not_exists: bool = False,
     should_create_tables: bool = False,
 ) -> None:

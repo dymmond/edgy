@@ -112,7 +112,7 @@ async def test_raises_ModelSchemaError_on_public_schema():
 
     assert (
         raised.value.args[0]
-        == "Can't update tenant outside it's own schema or the public schema. Current schema is 'public'"
+        == "Can't update tenant outside its own schema or the public schema. Current schema is 'public'"
     )
 
 
