@@ -107,5 +107,5 @@ def test_raises_error_on_missing_classvar():
 
     assert (
         raised.value.args[0]
-        == "'marshall_config' is part of the fields of 'ProfileMarshall'. Did you forgot to annotate with 'ClassVar'?"
+        == "'marshall_config' is part of the fields of 'ProfileMarshall'. Did you forget to annotate with 'ClassVar'?"
     )
