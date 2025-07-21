@@ -509,9 +509,10 @@ class BaseForeignKeyField(BaseForeignKey):
         for column_name in column_names:
             if column_name in kwargs:
                 to_add[self.from_fk_field_name(name, column_name)] = kwargs.pop(column_name)
-        # fake default
+        # empty path
         # If no individual columns were found, handle default behavior.
         if not to_add:
+            # fake default
             if phase in {"post_insert", "post_update", "load"}:
                 kwargs.setdefault(name, None)
             return
@@ -653,7 +654,7 @@ class BaseForeignKeyField(BaseForeignKey):
                 type_=related_column.type,  # Inherit type from the related column.
                 name=self.get_fk_column_name(name, related_column.name),  # DB column name.
                 primary_key=self.primary_key,  # Inherit primary key status.
-                autoincrement=False,  # FKs are typically not autoincrementing.
+                autoincrement=False,  # FKs cannot autoincrement.
                 # Nullability is OR of related column's nullability and field's nullability.
                 nullable=related_column.nullable or nullable,
                 unique=related_column.unique,  # Inherit uniqueness.

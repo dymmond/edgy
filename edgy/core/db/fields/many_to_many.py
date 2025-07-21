@@ -203,7 +203,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         # empty string (old way) is always prefix
         if self.embed_through_prefix is not False and path.startswith(self.embed_through_prefix):
             return (
-                self.through,  # The model being traversed to.
+                self.through,  # The intermediate model.
                 self.from_foreign_key,  # The foreign key from 'through' to 'owner'.
                 path.removeprefix(self.embed_through_prefix).removeprefix("__"),  # Remaining path.
             )
@@ -221,6 +221,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         This is used when a relationship is being queried from the `target` model
         back towards the `owner` via the `through` model.
         """
+        # used for target foreign_key
         # Check if embedding is enabled and the path starts with the reverse embedded prefix.
         # empty string (old way) is always prefix
         if self.reverse_embed_through_prefix is not False and path.startswith(
