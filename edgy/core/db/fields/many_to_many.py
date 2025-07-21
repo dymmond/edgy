@@ -200,7 +200,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         relation name, and remaining path.
         """
         # Check if embedding is disabled or an embedded prefix is set.
-        # empty string (new way without embedding) is to use always target
+        # empty string (new way and no embedding) is to use always owner
         if self.embed_through_prefix and path.startswith(self.embed_through_prefix):
             return (
                 self.through,  # The intermediate model.
@@ -223,7 +223,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         """
         # used for target foreign_key
         # Check if embedding is enabled and the path starts with the reverse embedded prefix.
-        # empty string (new way without embedding) is to use always owner
+        # empty string (new way and no embedding) is to use always owner
         if self.reverse_embed_through_prefix and path.startswith(
             self.reverse_embed_through_prefix
         ):
