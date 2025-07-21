@@ -435,7 +435,7 @@ class BaseModelType(ABC):
         model class). Otherwise, it returns the class itself.
 
         Returns:
-            BaseModelType: The real, non-proxy class of the model.
+            type[BaseModelType]: The real, non-proxy class of the model.
         """
         # Return the parent class if this is a proxy model, otherwise return the class itself.
         return cls.__parent__ if cls.__is_proxy_model__ else cls
