@@ -569,6 +569,7 @@ class FileField(FieldFactory):
         # Add Pydantic JSON schema for FileStruct representation.
         schema = FileStruct.model_json_schema()
         del schema["title"]  # Remove default Pydantic title.
+        del schema["description"]  # Remove default Pydantic desscription.
         result_field.metadata.append(WithJsonSchema(schema))
         # Add a PlainSerializer for custom JSON serialization.
         result_field.metadata.append(
