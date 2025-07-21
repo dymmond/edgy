@@ -100,7 +100,6 @@ class BaseModelType(ABC):
         Returns:
             type[BaseModelType]: A type representing the proxy model.
         """
-        ...
 
     @property
     @abstractmethod
@@ -427,7 +426,8 @@ class BaseModelType(ABC):
             dict[str, Any]: A dictionary containing the extracted and processed column values.
         """
 
-    def get_real_class(self) -> BaseModelType:
+    @classmethod
+    def get_real_class(cls) -> BaseModelType:
         """
         Returns the concrete (non-proxy) class of the model instance.
 
@@ -438,7 +438,7 @@ class BaseModelType(ABC):
             BaseModelType: The real, non-proxy class of the model.
         """
         # Return the parent class if this is a proxy model, otherwise return the class itself.
-        return self.__parent__ if self.__is_proxy_model__ else self  # type: ignore
+        return cls.__parent__ if cls.__is_proxy_model__ else cls
 
     def extract_db_fields(self, only: Container[str] | None = None) -> dict[str, Any]:
         """
