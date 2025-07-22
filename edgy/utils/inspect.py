@@ -17,7 +17,7 @@ from edgy import Database, run_sync
 # Mapping of SQLAlchemy generic types to their corresponding Edgy field types.
 # This dictionary is crucial for translating database schema types into
 # Edgy model field definitions during database inspection.
-SQL_GENERIC_TYPES = {
+SQL_GENERIC_TYPES: dict[type, str] = {
     sqltypes.BigInteger: "edgy.core.db.fields.BigIntegerField",
     sqltypes.Integer: "edgy.core.db.fields.IntegerField",
     sqltypes.JSON: "edgy.core.db.fields.JSONField",
@@ -289,12 +289,9 @@ class InspectDB:
         if (
             field_type == "JSONField"
             and database.url.dialect.startswith("postgres")
-            and not isinstance(column.type, postgresql.JSONB)
+            and not isinstance(column.type.dialect_impl(database.engine.dialect), postgresql.JSONB)
         ):
-            variant_mapping = column.type._variant_mapping
-            variant = variant_mapping.get("postgres", variant_mapping.get("postgresql"))
-            if not isinstance(variant, postgresql.JSONB):
-                field_params["no_jsonb"] = True
+            field_params["no_jsonb"] = True
 
         if field_type == "PGArrayField":
             # For PGArrayField, we need the specific item_type, not its generic form.

@@ -19,6 +19,7 @@ hide:
 ## Changed
 
 - `JSONField` uses now `JSONB` by default.
+- Slightly changed `InspectDB` internal interface.
 
 ### Fixed
 
@@ -30,6 +31,11 @@ hide:
 - Fix values_list when using only string.
 - Fix performance when using relation queryset.
 - Fix order_by when using relation queryset.
+
+### Breaking
+
+- `JSONField` uses now postgres `JSONB` by default. This can cause an extra migration. If this is unwanted,
+  add: `no_jsonb=True` to `JSONField`.
 
 ## 0.32.5
 
