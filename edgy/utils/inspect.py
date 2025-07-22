@@ -153,7 +153,7 @@ class InspectDB:
             tables, _ = self.generate_table_information(metadata)
 
             # Write the generated Edgy model code to standard output.
-            for line in self.write_output(tables, str(database.url), schema=self.schema):
+            for line in self.write_output(tables, database, schema=self.schema):
                 sys.stdout.writelines(line)  # type: ignore
 
     def inspect(self) -> None:
@@ -238,7 +238,7 @@ class InspectDB:
 
     @classmethod
     def get_field_type(
-        self, column: sqlalchemy.Column, is_fk: bool = False
+        self, column: sqlalchemy.Column, database: edgy.Database, is_fk: bool = False
     ) -> tuple[str, dict[str, Any]]:
         """
         Determines the appropriate Edgy field type and its parameters for a given
@@ -246,6 +246,7 @@ class InspectDB:
 
         Args:
             column (sqlalchemy.Column): The SQLAlchemy column to convert.
+            database (databasez.core.database.Database): The database used for inspection.
             is_fk (bool, optional): A flag indicating if the column is part of a
                                     foreign key relationship. If `True`, it will
                                     return "ForeignKey" or "OneToOne". Defaults to `False`.
@@ -285,8 +286,15 @@ class InspectDB:
 
         # Populate field_params based on the determined field_type and column properties.
 
-        if field_type == "JSONField" and column.type != postgresql.JSONB:
-            field_params["no_jsonb"] = True
+        if (
+            field_type == "JSONField"
+            and database.url.dialect.startswith("postgres")
+            and not isinstance(column.type, postgresql.JSONB)
+        ):
+            variant_mapping = column.type._variant_mapping
+            variant = variant_mapping.get("postgres", variant_mapping.get("postgresql"))
+            if not isinstance(variant, postgresql.JSONB):
+                field_params["no_jsonb"] = True
 
         if field_type == "PGArrayField":
             # For PGArrayField, we need the specific item_type, not its generic form.
@@ -409,7 +417,7 @@ class InspectDB:
 
     @classmethod
     def write_output(
-        cls, table_details: list[Any], connection_string: str, schema: str | None = None
+        cls, table_details: list[Any], database: edgy.Database, schema: str | None = None
     ) -> NoReturn:
         """
         Generates and yields lines of Python code representing the Edgy models.
@@ -418,7 +426,7 @@ class InspectDB:
 
         Args:
             table_details (list[Any]): A list of dictionaries, each detailing a reflected table.
-            connection_string (str): The database connection string used for the `Database` object.
+            database (databasez.core.database.Database): The database used for inspection.
             schema (str | None, optional): The schema name if one was used during reflection.
                                            Defaults to `None`.
 
@@ -452,7 +460,7 @@ class InspectDB:
 
         yield "\n"
         yield "\n"
-        yield f"database = {DB_MODULE}.Database('{connection_string}')\n"
+        yield f"database = {DB_MODULE}.Database('{database.url}')\n"
         yield registry
 
         # Iterate through each table detail to generate its class definition.
@@ -480,7 +488,7 @@ class InspectDB:
                 attr_name = column.name  # The Python attribute name for the field.
 
                 # Get the Edgy field type and its initial parameters.
-                field_type, field_params = cls.get_field_type(column, is_fk)
+                field_type, field_params = cls.get_field_type(column, database, is_fk)
                 field_params["null"] = column.nullable  # Add nullability.
 
                 # Handle primary key.
