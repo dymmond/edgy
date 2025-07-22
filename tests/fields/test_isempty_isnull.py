@@ -137,3 +137,9 @@ async def test_operators_empty_json(product, isempty, isnull):
     isnull_queries = {"data__isnull": False}
     assert (await type(product).query.exists(**isempty_queries)) != isempty
     assert (await type(product).query.exists(**isnull_queries)) != isnull
+
+
+@pytest.mark.parametrize("field_name", ["created", "created_date", "ipaddress"])
+async def test_troubled_none(field_name):
+    product = await Product.query.create()
+    assert await type(product).query.exists(**{field_name: None})

@@ -530,26 +530,6 @@ class DateTimeField(_AutoNowMixin, datetime.datetime):
             return {}
         return original_fn(field_name, cleaned_data)
 
-    @classmethod
-    def operator_to_clause(
-        cls,
-        field_obj: BaseFieldType,
-        field_name: str,
-        operator: str,
-        table: sqlalchemy.Table,
-        value: Any,
-        original_fn: Any,
-    ) -> Any:
-        mapped_operator = field_obj.operator_mapping.get(operator, operator)
-        if mapped_operator == "isempty" or mapped_operator == "isnull":
-            column = table.columns[field_name]
-            # needs the cast to fix a bug when null checking
-            casted = sqlalchemy.cast(column, sqlalchemy.Text())
-            isnull = sqlalchemy.or_(column.is_(sqlalchemy.null()), casted == "")
-            return isnull if value else sqlalchemy.not_(isnull)
-        else:
-            return original_fn(field_name, operator, table, value)
-
 
 class DateField(_AutoNowMixin, datetime.date):
     """
@@ -592,26 +572,6 @@ class DateField(_AutoNowMixin, datetime.date):
         """
         return sqlalchemy.Date()
 
-    @classmethod
-    def operator_to_clause(
-        cls,
-        field_obj: BaseFieldType,
-        field_name: str,
-        operator: str,
-        table: sqlalchemy.Table,
-        value: Any,
-        original_fn: Any,
-    ) -> Any:
-        mapped_operator = field_obj.operator_mapping.get(operator, operator)
-        if mapped_operator == "isempty" or mapped_operator == "isnull":
-            column = table.columns[field_name]
-            # needs the cast to fix a bug when null checking
-            casted = sqlalchemy.cast(column, sqlalchemy.Text())
-            isnull = sqlalchemy.or_(column.is_(sqlalchemy.null()), casted == "")
-            return isnull if value else sqlalchemy.not_(isnull)
-        else:
-            return original_fn(field_name, operator, table, value)
-
 
 class DurationField(FieldFactory, datetime.timedelta):
     """
@@ -640,7 +600,7 @@ class DurationField(FieldFactory, datetime.timedelta):
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty":
             column = table.columns[field_name]
-            is_empty = sqlalchemy.or_(column.is_(None), column == datetime.timedelta())
+            is_empty = sqlalchemy.or_(column == None, column == datetime.timedelta())  # noqa
             return is_empty if value else sqlalchemy.not_(is_empty)
         else:
             return original_fn(field_name, operator, table, value)
@@ -747,7 +707,8 @@ class JSONField(FieldFactory, pydantic.Json):
             column = table.columns[field_name]
             casted = sqlalchemy.cast(column, sqlalchemy.Text())
             is_empty = sqlalchemy.or_(
-                column.is_(sqlalchemy.null()), casted.in_(["null", "[]", "{}", "0", "0.0", '""'])
+                column == None,  # noqa
+                casted.in_(["null", "[]", "{}", "0", "0.0", '""']),
             )
             return is_empty if value else sqlalchemy.not_(is_empty)
         elif mapped_operator == "isnull":
@@ -1186,6 +1147,8 @@ class IPAddressField(FieldFactory, str):
 
         Raises `ValueError` if the input is not a valid IP address string.
         """
+        if field_obj.null and value is None:
+            return None
         if cls.is_native_type(value):
             return value
 
@@ -1194,26 +1157,6 @@ class IPAddressField(FieldFactory, str):
         except ValueError:
             # Re-raise with a more specific message.
             raise ValueError("Must be a real IP.")  # noqa
-
-    @classmethod
-    def operator_to_clause(
-        cls,
-        field_obj: BaseFieldType,
-        field_name: str,
-        operator: str,
-        table: sqlalchemy.Table,
-        value: Any,
-        original_fn: Any,
-    ) -> Any:
-        mapped_operator = field_obj.operator_mapping.get(operator, operator)
-        if mapped_operator == "isempty" or mapped_operator == "isnull":
-            column = table.columns[field_name]
-            # needs the cast to fix a bug when null checking
-            casted = sqlalchemy.cast(column, sqlalchemy.Text())
-            isnull = sqlalchemy.or_(column.is_(sqlalchemy.null()), casted == "")
-            return isnull if value else sqlalchemy.not_(isnull)
-        else:
-            return original_fn(field_name, operator, table, value)
 
 
 Monkay(
