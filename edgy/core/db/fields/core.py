@@ -542,9 +542,11 @@ class DateTimeField(_AutoNowMixin, datetime.datetime):
     ) -> Any:
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty" or mapped_operator == "isnull":
-            raise NotImplementedError(
-                "FIXME: isempty/isnull not implemented for this field because of bugs."
-            )
+            column = table.columns[field_name]
+            # needs the cast to fix a bug when null checking
+            casted = sqlalchemy.cast(column, sqlalchemy.Text())
+            isnull = sqlalchemy.or_(column.is_(sqlalchemy.null()), casted == "")
+            return isnull if value else sqlalchemy.not_(isnull)
         else:
             return original_fn(field_name, operator, table, value)
 
@@ -602,9 +604,11 @@ class DateField(_AutoNowMixin, datetime.date):
     ) -> Any:
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty" or mapped_operator == "isnull":
-            raise NotImplementedError(
-                "FIXME: isempty/isnull not implemented for this field because of bugs."
-            )
+            column = table.columns[field_name]
+            # needs the cast to fix a bug when null checking
+            casted = sqlalchemy.cast(column, sqlalchemy.Text())
+            isnull = sqlalchemy.or_(column.is_(sqlalchemy.null()), casted == "")
+            return isnull if value else sqlalchemy.not_(isnull)
         else:
             return original_fn(field_name, operator, table, value)
 
@@ -669,24 +673,6 @@ class TimeField(FieldFactory, datetime.time):
         The column type is `sqlalchemy.Time`, with optional timezone support.
         """
         return sqlalchemy.Time(kwargs.get("with_timezone") or False)
-
-    @classmethod
-    def operator_to_clause(
-        cls,
-        field_obj: BaseFieldType,
-        field_name: str,
-        operator: str,
-        table: sqlalchemy.Table,
-        value: Any,
-        original_fn: Any,
-    ) -> Any:
-        mapped_operator = field_obj.operator_mapping.get(operator, operator)
-        if mapped_operator == "isempty" or mapped_operator == "isnull":
-            raise NotImplementedError(
-                "FIXME: isempty/isnull not implemented for this field because of bugs."
-            )
-        else:
-            return original_fn(field_name, operator, table, value)
 
 
 class JSONField(FieldFactory, pydantic.Json):
@@ -1221,9 +1207,11 @@ class IPAddressField(FieldFactory, str):
     ) -> Any:
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty" or mapped_operator == "isnull":
-            raise NotImplementedError(
-                "FIXME: isempty/isnull not implemented for this field because of bugs."
-            )
+            column = table.columns[field_name]
+            # needs the cast to fix a bug when null checking
+            casted = sqlalchemy.cast(column, sqlalchemy.Text())
+            isnull = sqlalchemy.or_(column.is_(sqlalchemy.null()), casted == "")
+            return isnull if value else sqlalchemy.not_(isnull)
         else:
             return original_fn(field_name, operator, table, value)
 

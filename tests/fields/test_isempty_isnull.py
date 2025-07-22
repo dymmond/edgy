@@ -44,14 +44,14 @@ class Product(edgy.StrictModel):
     value = fields.FloatField(null=True)
     binary = fields.BinaryField(null=True)
     duration = fields.DurationField(null=True)
-    # created = fields.DateTimeField(null=True)
-    # created_date = fields.DateField(null=True)
-    # created_time = fields.TimeField(null=True)
+    created = fields.DateTimeField(null=True)
+    created_date = fields.DateField(null=True)
+    created_time = fields.TimeField(null=True)
     uuid = fields.UUIDField(null=True)
     data = fields.JSONField(null=True)
     status = fields.ChoiceField(StatusEnum, null=True)
     manual = fields.FileField(null=True)
-    # ipaddress = fields.IPAddressField(null=True)
+    ipaddress = fields.IPAddressField(null=True)
 
     class Meta:
         registry = models
