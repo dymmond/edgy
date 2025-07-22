@@ -42,6 +42,7 @@ class Product(edgy.StrictModel):
     integer = fields.IntegerField(null=True)
     price = fields.DecimalField(max_digits=9, decimal_places=2, null=True)
     value = fields.FloatField(null=True)
+    binary = fields.BinaryField(null=True)
     duration = fields.DurationField(null=True)
     # created = fields.DateTimeField(null=True)
     # created_date = fields.DateField(null=True)
@@ -93,6 +94,7 @@ async def rollback_transactions():
                 integer=0,
                 price=decimal.Decimal("0.0"),
                 value=0.0,
+                binary=b"",
             ),
             False,
         ),
