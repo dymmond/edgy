@@ -31,6 +31,7 @@ hide:
 - Fix values_list when using only string.
 - Fix performance when using relation queryset.
 - Fix order_by when using relation queryset.
+- Fix crash when `None`is passed to `IPAddressField`.
 
 ### Breaking
 

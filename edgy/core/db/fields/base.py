@@ -250,8 +250,9 @@ class BaseField(BaseFieldType, FieldInfo):
                     return column.ilike(value)
             case "isnull" | "isempty":
                 # Handle 'isnull' (checking for NULL values).
-                isnull = column == None  # noqa
+                isnull = column == None  # noqa: E711
                 # is_(None) doesn't work for all fields
+                # column == None is required for IPAddressField, DateField, DateTimeField
                 return isnull if value else sqlalchemy.not_(isnull)
 
             # Handle various string containment and prefix/suffix matching operations.

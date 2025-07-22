@@ -600,7 +600,7 @@ class DurationField(FieldFactory, datetime.timedelta):
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty":
             column = table.columns[field_name]
-            is_empty = sqlalchemy.or_(column == None, column == datetime.timedelta())  # noqa
+            is_empty = sqlalchemy.or_(column.is_(None), column == datetime.timedelta())
             return is_empty if value else sqlalchemy.not_(is_empty)
         else:
             return original_fn(field_name, operator, table, value)
@@ -707,7 +707,7 @@ class JSONField(FieldFactory, pydantic.Json):
             column = table.columns[field_name]
             casted = sqlalchemy.cast(column, sqlalchemy.Text())
             is_empty = sqlalchemy.or_(
-                column == None,  # noqa
+                column.is_(sqlalchemy.null()),
                 casted.in_(["null", "[]", "{}", "0", "0.0", '""']),
             )
             return is_empty if value else sqlalchemy.not_(is_empty)
@@ -1147,16 +1147,16 @@ class IPAddressField(FieldFactory, str):
 
         Raises `ValueError` if the input is not a valid IP address string.
         """
-        if field_obj.null and value is None:
+        if value is None:
             return None
         if cls.is_native_type(value):
             return value
 
         try:
             return ipaddress.ip_address(value)
-        except ValueError:
+        except ValueError as exc:
             # Re-raise with a more specific message.
-            raise ValueError("Must be a real IP.")  # noqa
+            raise ValueError("Must be a real IP.") from exc
 
 
 Monkay(
