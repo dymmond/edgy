@@ -8,6 +8,7 @@ from typing import Any, NoReturn
 import sqlalchemy
 from loguru import logger
 from monkay import load
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql import schema, sqltypes
 
 import edgy
@@ -283,6 +284,9 @@ class InspectDB:
             field_type = "TextField"
 
         # Populate field_params based on the determined field_type and column properties.
+
+        if field_type == "JSONField" and column.type != postgresql.JSONB:
+            field_params["no_jsonb"] = True
 
         if field_type == "PGArrayField":
             # For PGArrayField, we need the specific item_type, not its generic form.

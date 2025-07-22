@@ -250,9 +250,11 @@ class BaseField(BaseFieldType, FieldInfo):
                     return column.ilike(value)
             case "isnull" | "isempty":
                 # Handle 'isnull' (checking for NULL values).
-                # Return column.is_(None) if value is True (checking for NULL),
-                # otherwise column.isnot(None) (checking for NOT NULL).
-                return column.is_(None) if value is True else column.isnot(None)
+                return (
+                    column.is_(sqlalchemy.null())
+                    if value is True
+                    else column.isnot(sqlalchemy.null())
+                )
 
             # Handle various string containment and prefix/suffix matching operations.
             case (

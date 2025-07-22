@@ -3,6 +3,7 @@ import decimal
 from enum import Enum
 
 import pytest
+import sqlalchemy
 
 import edgy
 from edgy.core.db import fields
@@ -108,3 +109,29 @@ async def test_operators_empty(product, isnull):
         isnull_queries[f"{field_name}__isnull"] = True
     assert (await type(product).query.get(**isempty_queries)) is not None
     assert (await type(product).query.exists(**isnull_queries)) == isnull
+
+
+@pytest.mark.parametrize(
+    "product,isempty,isnull",
+    [
+        pytest.param(Product(), True, True),
+        pytest.param(Product(data=sqlalchemy.null()), True, True),
+        pytest.param(Product(data=sqlalchemy.JSON.NULL), True, True),
+        pytest.param(Product(data=""), True, False),
+        pytest.param(Product(data=[]), True, False),
+        pytest.param(Product(data={}), True, False),
+        pytest.param(Product(data=0), True, False),
+        pytest.param(Product(data=0.0), True, False),
+    ],
+)
+async def test_operators_empty_json(product, isempty, isnull):
+    await product.save()
+    isempty_queries = {"data__isempty": True}
+    isnull_queries = {"data__isnull": True}
+    assert (await type(product).query.exists(**isempty_queries)) == isempty
+    assert (await type(product).query.exists(**isnull_queries)) == isnull
+
+    isempty_queries = {"data__isempty": False}
+    isnull_queries = {"data__isnull": False}
+    assert (await type(product).query.exists(**isempty_queries)) != isempty
+    assert (await type(product).query.exists(**isnull_queries)) != isnull

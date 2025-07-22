@@ -757,6 +757,26 @@ Simple JSON representation object.
 !!! Note
     Mutable default values (list, dict) are deep-copied to ensure that the default is not manipulated accidentally.
 
+!!! Note
+    `isnull` checks for `sqlalchemy.null` and `"null"` to prevent surprises.
+
+!!! Note
+    `isempty` checks additionally to `isnull` for empty json elements like empty string, empty dictionary, empty list, `0`, `0.0`.
+
+!!! Warning
+    You cannot query against `sqlalchemy.JSON.NULL` directly.
+    You have to cast first the json column to a text column to match against "null".
+    (`sqlalchemy.cast(column, sqlalchemy.Text()) == "null"`).
+
+!!! Note
+    If you use `null=True`, you can select between a sql null (`sqlalchemy.null()`) and a json null (`sqlalchemy.JSON.NULL`).
+    `none_as_null` maps `None` to the default.
+
+##### Parameters
+
+- `no_jsonb` - Don't use optimized `jsonb` type on postgresql.
+- `none_as_null` - Shall `None` be mapped as sql `null`? Defaults to `True` in case `null=True` otherwise `False`. You can set it explicit.
+
 
 #### BinaryField
 

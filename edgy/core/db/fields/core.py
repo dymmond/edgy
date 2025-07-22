@@ -18,7 +18,7 @@ import pydantic
 import sqlalchemy
 from monkay import Monkay
 from pydantic.networks import AnyUrl, EmailStr, IPvAnyAddress
-from sqlalchemy.dialects import oracle
+from sqlalchemy.dialects import oracle, postgresql
 
 from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields._internal import IPAddress
@@ -649,7 +649,17 @@ class JSONField(FieldFactory, pydantic.Json):
         """
         Returns the SQLAlchemy column type for a JSONField.
         """
-        return sqlalchemy.JSON()
+        none_as_null = kwargs.get("none_as_null")
+        if none_as_null is None:
+            none_as_null = bool(kwargs.get("null"))
+        sqltype = sqlalchemy.JSON(none_as_null=none_as_null)
+        if kwargs.get("no_jsonb"):
+            return sqltype
+        return sqltype.with_variant(
+            postgresql.JSONB(none_as_null=none_as_null),
+            "postgres",
+            "postgresql",
+        )
 
     @classmethod
     def get_default_value(cls, field_obj: BaseFieldType, original_fn: Any = None) -> Any:
@@ -681,6 +691,33 @@ class JSONField(FieldFactory, pydantic.Json):
         if not isinstance(default, str):
             default = orjson.dumps(default)
         return sqlalchemy.text(":value").bindparams(value=default)
+
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            casted = sqlalchemy.cast(column, sqlalchemy.Text())
+            is_empty = sqlalchemy.or_(
+                column.is_(sqlalchemy.null()), casted.in_(["null", "[]", "{}", "0", "0.0", '""'])
+            )
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        elif mapped_operator == "isnull":
+            column = table.columns[field_name]
+            casted = sqlalchemy.cast(column, sqlalchemy.Text())
+            # we cannot check against sqlalchemy.JSON.NULL
+            isnull = sqlalchemy.or_(column.is_(sqlalchemy.null()), casted == "null")
+            return isnull if value else sqlalchemy.not_(isnull)
+        else:
+            return original_fn(field_name, operator, table, value)
 
 
 class BinaryField(FieldFactory, bytes):

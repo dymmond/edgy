@@ -13,7 +13,12 @@ hide:
 - Allow multiple admins.
 - Add asgi multiplexing middleware (`edgy.contrib.lilya.middleware.EdgyMiddleware`).
 - Support for `isnull` operator for querysets on a field.
+- Support for `isempty` operator for querysets on a field.
 - Support `NumberedPaginator` as alias for `Paginator` (n fact `Paginator` is an alias of `NumberedPaginator`).
+
+## Changed
+
+- `JSONField` uses now `JSONB` by default.
 
 ### Fixed
 
