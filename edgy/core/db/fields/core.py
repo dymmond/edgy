@@ -530,6 +530,24 @@ class DateTimeField(_AutoNowMixin, datetime.datetime):
             return {}
         return original_fn(field_name, cleaned_data)
 
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty" or mapped_operator == "isnull":
+            raise NotImplementedError(
+                "FIXME: isempty/isnull not implemented for this field because of bugs."
+            )
+        else:
+            return original_fn(field_name, operator, table, value)
+
 
 class DateField(_AutoNowMixin, datetime.date):
     """
@@ -571,6 +589,24 @@ class DateField(_AutoNowMixin, datetime.date):
         Returns the SQLAlchemy column type for a DateField.
         """
         return sqlalchemy.Date()
+
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty" or mapped_operator == "isnull":
+            raise NotImplementedError(
+                "FIXME: isempty/isnull not implemented for this field because of bugs."
+            )
+        else:
+            return original_fn(field_name, operator, table, value)
 
 
 class DurationField(FieldFactory, datetime.timedelta):
@@ -633,6 +669,24 @@ class TimeField(FieldFactory, datetime.time):
         The column type is `sqlalchemy.Time`, with optional timezone support.
         """
         return sqlalchemy.Time(kwargs.get("with_timezone") or False)
+
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty" or mapped_operator == "isnull":
+            raise NotImplementedError(
+                "FIXME: isempty/isnull not implemented for this field because of bugs."
+            )
+        else:
+            return original_fn(field_name, operator, table, value)
 
 
 class JSONField(FieldFactory, pydantic.Json):
@@ -1154,6 +1208,24 @@ class IPAddressField(FieldFactory, str):
         except ValueError:
             # Re-raise with a more specific message.
             raise ValueError("Must be a real IP.")  # noqa
+
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty" or mapped_operator == "isnull":
+            raise NotImplementedError(
+                "FIXME: isempty/isnull not implemented for this field because of bugs."
+            )
+        else:
+            return original_fn(field_name, operator, table, value)
 
 
 Monkay(
