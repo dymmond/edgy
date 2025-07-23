@@ -296,9 +296,11 @@ class BaseQuerySet(
         # fetch all is in cache
         self._cache_fetch_all: bool = False
 
-    def _build_order_by_iterable(self, order_by: Any) -> Iterable:
-        """Builds the order by expression"""
-        return (self._prepare_order_by(entry) for entry in order_by)
+    def _build_order_by_iterable(
+        self, order_by: Iterable[str], tables_and_models: tables_and_models_type
+    ) -> Iterable:
+        """Builds the iterator for a order by like expression."""
+        return (self._prepare_order_by(entry, tables_and_models) for entry in order_by)
 
     async def build_where_clause(
         self, _: Any = None, tables_and_models: tables_and_models_type | None = None
@@ -673,10 +675,14 @@ class BaseQuerySet(
         expression = expression.where(await self.build_where_clause(self, tables_and_models))
 
         if self._order_by:
-            expression = expression.order_by(*self._build_order_by_iterable(self._order_by))
+            expression = expression.order_by(
+                *self._build_order_by_iterable(self._order_by, tables_and_models)
+            )
 
         if self._group_by:
-            expression = expression.group_by(*self._build_order_by_iterable(self._group_by))
+            expression = expression.group_by(
+                *self._build_order_by_iterable(self._group_by, tables_and_models)
+            )
 
         if self.limit_count:
             expression = expression.limit(self.limit_count)
@@ -798,9 +804,9 @@ class BaseQuerySet(
 
         return clauses, select_related
 
-    def _prepare_order_by(self, order_by: str) -> Any:
+    def _prepare_order_by(self, order_by: str, tables_and_models: tables_and_models_type) -> Any:
         """
-        Prepares an order by or group by expression from a string.
+        Prepares an order_by or group_by clause from a string.
 
         Args:
             order_by (str): The field name for ordering, optionally prefixed with '-' for descending.
@@ -810,12 +816,15 @@ class BaseQuerySet(
         """
         reverse = order_by.startswith("-")
         order_by = order_by.lstrip("-")
-        order_col = clauses_mod.clean_field_to_column(
+        crawl_result = clauses_mod.clean_path_to_crawl_result(
             self.model_class,
-            field_path=order_by,
+            path=order_by,
             embed_parent=self.embed_parent_filters,
             model_database=self.database,
         )
+        order_col = tables_and_models[crawl_result.forward_path][0].columns[
+            crawl_result.field_name
+        ]
         return order_col.desc() if reverse else order_col
 
     def _update_select_related_weak(self, fields: Iterable[str], *, clear: bool) -> bool:

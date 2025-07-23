@@ -13,7 +13,6 @@ import sqlalchemy
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.relationships.utils import RelationshipCrawlResult, crawl_relationship
-from edgy.core.utils.db import hash_tablekey
 
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
@@ -223,28 +222,6 @@ def clean_path_to_crawl_result(
     if crawl_result.operator != "exact":
         raise ValueError("Cannot select operators here.")
     return crawl_result
-
-
-def clean_field_to_column(
-    model_class: type[BaseModelType],
-    field_path: str,
-    embed_parent: tuple[str, str] | None = None,
-    model_database: Database | None = None,
-) -> sqlalchemy.ColumnClause:
-    crawl_result = clean_path_to_crawl_result(
-        model_class=model_class,
-        path=field_path,
-        embed_parent=embed_parent,
-        model_database=model_database,
-    )
-    if crawl_result.cross_db_remainder:
-        raise ValueError("Cannot select field from other db.")
-    return sqlalchemy.table(
-        hash_tablekey(
-            tablekey=crawl_result.model_class.table.key, prefix=crawl_result.forward_path
-        ),
-        sqlalchemy.column(crawl_result.field_name),
-    ).columns[crawl_result.field_name]
 
 
 class _DefaultClausesHelper:
