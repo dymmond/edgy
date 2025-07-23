@@ -13,7 +13,13 @@ hide:
 - Allow multiple admins.
 - Add asgi multiplexing middleware (`edgy.contrib.lilya.middleware.EdgyMiddleware`).
 - Support for `isnull` operator for querysets on a field.
+- Support for `isempty` operator for querysets on a field.
 - Support `NumberedPaginator` as alias for `Paginator` (n fact `Paginator` is an alias of `NumberedPaginator`).
+
+## Changed
+
+- `JSONField` uses now `JSONB` by default for postgresql (and only for postgresql).
+- Slightly changed `InspectDB` internal interface.
 
 ### Fixed
 
@@ -25,6 +31,13 @@ hide:
 - Fix values_list when using only string.
 - Fix performance when using relation queryset.
 - Fix order_by when using relation queryset.
+- Fix crash when `None`is passed to `IPAddressField`.
+
+### Breaking
+
+- `JSONField` uses now postgresql `JSONB` by default for postgresql (and only for postgresql).
+  This may can cause an extra migration (because variants are used). If this is unwanted,
+  add: `no_jsonb=True` to `JSONField`.
 
 ## 0.32.5
 

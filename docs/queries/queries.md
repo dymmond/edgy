@@ -210,8 +210,11 @@ The same special operators are also automatically added on every column.
 * **lte** - Filter instances having values `Less Than Equal`.
 * **gt** - Filter instances having values `Greater Than`.
 * **gte** - Filter instances having values `Greater Than Equal`.
-* **isnull** - Filer instances by checking if a given attribute is null `True` or `False`
+* **isnull** - Filter instances by checking if a given attribute is null `True` or `False`.
+* **isempty** - Filter like `isnull` but also checks for empty, nullish values.
 
+!!! Warning
+    Datetime fields and the ipaddress field aren't supported by isempty and isnull yet. There are some bugs.
 
 ##### Example
 

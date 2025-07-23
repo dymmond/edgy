@@ -18,7 +18,7 @@ import pydantic
 import sqlalchemy
 from monkay import Monkay
 from pydantic.networks import AnyUrl, EmailStr, IPvAnyAddress
-from sqlalchemy.dialects import oracle
+from sqlalchemy.dialects import oracle, postgresql
 
 from edgy.core.db.context_vars import CURRENT_PHASE
 from edgy.core.db.fields._internal import IPAddress
@@ -101,6 +101,41 @@ class CharField(FieldFactory, str):
             if max_length is None
             else sqlalchemy.String(length=max_length, collation=kwargs.get("collation"))
         )
+
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == "")
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
 
 
 class TextField(CharField):
@@ -199,6 +234,41 @@ class IntegerField(FieldFactory, int):
             kwargs.setdefault("read_only", True)
             kwargs["inject_default_on_partial_update"] = True
 
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == 0)
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
+
 
 class FloatField(FieldFactory, float):
     """
@@ -252,6 +322,41 @@ class FloatField(FieldFactory, float):
             oracle.FLOAT(binary_precision=round(precision / 0.30103), asdecimal=False),  # type: ignore
             "oracle",
         )
+
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == 0.0)
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
 
 
 class BigIntegerField(IntegerField):
@@ -356,6 +461,41 @@ class DecimalField(FieldFactory, decimal.Decimal):
         if decimal_places is None or decimal_places < 0:
             raise FieldDefinitionError("decimal_places are required for DecimalField")
 
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == decimal.Decimal("0"))
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
+
 
 # in python it is not possible to subclass bool. So only use bool for type checking.
 class BooleanField(FieldFactory, cast(bool, int)):
@@ -374,6 +514,41 @@ class BooleanField(FieldFactory, cast(bool, int)):
         Returns the SQLAlchemy column type for a BooleanField.
         """
         return sqlalchemy.Boolean()
+
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column.is_(False))
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
 
 
 class DateTimeField(_AutoNowMixin, datetime.datetime):
@@ -497,6 +672,41 @@ class DurationField(FieldFactory, datetime.timedelta):
         """
         return sqlalchemy.Interval()
 
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == datetime.timedelta())
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
+
 
 class TimeField(FieldFactory, datetime.time):
     """
@@ -541,7 +751,17 @@ class JSONField(FieldFactory, pydantic.Json):
         """
         Returns the SQLAlchemy column type for a JSONField.
         """
-        return sqlalchemy.JSON()
+        none_as_null = kwargs.get("none_as_null")
+        if none_as_null is None:
+            none_as_null = bool(kwargs.get("null"))
+        sqltype = sqlalchemy.JSON(none_as_null=none_as_null)
+        if kwargs.get("no_jsonb"):
+            return sqltype
+        return sqltype.with_variant(
+            postgresql.JSONB(none_as_null=none_as_null),
+            "postgres",
+            "postgresql",
+        )
 
     @classmethod
     def get_default_value(cls, field_obj: BaseFieldType, original_fn: Any = None) -> Any:
@@ -574,6 +794,51 @@ class JSONField(FieldFactory, pydantic.Json):
             default = orjson.dumps(default)
         return sqlalchemy.text(":value").bindparams(value=default)
 
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        """
+        Overwrite for isempty. Change logic for isnull to select also json "null".
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            casted = sqlalchemy.cast(column, sqlalchemy.Text())
+            is_empty = sqlalchemy.or_(
+                column.is_(sqlalchemy.null()),
+                casted.in_(["null", "[]", "{}", "0", "0.0", '""']),
+            )
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        elif mapped_operator == "isnull":
+            column = table.columns[field_name]
+            casted = sqlalchemy.cast(column, sqlalchemy.Text())
+            # we cannot check against sqlalchemy.JSON.NULL
+            isnull = sqlalchemy.or_(column.is_(sqlalchemy.null()), casted == "null")
+            return isnull if value else sqlalchemy.not_(isnull)
+        else:
+            return original_fn(field_name, operator, table, value)
+
 
 class BinaryField(FieldFactory, bytes):
     """
@@ -602,6 +867,41 @@ class BinaryField(FieldFactory, bytes):
         Uses `sqlalchemy.LargeBinary` with the specified maximum length.
         """
         return sqlalchemy.LargeBinary(length=kwargs.get("max_length"))
+
+    @classmethod
+    def operator_to_clause(
+        cls,
+        field_obj: BaseFieldType,
+        field_name: str,
+        operator: str,
+        table: sqlalchemy.Table,
+        value: Any,
+        original_fn: Any,
+    ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
+        mapped_operator = field_obj.operator_mapping.get(operator, operator)
+        if mapped_operator == "isempty":
+            column = table.columns[field_name]
+            is_empty = sqlalchemy.or_(column.is_(None), column == b"")
+            return is_empty if value else sqlalchemy.not_(is_empty)
+        else:
+            return original_fn(field_name, operator, table, value)
 
 
 class UUIDField(FieldFactory, uuid.UUID):
@@ -983,14 +1283,16 @@ class IPAddressField(FieldFactory, str):
 
         Raises `ValueError` if the input is not a valid IP address string.
         """
+        if value is None:
+            return None
         if cls.is_native_type(value):
             return value
 
         try:
             return ipaddress.ip_address(value)
-        except ValueError:
+        except ValueError as exc:
             # Re-raise with a more specific message.
-            raise ValueError("Must be a real IP.")  # noqa
+            raise ValueError("Must be a real IP.") from exc
 
 
 Monkay(

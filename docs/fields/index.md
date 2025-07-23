@@ -752,10 +752,24 @@ class MyModel(edgy.Model):
     ...
 ```
 
-Simple JSON representation object.
+Simple JSON object which is queryable. On postgresql `JSONB` operators are allowed by default.
 
 !!! Note
     Mutable default values (list, dict) are deep-copied to ensure that the default is not manipulated accidentally.
+    `isnull` checks for `sqlalchemy.null` and `"null"` to prevent surprises.
+    `isempty` checks additionally to `isnull` for empty json elements like empty string, empty dictionary, empty list, `0`, `0.0`.
+    If you use `null=True`, you can select between a sql null (`sqlalchemy.null()`) and a json null (`sqlalchemy.JSON.NULL`).
+    `none_as_null` maps `None` to the default.
+
+!!! Warning
+    You cannot query against `sqlalchemy.JSON.NULL` directly.
+    You have to cast first the json column to a text column to match against "null".
+    (`sqlalchemy.cast(column, sqlalchemy.Text()) == "null"`).
+
+##### Parameters
+
+- `no_jsonb` - Don't use optimized `JSONB` type on postgresql.
+- `none_as_null` - Shall `None` be mapped as sql `null`? Defaults to `True` in case `null=True` otherwise `False`. You can set it explicit.
 
 
 #### BinaryField

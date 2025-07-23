@@ -686,7 +686,7 @@ class FileField(FieldFactory):
         cls,
         field_obj: BaseFieldType,
         field_name: str,
-        value: FieldFile | str | dict,
+        value: FieldFile | str | dict | bool | None,
         for_query: bool = False,
         original_fn: Any = None,
     ) -> dict[str, Any]:
@@ -765,6 +765,9 @@ class FileField(FieldFactory):
 
         # Process for query operations.
         if for_query:
+            if field_name.endswith("__isnull") or field_name.endswith("__isempty"):
+                assert isinstance(value, bool)
+                return {field_name: value}
             if isinstance(value, str):
                 return {field_name: value}
             assert isinstance(value, FieldFile)

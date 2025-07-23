@@ -133,7 +133,7 @@ async def test_create_correct_inspect_db_with_full_info_avail():
 
     out = StringIO()
     with redirect_stdout(out):
-        for line in InspectDB.write_output(tables, str(database.url), schema=None):
+        for line in InspectDB.write_output(tables, database, schema=None):
             sys.stdout.writelines(line)  # type: ignore
     out.seek(0)
     generated = out.read()

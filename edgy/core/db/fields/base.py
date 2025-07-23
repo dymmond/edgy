@@ -231,45 +231,41 @@ class BaseField(BaseFieldType, FieldInfo):
         mapped_operator = self.operator_mapping.get(operator, operator)
 
         # Handle 'iexact' (case-insensitive exact match) specifically.
-        if mapped_operator == "iexact":
-            # Define characters that need to be escaped in LIKE/ILIKE patterns.
-            escape_characters = ["%", "_"]
-            # Check if the value contains any of the escape characters.
-            has_escaped_character = any(char in value for char in escape_characters)
+        match mapped_operator:
+            case "iexact":
+                # Define characters that need to be escaped in LIKE/ILIKE patterns.
+                escape_characters = ["%", "_"]
+                # Check if the value contains any of the escape characters.
+                has_escaped_character = any(char in value for char in escape_characters)
 
-            if has_escaped_character:
-                # If escaped characters are present, escape backslashes first, then the specific escape characters.
-                processed_value = value.replace("\\", "\\\\")
-                for char in escape_characters:
-                    processed_value = processed_value.replace(char, f"\\{char}")
-                # Use ilike with an explicit escape character.
-                return column.ilike(processed_value, escape="\\")
-            else:
-                # If no escape characters, use ilike directly.
-                return column.ilike(value)
+                if has_escaped_character:
+                    # If escaped characters are present, escape backslashes first, then the specific escape characters.
+                    processed_value = value.replace("\\", "\\\\")
+                    for char in escape_characters:
+                        processed_value = processed_value.replace(char, f"\\{char}")
+                    # Use ilike with an explicit escape character.
+                    return column.ilike(processed_value, escape="\\")
+                else:
+                    # If no escape characters, use ilike directly.
+                    return column.ilike(value)
+            case "isnull" | "isempty":
+                # Handle 'isnull' (checking for NULL values).
+                isnull = column == None  # noqa: E711
+                # is_(None) doesn't work for all fields
+                # column == None is required for IPAddressField, DateField, DateTimeField
+                return isnull if value else sqlalchemy.not_(isnull)
 
-        # Handle 'isnull' (checking for NULL values).
-        elif mapped_operator == "isnull":
-            # Return column.is_(None) if value is True (checking for NULL),
-            # otherwise column.isnot(None) (checking for NOT NULL).
-            return column.is_(None) if value is True else column.isnot(None)
+            # Handle various string containment and prefix/suffix matching operations.
+            case (
+                "contains" | "icontains" | "startswith" | "endswith" | "istartswith" | "iendswith"
+            ):
+                # Apply the column method with autoescape enabled.
+                return getattr(column, mapped_operator)(value, autoescape=True)
 
-        # Handle various string containment and prefix/suffix matching operations.
-        elif mapped_operator in {
-            "contains",
-            "icontains",
-            "startswith",
-            "endswith",
-            "istartswith",
-            "iendswith",
-        }:
-            # Apply the column method with autoescape enabled.
-            return getattr(column, mapped_operator)(value, autoescape=True)
-
-        else:
-            # For all other operators, directly apply the corresponding method
-            # from the SQLAlchemy column object.
-            return getattr(column, mapped_operator)(value)
+            case _:
+                # For all other operators, directly apply the corresponding method
+                # from the SQLAlchemy column object.
+                return getattr(column, mapped_operator)(value)
 
     def is_required(self) -> bool:
         """
