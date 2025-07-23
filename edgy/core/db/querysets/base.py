@@ -810,7 +810,7 @@ class BaseQuerySet(
         """
         reverse = order_by.startswith("-")
         order_by = order_by.lstrip("-")
-        order_col, _ = clauses_mod.clean_field_to_column(
+        order_col = clauses_mod.clean_field_to_column(
             self.model_class,
             field_path=order_by,
             embed_parent=self.embed_parent_filters,
@@ -830,12 +830,12 @@ class BaseQuerySet(
         for field_name in fields:
             # handle order by values by stripping -
             field_name = field_name.lstrip("-")
-            related_element = clauses_mod.clean_field_to_column(
+            related_element = clauses_mod.clean_path_to_crawl_result(
                 self.model_class,
-                field_path=field_name,
+                path=field_name,
                 embed_parent=self.embed_parent_filters,
                 model_database=self.database,
-            )[1]
+            ).forward_path
             if related_element:
                 related.add(related_element)
         if related and not self._select_related.union(self._select_related_weak).issuperset(
@@ -860,15 +860,19 @@ class BaseQuerySet(
         for path in pathes:
             # handle order by values by stripping -
             path = path.lstrip("-")
-            col, related_element = clauses_mod.clean_field_to_column(
+            crawl_result = clauses_mod.clean_path_to_crawl_result(
                 self.model_class,
-                # actually a path not a field_path
-                field_path=path,
+                # actually not a field_path
+                path=path,
                 embed_parent=self.embed_parent_filters,
                 model_database=self.database,
             )
-            # the column is actually a path. Quick and dirty fix
-            related_element = col.key if not related_element else f"{related_element}__{col.key}"
+            # actually not a field name
+            related_element = (
+                crawl_result.field_name
+                if not crawl_result.forward_path
+                else f"{crawl_result.forward_path}__{crawl_result.field_name}"
+            )
             if related_element:
                 related.add(related_element)
         if related and not self._select_related.issuperset(related):
