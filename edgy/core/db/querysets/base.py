@@ -145,7 +145,6 @@ class BaseQuerySet(
         defer_fields: Sequence[str] | None = None,
         defer: Iterable[str] = _empty_set,
         embed_parent: tuple[str, str | str] | None = None,
-        embed_parent_filters: tuple[str, str] | None = None,
         using_schema: str | None | Any = Undefined,
         table: sqlalchemy.Table | None = None,
         exclude_secrets: bool = False,
@@ -207,7 +206,9 @@ class BaseQuerySet(
             defer = defer_fields
         self._defer = set(defer)
         self.embed_parent = embed_parent
-        self.embed_parent_filters = embed_parent_filters
+        # private attribute which manipulates the prefix of filters, order_by, select_related
+        # set by relations
+        self.embed_parent_filters: tuple[str, str | str] | None = None
         self.using_schema = using_schema
         self._extra_select = list(extra_select) if extra_select is not None else []
         self._reference_select = (
@@ -251,7 +252,6 @@ class BaseQuerySet(
             only=self._only,
             defer=self._defer,
             embed_parent=self.embed_parent,
-            embed_parent_filters=self.embed_parent_filters,
             using_schema=self.using_schema,
             table=getattr(self, "_table", None),
             exclude_secrets=self._exclude_secrets,
@@ -259,6 +259,7 @@ class BaseQuerySet(
             extra_select=self._extra_select,
         )
         queryset.or_clauses.extend(self.or_clauses)
+        queryset.embed_parent_filters = self.embed_parent_filters
         # copy but don't trigger update select related
         queryset._select_related.update(self._select_related)
         queryset._select_related_weak.update(self._select_related_weak)
@@ -358,11 +359,21 @@ class BaseQuerySet(
             )
         )
 
-    def _build_select_distinct(self, distinct_on: Sequence[str] | None, expression: Any) -> Any:
+    def _build_select_distinct(
+        self,
+        distinct_on: Sequence[str] | None,
+        expression: Any,
+        tables_and_models: tables_and_models_type,
+    ) -> Any:
         """Filters selects only specific fields. Leave empty to use simple distinct"""
         # using with columns is not supported by all databases
         if distinct_on:
-            return expression.distinct(*map(self._prepare_fields_for_distinct, distinct_on))
+            return expression.distinct(
+                *(
+                    self._prepare_distinct(distinct_el, tables_and_models)
+                    for distinct_el in distinct_on
+                )
+            )
         else:
             return expression.distinct()
 
@@ -691,7 +702,9 @@ class BaseQuerySet(
             expression = expression.offset(self._offset)
 
         if self.distinct_on is not None:
-            expression = self._build_select_distinct(self.distinct_on, expression=expression)
+            expression = self._build_select_distinct(
+                self.distinct_on, expression=expression, tables_and_models=tables_and_models
+            )
         return expression, tables_and_models
 
     async def as_select_with_tables(
@@ -892,7 +905,9 @@ class BaseQuerySet(
             self._cached_select_related_expression = None
             self._select_related.update(related)
 
-    def _prepare_fields_for_distinct(self, distinct_on: str) -> sqlalchemy.Column:
+    def _prepare_distinct(
+        self, distinct_on: str, tables_and_models: tables_and_models_type
+    ) -> sqlalchemy.Column:
         """
         Prepares a field for use in a distinct-on clause.
 
@@ -902,7 +917,13 @@ class BaseQuerySet(
         Returns:
             sqlalchemy.Column: The SQLAlchemy column object.
         """
-        return self.table.columns[distinct_on]
+        crawl_result = clauses_mod.clean_path_to_crawl_result(
+            self.model_class,
+            path=distinct_on,
+            embed_parent=self.embed_parent_filters,
+            model_database=self.database,
+        )
+        return tables_and_models[crawl_result.forward_path][0].columns[crawl_result.field_name]
 
     async def _embed_parent_in_result(
         self, result: EdgyModel | Awaitable[EdgyModel]

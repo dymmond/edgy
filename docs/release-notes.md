@@ -20,6 +20,25 @@ hide:
 
 - `JSONField` uses now `JSONB` by default for postgresql (and only for postgresql).
 - Slightly changed `InspectDB` internal interface.
+- When using a relation, all queryset operations are by default executed on the target model except for ManyToManyFields with `embed_through=""` (default).
+  In this case the reference is the through model. E.g.
+  ``` python
+  class User(edgy.Model):
+    name = edgy.CharField(max_length=255)
+      ...
+  class Product(edgy.Model):
+      name = edgy.CharField(max_length=255)
+      users = edgy.ManyToMany("User", related_name="products", through_tablename=edgy.NEW_M2M_NAMING)
+      users2 = edgy.ManyToMany("User", embed_through="", related_name="products", through_tablename=edgy.NEW_M2M_NAMING)
+      users3 = edgy.ManyToMany("User", embed_through="embedded", related_name="products", through_tablename=edgy.NEW_M2M_NAMING)
+
+  product: Product = ...
+  await product.users.order_by("name")
+  # use old way
+  await product.users2.order_by("user__name")
+  # sort for product name
+  await product.users3.order_by("embedded__product__name")
+  ```
 
 ### Fixed
 
@@ -38,6 +57,7 @@ hide:
 - `JSONField` uses now postgresql `JSONB` by default for postgresql (and only for postgresql).
   This may can cause an extra migration (because variants are used). If this is unwanted,
   add: `no_jsonb=True` to `JSONField`.
+- By fixing the column retrieval of order_by, ... we may break userspace. Fix it by removing the now superfluous prefix. `embed_through=""` is not affected as we have here the old interface.
 
 ## 0.32.5
 

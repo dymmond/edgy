@@ -111,7 +111,7 @@ class ManyRelation(ManyRelationProtocol):
         # Set the embed_parent attribute on the queryset for embedding the 'to' model.
         # If embed_through is an empty string, it defaults to False.
         queryset.embed_parent = (self.to_foreign_key, self.embed_through or "")
-        # If embed_through is specified, also set embed_parent_filters.
+        # If embed_through is not "",  use modern logic.
         if self.embed_through != "":
             queryset.embed_parent_filters = queryset.embed_parent
         if self.reverse:
@@ -460,14 +460,21 @@ class SingleRelation(ManyRelationProtocol):
         # Set the embed_parent attribute on the queryset for embedding.
         queryset.embed_parent = self.embed_parent
         # Apply embed_parent_filters only if embed_parent is set and the field is a RelationshipField.
-        if self.embed_parent and isinstance(
-            fk.owner.meta.fields[self.embed_parent[0].split("__", 1)[0]],
-            RelationshipField,
-        ):
-            queryset.embed_parent_filters = queryset.embed_parent
-        if not fk.is_cross_db():
-            # not initialized yet
-            queryset._select_related.add(self.to_foreign_key)
+        if self.embed_parent:
+            embed_parent_field_name = self.embed_parent[0].split("__", 1)[0]
+            embed_parent_field = fk.owner.meta.fields[embed_parent_field_name]
+            if isinstance(
+                embed_parent_field,
+                RelationshipField,
+            ):
+                queryset.embed_parent_filters = queryset.embed_parent
+                # also add to select_related, when not cross db
+                if not embed_parent_field.is_cross_db(
+                    owner_database=getattr(self.instance, "database", None)
+                ):
+                    # TODO: though this works, this isn't performant for deeply nested embed_parent definition
+                    # not initialized yet, so just add it
+                    queryset._select_related.add(embed_parent_field_name)
         return queryset
 
     def all(self, clear_cache: bool = False) -> QuerySet:

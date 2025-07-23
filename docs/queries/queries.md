@@ -701,6 +701,10 @@ The `values()` can also be combined with `filter`, `only`, `exclude` as per usua
 * **exclude** - Fields to exclude from the return.
 * **exclude_none** - Boolean flag indicating if the fields with `None` should be excluded.
 
+!!! Warning
+    All specified fields, exclude are passed to the `model_dump` of the target pydantic object. Prefixes are not adhering embed_parent or embed_through but use the `model_dump` logic.
+    Non-existing fields (e.g. only, defer) are ignored.
+
 ### Values list
 
 Returns the model results in a tuple like format.
@@ -747,6 +751,10 @@ The `values_list()` can also be combined with `filter`, `only`, `exclude` as per
 * **exclude** - Fields to exclude from the return.
 * **exclude_none** - Boolean flag indicating if the fields with `None` should be excluded.
 * **flat** - Boolean flag indicating the results should be flattened.
+
+!!! Warning
+    All specified fields, exclude are passed to the `model_dump` of the target pydantic object. Prefixes are not adhering embed_parent or embed_through but use the `model_dump` logic.
+    Non-existing fields (e.g. only, defer) are ignored.
 
 ### Only
 
