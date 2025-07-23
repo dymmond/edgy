@@ -327,6 +327,21 @@ async def test_related_name_query_returns_nothing(create_test_database):
     assert len(tracks_album) == 0
 
 
+async def test_values_list(create_test_database):
+    album = await Album.query.create(
+        name="Malibu",
+        tracks=[
+            Track(title="The Bird", position=1),
+            Track(title="Heart don't stand a chance", position=2),
+            Track(title="The Waters", position=3),
+        ],
+    )
+    assert await Track.query.count() == 3
+    assert await Album.query.count() == 1
+    arr = await album.tracks.order_by("position").values_list("title", flat=True)
+    assert arr == ["The Bird", "Heart don't stand a chance", "The Waters"]
+
+
 def test_assertation_error_on_embed_through_double_underscore_attr():
     with pytest.raises(FieldDefinitionError) as raised:
 

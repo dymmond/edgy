@@ -20,7 +20,7 @@ class User(edgy.StrictModel):
         registry = models
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture()
 async def create_test_database():
     await models.create_all()
     async with models:
@@ -45,6 +45,11 @@ def test_model_class():
     assert repr(User(id=1)) == "<User: User(id=1)>"
 
 
-async def test_save():
+async def test_create(create_test_database):
     user = await User.query.create()
+    assert user.name == ""
+
+
+async def test_save(create_test_database):
+    user = await User().save()
     assert user.name == ""

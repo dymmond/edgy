@@ -173,8 +173,14 @@ class BaseQuerySet(
             )
             offset = limit_offset
         self._offset = offset
-
-        self._select_related = set(select_related)
+        # Have the user passed select related values copied
+        select_related = set(select_related)
+        # Have the **real** path values
+        self._select_related: set[str] = set()
+        # computed only, replacable. Have the **real** path values
+        self._select_related_weak: set[str] = set()
+        if select_related:
+            self._update_select_related(select_related)
         self._prefetch_related = list(prefetch_related)
         self._batch_size = batch_size
         self._order_by: tuple[str, ...] = tuple(order_by)
@@ -235,7 +241,6 @@ class BaseQuerySet(
             self.model_class,
             database=getattr(self, "_database", None),
             filter_clauses=self.filter_clauses,
-            select_related=self._select_related,
             prefetch_related=self._prefetch_related,
             limit=self.limit_count,
             offset=self._offset,
@@ -254,6 +259,9 @@ class BaseQuerySet(
             extra_select=self._extra_select,
         )
         queryset.or_clauses.extend(self.or_clauses)
+        # copy but don't trigger update select related
+        queryset._select_related.update(self._select_related)
+        queryset._select_related_weak.update(self._select_related_weak)
         queryset._cached_select_related_expression = self._cached_select_related_expression
         return cast("QuerySet", queryset)
 
@@ -288,15 +296,11 @@ class BaseQuerySet(
         # fetch all is in cache
         self._cache_fetch_all: bool = False
 
-    def _build_order_by_expression(self, order_by: Any, expression: Any) -> Any:
-        """Builds the order by expression"""
-        expression = expression.order_by(*(self._prepare_order_by(entry) for entry in order_by))
-        return expression
-
-    def _build_group_by_expression(self, group_by: Any, expression: Any) -> Any:
-        """Builds the group by expression"""
-        expression = expression.group_by(*(self._prepare_order_by(entry) for entry in group_by))
-        return expression
+    def _build_order_by_iterable(
+        self, order_by: Iterable[str], tables_and_models: tables_and_models_type
+    ) -> Iterable:
+        """Builds the iterator for a order by like expression."""
+        return (self._prepare_order_by(entry, tables_and_models) for entry in order_by)
 
     async def build_where_clause(
         self, _: Any = None, tables_and_models: tables_and_models_type | None = None
@@ -444,7 +448,7 @@ class BaseQuerySet(
             ] = {}
 
             # Select related
-            for select_path in self._select_related:
+            for select_path in self._select_related.union(self._select_related_weak):
                 # For m2m relationships
                 model_class = self.model_class
                 former_table = maintable
@@ -671,16 +675,20 @@ class BaseQuerySet(
         expression = expression.where(await self.build_where_clause(self, tables_and_models))
 
         if self._order_by:
-            expression = self._build_order_by_expression(self._order_by, expression=expression)
+            expression = expression.order_by(
+                *self._build_order_by_iterable(self._order_by, tables_and_models)
+            )
+
+        if self._group_by:
+            expression = expression.group_by(
+                *self._build_order_by_iterable(self._group_by, tables_and_models)
+            )
 
         if self.limit_count:
             expression = expression.limit(self.limit_count)
 
         if self._offset:
             expression = expression.offset(self._offset)
-
-        if self._group_by:
-            expression = self._build_group_by_expression(self._group_by, expression=expression)
 
         if self.distinct_on is not None:
             expression = self._build_select_distinct(self.distinct_on, expression=expression)
@@ -796,20 +804,93 @@ class BaseQuerySet(
 
         return clauses, select_related
 
-    def _prepare_order_by(self, order_by: str) -> Any:
+    def _prepare_order_by(self, order_by: str, tables_and_models: tables_and_models_type) -> Any:
         """
-        Prepares an order by expression from a string.
+        Prepares an order_by or group_by clause from a string.
 
         Args:
             order_by (str): The field name for ordering, optionally prefixed with '-' for descending.
 
         Returns:
-            Any: The SQLAlchemy column expression for ordering.
+            Any: The SQLAlchemy column expression for ordering and the select_path.
         """
         reverse = order_by.startswith("-")
         order_by = order_by.lstrip("-")
-        order_col = self.table.columns[order_by]
+        crawl_result = clauses_mod.clean_path_to_crawl_result(
+            self.model_class,
+            path=order_by,
+            embed_parent=self.embed_parent_filters,
+            model_database=self.database,
+        )
+        order_col = tables_and_models[crawl_result.forward_path][0].columns[
+            crawl_result.field_name
+        ]
         return order_col.desc() if reverse else order_col
+
+    def _update_select_related_weak(self, fields: Iterable[str], *, clear: bool) -> bool:
+        """
+        Update _select_related_weak
+
+        Args:
+            fields (Iterable[str]): The field names of order_by, group_by, ...
+
+        """
+        related: set[str] = set()
+        for field_name in fields:
+            # handle order by values by stripping -
+            field_name = field_name.lstrip("-")
+            related_element = clauses_mod.clean_path_to_crawl_result(
+                self.model_class,
+                path=field_name,
+                embed_parent=self.embed_parent_filters,
+                model_database=self.database,
+            ).forward_path
+            if related_element:
+                related.add(related_element)
+        if related and not self._select_related.union(self._select_related_weak).issuperset(
+            related
+        ):
+            self._cached_select_related_expression = None
+            if clear:
+                self._select_related_weak.clear()
+            self._select_related_weak.update(related)
+            return True
+        return False
+
+    def _update_select_related(self, pathes: Iterable[str]) -> None:
+        """
+        Update _select_related
+
+        Args:
+            pathes (Iterable[str]): The related pathes.
+
+        """
+        related: set[str] = set()
+        for path in pathes:
+            # handle order by values by stripping -
+            path = path.lstrip("-")
+            crawl_result = clauses_mod.clean_path_to_crawl_result(
+                self.model_class,
+                # actually not a field_path
+                path=path,
+                embed_parent=self.embed_parent_filters,
+                model_database=self.database,
+            )
+            # actually not a field name
+            related_element = (
+                crawl_result.field_name
+                if not crawl_result.forward_path
+                else f"{crawl_result.forward_path}__{crawl_result.field_name}"
+            )
+            if crawl_result.cross_db_remainder:
+                raise QuerySetError(
+                    detail=f'Selected path "{related_element}" is on another database.'
+                )
+            if related_element:
+                related.add(related_element)
+        if related and not self._select_related.issuperset(related):
+            self._cached_select_related_expression = None
+            self._select_related.update(related)
 
     def _prepare_fields_for_distinct(self, distinct_on: str) -> sqlalchemy.Column:
         """
@@ -1586,6 +1667,8 @@ class QuerySet(BaseQuerySet):
         """
         queryset: QuerySet = self._clone()
         queryset._order_by = order_by
+        if queryset._update_select_related_weak(order_by, clear=True):
+            queryset._update_select_related_weak(queryset._group_by, clear=False)
         return queryset
 
     def reverse(self) -> QuerySet:
@@ -1638,6 +1721,8 @@ class QuerySet(BaseQuerySet):
         """
         queryset: QuerySet = self._clone()
         queryset._group_by = group_by
+        if queryset._update_select_related_weak(group_by, clear=True):
+            queryset._update_select_related_weak(queryset._order_by, clear=False)
         return queryset
 
     def distinct(self, first: bool | str = True, *distinct_on: str) -> QuerySet:
@@ -1706,9 +1791,7 @@ class QuerySet(BaseQuerySet):
                 stacklevel=2,
             )
             related = cast(tuple[str, ...], related[0])
-        if not self._select_related.issuperset(related):
-            queryset._cached_select_related_expression = None
-            queryset._select_related.update(related)
+        queryset._update_select_related(related)
         return queryset
 
     async def values(
@@ -1716,7 +1799,7 @@ class QuerySet(BaseQuerySet):
         fields: Sequence[str] | str | None = None,
         exclude: Sequence[str] | set[str] = None,
         exclude_none: bool = False,
-    ) -> list[Any]:
+    ) -> list[dict]:
         """
         Returns the results in a python dictionary format.
         """
@@ -1724,19 +1807,17 @@ class QuerySet(BaseQuerySet):
         if isinstance(fields, str):
             fields = [fields]
 
-        rows: list[BaseModelType] = await self
-
         if fields is not None and not isinstance(fields, Iterable):
             raise QuerySetError(detail="Fields must be a suitable sequence of strings or unset.")
 
-        if not fields:
-            rows = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
-        else:
-            rows = [
+        rows: list[BaseModelType] = await self
+        if fields:
+            return [
                 row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)
                 for row in rows
             ]
-        return rows
+        else:
+            return [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
 
     async def values_list(
         self,
@@ -1748,6 +1829,8 @@ class QuerySet(BaseQuerySet):
         """
         Returns the results in a python dictionary format.
         """
+        if isinstance(fields, str):
+            fields = [fields]
         rows = await self.values(
             fields=fields,
             exclude=exclude,

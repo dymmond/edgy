@@ -460,7 +460,9 @@ class ModelRowMixin:
                     queryset = crawl_result.model_class.query.all()
 
                 # Ensure the reverse path is selected to link back to the main model.
-                queryset = queryset.select_related(crawl_result.reverse_path)
+                queryset = queryset.all()
+                queryset._select_related.add(crawl_result.reverse_path)
+                queryset._cached_select_related_expression = None
 
             # Construct the filter clause for the prefetched query using the main model's
             # primary key(s).

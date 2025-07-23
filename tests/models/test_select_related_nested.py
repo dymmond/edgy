@@ -1,4 +1,5 @@
 import pytest
+from ordered_set import OrderedSet
 
 import edgy
 from edgy.testclient import DatabaseTestClient
@@ -51,8 +52,8 @@ async def test_nested_with_not_optimal_select_related_exclude_secrets():
     await Organisation.query.create(user=user)
 
     org_query = Organisation.query.exclude_secrets(True)
-    # by default _select_related is a set; for having an arbitary order provide a list
-    org_query._select_related = ["user", "user", "user__profile"]
+    # by default _select_related is a set; for having an arbitary order provide an OrderedSet
+    org_query._select_related = OrderedSet(["user", "user", "user__profile"])
     assert org_query._cached_select_related_expression is None
     org = await org_query.last()
     assert org_query._cached_select_related_expression is not None
@@ -71,8 +72,8 @@ async def test_nested_with_not_optimal_select_related_defer():
     await Organisation.query.create(user=user)
 
     org_query = Organisation.query.defer("name")
-    # by default _select_related is a set; for having an arbitary order provide a list
-    org_query._select_related = ["user", "user", "user__profile"]
+    # by default _select_related is a set; for having an arbitary order provide an OrderedSet
+    org_query._select_related = OrderedSet(["user", "user", "user__profile"])
     assert org_query._cached_select_related_expression is None
     org = await org_query.last()
     assert org_query._cached_select_related_expression is not None
@@ -91,8 +92,8 @@ async def test_nested_with_not_optimal_select_related_all():
     await Organisation.query.create(user=user)
 
     org_query = Organisation.query.all()
-    # by default _select_related is a set; for having an arbitary order provide a list
-    org_query._select_related = ["user", "user", "user__profile"]
+    # by default _select_related is a set; for having an arbitary order provide an OrderedSet
+    org_query._select_related = OrderedSet(["user", "user", "user__profile"])
     assert org_query._cached_select_related_expression is None
     org = await org_query.get()
     assert org_query._cached_select_related_expression is not None
@@ -111,8 +112,8 @@ async def test_nested_with_not_optimal_select_related_all2():
     await Organisation.query.create(user=user)
 
     org_query = Organisation.query.all()
-    # by default _select_related is a set; for having an arbitary order provide a list
-    org_query._select_related = ["user__profile", "user", "user"]
+    # by default _select_related is a set; for having an arbitary order provide an OrderedSet
+    org_query._select_related = OrderedSet(["user", "user", "user__profile"])
     assert org_query._cached_select_related_expression is None
     org = await org_query.get()
     assert org_query._cached_select_related_expression is not None
