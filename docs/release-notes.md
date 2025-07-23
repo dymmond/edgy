@@ -18,7 +18,7 @@ hide:
 
 ## Changed
 
-- `JSONField` uses now `JSONB` by default.
+- `JSONField` uses now `JSONB` by default for postgresql (and only for postgresql).
 - Slightly changed `InspectDB` internal interface.
 
 ### Fixed
@@ -35,7 +35,7 @@ hide:
 
 ### Breaking
 
-- `JSONField` uses now postgres `JSONB` by default. This can cause an extra migration. If this is unwanted,
+- `JSONField` uses now postgres `JSONB` by default for postgresql (and only for postgresql). This can cause an extra migration. If this is unwanted,
   add: `no_jsonb=True` to `JSONField`.
 
 ## 0.32.5
