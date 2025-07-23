@@ -220,8 +220,6 @@ def clean_path_to_crawl_result(
     # Crawl the relationship to find the relevant sub_model_class, field_name,
     # operator, related_string, and cross-database remainder.
     crawl_result = crawl_relationship(model_class, path, model_database=model_database)
-    if crawl_result.cross_db_remainder:
-        raise ValueError("Cannot select field from other db.")
     if crawl_result.operator != "exact":
         raise ValueError("Cannot select operators here.")
     return crawl_result
@@ -239,6 +237,8 @@ def clean_field_to_column(
         embed_parent=embed_parent,
         model_database=model_database,
     )
+    if crawl_result.cross_db_remainder:
+        raise ValueError("Cannot select field from other db.")
     return sqlalchemy.table(
         hash_tablekey(
             tablekey=crawl_result.model_class.table.key, prefix=crawl_result.forward_path

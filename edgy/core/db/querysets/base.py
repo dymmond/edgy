@@ -873,6 +873,10 @@ class BaseQuerySet(
                 if not crawl_result.forward_path
                 else f"{crawl_result.forward_path}__{crawl_result.field_name}"
             )
+            if crawl_result.cross_db_remainder:
+                raise QuerySetError(
+                    detail=f'Selected path "{related_element}" is on another database.'
+                )
             if related_element:
                 related.add(related_element)
         if related and not self._select_related.issuperset(related):
@@ -1282,7 +1286,6 @@ class BaseQuerySet(
                     f"QuerySet arg has wrong model_class {raw_clause.model_class}"
                 )
                 converted_clauses.append(raw_clause.build_where_clause)
-                queryset._select_related.update(raw_clause._select_related)
                 if not queryset._select_related.issuperset(raw_clause._select_related):
                     queryset._select_related.update(raw_clause._select_related)
                     queryset._cached_select_related_expression = None
