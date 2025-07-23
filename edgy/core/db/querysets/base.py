@@ -173,10 +173,14 @@ class BaseQuerySet(
             )
             offset = limit_offset
         self._offset = offset
-
-        self._select_related: set[str] = set(select_related)
-        # computed only, replacable
+        # Have the user passed select related values copied
+        select_related = set(select_related)
+        # Have the **real** path values
+        self._select_related: set[str] = set()
+        # computed only, replacable. Have the **real** path values
         self._select_related_weak: set[str] = set()
+        if select_related:
+            self._update_select_related(select_related)
         self._prefetch_related = list(prefetch_related)
         self._batch_size = batch_size
         self._order_by: tuple[str, ...] = tuple(order_by)
@@ -237,7 +241,6 @@ class BaseQuerySet(
             self.model_class,
             database=getattr(self, "_database", None),
             filter_clauses=self.filter_clauses,
-            select_related=self._select_related,
             prefetch_related=self._prefetch_related,
             limit=self.limit_count,
             offset=self._offset,
@@ -256,7 +259,8 @@ class BaseQuerySet(
             extra_select=self._extra_select,
         )
         queryset.or_clauses.extend(self.or_clauses)
-        # copy anyway
+        # copy but don't trigger update select related
+        queryset._select_related.update(self._select_related)
         queryset._select_related_weak.update(self._select_related_weak)
         queryset._cached_select_related_expression = self._cached_select_related_expression
         return cast("QuerySet", queryset)
@@ -814,25 +818,26 @@ class BaseQuerySet(
         )
         return order_col.desc() if reverse else order_col
 
-    def _update_select_related_order_by(self, order_by: tuple[str, ...], *, clear: bool) -> bool:
+    def _update_select_related_weak(self, fields: Iterable[str], *, clear: bool) -> bool:
         """
-        Extracts select related info
+        Update _select_related_weak
 
         Args:
-            order_by (list[str]): The field name for ordering, optionally prefixed with '-' for descending.
+            fields (Iterable[str]): The field names of order_by, group_by, ...
 
         """
         related: set[str] = set()
-        for order_by_element in order_by:
-            order_by_element = order_by_element.lstrip("-")
-            result = clauses_mod.clean_field_to_column(
+        for field_name in fields:
+            # handle order by values by stripping -
+            field_name = field_name.lstrip("-")
+            related_element = clauses_mod.clean_field_to_column(
                 self.model_class,
-                field_path=order_by_element,
+                field_path=field_name,
                 embed_parent=self.embed_parent_filters,
                 model_database=self.database,
             )[1]
-            if result:
-                related.add(result)
+            if related_element:
+                related.add(related_element)
         if related and not self._select_related.union(self._select_related_weak).issuperset(
             related
         ):
@@ -842,6 +847,33 @@ class BaseQuerySet(
             self._select_related_weak.update(related)
             return True
         return False
+
+    def _update_select_related(self, pathes: Iterable[str]) -> None:
+        """
+        Update _select_related
+
+        Args:
+            pathes (Iterable[str]): The related pathes.
+
+        """
+        related: set[str] = set()
+        for path in pathes:
+            # handle order by values by stripping -
+            path = path.lstrip("-")
+            col, related_element = clauses_mod.clean_field_to_column(
+                self.model_class,
+                # actually a path not a field_path
+                field_path=path,
+                embed_parent=self.embed_parent_filters,
+                model_database=self.database,
+            )
+            # the column is actually a path. Quick and dirty fix
+            related_element = col.key if not related_element else f"{related_element}__{col.key}"
+            if related_element:
+                related.add(related_element)
+        if related and not self._select_related.issuperset(related):
+            self._cached_select_related_expression = None
+            self._select_related.update(related)
 
     def _prepare_fields_for_distinct(self, distinct_on: str) -> sqlalchemy.Column:
         """
@@ -1246,6 +1278,7 @@ class BaseQuerySet(
                     f"QuerySet arg has wrong model_class {raw_clause.model_class}"
                 )
                 converted_clauses.append(raw_clause.build_where_clause)
+                queryset._select_related.update(raw_clause._select_related)
                 if not queryset._select_related.issuperset(raw_clause._select_related):
                     queryset._select_related.update(raw_clause._select_related)
                     queryset._cached_select_related_expression = None
@@ -1618,8 +1651,8 @@ class QuerySet(BaseQuerySet):
         """
         queryset: QuerySet = self._clone()
         queryset._order_by = order_by
-        if queryset._update_select_related_order_by(order_by, clear=True):
-            queryset._update_select_related_order_by(queryset._group_by, clear=False)
+        if queryset._update_select_related_weak(order_by, clear=True):
+            queryset._update_select_related_weak(queryset._group_by, clear=False)
         return queryset
 
     def reverse(self) -> QuerySet:
@@ -1672,8 +1705,8 @@ class QuerySet(BaseQuerySet):
         """
         queryset: QuerySet = self._clone()
         queryset._group_by = group_by
-        if queryset._update_select_related_order_by(group_by, clear=True):
-            queryset._update_select_related_order_by(queryset._order_by, clear=False)
+        if queryset._update_select_related_weak(group_by, clear=True):
+            queryset._update_select_related_weak(queryset._order_by, clear=False)
         return queryset
 
     def distinct(self, first: bool | str = True, *distinct_on: str) -> QuerySet:
@@ -1742,9 +1775,7 @@ class QuerySet(BaseQuerySet):
                 stacklevel=2,
             )
             related = cast(tuple[str, ...], related[0])
-        if not self._select_related.issuperset(related):
-            queryset._cached_select_related_expression = None
-            queryset._select_related.update(related)
+        queryset._update_select_related(related)
         return queryset
 
     async def values(
