@@ -13,6 +13,7 @@ import sqlalchemy
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.relationships.utils import crawl_relationship
+from edgy.core.utils.db import hash_tablekey
 
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
@@ -201,6 +202,34 @@ def clean_query_kwargs(
     # been processed or transformed elsewhere.
     assert "pk" not in new_kwargs, "pk should be already parsed"
     return new_kwargs
+
+
+def clean_field_to_column(
+    model_class: type[BaseModelType],
+    field_path: str,
+    embed_parent: tuple[str, str] | None = None,
+    model_database: Database | None = None,
+) -> tuple[sqlalchemy.ColumnClause, str]:
+    if embed_parent:
+        # If a prefix is defined and the key starts with it, remove the prefix.
+        if embed_parent[1] and field_path.startswith(embed_parent[1]):
+            field_path = field_path.removeprefix(embed_parent[1]).removeprefix("__")
+        else:
+            # Otherwise, prepend the parent alias to the key.
+            field_path = f"{embed_parent[0]}__{field_path}"
+    # Crawl the relationship to find the relevant sub_model_class, field_name,
+    # operator, related_string, and cross-database remainder.
+    crawl_result = crawl_relationship(model_class, field_path, model_database=model_database)
+    if crawl_result.cross_db_remainder:
+        raise ValueError("Cannot select field from other db.")
+    if crawl_result.operator != "exact":
+        raise ValueError("Cannot select operators here.")
+    return sqlalchemy.table(
+        hash_tablekey(
+            tablekey=crawl_result.model_class.table.key, prefix=crawl_result.forward_path
+        ),
+        sqlalchemy.column(crawl_result.field_name),
+    ).columns[crawl_result.field_name], crawl_result.forward_path
 
 
 class _DefaultClausesHelper:

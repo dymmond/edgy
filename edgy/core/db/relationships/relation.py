@@ -114,6 +114,10 @@ class ManyRelation(ManyRelationProtocol):
         # If embed_through is specified, also set embed_parent_filters.
         if self.embed_through != "":
             queryset.embed_parent_filters = queryset.embed_parent
+        # not initialized yet
+        queryset._select_related.add(
+            self.from_foreign_key if self.reverse else self.to_foreign_key
+        )
         return queryset
 
     async def save_related(self) -> None:
@@ -457,6 +461,8 @@ class SingleRelation(ManyRelationProtocol):
             RelationshipField,
         ):
             queryset.embed_parent_filters = queryset.embed_parent
+        # not initialized yet
+        queryset._select_related.add(self.to_foreign_key)
         return queryset
 
     def all(self, clear_cache: bool = False) -> QuerySet:
