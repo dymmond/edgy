@@ -112,6 +112,23 @@ class CharField(FieldFactory, str):
         value: Any,
         original_fn: Any,
     ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty":
             column = table.columns[field_name]
@@ -227,6 +244,23 @@ class IntegerField(FieldFactory, int):
         value: Any,
         original_fn: Any,
     ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty":
             column = table.columns[field_name]
@@ -299,6 +333,23 @@ class FloatField(FieldFactory, float):
         value: Any,
         original_fn: Any,
     ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty":
             column = table.columns[field_name]
@@ -420,6 +471,23 @@ class DecimalField(FieldFactory, decimal.Decimal):
         value: Any,
         original_fn: Any,
     ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty":
             column = table.columns[field_name]
@@ -457,6 +525,23 @@ class BooleanField(FieldFactory, cast(bool, int)):
         value: Any,
         original_fn: Any,
     ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty":
             column = table.columns[field_name]
@@ -597,6 +682,23 @@ class DurationField(FieldFactory, datetime.timedelta):
         value: Any,
         original_fn: Any,
     ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty":
             column = table.columns[field_name]
@@ -702,6 +804,23 @@ class JSONField(FieldFactory, pydantic.Json):
         value: Any,
         original_fn: Any,
     ) -> Any:
+        """
+        Overwrite for isempty. Change logic for isnull to select also json "null".
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty":
             column = table.columns[field_name]
@@ -759,6 +878,23 @@ class BinaryField(FieldFactory, bytes):
         value: Any,
         original_fn: Any,
     ) -> Any:
+        """
+        Overwrite for isempty.
+
+        Args:
+            field_name: The name of the column to apply the operator to.
+            operator: The operation code (e.g., 'iexact', 'contains', 'isnull').
+            table: The SQLAlchemy Table object the column belongs to.
+            value: The value to compare against.
+            original_fn: The field object original function.
+
+        Returns:
+            A SQLAlchemy clause suitable for use in a query's WHERE statement.
+
+        Raises:
+            KeyError: If 'field_name' does not correspond to an existing column in the table.
+            AttributeError: If the mapped operator does not exist as a method on the column.
+        """
         mapped_operator = field_obj.operator_mapping.get(operator, operator)
         if mapped_operator == "isempty":
             column = table.columns[field_name]
