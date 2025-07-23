@@ -79,10 +79,6 @@ async def rollback_transactions():
 
 async def test_embed():
     for profile in await SuperProfile.query.all():
-        user = (
-            await profile.profile.select_related("user")
-            .reference_select({"user": {"profile_name": "name"}})
-            .get()
-        )
-        assert isinstance(user, User)
+        user = await profile.profile.reference_select({"user": {"profile_name": "name"}}).get()
+        assert issubclass(user.get_real_class(), User)
         assert user.normal_profile.name == user.profile_name
