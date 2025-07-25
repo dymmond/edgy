@@ -330,3 +330,18 @@ async def test_related_name_query_returns_nothing():
     tracks_album = await track3.track_albumtracks_set.filter(album__name=album.name)
 
     assert len(tracks_album) == 0
+
+
+async def test_values_list():
+    album = await Album.query.create(
+        name="Malibu",
+        tracks=[
+            Track(title="The Bird", position=1),
+            Track(title="Heart don't stand a chance", position=2),
+            Track(title="The Waters", position=3),
+        ],
+    )
+    assert await Track.query.count() == 3
+    assert await Album.query.count() == 1
+    arr = await album.tracks.order_by("track__position").values_list("title", flat=True)
+    assert arr == ["The Bird", "Heart don't stand a chance", "The Waters"]

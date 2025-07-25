@@ -655,7 +655,7 @@ class Organisation(edgy.Model):
 
 class MyModel(edgy.Model):
     users: List[User] = edgy.ManyToMany(User)
-    organisations: List[Organisation] = edgy.ManyToMany("Organisation")
+    organisations: List[Organisation] = edgy.ManyToMany("Organisation", through_tablename=edgy.NEW_M2M_NAMING)
 
 ```
 
@@ -679,7 +679,7 @@ class MyModel(edgy.Model):
 * `through_registry` - Registry where the model callback is installed if `through` is a string or empty. Defaults to the field owner registry.
 * `embed_through` - When traversing, embed the through object in this attribute. Otherwise it is not accessable from the result.
                       if an empty string was provided, the old behaviour is used to query from the through model as base.
-                      if False (the new default), the base is transformed to the target and source model (full proxying). You cannot select the through model via path traversal anymore (except from the through model itself).
+                      if `False` (the new default), the base is transformed to the target and source model (full proxying). You cannot select the through model via path traversal anymore (except from the through model itself).
                       If not an empty string, the same behaviour like with False applies except that you can select the through model fields via path traversal with the provided name.
 
 !!! Warning
