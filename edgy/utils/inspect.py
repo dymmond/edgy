@@ -154,7 +154,7 @@ class InspectDB:
 
             # Write the generated Edgy model code to standard output.
             for line in self.write_output(tables, database, schema=self.schema):
-                sys.stdout.writelines(line)  # type: ignore
+                sys.stdout.writelines(line)
 
     def inspect(self) -> None:
         """
