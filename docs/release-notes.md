@@ -6,6 +6,13 @@ hide:
 
 # Release Notes
 
+## 0.33.1
+
+### Fixed
+
+- Crash because pydantic requires email-validator.
+- Incorrectly assigned table Alias to .table of model instances.
+
 ## 0.33.0
 
 ### Added
