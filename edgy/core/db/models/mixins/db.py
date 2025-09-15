@@ -625,6 +625,7 @@ class DatabaseMixin:
         Args:
             value: The SQLAlchemy `Table` object to set.
         """
+        assert isinstance(value, sqlalchemy.Table), f"Cannot assign: {value!r} to table."
         self._edgy_namespace.pop("_pkcolumns", None)
         self._edgy_namespace["_table"] = value
 

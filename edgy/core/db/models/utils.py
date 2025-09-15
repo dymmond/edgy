@@ -3,9 +3,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
-if TYPE_CHECKING:
-    from sqlalchemy import Table
+from sqlalchemy import Table
 
+if TYPE_CHECKING:
     from edgy.core.connection.database import Database
     from edgy.core.connection.registry import Registry
     from edgy.core.db.models.base import BaseModelType
@@ -139,7 +139,8 @@ def apply_instance_extras(
         _model_type: The modified model instance with applied configurations.
     """
     model.__using_schema__ = schema
-    if table is None:
+    # e.g. table alias. We need to filter it out.
+    if table is None or not isinstance(table, Table):
         # If no table is provided, apply the schema to create a new table instance.
         model.table = model_class.table_schema(schema)
     else:

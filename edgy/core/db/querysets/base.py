@@ -1968,6 +1968,7 @@ class QuerySet(BaseQuerySet):
         token = CHECK_DB_CONNECTION_SILENCED.set(True)
         try:
             instance = queryset.model_class(*args, **kwargs)
+            # apply_instance_extras filters out table Alias
             apply_instance_extras(
                 instance,
                 self.model_class,

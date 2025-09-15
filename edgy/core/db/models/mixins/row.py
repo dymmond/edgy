@@ -262,6 +262,7 @@ class ModelRowMixin:
             proxy_database = database if model_related.database is cls.database else None
 
             # Apply instance extras (schema, database, etc.) to the proxy model.
+            # apply_instance_extras filters out table Alias
             proxy_model = apply_instance_extras(
                 proxy_model,
                 model_related,
@@ -333,6 +334,7 @@ class ModelRowMixin:
             model.__no_load_trigger_attrs__.update(cls.meta.secret_fields)
 
         # Apply instance extras (schema, database, table, etc.) to the main model.
+        # apply_instance_extras filters out table Alias
         model = apply_instance_extras(
             model,
             cls,
