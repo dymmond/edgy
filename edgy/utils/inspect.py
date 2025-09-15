@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Generator
 from typing import Any, NoReturn
 
 import sqlalchemy
@@ -415,7 +415,7 @@ class InspectDB:
     @classmethod
     def write_output(
         cls, table_details: list[Any], database: edgy.Database, schema: str | None = None
-    ) -> NoReturn:
+    ) -> Generator[str]:
         """
         Generates and yields lines of Python code representing the Edgy models.
         This is the final step in the inspection process, producing the actual
