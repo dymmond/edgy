@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.33.2
+
+### Fixed
+
+- Rollback from a regression in the `core.terminal` colors causing issues with the shell
+
 ## 0.33.1
 
 ### Fixed
