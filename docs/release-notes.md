@@ -6,6 +6,18 @@ hide:
 
 # Release Notes
 
+
+## 0.33.3
+
+### Fixed
+
+- Handling non-starlette like lifespan when executing shell.
+
+### Changed
+
+- Replace ASGIHelper by monkay asgi helpers.
+- Replace generate_asgi_events by monkay asgi helpers.
+
 ## 0.33.2
 
 ### Fixed

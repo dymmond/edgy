@@ -6,6 +6,7 @@ import re
 import warnings
 from collections import defaultdict
 from collections.abc import Callable, Container, Generator, Iterable, Mapping, Sequence
+from contextlib import AsyncExitStack
 from copy import copy as shallow_copy
 from functools import cached_property, partial
 from types import TracebackType
@@ -13,6 +14,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, overload
 
 import sqlalchemy
 from loguru import logger
+from monkay.asgi import ASGIApp, LifespanHook
 from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
 from sqlalchemy.orm import declarative_base as sa_declarative_base
@@ -22,8 +24,6 @@ from edgy.core.connection.schemas import Schema
 from edgy.core.db.context_vars import CURRENT_INSTANCE, FORCE_FIELDS_NULLABLE
 from edgy.core.utils.sync import current_eventloop, run_sync
 from edgy.types import Undefined
-
-from .asgi import ASGIApp, ASGIHelper
 
 if TYPE_CHECKING:
     from edgy.conf.global_settings import EdgySettings
@@ -1149,20 +1149,20 @@ class Registry:
         self,
         app: None,
         handle_lifespan: bool = False,
-    ) -> Callable[[ASGIApp], ASGIHelper]: ...
+    ) -> Callable[[ASGIApp], ASGIApp]: ...
 
     @overload
     def asgi(
         self,
         app: ASGIApp,
         handle_lifespan: bool = False,
-    ) -> ASGIHelper: ...
+    ) -> ASGIApp: ...
 
     def asgi(
         self,
         app: ASGIApp | None = None,
         handle_lifespan: bool = False,
-    ) -> ASGIHelper | Callable[[ASGIApp], ASGIHelper]:
+    ) -> ASGIApp | Callable[[ASGIApp], ASGIApp]:
         """
         Returns an ASGI wrapper for the registry, allowing it to integrate
         with ASGI applications and manage database lifespan events.
@@ -1176,13 +1176,17 @@ class Registry:
                                     messages. Defaults to False.
 
         Returns:
-            ASGIHelper | Callable[[ASGIApp], ASGIHelper]: An ASGIHelper instance
+            ASGIApp | Callable[[ASGIApp], ASGIApp]: An ASGIApp instance
                                                           or a partial function
                                                           to create one.
         """
-        if app is not None:
-            return ASGIHelper(app=app, registry=self, handle_lifespan=handle_lifespan)
-        return partial(ASGIHelper, registry=self, handle_lifespan=handle_lifespan)
+
+        async def lifespan() -> AsyncExitStack:
+            cm = AsyncExitStack()
+            await cm.enter_async_context(self)
+            return cm
+
+        return LifespanHook(app, setup=lifespan, do_forward=not handle_lifespan)
 
     async def create_all(
         self, refresh_metadata: bool = True, databases: Sequence[str | None] = (None,)
