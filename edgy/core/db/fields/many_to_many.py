@@ -617,18 +617,16 @@ class ManyToManyField(ForeignKeyFieldFactory, list):
         kwargs["on_update"] = CASCADE  # Default cascade for M2M through table FKs.
 
         # Validate through_tablename.
-        through_tablename: str | type[OLD_M2M_NAMING] | type[NEW_M2M_NAMING] = kwargs.get(
-            "through_tablename", ""
+        through_tablename: str | type[OLD_M2M_NAMING] | type[NEW_M2M_NAMING] | None = kwargs.get(
+            "through_tablename"
         )
-        # default to NEW_M2M_NAMING
-        through_tablename = through_tablename or NEW_M2M_NAMING
-        if (
+        if not through_tablename or (
             not isinstance(through_tablename, str)
             and through_tablename is not OLD_M2M_NAMING
             and through_tablename is not NEW_M2M_NAMING
         ):
             raise FieldDefinitionError(
-                '"through_tablename" must be set to either "" (NEW_M2M_NAMING), OLD_M2M_NAMING, NEW_M2M_NAMING or a non-empty string.'
+                'When specified, "through_tablename" must be set to either OLD_M2M_NAMING, NEW_M2M_NAMING or a non-empty string.'
             )
 
 
