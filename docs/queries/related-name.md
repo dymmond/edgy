@@ -87,7 +87,7 @@ teams = await acme.teams_set.all()
 ```
 
 !!! Warning
-    Because the `org` foreign key in the `Team` model lacked a `related_name`, Edgy automatically generated `teams_set`, accessible from `Organisation`. Refer to [default behavior](#auto-generating) for more information.
+    Because the `org` foreign key in the `Team` model lacked a `related_name`, Edgy automatically generated `teams_set`, accessible from `Organisation`. Refer to [default behavior](#automatic-generation) for more information.
 
 * **Find the team to which the members of the `blue_team` belong.**
 

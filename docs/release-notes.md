@@ -1182,7 +1182,7 @@ field with `auto_now`.
 - Increased maximum of 63 characters the name of the index/unique.
 - ModelRow now contains private methods.
 - Updated documentation with missing [select_related](./queries/queries.md#load-the-foreign-keys-beforehand-with-select-related).
-- Updated documentation for [access of data via foreign keys](./relationships.md#access-the-foreign-key-values-directly-from-the-model).
+- Updated documentation for [access of data via foreign keys](./relationships.md#access-foreign-key-values-directly-from-the-model).
 
 ### Fixed
 

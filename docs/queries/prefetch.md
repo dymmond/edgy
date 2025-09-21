@@ -76,7 +76,7 @@ The `company` now has an attribute `tracks` where it contains all the associated
 
 ### Auto generated related names
 
-What if you don't add a `related_name`? That is covered in [related_names](./related-name.md#auto-generating) related with the [auto generation](./related-name.md#auto-generating) of the related name, which means, if you don't provide a related name, **automatically Edgy generates it and that is the one you must use**.
+What if you don't add a `related_name`? That is covered in [related_names](./related-name.md#automatic-generation), which means, if you don't provide a related name, **automatically Edgy generates it and that is the one you must use**.
 
 ### What can be used
 

@@ -95,4 +95,4 @@ $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy migrate
 
 And so on. To see available commands, check the [commands](./migrations/migrations.md) and [shell support](./shell.md).
 
-[esmerald_settings]: [https://esmerald.dev/application/settings/](https://esmerald.dev/application/settings/)
+[esmerald_settings]: https://esmerald.dev/application/settings/
