@@ -24,9 +24,7 @@ class Person(edgy.Model):
 
 class Organisation(edgy.Model):
     name = edgy.fields.CharField(max_length=100, unique=True)
-    persons = edgy.fields.ManyToMany(
-        to=Person, through=PersonsOrganisations, through_tablename=edgy.NEW_M2M_NAMING
-    )
+    persons = edgy.fields.ManyToMany(to=Person, through=PersonsOrganisations)
 
     class Meta:
         registry = models

@@ -15,19 +15,15 @@ registry = edgy.Registry("sqlite:///foo.sqlite3")
 
 class Group(edgy.Model):
     name = edgy.fields.CharField(max_length=100)
-    users = edgy.fields.ManyToMany("User", through_tablename=edgy.NEW_M2M_NAMING)
+    users = edgy.fields.ManyToMany("User")
 
     class Meta:
         registry = registry
 
 
 class Permission(BasePermission):
-    users: list["User"] = edgy.ManyToManyField(
-        "User", related_name="permissions", through_tablename=edgy.NEW_M2M_NAMING
-    )
-    groups: list["Group"] = edgy.ManyToManyField(
-        "Group", related_name="permissions", through_tablename=edgy.NEW_M2M_NAMING
-    )
+    users: list["User"] = edgy.ManyToManyField("User", related_name="permissions")
+    groups: list["Group"] = edgy.ManyToManyField("Group", related_name="permissions")
     name_model: str = edgy.fields.CharField(max_length=100, null=True)
     obj = edgy.fields.ForeignKey("ContentType", null=True)
 

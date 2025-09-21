@@ -6,6 +6,11 @@ hide:
 
 # Release Notes
 
+## 0.34.0
+
+### Changed
+
+- For `ManyToManyField` make `NEW_M2M_NAMING` the default. No need to set it explicit anymore.
 
 ## 0.33.3
 
