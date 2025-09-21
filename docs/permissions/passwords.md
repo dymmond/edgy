@@ -27,7 +27,7 @@ doing password hashing.
 
 Two good libraries are `passlib` (general including argon2) and `argon2-cffi` (only argon2 family).
 
-=== "With argon2id-cffi"
+=== "With argon2-cffi"
     ```python
     {!> ../docs_src/permissions/passwordargon2id.py !}
     ```
