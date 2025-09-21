@@ -13,15 +13,15 @@ class User(edgy.Model):
 
 class Group(edgy.Model):
     name = edgy.fields.CharField(max_length=100)
-    users = edgy.fields.ManyToMany("User")
+    users = edgy.fields.ManyToMany("User", through_tablename=edgy.NEW_M2M_NAMING)
 
     class Meta:
         registry = models
 
 
 class Permission(BasePermission):
-    users = edgy.fields.ManyToMany("User")
-    groups = edgy.fields.ManyToMany("Group")
+    users = edgy.fields.ManyToMany("User", through_tablename=edgy.NEW_M2M_NAMING)
+    groups = edgy.fields.ManyToMany("Group", through_tablename=edgy.NEW_M2M_NAMING)
     name_model: str = edgy.fields.CharField(max_length=100, null=True)
     obj = edgy.fields.ForeignKey("ContentType", null=True)
 

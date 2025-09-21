@@ -686,6 +686,7 @@ class MyModel(edgy.Model):
     If `through_tablename` is set to `edgy.OLD_M2M_NAMING` you won't be able to have multiple relations from the same source model to the same target model.
     You can however pass for additional ManyToMany the `edgy.NEW_M2M_NAMING` or a string so it works.
     This allows updating old codebases.
+    For edgy >=0.34.0 it is now optional to pass the `edgy.NEW_M2M_NAMING` parameter.
 
 !!! Warning
     If `through_tablename` is not set correctly or changed data-loss is possible. When changing it is **your** responsibility to move the

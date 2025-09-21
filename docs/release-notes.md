@@ -12,6 +12,11 @@ hide:
 
 - For `ManyToManyField` make `NEW_M2M_NAMING` the default. No need to set it explicit anymore.
 
+### Warning
+
+- The omitting of `through_tablename=edgy.NEW_M2M_NAMING` for `ManyToManyField` only **works** for edgy `>=0.34.0`.
+  To stay backward compatible you still have to pass the arguments.
+
 ## 0.33.3
 
 ### Fixed

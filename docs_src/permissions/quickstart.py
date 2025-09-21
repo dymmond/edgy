@@ -12,6 +12,7 @@ class User(edgy.Model):
 
 
 class Permission(BasePermission):
+    # for pre 0.34.0 edgy compatibility add through_tablename=edgy.NEW_M2M_NAMING
     users = edgy.fields.ManyToMany("User", embed_through=False)
 
     class Meta:
