@@ -655,7 +655,7 @@ class Organisation(edgy.Model):
 
 class MyModel(edgy.Model):
     users: List[User] = edgy.ManyToMany(User)
-    organisations: List[Organisation] = edgy.ManyToMany("Organisation", through_tablename=edgy.NEW_M2M_NAMING)
+    organisations: List[Organisation] = edgy.ManyToMany("Organisation")
 
 ```
 
@@ -666,7 +666,7 @@ class MyModel(edgy.Model):
 
 * `to` - A string [model](../models.md) name or a class object of that same model.
 * `through_tablename` - Custom tablename for `through`. E.g. when special characters are used in model names. It has two special options `edgy.OLD_M2M_NAMING` and `edgy.NEW_M2M_NAMING`.
-  It is **required** to either set an explicit name or one of the both options.
+  Edgy defaults to `edgy.NEW_M2M_NAMING` when unset.
   When migrating from pre 0.27.0 edgy versions you should pass either `edgy.OLD_M2M_NAMING` or the tablename or rename the table of the through model in an alembic migration.
   Otherwise data loss is possible. The same is true if you use edgy and saffier on the same tables. You need in case `edgy.OLD_M2M_NAMING`.
   For new projects and new ManyFields the `edgy.NEW_M2M_NAMING` option or a tablename is recommended as you don't have.
@@ -686,6 +686,7 @@ class MyModel(edgy.Model):
     If `through_tablename` is set to `edgy.OLD_M2M_NAMING` you won't be able to have multiple relations from the same source model to the same target model.
     You can however pass for additional ManyToMany the `edgy.NEW_M2M_NAMING` or a string so it works.
     This allows updating old codebases.
+    For edgy >=0.34.0 it is now optional to pass the `edgy.NEW_M2M_NAMING` parameter.
 
 !!! Warning
     If `through_tablename` is not set correctly or changed data-loss is possible. When changing it is **your** responsibility to move the

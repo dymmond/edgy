@@ -22,11 +22,9 @@ class Studio(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
     users = edgy.ManyToMany(
         Üser,
-        through_tablename=edgy.NEW_M2M_NAMING,
     )
     admins = edgy.ManyToMany(
         Üser,
-        through_tablename=edgy.NEW_M2M_NAMING,
     )
 
     class Meta:
