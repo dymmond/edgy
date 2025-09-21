@@ -28,8 +28,8 @@ class User(edgy.Model):
         if getattr(self, "password_original", None) is None:
             return self
         if self.password_original == "":
-            raise ValueError("must not be empty")
-        # for demonstration purposes we don't do it in model_validator
+            raise ValueError("Password must not be empty")
+        # for demonstration purposes we don't do validate in model_validator
         # validate_password_strength(self.password_original)
         return self
 
@@ -39,7 +39,8 @@ async def create_user(name: str, pw1: str, pw2: str) -> tuple[bool, User]:
 
     try:
         # operate on the non-hashed original
-        # for demonstration purposes we don't do it in model_validator
+        # for demonstration purposes we don't validate in model_validator
+        # here we would check the initial object but not updates
         validate_password_strength(user.password_original)
         return True, cast(User, await user.save())
     except Exception:
