@@ -201,7 +201,7 @@ class DumpMixin:
             MODEL_GETATTR_BEHAVIOR.reset(token)
         return result_dict
 
-    def model_dump_json(self, **kwargs: Any) -> str:
+    def model_dump_json(self: BaseModel, **kwargs: Any) -> str:
         """
         Dumps the model data into a JSON string.
 

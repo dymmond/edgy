@@ -705,7 +705,7 @@ class MyModel(edgy.Model):
 
 !!! Note
     By default generated through models are not added to content types. You must either define a registered model or add an explicit `ContentTypeField` to the abstract.
-    You can also modify the through model via the `through` attribute and add a `ContentTypeField` to the fields though not recommended (see [customizing fields](#customizing-fields-after-model-initialization)).
+    You can also modify the through model via the `through` attribute and add a `ContentTypeField` to the fields though not recommended (see [customizing fields](./custom.md#customizing-fields-after-model-initialization)).
 
 ```python title="Example for through model with content_type"
 {!> ../docs_src/contenttypes/m2m_with_contenttypes.py !}

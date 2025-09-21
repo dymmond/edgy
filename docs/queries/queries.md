@@ -130,10 +130,8 @@ finally:
 Select related is a functionality that *follows the foreign-key relationships* by selecting any
 additional related object when a query is executed. You can imagine it as a classic `join`.
 
-The difference is that when you execute the [select_related](../relationships.md#load-an-instance-with-the-foreign-key-relationship-on-it-with-select-related),
-the foreign keys of the model being used by that operation will be opulated with the database results.
-
-You can use the classic [select_related](../relationships.md#load-an-instance-with-the-foreign-key-relationship-on-it-with-select-related):
+The difference is that when you execute the [select_related](../relationships.md#load-an-instance-with-the-foreign-key-relationship-populated-using-select_related),
+the foreign keys of the model being used by that operation will be populated with the database results.
 
 ```python
 await Profile.query.select_related("user").get(id=1)
@@ -148,6 +146,9 @@ await profile.user.load()
 
 The `load()` works on any foreign key declared and it will automatically load the data into that
 field.
+
+For recursive loading you will need to call `load_recursive()`. But both approaches share one
+disadvantage in contrast to `select_related`: they are imperformant.
 
 ## Returning querysets
 
