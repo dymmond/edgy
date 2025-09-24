@@ -2,12 +2,11 @@ import os
 import sys
 import typing
 
+from sayer import error
+
 from edgy import Registry
 from edgy.cli.operations.shell.utils import import_objects
 from edgy.conf import settings
-from edgy.core.terminal import Print
-
-printer = Print()
 
 
 def get_ipython_arguments(options: typing.Any = None) -> typing.Any:
@@ -37,9 +36,8 @@ def get_ipython(app: typing.Any, registry: Registry, options: typing.Any = None)
                 imported_objects = import_objects(app, registry)
                 start_ipython(argv=ipython_arguments, user_ns=imported_objects)  # type: ignore
 
-    except (ModuleNotFoundError, ImportError):
-        error = "You must have IPython installed to run this. Run `pip install ipython`"
-        printer.write_error(error)
+    except ImportError:
+        error("You must have IPython installed to run this. Run `pip install ipython`.")
         sys.exit(1)
 
     return run_ipython

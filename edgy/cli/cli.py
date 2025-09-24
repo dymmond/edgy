@@ -2,10 +2,16 @@
 Client to interact with Edgy models and migrations.
 """
 
+from __future__ import annotations
+
+import typing
+
 import click
+from sayer import Sayer
+from sayer.params import Option
 
 from edgy import __version__
-from edgy.cli.decorators import add_app_module_option
+from edgy.cli.groups import DirectiveGroup
 from edgy.cli.operations import (
     admin_serve,
     check,
@@ -26,12 +32,43 @@ from edgy.cli.operations import (
     stamp,
 )
 
+help_text = """
+Edgy command line tool allowing to run Edgy native directives.
 
-@add_app_module_option
-@click.group()
-@click.version_option(__version__)
-def edgy_cli(path: str = "") -> None:
-    """Performs database migrations"""
+How to run Edgy native: `edgy init`. Or any other Edgy native command.
+
+    Example: `edgy shell`
+
+"""
+
+
+edgy_cli = Sayer(
+    name="Edgy",
+    help=help_text,
+    add_version_option=True,
+    version=__version__,
+    group_class=DirectiveGroup,
+)
+
+
+@edgy_cli.callback(invoke_without_command=True)
+def edgy_callback(
+    ctx: click.Context,
+    app: typing.Annotated[
+        str,
+        Option(
+            required=False,
+            help="Module path to the Edgy application. In a module.submodule format.",
+        ),
+    ],
+    path: typing.Annotated[
+        str | None,
+        Option(
+            required=False,
+            help="A path to a Python file or package directory with ([blue]__init__.py[/blue] files) containing a [bold]Edgy[/bold] app. If not provided, Edgy will try to discover from cwd.",
+        ),
+    ],
+) -> None: ...
 
 
 edgy_cli.add_command(list_templates)
