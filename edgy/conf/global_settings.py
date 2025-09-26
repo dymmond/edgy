@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -166,7 +167,7 @@ class EdgySettings(MediaSettings, MigrationSettings):
 
     @property
     def ipython_args(self) -> list[str] | tuple[str, ...]:
-        return os.environ.get("IPYTHON_ARGUMENTS", "--no-banner").split()
+        return shlex.split(os.environ.get("IPYTHON_ARGUMENTS", "--no-banner"))
 
     """
     A list or tuple of arguments to pass to the IPython shell when launched via Edgy.
