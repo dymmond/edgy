@@ -2,12 +2,12 @@
 Client to interact with Edgy models and migrations.
 """
 
-import click
+import sayer
 
 from edgy.cli.base import list_templates as template_list
 
 
-@click.command(name="list-templates")
+@sayer.command
 def list_templates() -> None:
     """
     Lists all the available templates available to Edgy

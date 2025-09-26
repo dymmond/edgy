@@ -11,6 +11,7 @@ hide:
 ### Changed
 
 - For `ManyToManyField` make `NEW_M2M_NAMING` the default. No need to set it explicit anymore.
+- Use `sayer` for cli.
 
 ### Warning
 

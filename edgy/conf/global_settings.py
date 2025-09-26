@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -163,7 +164,11 @@ class EdgySettings(MediaSettings, MigrationSettings):
     These extensions provide additional functionalities and integrations to
     the Monkay-based Edgy environment. Defaults to an empty tuple.
     """
-    ipython_args: list[str] | tuple[str, ...] = ("--no-banner",)
+
+    @property
+    def ipython_args(self) -> list[str] | tuple[str, ...]:
+        return shlex.split(os.environ.get("IPYTHON_ARGUMENTS", "--no-banner"))
+
     """
     A list or tuple of arguments to pass to the IPython shell when launched via Edgy.
 
