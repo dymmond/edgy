@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import nullcontext
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import click
 from monkay.asgi import Lifespan
@@ -10,9 +10,6 @@ from sayer import Option, command
 
 import edgy
 from edgy.cli.operations.shell.enums import ShellOption
-
-if TYPE_CHECKING:
-    pass
 
 
 @command

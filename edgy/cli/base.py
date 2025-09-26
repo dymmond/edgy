@@ -270,7 +270,7 @@ def edit(revision: str = "current") -> None:
 
 
 def merge(
-    revisions: str = "",
+    revisions: list[str] | tuple[str, ...] = (),
     message: str | None = None,
     branch_label: str | None = None,
     revision_id: str | None = None,
@@ -313,7 +313,7 @@ def downgrade(
     revision: str = "-1",
     sql: bool = False,
     tag: str | None = None,
-    arg: typing.Any | None = None,
+    arg: list | None = None,
 ) -> None:
     """Revert to a previous version"""
     config = Config.get_instance(args=arg)

@@ -1,27 +1,28 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from click import Command, Context
+    from click import Command
 
 
 def add_migration_directory_option(cmd: Command) -> Any:
-    from sayer import Option
+    import click
 
-    @cmd.callback
-    def callback(
-        ctx: Context,
-        directory: Annotated[
-            str | None,
-            Option(
-                None, "-d", type=str, help='Migration script directory (default is "migrations")'
-            ),
-        ],
-    ) -> None:
+    # is there a better way using sayer?
+
+    def callback(ctx: Any, param: str, value: str | None) -> None:
         import edgy
 
-        if directory is not None:
-            edgy.settings.migration_directory = directory
+        if value is not None:
+            edgy.settings.migration_directory = value
 
-    return cmd
+    return click.option(
+        "-d",
+        "--directory",
+        default=None,
+        help=('Migration script directory (default is "migrations")'),
+        expose_value=False,
+        is_eager=True,
+        callback=callback,
+    )(cmd)

@@ -2,51 +2,50 @@
 Client to interact with Edgy models and migrations.
 """
 
-from typing import Any
+from typing import Annotated
 
-import click
-from sayer import command
+from sayer import Option, command
 
 from ..base import migrate as _migrate
-from ..common_params import ForceNullFieldOption
+from ..common_params import ExtraArgOption, ForceNullFieldOption, MessageOption, SQLOption
 from ..decorators import add_migration_directory_option
 
 
-@click.option("-m", "--message", default=None, help="Revision message")
-@click.option(
-    "--sql", is_flag=True, help=("Don't emit SQL to database - dump to standard output instead")
-)
-@click.option(
-    "--head",
-    default="head",
-    help="Specify head revision or <branchname>@head to base new revision on",
-)
-@click.option(
-    "--splice", is_flag=True, help=('Allow a non-head revision as the "head" to splice onto')
-)
-@click.option(
-    "--branch-label", default=None, help="Specify a branch label to apply to the new revision"
-)
-@click.option(
-    "--version-path", default=None, help="Specify specific path from config for version file"
-)
-@click.option(
-    "--rev-id", default=None, help="Specify a hardcoded revision id instead of generating one"
-)
-@click.option(
-    "-x", "--arg", multiple=True, help="Additional arguments consumed by custom env.py scripts"
-)
 @add_migration_directory_option
 @command
 def makemigrations(
-    message: str,
-    sql: bool,
-    head: str,
-    splice: bool,
-    branch_label: str,
-    version_path: str,
-    rev_id: str,
-    arg: Any,
+    message: MessageOption,
+    sql: SQLOption,
+    head: Annotated[
+        str,
+        Option(
+            default="head",
+            help=("Specify head revision or <branchname>@head to base new revision on."),
+        ),
+    ],
+    splice: Annotated[
+        bool,
+        Option(
+            False,
+            is_flag=True,
+            help=('Allow a non-head revision as the "head" to splice onto.'),
+        ),
+    ],
+    branch_label: Annotated[
+        str,
+        Option(None, help="Specify a branch label to apply to the new revision"),
+    ],
+    rev_id: Annotated[
+        str, Option(None, help="Specify a hardcoded revision id instead of generating one.")
+    ],
+    version_path: Annotated[
+        str,
+        Option(
+            None,
+            help="Specify specific path from config for version file.",
+        ),
+    ],
+    arg: ExtraArgOption,
     null_field: ForceNullFieldOption,
 ) -> None:
     """Autogenerate a new revision file (Alias for 'revision --autogenerate')"""
