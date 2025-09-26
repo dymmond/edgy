@@ -163,7 +163,11 @@ class EdgySettings(MediaSettings, MigrationSettings):
     These extensions provide additional functionalities and integrations to
     the Monkay-based Edgy environment. Defaults to an empty tuple.
     """
-    ipython_args: list[str] | tuple[str, ...] = ("--no-banner",)
+
+    @property
+    def ipython_args(self) -> list[str] | tuple[str, ...]:
+        return os.environ.get("IPYTHON_ARGUMENTS", "--no-banner").split()
+
     """
     A list or tuple of arguments to pass to the IPython shell when launched via Edgy.
 
