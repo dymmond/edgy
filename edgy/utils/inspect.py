@@ -3,7 +3,7 @@ from __future__ import annotations
 import inspect
 import sys
 from collections.abc import Callable, Generator
-from typing import Any, NoReturn
+from typing import Any
 
 import sqlalchemy
 from loguru import logger
@@ -343,7 +343,7 @@ class InspectDB:
     @classmethod
     def get_meta(
         cls, table_detail: dict[str, Any], unique_constraints: set[str], _indexes: set[str]
-    ) -> NoReturn:
+    ) -> None:
         """
         Generates the content for the `Meta` class within an Edgy model definition.
 

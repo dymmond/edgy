@@ -33,8 +33,8 @@ def get_ipython(app: typing.Any, registry: Registry, options: typing.Any = None)
             ipython_arguments = get_ipython_arguments(options)
             with registry.with_async_env():
                 # we need an initialized registry first to detect reflected models
-                imported_objects = import_objects(app, registry)
-                start_ipython(argv=ipython_arguments, user_ns=imported_objects)  # type: ignore
+                imported_objects: dict[str, typing.Any] = import_objects(app, registry)
+                start_ipython(argv=ipython_arguments, user_ns=imported_objects)
 
     except ImportError:
         error("You must have IPython installed to run this. Run `pip install ipython`.")

@@ -13,7 +13,6 @@ from alembic.config import Config as AlembicConfig
 
 import edgy
 from edgy.cli.constants import DEFAULT_TEMPLATE_NAME
-from edgy.cli.decorators import catch_errors
 from edgy.core.db.context_vars import with_force_fields_nullable
 from edgy.core.signals import post_migrate, pre_migrate
 from edgy.utils.compat import is_class_and_subclass
@@ -146,7 +145,6 @@ class Migrate:
         edgy.monkay.set_instance(edgy.Instance(self.registry, self.app))
 
 
-@catch_errors
 def list_templates() -> None:
     """Lists the available templates"""
     config = Config()
@@ -158,7 +156,6 @@ def list_templates() -> None:
         config.print_stdout(f"{name} - {synopsis}")
 
 
-@catch_errors
 def init(
     template: str | None = None,
     package: bool = False,
@@ -180,7 +177,6 @@ def init(
     command.init(config, directory, template, package)
 
 
-@catch_errors
 def revision(
     message: str | None = None,
     autogenerate: bool = False,
@@ -264,7 +260,6 @@ def migrate(
     )
 
 
-@catch_errors
 def edit(revision: str = "current") -> None:
     """Edit current revision."""
     if alembic_version >= (1, 9, 4):
@@ -274,7 +269,6 @@ def edit(revision: str = "current") -> None:
         raise RuntimeError("Alembic 1.9.4 or greater is required")
 
 
-@catch_errors
 def merge(
     revisions: str = "",
     message: str | None = None,
@@ -288,7 +282,6 @@ def merge(
     )
 
 
-@catch_errors
 def upgrade(
     revision: str = "head",
     sql: bool = False,
@@ -316,7 +309,6 @@ def upgrade(
     )
 
 
-@catch_errors
 def downgrade(
     revision: str = "-1",
     sql: bool = False,
@@ -346,7 +338,6 @@ def downgrade(
     )
 
 
-@catch_errors
 def show(
     revision: str = "head",
 ) -> None:
@@ -355,7 +346,6 @@ def show(
     command.show(config, revision)
 
 
-@catch_errors
 def history(
     rev_range: typing.Any | None = None,
     verbose: bool = False,
@@ -366,7 +356,6 @@ def history(
     command.history(config, rev_range, verbose=verbose, indicate_current=indicate_current)
 
 
-@catch_errors
 def heads(
     verbose: bool = False,
     resolve_dependencies: bool = False,
@@ -376,21 +365,18 @@ def heads(
     command.heads(config, verbose=verbose, resolve_dependencies=resolve_dependencies)
 
 
-@catch_errors
 def branches(verbose: bool = False) -> None:
     """Show current branch points"""
     config = Config.get_instance()
     command.branches(config, verbose=verbose)
 
 
-@catch_errors
 def current(verbose: bool = False) -> None:
     """Display the current revision for each database."""
     config = Config.get_instance()
     command.current(config, verbose=verbose)
 
 
-@catch_errors
 def stamp(
     revision: str = "head",
     sql: bool = False,
@@ -402,7 +388,6 @@ def stamp(
     command.stamp(config, revision, sql=sql, tag=tag)
 
 
-@catch_errors
 def check() -> None:
     """Check if there are any new operations to migrate"""
     config = Config.get_instance()

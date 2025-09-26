@@ -1,13 +1,14 @@
 from typing import Any
 
 import click
+from sayer import command
 
 from edgy.cli.base import revision as _revision
-from edgy.cli.decorators import add_force_field_nullable_option, add_migration_directory_option
+from edgy.cli.decorators import add_migration_directory_option
+
+from ..common_params import ForceNullFieldOption
 
 
-@add_force_field_nullable_option
-@add_migration_directory_option
 @click.option("-m", "--message", default=None, help="Revision message")
 @click.option(
     "--autogenerate",
@@ -40,7 +41,8 @@ from edgy.cli.decorators import add_force_field_nullable_option, add_migration_d
 @click.option(
     "-x", "--arg", multiple=True, help="Additional arguments consumed by custom env.py scripts"
 )
-@click.command(context_settings={"ignore_unknown_options": True})
+@add_migration_directory_option
+@command(context_settings={"ignore_unknown_options": True})  # type: ignore
 def revision(
     message: str,
     autogenerate: bool,
@@ -51,7 +53,7 @@ def revision(
     version_path: str,
     rev_id: str,
     arg: Any,
-    null_field: list[str] | tuple[str, ...],
+    null_field: ForceNullFieldOption,
 ) -> None:
     """Create a new revision file."""
     _revision(

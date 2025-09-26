@@ -1,52 +1,27 @@
-import sys
-from functools import wraps
-from typing import Any, NoReturn, TypeVar
+from __future__ import annotations
 
-from alembic.util import CommandError
-from loguru import logger
+from typing import TYPE_CHECKING, Annotated, Any
 
-T = TypeVar("T")
+if TYPE_CHECKING:
+    from click import Command, Context
 
 
-def catch_errors(fn: T) -> T:
-    @wraps(fn)  # type: ignore
-    def wrap(*args: Any, **kwargs: Any) -> NoReturn:
-        try:
-            fn(*args, **kwargs)  # type: ignore
-        except (CommandError, RuntimeError) as exc:
-            logger.error(f"Error: {str(exc)}")
-            sys.exit(1)
+def add_migration_directory_option(cmd: Command) -> Any:
+    from sayer import Option
 
-    return wrap  # type: ignore
-
-
-def add_migration_directory_option(fn: Any) -> Any:
-    import click
-
-    def callback(ctx: Any, param: str, value: str | None) -> None:
+    @cmd.callback
+    def callback(
+        ctx: Context,
+        directory: Annotated[
+            str | None,
+            Option(
+                None, "-d", type=str, help='Migration script directory (default is "migrations")'
+            ),
+        ],
+    ) -> None:
         import edgy
 
-        if value is not None:
-            edgy.settings.migration_directory = value
+        if directory is not None:
+            edgy.settings.migration_directory = directory
 
-    return click.option(
-        "-d",
-        "--directory",
-        default=None,
-        help=('Migration script directory (default is "migrations")'),
-        expose_value=False,
-        is_eager=True,
-        callback=callback,
-    )(fn)
-
-
-def add_force_field_nullable_option(fn: Any) -> Any:
-    import click
-
-    return click.option(
-        "--null-field",
-        "--nf",
-        multiple=True,
-        default=(),
-        help='Force field being nullable. Syntax model:field or ":field" for auto-detection of models with such a field.',
-    )(fn)
+    return cmd

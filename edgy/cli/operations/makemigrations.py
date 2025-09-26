@@ -5,13 +5,13 @@ Client to interact with Edgy models and migrations.
 from typing import Any
 
 import click
+from sayer import command
 
-from edgy.cli.base import migrate as _migrate
-from edgy.cli.decorators import add_force_field_nullable_option, add_migration_directory_option
+from ..base import migrate as _migrate
+from ..common_params import ForceNullFieldOption
+from ..decorators import add_migration_directory_option
 
 
-@add_force_field_nullable_option
-@add_migration_directory_option
 @click.option("-m", "--message", default=None, help="Revision message")
 @click.option(
     "--sql", is_flag=True, help=("Don't emit SQL to database - dump to standard output instead")
@@ -36,7 +36,8 @@ from edgy.cli.decorators import add_force_field_nullable_option, add_migration_d
 @click.option(
     "-x", "--arg", multiple=True, help="Additional arguments consumed by custom env.py scripts"
 )
-@click.command()
+@add_migration_directory_option
+@command
 def makemigrations(
     message: str,
     sql: bool,
@@ -46,7 +47,7 @@ def makemigrations(
     version_path: str,
     rev_id: str,
     arg: Any,
-    null_field: list[str] | tuple[str, ...],
+    null_field: ForceNullFieldOption,
 ) -> None:
     """Autogenerate a new revision file (Alias for 'revision --autogenerate')"""
     _migrate(

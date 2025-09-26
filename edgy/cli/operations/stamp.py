@@ -5,16 +5,13 @@ import sayer
 from edgy.cli.base import stamp as _stamp
 from edgy.cli.decorators import add_migration_directory_option
 
+from ..common_params import SQLOption
+
 
 @add_migration_directory_option
 @sayer.command
 def stamp(
-    sql: Annotated[
-        bool,
-        sayer.Option(
-            is_flag=True, help=("Don't emit SQL to database - dump to standard output instead.")
-        ),
-    ],
+    sql: SQLOption,
     tag: Annotated[
         str | None,
         sayer.Option(
