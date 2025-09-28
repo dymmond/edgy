@@ -6,12 +6,16 @@ from typing import Annotated
 
 from sayer import Option, command
 
-from ..base import migrate as _migrate
-from ..common_params import ExtraArgOption, ForceNullFieldOption, MessageOption, SQLOption
-from ..decorators import add_migration_directory_option
+from ..base import revision as _revision
+from ..common_params import (
+    DirectoryOption,
+    ExtraArgOption,
+    ForceNullFieldOption,
+    MessageOption,
+    SQLOption,
+)
 
 
-@add_migration_directory_option
 @command
 def makemigrations(
     message: MessageOption,
@@ -32,24 +36,26 @@ def makemigrations(
         ),
     ],
     branch_label: Annotated[
-        str,
-        Option(None, help="Specify a branch label to apply to the new revision"),
+        str | None,
+        Option(required=False, help="Specify a branch label to apply to the new revision"),
     ],
     rev_id: Annotated[
-        str, Option(None, help="Specify a hardcoded revision id instead of generating one.")
+        str | None,
+        Option(required=False, help="Specify a hardcoded revision id instead of generating one."),
     ],
     version_path: Annotated[
-        str,
+        str | None,
         Option(
-            None,
+            required=False,
             help="Specify specific path from config for version file.",
         ),
     ],
     arg: ExtraArgOption,
     null_field: ForceNullFieldOption,
+    directory: DirectoryOption,
 ) -> None:
     """Autogenerate a new revision file (Alias for 'revision --autogenerate')"""
-    _migrate(
+    _revision(
         message=message,
         sql=sql,
         head=head,
@@ -59,4 +65,5 @@ def makemigrations(
         revision_id=rev_id,
         arg=arg,
         null_fields=null_field,
+        autogenerate=True,
     )

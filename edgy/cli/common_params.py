@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any, Never
 
 from sayer import Argument, Option
 
@@ -14,7 +14,9 @@ ForceNullFieldOption = Annotated[
 ]
 SQLOption = Annotated[
     bool,
-    Option(is_flag=True, help=("Don't emit SQL to database - dump to standard output instead.")),
+    Option(
+        False, is_flag=True, help=("Don't emit SQL to database - dump to standard output instead.")
+    ),
 ]
 RevisionHeadArgument = Annotated[str, Argument("head")]
 TagOption = Annotated[
@@ -28,4 +30,26 @@ ExtraArgOption = Annotated[
     list,
     Option((), "-x", multiple=True, help="Additional arguments consumed by custom env.py scripts"),
 ]
-MessageOption = Annotated[str | None, Option(None, "-m", help="Revision message")]
+MessageOption = Annotated[str | None, Option(..., "-m", required=False, help="Revision message")]
+
+
+def directory_callback(ctx: Any, param: str, value: str | None) -> None:
+    import edgy
+
+    if value is not None:
+        edgy.settings.migration_directory = value
+
+
+DirectoryOption = Annotated[
+    Never,
+    Option(
+        None,
+        "-d",
+        "--directory",
+        help=('Migration script directory (default is "migrations")'),
+        expose_value=False,
+        type=str | None,
+        is_eager=True,
+        callback=directory_callback,
+    ),
+]

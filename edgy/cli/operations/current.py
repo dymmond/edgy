@@ -1,13 +1,11 @@
 import sayer
 
 from edgy.cli.base import current as _current
-from edgy.cli.decorators import add_migration_directory_option
 
-from ..common_params import VerboseOption
+from ..common_params import DirectoryOption, VerboseOption
 
 
-@add_migration_directory_option
 @sayer.command
-def current(verbose: VerboseOption) -> None:
+def current(verbose: VerboseOption, directory: DirectoryOption) -> None:
     """Display the current revision for each database."""
     _current(verbose)

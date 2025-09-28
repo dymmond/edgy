@@ -67,7 +67,7 @@ Alternatively, if none is passed, Edgy will perform the application discovery st
 def edgy_callback(
     ctx: click.Context,
     app: typing.Annotated[
-        str,
+        str | None,
         Option(required=False, help=app_help_text, envvar="EDGY_DEFAULT_APP"),
     ],
     path: typing.Annotated[

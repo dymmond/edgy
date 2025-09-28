@@ -3,12 +3,10 @@ from typing import Annotated
 import sayer
 
 from edgy.cli.base import heads as _heads
-from edgy.cli.decorators import add_migration_directory_option
 
-from ..common_params import VerboseOption
+from ..common_params import DirectoryOption, VerboseOption
 
 
-@add_migration_directory_option
 @sayer.command
 def heads(
     verbose: VerboseOption,
@@ -20,6 +18,7 @@ def heads(
             help="Treat dependency versions as down revisions",
         ),
     ],
+    directory: DirectoryOption,
 ) -> None:
     """Show current available heads in the script directory"""
     _heads(verbose, resolve_dependencies)

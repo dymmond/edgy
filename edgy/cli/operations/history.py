@@ -3,12 +3,10 @@ from typing import Annotated
 import sayer
 
 from edgy.cli.base import history as _history
-from edgy.cli.decorators import add_migration_directory_option
 
-from ..common_params import VerboseOption
+from ..common_params import DirectoryOption, VerboseOption
 
 
-@add_migration_directory_option
 @sayer.command
 def history(
     rev_range: Annotated[
@@ -27,6 +25,7 @@ def history(
             help=("Indicate current version (Alembic 0.9.9 or greater is required)"),
         ),
     ],
+    directory: DirectoryOption,
 ) -> None:
     """List changeset scripts in chronological order."""
     _history(rev_range, verbose, indicate_current)

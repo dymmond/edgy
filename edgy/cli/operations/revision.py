@@ -3,12 +3,16 @@ from typing import Annotated
 from sayer import Option, command
 
 from edgy.cli.base import revision as _revision
-from edgy.cli.decorators import add_migration_directory_option
 
-from ..common_params import ExtraArgOption, ForceNullFieldOption, MessageOption, SQLOption
+from ..common_params import (
+    DirectoryOption,
+    ExtraArgOption,
+    ForceNullFieldOption,
+    MessageOption,
+    SQLOption,
+)
 
 
-@add_migration_directory_option
 @command(context_settings={"ignore_unknown_options": True})  # type: ignore
 def revision(
     message: MessageOption,
@@ -40,14 +44,14 @@ def revision(
         ),
     ],
     branch_label: Annotated[
-        str,
+        str | None,
         Option(None, help="Specify a branch label to apply to the new revision."),
     ],
     rev_id: Annotated[
-        str, Option(None, help="Specify a hardcoded revision id instead of generating one.")
+        str | None, Option(None, help="Specify a hardcoded revision id instead of generating one.")
     ],
     version_path: Annotated[
-        str,
+        str | None,
         Option(
             None,
             help="Specify specific path from config for version file.",
@@ -55,6 +59,7 @@ def revision(
     ],
     arg: ExtraArgOption,
     null_field: ForceNullFieldOption,
+    directory: DirectoryOption,
 ) -> None:
     """Create a new revision file."""
     _revision(

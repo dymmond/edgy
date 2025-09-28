@@ -1,11 +1,11 @@
 import sayer
 
 from edgy.cli.base import check as _check
-from edgy.cli.decorators import add_migration_directory_option
+
+from ..common_params import DirectoryOption
 
 
-@add_migration_directory_option
 @sayer.command
-def check() -> None:
+def check(directory: DirectoryOption) -> None:
     """Check if there are any new operations to migrate"""
     _check()

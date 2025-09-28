@@ -179,19 +179,20 @@ def init(
 
 def revision(
     message: str | None = None,
-    autogenerate: bool = False,
     sql: bool = False,
     head: str = "head",
     splice: bool = False,
     branch_label: str | None = None,
     version_path: str | None = None,
     revision_id: typing.Any | None = None,
-    arg: typing.Any | None = None,
+    arg: list[str] | tuple[str, ...] | None = None,
     null_fields: list[str] | tuple[str, ...] = (),
+    autogenerate: bool = False,
 ) -> None:
     """
     Creates a new revision file
     """
+    assert version_path is None
     options = ["autogenerate"] if autogenerate else None
     config = Config.get_instance(options=options, args=arg)
     with with_force_fields_nullable(null_fields):
@@ -232,32 +233,6 @@ def revision(
             version_path=version_path,
             revision_id=revision_id,
         )
-
-
-def migrate(
-    message: str | None = None,
-    sql: bool = False,
-    head: str = "head",
-    splice: bool = False,
-    branch_label: str | None = None,
-    version_path: str | None = None,
-    revision_id: typing.Any | None = None,
-    arg: typing.Any | None = None,
-    null_fields: list[str] | tuple[str, ...] = (),
-) -> None:
-    """Alias for 'revision --autogenerate'"""
-    return revision(
-        message=message,
-        autogenerate=True,
-        sql=sql,
-        head=head,
-        splice=splice,
-        branch_label=branch_label,
-        version_path=version_path,
-        revision_id=revision_id,
-        arg=arg,
-        null_fields=null_fields,
-    )
 
 
 def edit(revision: str = "current") -> None:
