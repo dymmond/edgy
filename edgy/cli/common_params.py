@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Never
+from typing import Annotated, Any
 
 from sayer import Argument, Option
 
@@ -41,7 +41,7 @@ def directory_callback(ctx: Any, param: str, value: str | None) -> None:
 
 
 DirectoryOption = Annotated[
-    Never,
+    None,
     Option(
         None,
         "-d",
