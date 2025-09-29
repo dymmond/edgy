@@ -4,6 +4,7 @@ import os
 import typing
 import warnings
 from collections.abc import Awaitable, Callable
+from functools import partial
 from importlib import import_module
 from typing import TYPE_CHECKING, Any, cast
 
@@ -233,6 +234,10 @@ def revision(
             version_path=version_path,
             revision_id=revision_id,
         )
+
+
+# use partial instead of redefinition
+migrate = partial(revision, autogenerate=True)
 
 
 def edit(revision: str = "current") -> None:
