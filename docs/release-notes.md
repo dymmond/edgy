@@ -12,6 +12,7 @@ hide:
 
 - For `ManyToManyField` make `NEW_M2M_NAMING` the default. No need to set it explicit anymore.
 - Use `sayer` for cli.
+- Add .jinja suffix to admin templates (makes it easier to recognize jinja templates for IDEs and humans).
 
 ### Warning
 

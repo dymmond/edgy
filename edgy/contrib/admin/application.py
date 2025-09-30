@@ -40,7 +40,7 @@ async def not_found(request: Request, exc: Exception) -> Any:
     """
     An asynchronous exception handler for 404 Not Found errors.
 
-    This function renders a 404.html template and returns it with a 404 status code.
+    This function renders a 404.html.jinja template and returns it with a 404 status code.
 
     Args:
         request (Request): The incoming Lilya request object.
@@ -50,7 +50,10 @@ async def not_found(request: Request, exc: Exception) -> Any:
         Any: A Jinja2TemplateResponse object for the 404 page.
     """
     return templates.get_template_response(
-        request, "404.html", context={"title": "Not Found"}, status_code=status.HTTP_404_NOT_FOUND
+        request,
+        "404.html.jinja",
+        context={"title": "Not Found"},
+        status_code=status.HTTP_404_NOT_FOUND,
     )
 
 

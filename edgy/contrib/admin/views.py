@@ -106,7 +106,7 @@ class AdminDashboard(AdminMixin, TemplateController):
     including their record counts and recently accessed models.
     """
 
-    template_name = "admin/dashboard.html"
+    template_name = "admin/dashboard.html.jinja"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         """
@@ -201,7 +201,7 @@ class ModelOverview(AdminMixin, TemplateController):
     administration.
     """
 
-    template_name = "admin/models.html"
+    template_name = "admin/models.html.jinja"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         """
@@ -259,7 +259,7 @@ class ModelDetailView(AdminMixin, TemplateController):
     This view also includes pagination and search functionality for the objects.
     """
 
-    template_name = "admin/model_detail.html"
+    template_name = "admin/model_detail.html.jinja"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         """
@@ -459,7 +459,7 @@ class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
     This view shows all fields of an object, including handling of relationships.
     """
 
-    template_name = "admin/model_object_detail.html"
+    template_name = "admin/model_object_detail.html.jinja"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         """
@@ -565,7 +565,7 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
     View for displaying and processing the form to edit an existing model instance.
     """
 
-    template_name = "admin/model_object_edit.html"
+    template_name = "admin/model_object_edit.html.jinja"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         """
@@ -739,7 +739,7 @@ class ModelObjectCreateView(BaseObjectView, AdminMixin, TemplateController):
     View for displaying and processing the form to create a new model instance.
     """
 
-    template_name = "admin/model_object_create.html"
+    template_name = "admin/model_object_create.html.jinja"
 
     async def get_context_data(self, request: Request, **kwargs: Any) -> dict:
         """
