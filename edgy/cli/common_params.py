@@ -45,7 +45,6 @@ DirectoryOption = Annotated[
     Option(
         None,
         "-d",
-        "--directory",
         help=('Migration script directory (default is "migrations")'),
         expose_value=False,
         type=str | None,

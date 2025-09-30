@@ -7,7 +7,7 @@ from edgy.cli.base import downgrade as _downgrade
 from ..common_params import DirectoryOption, ExtraArgOption, SQLOption, TagOption
 
 
-@sayer.command(context_settings={"ignore_unknown_options": True})  # type: ignore
+@sayer.command(context_settings={"ignore_unknown_options": True})
 def downgrade(
     sql: SQLOption,
     tag: TagOption,

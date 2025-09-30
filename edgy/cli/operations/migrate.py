@@ -11,7 +11,7 @@ from ..common_params import (
 )
 
 
-@sayer.command(context_settings={"ignore_unknown_options": True})  # type: ignore
+@sayer.command(context_settings={"ignore_unknown_options": True})
 def migrate(
     sql: SQLOption,
     tag: TagOption,

@@ -13,7 +13,7 @@ from ..common_params import (
 )
 
 
-@command(context_settings={"ignore_unknown_options": True})  # type: ignore
+@command(context_settings={"ignore_unknown_options": True})
 def revision(
     message: MessageOption,
     autogenerate: Annotated[
