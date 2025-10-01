@@ -2,15 +2,13 @@
 Client to interact with Edgy models and migrations.
 """
 
-import click
+from sayer import command
 
-from edgy.cli.base import branches as _branches
-from edgy.cli.decorators import add_migration_directory_option
+from ..base import branches as _branches
+from ..common_params import DirectoryOption, VerboseOption
 
 
-@add_migration_directory_option
-@click.option("-v", "--verbose", is_flag=True, help="Use more verbose output")
-@click.command()
-def branches(verbose: bool) -> None:
+@command
+def branches(verbose: VerboseOption, directory: DirectoryOption) -> None:
     """Show current branch points"""
     _branches(verbose)

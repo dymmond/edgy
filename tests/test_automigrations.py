@@ -7,7 +7,7 @@ from monkay import ExtensionProtocol
 
 import edgy
 from edgy import EdgySettings, Registry
-from edgy.cli.base import init, migrate, upgrade
+from edgy.cli.base import init, revision, upgrade
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -64,7 +64,7 @@ async def _prepare(with_upgrade: bool):
             edgy.monkay.apply_extensions()
             assert "User" in edgy.monkay.instance.registry.models
             await asyncio.to_thread(init)
-            await asyncio.to_thread(migrate)
+            await asyncio.to_thread(revision, autogenerate=True)
             if with_upgrade:
                 await asyncio.to_thread(upgrade)
 

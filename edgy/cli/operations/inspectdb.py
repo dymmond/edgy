@@ -1,22 +1,22 @@
-import click
+from typing import Annotated
+
+import sayer
 
 from edgy.utils.inspect import InspectDB
 
 
-@click.option(
-    "--database",
-    required=True,
-    help=("Connection string. Example: postgres+asyncpg://user:password@localhost:5432/my_db"),
-)
-@click.option(
-    "--schema",
-    default=None,
-    help=("Database schema to be applied."),
-)
-@click.command()
+@sayer.command
 def inspect_db(
-    database: str,
-    schema: str | None = None,
+    database: Annotated[
+        str,
+        sayer.Option(
+            required=True,
+            help=(
+                "Connection string. Example: postgres+asyncpg://user:password@localhost:5432/my_db"
+            ),
+        ),
+    ],
+    schema: Annotated[str | None, sayer.Option(None, help="Database schema to be applied.")],
 ) -> None:
     """
     Inspects an existing database and generates the Edgy reflect models.

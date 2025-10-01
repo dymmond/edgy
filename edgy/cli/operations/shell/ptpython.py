@@ -2,12 +2,11 @@ import os
 import sys
 import typing
 
+from sayer import error
+
 from edgy import Registry
 from edgy.cli.operations.shell.utils import import_objects
 from edgy.conf import settings
-from edgy.core.terminal import Print
-
-printer = Print()
 
 
 def vi_mode() -> typing.Any:
@@ -48,9 +47,8 @@ def get_ptpython(app: typing.Any, registry: Registry, options: typing.Any = None
                         configure=run_config,
                     )
 
-    except (ModuleNotFoundError, ImportError):
-        error = "You must have ptpython installed to run this. Run `pip install ptpython`"
-        printer.write_error(error)
+    except ImportError:
+        error("You must have ptpython installed to run this. Run `pip install ptpython`.")
         sys.exit(1)
 
     return run_ptpython

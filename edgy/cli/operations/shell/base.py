@@ -1,30 +1,29 @@
 from __future__ import annotations
 
 import asyncio
-import select
-import sys
-from typing import TYPE_CHECKING, Any
+from contextlib import nullcontext
+from typing import Annotated
 
 import click
 from monkay.asgi import Lifespan
+from sayer import Option, command
 
 import edgy
 from edgy.cli.operations.shell.enums import ShellOption
-from edgy.core.utils.sync import run_sync
-
-if TYPE_CHECKING:
-    from edgy.core.connection import Registry
 
 
-@click.option(
-    "--kernel",
-    default="ipython",
-    type=click.Choice(["ipython", "ptpython"]),
-    help="Which shell should start.",
-    show_default=True,
-)
-@click.command()
-def shell(kernel: str) -> None:
+@command
+async def shell(
+    kernel: Annotated[
+        str,
+        Option(
+            default="ipython",
+            type=click.Choice(f.value for f in ShellOption.__members__.values()),
+            help="Which shell should start.",
+            show_default=True,
+        ),
+    ],
+) -> None:
     """
     Starts an interactive ipython shell with all the models
     and important python libraries.
@@ -36,23 +35,9 @@ def shell(kernel: str) -> None:
     if instance is not None:
         app = instance.app
         registry = instance.registry
-    if (
-        sys.platform != "win32"
-        and not sys.stdin.isatty()
-        and select.select([sys.stdin], [], [], 0)[0]
-    ):
-        exec(sys.stdin.read(), globals())
-        return
 
     assert registry is not None
-    run_sync(run_shell(app, registry, kernel))
-    return None
-
-
-async def run_shell(app: Any, registry: Registry, kernel: str) -> None:
-    """Executes the database shell connection"""
-
-    async with Lifespan(app):
+    async with nullcontext() if app is None else Lifespan(app):
         if kernel == ShellOption.IPYTHON:
             from edgy.cli.operations.shell.ipython import get_ipython
 
@@ -65,3 +50,5 @@ async def run_shell(app: Any, registry: Registry, kernel: str) -> None:
             ptpython = get_ptpython(app=app, registry=registry)
             # it maybe want its own asyncio.run
             await asyncio.to_thread(ptpython)
+
+    return None

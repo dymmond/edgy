@@ -1,24 +1,11 @@
-import os
 import sys
 import typing
+
+from sayer import error
 
 from edgy import Registry
 from edgy.cli.operations.shell.utils import import_objects
 from edgy.conf import settings
-from edgy.core.terminal import Print
-
-printer = Print()
-
-
-def get_ipython_arguments(options: typing.Any = None) -> typing.Any:
-    """Loads the IPython arguments from the settings or defaults to
-    main Edgy settings.
-    """
-    ipython_args = "IPYTHON_ARGUMENTS"
-    arguments = getattr(settings, "ipython_args", [])
-    if not arguments:
-        arguments = os.environ.get(ipython_args, "").split()
-    return arguments
 
 
 def get_ipython(app: typing.Any, registry: Registry, options: typing.Any = None) -> typing.Any:
@@ -31,15 +18,14 @@ def get_ipython(app: typing.Any, registry: Registry, options: typing.Any = None)
         from IPython import start_ipython  # pyright: ignore[reportMissingModuleSource]
 
         def run_ipython() -> None:
-            ipython_arguments = get_ipython_arguments(options)
+            ipython_arguments = getattr(settings, "ipython_args", [])
             with registry.with_async_env():
                 # we need an initialized registry first to detect reflected models
-                imported_objects = import_objects(app, registry)
+                imported_objects: dict[str, typing.Any] = import_objects(app, registry)
                 start_ipython(argv=ipython_arguments, user_ns=imported_objects)  # type: ignore
 
-    except (ModuleNotFoundError, ImportError):
-        error = "You must have IPython installed to run this. Run `pip install ipython`"
-        printer.write_error(error)
+    except ImportError:
+        error("You must have IPython installed to run this. Run `pip install ipython`.")
         sys.exit(1)
 
     return run_ipython
