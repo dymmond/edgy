@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from lilya import status
 from lilya.apps import ChildLilya, Lilya
 from lilya.middleware import DefineMiddleware
 from lilya.middleware.session_context import SessionContextMiddleware
-from lilya.requests import Request
 from lilya.routing import RoutePath
-from lilya.templating import Jinja2Template
 
 from edgy.contrib.lilya.middleware import EdgyMiddleware
 
@@ -27,34 +23,6 @@ from .views import (
 if TYPE_CHECKING:
     from edgy.conf.global_settings import EdgySettings
     from edgy.core.connection import Registry
-
-# Initialize Jinja2Template to load templates from the 'templates' directory
-# relative to the current file.
-templates = Jinja2Template(directory=str(Path(__file__).resolve().parent / "templates"))
-# Add the built-in 'getattr' function to Jinja2's global environment.
-# This allows 'getattr' to be used directly within templates for dynamic attribute access.
-templates.env.globals["getattr"] = getattr
-
-
-async def not_found(request: Request, exc: Exception) -> Any:
-    """
-    An asynchronous exception handler for 404 Not Found errors.
-
-    This function renders a 404.html.jinja template and returns it with a 404 status code.
-
-    Args:
-        request (Request): The incoming Lilya request object.
-        exc (Exception): The exception that triggered this handler (e.g., NotFound).
-
-    Returns:
-        Any: A Jinja2TemplateResponse object for the 404 page.
-    """
-    return templates.get_template_response(
-        request,
-        "404.html.jinja",
-        context={"title": "Not Found"},
-        status_code=status.HTTP_404_NOT_FOUND,
-    )
 
 
 def create_admin_app(
@@ -114,6 +82,4 @@ def create_admin_app(
             ),
         ],
         middleware=middleware,
-        # Register the custom 404 not found handler.
-        exception_handlers={404: not_found},
     )
