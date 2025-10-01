@@ -127,6 +127,7 @@ def admin_serve(
             'You need to specify an app which registry is used. For experimenting use: --app="tests.cli.main"'
         )
     from edgy.contrib.admin.application import create_admin_app
+    from edgy.contrib.admin.views import admin_not_found
 
     print_pw = False
     if auth_pw is None:
@@ -157,6 +158,8 @@ def admin_serve(
         routes.append(Include(path="/", app=old_instance.app))
     app: Any = Lilya(
         routes=routes,
+        # Register the custom 404 not found handler.
+        exception_handlers={404: admin_not_found},
     )
     if debug:
         app.debug = True

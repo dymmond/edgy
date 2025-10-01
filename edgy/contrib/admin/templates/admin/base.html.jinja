@@ -6,8 +6,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <link rel="icon" href="{{ favicon }}"/>
     <title>{% block title %}Edgy Admin | {{ title }}{% endblock %}</title>
-    {% include 'admin/base_definitions.html' %}
-    {% include 'admin/base_head.html' %}
+    {% include 'admin/base_definitions.html.jinja' %}
+    {% include 'admin/base_head.html.jinja' %}
     {% endblock %}
 </head>
 <body class="bg-gray-100 text-gray-900">
