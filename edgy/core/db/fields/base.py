@@ -1211,8 +1211,11 @@ class BaseForeignKey(RelationshipField):
         # Use the provided owner_database or default to the owner model's database.
         if owner_database is None:
             owner_database = self.owner.database
+        target = self.target
+        # check that the database is set
+        assert target.database, f"target ({target}) of {self.owner}:{self.name} lacks a database"
         # Compare the string representation of the database URLs.
-        return str(owner_database.url) != str(self.target.database.url)
+        return str(owner_database.url) != str(target.database.url)
 
     def get_related_model_for_admin(self) -> type[BaseModelType] | None:
         """
