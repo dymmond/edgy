@@ -7,6 +7,7 @@ from sqlalchemy.exc import DBAPIError, ProgrammingError
 from edgy.core.connection.database import Database
 from edgy.core.db.context_vars import NO_GLOBAL_FIELD_CONSTRAINTS
 from edgy.exceptions import SchemaError
+from edgy.types import Undefined
 
 if TYPE_CHECKING:
     from edgy import Registry
@@ -101,7 +102,9 @@ class Schema:
         # update their table schema and cache.
         if init_models:
             for model_class in self.registry.models.values():
-                model_class.table_schema(schema=schema, update_cache=update_cache)
+                # only init if no schema is set. This prevents problems with e.g. reflection.
+                if model_class.__using_schema__ is Undefined:
+                    model_class.table_schema(schema=schema, update_cache=update_cache)
 
         # If init_tenant_models is True, handle the creation of tenant-specific model tables.
         if init_tenant_models:

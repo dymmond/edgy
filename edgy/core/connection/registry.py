@@ -770,7 +770,9 @@ class Registry:
                             elif model_class.__using_schema__ != schema:
                                 continue
                     # Initialize table schema for the model.
-                    model_class.table_schema(schema=schema, metadata=self.metadata_by_url[url])
+                    model_class.table_schema(
+                        schema=schema, metadata=self.metadata_by_url[url], update_cache=True
+                    )
 
         # Don't initialize reflected models to keep metadata clean if not updating.
         if not update_only:
