@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
@@ -64,7 +63,7 @@ class Schema:
 
     async def create_schema(
         self,
-        schema: str,
+        schema: str | None,
         if_not_exists: bool = False,
         init_models: bool = False,
         init_tenant_models: bool = False,
@@ -79,7 +78,7 @@ class Schema:
         respecting global field constraints.
 
         Args:
-            schema: The name of the schema to be created.
+            schema: The name of the schema to be created or None for main.
             if_not_exists: If True, the schema will only be created if it does
                            not already exist, preventing an error. Defaults to False.
             init_models: If True, all models registered with the registry will have
@@ -125,14 +124,15 @@ class Schema:
             Internal helper function to execute the schema and table creation
             within a given database connection.
             """
-            try:
-                # Attempt to create the schema.
-                connection.execute(
-                    sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists)
-                )
-            except ProgrammingError as e:
-                # Raise a SchemaError if there's a programming error during schema creation.
-                raise SchemaError(detail=e.orig.args[0]) from e
+            if schema is not None:
+                try:
+                    # Attempt to create the schema.
+                    connection.execute(
+                        sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists)
+                    )
+                except ProgrammingError as e:
+                    # Raise a SchemaError if there's a programming error during schema creation.
+                    raise SchemaError(detail=e.orig.args[0]) from e
 
             # If tenant_tables exist, create them within the schema.
             if tenant_tables:
@@ -145,7 +145,6 @@ class Schema:
                     connection, checkfirst=if_not_exists
                 )
 
-        ops = []
         # Iterate through the specified databases to perform schema creation.
         for database_name in databases:
             # Determine which database instance to use based on database_name.
@@ -158,14 +157,13 @@ class Schema:
             # prevents warning of inperformance
             async with db as db:
                 with db.force_rollback(False):
-                    # Append the run_sync operation to the list of operations.
-                    ops.append(db.run_sync(execute_create, database_name))
-        # Await all schema creation operations concurrently.
-        await asyncio.gather(*ops)
+                    # run the operation sequencially because we need the right context and
+                    # a connected database
+                    await db.run_sync(execute_create, database_name)
 
     async def drop_schema(
         self,
-        schema: str,
+        schema: str | None,
         cascade: bool = False,
         if_exists: bool = False,
         databases: Sequence[str | None] = (None,),
@@ -175,7 +173,7 @@ class Schema:
         to all contained objects.
 
         Args:
-            schema: The name of the schema to be dropped.
+            schema: The name of the schema to be dropped. If None fallback to the classic drop_all logic.
             cascade: If True, all objects (tables, views, etc.) within the
                      schema will also be dropped. Defaults to False.
             if_exists: If True, the schema will only be dropped if it exists,
@@ -194,15 +192,23 @@ class Schema:
             within a given database connection.
             """
             try:
-                # Attempt to drop the schema.
-                connection.execute(
-                    sqlalchemy.schema.DropSchema(name=schema, cascade=cascade, if_exists=if_exists)
-                )
+                # just remove the schema
+                if schema is not None:
+                    # Attempt to drop the schema.
+                    connection.execute(
+                        sqlalchemy.schema.DropSchema(
+                            name=schema, cascade=cascade, if_exists=if_exists
+                        )
+                    )
+                else:
+                    # if no schema is found remove all registered models in meta
+                    self.registry.metadata_by_name[database_name].drop_all(
+                        connection, checkfirst=if_exists
+                    )
             except DBAPIError as e:
                 # Raise a SchemaError if there's a database API error during schema drop.
                 raise SchemaError(detail=e.orig.args[0]) from e
 
-        ops = []
         # Iterate through the specified databases to perform schema drop.
         for database_name in databases:
             # Determine which database instance to use based on database_name.
@@ -215,10 +221,9 @@ class Schema:
             # prevents warning of inperformance
             async with db as db:
                 with db.force_rollback(False):
-                    # Append the run_sync operation to the list of operations.
-                    ops.append(db.run_sync(execute_drop))
-        # Await all schema drop operations concurrently.
-        await asyncio.gather(*ops)
+                    # run the operation sequencially because we need the right context and
+                    # a connected database
+                    await db.run_sync(execute_drop)
 
     async def get_metadata_of_all_schemes(
         self, database: Database, *, no_reflect: bool = False

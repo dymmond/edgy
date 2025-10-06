@@ -14,11 +14,13 @@ hide:
 - Use `sayer` for cli.
 - Add .jinja suffix to admin templates (makes it easier to recognize jinja templates for IDEs and humans).
 - Move `404.html.jinja` to admin, as it is solely used by `admin_serve` now.
+- `schemas`: Use for non-schema databases (include now fallbacks). This simplifies the codebase.
 
 ### Fixed
 
 - The `create_admin_app` created lilya instance doesn't intercept 404 errors anymore.
 - `404.html.jinja` uses now also the `base_definitions.html.jinja` so we can exchange libraries at one place.
+- `schemas`: Misc fixes. We could end up with a wrong context or a closed database.
 
 ### Removed
 
