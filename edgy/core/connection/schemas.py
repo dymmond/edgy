@@ -1,5 +1,4 @@
 import asyncio
-import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
@@ -62,43 +61,6 @@ class Schema:
             self._default_schema = self.database.url.sqla_url.get_dialect(True).default_schema_name
         # Return the cached default schema name.
         return self._default_schema
-
-    async def activate_schema_path(
-        self, database: Database, schema: str, is_shared: bool = True
-    ) -> None:
-        """
-        Activates a specific schema within the database connection's search path.
-
-        This method modifies the `search_path` for the current database session,
-        allowing queries to implicitly reference objects within the specified schema.
-
-        Warning: This method is deprecated and considered insecure due to improper
-        schema escaping. It should not be used in production environments.
-
-        Args:
-            database: The database instance on which to activate the schema path.
-            schema: The name of the schema to add to the search path.
-            is_shared: If True, adds 'shared' to the search path along with the
-                       specified schema. Defaults to True.
-        """
-        # Issue a deprecation warning as this method is insecure.
-        warnings.warn(
-            "`activate_schema_path` is dangerous because the schema is not properly "
-            "escaped and deprecated.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        # Construct the SQL command to set the search_path.
-        # If is_shared is True, include 'shared' in the path.
-        path = (
-            f"SET search_path TO {schema}, shared;"
-            if is_shared
-            else f"SET search_path TO {schema};"
-        )
-        # Convert the SQL string into a SQLAlchemy text expression.
-        expression = sqlalchemy.text(path)
-        # Execute the SQL expression on the provided database.
-        await database.execute(expression)
 
     async def create_schema(
         self,

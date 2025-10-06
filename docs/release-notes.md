@@ -20,6 +20,10 @@ hide:
 - The `create_admin_app` created lilya instance doesn't intercept 404 errors anymore.
 - `404.html.jinja` uses now also the `base_definitions.html.jinja` so we can exchange libraries at one place.
 
+### Removed
+
+- The deprecated `activate_schema_path` method.
+
 ### Warning
 
 - The omitting of `through_tablename=edgy.NEW_M2M_NAMING` for `ManyToManyField` only **works** for edgy `>=0.34.0`.
