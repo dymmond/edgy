@@ -1,5 +1,3 @@
-import asyncio
-import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING
 
@@ -9,6 +7,7 @@ from sqlalchemy.exc import DBAPIError, ProgrammingError
 from edgy.core.connection.database import Database
 from edgy.core.db.context_vars import NO_GLOBAL_FIELD_CONSTRAINTS
 from edgy.exceptions import SchemaError
+from edgy.types import Undefined
 
 if TYPE_CHECKING:
     from edgy import Registry
@@ -63,46 +62,9 @@ class Schema:
         # Return the cached default schema name.
         return self._default_schema
 
-    async def activate_schema_path(
-        self, database: Database, schema: str, is_shared: bool = True
-    ) -> None:
-        """
-        Activates a specific schema within the database connection's search path.
-
-        This method modifies the `search_path` for the current database session,
-        allowing queries to implicitly reference objects within the specified schema.
-
-        Warning: This method is deprecated and considered insecure due to improper
-        schema escaping. It should not be used in production environments.
-
-        Args:
-            database: The database instance on which to activate the schema path.
-            schema: The name of the schema to add to the search path.
-            is_shared: If True, adds 'shared' to the search path along with the
-                       specified schema. Defaults to True.
-        """
-        # Issue a deprecation warning as this method is insecure.
-        warnings.warn(
-            "`activate_schema_path` is dangerous because the schema is not properly "
-            "escaped and deprecated.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        # Construct the SQL command to set the search_path.
-        # If is_shared is True, include 'shared' in the path.
-        path = (
-            f"SET search_path TO {schema}, shared;"
-            if is_shared
-            else f"SET search_path TO {schema};"
-        )
-        # Convert the SQL string into a SQLAlchemy text expression.
-        expression = sqlalchemy.text(path)
-        # Execute the SQL expression on the provided database.
-        await database.execute(expression)
-
     async def create_schema(
         self,
-        schema: str,
+        schema: str | None,
         if_not_exists: bool = False,
         init_models: bool = False,
         init_tenant_models: bool = False,
@@ -117,7 +79,7 @@ class Schema:
         respecting global field constraints.
 
         Args:
-            schema: The name of the schema to be created.
+            schema: The name of the schema to be created or None for main.
             if_not_exists: If True, the schema will only be created if it does
                            not already exist, preventing an error. Defaults to False.
             init_models: If True, all models registered with the registry will have
@@ -140,7 +102,9 @@ class Schema:
         # update their table schema and cache.
         if init_models:
             for model_class in self.registry.models.values():
-                model_class.table_schema(schema=schema, update_cache=update_cache)
+                # only init if no schema is set. This prevents problems with e.g. reflection.
+                if model_class.__using_schema__ is Undefined:
+                    model_class.table_schema(schema=schema, update_cache=update_cache)
 
         # If init_tenant_models is True, handle the creation of tenant-specific model tables.
         if init_tenant_models:
@@ -163,14 +127,15 @@ class Schema:
             Internal helper function to execute the schema and table creation
             within a given database connection.
             """
-            try:
-                # Attempt to create the schema.
-                connection.execute(
-                    sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists)
-                )
-            except ProgrammingError as e:
-                # Raise a SchemaError if there's a programming error during schema creation.
-                raise SchemaError(detail=e.orig.args[0]) from e
+            if schema is not None:
+                try:
+                    # Attempt to create the schema.
+                    connection.execute(
+                        sqlalchemy.schema.CreateSchema(name=schema, if_not_exists=if_not_exists)
+                    )
+                except ProgrammingError as e:
+                    # Raise a SchemaError if there's a programming error during schema creation.
+                    raise SchemaError(detail=e.orig.args[0]) from e
 
             # If tenant_tables exist, create them within the schema.
             if tenant_tables:
@@ -183,7 +148,6 @@ class Schema:
                     connection, checkfirst=if_not_exists
                 )
 
-        ops = []
         # Iterate through the specified databases to perform schema creation.
         for database_name in databases:
             # Determine which database instance to use based on database_name.
@@ -196,14 +160,13 @@ class Schema:
             # prevents warning of inperformance
             async with db as db:
                 with db.force_rollback(False):
-                    # Append the run_sync operation to the list of operations.
-                    ops.append(db.run_sync(execute_create, database_name))
-        # Await all schema creation operations concurrently.
-        await asyncio.gather(*ops)
+                    # run the operation sequencially because we need the right context and
+                    # a connected database
+                    await db.run_sync(execute_create, database_name)
 
     async def drop_schema(
         self,
-        schema: str,
+        schema: str | None,
         cascade: bool = False,
         if_exists: bool = False,
         databases: Sequence[str | None] = (None,),
@@ -213,7 +176,7 @@ class Schema:
         to all contained objects.
 
         Args:
-            schema: The name of the schema to be dropped.
+            schema: The name of the schema to be dropped. If None fallback to the classic drop_all logic.
             cascade: If True, all objects (tables, views, etc.) within the
                      schema will also be dropped. Defaults to False.
             if_exists: If True, the schema will only be dropped if it exists,
@@ -232,15 +195,23 @@ class Schema:
             within a given database connection.
             """
             try:
-                # Attempt to drop the schema.
-                connection.execute(
-                    sqlalchemy.schema.DropSchema(name=schema, cascade=cascade, if_exists=if_exists)
-                )
+                # just remove the schema
+                if schema is not None:
+                    # Attempt to drop the schema.
+                    connection.execute(
+                        sqlalchemy.schema.DropSchema(
+                            name=schema, cascade=cascade, if_exists=if_exists
+                        )
+                    )
+                else:
+                    # if no schema is found remove all registered models in meta
+                    self.registry.metadata_by_name[database_name].drop_all(
+                        connection, checkfirst=if_exists
+                    )
             except DBAPIError as e:
                 # Raise a SchemaError if there's a database API error during schema drop.
                 raise SchemaError(detail=e.orig.args[0]) from e
 
-        ops = []
         # Iterate through the specified databases to perform schema drop.
         for database_name in databases:
             # Determine which database instance to use based on database_name.
@@ -253,10 +224,9 @@ class Schema:
             # prevents warning of inperformance
             async with db as db:
                 with db.force_rollback(False):
-                    # Append the run_sync operation to the list of operations.
-                    ops.append(db.run_sync(execute_drop))
-        # Await all schema drop operations concurrently.
-        await asyncio.gather(*ops)
+                    # run the operation sequencially because we need the right context and
+                    # a connected database
+                    await db.run_sync(execute_drop)
 
     async def get_metadata_of_all_schemes(
         self, database: Database, *, no_reflect: bool = False
