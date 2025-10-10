@@ -137,7 +137,14 @@ async def test_model_schema():
                 "type": "object",
             },
             "price": {
-                "anyOf": [{"type": "number"}, {"type": "string"}, {"type": "null"}],
+                "anyOf": [
+                    {"type": "number"},
+                    {
+                        "type": "string",
+                        "pattern": "^(?!^[-+.]*$)[+-]?0*(?:\\d{0,7}|(?=[\\d.]{1,10}0*$)\\d{0,7}\\.\\d{0,2}0*$)",
+                    },
+                    {"type": "null"},
+                ],
                 "default": None,
                 "title": "Price",
             },
