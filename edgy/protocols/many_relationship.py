@@ -125,7 +125,7 @@ class ManyRelationProtocol(Protocol):
         """
         ...
 
-    async def remove_many(self, *children: BaseModelType) -> None:
+    async def remove_many(self, *children: "BaseModelType") -> None:
         """
         Asynchronously removes multiple specific related model instances from
         the association with the primary instance.
