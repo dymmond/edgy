@@ -236,11 +236,7 @@ class BaseMarshall(DumpMixin, BaseModel):
                 setattr(self, name, value)  # Set the field value.
 
         if async_resolvers:
-
-            async def _resolve() -> None:
-                await run_concurrently(async_resolvers)
-
-            run_sync(_resolve())  # Run all async resolvers synchronously.
+            run_sync(run_concurrently(async_resolvers))  # Run all async resolvers synchronously.
         return self
 
     def _get_method_value(self, name: str, instance: Model) -> Any:

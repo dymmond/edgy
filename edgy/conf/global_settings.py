@@ -151,7 +151,7 @@ class ConcurrencySettings(MediaSettings, MigrationSettings):
     high-level, parallel sub-queries, such as resolving multiple **prefetch** relationships
     or **lazy reverse managers** (e.g., retrieving related objects for many rows at once).
 
-    - If set to `None`, concurrency is unlimited (bounded only by the event loop).
+    - If set to `None` or `0, concurrency is unlimited (bounded only by the event loop).
     - If set to an integer, it bounds the fan-out rate, which is useful for mitigating
       connection pool or CPU exhaustion during complex graph traversals.
     """

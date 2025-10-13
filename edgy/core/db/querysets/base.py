@@ -24,7 +24,6 @@ from typing import (
 import orjson
 import sqlalchemy
 
-from edgy.conf import settings
 from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR, get_schema
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields import CharField, TextField
@@ -33,7 +32,6 @@ from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.relationships.utils import crawl_relationship
-from edgy.core.db.utils.concurrency import run_concurrently
 from edgy.core.utils.db import CHECK_DB_CONNECTION_SILENCED, check_db_connection, hash_tablekey
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
@@ -266,7 +264,6 @@ class BaseQuerySet(
         queryset._select_related.update(self._select_related)
         queryset._select_related_weak.update(self._select_related_weak)
         queryset._cached_select_related_expression = self._cached_select_related_expression
-        queryset._prefetch_related = list(self._prefetch_related)
         return cast("QuerySet", queryset)
 
     @cached_property
@@ -1032,24 +1029,6 @@ class BaseQuerySet(
             schema = self.model_class.get_db_schema()
         return schema
 
-    async def _run_prefetches(self, prefetches: list[Any]) -> None:
-        """
-        Internal helper to execute all configured prefetch_related queries
-        for a given list of model instances.
-        """
-        if not prefetches:
-            return
-
-        async def _resolve(prefetch: Prefetch) -> None:
-            qs = prefetch.queryset
-            if qs is not None:
-                await qs._execute_all()
-
-        await run_concurrently(
-            [_resolve(p) for p in prefetches if p.queryset is not None],
-            limit=getattr(settings, "orm_row_prefetch_limit", None),
-        )
-
     async def _handle_batch(
         self,
         batch: Sequence[sqlalchemy.Row],
@@ -1069,20 +1048,20 @@ class BaseQuerySet(
             new_cache (QueryModelResultCache): The cache to store the new batch results.
 
         Returns:
-            Sequence[tuple[BaseModelType, BaseModelType]]: A sequence of tuples, each containing
+            Sequence[tuple[EdgyModel, EdgyEmbedTarget]]: A sequence of tuples, each containing
                                                             the raw model instance and the embedded target.
 
         Raises:
             NotImplementedError: If prefetching from another database is attempted.
             QuerySetError: If creating a reverse path for prefetching is not possible.
         """
-
         is_defer_fields = bool(queryset._defer)
         del queryset
         _prefetch_related: list[Prefetch] = []
 
         for prefetch in self._prefetch_related:
-            check_prefetch_collision(self.model_class, prefetch)  # type: ignore[arg-type]
+            check_prefetch_collision(self.model_class, prefetch)  # type: ignore
+
             crawl_result = crawl_relationship(
                 self.model_class, prefetch.related_name, traverse_last=True
             )
@@ -1092,8 +1071,9 @@ class BaseQuerySet(
                 )
             if crawl_result.reverse_path is False:
                 raise QuerySetError(
-                    detail="Creating a reverse path is not possible, unidirectional fields used."
+                    detail=("Creating a reverse path is not possible, unidirectional fields used.")
                 )
+            prefetch_queryset: QuerySet | None = prefetch.queryset
 
             clauses = [
                 {
@@ -1102,19 +1082,19 @@ class BaseQuerySet(
                 }
                 for row in batch
             ]
-            prefetch_queryset = (
-                crawl_result.model_class.query.local_or(*clauses)
-                if prefetch.queryset is None
-                else prefetch.queryset.local_or(*clauses)
-            )
+            if prefetch_queryset is None:
+                prefetch_queryset = crawl_result.model_class.query.local_or(*clauses)
+            else:
+                # ensure local or
+                prefetch_queryset = prefetch_queryset.local_or(*clauses)
 
-            # Adjust select_related embedding for recursive fetches
             if prefetch_queryset.model_class is self.model_class:
+                # queryset is of this model
                 prefetch_queryset = prefetch_queryset.select_related(prefetch.related_name)
                 prefetch_queryset.embed_parent = (prefetch.related_name, "")
             else:
+                # queryset is of the target model
                 prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
-
             new_prefetch = Prefetch(
                 related_name=prefetch.related_name,
                 to_attr=prefetch.to_attr,
@@ -1124,8 +1104,10 @@ class BaseQuerySet(
             new_prefetch._is_finished = True
             _prefetch_related.append(new_prefetch)
 
-        async def _build_one(row: sqlalchemy.Row) -> tuple[BaseModelType, BaseModelType]:
-            return await self.model_class.from_sqla_row(  # type: ignore
+        return await new_cache.aget_or_cache_many(
+            self.model_class,
+            batch,
+            cache_fn=lambda row: self.model_class.from_sqla_row(
                 row,
                 tables_and_models=tables_and_models,
                 select_related=self._select_related,
@@ -1136,43 +1118,10 @@ class BaseQuerySet(
                 using_schema=self.active_schema,
                 database=self.database,
                 reference_select=self._reference_select,
-            )
-
-        coros = [_build_one(row) for row in batch]
-        model_objs = await run_concurrently(
-            coros, limit=getattr(settings, "orm_row_prefetch_limit", None)
+            ),
+            transform_fn=self._embed_parent_in_result,
+            old_cache=self._cache,
         )
-
-        # Embed parent results concurrently
-        embed_coros = [self._embed_parent_in_result(obj) for obj in model_objs]
-        results = await run_concurrently(
-            embed_coros, limit=getattr(settings, "orm_row_prefetch_limit", None)
-        )
-
-        cache_keys: list[Any] = []
-        cache_values: list[tuple[Any, Any]] = []
-
-        for obj, embedded in results:
-            cache_keys.append(self._cache.create_cache_key(self.model_class, embedded))
-            cache_values.append((obj, embedded))
-
-        self._cache.update(self.model_class, cache_values, cache_keys=cache_keys)
-        if new_cache is not None:
-            new_cache.update(self.model_class, cache_values, cache_keys=cache_keys)
-
-        await self._run_prefetches([embedded for _, embedded in results])
-
-        for obj, _ in results:
-            for prefetch in _prefetch_related:
-                related_attr = prefetch.to_attr or prefetch.related_name
-                if not hasattr(obj, related_attr):
-                    try:
-                        value = await getattr(obj, related_attr)
-                        setattr(obj, related_attr, value)
-                    except Exception:
-                        continue
-
-        return [embedded for _, embedded in results]
 
     @property
     def _current_row(self) -> sqlalchemy.Row | None:
@@ -1877,23 +1826,14 @@ class QuerySet(BaseQuerySet):
         if fields is not None and not isinstance(fields, Iterable):
             raise QuerySetError(detail="Fields must be a suitable sequence of strings or unset.")
 
-        rows: list[BaseModelType] = await self  # already concurrent fetch
-        if not rows:
-            return []
-
-        # parallelize the model_dump phase (optional but real concurrency)
+        rows: list[BaseModelType] = await self
         if fields:
-            coros = [
+            return [
                 row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)
                 for row in rows
             ]
         else:
-            coros = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
-
-        return await run_concurrently(
-            coros,  # type: ignore
-            limit=getattr(settings, "orm_row_prefetch_limit", None),
-        )
+            return [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
 
     async def values_list(
         self,
@@ -1907,7 +1847,6 @@ class QuerySet(BaseQuerySet):
         """
         if isinstance(fields, str):
             fields = [fields]
-
         rows = await self.values(
             fields=fields,
             exclude=exclude,
@@ -1915,24 +1854,13 @@ class QuerySet(BaseQuerySet):
         )
         if not rows:
             return []
-
         if not flat:
-            # parallelize tupleization as well (cheap but consistent)
-            return await run_concurrently(
-                [tuple(row.values()) for row in rows],
-                limit=getattr(settings, "orm_row_prefetch_limit", None),
-            )
+            return [tuple(row.values()) for row in rows]
         else:
-            if not fields or not fields[0]:
-                raise QuerySetError(detail="`flat=True` requires exactly one field.")
-            key = fields[0]
             try:
-                return await run_concurrently(
-                    [row[key] for row in rows],
-                    limit=getattr(settings, "orm_row_prefetch_limit", None),
-                )
+                return [row[fields[0]] for row in rows]
             except KeyError:
-                raise QuerySetError(detail=f"{key} does not exist in the results.") from None
+                raise QuerySetError(detail=f"{fields[0]} does not exist in the results.") from None
 
     async def exists(self, **kwargs: Any) -> bool:
         """
@@ -2099,14 +2027,11 @@ class QuerySet(BaseQuerySet):
                 await database.execute_many(expression)
             self._clear_cache(keep_result_cache=True)
             if new_objs:
-                await run_concurrently(
-                    [
-                        obj.execute_post_save_hooks(
-                            self.model_class.meta.fields.keys(), is_update=False
-                        )
-                        for obj in new_objs
-                    ]
-                )
+                # TODO: check if we can parallelize
+                for obj in new_objs:
+                    await obj.execute_post_save_hooks(
+                        self.model_class.meta.fields.keys(), is_update=False
+                    )
         finally:
             CURRENT_INSTANCE.reset(token)
 
@@ -2166,9 +2091,9 @@ class QuerySet(BaseQuerySet):
                 self.model_class.meta.post_save_fields
                 and not self.model_class.meta.post_save_fields.isdisjoint(fields)
             ):
-                await run_concurrently(
-                    [obj.execute_post_save_hooks(fields, is_update=True) for obj in objs]
-                )
+                # TODO: check if we can parallelize
+                for obj in objs:
+                    await obj.execute_post_save_hooks(fields, is_update=True)
         finally:
             CURRENT_INSTANCE.reset(token)
 
@@ -2261,6 +2186,7 @@ class QuerySet(BaseQuerySet):
                     retrieved_objs.extend(new_objs)
 
                 self._clear_cache()
+                # TODO: check if we can parallelize
                 for obj in new_objs:
                     await obj.execute_post_save_hooks(
                         self.model_class.meta.fields.keys(), is_update=False

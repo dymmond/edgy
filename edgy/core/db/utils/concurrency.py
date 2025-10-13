@@ -1,141 +1,39 @@
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable, Sequence
-from typing import Any, TypeVar
-
-import anyio
-from anyio import Semaphore
+import asyncio
+from collections.abc import Awaitable, Generator, Iterable, Sequence
+from itertools import islice
+from typing import TypeVar
 
 from edgy.conf import settings
 
 T = TypeVar("T")
-TaskFactory = Callable[[], Awaitable[T]]
 
 
-async def gather_limited(tasks: Sequence[TaskFactory[T]], limit: int | None = None) -> list[T]:
-    """
-    Runs a sequence of zero-argument coroutine factories concurrently with an optional
-    concurrency limit.
-
-    This utility functions similarly to `asyncio.gather` but leverages `anyio` for
-    asynchronous scheduling and incorporates an explicit throttling mechanism via an
-    `anyio.Semaphore` when a limit is provided.
-
-    The primary guarantee of this function is that the results of the executed coroutines
-    are collected and returned in a list that **preserves the original order** of the
-    input `tasks` sequence, regardless of their completion time.
-
-    Args:
-        tasks: A sequence of callable objects (factories). Each callable must take no
-               arguments and return an awaitable (a coroutine) to be executed.
-        limit: An integer specifying the maximum number of tasks allowed to execute
-               simultaneously.
-               - If set to an integer greater than 0, an `anyio.Semaphore` is initialized
-                 to enforce the bound.
-               - If set to `None`, concurrency is unbounded (limited only by the
-                 underlying `anyio` event loop scheduler).
-
-    Returns:
-        A list containing the results (`T`) of the awaited coroutines. The order
-        of elements in this list corresponds directly to the order of tasks in the
-        input sequence.
-
-    Raises:
-        Exception: If any task within the group raises an exception, the `anyio.create_task_group`
-                   will propagate that exception, and all other running tasks will be
-                   immediately cancelled.
-    """
-    if not tasks:
-        return []
-
-    # Initialize a results list with 'None' placeholders to ensure the final list
-    # preserves the input order based on index.
-    results: list[Any] = [None] * len(tasks)
-
-    # Initialize the Semaphore only if a positive integer limit is provided.
-    semaphore: Semaphore | None = anyio.Semaphore(limit) if limit and limit > 0 else None
-
-    async def _one(i: int, f: TaskFactory[Any]) -> None:
-        """
-        Internal asynchronous worker that executes a single task factory, awaits its
-        coroutine, and stores the result at the correct index `i`.
-
-        It handles the acquisition and release of the concurrency semaphore if one exists.
-        """
-        if semaphore:
-            async with semaphore:
-                results[i] = await f()
-        else:
-            results[i] = await f()
-
-    # Create a TaskGroup to manage the concurrent lifecycle of all tasks
-    async with anyio.create_task_group() as tg:
-        for i, f in enumerate(tasks):
-            # Start each task, passing its original index `i` and the factory `f`
-            tg.start_soon(_one, i, f)
-
-    # All tasks are guaranteed to be complete when the task group exits successfully.
-    # We cast to list[T] as all placeholders must have been replaced by results of type T.
-    return results
+def batched(iterable: Iterable[T], n: int) -> Generator[tuple[T, ...], None, None]:
+    # batched('ABCDEFG', 2) → AB CD EF G
+    if n < 1:
+        raise ValueError("n must be at least one")
+    iterator = iter(iterable)
+    while batch := tuple(islice(iterator, n)):
+        yield batch
 
 
-async def run_all(coros: Sequence[Awaitable[Any]], limit: int | None = None) -> list[Any]:
-    """
-    Executes a sequence of already-created coroutine objects concurrently with an
-    optional limit on the number of simultaneous executions.
-
-    This function acts as a convenience wrapper, similar to `asyncio.gather`, but
-    is built on `anyio` and supports concurrency throttling via the `gather_limited`
-    utility.
-
-    It ensures that all coroutines are started, awaited, and their results are collected
-    in a list that preserves the original input order.
-
-    Args:
-        coros: A sequence of already created `Awaitable[Any]` objects (coroutines).
-        limit: An integer specifying the maximum number of coroutines allowed to run
-               concurrently.
-               - If `None`, concurrency is unbounded.
-               - If an integer, execution is throttled by a semaphore.
-
-    Returns:
-        A list containing the results of the awaited coroutines, ordered identically
-        to the input `coros` sequence.
-
-    Implementation Detail:
-        It converts the sequence of awaitables into a sequence of zero-argument callable
-        factories (using a lambda function with a closure `c=c`) as required by
-        `gather_limited`.
-    """
-    return await gather_limited([lambda c=c: c for c in coros], limit=limit)
-
-
-async def run_concurrently(coros: Sequence[Awaitable[Any]], limit: int | None = None) -> list[Any]:
+async def run_concurrently(coros: Sequence[Awaitable[T]], limit: int | None = None) -> list[T]:
     """
     Generic concurrent runner for Edgy ORM operations that need to be executed
     in parallel while respecting global concurrency settings.
 
-    This function executes a sequence of already-created coroutine objects (`coros`)
-    using an `anyio.create_task_group`. It enforces a concurrency limit read from
-    `settings.orm_concurrency_limit` via an `anyio.Semaphore`.
-
-    The results are collected in the order the coroutines finish, **not** necessarily
-    the order they appeared in the input sequence.
-
     Args:
         coros: A sequence of already created `Awaitable[Any]` objects (coroutines)
                to be executed.
+        limit:
+            An optional limit. Can be 0 to be disabled, 1 for a sequential mode,
+            None for using the orm_concurrency_limit setting.
 
     Returns:
         A list containing the results of the awaited coroutines. The order of results
         is determined by the completion time of the tasks.
-
-    Internal Logic:
-        - It reads the **concurrency limit** (`orm_concurrency_limit`, defaults to 5)
-          and **enabled status** (`orm_concurrency_enabled`, defaults to True) from
-          the global `settings`.
-        - If concurrency is disabled, the semaphore is set to `None`, effectively
-          running tasks sequentially without concurrency benefit.
     """
     if not coros:
         return []
@@ -145,27 +43,12 @@ async def run_concurrently(coros: Sequence[Awaitable[Any]], limit: int | None = 
         limit if limit is not None else getattr(settings, "orm_concurrency_limit", None)
     )
 
-    if not enabled or not eff_limit or eff_limit <= 1:
-        results: list[Any] = []
-        for _, item in enumerate(coros):
-            if callable(getattr(item, "__await__", None)):
-                results.append(await item)
-            else:
-                results.append(item)
-        return results
-
-    sem = anyio.Semaphore(eff_limit)
-    results = [None] * len(coros)
-
-    async def _runner(i: int, item: Any) -> None:
-        async with sem:
-            if callable(getattr(item, "__await__", None)):
-                results[i] = await item
-            else:
-                results[i] = item
-
-    async with anyio.create_task_group() as tg:
-        for i, item in enumerate(coros):
-            tg.start_soon(_runner, i, item)
+    if not enabled:
+        eff_limit = 1
+    if eff_limit is None or eff_limit <= 0:
+        return await asyncio.gather(*coros)
+    results: list[T] = []
+    for batch in batched(coros, eff_limit):
+        results.extend(await asyncio.gather(*batch))
 
     return results
