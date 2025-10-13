@@ -141,27 +141,23 @@ async def run_concurrently(coros: Sequence[Awaitable[Any]], limit: int | None = 
         return []
 
     enabled: bool = getattr(settings, "orm_concurrency_enabled", True)
-    limit = limit if limit is not None else getattr(settings, "orm_concurrency_limit", None)
+    eff_limit: int | None = (
+        limit if limit is not None else getattr(settings, "orm_concurrency_limit", None)
+    )
 
-    # Determine effective concurrency limit
-    if not enabled:
-        # Just sequentially collect, no parallelism
+    if not enabled or not eff_limit or eff_limit <= 1:
         results: list[Any] = []
-        for item in coros:
+        for _, item in enumerate(coros):
             if callable(getattr(item, "__await__", None)):
                 results.append(await item)
             else:
                 results.append(item)
         return results
 
-    if limit is None or limit < 1:
-        limit = 1
-
+    sem = anyio.Semaphore(eff_limit)
     results = [None] * len(coros)
-    sem: Semaphore = anyio.Semaphore(limit)
 
-    async def _one(i: int, item: Any) -> None:
-        # Handle mixed inputs gracefully
+    async def _runner(i: int, item: Any) -> None:
         async with sem:
             if callable(getattr(item, "__await__", None)):
                 results[i] = await item
@@ -170,6 +166,6 @@ async def run_concurrently(coros: Sequence[Awaitable[Any]], limit: int | None = 
 
     async with anyio.create_task_group() as tg:
         for i, item in enumerate(coros):
-            tg.start_soon(_one, i, item)
+            tg.start_soon(_runner, i, item)
 
     return results

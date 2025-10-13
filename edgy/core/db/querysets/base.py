@@ -1032,20 +1032,21 @@ class BaseQuerySet(
             schema = self.model_class.get_db_schema()
         return schema
 
-    async def _run_prefetches(self, objs: list[Any]) -> None:
+    async def _run_prefetches(self, prefetches: list[Any]) -> None:
         """
         Internal helper to execute all configured prefetch_related queries
         for a given list of model instances.
         """
-        if not self._prefetch_related or not objs:
+        if not prefetches:
             return
 
         async def _resolve(prefetch: Prefetch) -> None:
-            related_qs = prefetch.queryset
-            await related_qs._execute_all()
+            qs = prefetch.queryset
+            if qs is not None:
+                await qs._execute_all()
 
         await run_concurrently(
-            [_resolve(prefetch) for prefetch in self._prefetch_related],
+            [_resolve(p) for p in prefetches if p.queryset is not None],
             limit=getattr(settings, "orm_row_prefetch_limit", None),
         )
 
@@ -1075,11 +1076,11 @@ class BaseQuerySet(
             NotImplementedError: If prefetching from another database is attempted.
             QuerySetError: If creating a reverse path for prefetching is not possible.
         """
+
         is_defer_fields = bool(queryset._defer)
         del queryset
         _prefetch_related: list[Prefetch] = []
 
-        # build prefetch configurations for this batch
         for prefetch in self._prefetch_related:
             check_prefetch_collision(self.model_class, prefetch)  # type: ignore[arg-type]
             crawl_result = crawl_relationship(
@@ -1107,7 +1108,7 @@ class BaseQuerySet(
                 else prefetch.queryset.local_or(*clauses)
             )
 
-            # adjust select_related embedding for recursive fetches
+            # Adjust select_related embedding for recursive fetches
             if prefetch_queryset.model_class is self.model_class:
                 prefetch_queryset = prefetch_queryset.select_related(prefetch.related_name)
                 prefetch_queryset.embed_parent = (prefetch.related_name, "")
@@ -1137,30 +1138,30 @@ class BaseQuerySet(
                 reference_select=self._reference_select,
             )
 
-        # parallelize row -> model creation
         coros = [_build_one(row) for row in batch]
         model_objs = await run_concurrently(
             coros, limit=getattr(settings, "orm_row_prefetch_limit", None)
         )
 
+        # Embed parent results concurrently
         embed_coros = [self._embed_parent_in_result(obj) for obj in model_objs]
         results = await run_concurrently(
             embed_coros, limit=getattr(settings, "orm_row_prefetch_limit", None)
         )
 
-        # Update cache (once)
-        cache_keys = []
-        cache_values = []
+        cache_keys: list[Any] = []
+        cache_values: list[tuple[Any, Any]] = []
+
         for obj, embedded in results:
-            cache_keys.append(self._cache.create_cache_key(self.model_class, obj))
+            cache_keys.append(self._cache.create_cache_key(self.model_class, embedded))
             cache_values.append((obj, embedded))
 
-        new_cache.update(self.model_class, cache_values, cache_keys=cache_keys)
+        self._cache.update(self.model_class, cache_values, cache_keys=cache_keys)
+        if new_cache is not None:
+            new_cache.update(self.model_class, cache_values, cache_keys=cache_keys)
 
-        # Automatically run nested prefetches for deeper relations
-        await self._run_prefetches([obj for obj, _ in results])
+        await self._run_prefetches([embedded for _, embedded in results])
 
-        # Safely attach prefetched results to parent objects
         for obj, _ in results:
             for prefetch in _prefetch_related:
                 related_attr = prefetch.to_attr or prefetch.related_name
@@ -1168,10 +1169,10 @@ class BaseQuerySet(
                     try:
                         value = await getattr(obj, related_attr)
                         setattr(obj, related_attr, value)
-                    except Exception:  # noqa
+                    except Exception:
                         continue
 
-        return results
+        return [embedded for _, embedded in results]
 
     @property
     def _current_row(self) -> sqlalchemy.Row | None:

@@ -122,15 +122,17 @@ async def parse_clause_args(
     if not args:
         return []
 
-    # build list of coroutine calls
+    enabled: bool = getattr(settings, "orm_concurrency_enabled", True)
+    limit: int | None = getattr(settings, "orm_clauses_concurrency_limit", None)
+
+    if (not enabled) or (not limit) or (limit <= 1):
+        results = []
+        for arg in args:
+            results.append(await parse_clause_arg(arg, queryset, tables_and_models))
+        return results
+
     tasks = [parse_clause_arg(arg, queryset, tables_and_models) for arg in args]
-
-    # run them concurrently and capture the results
-    results = await run_concurrently(
-        tasks,
-        limit=getattr(settings, "orm_clauses_concurrency_limit", None),
-    )
-
+    results = await run_concurrently(tasks, limit=limit)
     return results
 
 
