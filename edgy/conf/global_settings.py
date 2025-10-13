@@ -145,7 +145,7 @@ class ConcurrencySettings(MediaSettings, MigrationSettings):
     will run without explicit concurrency bounding.
     """
 
-    orm_concurrency_limit: int | None = None
+    orm_concurrency_limit: int | None = 10
     """
     The maximum number of concurrent asynchronous operations allowed when performing
     high-level, parallel sub-queries, such as resolving multiple **prefetch** relationships
@@ -156,7 +156,7 @@ class ConcurrencySettings(MediaSettings, MigrationSettings):
       connection pool or CPU exhaustion during complex graph traversals.
     """
 
-    orm_row_prefetch_limit: int | None = None
+    orm_row_prefetch_limit: int | None = 5
     """
     A specific concurrency limit applied when resolving **per-row prefetch** or **lazy loading**
     operations. This fine-tunes the concurrency when fetching related objects for the
@@ -166,7 +166,7 @@ class ConcurrencySettings(MediaSettings, MigrationSettings):
       `orm_concurrency_limit`.
     """
 
-    orm_clauses_concurrency_limit: int | None = None
+    orm_clauses_concurrency_limit: int | None = 20
     """
     The concurrency limit applied during the orchestration of **CLAUSE async callables**.
     This relates to internal framework processes where various database-interacting components
@@ -176,7 +176,7 @@ class ConcurrencySettings(MediaSettings, MigrationSettings):
       internal, low-level operational hooks.
     """
 
-    orm_registry_ops_limit: int | None = None
+    orm_registry_ops_limit: int | None = 10
     """
     The concurrency limit applied when performing **registry operations**, such as
     batch connect or disconnect operations across multiple database connections
