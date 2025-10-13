@@ -119,18 +119,19 @@ async def parse_clause_args(
     Returns:
         list[Any]: A list containing the parsed results of all arguments.
     """
-    result: list[Any] = []
-    # Prepare all arguments for parsing, creating a list of awaitables.
+    if not args:
+        return []
+
+    # build list of coroutine calls
     tasks = [parse_clause_arg(arg, queryset, tables_and_models) for arg in args]
-    await run_concurrently(tasks, limit=getattr(settings, "orm_clauses_concurrency_limit", None))
-    # Await the results based on the force_rollback flag.
-    if queryset.database.force_rollback:
-        # Await sequentially if force_rollback is enabled.
-        return [await el for el in result]
-    else:
-        # Await concurrently using asyncio.gather if force_rollback is disabled.
-        limit = settings.orm_clauses_concurrency_limit if settings.orm_concurrency_enabled else 1
-        return await run_concurrently(result, limit=limit)
+
+    # run them concurrently and capture the results
+    results = await run_concurrently(
+        tasks,
+        limit=getattr(settings, "orm_clauses_concurrency_limit", None),
+    )
+
+    return results
 
 
 def clean_query_kwargs(
