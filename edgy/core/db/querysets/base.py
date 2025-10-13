@@ -266,6 +266,7 @@ class BaseQuerySet(
         queryset._select_related.update(self._select_related)
         queryset._select_related_weak.update(self._select_related_weak)
         queryset._cached_select_related_expression = self._cached_select_related_expression
+        queryset._prefetch_related = list(self._prefetch_related)
         return cast("QuerySet", queryset)
 
     @cached_property
@@ -1031,6 +1032,23 @@ class BaseQuerySet(
             schema = self.model_class.get_db_schema()
         return schema
 
+    async def _run_prefetches(self, objs: list[Any]) -> None:
+        """
+        Internal helper to execute all configured prefetch_related queries
+        for a given list of model instances.
+        """
+        if not self._prefetch_related or not objs:
+            return
+
+        async def _resolve(prefetch: Prefetch) -> None:
+            related_qs = prefetch.queryset
+            await related_qs._execute_all()
+
+        await run_concurrently(
+            [_resolve(prefetch) for prefetch in self._prefetch_related],
+            limit=getattr(settings, "orm_row_prefetch_limit", None),
+        )
+
     async def _handle_batch(
         self,
         batch: Sequence[sqlalchemy.Row],
@@ -1138,6 +1156,21 @@ class BaseQuerySet(
             cache_values.append((obj, embedded))
 
         new_cache.update(self.model_class, cache_values, cache_keys=cache_keys)
+
+        # Automatically run nested prefetches for deeper relations
+        await self._run_prefetches([obj for obj, _ in results])
+
+        # Safely attach prefetched results to parent objects
+        for obj, _ in results:
+            for prefetch in _prefetch_related:
+                related_attr = prefetch.to_attr or prefetch.related_name
+                if not hasattr(obj, related_attr):
+                    try:
+                        value = await getattr(obj, related_attr)
+                        setattr(obj, related_attr, value)
+                    except Exception:  # noqa
+                        continue
+
         return results
 
     @property
