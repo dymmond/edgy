@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Any, Optional, Protocol, runtime_checkable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
 # TYPE_CHECKING is used to prevent circular imports during runtime while
 # allowing type checkers to see the correct types.
@@ -21,7 +23,7 @@ class ManyRelationProtocol(Protocol):
     The `@runtime_checkable` decorator allows for runtime checks using `isinstance()`.
     """
 
-    instance: "BaseModelType"
+    instance: BaseModelType
     """
     The primary model instance to which this many-relation manager is attached.
     This is the "one" side of a one-to-many relationship or one side of a
@@ -38,7 +40,7 @@ class ManyRelationProtocol(Protocol):
         """
         ...
 
-    async def create(self, *args: Any, **kwargs: Any) -> Optional["BaseModelType"]:
+    async def create(self, *args: Any, **kwargs: Any) -> BaseModelType | None:
         """
         Asynchronously creates a new related model instance and associates it
         with the primary instance.
@@ -60,7 +62,7 @@ class ManyRelationProtocol(Protocol):
         """
         ...
 
-    async def add(self, child: "BaseModelType") -> Optional["BaseModelType"]:
+    async def add(self, child: BaseModelType) -> BaseModelType | None:
         """
         Asynchronously adds an existing related model instance to the collection
         associated with the primary instance.
@@ -78,7 +80,7 @@ class ManyRelationProtocol(Protocol):
         """
         ...
 
-    def stage(self, *children: "BaseModelType") -> None:
+    def stage(self, *children: BaseModelType) -> None:
         """
         Stages one or more related model instances for later addition or saving.
 
@@ -92,7 +94,7 @@ class ManyRelationProtocol(Protocol):
         """
         ...
 
-    async def remove(self, child: Optional["BaseModelType"] = None) -> None:
+    async def remove(self, child: BaseModelType | None = None) -> None:
         """
         Asynchronously removes a specific related model instance or all related
         instances from the association with the primary instance.
@@ -111,7 +113,7 @@ class ManyRelationProtocol(Protocol):
         """
         ...
 
-    async def add_many(self, *children: "BaseModelType") -> list["BaseModelType"]:
+    async def add_many(self, *children: BaseModelType) -> list[BaseModelType | None]:
         """
         Asynchronously adds multiple existing related model instances to the
         collection associated with the primary instance.
@@ -125,7 +127,7 @@ class ManyRelationProtocol(Protocol):
         """
         ...
 
-    async def remove_many(self, *children: "BaseModelType") -> None:
+    async def remove_many(self, *children: BaseModelType) -> None:
         """
         Asynchronously removes multiple specific related model instances from
         the association with the primary instance.

@@ -665,7 +665,7 @@ class SingleRelation(ManyRelationProtocol):
         await child.save(values={self.to_foreign_key: self.instance})
         return child
 
-    async def add_many(self, *children: BaseModelType) -> list[BaseModelType] | None:
+    async def add_many(self, *children: BaseModelType) -> list[BaseModelType | None]:
         """
         Asynchronously adds multiple child instances to the one-to-many or
         one-to-one relationship by updating their foreign keys.
@@ -676,7 +676,7 @@ class SingleRelation(ManyRelationProtocol):
                                         model or a dictionary.
 
         Returns:
-            list[BaseModelType] | None: A list of saved child model instances.
+            list[BaseModelType | None]: A list of saved child model instances.
 
         Raises:
             RelationshipIncompatible: If a child type is not compatible.
