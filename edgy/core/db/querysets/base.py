@@ -24,6 +24,7 @@ from typing import (
 import orjson
 import sqlalchemy
 
+from edgy.conf import settings
 from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR, get_schema
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields import CharField, TextField
@@ -1060,9 +1061,9 @@ class BaseQuerySet(
         del queryset
         _prefetch_related: list[Prefetch] = []
 
+        # build prefetch configurations for this batch
         for prefetch in self._prefetch_related:
-            check_prefetch_collision(self.model_class, prefetch)  # type: ignore
-
+            check_prefetch_collision(self.model_class, prefetch)  # type: ignore[arg-type]
             crawl_result = crawl_relationship(
                 self.model_class, prefetch.related_name, traverse_last=True
             )
@@ -1071,10 +1072,9 @@ class BaseQuerySet(
                     "Cannot prefetch from other db yet. Maybe in future this feature will be added."
                 )
             if crawl_result.reverse_path is False:
-                QuerySetError(
-                    detail=("Creating a reverse path is not possible, unidirectional fields used.")
+                raise QuerySetError(
+                    detail="Creating a reverse path is not possible, unidirectional fields used."
                 )
-            prefetch_queryset: QuerySet | None = prefetch.queryset
 
             clauses = [
                 {
@@ -1083,51 +1083,62 @@ class BaseQuerySet(
                 }
                 for row in batch
             ]
-            if prefetch_queryset is None:
-                prefetch_queryset = crawl_result.model_class.query.local_or(*clauses)
-            else:
-                # ensure local or
-                prefetch_queryset = prefetch_queryset.local_or(*clauses)
+            prefetch_queryset = (
+                crawl_result.model_class.query.local_or(*clauses)
+                if prefetch.queryset is None
+                else prefetch.queryset.local_or(*clauses)
+            )
 
+            # adjust select_related embedding for recursive fetches
             if prefetch_queryset.model_class is self.model_class:
-                # queryset is of this model
                 prefetch_queryset = prefetch_queryset.select_related(prefetch.related_name)
                 prefetch_queryset.embed_parent = (prefetch.related_name, "")
             else:
-                # queryset is of the target model
-                prefetch_queryset = prefetch_queryset.select_related(
-                    cast(str, crawl_result.reverse_path)
-                )
+                prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
+
             new_prefetch = Prefetch(
                 related_name=prefetch.related_name,
                 to_attr=prefetch.to_attr,
                 queryset=prefetch_queryset,
             )
-            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=tables_and_models[''][0].key, prefix=cast(str, crawl_result.reverse_path))}_"
+            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=tables_and_models[''][0].key, prefix=crawl_result.reverse_path)}_"
             new_prefetch._is_finished = True
             _prefetch_related.append(new_prefetch)
 
-        return cast(
-            Sequence[tuple[BaseModelType, BaseModelType]],
-            await new_cache.aget_or_cache_many(
-                self.model_class,
-                batch,
-                cache_fn=lambda row: self.model_class.from_sqla_row(
-                    row,
-                    tables_and_models=tables_and_models,
-                    select_related=self._select_related,
-                    only_fields=self._only,
-                    is_defer_fields=is_defer_fields,
-                    prefetch_related=_prefetch_related,
-                    exclude_secrets=self._exclude_secrets,
-                    using_schema=self.active_schema,
-                    database=self.database,
-                    reference_select=self._reference_select,
-                ),
-                transform_fn=self._embed_parent_in_result,
-                old_cache=self._cache,
-            ),
+        async def _build_one(row: sqlalchemy.Row) -> tuple[BaseModelType, BaseModelType]:
+            return await self.model_class.from_sqla_row(  # type: ignore
+                row,
+                tables_and_models=tables_and_models,
+                select_related=self._select_related,
+                only_fields=self._only,
+                is_defer_fields=is_defer_fields,
+                prefetch_related=_prefetch_related,
+                exclude_secrets=self._exclude_secrets,
+                using_schema=self.active_schema,
+                database=self.database,
+                reference_select=self._reference_select,
+            )
+
+        # parallelize row -> model creation
+        coros = [_build_one(row) for row in batch]
+        model_objs = await run_concurrently(
+            coros, limit=getattr(settings, "orm_row_prefetch_limit", None)
         )
+
+        embed_coros = [self._embed_parent_in_result(obj) for obj in model_objs]
+        results = await run_concurrently(
+            embed_coros, limit=getattr(settings, "orm_row_prefetch_limit", None)
+        )
+
+        # Update cache (once)
+        cache_keys = []
+        cache_values = []
+        for obj, embedded in results:
+            cache_keys.append(self._cache.create_cache_key(self.model_class, obj))
+            cache_values.append((obj, embedded))
+
+        new_cache.update(self.model_class, cache_values, cache_keys=cache_keys)
+        return results
 
     @property
     def _current_row(self) -> sqlalchemy.Row | None:
@@ -1832,14 +1843,23 @@ class QuerySet(BaseQuerySet):
         if fields is not None and not isinstance(fields, Iterable):
             raise QuerySetError(detail="Fields must be a suitable sequence of strings or unset.")
 
-        rows: list[BaseModelType] = await self
+        rows: list[BaseModelType] = await self  # already concurrent fetch
+        if not rows:
+            return []
+
+        # parallelize the model_dump phase (optional but real concurrency)
         if fields:
-            return [
+            coros = [
                 row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)
                 for row in rows
             ]
         else:
-            return [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
+            coros = [row.model_dump(exclude=exclude, exclude_none=exclude_none) for row in rows]
+
+        return await run_concurrently(
+            coros,  # type: ignore
+            limit=getattr(settings, "orm_row_prefetch_limit", None),
+        )
 
     async def values_list(
         self,
@@ -1853,18 +1873,32 @@ class QuerySet(BaseQuerySet):
         """
         if isinstance(fields, str):
             fields = [fields]
+
         rows = await self.values(
             fields=fields,
             exclude=exclude,
             exclude_none=exclude_none,
         )
+        if not rows:
+            return []
+
         if not flat:
-            return [tuple(row.values()) for row in rows]
+            # parallelize tupleization as well (cheap but consistent)
+            return await run_concurrently(
+                [tuple(row.values()) for row in rows],
+                limit=getattr(settings, "orm_row_prefetch_limit", None),
+            )
         else:
+            if not fields or not fields[0]:
+                raise QuerySetError(detail="`flat=True` requires exactly one field.")
+            key = fields[0]
             try:
-                return [row[fields[0]] for row in rows]
+                return await run_concurrently(
+                    [row[key] for row in rows],
+                    limit=getattr(settings, "orm_row_prefetch_limit", None),
+                )
             except KeyError:
-                raise QuerySetError(detail=f"{fields[0]} does not exist in the results.") from None
+                raise QuerySetError(detail=f"{key} does not exist in the results.") from None
 
     async def exists(self, **kwargs: Any) -> bool:
         """
