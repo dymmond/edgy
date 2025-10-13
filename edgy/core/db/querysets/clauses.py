@@ -121,8 +121,8 @@ async def parse_clause_args(
     """
     result: list[Any] = []
     # Prepare all arguments for parsing, creating a list of awaitables.
-    for arg in args:
-        result.append(parse_clause_arg(arg, queryset, tables_and_models))
+    tasks = [parse_clause_arg(arg, queryset, tables_and_models) for arg in args]
+    await run_concurrently(tasks, limit=getattr(settings, "orm_clauses_concurrency_limit", None))
     # Await the results based on the force_rollback flag.
     if queryset.database.force_rollback:
         # Await sequentially if force_rollback is enabled.
