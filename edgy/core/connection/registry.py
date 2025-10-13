@@ -12,6 +12,7 @@ from functools import cached_property, partial
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, overload
 
+import anyio
 import sqlalchemy
 from loguru import logger
 from monkay.asgi import ASGIApp, LifespanHook
@@ -19,6 +20,7 @@ from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
 from sqlalchemy.orm import declarative_base as sa_declarative_base
 
+from edgy.conf import settings
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
 from edgy.core.db.context_vars import CURRENT_INSTANCE, FORCE_FIELDS_NULLABLE
@@ -420,7 +422,21 @@ class Registry:
                         CURRENT_INSTANCE.reset(token)  # Reset context variable.
 
             ops.append(wrapper_fn())
-        await asyncio.gather(*ops)  # Run all update operations concurrently.
+
+        # Execute all update operations concurrently.
+        limit: int = settings.orm_registry_ops_limit if settings.orm_concurrency_enabled else 1
+        semaphore = anyio.Semaphore(limit) if limit else None
+
+        async def _run(coro: Any) -> None:
+            if semaphore:
+                async with semaphore:
+                    await coro
+            else:
+                await coro
+
+        async with anyio.create_task_group() as tg:
+            for op in ops:
+                tg.start_soon(_run, op)
 
     def extra_name_check(self, name: Any) -> bool:
         """

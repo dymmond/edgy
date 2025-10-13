@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import inspect
 import sys
 from collections.abc import Awaitable
@@ -12,6 +11,7 @@ from pydantic.fields import FieldInfo
 from pydantic.json_schema import SkipJsonSchema
 
 from edgy.core.db.models.mixins.dump import DumpMixin
+from edgy.core.db.utils.concurrency import run_all
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
 from edgy.core.marshalls.metaclasses import MarshallMeta
@@ -236,9 +236,11 @@ class BaseMarshall(DumpMixin, BaseModel):
                 setattr(self, name, value)  # Set the field value.
 
         if async_resolvers:
-            # If there are any async resolvers, run them synchronously.
-            # This blocks until all async fields are resolved.
-            run_sync(asyncio.gather(*async_resolvers))
+
+            async def _resolve() -> None:
+                await run_all(async_resolvers)
+
+            run_sync(_resolve())  # Run all async resolvers synchronously.
         return self
 
     def _get_method_value(self, name: str, instance: Model) -> Any:

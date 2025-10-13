@@ -128,7 +128,66 @@ class MigrationSettings(BaseSettings):
     """
 
 
-class EdgySettings(MediaSettings, MigrationSettings):
+class ConcurrencySettings(MediaSettings, MigrationSettings):
+    """
+    Settings related to concurrency and asynchronous operations within the Edgy framework,
+    specifically governing limits on parallel execution of database-related tasks.
+
+    These configurations are crucial for preventing resource exhaustion (e.g., thread
+    pool saturation or excessive connection usage) when handling highly concurrent or
+    complex database operations like nested data fetching.
+    """
+
+    orm_concurrency_enabled: bool = False
+    """
+    A global flag to enable or disable internal concurrency management for ORM operations.
+    If set to `False`, many of the specific limits below will be ignored, and operations
+    will run without explicit concurrency bounding.
+    """
+
+    orm_concurrency_limit: int | None = None
+    """
+    The maximum number of concurrent asynchronous operations allowed when performing
+    high-level, parallel sub-queries, such as resolving multiple **prefetch** relationships
+    or **lazy reverse managers** (e.g., retrieving related objects for many rows at once).
+
+    - If set to `None`, concurrency is unlimited (bounded only by the event loop).
+    - If set to an integer, it bounds the fan-out rate, which is useful for mitigating
+      connection pool or CPU exhaustion during complex graph traversals.
+    """
+
+    orm_row_prefetch_limit: int | None = None
+    """
+    A specific concurrency limit applied when resolving **per-row prefetch** or **lazy loading**
+    operations. This fine-tunes the concurrency when fetching related objects for the
+    primary result set after the initial query.
+
+    - If set to `None`, this specific limit is often unbounded or falls back to
+      `orm_concurrency_limit`.
+    """
+
+    orm_clauses_concurrency_limit: int | None = None
+    """
+    The concurrency limit applied during the orchestration of **CLAUSE async callables**.
+    This relates to internal framework processes where various database-interacting components
+    (e.g., custom query clauses, pre-computation hooks) are executed concurrently.
+
+    - Bounding this limit controls the maximum number of concurrent executions for these
+      internal, low-level operational hooks.
+    """
+
+    orm_registry_ops_limit: int | None = None
+    """
+    The concurrency limit applied when performing **registry operations**, such as
+    batch connect or disconnect operations across multiple database connections
+    or tenants during application startup or shutdown.
+
+    - This prevents a sudden burst of synchronous/blocking operations from overwhelming
+      the thread pool or connection manager.
+    """
+
+
+class EdgySettings(ConcurrencySettings):
     """
     Main settings class for the Edgy framework, inheriting from `MediaSettings`
     and `MigrationSettings`.
@@ -137,10 +196,6 @@ class EdgySettings(MediaSettings, MigrationSettings):
     including general application behavior, extensions, preloads, and CLI tools.
     """
 
-    # Pydantic-settings configuration:
-    # - `extra="allow"`: Allows additional fields not explicitly defined in the settings.
-    # - `ignored_types=(cached_property,)`: Prevents Pydantic from trying to validate
-    #   cached properties, as they are dynamic attributes.
     model_config = SettingsConfigDict(extra="allow", ignored_types=(cached_property,))
 
     allow_auto_compute_server_defaults: bool = True

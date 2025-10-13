@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.models.utils import apply_instance_extras
-from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
+from edgy.core.db.querysets.prefetch import Prefetch, _run_prefetches, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.exceptions import QuerySetError
 
@@ -514,6 +513,7 @@ class ModelRowMixin:
             queries.append(
                 cls.__set_prefetch(row=row, row_prefix=row_prefix, model=model, related=related)
             )
+
         # Execute all prefetch queries concurrently if there are any.
         if queries:
-            await asyncio.gather(*queries)
+            await _run_prefetches(queries)

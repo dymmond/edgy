@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import warnings
 from collections.abc import Iterable
 from functools import partial
@@ -10,9 +9,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy
 
+from edgy.conf import settings
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.relationships.utils import RelationshipCrawlResult, crawl_relationship
+from edgy.core.db.utils.concurrency import run_all
 
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
@@ -128,7 +129,8 @@ async def parse_clause_args(
         return [await el for el in result]
     else:
         # Await concurrently using asyncio.gather if force_rollback is disabled.
-        return await asyncio.gather(*result)
+        limit = settings.orm_clauses_concurrency_limit if settings.orm_concurrency_enabled else 1
+        return await run_all(result, limit=limit)
 
 
 def clean_query_kwargs(

@@ -1,13 +1,55 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Coroutine
 from typing import TYPE_CHECKING, Any
 
+import anyio
+
+from edgy.conf import settings
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
     from edgy import Model, QuerySet
     from edgy.core.db.models.types import BaseModelType
+
+
+async def _run_prefetches(
+    prefetches: list[Prefetch] | list[Coroutine[Any, Any, None]],
+) -> None:
+    """
+    Asynchronously orchestrates the initialization (baking) of multiple Prefetch objects.
+
+    This function utilizes `anyio.create_task_group` to run the prefetch operations
+    concurrently, while respecting the framework's global concurrency limit using
+    an `anyio.Semaphore`.
+
+    The concurrency limit is fetched from `settings.orm_concurrency_limit`. If
+    concurrency is disabled (`settings.orm_concurrency_enabled = False`), the limit
+    is effectively set to 1, forcing sequential execution.
+
+    Args:
+        prefetches: A list of `Prefetch` instances awaiting initialization.
+        model_cls: The primary model class associated with the query result set.
+        *args: Variable positional arguments (currently reserved and not used by the function).
+    """
+    if not prefetches:
+        return
+
+    limit = getattr(settings, "orm_concurrency_limit", 5)
+    enabled = getattr(settings, "orm_concurrency_enabled", True)
+    sem = anyio.Semaphore(limit) if enabled else None
+
+    async def _runner(coro: Any) -> None:
+        if sem:
+            async with sem:
+                await coro
+        else:
+            await coro
+
+    async with anyio.create_task_group() as tg:
+        for c in prefetches:
+            tg.start_soon(_runner, c)
 
 
 class Prefetch:
