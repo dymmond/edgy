@@ -12,7 +12,6 @@ from functools import cached_property, partial
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, overload
 
-import anyio
 import sqlalchemy
 from loguru import logger
 from monkay.asgi import ASGIApp, LifespanHook
@@ -24,6 +23,7 @@ from edgy.conf import settings
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
 from edgy.core.db.context_vars import CURRENT_INSTANCE, FORCE_FIELDS_NULLABLE
+from edgy.core.db.utils.concurrency import run_concurrently
 from edgy.core.utils.sync import current_eventloop, run_sync
 from edgy.types import Undefined
 
@@ -424,19 +424,7 @@ class Registry:
             ops.append(wrapper_fn())
 
         # Execute all update operations concurrently.
-        limit: int = settings.orm_registry_ops_limit if settings.orm_concurrency_enabled else 1
-        semaphore = anyio.Semaphore(limit) if limit else None
-
-        async def _run(coro: Any) -> None:
-            if semaphore:
-                async with semaphore:
-                    await coro
-            else:
-                await coro
-
-        async with anyio.create_task_group() as tg:
-            for op in ops:
-                tg.start_soon(_run, op)
+        await run_concurrently(ops, limit=settings.orm_registry_ops_limit)
 
     def extra_name_check(self, name: Any) -> bool:
         """

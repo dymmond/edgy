@@ -110,7 +110,7 @@ async def run_all(coros: Sequence[Awaitable[Any]], limit: int | None = None) -> 
     return await gather_limited([lambda c=c: c for c in coros], limit=limit)
 
 
-async def run_concurrently(coros: Sequence[Awaitable[Any]]) -> list[Any]:
+async def run_concurrently(coros: Sequence[Awaitable[Any]], limit: int | None = None) -> list[Any]:
     """
     Generic concurrent runner for Edgy ORM operations that need to be executed
     in parallel while respecting global concurrency settings.
@@ -140,9 +140,14 @@ async def run_concurrently(coros: Sequence[Awaitable[Any]]) -> list[Any]:
     if not coros:
         return []
 
-    # Read concurrency settings with defaults
-    limit: int = getattr(settings, "orm_concurrency_limit", 5)
     enabled: bool = getattr(settings, "orm_concurrency_enabled", True)
+    if not enabled:
+        return [await c for c in coros]
+
+    # Read concurrency settings with defaults
+    limit = limit if limit is not None else getattr(settings, "orm_concurrency_limit", None)
+    if limit is None or limit < 1:
+        limit = 1
 
     # Initialize semaphore if enabled; otherwise, it's None.
     sem: Semaphore | None = anyio.Semaphore(limit) if enabled else None

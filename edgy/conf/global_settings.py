@@ -138,7 +138,7 @@ class ConcurrencySettings(MediaSettings, MigrationSettings):
     complex database operations like nested data fetching.
     """
 
-    orm_concurrency_enabled: bool = False
+    orm_concurrency_enabled: bool = True
     """
     A global flag to enable or disable internal concurrency management for ORM operations.
     If set to `False`, many of the specific limits below will be ignored, and operations

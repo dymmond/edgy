@@ -11,7 +11,7 @@ from pydantic.fields import FieldInfo
 from pydantic.json_schema import SkipJsonSchema
 
 from edgy.core.db.models.mixins.dump import DumpMixin
-from edgy.core.db.utils.concurrency import run_all
+from edgy.core.db.utils.concurrency import run_concurrently
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
 from edgy.core.marshalls.metaclasses import MarshallMeta
@@ -238,7 +238,7 @@ class BaseMarshall(DumpMixin, BaseModel):
         if async_resolvers:
 
             async def _resolve() -> None:
-                await run_all(async_resolvers)
+                await run_concurrently(async_resolvers)
 
             run_sync(_resolve())  # Run all async resolvers synchronously.
         return self
