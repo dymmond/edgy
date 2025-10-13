@@ -141,35 +141,35 @@ async def run_concurrently(coros: Sequence[Awaitable[Any]], limit: int | None = 
         return []
 
     enabled: bool = getattr(settings, "orm_concurrency_enabled", True)
-    if not enabled:
-        return [await c for c in coros]
-
-    # Read concurrency settings with defaults
     limit = limit if limit is not None else getattr(settings, "orm_concurrency_limit", None)
+
+    # Determine effective concurrency limit
+    if not enabled:
+        # Just sequentially collect, no parallelism
+        results: list[Any] = []
+        for item in coros:
+            if callable(getattr(item, "__await__", None)):
+                results.append(await item)
+            else:
+                results.append(item)
+        return results
+
     if limit is None or limit < 1:
         limit = 1
 
-    # Initialize semaphore if enabled, otherwise it's None.
-    sem: Semaphore | None = anyio.Semaphore(limit) if enabled else None
+    results = [None] * len(coros)
+    sem: Semaphore = anyio.Semaphore(limit)
 
-    # Results are collected in the order of completion
-    results: list[Any] = []
+    async def _one(i: int, item: Any) -> None:
+        # Handle mixed inputs gracefully
+        async with sem:
+            if callable(getattr(item, "__await__", None)):
+                results[i] = await item
+            else:
+                results[i] = item
 
-    async def _runner(coro: Awaitable[Any]) -> None:
-        """
-        Internal worker function that executes a single coroutine, acquiring the
-        concurrency semaphore if one is present.
-        """
-        if sem:
-            async with sem:
-                results.append(await coro)
-        else:
-            results.append(await coro)
-
-    # Use a TaskGroup for efficient concurrent execution
     async with anyio.create_task_group() as tg:
-        for c in coros:
-            tg.start_soon(_runner, c)
+        for i, item in enumerate(coros):
+            tg.start_soon(_one, i, item)
 
-    # Return results collected by the _runner workers
     return results
