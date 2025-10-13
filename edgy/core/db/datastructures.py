@@ -9,7 +9,7 @@ from pydantic import ConfigDict, model_validator
 from pydantic.dataclasses import dataclass
 
 from edgy.conf import settings
-from edgy.core.db.utils.concurrency import run_concurrently
+from edgy.core.utils.concurrency import run_concurrently
 
 if sys.version_info >= (3, 11):  # pragma: no cover
     from typing import Self

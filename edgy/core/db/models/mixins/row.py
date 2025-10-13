@@ -7,7 +7,7 @@ from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
-from edgy.core.db.utils.concurrency import run_concurrently
+from edgy.core.utils.concurrency import run_concurrently
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover

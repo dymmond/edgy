@@ -23,7 +23,7 @@ from edgy.conf import settings
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
 from edgy.core.db.context_vars import CURRENT_INSTANCE, FORCE_FIELDS_NULLABLE
-from edgy.core.db.utils.concurrency import run_concurrently
+from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.sync import current_eventloop, run_sync
 from edgy.types import Undefined
 

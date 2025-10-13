@@ -13,7 +13,7 @@ from edgy.conf import settings
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.relationships.utils import RelationshipCrawlResult, crawl_relationship
-from edgy.core.db.utils.concurrency import run_concurrently
+from edgy.core.utils.concurrency import run_concurrently
 
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
@@ -122,23 +122,16 @@ async def parse_clause_args(
     if not args:
         return []
 
-    enabled: bool = getattr(settings, "orm_concurrency_enabled", True)
     limit: int | None = getattr(settings, "orm_clauses_concurrency_limit", None)
 
     # Disable concurrency if rollback is active or evaluation order matters
-    force_seq = (
-        not enabled
-        or not limit
-        or limit <= 1
-        or getattr(queryset.database, "force_rollback", False)
-        or any(hasattr(arg, "is_logical_clause") for arg in args)
+    force_seq = getattr(queryset.database, "force_rollback", False) or any(
+        hasattr(arg, "is_logical_clause") for arg in args
     )
 
     if force_seq:
-        results: list[Any] = []
-        for arg in args:
-            results.append(await parse_clause_arg(arg, queryset, tables_and_models))
-        return results
+        # serialize
+        limit = 1
 
     tasks = [parse_clause_arg(arg, queryset, tables_and_models) for arg in args]
     results = await run_concurrently(tasks, limit=limit)

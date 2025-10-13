@@ -11,10 +11,10 @@ from pydantic.fields import FieldInfo
 from pydantic.json_schema import SkipJsonSchema
 
 from edgy.core.db.models.mixins.dump import DumpMixin
-from edgy.core.db.utils.concurrency import run_concurrently
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
 from edgy.core.marshalls.metaclasses import MarshallMeta
+from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.sync import run_sync
 
 if TYPE_CHECKING:
