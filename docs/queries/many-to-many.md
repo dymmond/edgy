@@ -49,6 +49,8 @@ ManyToMany allows three different methods when using it (the same applies for th
 * `add()` - Adds a record to the ManyToMany.
 * `create()` - Create a new record and add it to the ManyToMany.
 * `remove()` - Removes a record to the ManyToMany.
+* `add_many()` - Adds multiple records to the ManyToMany.
+* `remove_many()` - Removes multiple records to the ManyToMany.
 
 Let us see how it looks by using the following example.
 
@@ -68,6 +70,39 @@ organisation = await Organisation.query.create(ident="Acme Ltd")
 # Add teams to the organisation
 await organisation.teams.add(blue_team)
 await organisation.teams.add(green_team)
+```
+
+### add_many()
+
+You can now add multiple teams to organisations, something like this.
+
+```python hl_lines="6-7"
+blue_team = await Team.query.create(name="Blue Team")
+green_team = await Team.query.create(name="Green Team")
+red_team = await Team.query.create(name="Red Team")
+organisation = await Organisation.query.create(ident="Acme Ltd")
+
+# Add teams to the organisation
+await organisation.teams.add_many([blue_team, green_team, red_team])
+```
+
+### remove_many()
+
+You can now remove multiple teams from organisations, something like this.
+
+```python hl_lines="12-13"
+blue_team = await Team.query.create(name="Blue Team")
+green_team = await Team.query.create(name="Green Team")
+red_team = await Team.query.create(name="Red Team")
+organisation = await Organisation.query.create(ident="Acme Ltd")
+
+# Add teams to organisation
+await organisation.teams.add(blue_team)
+await organisation.teams.add(green_team)
+await organisation.teams.add(red_team)
+
+# Remove the teams from the organisation
+await organisation.teams.remove_many([red_team, blue_team])
 ```
 
 #### create()

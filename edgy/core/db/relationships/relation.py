@@ -257,6 +257,27 @@ class ManyRelation(ManyRelationProtocol):
         # Create an instance of the 'to' model and then add it to the relationship.
         return await self.add(self.to(*args, **kwargs))
 
+    async def add_many(self, *children: BaseModelType) -> list[BaseModelType | None]:
+        """
+        Asynchronously adds multiple child instances to the many-to-many relationship
+        via the `through` model. This method validates each child type and
+        attempts to save the intermediate records.
+
+        Args:
+            *children (BaseModelType): Variable number of child instances to add.
+                                       Each can be an instance of the 'to' model,
+                                        'through' model, or a dictionary.
+        Returns:
+            list[BaseModelType | None]: A list of saved intermediate model instances,
+                                        or None for each record that already exists
+                                        (IntegrityError).
+        """
+        results = []
+        for child in children:
+            result = await self.add(child)
+            results.append(result)
+        return results
+
     async def add(self, child: BaseModelType) -> BaseModelType | None:
         """
         Asynchronously adds a child instance to the many-to-many relationship
@@ -291,6 +312,22 @@ class ManyRelation(ManyRelationProtocol):
         except IntegrityError:
             pass  # The record already exists.
         return None
+
+    async def remove_many(self, *children: BaseModelType) -> None:
+        """
+        Asynchronously removes multiple children from the many-to-many relationship.
+        This deletes the corresponding records in the `through` table.
+
+        Args:
+            *children (BaseModelType): Variable number of child instances to remove.
+                                       Each can be an instance of the 'to' model,
+                                        'through' model, or None (if the foreign key is unique).
+        Raises:
+            RelationshipNotFound: If no child is found or specified for removal.
+            RelationshipIncompatible: If a child type is not compatible.
+        """
+        for child in children:
+            await self.remove(child)
 
     async def remove(self, child: BaseModelType | None = None) -> None:
         """
@@ -627,6 +664,46 @@ class SingleRelation(ManyRelationProtocol):
         # Save the child, setting its foreign key to the current instance.
         await child.save(values={self.to_foreign_key: self.instance})
         return child
+
+    async def add_many(self, *children: BaseModelType) -> list[BaseModelType] | None:
+        """
+        Asynchronously adds multiple child instances to the one-to-many or
+        one-to-one relationship by updating their foreign keys.
+
+        Args:
+            *children (BaseModelType): Variable number of child instances to add.
+                                       Each can be an instance of the 'to'
+                                        model or a dictionary.
+
+        Returns:
+            list[BaseModelType] | None: A list of saved child model instances.
+
+        Raises:
+            RelationshipIncompatible: If a child type is not compatible.
+        """
+        results = []
+        for child in children:
+            result = await self.add(child)
+            results.append(result)
+        return results
+
+    async def remove_many(self, *children: BaseModelType) -> None:
+        """
+        Asynchronously removes multiple children from the one-to-many or
+        one-to-one relationship. This is typically done by setting the foreign
+        key on each child to None.
+
+        Args:
+            *children (BaseModelType): Variable number of child instances to remove.
+                                       Each can be an instance of the 'to' model
+                                       or None (if the foreign key is unique).
+
+        Raises:
+            RelationshipNotFound: If no child is found or specified for removal.
+            RelationshipIncompatible: If a child type is not compatible.
+        """
+        for child in children:
+            await self.remove(child)
 
     async def remove(self, child: BaseModelType | None = None) -> None:
         """

@@ -8,9 +8,10 @@ Django for example has the `prefetch_related` as well and Edgy has a similar app
 
 The **Edgy** way of doing it its by also calling the `prefetch_related` queryset but passing [Prefetch](#prefetch) instances and utilising the [related_name](./related-name.md) to do it so.
 
-Note:
 
-The syntax is like the django syntax. With `__` a foreign key or related name of a foreign key is traversed. Only the last part of the path must be a inversion of a foreign key (`related_name`).
+!!! Note
+    The syntax is like the django syntax. With `__` a foreign key or related name of a foreign key is traversed.
+    Only the last part of the path must be a inversion of a foreign key (`related_name`).
 
 Note:
 
@@ -142,7 +143,7 @@ What if you want to use the `queryset` parameter of the [Prefetch](#prefetch). L
 {!> ../docs_src/prefetch/second/data.py !}
 ```
 
-**You know want to queryusing the queryset**:
+**You know want to query using the queryset**:
 
 * All the tracks that belong to a specific `Company`. The tracks are associated with `albums` and `studios` **but** the `Track` will be also internally filtered.
 

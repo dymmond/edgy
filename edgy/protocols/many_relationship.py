@@ -110,3 +110,33 @@ class ManyRelationProtocol(Protocol):
                                              instances are removed. Defaults to `None`.
         """
         ...
+
+    async def add_many(self, *children: "BaseModelType") -> list["BaseModelType" | None]:
+        """
+        Asynchronously adds multiple existing related model instances to the
+        collection associated with the primary instance.
+
+        This method establishes relationships between the `instance` and the
+        provided `children` models, typically by updating foreign keys or creating
+        entries in an intermediary table for many-to-many relationships.
+
+        Parameters:
+            *children (BaseModelType): One or more existing related model instances to add.
+        """
+        ...
+
+    async def remove_many(self, *children: "BaseModelType") -> None:
+        """
+        Asynchronously removes multiple specific related model instances from
+        the association with the primary instance.
+
+        This method severs the relationships between the `instance` and the
+        provided `children` models. It should handle the necessary database
+        operations to break these associations without necessarily deleting
+        the related model records themselves (unless cascading deletes are
+        configured at the database level).
+
+        Parameters:
+            *children (BaseModelType): One or more specific related model instances to remove.
+        """
+        ...
