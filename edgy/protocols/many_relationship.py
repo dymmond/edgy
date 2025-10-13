@@ -111,7 +111,7 @@ class ManyRelationProtocol(Protocol):
         """
         ...
 
-    async def add_many(self, *children: "BaseModelType") -> list[BaseModelType | None]:
+    async def add_many(self, *children: "BaseModelType") -> list["BaseModelType"]:
         """
         Asynchronously adds multiple existing related model instances to the
         collection associated with the primary instance.
