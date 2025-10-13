@@ -32,6 +32,7 @@ from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.relationships.utils import crawl_relationship
+from edgy.core.db.utils.concurrency import run_concurrently
 from edgy.core.utils.db import CHECK_DB_CONNECTION_SILENCED, check_db_connection, hash_tablekey
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
@@ -2030,10 +2031,14 @@ class QuerySet(BaseQuerySet):
                 await database.execute_many(expression)
             self._clear_cache(keep_result_cache=True)
             if new_objs:
-                for obj in new_objs:
-                    await obj.execute_post_save_hooks(
-                        self.model_class.meta.fields.keys(), is_update=False
-                    )
+                await run_concurrently(
+                    [
+                        obj.execute_post_save_hooks(
+                            self.model_class.meta.fields.keys(), is_update=False
+                        )
+                        for obj in new_objs
+                    ]
+                )
         finally:
             CURRENT_INSTANCE.reset(token)
 
@@ -2093,8 +2098,9 @@ class QuerySet(BaseQuerySet):
                 self.model_class.meta.post_save_fields
                 and not self.model_class.meta.post_save_fields.isdisjoint(fields)
             ):
-                for obj in objs:
-                    await obj.execute_post_save_hooks(fields, is_update=True)
+                await run_concurrently(
+                    [obj.execute_post_save_hooks(fields, is_update=True) for obj in objs]
+                )
         finally:
             CURRENT_INSTANCE.reset(token)
 

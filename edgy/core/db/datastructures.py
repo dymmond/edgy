@@ -8,6 +8,9 @@ import sqlalchemy
 from pydantic import ConfigDict, model_validator
 from pydantic.dataclasses import dataclass
 
+from edgy.conf import settings
+from edgy.core.db.utils.concurrency import run_concurrently
+
 if sys.version_info >= (3, 11):  # pragma: no cover
     from typing import Self
 else:  # pragma: no cover
@@ -535,62 +538,61 @@ class QueryModelResultCache:
             model_class (type[BaseModelType]): The model class of the instances.
             row_or_models (Sequence[Any]): A sequence of database rows or model
                                            instances to process.
-            cache_fn (Callable[[Any], Awaitable[BaseModelType | None]] | None): An optional
-                                                                               asynchronous
-                                                                               function that
-                                                                               takes a row/model
-                                                                               and returns
-                                                                               a `BaseModelType`
-                                                                               instance to cache.
-                                                                               Defaults to None.
-            transform_fn (Callable[[BaseModelType | None], Awaitable[Any]] | None): An optional
-                                                                                    asynchronous
-                                                                                    function to
-                                                                                    transform the
-                                                                                    cached model
-                                                                                    instance before
-                                                                                    returning it.
-                                                                                    Defaults to None.
+            cache_fn (Callable[[Any], Awaitable[BaseModelType | None]] | None):
+                An optional asynchronous function that takes a row/model and returns
+                a `BaseModelType` instance to cache. Defaults to None.
+            transform_fn (Callable[[BaseModelType | None], Awaitable[Any]] | None):
+                An optional asynchronous function to transform the cached model
+                    instance before returning it. Defaults to None.
             prefix (str | None): The prefix for the cache category. If None, the
                                  instance's default prefix is used. Defaults to None.
             old_cache (QueryModelResultCache | None): An optional older cache instance
-                                                     to check if entries are not found
-                                                     in the current cache. Defaults to None.
+                to check if entries are not found n the current cache. Defaults to None.
 
         Returns:
             Sequence[Any]: A sequence of cached or newly created and transformed instances.
         """
-        cache_update_keys: list[tuple] = []
+        results: list[Any] = []
         cache_update: list[Any] = []
-        results: list[BaseModelType | None] = []
+        cache_update_keys: list[Any] = []
 
-        for row_or_model in row_or_models:
-            try:
-                # Attempt to create a cache key for the current row or model.
-                cache_key = self.create_cache_key(model_class, row_or_model, prefix=prefix)
-            except (AttributeError, KeyError):
-                # If key creation fails, bypass caching for this item and process it directly.
-                result = row_or_model
-                if cache_fn is not None:
-                    result = await cache_fn(row_or_model)
-                if transform_fn is not None:
-                    result = await transform_fn(result)
-                results.append(result)
-                continue
+        tasks: list[tuple[int, Any, Any]] = []  # (idx, row_or_model, cache_key)
+        for idx, row_or_model in enumerate(row_or_models):
+            if hasattr(model_class, "create_model_key_from_sqla_row"):
+                cache_key: Any = model_class.create_model_key_from_sqla_row(row_or_model)
+            else:
+                cache_key = model_class.create_model_key(row_or_model)
 
-            # Attempt to retrieve the result from the cache.
             result = self.get_for_cache_key(cache_key, prefix=prefix, old_cache=old_cache)
             if result is None and cache_fn is not None:
-                # If not found and an asynchronous cache_fn is provided, create the result.
-                result = await cache_fn(row_or_model)
-                if result is not None:
-                    # If a result is obtained, add its key and the result to the update lists.
-                    cache_update_keys.append(cache_key)
-                    if transform_fn is not None:
-                        # Apply asynchronous transformation if a transform_fn is provided.
-                        result = await transform_fn(result)
-                    cache_update.append(result)
-            results.append(result)
-        # Update the cache with any newly created entries.
-        self.update(model_class, cache_update, cache_keys=cache_update_keys, prefix=prefix)
+                tasks.append((idx, row_or_model, cache_key))
+                results.append(None)  # placeholder
+            else:
+                results.append(result)
+
+        # Compute misses concurrently
+        if tasks and cache_fn is not None:
+
+            async def _one(row_or_model: Any, ckey: Any) -> tuple[Any, Any]:
+                out = await cache_fn(row_or_model)
+                if out is not None and transform_fn is not None:
+                    out = await transform_fn(out)
+                return ckey, out
+
+            coros = [_one(row, ckey) for _, row, ckey in tasks]
+            computed = await run_concurrently(
+                coros, limit=getattr(settings, "orm_row_prefetch_limit", None)
+            )
+
+            # place results and stage cache updates
+            for (idx, _, _), (ckey, out) in zip(tasks, computed, strict=False):
+                results[idx] = out
+                if out is not None:
+                    cache_update_keys.append(ckey)
+                    cache_update.append(out)
+
+        # single cache update
+        if cache_update:
+            self.update(model_class, cache_update, cache_keys=cache_update_keys, prefix=prefix)
+
         return results
