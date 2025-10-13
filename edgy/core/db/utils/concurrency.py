@@ -149,7 +149,7 @@ async def run_concurrently(coros: Sequence[Awaitable[Any]], limit: int | None = 
     if limit is None or limit < 1:
         limit = 1
 
-    # Initialize semaphore if enabled; otherwise, it's None.
+    # Initialize semaphore if enabled, otherwise it's None.
     sem: Semaphore | None = anyio.Semaphore(limit) if enabled else None
 
     # Results are collected in the order of completion
