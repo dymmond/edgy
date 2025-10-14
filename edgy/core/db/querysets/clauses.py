@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import warnings
 from collections.abc import Iterable
 from functools import partial
@@ -10,9 +9,11 @@ from typing import TYPE_CHECKING, Any, cast
 
 import sqlalchemy
 
+from edgy.conf import settings
 from edgy.core.db.fields.base import BaseField, BaseForeignKey
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.relationships.utils import RelationshipCrawlResult, crawl_relationship
+from edgy.core.utils.concurrency import run_concurrently
 
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
@@ -118,17 +119,23 @@ async def parse_clause_args(
     Returns:
         list[Any]: A list containing the parsed results of all arguments.
     """
-    result: list[Any] = []
-    # Prepare all arguments for parsing, creating a list of awaitables.
-    for arg in args:
-        result.append(parse_clause_arg(arg, queryset, tables_and_models))
-    # Await the results based on the force_rollback flag.
-    if queryset.database.force_rollback:
-        # Await sequentially if force_rollback is enabled.
-        return [await el for el in result]
-    else:
-        # Await concurrently using asyncio.gather if force_rollback is disabled.
-        return await asyncio.gather(*result)
+    if not args:
+        return []
+
+    limit: int | None = getattr(settings, "orm_clauses_concurrency_limit", None)
+
+    # Disable concurrency if rollback is active or evaluation order matters
+    force_seq = getattr(queryset.database, "force_rollback", False) or any(
+        hasattr(arg, "is_logical_clause") for arg in args
+    )
+
+    if force_seq:
+        # serialize
+        limit = 1
+
+    tasks = [parse_clause_arg(arg, queryset, tables_and_models) for arg in args]
+    results = await run_concurrently(tasks, limit=limit)
+    return results
 
 
 def clean_query_kwargs(

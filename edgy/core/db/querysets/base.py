@@ -32,6 +32,7 @@ from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.relationships.utils import crawl_relationship
+from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import CHECK_DB_CONNECTION_SILENCED, check_db_connection, hash_tablekey
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
@@ -1048,7 +1049,7 @@ class BaseQuerySet(
             new_cache (QueryModelResultCache): The cache to store the new batch results.
 
         Returns:
-            Sequence[tuple[BaseModelType, BaseModelType]]: A sequence of tuples, each containing
+            Sequence[tuple[EdgyModel, EdgyEmbedTarget]]: A sequence of tuples, each containing
                                                             the raw model instance and the embedded target.
 
         Raises:
@@ -1070,7 +1071,7 @@ class BaseQuerySet(
                     "Cannot prefetch from other db yet. Maybe in future this feature will be added."
                 )
             if crawl_result.reverse_path is False:
-                QuerySetError(
+                raise QuerySetError(
                     detail=("Creating a reverse path is not possible, unidirectional fields used.")
                 )
             prefetch_queryset: QuerySet | None = prefetch.queryset
@@ -1094,38 +1095,33 @@ class BaseQuerySet(
                 prefetch_queryset.embed_parent = (prefetch.related_name, "")
             else:
                 # queryset is of the target model
-                prefetch_queryset = prefetch_queryset.select_related(
-                    cast(str, crawl_result.reverse_path)
-                )
+                prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
             new_prefetch = Prefetch(
                 related_name=prefetch.related_name,
                 to_attr=prefetch.to_attr,
                 queryset=prefetch_queryset,
             )
-            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=tables_and_models[''][0].key, prefix=cast(str, crawl_result.reverse_path))}_"
+            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=tables_and_models[''][0].key, prefix=crawl_result.reverse_path)}_"
             new_prefetch._is_finished = True
             _prefetch_related.append(new_prefetch)
 
-        return cast(
-            Sequence[tuple[BaseModelType, BaseModelType]],
-            await new_cache.aget_or_cache_many(
-                self.model_class,
-                batch,
-                cache_fn=lambda row: self.model_class.from_sqla_row(
-                    row,
-                    tables_and_models=tables_and_models,
-                    select_related=self._select_related,
-                    only_fields=self._only,
-                    is_defer_fields=is_defer_fields,
-                    prefetch_related=_prefetch_related,
-                    exclude_secrets=self._exclude_secrets,
-                    using_schema=self.active_schema,
-                    database=self.database,
-                    reference_select=self._reference_select,
-                ),
-                transform_fn=self._embed_parent_in_result,
-                old_cache=self._cache,
+        return await new_cache.aget_or_cache_many(
+            self.model_class,
+            batch,
+            cache_fn=lambda row: self.model_class.from_sqla_row(
+                row,
+                tables_and_models=tables_and_models,
+                select_related=self._select_related,
+                only_fields=self._only,
+                is_defer_fields=is_defer_fields,
+                prefetch_related=_prefetch_related,
+                exclude_secrets=self._exclude_secrets,
+                using_schema=self.active_schema,
+                database=self.database,
+                reference_select=self._reference_select,
             ),
+            transform_fn=self._embed_parent_in_result,
+            old_cache=self._cache,
         )
 
     @property
@@ -1857,6 +1853,8 @@ class QuerySet(BaseQuerySet):
             exclude=exclude,
             exclude_none=exclude_none,
         )
+        if not rows:
+            return []
         if not flat:
             return [tuple(row.values()) for row in rows]
         else:
@@ -2030,10 +2028,11 @@ class QuerySet(BaseQuerySet):
                 await database.execute_many(expression)
             self._clear_cache(keep_result_cache=True)
             if new_objs:
-                for obj in new_objs:
-                    await obj.execute_post_save_hooks(
-                        self.model_class.meta.fields.keys(), is_update=False
-                    )
+                keys = self.model_class.meta.fields.keys()
+                await run_concurrently(
+                    [obj.execute_post_save_hooks(keys, is_update=False) for obj in new_objs],
+                    limit=1 if getattr(queryset.database, "force_rollback", False) else None,
+                )
         finally:
             CURRENT_INSTANCE.reset(token)
 
@@ -2093,8 +2092,10 @@ class QuerySet(BaseQuerySet):
                 self.model_class.meta.post_save_fields
                 and not self.model_class.meta.post_save_fields.isdisjoint(fields)
             ):
-                for obj in objs:
-                    await obj.execute_post_save_hooks(fields, is_update=True)
+                await run_concurrently(
+                    [obj.execute_post_save_hooks(fields, is_update=True) for obj in objs],
+                    limit=1 if getattr(queryset.database, "force_rollback", False) else None,
+                )
         finally:
             CURRENT_INSTANCE.reset(token)
 
@@ -2187,10 +2188,11 @@ class QuerySet(BaseQuerySet):
                     retrieved_objs.extend(new_objs)
 
                 self._clear_cache()
-                for obj in new_objs:
-                    await obj.execute_post_save_hooks(
-                        self.model_class.meta.fields.keys(), is_update=False
-                    )
+                keys = self.model_class.meta.fields.keys()
+                await run_concurrently(
+                    [obj.execute_post_save_hooks(keys, is_update=False) for obj in new_objs],
+                    limit=1 if getattr(queryset.database, "force_rollback", False) else None,
+                )
         finally:
             CURRENT_INSTANCE.reset(token)
 

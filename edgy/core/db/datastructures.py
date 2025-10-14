@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Awaitable, Callable, Sequence
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 import sqlalchemy
 from pydantic import ConfigDict, model_validator
 from pydantic.dataclasses import dataclass
+
+from edgy.conf import settings
+from edgy.core.utils.concurrency import run_concurrently
 
 if sys.version_info >= (3, 11):  # pragma: no cover
     from typing import Self
@@ -528,55 +531,46 @@ class QueryModelResultCache:
     ) -> Sequence[Any]:
         """
         Asynchronously retrieves multiple cached entries or populates the cache
-        if entries are not found. This method is similar to `get_or_cache_many`
-        but supports asynchronous `cache_fn` and `transform_fn`.
+        if entries are not found. It processes a sequence of rows or model instances,
+        attempting to retrieve them from the cache. If an entry is not found, an
+        optional async `cache_fn` is called to create the model instance, which is then
+        cached and potentially transformed by an async `transform_fn`.
 
         Args:
             model_class (type[BaseModelType]): The model class of the instances.
             row_or_models (Sequence[Any]): A sequence of database rows or model
                                            instances to process.
-            cache_fn (Callable[[Any], Awaitable[BaseModelType | None]] | None): An optional
-                                                                               asynchronous
-                                                                               function that
-                                                                               takes a row/model
-                                                                               and returns
-                                                                               a `BaseModelType`
-                                                                               instance to cache.
-                                                                               Defaults to None.
-            transform_fn (Callable[[BaseModelType | None], Awaitable[Any]] | None): An optional
-                                                                                    asynchronous
-                                                                                    function to
-                                                                                    transform the
-                                                                                    cached model
-                                                                                    instance before
-                                                                                    returning it.
-                                                                                    Defaults to None.
+            cache_fn (Callable[[Any], Awaitable[BaseModelType | None]] | None):
+                An optional asynchronous function that takes a row/model and returns
+                a `BaseModelType` instance to cache. Defaults to None.
+            transform_fn (Callable[[BaseModelType | None], Awaitable[Any]] | None):
+                An optional asynchronous function to transform the cached model
+                instance before returning it. Defaults to None.
             prefix (str | None): The prefix for the cache category. If None, the
                                  instance's default prefix is used. Defaults to None.
-            old_cache (QueryModelResultCache | None): An optional older cache instance
-                                                     to check if entries are not found
-                                                     in the current cache. Defaults to None.
+            old_cache (QueryModelResultCache | None):
+                An optional older cache instance
+                to check if entries are not found n the current cache. Defaults to None.
 
         Returns:
             Sequence[Any]: A sequence of cached or newly created and transformed instances.
         """
-        cache_update_keys: list[tuple] = []
-        cache_update: list[Any] = []
-        results: list[BaseModelType | None] = []
+        cache_update: dict[Any, Any] = {}
+        ops: list = []
 
-        for row_or_model in row_or_models:
+        async def _helper(row_or_model: Any) -> Any:
             try:
                 # Attempt to create a cache key for the current row or model.
                 cache_key = self.create_cache_key(model_class, row_or_model, prefix=prefix)
             except (AttributeError, KeyError):
                 # If key creation fails, bypass caching for this item and process it directly.
                 result = row_or_model
+                # apply both transformations directly and skip cache
                 if cache_fn is not None:
                     result = await cache_fn(row_or_model)
                 if transform_fn is not None:
                     result = await transform_fn(result)
-                results.append(result)
-                continue
+                return result
 
             # Attempt to retrieve the result from the cache.
             result = self.get_for_cache_key(cache_key, prefix=prefix, old_cache=old_cache)
@@ -584,13 +578,23 @@ class QueryModelResultCache:
                 # If not found and an asynchronous cache_fn is provided, create the result.
                 result = await cache_fn(row_or_model)
                 if result is not None:
-                    # If a result is obtained, add its key and the result to the update lists.
-                    cache_update_keys.append(cache_key)
                     if transform_fn is not None:
                         # Apply asynchronous transformation if a transform_fn is provided.
                         result = await transform_fn(result)
-                    cache_update.append(result)
-            results.append(result)
+                    cache_update[cache_key] = result
+            return result
+
+        for row_or_model in row_or_models:
+            ops.append(_helper(row_or_model))
+
+        results: list[BaseModelType | None] = await run_concurrently(
+            ops, limit=getattr(settings, "orm_row_prefetch_limit", None)
+        )
         # Update the cache with any newly created entries.
-        self.update(model_class, cache_update, cache_keys=cache_update_keys, prefix=prefix)
+        self.update(
+            model_class,
+            cast(Sequence[Any], cache_update.values()),
+            cache_keys=cast(Sequence[tuple], cache_update.keys()),
+            prefix=prefix,
+        )
         return results

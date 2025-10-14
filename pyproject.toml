@@ -154,11 +154,9 @@ dependencies = ["ruff==0.12.2"]
 # needs docker services running
 features = ["all", "testing"]
 
-
 [tool.hatch.envs.hatch-test.env-vars]
 EDGY_TESTCLIENT_TEST_PREFIX = ""
 EDGY_TESTCLIENT_USE_EXISTING = "true"
-
 
 [tool.hatch.version]
 path = "edgy/__init__.py"

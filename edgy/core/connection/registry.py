@@ -19,9 +19,11 @@ from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
 from sqlalchemy.orm import declarative_base as sa_declarative_base
 
+from edgy.conf import settings
 from edgy.core.connection.database import Database, DatabaseURL
 from edgy.core.connection.schemas import Schema
 from edgy.core.db.context_vars import CURRENT_INSTANCE, FORCE_FIELDS_NULLABLE
+from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.sync import current_eventloop, run_sync
 from edgy.types import Undefined
 
@@ -420,7 +422,9 @@ class Registry:
                         CURRENT_INSTANCE.reset(token)  # Reset context variable.
 
             ops.append(wrapper_fn())
-        await asyncio.gather(*ops)  # Run all update operations concurrently.
+
+        # Execute all update operations concurrently.
+        await run_concurrently(ops, limit=settings.orm_registry_ops_limit)
 
     def extra_name_check(self, name: Any) -> bool:
         """

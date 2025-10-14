@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import inspect
 import sys
 from collections.abc import Awaitable
@@ -15,6 +14,7 @@ from edgy.core.db.models.mixins.dump import DumpMixin
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
 from edgy.core.marshalls.metaclasses import MarshallMeta
+from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.sync import run_sync
 
 if TYPE_CHECKING:
@@ -236,9 +236,7 @@ class BaseMarshall(DumpMixin, BaseModel):
                 setattr(self, name, value)  # Set the field value.
 
         if async_resolvers:
-            # If there are any async resolvers, run them synchronously.
-            # This blocks until all async fields are resolved.
-            run_sync(asyncio.gather(*async_resolvers))
+            run_sync(run_concurrently(async_resolvers))  # Run all async resolvers synchronously.
         return self
 
     def _get_method_value(self, name: str, instance: Model) -> Any:
