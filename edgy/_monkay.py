@@ -50,19 +50,16 @@ def create_monkay(global_dict: dict, all_var: list[str]) -> Monkay[Instance, Edg
         global_dict,
         with_extensions=True,  # Enables Monkay extensions
         with_instance=True,  # Enables instance management
-        # Dynamically sets the path to the Edgy settings module.
+        # Dynamically sets the path to the Edgy settings module (settings are enabled because of lambda).
         # It first checks the EDGY_SETTINGS_MODULE environment variable,
         # then defaults to 'edgy.conf.global_settings.EdgySettings',
-        # falling back to an empty string if neither is found.
         settings_path=lambda: os.environ.get(
             "EDGY_SETTINGS_MODULE", "edgy.conf.global_settings.EdgySettings"
-        )
-        or "",
+        ),
         settings_extensions_name="extensions",  # Name for settings extensions
         settings_preloads_name="preloads",  # Name for settings preloads
         uncached_imports={"settings"},  # Imports that should not be cached
         lazy_imports={
-            "settings": lambda: monkay.settings,  # Lazy import for application settings
             "EdgySettings": "edgy.conf.global_settings:EdgySettings",  # Edgy settings class
             "marshalls": lambda: import_module(
                 "edgy.core.marshalls"
@@ -78,6 +75,11 @@ def create_monkay(global_dict: dict, all_var: list[str]) -> Monkay[Instance, Edg
             "Index": "edgy.core.db.datastructures:Index",  # Index class
         },
         deprecated_lazy_imports={
+            "settings": {
+                "path": lambda: monkay.settings,
+                "reason": "Use the monkay based system instead.",
+                "new_attribute": "monkay.settings",
+            },
             "Migrate": {
                 "path": "edgy.cli.base:Migrate",
                 "reason": "Use the monkay based system instead.",

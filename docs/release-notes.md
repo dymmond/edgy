@@ -13,6 +13,10 @@ hide:
 - [add_many()](./queries/many-to-many.md#add_many) to ManyToManyField for adding multiple relations at once.
 - [remove_many()](./queries/many-to-many.md#remove_many) to ManyToManyField for removing multiple relations at once.
 
+### Changed
+
+- Deprecate `edgy.settings`, code should use `edgy.monkay.settings` instead.
+
 ## 0.34.0
 
 ### Changed
