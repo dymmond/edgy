@@ -16,7 +16,7 @@ hide:
 
 ### Changed
 
-- Don't autoimport models with `in_admin=False`.
+- Don't autoimport models which are excluded from admin.
 
 ### Fixed
 
