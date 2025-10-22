@@ -1,7 +1,9 @@
 import os
 import sys
 import typing
+from contextlib import nullcontext
 
+from monkay.asgi import Lifespan
 from sayer import error
 
 from edgy import Registry
@@ -26,26 +28,21 @@ def get_ptpython(app: typing.Any, registry: Registry, options: typing.Any = None
     try:
         from ptpython.repl import embed, run_config
 
-        def run_ptpython() -> None:
+        async def run_ptpython() -> None:
             history_filename = os.path.expanduser("~/.ptpython_history")
 
             config_file = os.path.expanduser(settings.ptpython_config_file)
-            with registry.with_async_env():
+            ctx = nullcontext() if app is None else Lifespan(app)
+            async with ctx, registry:
                 # we need an initialized registry first to detect reflected models
                 imported_objects = import_objects(app, registry)
-                if not os.path.exists(config_file):
-                    embed(
-                        globals=imported_objects,
-                        history_filename=history_filename,
-                        vi_mode=vi_mode(),
-                    )
-                else:
-                    embed(
-                        globals=imported_objects,
-                        history_filename=history_filename,
-                        vi_mode=vi_mode(),
-                        configure=run_config,
-                    )
+                await embed(
+                    globals=imported_objects,
+                    history_filename=history_filename,
+                    vi_mode=vi_mode(),
+                    configure=run_config if os.path.exists(config_file) else None,
+                    return_asyncio_coroutine=True,
+                )
 
     except ImportError:
         error("You must have ptpython installed to run this. Run `pip install ptpython`.")

@@ -704,6 +704,7 @@ class Registry:
         update_only: bool = False,
         multi_schema: bool | re.Pattern | str = False,
         ignore_schema_pattern: re.Pattern | str | None = "information_schema",
+        _schemes_tree: dict[str | None, tuple[str, sqlalchemy.MetaData, list[str]]] | None = None,
     ) -> None:
         """
         Refreshes the SQLAlchemy MetaData objects associated with the models
@@ -728,9 +729,10 @@ class Registry:
         maindatabase_url = str(self.database.url)
         # Determine schemes to process based on multi_schema setting.
         if multi_schema is not False:
+            if _schemes_tree is None:
+                _schemes_tree = run_sync(self.schema.get_schemes_tree(no_reflect=True))
             schemes_tree: dict[str, tuple[str | None, list[str]]] = {
-                v[0]: (key, v[2])
-                for key, v in run_sync(self.schema.get_schemes_tree(no_reflect=True)).items()
+                v[0]: (key, v[2]) for key, v in _schemes_tree.items()
             }
         else:
             schemes_tree = {
@@ -783,6 +785,41 @@ class Registry:
             for model_class in self.reflected.values():
                 model_class._table = None
                 model_class._db_schemas = {}
+
+    async def arefresh_metadata(
+        self,
+        *,
+        update_only: bool = False,
+        multi_schema: bool | re.Pattern | str = False,
+        ignore_schema_pattern: re.Pattern | str | None = "information_schema",
+    ) -> None:
+        """
+        Refreshes the SQLAlchemy MetaData objects associated with the models
+        in the registry. This is crucial for ensuring that table definitions
+        are up-to-date, especially in multi-schema or dynamic reflection scenarios.
+
+        Args:
+            update_only (bool): If True, only updates existing table definitions
+                                without clearing the metadata first. Defaults to
+                                False.
+            multi_schema (bool | re.Pattern | str): If True, enables multi-schema
+                reflection based on detected schemas. Can also be a regex pattern
+                or string to match specific schemas. Defaults to False.
+            ignore_schema_pattern (re.Pattern | str | None): A regex pattern
+                or string to ignore certain schemas during multi-schema reflection.
+                Defaults to "information_schema".
+
+        Difference to refresh_metadata: if multi_schema is in use, don't use a second loop
+        """
+        _schemes_tree = (
+            None if multi_schema is False else await self.schema.get_schemes_tree(no_reflect=True)
+        )
+        self.refresh_metadata(
+            update_only=update_only,
+            multi_schema=multi_schema,
+            ignore_schema_pattern=ignore_schema_pattern,
+            _schemes_tree=_schemes_tree,
+        )
 
     def register_callback(
         self,
@@ -1212,7 +1249,7 @@ class Registry:
         """
         # Refresh metadata to avoid old references to non-existing tables/fks.
         if refresh_metadata:
-            self.refresh_metadata(multi_schema=True)
+            await self.arefresh_metadata(multi_schema=True)
         # create schema (if required), create model tables
         await self.schema.create_schema(
             self.db_schema,
