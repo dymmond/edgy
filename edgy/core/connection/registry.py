@@ -9,6 +9,7 @@ from collections.abc import Callable, Container, Generator, Iterable, Mapping, S
 from contextlib import AsyncExitStack
 from copy import copy as shallow_copy
 from functools import cached_property, partial
+from itertools import chain
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, overload
 
@@ -736,7 +737,9 @@ class Registry:
             }
         else:
             schemes_tree = {
+                # main db with db_schema
                 maindatabase_url: (None, [self.db_schema]),
+                # extra dbs without
                 **{str(v.url): (k, [None]) for k, v in self.extra.items()},
             }
 
@@ -746,16 +749,23 @@ class Registry:
         if isinstance(ignore_schema_pattern, str):
             ignore_schema_pattern = re.compile(ignore_schema_pattern)
 
-        # Iterate through all registered models.
-        for model_class in self.models.values():
-            if not update_only:
+        # clear data
+        if not update_only:
+            for model_class in chain(
+                self.tenant_models.values(), self.models.values(), self.reflected.values()
+            ):
                 model_class._table = None  # Clear cached table.
                 model_class._db_schemas = {}  # Clear cached db schemas.
+        db_schema = self.db_schema or ""
+        # Iterate through all registered models.
+        # In case of models which double as tenant models, we check the regular case
+        for model_class in self.models.values():
             url = str(model_class.database.url)
             if url in schemes_tree:
                 extra_key, schemes = schemes_tree[url]
                 for schema in schemes:
                     if multi_schema is not False:
+                        assert schema is not None
                         # Skip if multi_schema is enabled but pattern doesn't match.
                         if multi_schema is not True and multi_schema.match(schema) is None:
                             continue
@@ -765,26 +775,46 @@ class Registry:
                             and ignore_schema_pattern.match(schema) is not None
                         ):
                             continue
-                        # Handle tenant models and explicit schema usage.
-                        if not getattr(model_class.meta, "is_tenant", False):
-                            if (
-                                model_class.__using_schema__ is Undefined
-                                or model_class.__using_schema__ is None
-                            ):
-                                if schema != "":
-                                    continue
-                            elif model_class.__using_schema__ != schema:
+                        # Handle model schemes
+                        # Case 1: no schema defined
+                        if (
+                            model_class.__using_schema__ is Undefined
+                            or model_class.__using_schema__ is None
+                        ):
+                            # if not main schema, continue
+                            if schema != db_schema:
                                 continue
+                        elif model_class.__using_schema__ != schema:
+                            # Case 2: non-matching schema, continue
+                            continue
+
                     # Initialize table schema for the model.
                     model_class.table_schema(
                         schema=schema, metadata=self.metadata_by_url[url], update_cache=True
                     )
+                    break
 
-        # Clear caches when not just updating
-        if not update_only:
-            for model_class in self.reflected.values():
-                model_class._table = None
-                model_class._db_schemas = {}
+        # Iterate through all registered tenant models (not necessarily in models).
+        for model_class in self.tenant_models.values():
+            url = str(model_class.database.url)
+            if url in schemes_tree:
+                extra_key, schemes = schemes_tree[url]
+                for schema in schemes:
+                    if multi_schema is not False:
+                        assert schema is not None
+                        # Skip if multi_schema is enabled but pattern doesn't match.
+                        if multi_schema is not True and multi_schema.match(schema) is None:
+                            continue
+                        # Skip if schema matches ignore pattern.
+                        if (
+                            ignore_schema_pattern is not None
+                            and ignore_schema_pattern.match(schema) is not None
+                        ):
+                            continue
+                    # Initialize table schema for the model.
+                    model_class.table_schema(
+                        schema=schema, metadata=self.metadata_by_url[url], update_cache=True
+                    )
 
     async def arefresh_metadata(
         self,
