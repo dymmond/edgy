@@ -758,6 +758,7 @@ class Registry:
                 model_class._db_schemas = {}  # Clear cached db schemas.
         db_schema = self.db_schema or ""
         # Iterate through all registered models.
+        # In case of models which double as tenant models, we check the regular case
         for model_class in self.models.values():
             url = str(model_class.database.url)
             if url in schemes_tree:
