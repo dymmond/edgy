@@ -427,7 +427,7 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         # Create the 'through' model using `create_edgy_model`.
         through_model = create_edgy_model(
             __name__=class_name,
-            __module__=self.__module__,
+            __module__=BaseManyToManyForeignKeyField.__module__,
             __definitions__=fields,
             __metadata__=new_meta,
             __bases__=__bases__,
