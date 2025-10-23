@@ -2,7 +2,7 @@ from enum import Enum
 from warnings import warn
 
 warn(
-    "This module is deprecated. Use `esmerald.conf.EnvironmentType` instead when using Esmerald "
+    "This module is deprecated. Use `ravyn.conf.EnvironmentType` instead when using Ravyn "
     "or define otherwise your own EnvironmentType.",
     DeprecationWarning,
     stacklevel=2,
