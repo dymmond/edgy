@@ -16,7 +16,7 @@ jobs:
     runs-on: "ubuntu-latest"
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     services:
       postgres:
         image: postgres:16
@@ -47,7 +47,7 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: "actions/checkout@v4"
+      - uses: "actions/checkout@v5"
       - uses: "dorny/paths-filter@v3"
         id: filters
         with:
@@ -63,19 +63,15 @@ jobs:
               - 'pyproject.toml'
             workflows:
               - '.github/workflows/**'
-      - uses: "actions/setup-python@v5"
+      - id: python
+        uses: "actions/setup-python@v6"
         with:
           python-version: "${{ matrix.python-version }}"
           allow-prereleases: true
-      - uses: actions/cache@v4
-        id: cache
-        with:
-          path: ${{ env.pythonLocation }}
-          key: ${{ runner.os }}-python-${{ env.pythonLocation }}-${{ hashFiles('pyproject.toml') }}-test-v02
+          cache: pip
       - name: "Install dependencies"
-        if: steps.cache.outputs.cache-hit != 'true'
+        if: steps.python.outputs.cache-hit != 'true'
         run: |
-          pip install click==8.2.2
           pip install hatch
       - name: "Run linting"
         if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true'
