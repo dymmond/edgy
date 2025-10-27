@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import inspect
+import logging
 import sys
 from collections.abc import Callable, Generator
 from typing import Any
 
 import sqlalchemy
-from loguru import logger
 from monkay import load
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql import schema, sqltypes
 
 import edgy
 from edgy import Database, run_sync
+
+logger = logging.getLogger(__name__)
 
 # Mapping of SQLAlchemy generic types to their corresponding Edgy field types.
 # This dictionary is crucial for translating database schema types into

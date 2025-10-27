@@ -7,7 +7,6 @@ from monkay import load
 from pydantic._internal._model_construction import ModelMetaclass
 
 from edgy.core.db import models
-from edgy.core.db.models.metaclasses import handle_annotations
 from edgy.core.marshalls.config import ConfigMarshall
 from edgy.core.marshalls.fields import BaseMarshallField
 from edgy.core.utils.functional import extract_field_annotations_and_defaults
@@ -194,10 +193,6 @@ class MarshallMeta(ModelMetaclass):
 
         # Add the determined base marshall model fields.
         model_fields_on_class.update(base_marshall_model_fields)
-
-        # Handle annotations for the marshall class.
-        annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
-        marshall_class.__init_annotations__ = annotations
 
         # Set metaclass-level attributes on the marshall class.
         marshall_class.__show_pk__ = show_pk

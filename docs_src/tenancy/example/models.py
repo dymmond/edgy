@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Type, Union
 
 import sqlalchemy
-from loguru import logger
+import logging
 
 import edgy
 from edgy.core.db.models.model import Model
@@ -10,6 +10,7 @@ from edgy.testclient import DatabaseTestClient as Database
 
 database = Database("<YOUR-CONNECTION-STRING>")
 registry = edgy.Registry(database=database)
+logger = logging.getLogger(__name__)
 
 
 class Tenant(edgy.Model):
@@ -45,7 +46,10 @@ class Tenant(edgy.Model):
                     await connection.run_sync(table.create)
                 await registry.engine.dispose()
             except Exception as e:
-                logger.error(str(e))
+                logger.error(
+                    f"Failed creating table '{model.meta.tablename}' for schema: '{schema}'",
+                    exc_info=e,
+                )
 
     async def create_schema(self) -> None:
         await registry.schema.create_schema(self.schema_name)

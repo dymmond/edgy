@@ -43,7 +43,6 @@ dependencies = [
     "orjson>=3.6.1",
     "alembic>=1.11.3,<2.0.0",
     "databasez>=0.10.3",
-    "loguru>=0.7.0,<0.10.0",
     "pydantic[email]>=2.5.3,<3.0.0",
     "pydantic-settings>=2.0.0,<3.0.0",
     "sayer>=0.7.0",

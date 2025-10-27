@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import copy
 import inspect
+import sys
 import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
@@ -45,6 +46,18 @@ _empty_dict: dict[str, Any] = {}
 _empty_set: frozenset[Any] = frozenset()
 
 _seen_table_names: ContextVar[set[str]] = ContextVar("_seen_table_names", default=None)
+
+if sys.version_info >= (3, 14):  # pragma: no cover
+    from annotationlib import get_annotations
+
+    def _get_annotations(obj: type) -> dict[str, Any]:
+        return get_annotations(obj, eval_str=False)
+
+
+else:  # pragma: no cover
+
+    def _get_annotations(obj: type) -> dict[str, Any]:
+        return inspect.get_annotations(obj, eval_str=False)
 
 
 class Fields(UserDict, dict[str, BaseFieldType]):
@@ -811,46 +824,12 @@ def get_model_registry(
     )
 
 
-def _handle_annotations(base: type, base_annotations: dict[str, Any]) -> None:
-    """
-    Recursively handles and updates annotations from base classes into `base_annotations`.
-
-    Args:
-        base: The current base class being processed.
-        base_annotations: The dictionary to accumulate annotations.
-    """
-    for parent in base.__mro__[1:]:
-        _handle_annotations(parent, base_annotations)
-    if hasattr(base, "__init_annotations__") and base.__init_annotations__:
-        base_annotations.update(base.__init_annotations__)
-    elif hasattr(base, "__annotations__") and base.__annotations__:
-        base_annotations.update(inspect.get_annotations(base, eval_str=False))
-
-
-def handle_annotations(
-    bases: tuple[type, ...], base_annotations: dict[str, Any], attrs: Any
-) -> dict[str, Any]:
-    """
-    Handles and copies annotations for initialisation, merging annotations from
-    base classes and the current class attributes.
-
-    Args:
-        bases: A tuple of base classes.
-        base_annotations: A dictionary to store annotations from base classes.
-        attrs: The attributes of the current class being created.
-
-    Returns:
-        A dictionary containing the combined annotations.
-    """
-    for base in bases:
-        _handle_annotations(base, base_annotations)
-
-    annotations: dict[str, Any] = (
-        copy.copy(attrs["__init_annotations__"])
-        if "__init_annotations__" in attrs
-        else copy.copy(attrs["__annotations__"])
-    )
-    annotations.update(base_annotations)
+def find_all_annotations(obj: type) -> dict[str, Any]:
+    """Extract all annotations"""
+    annotations: dict[str, Any] = {}
+    for parent in obj.__mro__[1:]:
+        annotations.update(_get_annotations(parent))
+    annotations.update(_get_annotations(obj))
     return annotations
 
 
@@ -1140,12 +1119,12 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                 exclude=True, name="pk", inherit=False, no_copy=True
             )
 
-        # Handle annotations
-        annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
+        new_class = cast(type["Model"], super().__new__(cls, name, bases, attrs, **kwargs))
 
-        for k, _ in meta.managers.items():
-            if annotations:
-                if k not in annotations:
+        found_annotations = find_all_annotations(new_class)
+        if found_annotations:
+            for k, _ in meta.managers.items():
+                if k not in found_annotations:
                     raise ImproperlyConfigured(
                         f"Managers must be type annotated and '{k}' is not annotated. Managers "
                         "must be annotated with ClassVar."
@@ -1153,15 +1132,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                 # evaluate annotation which can be a string reference.
                 # because we really import ClassVar to check against it is safe to assume a
                 # ClassVar is available.
-                if isinstance(annotations[k], str):
-                    annotations[k] = eval(annotations[k])
-                if get_origin(annotations[k]) is not ClassVar:
+                if not found_annotations[k].startswith("ClassVar["):
                     raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
-
-        # Ensure the initialization is only performed for subclasses of EdgyBaseModel
-        attrs["__init_annotations__"] = annotations
-
-        new_class = cast(type["Model"], super().__new__(cls, name, bases, attrs, **kwargs))
         meta.model = new_class
         # Ensure initialization is only performed for subclasses of edgy.Model
         # (excluding the edgy.Model class itself).

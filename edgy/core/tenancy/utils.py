@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import logging
 import warnings
 from typing import TYPE_CHECKING
 
 import sqlalchemy
-from loguru import logger
 
 from edgy.core.terminal import Terminal
 from edgy.exceptions import ModelSchemaError
 
+logger = logging.getLogger(__name__)
 terminal = Terminal()
 
 if TYPE_CHECKING:
@@ -42,7 +43,7 @@ async def create_tables(
             async with registry.database as database:
                 await database.run_sync(table.create)
         except Exception as e:
-            logger.error(str(e))
+            logger.error("Failed creating table", exc_info=e)
             ...
 
 

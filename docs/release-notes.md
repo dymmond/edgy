@@ -6,6 +6,16 @@ hide:
 
 # Release Notes
 
+## 0.34.2
+
+### Changed
+
+- Remove `loguru` dependency.
+
+### Fixed
+
+- Fix `auto_create_schema` and `auto_drop_schema` of `TenantMixin` which were not used at all.
+
 ## 0.34.1
 
 ### Added
