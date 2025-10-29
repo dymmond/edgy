@@ -15,6 +15,11 @@ hide:
 ### Fixed
 
 - Fix `auto_create_schema` and `auto_drop_schema` of `TenantMixin` which were not used at all.
+- Fix python 3.14 compatibility.
+
+### Removed
+
+- `handle_annotations` it breaks horrible on python 3.14 and there are better ways.
 
 ## 0.34.1
 

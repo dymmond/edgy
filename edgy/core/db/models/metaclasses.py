@@ -3,7 +3,6 @@ from __future__ import annotations
 import contextlib
 import copy
 import inspect
-import sys
 import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
@@ -12,10 +11,8 @@ from contextvars import ContextVar
 from typing import (
     TYPE_CHECKING,
     Any,
-    ClassVar,
     Literal,
     cast,
-    get_origin,
 )
 
 import sqlalchemy
@@ -46,18 +43,6 @@ _empty_dict: dict[str, Any] = {}
 _empty_set: frozenset[Any] = frozenset()
 
 _seen_table_names: ContextVar[set[str]] = ContextVar("_seen_table_names", default=None)
-
-if sys.version_info >= (3, 14):  # pragma: no cover
-    from annotationlib import get_annotations
-
-    def _get_annotations(obj: type) -> dict[str, Any]:
-        return get_annotations(obj, eval_str=False)
-
-
-else:  # pragma: no cover
-
-    def _get_annotations(obj: type) -> dict[str, Any]:
-        return inspect.get_annotations(obj, eval_str=False)
 
 
 class Fields(UserDict, dict[str, BaseFieldType]):
@@ -824,15 +809,6 @@ def get_model_registry(
     )
 
 
-def find_all_annotations(obj: type) -> dict[str, Any]:
-    """Extract all annotations"""
-    annotations: dict[str, Any] = {}
-    for parent in obj.__mro__[1:]:
-        annotations.update(_get_annotations(parent))
-    annotations.update(_get_annotations(obj))
-    return annotations
-
-
 _occluded_sentinel = object()
 
 
@@ -1002,7 +978,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         fields: dict[str, BaseFieldType] = {}
         managers: dict[str, BaseManager] = {}
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
-        base_annotations: dict[str, Any] = {}
         has_explicit_primary_key = False
         is_abstract: bool = getattr(meta_class, "abstract", False)
         has_parents = any(isinstance(parent, BaseModelMeta) for parent in bases)
@@ -1121,19 +1096,13 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
 
         new_class = cast(type["Model"], super().__new__(cls, name, bases, attrs, **kwargs))
 
-        found_annotations = find_all_annotations(new_class)
-        if found_annotations:
-            for k, _ in meta.managers.items():
-                if k not in found_annotations:
-                    raise ImproperlyConfigured(
-                        f"Managers must be type annotated and '{k}' is not annotated. Managers "
-                        "must be annotated with ClassVar."
-                    )
-                # evaluate annotation which can be a string reference.
-                # because we really import ClassVar to check against it is safe to assume a
-                # ClassVar is available.
-                if not found_annotations[k].startswith("ClassVar["):
-                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
+        for k, _ in meta.managers.items():
+            # reuse the var of pydantic
+            if k not in new_class.__class_vars__:
+                raise ImproperlyConfigured(
+                    f"Managers must be ClassVar type annotated and '{k}' "
+                    "is not or not correctly annotated."
+                )
         meta.model = new_class
         # Ensure initialization is only performed for subclasses of edgy.Model
         # (excluding the edgy.Model class itself).

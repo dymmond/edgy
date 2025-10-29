@@ -54,7 +54,6 @@ class MarshallMeta(ModelMetaclass):
 
     def __new__(cls, name: str, bases: tuple[type, ...], attrs: dict[str, Any]) -> Any:
         # Initialize variables.
-        base_annotations: dict[str, Any] = {}
         show_pk: bool = False
         # Pop 'marshall_config' from attrs; it's a metaclass-level configuration.
         marshall_config: ConfigMarshall | None = attrs.pop("marshall_config", None)

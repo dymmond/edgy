@@ -57,7 +57,9 @@ class _EmptyClass: ...
 
 
 _removed_copy_keys = {
-    *BaseModel.__dict__.keys(),
+    # remove pydantic specific attrs from copying
+    *(k for k in BaseModel.__dict__ if k not in _EmptyClass.__dict__),
+    # remove extra
     "_db_loaded",
     "_db_deleted",
     "_pkcolumns",
@@ -67,9 +69,6 @@ _removed_copy_keys = {
     "meta",
     "transaction",
 }
-_removed_copy_keys.difference_update(
-    {*_EmptyClass.__dict__.keys(), "__annotations__", "__module__"}
-)
 
 
 def _check_replace_related_field(
