@@ -1,19 +1,19 @@
 from __future__ import annotations
 
+import logging
 import uuid
 import warnings
 from datetime import date
-from typing import Any, cast
+from typing import Any, ClassVar, cast
 from uuid import UUID
 
-from loguru import logger
-
 import edgy
-from edgy import settings
 from edgy.core.db.models.model import Model
 from edgy.core.db.models.utils import get_model
 from edgy.core.utils.db import check_db_connection
 from edgy.exceptions import ModelSchemaError, ObjectNotFound
+
+logger = logging.getLogger(__name__)
 
 
 class TenantMixin(edgy.Model):
@@ -28,14 +28,15 @@ class TenantMixin(edgy.Model):
     """
 
     schema_name: str = edgy.CharField(max_length=63, unique=True, index=True)
-    domain_url: str = edgy.URLField(null=True, default=settings.domain, max_length=2048)
+    domain_url: str = edgy.URLField(
+        null=True, default=lambda: edgy.monkay.settings.domain, max_length=2048
+    )
     tenant_name: str = edgy.CharField(max_length=100, unique=True, null=False)
     tenant_uuid: UUID = edgy.UUIDField(default=uuid.uuid4, null=False)
     paid_until: date = edgy.DateField(null=True)
     on_trial: bool = edgy.BooleanField(null=True)
     created_on: date = edgy.DateField(auto_now_add=True)
 
-    auto_create_schema: bool = getattr(settings, "auto_create_schema", True)
     """
     Controls whether the database schema for this tenant is automatically
     created and synchronized upon saving the tenant record.
@@ -43,7 +44,7 @@ class TenantMixin(edgy.Model):
     Set this flag to `False` on a parent class if you don't want the schema
     to be automatically generated for inherited tenant models.
     """
-    auto_drop_schema: bool = getattr(settings, "auto_drop_schema", False)
+    auto_create_schema: ClassVar[bool | None] = None
     """
     **Use with caution!**
 
@@ -52,6 +53,7 @@ class TenantMixin(edgy.Model):
     Ensure you understand the implications before enabling this flag in
     production environments.
     """
+    auto_drop_schema: ClassVar[bool | None] = None
 
     class Meta:
         abstract = True
@@ -117,11 +119,11 @@ class TenantMixin(edgy.Model):
         # Prevent saving to the default public schema or an existing registry schema.
         if (
             not schema_name
-            or schema_name.lower() == settings.tenant_schema_default.lower()
+            or schema_name.lower() == edgy.monkay.settings.tenant_schema_default.lower()
             or schema_name == registry.db_schema
         ):
             current_schema = (
-                settings.tenant_schema_default.lower()
+                edgy.monkay.settings.tenant_schema_default.lower()
                 if not registry.db_schema
                 else registry.db_schema
             )
@@ -132,23 +134,28 @@ class TenantMixin(edgy.Model):
 
         # Save the tenant record using the parent's `real_save` method.
         tenant = await super().real_save(force_insert, values)
-        try:
-            # Attempt to create the database schema for the new tenant.
-            # `if_not_exists=True` prevents errors if the schema already exists.
-            # `init_tenant_models=True` ensures that tenant-specific models are
-            # migrated into this new schema.
-            # `update_cache=False` prevents caching issues during schema creation.
-            await registry.schema.create_schema(
-                schema=tenant.schema_name,
-                if_not_exists=True,
-                init_tenant_models=True,
-                update_cache=False,
-            )
-        except Exception as e:
-            # If schema creation fails, log the error and roll back by deleting the tenant record.
-            message = f"Rolling back... {str(e)}"
-            logger.error(message)
-            await self.delete()
+        if (
+            self.auto_create_schema
+            if self.auto_create_schema is not None
+            else edgy.monkay.settings.auto_create_schema
+        ):
+            try:
+                # Attempt to create the database schema for the new tenant.
+                # `if_not_exists=True` prevents errors if the schema already exists.
+                # `init_tenant_models=True` ensures that tenant-specific models are
+                # migrated into this new schema.
+                # `update_cache=False` prevents caching issues during schema creation.
+                await registry.schema.create_schema(
+                    schema=tenant.schema_name,
+                    if_not_exists=True,
+                    init_tenant_models=True,
+                    update_cache=False,
+                )
+            except Exception as e:
+                # If schema creation fails, log the error and roll back by deleting the tenant record.
+                message = "Rolling back..."
+                logger.error(message, exc_info=e)
+                await self.delete()
         return tenant
 
     async def delete(self, force_drop: bool = False) -> None:
@@ -168,7 +175,7 @@ class TenantMixin(edgy.Model):
             ValueError: If an attempt is made to drop the public schema.
         """
         # Prevent deletion of the default public schema.
-        if self.schema_name == settings.tenant_schema_default:
+        if self.schema_name == edgy.monkay.settings.tenant_schema_default:
             raise ValueError("Cannot drop public schema.")
 
         registry = self.meta.registry
@@ -178,7 +185,14 @@ class TenantMixin(edgy.Model):
         # Drop the associated database schema.
         # `cascade=True` ensures all objects within the schema are also dropped.
         # `if_exists=True` prevents errors if the schema does not exist.
-        await registry.schema.drop_schema(schema=self.schema_name, cascade=True, if_exists=True)
+        if force_drop or (
+            self.auto_drop_schema
+            if self.auto_drop_schema is not None
+            else edgy.monkay.settings.auto_drop_schema
+        ):
+            await registry.schema.drop_schema(
+                schema=self.schema_name, cascade=True, if_exists=True
+            )
         # Call the parent's delete method to remove the tenant record from the database.
         await super().delete()
 
@@ -193,7 +207,9 @@ class DomainMixin(edgy.Model):
     """
 
     domain: str = edgy.CharField(max_length=253, unique=True, db_index=True)
-    tenant: Any = edgy.ForeignKey(settings.tenant_model, index=True, related_name="domains")
+    tenant: Any = edgy.ForeignKey(
+        edgy.monkay.settings.tenant_model, index=True, related_name="domains"
+    )
     is_primary: bool = edgy.BooleanField(default=True, index=True)
 
     class Meta:
@@ -280,8 +296,8 @@ class DomainMixin(edgy.Model):
 
         # Prevent deletion of the default public domain.
         if (
-            tenant.schema_name.lower() == settings.tenant_schema_default.lower()
-            and self.domain == settings.domain_name
+            tenant.schema_name.lower() == edgy.monkay.settings.tenant_schema_default.lower()
+            and self.domain == edgy.monkay.settings.domain_name
         ):
             raise ValueError("Cannot drop public domain.")
 
@@ -300,12 +316,12 @@ class TenantUserMixin(edgy.Model):
     """
 
     user: Any = edgy.ForeignKey(
-        settings.auth_user_model,
+        edgy.monkay.settings.auth_user_model,
         null=False,
         related_name="tenant_user_users",
     )
     tenant: Any = edgy.ForeignKey(
-        settings.tenant_model,
+        edgy.monkay.settings.tenant_model,
         null=False,
         related_name="tenant_users_tenant",
     )

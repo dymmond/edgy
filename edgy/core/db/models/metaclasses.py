@@ -11,10 +11,8 @@ from contextvars import ContextVar
 from typing import (
     TYPE_CHECKING,
     Any,
-    ClassVar,
     Literal,
     cast,
-    get_origin,
 )
 
 import sqlalchemy
@@ -811,49 +809,6 @@ def get_model_registry(
     )
 
 
-def _handle_annotations(base: type, base_annotations: dict[str, Any]) -> None:
-    """
-    Recursively handles and updates annotations from base classes into `base_annotations`.
-
-    Args:
-        base: The current base class being processed.
-        base_annotations: The dictionary to accumulate annotations.
-    """
-    for parent in base.__mro__[1:]:
-        _handle_annotations(parent, base_annotations)
-    if hasattr(base, "__init_annotations__") and base.__init_annotations__:
-        base_annotations.update(base.__init_annotations__)
-    elif hasattr(base, "__annotations__") and base.__annotations__:
-        base_annotations.update(inspect.get_annotations(base, eval_str=False))
-
-
-def handle_annotations(
-    bases: tuple[type, ...], base_annotations: dict[str, Any], attrs: Any
-) -> dict[str, Any]:
-    """
-    Handles and copies annotations for initialisation, merging annotations from
-    base classes and the current class attributes.
-
-    Args:
-        bases: A tuple of base classes.
-        base_annotations: A dictionary to store annotations from base classes.
-        attrs: The attributes of the current class being created.
-
-    Returns:
-        A dictionary containing the combined annotations.
-    """
-    for base in bases:
-        _handle_annotations(base, base_annotations)
-
-    annotations: dict[str, Any] = (
-        copy.copy(attrs["__init_annotations__"])
-        if "__init_annotations__" in attrs
-        else copy.copy(attrs["__annotations__"])
-    )
-    annotations.update(base_annotations)
-    return annotations
-
-
 _occluded_sentinel = object()
 
 
@@ -1023,7 +978,6 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         fields: dict[str, BaseFieldType] = {}
         managers: dict[str, BaseManager] = {}
         meta_class: object = attrs.get("Meta", type("Meta", (), {}))
-        base_annotations: dict[str, Any] = {}
         has_explicit_primary_key = False
         is_abstract: bool = getattr(meta_class, "abstract", False)
         has_parents = any(isinstance(parent, BaseModelMeta) for parent in bases)
@@ -1140,28 +1094,15 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                 exclude=True, name="pk", inherit=False, no_copy=True
             )
 
-        # Handle annotations
-        annotations: dict[str, Any] = handle_annotations(bases, base_annotations, attrs)
+        new_class = cast(type["Model"], super().__new__(cls, name, bases, attrs, **kwargs))
 
         for k, _ in meta.managers.items():
-            if annotations:
-                if k not in annotations:
-                    raise ImproperlyConfigured(
-                        f"Managers must be type annotated and '{k}' is not annotated. Managers "
-                        "must be annotated with ClassVar."
-                    )
-                # evaluate annotation which can be a string reference.
-                # because we really import ClassVar to check against it is safe to assume a
-                # ClassVar is available.
-                if isinstance(annotations[k], str):
-                    annotations[k] = eval(annotations[k])
-                if get_origin(annotations[k]) is not ClassVar:
-                    raise ImproperlyConfigured("Managers must be ClassVar type annotated.")
-
-        # Ensure the initialization is only performed for subclasses of EdgyBaseModel
-        attrs["__init_annotations__"] = annotations
-
-        new_class = cast(type["Model"], super().__new__(cls, name, bases, attrs, **kwargs))
+            # reuse the var of pydantic
+            if k not in new_class.__class_vars__:
+                raise ImproperlyConfigured(
+                    f"Managers must be ClassVar type annotated and '{k}' "
+                    "is not or not correctly annotated."
+                )
         meta.model = new_class
         # Ensure initialization is only performed for subclasses of edgy.Model
         # (excluding the edgy.Model class itself).

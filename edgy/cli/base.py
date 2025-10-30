@@ -45,7 +45,7 @@ class Config(AlembicConfig):
         args: typing.Sequence | None = None,
         options: typing.Any | None = None,
     ) -> Any:
-        directory = str(edgy.settings.migration_directory)
+        directory = str(edgy.monkay.settings.migration_directory)
         config = cls(os.path.join(directory, "alembic.ini"))
         config.set_main_option("script_location", str(directory))
 

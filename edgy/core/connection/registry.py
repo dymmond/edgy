@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import re
 import warnings
 from collections import defaultdict
@@ -14,7 +15,6 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, overload
 
 import sqlalchemy
-from loguru import logger
 from monkay.asgi import ASGIApp, LifespanHook
 from sqlalchemy import Engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
@@ -32,6 +32,8 @@ if TYPE_CHECKING:
     from edgy.conf.global_settings import EdgySettings
     from edgy.contrib.autoreflection.models import AutoReflectModel
     from edgy.core.db.models.types import BaseModelType
+
+logger = logging.getLogger(__name__)
 
 
 class MetaDataDict(defaultdict[str, sqlalchemy.MetaData]):
@@ -1156,7 +1158,7 @@ class Registry:
                     # Disconnect successfully connected databases if others failed.
                     ops2.append(dbs[num][1].disconnect())
                 else:
-                    logger.opt(exception=value).error("Failed to connect database.")
+                    logger.error("Failed to connect database.", exc_info=value)
             await asyncio.gather(*ops2)  # Await disconnections.
         return self
 

@@ -14,18 +14,14 @@ def extract_field_annotations_and_defaults(
     """
     Extracts field annotations and populates model fields from a class's attribute dictionary.
 
-    This function performs a crucial step in preparing a model's definition by:
-    1.  Ensuring that the `__annotations__` key exists within the provided `attrs`
-        dictionary, initializing it as an empty dictionary if it's not already present.
-        This is fundamental for Python's type hinting system and for Pydantic's
-        subsequent validation process.
-    2.  Delegating the actual field identification and configuration to the
-        `populate_pydantic_default_values` function. This separation of concerns
-        allows for a cleaner and more maintainable codebase. The delegated function
-        will meticulously go through the attributes, identify Edgy-specific field
-        instances, and correctly set up their properties, including their names
-        and type annotations, in a way that aligns with both Edgy's internal
-        mechanisms and Pydantic's validation requirements.
+    This function performs a crucial step in preparing a model's definition by
+    Delegating the actual field identification and configuration to the
+    `populate_pydantic_default_values` function. This separation of concerns
+    allows for a cleaner and more maintainable codebase. The delegated function
+    will meticulously go through the attributes, identify Edgy-specific field
+    instances, and correctly set up their properties, including their names
+    and type annotations, in a way that aligns with both Edgy's internal
+    mechanisms and Pydantic's validation requirements.
 
     Parameters:
         attrs (dict[Any, Any]): The dictionary representing the class namespace,
@@ -42,17 +38,12 @@ def extract_field_annotations_and_defaults(
 
     Returns:
         tuple[dict[Any, Any], dict[Any, Any]]: A two-element tuple containing:
-            - The modified `attrs` dictionary: This dictionary will have its
-              `__annotations__` entry updated to reflect the determined type
-              hints for all identified fields.
+            - The modified `attrs` dictionary
             - A dictionary of `model_fields`: This dictionary contains the
               configured Edgy field instances, keyed by their respective names.
               These fields are ready for use by Edgy's ORM functionalities
               and Pydantic's validation engine.
     """
-    # Ensure '__annotations__' key exists in the attrs dictionary, initializing if not present.
-    key = "__annotations__"
-    attrs[key] = attrs.get(key, {})
     # Populate Pydantic default values and extract model fields.
     attrs, model_fields = populate_pydantic_default_values(attrs, base_type)
     return attrs, model_fields
@@ -116,11 +107,7 @@ def populate_pydantic_default_values(
             `original_type` exists and differs from the computed `field.field_type`,
             the `original_type` is preferred for the annotation. This ensures that
             complex or generic type hints defined by the user are maintained.
-    3.  **Annotation Update**: Updates the model's `__annotations__` dictionary with
-        the determined type annotation for the current field. This is crucial
-        because Pydantic (and Python's type system) relies on this `__annotations__`
-        dictionary to perform validation and introspection.
-    4.  **Field Collection**: Adds the fully configured Edgy field instance to a
+    3.  **Field Collection**: Adds the fully configured Edgy field instance to a
         `model_fields` dictionary. This dictionary will be returned and used
         internally by Edgy for ORM operations and model management.
 
@@ -131,17 +118,13 @@ def populate_pydantic_default_values(
     Parameters:
         attrs (dict[Any, Any]): The class attributes dictionary where potential
                                 Edgy fields are defined. This dictionary is
-                                modified in place (specifically, its
-                                `__annotations__` entry).
+                                modified in place.
         base_type (type[FieldInfo] | type[BaseFieldType]): The base type used to
             identify field instances within `attrs`. Defaults to `BaseFieldType`,
             ensuring that only Edgy-specific fields are processed.
 
     Returns:
         tuple[dict[Any, Any], dict[Any, Any]]: A two-element tuple containing:
-            - The `attrs` dictionary: This dictionary, after being processed,
-              will have its `__annotations__` key fully populated with the
-              correct type hints for all Edgy fields.
             - A dictionary of `model_fields`: This dictionary contains all
               the identified and configured Edgy field instances, ready for
               use by Edgy's ORM and Pydantic's validation.
@@ -174,7 +157,4 @@ def populate_pydantic_default_values(
         # Add the configured field instance to the 'model_fields' dictionary,
         # keyed by its name. This dictionary collects all processed Edgy fields.
         model_fields[field_name] = field
-        # Update the '__annotations__' dictionary of the class. This makes the
-        # type hints visible to Pydantic for validation and to static type checkers.
-        attrs["__annotations__"][field_name] = overwrite_type or default_type
     return attrs, model_fields

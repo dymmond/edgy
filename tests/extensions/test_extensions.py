@@ -62,7 +62,7 @@ async def test_extensions_add_extension():
 async def test_extensions_extension_settings():
     with (
         edgy.monkay.with_settings(
-            edgy.settings.model_copy(update={"extensions": [PermissionExtension]})
+            edgy.monkay.settings.model_copy(update={"extensions": [PermissionExtension]})
         ),
         edgy.monkay.with_extensions({}) as extensions,
     ):

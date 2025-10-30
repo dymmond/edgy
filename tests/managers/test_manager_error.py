@@ -31,9 +31,8 @@ async def test_raise_improperly_configured_on_missing_annotation():
             class Meta:
                 registry = models
 
-    assert (
-        raised.value.args[0]
-        == "Managers must be type annotated and 'mang' is not annotated. Managers must be annotated with ClassVar."
+    assert raised.value.args[0] == (
+        "Managers must be ClassVar type annotated and 'mang' is not or not correctly annotated."
     )
 
 
@@ -49,4 +48,6 @@ async def test_raise_improperly_configured_on_wrong_annotation():
             class Meta:
                 registry = models
 
-    assert raised.value.args[0] == "Managers must be ClassVar type annotated."
+    assert raised.value.args[0] == (
+        "Managers must be ClassVar type annotated and 'mang' is not or not correctly annotated."
+    )

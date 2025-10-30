@@ -2,25 +2,24 @@
 # See https://pre-commit.com/hooks.html for more hooks.
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: check-added-large-files
       - id: check-toml
       - id: debug-statements
+        exclude: "^.*\\.pdbrc$"
       - id: check-yaml
-        args:
-          - --unsafe
       - id: end-of-file-fixer
       - id: trailing-whitespace
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.2
+    rev: v0.14.2
     hooks:
       # Run the linter.
       - id: ruff-check
         args: [ --fix ]
       # Run the formatter.
       - id: ruff-format
-
+        exclude: "^.*\\.pdbrc$"
 ci:
   autofix_commit_msg: 🎨 [pre-commit.ci] Auto format from pre-commit.com hooks
   autoupdate_commit_msg: ⬆ [pre-commit.ci] pre-commit autoupdate
