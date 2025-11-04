@@ -8,6 +8,10 @@ hide:
 
 ## 0.34.2
 
+### Added
+
+- New [select_for_update()](./queries/queries.md#select-for-update) operator allowing to lock rows and avoid race conditions.
+
 ### Changed
 
 - Remove `loguru` dependency.

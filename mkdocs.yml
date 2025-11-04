@@ -70,8 +70,7 @@ plugins:
             show_symbol_type_toc: true
 
 nav:
-  - Home: "index.md"
-  - Edgy: "edgy.md"
+  - Edgy: "index.md"
   - Core:
       - Connection: "connection.md"
       - Models: "models.md"

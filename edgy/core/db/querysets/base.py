@@ -226,6 +226,7 @@ class BaseQuerySet(
         ) = None
         # initialize
         self.active_schema = self.get_schema()
+        self._for_update: dict[str, Any] | None = None
 
         # Making sure the queryset always starts without any schema associated unless specified
 
@@ -265,6 +266,7 @@ class BaseQuerySet(
         queryset._select_related.update(self._select_related)
         queryset._select_related_weak.update(self._select_related_weak)
         queryset._cached_select_related_expression = self._cached_select_related_expression
+        queryset._for_update = self._for_update.copy() if self._for_update is not None else None
         return cast("QuerySet", queryset)
 
     @cached_property
@@ -706,6 +708,22 @@ class BaseQuerySet(
             expression = self._build_select_distinct(
                 self.distinct_on, expression=expression, tables_and_models=tables_and_models
             )
+
+        if self._for_update:
+            params = dict(self._for_update)
+            # If user provided model classes via "of", map them to the actual tables
+            # (including aliases) present in this SELECT. Postgres requires FROM members.
+            if "of" in params and params["of"]:
+                target_models = set(params["of"])
+                of_tables: list[Any] = []
+                for _, (table, model) in tables_and_models.items():
+                    if model in target_models:
+                        of_tables.append(table)
+                if of_tables:
+                    params["of"] = tuple(of_tables)
+                else:
+                    params.pop("of", None)
+            expression = expression.with_for_update(**params)
         return expression, tables_and_models
 
     async def as_select_with_tables(
@@ -1487,6 +1505,54 @@ class QuerySet(BaseQuerySet):
     def sql(self) -> str:
         """Get SQL select query as string with inserted blanks. For debugging only!"""
         return str(run_sync(self._sql_helper()))
+
+    def select_for_update(
+        self,
+        *,
+        nowait: bool = False,
+        skip_locked: bool = False,
+        read: bool = False,
+        key_share: bool = False,
+        of: Sequence[type[BaseModelType]] | None = None,
+    ) -> QuerySet:
+        """
+        Request row-level locks on the rows selected by this queryset, using
+        dialect-appropriate SELECT ... FOR UPDATE semantics via SQLAlchemy's
+        `with_for_update()`.
+
+        Args:
+            nowait (bool): Fail immediately if a lock cannot be acquired.
+            skip_locked (bool): Skip rows that are locked by other transactions (where supported).
+            read (bool): Shared lock variant (PostgreSQL's FOR SHARE).
+            key_share (bool):PostgreSQL's FOR KEY SHARE.
+            of (Sequence[type[BaseModelType]] | None): Models whose tables should be explicitly locked
+                (PostgreSQL's OF ...). The models must be part of the FROM/JOIN set for this query.
+
+        Notes:
+            - Most databases require running inside an explicit transaction:
+                  async with database.transaction():
+                      ...
+            - On unsupported dialects (e.g. SQLite), this is a no-op.
+            - For PostgreSQL, `read=True` maps to FOR SHARE and `key_share=True` to FOR KEY SHARE.
+            - `of=[ModelA, ...]` restricts locking to specific tables (PostgreSQL only).
+              You should include related models in the query via `select_related(...)`
+              if you plan to lock them with `of=...`.
+
+        Returns:
+            QuerySet: A cloned queryset with locking enabled.
+        """
+        queryset: QuerySet = self._clone()
+        payload: dict[str, Any] = {
+            "nowait": bool(nowait),
+            "skip_locked": bool(skip_locked),
+            "read": bool(read),
+            "key_share": bool(key_share),
+        }
+        if of:
+            # Store model classes here during compilation we map them to actual (possibly aliased) tables
+            payload["of"] = tuple(of)
+        queryset._for_update = payload
+        return queryset
 
     def filter(
         self,
