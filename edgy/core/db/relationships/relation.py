@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Literal, cast
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
+from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import RelationshipField
 from edgy.exceptions import ObjectNotFound, RelationshipIncompatible, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
@@ -305,13 +306,17 @@ class ManyRelation(ManyRelationProtocol):
             )
         # Expand the child into a 'through' model instance.
         through_instance = self.expand_relationship(child)
+
+        token = CURRENT_INSTANCE.set(through_instance)
         try:
             # Attempt to save the intermediate model. If it fails due to IntegrityError,
             # it means the record already exists, so return None.
-            result = await through_instance.save(force_insert=True)
-            return getattr(result, self.to_foreign_key)
+            result = await through_instance.real_save(force_insert=True)
+            return cast(BaseModelType, getattr(result, self.to_foreign_key))
         except IntegrityError:
             pass  # The record already exists.
+        finally:
+            CURRENT_INSTANCE.reset(token)
         return None
 
     async def remove_many(self, *children: BaseModelType) -> None:
@@ -373,16 +378,28 @@ class ManyRelation(ManyRelationProtocol):
         # Cast the child to BaseModelType as it is now confirmed to be a model instance.
         child = cast("BaseModelType", self.expand_relationship(child))
         # Count the number of relationships based on the identifying clauses of the child.
-        count = await child.query.filter(*child.identifying_clauses()).count()
-        if count == 0:
-            # If no relationship is found, raise an error.
-            raise RelationshipNotFound(
-                detail=f"There is no relationship between '{self.from_foreign_key}' and "
-                f"'{self.to_foreign_key}: {getattr(child, self.to_foreign_key).pk}'."
+        real_class = self.get_real_class()
+        await child.meta.signals.pre_delete.send_async(
+            real_class, instance=child, model_instance=child
+        )
+        token = CURRENT_INSTANCE.set(child)
+        try:
+            with child.transaction():
+                row_count = await child.raw_delete(
+                    skip_post_delete_hooks=False,
+                    remove_referenced_call=False,
+                )
+                if row_count == 0:
+                    # If no relationship is found, raise an error.
+                    raise RelationshipNotFound(
+                        detail=f"There is no relationship between '{self.from_foreign_key}' and "
+                        f"'{self.to_foreign_key}: {getattr(child, self.to_foreign_key).pk}'."
+                    )
+        finally:
+            CURRENT_INSTANCE.reset(token)
+            await self.meta.signals.post_delete.send_async(
+                real_class, instance=child, model_instance=child, row_count=row_count
             )
-        else:
-            # If a relationship exists, delete the child from the through table.
-            await child.delete()
 
     def __repr__(self) -> str:
         """
@@ -663,8 +680,16 @@ class SingleRelation(ManyRelationProtocol):
         # Expand the child into a 'to' model instance.
         child = self.expand_relationship(child)
         # Save the child, setting its foreign key to the current instance.
-        await child.save(values={self.to_foreign_key: self.instance})
-        return child
+
+        token = CURRENT_INSTANCE.set(child)
+        try:
+            await child.real_save(values={self.to_foreign_key: self.instance})
+            return child
+        except IntegrityError:
+            # one-to-one violation
+            return None
+        finally:
+            CURRENT_INSTANCE.reset(token)
 
     async def add_many(self, *children: BaseModelType) -> list[BaseModelType | None]:
         """
@@ -738,7 +763,14 @@ class SingleRelation(ManyRelationProtocol):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
 
         # Save the child, setting its foreign key to None to remove the relationship.
-        await child.save(values={self.to_foreign_key: None})
+        # MAYBE: optimize the case if the foreign_key is not matching.
+        # We need to check if the model is loaded completely
+
+        token = CURRENT_INSTANCE.set(child)
+        try:
+            await child.real_save(values={self.to_foreign_key: None})
+        finally:
+            CURRENT_INSTANCE.reset(token)
 
     def __repr__(self) -> str:
         """

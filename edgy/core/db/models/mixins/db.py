@@ -927,7 +927,7 @@ class DatabaseMixin:
             )
         return row_count
 
-    async def delete(self: Model, skip_post_delete_hooks: bool = False) -> None:
+    async def delete(self: Model, skip_post_delete_hooks: bool = False) -> int:
         """
         Deletes the current model instance from the database.
 
@@ -951,6 +951,7 @@ class DatabaseMixin:
         await self.meta.signals.post_delete.send_async(
             real_class, instance=self, model_instance=self, row_count=row_count
         )
+        return row_count
 
     async def load(self, only_needed: bool = False) -> None:
         """
