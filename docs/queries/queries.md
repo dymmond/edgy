@@ -654,7 +654,6 @@ user = await User.query.create(email="foo@bar.com")
 exists = await User.query.contains(instance=user)
 ```
 
-
 ### Count
 
 Returns an integer with the total of records.
@@ -799,6 +798,78 @@ Sometimes you want directly work with a sqlalchemy select expression. This is po
 
 ```python
 user_select = await User.query.filter(id=1).as_select()
+```
+
+### Select for update
+
+Sometimes you will require atomic transactions and you will **need to lock** the row to make sure no race conditions
+or deadlocks happen.
+
+```python
+from edgy import Registry, Database, Model
+
+database = Database("sqlite:///db.sqlite")
+models = Registry(database=database)
+
+class Order(Model):
+    # Order fields
+    ...
+
+
+class Job(Model):
+    # Job fields
+    ...
+
+
+class InventoryItem(Model):
+    # InventoryItem
+    ...
+
+
+class LineItem(Model):
+    # LineItem fields
+    ...
+
+# Basic row lock
+async with database.transaction():
+    order = await Order.query.filter(id=order_id).select_for_update().get()
+    order.status = "processing"
+    await order.save()
+
+# Avoid waiting for locks
+async with database.transaction():
+    maybe_order = await (
+        Order.query
+        .filter(id=order_id)
+        .select_for_update(nowait=True)
+        .get_or_none()
+    )
+    if not maybe_order:
+        # locked elsewhere
+        ...
+
+# Work-stealing pattern
+async with database.transaction():
+    jobs = await (
+        Job.query
+        .filter(status="pending")
+        .order_by(Job.created_at.asc())
+        .select_for_update(skip_locked=True)
+        .limit(10)
+    )
+
+# Postgres shared lock / key share
+async with database.transaction():
+    _ = await InventoryItem.query.select_for_update(read=True).all()
+
+# Lock only certain tables (Postgres)
+async with database.transaction():
+    items = await (
+        LineItem.query
+        .select_related("order")
+        .select_for_update(of=[LineItem])
+        .all()
+    )
 ```
 
 ## Using the cache

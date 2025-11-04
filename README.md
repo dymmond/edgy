@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-<a href="https://github.com/dymmond/edgy/workflows/Test%20Suite/badge.svg?event=push&branch=main" target="_blank">
-    <img src="https://github.com/dymmond/edgy/workflows/Test%20Suite/badge.svg?event=push&branch=main" alt="Test Suite">
+<a href="https://github.com/dymmond/edgy/actions/workflows/test-suite.yml/badge.svg?event=push&branch=main" target="_blank">
+    <img src="https://github.com/dymmond/edgy/actions/workflows/test-suite.yml/badge.svg?event=push&branch=main" alt="Test Suite">
 </a>
 
 <a href="https://pypi.org/project/edgy" target="_blank">
