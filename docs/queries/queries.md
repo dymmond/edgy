@@ -416,7 +416,7 @@ related-object data when it executes its query.
 
 This is a performance booster which results in a single more complex query but means
 
-later use of foreign-key relationships won’t require database queries.
+later use of foreign-key relationships won't require database queries.
 
 A simple query:
 
@@ -802,73 +802,200 @@ user_select = await User.query.filter(id=1).as_select()
 
 ### Select for update
 
-Sometimes you will require atomic transactions and you will **need to lock** the row to make sure no race conditions
-or deadlocks happen.
+Row-level locks let you perform atomic work safely under concurrency. Edgy exposes database-native SELECT … FOR UPDATE semantics through QuerySet.select_for_update(...).
+
+* Always use it inside an explicit transaction.
+* On SQLite it's effectively a no-op (engine limitation).
+* On PostgreSQL you also get FOR SHARE (read=True), FOR KEY SHARE (key_share=True), NOWAIT, SKIP LOCKED, and OF ....
 
 ```python
-from edgy import Registry, Database, Model
+select_for_update(
+    *,
+    nowait: bool = False,
+    skip_locked: bool = False,
+    read: bool = False,        # Postgres: FOR SHARE
+    key_share: bool = False,   # Postgres: FOR KEY SHARE
+    of: Sequence[type[Model]] | None = None,  # Postgres: OF <tables>
+) -> QuerySet
+```
 
-database = Database("sqlite:///db.sqlite")
-models = Registry(database=database)
+* nowait=True – fail immediately if the row is locked elsewhere.
+* skip_locked=True – do not wait; simply skip locked rows (useful for work stealing).
+* read=True – shared lock (Postgres FOR SHARE).
+* key_share=True – Postgres FOR KEY SHARE.
+* of=[ModelA, ...] – restrict locking to specific tables of the current SELECT (Postgres).
 
-class Order(Model):
-    # Order fields
-    ...
+!!! Tip
+    Include related models with select_related(...) if you intend to lock them.
 
+**Locks are per connection. To observe blocking/skip behavior in tests, use a second client/connection.**
 
-class Job(Model):
-    # Job fields
-    ...
+#### Basic row lock
 
-
-class InventoryItem(Model):
-    # InventoryItem
-    ...
-
-
-class LineItem(Model):
-    # LineItem fields
-    ...
-
-# Basic row lock
+```python
 async with database.transaction():
-    order = await Order.query.filter(id=order_id).select_for_update().get()
+    order = await (
+        Order.query
+        .filter(id=order_id)
+        .select_for_update()
+        .get()
+    )
     order.status = "processing"
     await order.save()
+```
 
-# Avoid waiting for locks
+Don't wait for busy rows (nowait)
+
+Immediate failure if the row is locked by another transaction.
+
+```python
+maybe = None
 async with database.transaction():
-    maybe_order = await (
+    maybe = await (
         Order.query
         .filter(id=order_id)
         .select_for_update(nowait=True)
         .get_or_none()
     )
-    if not maybe_order:
-        # locked elsewhere
-        ...
 
-# Work-stealing pattern
+if not maybe:
+    # Someone else holds the lock; choose another strategy (retry, queue, etc.)
+    ...
+```
+
+On PostgreSQL you'll see a LockNotAvailableError surfaced via SQLAlchemy as a DBAPIError/OperationalError.
+
+Work-stealing / sharded consumers (skip_locked)
+
+Process only rows that aren't currently locked by other workers.
+
+```python
+BATCH = 10
+
 async with database.transaction():
     jobs = await (
         Job.query
         .filter(status="pending")
-        .order_by(Job.created_at.asc())
+        .order_by("created_at")                # Recommended for fairness/stability
         .select_for_update(skip_locked=True)
-        .limit(10)
+        .limit(BATCH)
     )
 
-# Postgres shared lock / key share
-async with database.transaction():
-    _ = await InventoryItem.query.select_for_update(read=True).all()
+    for job in jobs:
+        job.status = "processing"
+        await job.save()
+```
 
-# Lock only certain tables (Postgres)
+`skip_locked` pairs naturally with `limit()`, always use an `order_by()` to keep the selection predictable across workers.
+
+#### Shared locks / key-share (PostgreSQL)
+
+Use a shared lock when you need read-consistency while preventing certain concurrent updates.
+
+#####  FOR SHARE
+
+```
+async with database.transaction():
+    rows = await InventoryItem.query.select_for_update(read=True)
+
+```
+
+##### FOR KEY SHARE
+
+```python
+async with database.transaction():
+    rows = await InventoryItem.query.select_for_update(key_share=True)
+```
+
+When a query touches multiple tables (via select_related), you can restrict which tables are locked:
+
+```python
 async with database.transaction():
     items = await (
         LineItem.query
-        .select_related("order")
+        .select_related("order")      # bring order into the SELECT/JOIN
         .select_for_update(of=[LineItem])
         .all()
+    )
+```
+
+Edgy maps the models in of=[...] to the actual (possibly aliased) tables used in the compiled SELECT.
+
+Chaining with filter(), all(), only()/defer(), etc.
+
+You can place `select_for_update()` before or after other query methods:
+
+##### Both are equivalent:
+
+q1 = Order.query.filter(id=order_id).select_for_update()
+q2 = Order.query.select_for_update().filter(id=order_id)
+
+##### Clones preserve the lock mode:
+
+```python
+q3 = q1.all()            # clone keeps FOR UPDATE
+q4 = q1.all(True)        # clear cache, same object; lock mode is preserved
+```
+
+only()/defer() affect selected columns but not the lock behavior.
+
+#### Patterns & recipes
+
+Claim-and-process loop with retry backoff (NOWAIT)
+
+```python
+from anyio import sleep
+
+async def claim_one(order_id: int, retries: int = 3) -> bool:
+    for attempt in range(retries):
+        async with database.transaction():
+            order = await (
+                Order.query
+                .filter(id=order_id, status="queued")
+                .select_for_update(nowait=True)
+                .get_or_none()
+            )
+            if not order:
+                # locked or not in queued state
+                await sleep(0.05 * (attempt + 1))
+                continue
+
+            order.status = "processing"
+            await order.save()
+            return True
+
+    return False
+
+Batching with skip_locked
+
+async with database.transaction():
+    batch = await (
+        Task.query
+        .filter(state="ready")
+        .order_by("-priority", "id")
+        .select_for_update(skip_locked=True)
+        .limit(100)
+    )
+    # process batch...
+```
+
+#### Full example (end-to-end)
+
+```python
+async with database.transaction():
+    # lock + update atomically
+    user = await User.query.filter(id=user_id).select_for_update().get()
+    user.language = "EN"
+    await user.save()
+
+# skip locked batch
+async with database.transaction():
+    users = await (
+        User.query
+        .filter(active=True)
+        .order_by("id")
+        .select_for_update(skip_locked=True)
+        .limit(50)
     )
 ```
 

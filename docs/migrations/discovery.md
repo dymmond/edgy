@@ -7,7 +7,7 @@ Edgy provides multiple ways to identify and run commands. The two primary method
 
 ## Auto-Discovery
 
-If you’re familiar with frameworks like Django, you might know how `manage.py` serves as a command-line interface for running internal commands. While Edgy doesn’t work exactly the same way, it does attempt to automatically detect the appropriate application and will raise an error if none is found or if neither an [environment variable](#environment-variables) nor `--app` is provided.
+If you're familiar with frameworks like Django, you might know how `manage.py` serves as a command-line interface for running internal commands. While Edgy doesn't work exactly the same way, it does attempt to automatically detect the appropriate application and will raise an error if none is found or if neither an [environment variable](#environment-variables) nor `--app` is provided.
 
 **Auto-discovery serves as an alternative to manually specifying `--app` or setting the `EDGY_DEFAULT_APP` environment variable.**
 
@@ -69,7 +69,7 @@ By default, the primary database is used. Since Edgy is framework-agnostic, this
 
 ## Using Auto-Discovery in Practice
 
-Now that we’ve seen how Edgy discovers applications, let’s look at how it works with actual commands. The following structure will be used as a reference:
+Now that we've seen how Edgy discovers applications, let's look at how it works with actual commands. The following structure will be used as a reference:
 
 ```shell
 title="myproject"

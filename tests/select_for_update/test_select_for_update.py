@@ -96,7 +96,6 @@ async def test_select_for_update_skip_locked_excludes_locked_rows():
     await other.connect()
 
     try:
-        # Txn A on the default client -> lock u1
         async with txn():
             _ = await User.query.filter(id=user.id).select_for_update().get()
 
@@ -146,3 +145,104 @@ async def test_select_for_update_of_and_shared_variants_compile_and_run():
 
         # just executes without error
         assert len(rows) >= 0
+
+
+async def test_select_for_update_preserved_through_all_clone_and_clear_cache():
+    u = await User.query.create(name="John", language="PT")
+
+    # clone via all() should preserve FOR UPDATE
+    qs = User.query.filter(id=u.id).select_for_update()
+    qs_clone = qs.all()  # standard clone
+    assert "FOR UPDATE" in qs_clone.sql.upper()
+
+    # all(clear_cache=True) returns same object but should keep FOR UPDATE too
+    qs_same = qs.all(True)
+    assert "FOR UPDATE" in qs_same.sql.upper()
+
+
+async def test_select_for_update_filter_before_vs_after_equivalent_results():
+    user = await User.query.create(name="A", language="X")
+
+    # filter -> select_for_update
+    queryset = User.query.filter(id=user.id).select_for_update()
+
+    # select_for_update -> filter (order of chaining reversed)
+    queryset2 = User.query.select_for_update().filter(id=user.id)
+
+    async with txn():
+        result = await queryset.limit(1)
+        result2 = await queryset2.limit(1)
+
+    assert [model.id for model in result] == [user.id]
+    assert [model.id for model in result2] == [user.id]
+
+
+async def test_select_for_update_multiple_filters_chain():
+    user = await User.query.create(name="B", language="Y")
+
+    async with txn():
+        rows = await (
+            User.query.filter(language="Y").filter(id=user.id).select_for_update().limit(1)
+        )
+    assert [model.id for model in rows] == [user.id]
+
+
+async def test_select_for_update_skip_locked_with_filter_subset_excludes_locked_row():
+    user = await User.query.create(name="A", language="X")
+    user2 = await User.query.create(name="B", language="Y")
+
+    def bind(qs, db):
+        queryset2 = qs.all()
+
+        # swap connection/pool
+        queryset2.database = db
+        return queryset2
+
+    # Use a second client to guarantee a different connection
+    other = DatabaseTestClient(DATABASE_URL, full_isolation=False)
+    await other.connect()
+
+    try:
+        async with txn():
+            _ = await User.query.filter(id=user.id).select_for_update().get()
+
+            async with other.transaction():
+                qs = (
+                    User.query.filter(id__in=[user.id, user2.id])
+                    .order_by("id")
+                    .select_for_update(skip_locked=True)
+                )
+                rows = await bind(qs, other)
+                ids = [m.id for m in rows]
+                assert user.id not in ids
+                assert ids == [user2.id]
+    finally:
+        with contextlib.suppress(Exception):
+            await other.disconnect()
+
+
+async def test_select_for_update_nowait_with_filter_raises_on_locked_row():
+    user = await User.query.create(name="C", language="Z")
+
+    def bind(qs, db):
+        """Rebind a queryset to a specific DatabaseTestClient/connection."""
+        queryset2 = qs.all()  # clone
+        queryset2.database = db  # swap connection/pool
+        return queryset2
+
+    other = DatabaseTestClient(DATABASE_URL, full_isolation=False)
+    await other.connect()
+
+    try:
+        # Txn A: hold lock
+        async with txn():
+            _ = await User.query.filter(id=user.id).select_for_update().get()
+
+            # Txn B: NOWAIT should raise
+            async with other.transaction():
+                qs = User.query.filter(id=user.id).select_for_update(nowait=True)
+                with pytest.raises((sqlalchemy.exc.OperationalError, sqlalchemy.exc.DBAPIError)):
+                    await bind(qs, other).get()
+    finally:
+        with contextlib.suppress(Exception):
+            await other.disconnect()
