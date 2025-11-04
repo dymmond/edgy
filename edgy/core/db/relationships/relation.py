@@ -304,13 +304,12 @@ class ManyRelation(ManyRelationProtocol):
                 f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
             )
         # Expand the child into a 'through' model instance.
-        through = self.expand_relationship(child)
-        return_through_model = through is child
+        through_instance = self.expand_relationship(child)
         try:
             # Attempt to save the intermediate model. If it fails due to IntegrityError,
             # it means the record already exists, so return None.
-            result = await through.save(force_insert=True)
-            return result if return_through_model else getattr(result, self.to_foreign_key)
+            result = await through_instance.save(force_insert=True)
+            return getattr(result, self.to_foreign_key)
         except IntegrityError:
             pass  # The record already exists.
         return None
