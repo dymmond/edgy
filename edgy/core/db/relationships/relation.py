@@ -311,7 +311,7 @@ class ManyRelation(ManyRelationProtocol):
         try:
             # Attempt to save the intermediate model. If it fails due to IntegrityError,
             # it means the record already exists, so return None.
-            result = await through_instance.real_save(force_insert=True)
+            result = await through_instance.real_save(force_insert=True, values=None)
             return cast(BaseModelType, getattr(result, self.to_foreign_key))
         except IntegrityError:
             pass  # The record already exists.
@@ -384,17 +384,16 @@ class ManyRelation(ManyRelationProtocol):
         )
         token = CURRENT_INSTANCE.set(child)
         try:
-            with child.transaction():
-                row_count = await child.raw_delete(
-                    skip_post_delete_hooks=False,
-                    remove_referenced_call=False,
+            row_count = await child.raw_delete(
+                skip_post_delete_hooks=False,
+                remove_referenced_call=False,
+            )
+            if row_count == 0:
+                # If no relationship is found, raise an error.
+                raise RelationshipNotFound(
+                    detail=f"There is no relationship between '{self.from_foreign_key}' and "
+                    f"'{self.to_foreign_key}: {getattr(child, self.to_foreign_key).pk}'."
                 )
-                if row_count == 0:
-                    # If no relationship is found, raise an error.
-                    raise RelationshipNotFound(
-                        detail=f"There is no relationship between '{self.from_foreign_key}' and "
-                        f"'{self.to_foreign_key}: {getattr(child, self.to_foreign_key).pk}'."
-                    )
         finally:
             CURRENT_INSTANCE.reset(token)
             await self.meta.signals.post_delete.send_async(
@@ -683,7 +682,7 @@ class SingleRelation(ManyRelationProtocol):
 
         token = CURRENT_INSTANCE.set(child)
         try:
-            await child.real_save(values={self.to_foreign_key: self.instance})
+            await child.real_save(force_insert=False, values={self.to_foreign_key: self.instance})
             return child
         except IntegrityError:
             # one-to-one violation
@@ -768,7 +767,7 @@ class SingleRelation(ManyRelationProtocol):
 
         token = CURRENT_INSTANCE.set(child)
         try:
-            await child.real_save(values={self.to_foreign_key: None})
+            await child.real_save(force_insert=False, values={self.to_foreign_key: None})
         finally:
             CURRENT_INSTANCE.reset(token)
 
