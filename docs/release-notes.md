@@ -6,6 +6,11 @@ hide:
 
 # Release Notes
 
+## 0.35.1
+
+### Fixed
+- Fix m2m returning through model when using create.
+
 ## 0.35.0
 
 ### Added

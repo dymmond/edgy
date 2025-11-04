@@ -44,7 +44,7 @@ It is like a virtual path part which can be traversed via the `__` path building
 With the many to many you can perform all the normal operations of searching from normal queries
 to the [related name][related_name] as per normal search.
 
-ManyToMany allows three different methods when using it (the same applies for the reverse side).
+ManyToMany allows some different methods when using it (the same applies for the reverse side).
 
 * `add(obj) -> finalobj | None` - Adds a record to the ManyToMany. Return `None` when adding failed, the finalized object with primary key set otherwise.
 * `create(*args. **kwargs) -> finalobj | None` - Create a new record and add it to the ManyToMany. Return values like `add`.
@@ -69,8 +69,13 @@ organisation = await Organisation.query.create(ident="Acme Ltd")
 
 # Add teams to the organisation
 await organisation.teams.add(blue_team)
-await organisation.teams.add(green_team)
+result = await organisation.teams.add(green_team)
+# result is either None or a proxymodel of green_team
 ```
+
+Why do we need the proxy model when having green_team?
+Well yes, you can find the embedded through model here (if enabled) as well as
+checking that adding was successful (and there was not already a relationship).
 
 ### add_many()
 
@@ -84,6 +89,7 @@ organisation = await Organisation.query.create(ident="Acme Ltd")
 
 # Add teams to the organisation
 results = await organisation.teams.add_many(blue_team, green_team, red_team)
+# results contain the proxy models as well as None when the object was added already
 ```
 
 ### remove_many()
@@ -118,8 +124,6 @@ await organisation.teams.create(name="Blue Team")
 await organisation.teams.create(name="Green Team")
 ```
 
-This is also more performant because less transactions are required.
-
 #### remove()
 
 You can now remove teams from organisations, something like this.
@@ -138,9 +142,11 @@ await organisation.teams.add(red_team)
 # Remove the teams from the organisation
 await organisation.teams.remove(red_team)
 await organisation.teams.remove(blue_team)
+# green team is removed because it is unique
+await organisation.teams.remove()
 ```
 
-Hint: when unique, remove works also without argument.
+Hint: when only a relation is left, remove works also without argument.
 
 #### Related name
 

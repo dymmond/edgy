@@ -38,7 +38,7 @@ class Album(edgy.StrictModel):
 
 class Studio(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
-    users = edgy.ManyToMany(User, through_tablename=edgy.NEW_M2M_NAMING)
+    users = edgy.ManyToMany(User, through_tablename=edgy.NEW_M2M_NAMING, embed_through="")
     albums = edgy.ManyToMany(Album, embed_through="", through_tablename=edgy.NEW_M2M_NAMING)
 
     class Meta:
@@ -199,6 +199,7 @@ async def test_many_to_many_many_fields():
     total_albums = await studio.albums.all()
 
     assert len(total_users) == 3
+    assert isinstance(total_users[0], User)
     assert total_users[0].pk == user1.pk
     assert total_users[1].pk == user2.pk
     assert total_users[2].pk == user3.pk
@@ -216,6 +217,23 @@ async def test_many_to_many_many_fields():
     total_tracks_album3 = await album3.tracks.all()
     assert len(total_tracks_album3) == 1
     assert total_tracks_album3[0].pk == track3.pk
+    # deep select_related
+    albums = await Album.query.filter(id=album1.id).select_related(
+        "album_studioalbums_set__studio"
+    )
+    assert albums[0]._db_loaded_or_deleted
+
+
+async def test_rollback(create_test_database):
+    studio = await Studio.query.create(name="Downtown Records")
+    with pytest.raises(ValueError):
+        async with studio.transaction():
+            user = await studio.users.create(name="edgy")
+            total_users = await studio.users.all()
+            raise ValueError()
+    assert user.__parent__ is User
+    assert not await User.query.filter(id=total_users[0].id).exists()
+    assert not await User.query.filter(id=user.id).exists()
 
 
 async def test_related_name_query():
