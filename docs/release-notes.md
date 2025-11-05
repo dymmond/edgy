@@ -12,6 +12,7 @@ hide:
 
 - New [select_for_update()](./queries/queries.md#select-for-update) operator allowing to lock rows and avoid race conditions.
 - New [CombinedQueryset](./queries/combined-queries.md) operators (Union, Inteserct).
+- Support for Python 3.14
 
 ### Changed
 
@@ -21,11 +22,10 @@ hide:
 ### Fixed
 
 - Fix `auto_create_schema` and `auto_drop_schema` of `TenantMixin` which were not used at all.
-- Fix python 3.14 compatibility.
 
 ### Removed
 
-- `handle_annotations` it breaks horrible on python 3.14 and there are better ways.
+- `handle_annotations` as it no longer serves its purpose.
 
 ## 0.34.1
 
