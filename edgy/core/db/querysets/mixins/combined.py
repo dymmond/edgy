@@ -5,7 +5,7 @@ from typing import Any
 import sqlalchemy
 
 from edgy.core.db.models.types import BaseModelType
-from edgy.core.db.querysets.base import QuerySet
+from edgy.core.db.querysets.queryset import QuerySet
 from edgy.exceptions import QuerySetError
 
 

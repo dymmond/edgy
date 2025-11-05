@@ -8,7 +8,7 @@ from .metaclasses import ContentTypeMeta
 
 if TYPE_CHECKING:
     from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
-    from edgy.core.db.querysets.base import QuerySet
+    from edgy.core.db.querysets.queryset import QuerySet
 
 
 class ContentType(edgy.Model, metaclass=ContentTypeMeta):

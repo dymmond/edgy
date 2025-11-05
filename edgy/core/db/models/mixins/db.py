@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import FIELD_CONTEXT_TYPE, BaseFieldType
     from edgy.core.db.models.model import Model
-    from edgy.core.db.querysets.base import QuerySet
+    from edgy.core.db.querysets.queryset import QuerySet
 
 
 _empty = cast(set[str], frozenset())
