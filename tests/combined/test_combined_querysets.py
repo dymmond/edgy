@@ -4,7 +4,6 @@ import edgy
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
-# Use rollback to avoid recreating/dropping DB for every test and to mimic your existing style
 database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 

@@ -34,6 +34,7 @@ from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import CHECK_DB_CONNECTION_SILENCED, check_db_connection, hash_tablekey
+from edgy.core.utils.sync import run_sync
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.types import Undefined
 
@@ -1482,11 +1483,13 @@ class BaseQuerySet(
 
         return await self._get_or_cache_row(rows[0], tables_and_models, "_cache_first,_cache_last")
 
-    def __repr__(self) -> str:
-        return f"QuerySet<{self.sql}>"
-
 
 class QuerySet(BaseQuerySet):
+    @cached_property
+    def sql(self) -> str:
+        """Get SQL select query as string with inserted blanks. For debugging only!"""
+        return str(run_sync(self._sql_helper()))
+
     def _combine(
         self,
         other: QuerySet,
