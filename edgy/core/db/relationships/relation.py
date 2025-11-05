@@ -321,7 +321,7 @@ class ManyRelation(ManyRelationProtocol):
         if isinstance(child, self.through | self.through.proxy_model | dict):
             return cast("BaseModelType", getattr(result, self.to_foreign_key))
         if self.embed_parent:
-            token = MODEL_GETATTR_BEHAVIOR.set("coro")
+            embed_token = MODEL_GETATTR_BEHAVIOR.set("coro")
             try:
                 new_result: Any = result
                 for part in self.embed_parent[0].split("__"):
@@ -329,7 +329,7 @@ class ManyRelation(ManyRelationProtocol):
                     if isawaitable(new_result):
                         new_result = await new_result
             finally:
-                MODEL_GETATTR_BEHAVIOR.reset(token)
+                MODEL_GETATTR_BEHAVIOR.reset(embed_token)
             if self.embed_parent[1]:
                 setattr(child, self.embed_parent[1], new_result)
         return child
@@ -704,7 +704,7 @@ class SingleRelation(ManyRelationProtocol):
         finally:
             CURRENT_INSTANCE.reset(token)
         if self.embed_parent:
-            token = MODEL_GETATTR_BEHAVIOR.set("coro")
+            embed_token = MODEL_GETATTR_BEHAVIOR.set("coro")
             try:
                 new_result: Any = self.instance
                 for part in self.embed_parent[0].split("__"):
@@ -712,7 +712,7 @@ class SingleRelation(ManyRelationProtocol):
                     if isawaitable(new_result):
                         new_result = await new_result
             finally:
-                MODEL_GETATTR_BEHAVIOR.reset(token)
+                MODEL_GETATTR_BEHAVIOR.reset(embed_token)
             if self.embed_parent[1]:
                 setattr(child, self.embed_parent[1], new_result)
         return child
