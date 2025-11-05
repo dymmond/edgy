@@ -34,7 +34,6 @@ from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import CHECK_DB_CONNECTION_SILENCED, check_db_connection, hash_tablekey
-from edgy.core.utils.sync import run_sync
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 from edgy.types import Undefined
 
@@ -1488,23 +1487,143 @@ class BaseQuerySet(
 
 
 class QuerySet(BaseQuerySet):
-    """
-    QuerySet object used for query retrieving. Public interface
-    """
+    def _combine(
+        self,
+        other: QuerySet,
+        op: Literal["union", "intersect", "except"],
+        *,
+        all_: bool = False,
+    ) -> CombinedQuerySet:
+        """
+        Internal helper method used by the public interface (union, intersect, except_)
+        to build and validate a CombinedQuerySet object.
+
+        This function enforces model class consistency and maps the requested set operation
+        (with or without ALL) to the canonical operation name used by `CombinedQuerySet`.
+
+        Args:
+            other: The secondary `QuerySet` to combine results with.
+            op: The base set operation type ('union', 'intersect', or 'except').
+            all_: If `True`, requests the ALL variant of the set operation (e.g., UNION ALL).
+
+        Returns:
+            A `CombinedQuerySet` instance configured for the specified set operation.
+
+        Raises:
+            TypeError: If `other` is not an instance of `QuerySet`.
+            QuerySetError: If the models (`self.model_class` and `other.model_class`)
+                           of the two querysets do not match.
+        """
+        # Check type of the other object
+        if not isinstance(other, QuerySet):
+            raise TypeError("other must be a QuerySet")
+
+        # Check model class consistency
+        if self.model_class is not other.model_class:
+            # QuerySetError detail string must be defined
+            raise QuerySetError(detail="Both querysets must have the same model_class to combine.")
+
+        # Map (op, all_) to a concrete set-op name understood by CombinedQuerySet
+        if all_:
+            if op == "union":
+                op_name: str = "union_all"
+            elif op == "intersect":
+                op_name = "intersect_all"
+            elif op == "except":
+                op_name = "except_all"
+            else:
+                op_name = op  # type: ignore
+        else:
+            op_name = op
+
+        return CombinedQuerySet(left=self, right=other, op=op_name)
+
+    def union(self, other: QuerySet, *, all: bool = False) -> CombinedQuerySet:
+        """
+        Returns a result set that is the UNION of the current QuerySet and another QuerySet.
+
+        By default, `UNION` returns only distinct rows (UNION DISTINCT).
+        If `all=True`, it returns `UNION ALL`, which includes duplicate rows.
+
+        Args:
+            other: The other `QuerySet` to combine results with.
+            all: If `True`, performs `UNION ALL`; otherwise, performs `UNION DISTINCT`.
+
+        Returns:
+            A `CombinedQuerySet` instance representing the combined operation.
+        """
+        return self._combine(other, "union", all_=all)
+
+    def union_all(self, other: QuerySet) -> CombinedQuerySet:
+        """
+        Returns a result set that is the UNION ALL of the current QuerySet and another QuerySet.
+
+        This is a shortcut method equivalent to calling `union(other, all=True)`.
+
+        Args:
+            other: The other `QuerySet` to combine results with.
+
+        Returns:
+            A `CombinedQuerySet` instance representing the UNION ALL operation.
+        """
+        return self._combine(other, "union", all_=True)
+
+    def intersect(self, other: QuerySet, *, all: bool = False) -> CombinedQuerySet:
+        """
+        Returns a result set that is the INTERSECT (intersection) of the current QuerySet
+        and another QuerySet.
+
+        By default, `INTERSECT` returns only distinct rows (INTERSECT DISTINCT).
+        If `all=True`, the behavior depends on the backend but typically implies `INTERSECT ALL`.
+
+        Args:
+            other: The other `QuerySet` to combine results with.
+            all: If `True`, attempts to perform `INTERSECT ALL`; otherwise, performs `INTERSECT DISTINCT`.
+
+        Returns:
+            A `CombinedQuerySet` instance representing the combined operation.
+        """
+        return self._combine(other, "intersect", all_=all)
+
+    def except_(self, other: QuerySet, *, all: bool = False) -> CombinedQuerySet:
+        """
+        Returns a result set that is the EXCEPT (difference) of the current QuerySet
+        and another QuerySet (rows in the first but not in the second).
+
+        By default, `EXCEPT` returns only distinct rows (EXCEPT DISTINCT).
+        If `all=True`, performs `EXCEPT ALL`.
+
+        Args:
+            other: The other `QuerySet` to combine results with.
+            all: If `True`, performs `EXCEPT ALL`; otherwise, performs `EXCEPT DISTINCT`.
+
+        Returns:
+            A `CombinedQuerySet` instance representing the combined operation.
+        """
+        return self._combine(other, "except", all_=all)
 
     async def _sql_helper(self) -> Any:
         """
-        Helper method to compile the SQL query into a string.
-        """
-        async with self.database:
-            return (await self.as_select()).compile(
-                self.database.engine, compile_kwargs={"literal_binds": True}
-            )
+        Helper method to compile the SQL query represented by the current QuerySet into a string.
 
-    @cached_property
-    def sql(self) -> str:
-        """Get SQL select query as string with inserted blanks. For debugging only!"""
-        return str(run_sync(self._sql_helper()))
+        This is primarily used for debugging, introspection, or logging the generated SQL.
+        The method ensures that literal bind values (parameters) are included in the final string.
+
+        Returns:
+            A string containing the compiled SQL query.
+        """
+        # Use the database context manager to ensure the engine is ready
+        async with self.database:
+            # 1. Get the SQLAlchemy Selectable object
+            selectable = await self.as_select()
+
+            # 2. Compile the selectable object using the database engine
+            compiled_sql: Any = selectable.compile(
+                self.database.engine,
+                compile_kwargs={"literal_binds": True},  # Include parameter values directly
+            )
+            # Return the compiled statement (which often implicitly converts to a string)
+            return compiled_sql
 
     def select_for_update(
         self,
@@ -1567,13 +1686,34 @@ class QuerySet(BaseQuerySet):
         **kwargs: Any,
     ) -> QuerySet:
         """
-        Filters the QuerySet by the given kwargs and clauses.
+        Filters the QuerySet by the given clauses and keyword arguments, combining them with the AND operand.
+
+        This is the primary method for constructing the WHERE clause of a query. Multiple clauses
+        and kwargs are implicitly combined using AND.
+
+        Args:
+            *clauses: Positional arguments which can be:
+                      - SQLAlchemy Binary Expressions (e.g., `Model.field == value`).
+                      - Callables (sync/async) that accept the QuerySet and return a Binary Expression.
+                      - Dictionaries (Django-style lookups, e.g., `{"field__gt": 10}`).
+                      - Nested QuerySets (for subqueries).
+            **kwargs: Keyword arguments for Django-style lookups (e.g., `field__gt=10`).
+
+        Returns:
+            A new QuerySet instance with the additional filters applied.
         """
         return self._filter_or_exclude(clauses=clauses, kwargs=kwargs)
 
     def all(self, clear_cache: bool = False) -> QuerySet:
         """
-        Returns a cloned query with empty cache. Optionally just clear the cache and return the same query.
+        Returns a cloned QuerySet instance, or simply clears the cache of the current instance.
+
+        Args:
+            clear_cache: If `True`, the method clears the internal cache and returns `self`.
+                         If `False` (default), it returns a fresh clone with an empty cache.
+
+        Returns:
+            A new QuerySet clone or the current QuerySet instance (`self`).
         """
         if clear_cache:
             self._clear_cache(keep_cached_selected=not self._has_dynamic_clauses)
@@ -1593,7 +1733,16 @@ class QuerySet(BaseQuerySet):
         **kwargs: Any,
     ) -> QuerySet:
         """
-        Filters the QuerySet by the OR operand.
+        Filters the QuerySet by the given clauses and keyword arguments, combining them with the OR operand.
+
+        This method is used to construct a disjunction (OR logic) for the WHERE clause.
+
+        Args:
+            *clauses: Positional arguments for filtering (same types as `filter`).
+            **kwargs: Keyword arguments for filtering (Django-style lookups).
+
+        Returns:
+            A new QuerySet instance with the OR filters applied.
         """
         return self._filter_or_exclude(clauses=clauses, or_=True, kwargs=kwargs)
 
@@ -1610,7 +1759,17 @@ class QuerySet(BaseQuerySet):
         **kwargs: Any,
     ) -> QuerySet:
         """
-        Filters the QuerySet by the OR operand.
+        Filters the QuerySet using the OR operand, but only applies the OR logic locally.
+
+        This prevents the OR operation from becoming a global OR that overrides existing,
+        unrelated AND filters, often by applying the OR clause within parentheses.
+
+        Args:
+            *clauses: Positional arguments for filtering.
+            **kwargs: Keyword arguments for filtering.
+
+        Returns:
+            A new QuerySet instance with the local OR filters applied.
         """
         return self._filter_or_exclude(
             clauses=clauses, or_=True, kwargs=kwargs, allow_global_or=False
@@ -1628,7 +1787,16 @@ class QuerySet(BaseQuerySet):
         **kwargs: Any,
     ) -> QuerySet:
         """
-        Filters the QuerySet by the AND operand. Alias of filter.
+        Filters the QuerySet by the given clauses and keyword arguments, using the AND operand.
+
+        This method is an alias for `filter()`, explicitly stating the AND logic.
+
+        Args:
+            *clauses: Positional arguments for filtering.
+            **kwargs: Keyword arguments for filtering.
+
+        Returns:
+            A new QuerySet instance with the AND filters applied.
         """
         return self._filter_or_exclude(clauses=clauses, kwargs=kwargs)
 
@@ -1645,7 +1813,16 @@ class QuerySet(BaseQuerySet):
         **kwargs: Any,
     ) -> QuerySet:
         """
-        Filters the QuerySet by the NOT operand. Alias of exclude.
+        Excludes results from the QuerySet by negating the given clauses and keyword arguments.
+
+        This method is an alias for `exclude()`, explicitly stating the NOT logic.
+
+        Args:
+            *clauses: Positional arguments for exclusion.
+            **kwargs: Keyword arguments for exclusion.
+
+        Returns:
+            A new QuerySet instance with the exclusion applied.
         """
         return self.exclude(*clauses, **kwargs)
 
@@ -1662,7 +1839,17 @@ class QuerySet(BaseQuerySet):
         **kwargs: Any,
     ) -> QuerySet:
         """
-        Exactly the same as the filter but for the exclude.
+        Excludes results from the QuerySet by negating the given clauses and keyword arguments.
+
+        The exclusion logic is typically implemented by calling `_filter_or_exclude`
+        with the `exclude=True` flag.
+
+        Args:
+            *clauses: Positional arguments for exclusion (same types as `filter`).
+            **kwargs: Keyword arguments for exclusion (Django-style lookups).
+
+        Returns:
+            A new QuerySet instance with the exclusion applied.
         """
         return self._filter_or_exclude(clauses=clauses, exclude=True, kwargs=kwargs)
 
@@ -1671,7 +1858,14 @@ class QuerySet(BaseQuerySet):
         exclude_secrets: bool = True,
     ) -> QuerySet:
         """
-        Excludes any field that contains the `secret=True` declared from being leaked.
+        Marks the QuerySet to exclude any model fields declared with `secret=True` from being leaked
+        or serialized in the final result set.
+
+        Args:
+            exclude_secrets: If `True` (default), secrets are excluded; if `False`, they are included.
+
+        Returns:
+            A new QuerySet clone with the `_exclude_secrets` flag set.
         """
         queryset = self._clone()
         queryset._exclude_secrets = exclude_secrets
@@ -1713,7 +1907,15 @@ class QuerySet(BaseQuerySet):
         batch_size: int | None = None,
     ) -> QuerySet:
         """
-        Set batch/chunk size. Used for iterate
+        Sets the batch or chunk size for results. This is primarily used in conjunction
+        with iteration methods (like `QuerySet.iterate()`) to control memory usage.
+
+        Args:
+            batch_size: The number of records to fetch in each database round-trip.
+                        If `None`, iteration may fetch all results at once (depending on the backend).
+
+        Returns:
+            A new QuerySet clone with the batch size set.
         """
         queryset = self._clone()
         queryset._batch_size = batch_size
@@ -1721,7 +1923,17 @@ class QuerySet(BaseQuerySet):
 
     def lookup(self, term: Any) -> QuerySet:
         """
-        Broader way of searching for a given term on CharField and TextField instances.
+        Performs a broader, case-insensitive search for a given term across all
+        CharField and TextField instances defined on the model.
+
+        The search uses the SQL `LIKE` operator with wildcards (`%`) and typically
+        maps to `ILIKE` on PostgreSQL for case-insensitivity.
+
+        Args:
+            term: The search term to look for.
+
+        Returns:
+            A new QuerySet instance with the combined OR filter applied to all searchable fields.
         """
         queryset: QuerySet = self._clone()
         if not term:
@@ -1747,6 +1959,15 @@ class QuerySet(BaseQuerySet):
     def order_by(self, *order_by: str) -> QuerySet:
         """
         Returns a QuerySet ordered by the given fields.
+
+        Sorting is applied in ascending order by default. Prepending a field name with
+        a hyphen (`-`) specifies descending order (e.g., `-created_at`).
+
+        Args:
+            *order_by: One or more field names to sort by.
+
+        Returns:
+            A new QuerySet clone with the specified ordering.
         """
         queryset: QuerySet = self._clone()
         queryset._order_by = order_by
@@ -1756,10 +1977,14 @@ class QuerySet(BaseQuerySet):
 
     def reverse(self) -> QuerySet:
         """
-        Reverses the order of the QuerySet.
+        Reverses the established order of the QuerySet.
 
-        If no `order_by` is set, it defaults to ordering by primary key columns.
-        It also attempts to reverse the cached results for immediate consistency.
+        If an `order_by` is already set, it negates the sorting direction of every field.
+        If no `order_by` is set, it defaults to reversing the primary key columns.
+        It also adjusts internal cache pointers for consistency if caching is active.
+
+        Returns:
+            A new QuerySet clone with the reversed ordering.
         """
         if not self._order_by:
             queryset = self.order_by(*self.model_class.pkcolumns)
@@ -1784,7 +2009,13 @@ class QuerySet(BaseQuerySet):
 
     def limit(self, limit_count: int) -> QuerySet:
         """
-        Returns a QuerySet limited by.
+        Limits the number of results returned by the QuerySet (SQL LIMIT clause).
+
+        Args:
+            limit_count: The maximum number of rows to return.
+
+        Returns:
+            A new QuerySet clone with the limit applied.
         """
         queryset: QuerySet = self._clone()
         queryset.limit_count = limit_count
@@ -1792,7 +2023,13 @@ class QuerySet(BaseQuerySet):
 
     def offset(self, offset: int) -> QuerySet:
         """
-        Returns a Queryset limited by the offset.
+        Skips the specified number of results before starting to return rows (SQL OFFSET clause).
+
+        Args:
+            offset: The number of rows to skip.
+
+        Returns:
+            A new QuerySet clone with the offset applied.
         """
         queryset: QuerySet = self._clone()
         queryset._offset = offset
@@ -1800,7 +2037,13 @@ class QuerySet(BaseQuerySet):
 
     def group_by(self, *group_by: str) -> QuerySet:
         """
-        Returns the values grouped by the given fields.
+        Groups the results of the QuerySet by the given fields (SQL GROUP BY clause).
+
+        Args:
+            *group_by: One or more field names to group the results by.
+
+        Returns:
+            A new QuerySet clone with the grouping applied.
         """
         queryset: QuerySet = self._clone()
         queryset._group_by = group_by
@@ -1831,8 +2074,17 @@ class QuerySet(BaseQuerySet):
 
     def only(self, *fields: str) -> QuerySet:
         """
-        Returns a list of models with the selected only fields and always the primary
-        key.
+        Restricts the QuerySet to retrieve **only** the specified fields from the database
+        for the model instances, along with the primary key field(s).
+
+        This method is used for performance optimization when only a subset of columns is needed.
+        The primary key is automatically included to ensure object identity and saving functionality.
+
+        Args:
+            *fields: The names of the model fields (columns) to include in the SELECT statement.
+
+        Returns:
+            A new QuerySet clone with the `_only` set attribute containing the selected fields.
         """
         queryset: QuerySet = self._clone()
         only_fields = set(fields)
@@ -1849,8 +2101,17 @@ class QuerySet(BaseQuerySet):
 
     def defer(self, *fields: str) -> QuerySet:
         """
-        Returns a list of models with the selected only fields and always the primary
-        key.
+        Excludes the specified fields from being retrieved from the database.
+
+        When accessing a deferred field on a model instance, a subsequent database query
+        will be triggered to fetch its value. This is useful for large, rarely accessed
+        fields (e.g., large text blobs).
+
+        Args:
+            *fields: The names of the model fields (columns) to **exclude** from the SELECT statement.
+
+        Returns:
+            A new QuerySet clone with the `_defer` set attribute containing the fields to skip.
         """
         queryset: QuerySet = self._clone()
 
@@ -1884,7 +2145,20 @@ class QuerySet(BaseQuerySet):
         exclude_none: bool = False,
     ) -> list[dict]:
         """
-        Returns the results in a python dictionary format.
+        Executes the query and returns the results as a list of Python dictionaries,
+        rather than model instances.
+
+        Args:
+            fields: A sequence of field names to include in the resulting dictionaries.
+                    If `None`, all model fields are included.
+            exclude: A sequence of field names to exclude from the resulting dictionaries.
+            exclude_none: If `True`, fields with a value of `None` are omitted from the dictionaries.
+
+        Returns:
+            A list of dictionaries representing the selected data rows.
+
+        Raises:
+            QuerySetError: If the `fields` argument is not a suitable sequence.
         """
 
         if isinstance(fields, str):
@@ -1910,7 +2184,20 @@ class QuerySet(BaseQuerySet):
         flat: bool = False,
     ) -> list[Any]:
         """
-        Returns the results in a python dictionary format.
+        Executes the query and returns the results as a list of tuples or, if `flat=True`,
+        a flat list of values for a single field.
+
+        Args:
+            fields: A sequence of field names to include. Must contain exactly one field if `flat=True`.
+            exclude: A sequence of field names to exclude.
+            exclude_none: If `True`, fields with a value of `None` are omitted during dictionary creation.
+            flat: If `True` and only one field is selected, returns a list of values instead of tuples/dictionaries.
+
+        Returns:
+            A list of tuples, or a flat list of values if `flat=True`.
+
+        Raises:
+            QuerySetError: If `flat=True` but more than one field is selected, or if the selected field does not exist.
         """
         if isinstance(fields, str):
             fields = [fields]
@@ -1931,7 +2218,15 @@ class QuerySet(BaseQuerySet):
 
     async def exists(self, **kwargs: Any) -> bool:
         """
-        Returns a boolean indicating if a record exists or not.
+        Returns a boolean indicating if one or more records matching the QuerySet's criteria exists.
+
+        If keyword arguments are provided, it first checks the cache for an existence match.
+
+        Args:
+            **kwargs: Optional filters to apply before checking for existence (e.g., `pk=1`).
+
+        Returns:
+            True if at least one record exists, False otherwise.
         """
         if kwargs:
             # check cache for existance
@@ -1950,7 +2245,12 @@ class QuerySet(BaseQuerySet):
 
     async def count(self) -> int:
         """
-        Returns an indicating the total records.
+        Executes a SELECT COUNT statement and returns the total number of records matching the query.
+
+        The result is cached internally to prevent redundant database calls for subsequent counts.
+
+        Returns:
+            The total number of records as an integer.
         """
         if self._cache_count is not None:
             return self._cache_count
@@ -1964,7 +2264,15 @@ class QuerySet(BaseQuerySet):
 
     async def get_or_none(self, **kwargs: Any) -> EdgyEmbedTarget | None:
         """
-        Fetch one object matching the parameters or returns None.
+        Fetches a single object matching the parameters.
+
+        If no object is found (raises `ObjectNotFound`), returns `None`.
+
+        Args:
+            **kwargs: Filters to identify the single object.
+
+        Returns:
+            The matching model instance, or `None`.
         """
         try:
             return await self.get(**kwargs)
@@ -1973,13 +2281,28 @@ class QuerySet(BaseQuerySet):
 
     async def get(self, **kwargs: Any) -> EdgyEmbedTarget:
         """
-        Returns a single record based on the given kwargs.
+        Fetches a single object matching the parameters.
+
+        Args:
+            **kwargs: Filters to identify the single object.
+
+        Returns:
+            The matching model instance.
+
+        Raises:
+            ObjectNotFound: If no object is found.
+            MultipleObjectsReturned: If more than one object is found (implicitly handled by underlying `_get_raw`).
         """
         return cast(EdgyEmbedTarget, (await self._get_raw(**kwargs))[1])
 
     async def first(self) -> EdgyEmbedTarget | None:
         """
-        Returns the first record of a given queryset.
+        Returns the first record from the QuerySet, respecting any ordering and limits.
+
+        If the count is zero or the first record is already cached, it returns the cached result.
+
+        Returns:
+            The first model instance, or `None` if the QuerySet is empty.
         """
         if self._cache_count is not None and self._cache_count == 0:
             return None
@@ -2001,7 +2324,12 @@ class QuerySet(BaseQuerySet):
 
     async def last(self) -> EdgyEmbedTarget | None:
         """
-        Returns the last record of a given queryset.
+        Returns the last record from the QuerySet, by reversing the implicit or explicit ordering.
+
+        If the count is zero or the last record is already cached, it returns the cached result.
+
+        Returns:
+            The last model instance, or `None` if the QuerySet is empty.
         """
         if self._cache_count is not None and self._cache_count == 0:
             return None
@@ -2024,7 +2352,14 @@ class QuerySet(BaseQuerySet):
 
     async def create(self, *args: Any, **kwargs: Any) -> EdgyEmbedTarget:
         """
-        Creates a record in a specific table.
+        Creates and saves a single record in the database table associated with the QuerySet's model.
+
+        Args:
+            *args: Positional arguments for model instantiation.
+            **kwargs: Keyword arguments for model instantiation and field values.
+
+        Returns:
+            The newly created model instance.
         """
         # for tenancy
         queryset: QuerySet = self._clone()
@@ -2059,7 +2394,13 @@ class QuerySet(BaseQuerySet):
 
     async def bulk_create(self, objs: Iterable[dict[str, Any] | EdgyModel]) -> None:
         """
-        Bulk creates records in a table
+        Bulk creates multiple records in a single batch operation.
+
+        This method bypasses model-level save hooks (except for pre/post-save) for efficiency,
+        and returns `None`.
+
+        Args:
+            objs: An iterable of dictionaries or model instances to be created.
         """
         queryset: QuerySet = self._clone()
 
@@ -2104,12 +2445,14 @@ class QuerySet(BaseQuerySet):
 
     async def bulk_update(self, objs: list[EdgyModel], fields: list[str]) -> None:
         """
-        Bulk updates records in a table.
+        Bulk updates records in a table based on the provided list of model instances and fields.
 
-        A similar solution was suggested here: https://github.com/encode/orm/pull/148
+        The primary key of each model instance is used to identify the record to update.
+        This operation is performed within a database transaction.
 
-        It is thought to be a clean approach to a simple problem so it was added here and
-        refactored to be compatible with Edgy.
+        Args:
+            objs: A list of existing model instances to update.
+            fields: A list of field names that should be updated across all instances.
         """
         queryset: QuerySet = self._clone()
         fields = list(fields)
@@ -2290,9 +2633,16 @@ class QuerySet(BaseQuerySet):
 
     async def update(self, **kwargs: Any) -> None:
         """
-        Updates records in a specific table with the given kwargs.
+        Updates records in a specific table with the given keyword arguments, matching the QuerySet's filters.
 
-        Warning: does not execute pre_save_callback/post_save_callback hooks and passes values directly to clean.
+        This performs a database-level update operation without fetching and saving model instances.
+
+        Warning:
+        - **Does not** execute instance-level `pre_save_callback`/`post_save_callback` hooks.
+        - Values are processed directly for column mapping and validation but do not pass through model instance saving.
+
+        Args:
+            **kwargs: The field names and new values to apply to the matching records.
         """
 
         column_values = self.model_class.extract_column_values(
@@ -2334,7 +2684,18 @@ class QuerySet(BaseQuerySet):
         self, defaults: dict[str, Any] | Any | None = None, *args: Any, **kwargs: Any
     ) -> tuple[EdgyEmbedTarget, bool]:
         """
-        Creates a record in a specific table or updates if already exists.
+        Fetches a single object matching `kwargs`. If found, returns the object and `False`.
+        If not found, creates a new object using `kwargs` (with `defaults` applied) and returns it with `True`.
+
+        Args:
+            defaults: Optional dictionary of values to use if a new object must be created.
+                      Can also be a `ModelRef` instance to set a related object upon creation.
+            *args: Positional arguments for model creation if object is not found.
+            **kwargs: Filters used to attempt retrieval, and primary creation arguments if not found.
+
+        Returns:
+            A tuple containing the fetched/created model instance and a boolean indicating
+            if the object was created (`True`) or fetched (`False`).
         """
         if not isinstance(defaults, dict):
             # can be a ModelRef so pass it
@@ -2372,7 +2733,17 @@ class QuerySet(BaseQuerySet):
         self, defaults: dict[str, Any] | Any | None = None, *args: Any, **kwargs: Any
     ) -> tuple[EdgyEmbedTarget, bool]:
         """
-        Updates a record in a specific table or creates a new one.
+        Updates a single object matching `kwargs` using `defaults`. If not found, creates a new object.
+
+        Args:
+            defaults: Optional dictionary of values to apply as updates if the object is found,
+                      or to use as creation values if the object is new. Can also be a `ModelRef`.
+            *args: Positional arguments for model creation if object is not found.
+            **kwargs: Filters used to attempt retrieval.
+
+        Returns:
+            A tuple containing the fetched/created model instance and a boolean indicating
+            if the object was created (`True`) or updated (`False`).
         """
         if not isinstance(defaults, dict):
             # can be a ModelRef so pass it
@@ -2408,8 +2779,18 @@ class QuerySet(BaseQuerySet):
         return cast(EdgyEmbedTarget, get_instance), False
 
     async def contains(self, instance: BaseModelType) -> bool:
-        """Returns true if the QuerySet contains the provided object.
-        False if otherwise.
+        """
+        Checks if the QuerySet contains a specific model instance by verifying its existence
+        in the database using its primary key(s).
+
+        Args:
+            instance: The model instance to check for containment.
+
+        Returns:
+            True if the record exists in the database and matches the QuerySet filters, False otherwise.
+
+        Raises:
+            ValueError: If the provided object is not a model instance or has a missing primary key.
         """
         query: Any = {}
         try:
@@ -2423,7 +2804,17 @@ class QuerySet(BaseQuerySet):
         return await self.exists(**query)
 
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
-        """Return database transaction for the assigned database."""
+        """
+        Returns a database transaction context manager for the assigned database.
+
+        Args:
+            force_rollback: If `True`, the transaction will always rollback when the context manager exits,
+                            regardless of whether an exception occurred. Useful for testing.
+            **kwargs: Additional keyword arguments passed to the underlying database transaction factory.
+
+        Returns:
+            A `Transaction` context manager.
+        """
         return self.database.transaction(force_rollback=force_rollback, **kwargs)
 
     def __await__(
@@ -2434,3 +2825,194 @@ class QuerySet(BaseQuerySet):
     async def __aiter__(self) -> AsyncIterator[Any]:
         async for value in self._execute_iterate():
             yield value
+
+
+class CombinedQuerySet(QuerySet):
+    """
+    A queryset that represents a SQL set operation between two querysets
+    (UNION / UNION ALL / INTERSECT / EXCEPT).
+
+    It inherits all public APIs from `QuerySet`. The internal compilation is
+    overridden so that the outer SELECT is built on top of the set-operation
+    subquery, allowing chaining (filter/order_by/distinct/limit/offset) to apply
+    to the combined results.
+    """
+
+    def __init__(
+        self,
+        left: QuerySet,
+        right: QuerySet,
+        *,
+        op: str = "union",
+    ) -> None:
+        # initialize as a normal QuerySet bound to the same model/database
+        super().__init__(model_class=left.model_class, database=left.database)
+
+        self._left = left
+        self._right = right
+        self._op: str = op
+
+        # carry over schema from the left side
+        self.using_schema = left.using_schema
+        self.active_schema = self.get_schema()
+
+        # safety & consistency checks
+        if left.model_class is not right.model_class:
+            raise QuerySetError(
+                detail="CombinedQuerySet requires both sides to have the same model class."
+            )
+        if getattr(left.database, "dsn", None) != getattr(right.database, "dsn", None):  # noqa
+            if getattr(left.database, "url", None) != getattr(right.database, "url", None):
+                raise QuerySetError(
+                    detail="Both querysets must be on the same database connection."
+                )
+
+    def _clone(self) -> CombinedQuerySet:
+        """
+        Return a copy of this CombinedQuerySet that preserves the left/right branches,
+        the chosen set operation, and all the usual queryset flags (filters, order_by, etc).
+        """
+        # Rebuild with the same branches/op
+        queryset = self.__class__(left=self._left, right=self._right, op=self._op)
+
+        # Copy commonly-cloned attributes from BaseQuerySet._clone()
+        queryset.filter_clauses = list(self.filter_clauses)
+        queryset.or_clauses.extend(self.or_clauses)
+
+        queryset._aliases = dict(getattr(self, "_aliases", {}))
+        queryset.limit_count = self.limit_count
+        queryset._offset = self._offset
+        queryset._batch_size = self._batch_size
+        queryset._order_by = self._order_by
+        queryset._group_by = self._group_by
+
+        # distinct handling mirrors BaseQuerySet._clone behavior
+        queryset.distinct_on = (
+            self.distinct_on[:] if isinstance(self.distinct_on, list) else self.distinct_on
+        )
+
+        queryset._only = set(self._only)
+        queryset._defer = set(self._defer)
+
+        queryset.embed_parent = self.embed_parent
+        queryset.embed_parent_filters = self.embed_parent_filters
+        queryset.using_schema = self.using_schema
+        queryset.active_schema = self.active_schema
+
+        queryset._extra_select = list(self._extra_select)
+        queryset._reference_select = (
+            self._reference_select.copy() if isinstance(self._reference_select, dict) else {}
+        )
+
+        # Select-related caches: copy values to avoid recomputation unless necessary
+        queryset._select_related.update(self._select_related)
+        queryset._select_related_weak.update(self._select_related_weak)
+        queryset._cached_select_related_expression = self._cached_select_related_expression
+
+        # Locking is not supported for combined sets; ensure none is carried
+        queryset._for_update = None
+
+        # Result caches are intentionally *not* copied; the clone should start "fresh".
+        queryset._clear_cache(keep_result_cache=False, keep_cached_selected=False)
+        return queryset
+
+    async def _as_select_with_tables(
+        self,
+    ) -> tuple[Any, dict[str, tuple[Any, type[BaseModelType]]]]:
+        """
+        Build a SELECT over a set operation subquery.
+
+        We compile left/right to SELECTs, perform the set op, then SELECT * FROM ( .. )
+        so that subsequent clauses (filter/order_by/group_by/distinct/limit/offset)
+        from this CombinedQuerySet apply to the merged rows.
+        """
+        # compile both branches
+        left_sel, _ = await self._left.as_select_with_tables()
+        right_sel, _ = await self._right.as_select_with_tables()
+
+        # Ensure both sides project the same number of columns
+        left_cols = list(left_sel.selected_columns)
+        right_cols = list(right_sel.selected_columns)
+        if len(left_cols) != len(right_cols):
+            raise QuerySetError(
+                detail=(
+                    "UNION/INTERSECT/EXCEPT require both querysets to select the same columns. "
+                    "Align projections (use only()/defer()/extra_select()) on both sides."
+                )
+            )
+
+        # perform the set operation
+        op = self._op
+        if op == "union":
+            set_expr = left_sel.union(right_sel)
+        elif op == "union_all":
+            set_expr = left_sel.union_all(right_sel)
+        elif op in ("intersect", "intersect_all"):
+            # SQLAlchemy Core lacks direct intersect_all(), but some dialects accept the SQL.
+            # Use .intersect() and let DISTINCT semantics apply callers who need ALL should rely
+            # on SQL dialect support or raw extra_select.
+            set_expr = left_sel.intersect(right_sel)
+        elif op in ("except", "except_all"):
+            # Same note as above for ALL variants.
+            set_expr = left_sel.except_(right_sel)
+        else:
+            raise QuerySetError(detail=f"Unsupported set operation: {self._op}")
+
+        # Wrap into a subquery to apply outer clauses
+        sub = set_expr.subquery("edgy_combined")
+
+        # Outer SELECT re-projects all columns from the subquery.
+        outer_cols = [getattr(sub.c, c.key) for c in left_cols]
+        expression = (
+            sqlalchemy.select(*outer_cols)
+            .set_label_style(sqlalchemy.LABEL_STYLE_NONE)
+            .select_from(sub)
+        )
+
+        # Minimal tables_and_models: map "" to the subquery and original model
+        tables_and_models: dict[str, tuple[Any, type[BaseModelType]]] = {
+            "": (sub, self.model_class)
+        }
+
+        # WHERE based on this CombinedQuerySet's filters (if any)
+        where_clause = await self.build_where_clause(self, tables_and_models)
+        if where_clause is not None:
+            expression = expression.where(where_clause)
+
+        # ORDER BY
+        if self._order_by:
+            expression = expression.order_by(
+                *self._build_order_by_iterable(self._order_by, tables_and_models)
+            )
+
+        # GROUP BY
+        if self._group_by:
+            expression = expression.group_by(
+                *self._build_order_by_iterable(self._group_by, tables_and_models)
+            )
+
+        # LIMIT / OFFSET
+        if self.limit_count:
+            expression = expression.limit(self.limit_count)
+        if self._offset:
+            expression = expression.offset(self._offset)
+
+        # DISTINCT / DISTINCT ON
+        if self.distinct_on is not None:
+            expression = self._build_select_distinct(
+                self.distinct_on, expression=expression, tables_and_models=tables_and_models
+            )
+
+        # Row locking on combined sets generally isn't supported in SQLAlchemy;
+        # we explicitly ignore/forbid it to avoid dialect errors.
+        if getattr(self, "_for_update", None):
+            raise QuerySetError(
+                detail="select_for_update() is not supported on combined querysets."
+            )
+
+        return expression, tables_and_models
+
+    # factory helpers to construct CombinedQuerySet from a base QuerySet
+    @classmethod
+    def build(cls, left: QuerySet, right: QuerySet, *, op: str) -> CombinedQuerySet:
+        return cls(left=left, right=right, op=op)
