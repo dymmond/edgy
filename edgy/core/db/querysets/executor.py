@@ -14,14 +14,16 @@ from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.db import check_db_connection, hash_tablekey
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
 
-from .types import EdgyModel
+from .types import EdgyEmbedTarget, EdgyModel
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.base import BaseQuerySet
     from edgy.core.db.querysets.compiler import QueryCompiler
     from edgy.core.db.querysets.parser import ResultParser
+    from edgy.core.db.querysets.queryset import QuerySet
 
     from .types import tables_and_models_type
+
 
 _current_row_holder: ContextVar[list[sqlalchemy.Row | None] | None] = ContextVar(
     "_current_row_holder", default=None
@@ -48,15 +50,63 @@ class QueryExecutor:
         compiler: QueryCompiler,
         parser: ResultParser,
     ):
+        """
+        Initializes the QueryExecutor.
+
+        Args:
+            queryset: The BaseQuerySet instance holding the query state.
+            compiler: The QueryCompiler to be used for WHERE clauses (e.g., in deletes).
+            parser: The ResultParser to be used for turning rows into models.
+        """
         self.queryset = queryset
         self.compiler = compiler
         self.parser = parser
         self.database = queryset.database
         self.model_class = queryset.model_class
 
+    async def _process_and_yield_batch(
+        self,
+        batch: Sequence[sqlalchemy.Row],
+        tables_and_models: tables_and_models_type,
+        new_cache: QueryModelResultCache,
+    ) -> AsyncGenerator[tuple[tuple[EdgyModel, EdgyEmbedTarget], sqlalchemy.Row], None]:
+        """
+        Processes a single batch of rows.
+
+        This helper method prepares prefetches, parses rows into models,
+        and yields the (result_tuple, row) for the iterator.
+
+        Args:
+            batch: A list of raw SQLAlchemy Row objects.
+            tables_and_models: The table/model mapping from the compiler.
+            new_cache: The result cache to populate.
+
+        Yields:
+            A tuple containing:
+                - (result_tuple): The (raw_model, embed_target) tuple.
+                - (row): The raw SQLAlchemy Row.
+        """
+        prefetches = await self._prepare_prefetches_for_batch(batch, tables_and_models)
+        results: Sequence[tuple[EdgyModel, EdgyEmbedTarget]] = await self.parser.batch_to_models(
+            batch, tables_and_models, prefetches, new_cache
+        )
+
+        for row_num, result_tuple in enumerate(results):
+            yield result_tuple, batch[row_num]
+
     async def iterate(self, fetch_all_at_once: bool = False) -> AsyncGenerator[EdgyModel, None]:
         """
-        This is the refactored _execute_iterate.
+        Executes the query and iterates over results, yielding model instances.
+
+        This method orchestrates the query execution, handling either
+        fetching all results at once or iterating in batches.
+
+        Args:
+            fetch_all_at_once: If True, fetches all rows from the database in
+                a single query. If False, uses a batched iterator.
+
+        Yields:
+            EdgyModel: A populated model instance for each row.
         """
         qs = self.queryset
         if qs._cache_fetch_all:
@@ -70,7 +120,6 @@ class QueryExecutor:
         if qs.embed_parent:
             qs = qs.distinct()  # type: ignore
 
-        # Use the compiler to get the SQL
         expression, tables_and_models = await qs.as_select_with_tables()
 
         if not fetch_all_at_once and bool(self.database.force_rollback):
@@ -95,17 +144,15 @@ class QueryExecutor:
                 async with self.database as database:
                     batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
 
-                prefetches = await self._prepare_prefetches_for_batch(batch, tables_and_models)
-                results: Sequence[tuple[EdgyModel, Any]] = await self.parser.batch_to_models(
-                    batch, tables_and_models, prefetches, new_cache
-                )
-
-                for row_num, result in enumerate(results):
+                # Use the new helper to process the single, large batch
+                async for result, row in self._process_and_yield_batch(
+                    batch, tables_and_models, new_cache
+                ):
                     if counter == 0:
                         qs._cache_first = result
                     last_element = result
                     counter += 1
-                    current_row[0] = batch[row_num]
+                    current_row[0] = row
                     yield result[1]
 
                 qs._cache_fetch_all = True
@@ -121,20 +168,16 @@ class QueryExecutor:
                         new_cache.clear()
                         qs._cache_fetch_all = False
 
-                        prefetches = await self._prepare_prefetches_for_batch(
-                            batch, tables_and_models
-                        )
-                        results = await self.parser.batch_to_models(
-                            batch, tables_and_models, prefetches, new_cache
-                        )
-
-                        for row_num, result in enumerate(results):
+                        # Use the new helper to process each batch
+                        async for result, row in self._process_and_yield_batch(
+                            batch, tables_and_models, new_cache
+                        ):
                             if counter == 0:
                                 qs._cache_first = result
                             last_element = result
                             counter += 1
-                            current_row[0] = batch[row_num]
-                            yield result[1]
+                            current_row[0] = row
+                            yield result[1]  # Yield the embed target
                         batch_num += 1
 
                 if batch_num <= 1:
@@ -146,9 +189,17 @@ class QueryExecutor:
         qs._cache_count = counter
         qs._cache_last = last_element
 
-    async def get_one(self) -> tuple[EdgyModel, Any]:
+    async def get_one(self) -> tuple[EdgyModel, EdgyEmbedTarget]:
         """
+        Fetches a single unique record from the database.
         This is the refactored _get_raw (when no kwargs are present).
+
+        Returns:
+            A tuple of (raw_model, embed_target).
+
+        Raises:
+            ObjectNotFound: If no record is found.
+            MultipleObjectsReturned: If more than one record is found.
         """
         expression, tables_and_models = await self.queryset.as_select_with_tables()
         check_db_connection(self.database, stacklevel=4)
@@ -164,8 +215,9 @@ class QueryExecutor:
 
         self.queryset._cache_count = 1
 
-        # Use the parser
-        result: tuple[EdgyModel, Any] = await self.parser.row_to_model(rows[0], tables_and_models)
+        result: tuple[EdgyModel, EdgyEmbedTarget] = await self.parser.row_to_model(
+            rows[0], tables_and_models
+        )
 
         # Update cache attributes
         self.queryset._cache_first = result
@@ -178,10 +230,20 @@ class QueryExecutor:
         tables_and_models: tables_and_models_type,
     ) -> list[Prefetch]:
         """
+        Builds the Prefetch objects for a given batch of results.
         This is the *prefetch building* half of the original _handle_batch.
-        """
-        from edgy.core.db.querysets.queryset import QuerySet  # Local import
 
+        Args:
+            batch: The current batch of SQLAlchemy Row objects.
+            tables_and_models: The table/model mapping from the compiler.
+
+        Returns:
+            A list of populated Prefetch objects, ready to be executed.
+
+        Raises:
+            NotImplementedError: If a prefetch crosses database boundaries.
+            QuerySetError: If a prefetch path is invalid (e.g., unidirectional).
+        """
         prepared_prefetches: list[Prefetch] = []
         qs = self.queryset
 
@@ -235,8 +297,19 @@ class QueryExecutor:
         self, use_models: bool = False, remove_referenced_call: str | bool = False
     ) -> int:
         """
-        Executes a raw delete operation.
-        (Refactored from raw_delete)
+        Executes a delete operation.
+
+        This method coordinates the deletion, deciding whether to perform a
+        fast, raw SQL delete or a slower, model-based delete (which runs hooks).
+
+        Args:
+            use_models: If True, deletion is performed by iterating and
+                deleting individual model instances.
+            remove_referenced_call: Specifies how to handle referenced objects
+                during deletion (passed to model.raw_delete).
+
+        Returns:
+            The number of rows deleted.
         """
         if (
             self.model_class.__require_model_based_deletion__
@@ -262,9 +335,20 @@ class QueryExecutor:
 
     async def _model_based_delete(self, remove_referenced_call: str | bool) -> int:
         """
-        Performs a model-based deletion.
-        (Moved from BaseQuerySet)
+        Performs a model-based deletion by iterating over models in batches.
+
+        This method ensures that each model's `raw_delete` method is called,
+        allowing all pre/post_delete hooks and signal handlers to run.
+
+        Args:
+            remove_referenced_call: Passed to each model's `raw_delete` method.
+
+        Returns:
+            The total number of models deleted.
         """
+        from edgy.core.db.querysets.compiler import QueryCompiler
+        from edgy.core.db.querysets.parser import ResultParser
+
         queryset = (
             self.queryset.limit(self.queryset._batch_size)
             if not self.queryset._cache_fetch_all
@@ -273,12 +357,13 @@ class QueryExecutor:
         queryset.embed_parent = None
         row_count = 0
 
-        # We need to create new specialists for this queryset
-        compiler = QueryCompiler(queryset)
+        compiler = QueryCompiler(queryset)  # type: ignore
         parser = ResultParser(queryset)
+
+        # Instantiate the QueryExecutor recursively for the new queryset
         executor = QueryExecutor(queryset, compiler, parser)  # type: ignore
 
-        # We must use the executor's iterate method
+        # Uuse the new executor's iterate method
         models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
 
         token = CURRENT_INSTANCE.set(self.queryset)
