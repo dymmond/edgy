@@ -6,7 +6,7 @@ hide:
 
 # Release Notes
 
-## 0.34.2
+## 0.35.0
 
 ### Added
 
@@ -16,6 +16,7 @@ hide:
 ### Changed
 
 - Remove `loguru` dependency.
+- Reorganise some internals for better clarity and separation of concerns.
 
 ### Fixed
 
