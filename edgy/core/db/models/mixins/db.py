@@ -1114,7 +1114,7 @@ class DatabaseMixin:
         Returns:
             The saved model instance.
         """
-        instance: BaseModelType | QuerySet = CURRENT_INSTANCE.get()
+        instance: BaseModelType | QuerySet = CURRENT_INSTANCE.get()  # type: ignore
         extracted_fields = self.extract_db_fields()
         if values is None:
             explicit_values: set[str] = set()

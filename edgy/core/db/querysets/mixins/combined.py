@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Sequence
+from typing import Any, cast
 
 import sqlalchemy
 
 from edgy.core.db.models.types import BaseModelType
+from edgy.core.db.querysets import clauses as clauses_mod
 from edgy.core.db.querysets.queryset import QuerySet
 from edgy.exceptions import QuerySetError
 
@@ -48,6 +50,46 @@ class CombinedQuerySet(QuerySet):
                 raise QuerySetError(
                     detail="Both querysets must be on the same database connection."
                 )
+
+    def _build_select_distinct(
+        self,
+        distinct_on: Sequence[str] | None,
+        expression: Any,
+        tables_and_models: dict[str, tuple[Any, type[BaseModelType]]],
+    ) -> Any:
+        """
+        (Copied from QueryCompiler)
+        Filters selects only specific fields. Leave empty to use simple distinct
+        """
+        # using with columns is not supported by all databases
+        if distinct_on:
+            return expression.distinct(
+                *(
+                    self._prepare_distinct(distinct_el, tables_and_models)
+                    for distinct_el in distinct_on
+                )
+            )
+        else:
+            return expression.distinct()
+
+    def _prepare_distinct(
+        self, distinct_on: str, tables_and_models: dict[str, tuple[Any, type[BaseModelType]]]
+    ) -> sqlalchemy.Column:
+        """
+        (Copied from QueryCompiler and adapted for self)
+        Prepares a field for use in a distinct-on clause.
+        """
+        crawl_result = clauses_mod.clean_path_to_crawl_result(
+            self.model_class,
+            path=distinct_on,
+            embed_parent=self.embed_parent_filters,
+            model_database=self.database,
+        )
+        # The subquery is aliased as "edgy_combined", which is in tables_and_models[""]
+        return cast(
+            sqlalchemy.Column,
+            tables_and_models[crawl_result.forward_path][0].columns[crawl_result.field_name],
+        )
 
     def _clone(self) -> CombinedQuerySet:
         """

@@ -25,6 +25,7 @@ from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.querysets.base import BaseQuerySet, _extract_unique_lookup_key
+from edgy.core.db.querysets.parser import ResultParser
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import CHECK_DB_CONNECTION_SILENCED, check_db_connection
 from edgy.core.utils.sync import run_sync
@@ -881,19 +882,17 @@ class QuerySet(BaseQuerySet):
         async with queryset.database as database:
             row = await database.fetch_one(expression, pos=0)
         if row:
-            return (
-                await self._get_or_cache_row(row, tables_and_models, extra_attr="_cache_first")
-            )[1]
+            parser = ResultParser(self)
+            result_tuple: tuple[Any, EdgyEmbedTarget] = await parser.row_to_model(
+                row, tables_and_models
+            )
+            self._cache_first = result_tuple
+            return result_tuple[1]
         return None
 
     async def last(self) -> EdgyEmbedTarget | None:
         """
-        Returns the last record from the QuerySet, by reversing the implicit or explicit ordering.
-
-        If the count is zero or the last record is already cached, it returns the cached result.
-
-        Returns:
-            The last model instance, or `None` if the QuerySet is empty.
+        Returns the last record from the QuerySet...
         """
         if self._cache_count is not None and self._cache_count == 0:
             return None
@@ -909,9 +908,13 @@ class QuerySet(BaseQuerySet):
         async with queryset.database as database:
             row = await database.fetch_one(expression, pos=0)
         if row:
-            return (
-                await self._get_or_cache_row(row, tables_and_models, extra_attr="_cache_last")
-            )[1]
+            # NEW FIXED LINES:
+            parser = ResultParser(self)
+            result_tuple: tuple[Any, EdgyEmbedTarget] = await parser.row_to_model(
+                row, tables_and_models
+            )
+            self._cache_last = result_tuple
+            return result_tuple[1]
         return None
 
     async def create(self, *args: Any, **kwargs: Any) -> EdgyEmbedTarget:

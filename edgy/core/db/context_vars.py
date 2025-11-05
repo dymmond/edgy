@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import FIELD_CONTEXT_TYPE
     from edgy.core.db.models.types import BaseModelType
+    from edgy.core.db.querysets.base import BaseQuerySet
     from edgy.core.db.querysets.queryset import QuerySet
 
 # A frozen set used as a default empty set for context variables, preventing modification.
@@ -39,7 +40,7 @@ CURRENT_FIELD_CONTEXT: ContextVar[FIELD_CONTEXT_TYPE] = ContextVar("CURRENT_FIEL
 # This is used for operations that need to know the context of the current model
 # or queryset, such as during relationship loading or method calls that operate
 # on the current object.
-CURRENT_INSTANCE: ContextVar[BaseModelType | QuerySet | None] = ContextVar(
+CURRENT_INSTANCE: ContextVar[BaseModelType | QuerySet | BaseQuerySet | None] = ContextVar(
     "CURRENT_INSTANCE", default=None
 )
 
