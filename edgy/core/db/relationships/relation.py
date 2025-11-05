@@ -312,7 +312,7 @@ class ManyRelation(ManyRelationProtocol):
             # Attempt to save the intermediate model. If it fails due to IntegrityError,
             # it means the record already exists, so return None.
             result = await through_instance.real_save(force_insert=True, values=None)
-            return cast(BaseModelType, getattr(result, self.to_foreign_key))
+            return cast("BaseModelType", getattr(result, self.to_foreign_key))
         except IntegrityError:
             pass  # The record already exists.
         finally:
