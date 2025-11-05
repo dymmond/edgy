@@ -70,7 +70,7 @@ organisation = await Organisation.query.create(ident="Acme Ltd")
 # Add teams to the organisation
 await organisation.teams.add(blue_team)
 result = await organisation.teams.add(green_team)
-# result is either None or a proxymodel of green_team
+# result is either None or a the model green_team with added embedded information
 ```
 
 Why do we need the proxy model when having green_team?
@@ -89,7 +89,7 @@ organisation = await Organisation.query.create(ident="Acme Ltd")
 
 # Add teams to the organisation
 results = await organisation.teams.add_many(blue_team, green_team, red_team)
-# results contain the proxy models as well as None when the object was added already
+# results contain the created models as well as None when the object was added already
 ```
 
 ### remove_many()

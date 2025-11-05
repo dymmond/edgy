@@ -231,7 +231,7 @@ async def test_rollback(create_test_database):
             user = await studio.users.create(name="edgy")
             total_users = await studio.users.all()
             raise ValueError()
-    assert user.__parent__ is User
+    assert isinstance(user, User | User.proxy_model)
     assert not await User.query.filter(id=total_users[0].id).exists()
     assert not await User.query.filter(id=user.id).exists()
 

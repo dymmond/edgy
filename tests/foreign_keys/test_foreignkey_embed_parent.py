@@ -1,6 +1,7 @@
 import pytest
 
 import edgy
+from edgy.exceptions import ForeignKeyBadConfigured
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -63,6 +64,38 @@ async def rollback_transactions():
     # this rolls back
     async with models:
         yield
+
+
+async def test_error_on_colliding_annotation():
+    with pytest.raises(ForeignKeyBadConfigured) as raised:
+
+        class BadProfileHolder(edgy.StrictModel):
+            profile = edgy.ForeignKey(
+                Profile, on_delete=edgy.CASCADE, embed_parent=("", "website"), reverse_name=False
+            )
+            website = edgy.CharField(max_length=100)
+
+            class Meta:
+                registry = models
+
+    models.delete_model("BadProfileHolder")
+    assert raised.value.args[0] == "Colliding field `website` on `BadProfileHolder` for embedding."
+
+
+async def test_error_on_colliding_annotation2():
+    with pytest.raises(ForeignKeyBadConfigured) as raised:
+
+        class BadProfileHolder(edgy.StrictModel):
+            profile = edgy.ForeignKey(
+                Profile, on_delete=edgy.CASCADE, embed_parent=("", "website"), reverse_name=False
+            )
+            website: str = ""
+
+            class Meta:
+                registry = models
+
+    models.delete_model("BadProfileHolder")
+    assert raised.value.args[0] == "Colliding field `website` on `BadProfileHolder` for embedding."
 
 
 async def test_embed_parent():

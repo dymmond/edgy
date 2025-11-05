@@ -242,7 +242,7 @@ async def test_rollback_create(create_test_database):
             user = await studio.users.create(name="edgy")
             await studio.users.all()
             raise ValueError()
-    assert user.__parent__ is User
+    assert isinstance(user, User | User.proxy_model)
     assert await studio.users.count() == 0
 
 
@@ -253,7 +253,7 @@ async def test_rollback_create2(create_test_database):
             user = await studio.users.create(name="edgy")
             await studio.users.all()
             raise ValueError()
-    assert user.__parent__ is User
+    assert isinstance(user, User | User.proxy_model)
     assert await studio.users.count() == 0
 
 
@@ -262,7 +262,7 @@ async def test_rollback_force(create_test_database):
     async with studio.transaction(force_rollback=True):
         user = await studio.users.create(name="edgy")
         await studio.users.all()
-    assert user.__parent__ is User
+    assert isinstance(user, User | User.proxy_model)
     assert await studio.users.count() == 0
 
 
@@ -274,7 +274,7 @@ async def test_rollback_delete(create_test_database):
             await studio.users.delete()
             assert await studio.users.count() == 0
             raise ValueError()
-    assert user.__parent__ is User
+    assert isinstance(user, User | User.proxy_model)
     assert await studio.users.count() == 1
 
 

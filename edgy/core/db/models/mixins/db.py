@@ -146,13 +146,30 @@ def _set_related_field(
                 "the same target. Related names must be different."
             )
     # now we have enough data
-    fk = source.meta.fields[foreign_key_name]
+    fk = cast("BaseForeignKey", source.meta.fields[foreign_key_name])
     if fk.force_cascade_deletion_relation or (
         fk.on_delete == CASCADE
         and (source.meta.registry is not target.meta.registry or fk.no_constraint)
     ):
         fk.relation_has_post_delete_callback = True
         fk.force_cascade_deletion_relation = True
+    if fk.embed_parent and fk.embed_parent[1]:  # noqa: SIM102
+        if fk.embed_parent[1] in source.model_fields and not isinstance(
+            source.model_fields[fk.embed_parent[1]].annotation, target
+        ):
+            raise ForeignKeyBadConfigured(
+                f"Colliding field `{fk.embed_parent[1]}` on `{source.__name__}` for embedding."
+            )
+        # For the next major release. Do we want to force this? This will break things for certain
+        # but would be cleaner
+        # if (
+        #    source.model_config["extra"] != "allow"
+        #    and fk.embed_parent[1] not in source.model_fields
+        # ):
+        #    raise ForeignKeyBadConfigured(
+        #        f"Missing field (`{fk.embed_parent[1]}`) on `{source.__name__}` for embedding "
+        #        '(source.model_config["extra"] != "allow").'
+        #    )
 
     related_field = RelatedField(
         foreign_key_name=foreign_key_name,

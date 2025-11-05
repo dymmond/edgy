@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from inspect import isawaitable
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
-from edgy.core.db.context_vars import CURRENT_INSTANCE
+from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.fields.base import RelationshipField
 from edgy.exceptions import ObjectNotFound, RelationshipIncompatible, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
@@ -312,12 +313,26 @@ class ManyRelation(ManyRelationProtocol):
             # Attempt to save the intermediate model. If it fails due to IntegrityError,
             # it means the record already exists, so return None.
             result = await through_instance.real_save(force_insert=True, values=None)
-            return cast("BaseModelType", getattr(result, self.to_foreign_key))
         except IntegrityError:
-            pass  # The record already exists.
+            # The record already exists.
+            return None
         finally:
             CURRENT_INSTANCE.reset(token)
-        return None
+        if isinstance(child, self.through | self.through.proxy_model | dict):
+            return cast("BaseModelType", getattr(result, self.to_foreign_key))
+        if self.embed_parent:
+            token = MODEL_GETATTR_BEHAVIOR.set("coro")
+            try:
+                new_result: Any = result
+                for part in self.embed_parent[0].split("__"):
+                    new_result = getattr(new_result, part)
+                    if isawaitable(new_result):
+                        new_result = await new_result
+            finally:
+                MODEL_GETATTR_BEHAVIOR.reset(token)
+            if self.embed_parent[1]:
+                setattr(child, self.embed_parent[1], new_result)
+        return child
 
     async def remove_many(self, *children: BaseModelType) -> None:
         """
@@ -683,12 +698,24 @@ class SingleRelation(ManyRelationProtocol):
         token = CURRENT_INSTANCE.set(child)
         try:
             await child.real_save(force_insert=False, values={self.to_foreign_key: self.instance})
-            return child
         except IntegrityError:
             # one-to-one violation
             return None
         finally:
             CURRENT_INSTANCE.reset(token)
+        if self.embed_parent:
+            token = MODEL_GETATTR_BEHAVIOR.set("coro")
+            try:
+                new_result: Any = self.instance
+                for part in self.embed_parent[0].split("__"):
+                    new_result = getattr(new_result, part)
+                    if isawaitable(new_result):
+                        new_result = await new_result
+            finally:
+                MODEL_GETATTR_BEHAVIOR.reset(token)
+            if self.embed_parent[1]:
+                setattr(child, self.embed_parent[1], new_result)
+        return child
 
     async def add_many(self, *children: BaseModelType) -> list[BaseModelType | None]:
         """
