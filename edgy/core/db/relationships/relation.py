@@ -331,6 +331,7 @@ class ManyRelation(ManyRelationProtocol):
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(embed_token)
             if self.embed_parent[1]:
+                # object.__setattr__ will set it if extra="forbid" or "ignore" and not a field
                 setattr(child, self.embed_parent[1], new_result)
         return child
 
@@ -714,6 +715,7 @@ class SingleRelation(ManyRelationProtocol):
             finally:
                 MODEL_GETATTR_BEHAVIOR.reset(embed_token)
             if self.embed_parent[1]:
+                # object.__setattr__ will set it if extra="forbid" or "ignore" and not a field
                 setattr(child, self.embed_parent[1], new_result)
         return child
 
