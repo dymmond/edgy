@@ -87,6 +87,7 @@ nav:
       - File Handling: "file-handling.md"
       - Queries:
           - Queries: "queries/queries.md"
+          - Combined Queries: "queries/combined-queries.md"
           - Annotations: "queries/annotate.md"
           - Secrets: "queries/secrets.md"
           - Related Name: "queries/related-name.md"
