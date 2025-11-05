@@ -153,23 +153,6 @@ def _set_related_field(
     ):
         fk.relation_has_post_delete_callback = True
         fk.force_cascade_deletion_relation = True
-    if fk.embed_parent and fk.embed_parent[1]:  # noqa: SIM102
-        # TODO: find a way to proper resolve this
-        # if fk.embed_parent[1] in source.model_fields and not isinstance(
-        #     source.model_fields[fk.embed_parent[1]].annotation, target
-        # ):
-        #     raise ForeignKeyBadConfigured(
-        #         f"Colliding field `{fk.embed_parent[1]}` on `{source.__name__}` for embedding."
-        #     )
-        if (
-            source.model_config["extra"] != "allow"
-            and source.model_config["validate_assignment"]
-            and fk.embed_parent[1] not in source.model_fields
-        ):
-            raise ForeignKeyBadConfigured(
-                f"Missing field (`{fk.embed_parent[1]}`) on `{source.__name__}` for embedding "
-                '(source.model_config["extra"] != "allow" and source.model_config["validate_assignment"]).'
-            )
 
     related_field = RelatedField(
         foreign_key_name=foreign_key_name,

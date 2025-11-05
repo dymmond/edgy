@@ -1097,7 +1097,6 @@ class BaseForeignKey(RelationshipField):
     # Name used for backward relations. Only useful if related_name = False,
     # because otherwise it gets overwritten.
     reverse_name: str = ""
-    embed_parent: tuple[str, str] | None = None
 
     @property
     def target_registry(self) -> Registry:
