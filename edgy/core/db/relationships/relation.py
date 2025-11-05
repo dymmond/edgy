@@ -698,7 +698,9 @@ class SingleRelation(ManyRelationProtocol):
 
         token = CURRENT_INSTANCE.set(child)
         try:
-            await child.real_save(force_insert=False, values={self.to_foreign_key: self.instance})
+            result = await child.real_save(
+                force_insert=False, values={self.to_foreign_key: self.instance}
+            )
         except IntegrityError:
             # one-to-one violation
             return None
@@ -707,7 +709,7 @@ class SingleRelation(ManyRelationProtocol):
         if self.embed_parent:
             embed_token = MODEL_GETATTR_BEHAVIOR.set("coro")
             try:
-                new_result: Any = self.instance
+                new_result: Any = result
                 for part in self.embed_parent[0].split("__"):
                     new_result = getattr(new_result, part)
                     if isawaitable(new_result):
