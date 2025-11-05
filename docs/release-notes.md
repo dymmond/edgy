@@ -11,6 +11,7 @@ hide:
 ### Added
 
 - New [select_for_update()](./queries/queries.md#select-for-update) operator allowing to lock rows and avoid race conditions.
+- New [CombinedQueryset](./queries/combined-queries.md) operators (Union, Inteserct).
 
 ### Changed
 
