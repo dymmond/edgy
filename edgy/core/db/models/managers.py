@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-from edgy.core.db.querysets.base import QuerySet
+from edgy.core.db.querysets.queryset import QuerySet
 
 if TYPE_CHECKING:
     from edgy.core.db.models.base import BaseModelType

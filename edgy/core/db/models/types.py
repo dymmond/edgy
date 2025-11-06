@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from edgy.core.db.models.managers import BaseManager
     from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.db.models.model import Model
-    from edgy.core.db.querysets.base import QuerySet
+    from edgy.core.db.querysets.queryset import QuerySet
     from edgy.protocols.transaction_call import TransactionCallProtocol
 
 

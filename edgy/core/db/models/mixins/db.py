@@ -47,7 +47,7 @@ if TYPE_CHECKING:
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import FIELD_CONTEXT_TYPE, BaseFieldType
     from edgy.core.db.models.model import Model
-    from edgy.core.db.querysets.base import QuerySet
+    from edgy.core.db.querysets.queryset import QuerySet
 
 
 _empty = cast(set[str], frozenset())
@@ -1114,7 +1114,7 @@ class DatabaseMixin:
         Returns:
             The saved model instance.
         """
-        instance: BaseModelType | QuerySet = CURRENT_INSTANCE.get()
+        instance: BaseModelType | QuerySet = CURRENT_INSTANCE.get()  # type: ignore
         extracted_fields = self.extract_db_fields()
         if values is None:
             explicit_values: set[str] = set()

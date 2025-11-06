@@ -31,7 +31,7 @@ from .utils.models import get_model as _get_model
 
 if TYPE_CHECKING:
     from edgy.core.db.models.model import Model
-    from edgy.core.db.querysets.base import QuerySet
+    from edgy.core.db.querysets.queryset import QuerySet
 
 
 def get_registered_model(model: str) -> type[Model]:

@@ -3,16 +3,16 @@ from typing import TYPE_CHECKING
 from monkay import Monkay
 
 if TYPE_CHECKING:
-    from .base import QuerySet
     from .clauses import Q, and_, not_, or_
     from .prefetch import Prefetch
+    from .queryset import QuerySet
 
 __all__ = ["QuerySet", "Q", "and_", "not_", "or_", "Prefetch"]
 
 Monkay(
     globals(),
     lazy_imports={
-        "QuerySet": ".base.QuerySet",
+        "QuerySet": ".queryset.QuerySet",
         "Q": ".clauses.Q",
         "and_": ".clauses.and_",
         "not_": ".clauses.not_",

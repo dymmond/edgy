@@ -8,7 +8,7 @@ from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.querysets.clauses import and_
 
 if TYPE_CHECKING:
-    from edgy.core.db.querysets.base import QuerySet
+    from edgy.core.db.querysets.queryset import QuerySet
 
 
 class PermissionManager(Manager):
