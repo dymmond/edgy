@@ -208,10 +208,7 @@ def with_force_fields_nullable(
         None: The execution context within which the fields are forced nullable.
     """
     # Set the FORCE_FIELDS_NULLABLE context variable with the processed input.
-    # FIXME (for sayer): somehow we end up with [None]
-    token = FORCE_FIELDS_NULLABLE.set(
-        {_process_force_field_nullable(item) for item in inp if item}
-    )
+    token = FORCE_FIELDS_NULLABLE.set({_process_force_field_nullable(item) for item in inp})
     try:
         yield
     finally:
