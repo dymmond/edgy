@@ -36,20 +36,21 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
 
     async def raw_delete(
         self, *, skip_post_delete_hooks: bool, remove_referenced_call: bool | str
-    ) -> None:
-        await super().raw_delete(
+    ) -> int:
+        row_count = await super().raw_delete(
             skip_post_delete_hooks=skip_post_delete_hooks,
             remove_referenced_call=remove_referenced_call,
         )
         if remove_referenced_call:
-            return
+            return row_count
         reverse_name = f"reverse_{self.name.lower()}"
         if not hasattr(self, reverse_name):
             # e.g. model was removed from registry
-            return
+            return row_count
         referenced_obs = cast("QuerySet", getattr(self, reverse_name))
         fk = cast("BaseForeignKeyField", self.meta.fields[reverse_name].foreign_key)
         if fk.force_cascade_deletion_relation:
             await referenced_obs.using(schema=self.schema_name).raw_delete(
                 use_models=fk.use_model_based_deletion, remove_referenced_call=reverse_name
             )
+        return row_count

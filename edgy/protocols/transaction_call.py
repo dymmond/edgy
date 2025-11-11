@@ -16,9 +16,8 @@ class TransactionCallProtocol(Protocol):
     hinting and ensuring consistency across different transaction managers.
     """
 
-    def __call__(
-        self, instance: Any, *, force_rollback: bool = False, **kwargs: Any
-    ) -> Transaction:
+    @classmethod
+    def __call__(cls, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
         """
         Initiates and returns a database transaction.
 

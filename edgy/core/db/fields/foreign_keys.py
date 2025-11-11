@@ -343,7 +343,6 @@ class BaseForeignKeyField(BaseForeignKey):
             return None
         target = self.target
         related_columns = self.related_columns.keys()
-
         # If value is already a target model instance or its proxy.
         if isinstance(value, target | target.proxy_model):
             # If all related columns are set to None in the instance, return None.

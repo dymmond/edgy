@@ -241,7 +241,7 @@ class BaseModelType(ABC):
     @abstractmethod
     async def raw_delete(
         self, *, skip_post_delete_hooks: bool, remove_referenced_call: bool | str
-    ) -> None:
+    ) -> int:
         """
         Abstract asynchronous method to delete the model instance from the database.
 
@@ -266,7 +266,7 @@ class BaseModelType(ABC):
         """
 
     @abstractmethod
-    async def delete(self, skip_post_delete_hooks: bool = False) -> None:
+    async def delete(self, skip_post_delete_hooks: bool = False) -> int | None:
         """
         Abstract asynchronous method to delete the model instance from the database.
 

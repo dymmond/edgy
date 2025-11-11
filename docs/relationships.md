@@ -132,7 +132,10 @@ The `Profile` model defines an `edgy.ForeignKey` to `User` with `on_delete=edgy.
 
 * **CASCADE**: Remove all referencing objects.
 * **RESTRICT**: Restricts the removal of referenced objects.
+* **PROTECT**: Like restrict but if the referenced object is deleted by other pathes still delete.
 * **SET_NULL**: Sets the referencing instance's foreign key to `null` when the referenced object is deleted. When using `SET_NULL`, `null=True` must also be provided.
+* **SET_DEFAULT**: Sets the referencing foreign key to its default.
+* **DO_NOTHING**: Don't trigger anything.
 
 ## OneToOne
 
@@ -156,6 +159,14 @@ Creating another `Profile` with the same user will fail and raise an exception.
 ```
 await Profile.query.create(user=user)
 ```
+
+## Special methods
+
+The reverse end of many-to-many or ForeignKey behaves like the
+
+[Operations of ManyToManyField](./queries/many-to-many.md#operations).
+
+In fact the same intermediate relation protocol is used.
 
 ## Limitations
 

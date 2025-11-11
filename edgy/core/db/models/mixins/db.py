@@ -146,7 +146,7 @@ def _set_related_field(
                 "the same target. Related names must be different."
             )
     # now we have enough data
-    fk = source.meta.fields[foreign_key_name]
+    fk = cast("BaseForeignKey", source.meta.fields[foreign_key_name])
     if fk.force_cascade_deletion_relation or (
         fk.on_delete == CASCADE
         and (source.meta.registry is not target.meta.registry or fk.no_constraint)
@@ -927,7 +927,7 @@ class DatabaseMixin:
             )
         return row_count
 
-    async def delete(self: Model, skip_post_delete_hooks: bool = False) -> None:
+    async def delete(self: Model, skip_post_delete_hooks: bool = False) -> int:
         """
         Deletes the current model instance from the database.
 
@@ -951,6 +951,7 @@ class DatabaseMixin:
         await self.meta.signals.post_delete.send_async(
             real_class, instance=self, model_instance=self, row_count=row_count
         )
+        return row_count
 
     async def load(self, only_needed: bool = False) -> None:
         """

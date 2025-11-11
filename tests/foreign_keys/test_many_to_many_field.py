@@ -211,6 +211,7 @@ async def test_many_to_many_many_fields(create_test_database):
     total_albums = await studio.albums.all()
 
     assert len(total_users) == 3
+    assert not isinstance(total_users[0], Studio.meta.fields["users"].through)
     assert total_users[0].pk == user1.pk
     assert total_users[1].pk == user2.pk
     assert total_users[2].pk == user3.pk
@@ -228,6 +229,53 @@ async def test_many_to_many_many_fields(create_test_database):
     total_tracks_album3 = await album3.tracks.all()
     assert len(total_tracks_album3) == 1
     assert total_tracks_album3[0].pk == track3.pk
+
+    # deep select_related (despite useless)
+    albums = await studio.albums.select_related("tracks")
+    assert albums[0]._db_loaded_or_deleted
+
+
+async def test_rollback_create(create_test_database):
+    studio = await Studio.query.create(name="Downtown Records")
+    with pytest.raises(ValueError):
+        async with studio.transaction():
+            user = await studio.users.create(name="edgy")
+            await studio.users.all()
+            raise ValueError()
+    assert isinstance(user, User | User.proxy_model)
+    assert await studio.users.count() == 0
+
+
+async def test_rollback_create2(create_test_database):
+    studio = await Studio.query.create(name="Downtown Records")
+    with pytest.raises(ValueError):
+        async with Studio.transaction():
+            user = await studio.users.create(name="edgy")
+            await studio.users.all()
+            raise ValueError()
+    assert isinstance(user, User | User.proxy_model)
+    assert await studio.users.count() == 0
+
+
+async def test_rollback_force(create_test_database):
+    studio = await Studio.query.create(name="Downtown Records")
+    async with studio.transaction(force_rollback=True):
+        user = await studio.users.create(name="edgy")
+        await studio.users.all()
+    assert isinstance(user, User | User.proxy_model)
+    assert await studio.users.count() == 0
+
+
+async def test_rollback_delete(create_test_database):
+    studio = await Studio.query.create(name="Downtown Records")
+    user = await studio.users.create(name="edgy")
+    with pytest.raises(ValueError):
+        async with studio.transaction():
+            await studio.users.delete()
+            assert await studio.users.count() == 0
+            raise ValueError()
+    assert isinstance(user, User | User.proxy_model)
+    assert await studio.users.count() == 1
 
 
 async def test_related_name_query(create_test_database):

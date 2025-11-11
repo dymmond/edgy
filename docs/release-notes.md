@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.35.1
+
+### Fixed
+- Fix m2m returning through model when using create.
+- Fix incorrect use of delete and save in relations. They should use the raw versions as they are not userfacing.
+
 ## 0.35.0
 
 ### Added

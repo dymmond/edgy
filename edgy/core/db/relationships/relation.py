@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from inspect import isawaitable
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
+from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.fields.base import RelationshipField
 from edgy.exceptions import ObjectNotFound, RelationshipIncompatible, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
@@ -304,14 +306,34 @@ class ManyRelation(ManyRelationProtocol):
                 f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
             )
         # Expand the child into a 'through' model instance.
-        child = self.expand_relationship(child)
+        through_instance = self.expand_relationship(child)
+
+        token = CURRENT_INSTANCE.set(through_instance)
         try:
             # Attempt to save the intermediate model. If it fails due to IntegrityError,
             # it means the record already exists, so return None.
-            return await child.save(force_insert=True)
+            result = await through_instance.real_save(force_insert=True, values=None)
         except IntegrityError:
-            pass  # The record already exists.
-        return None
+            # The record already exists.
+            return None
+        finally:
+            CURRENT_INSTANCE.reset(token)
+        if isinstance(child, self.through | self.through.proxy_model | dict):
+            return cast("BaseModelType", getattr(result, self.to_foreign_key))
+        if self.embed_parent:
+            embed_token = MODEL_GETATTR_BEHAVIOR.set("coro")
+            try:
+                new_result: Any = result
+                for part in self.embed_parent[0].split("__"):
+                    new_result = getattr(new_result, part)
+                    if isawaitable(new_result):
+                        new_result = await new_result
+            finally:
+                MODEL_GETATTR_BEHAVIOR.reset(embed_token)
+            if self.embed_parent[1]:
+                # object.__setattr__ will set it if extra="forbid" or "ignore" and not a field
+                setattr(child, self.embed_parent[1], new_result)
+        return child
 
     async def remove_many(self, *children: BaseModelType) -> None:
         """
@@ -372,16 +394,27 @@ class ManyRelation(ManyRelationProtocol):
         # Cast the child to BaseModelType as it is now confirmed to be a model instance.
         child = cast("BaseModelType", self.expand_relationship(child))
         # Count the number of relationships based on the identifying clauses of the child.
-        count = await child.query.filter(*child.identifying_clauses()).count()
-        if count == 0:
-            # If no relationship is found, raise an error.
-            raise RelationshipNotFound(
-                detail=f"There is no relationship between '{self.from_foreign_key}' and "
-                f"'{self.to_foreign_key}: {getattr(child, self.to_foreign_key).pk}'."
+        real_class = self.get_real_class()
+        await child.meta.signals.pre_delete.send_async(
+            real_class, instance=child, model_instance=child
+        )
+        token = CURRENT_INSTANCE.set(child)
+        try:
+            row_count = await child.raw_delete(
+                skip_post_delete_hooks=False,
+                remove_referenced_call=False,
             )
-        else:
-            # If a relationship exists, delete the child from the through table.
-            await child.delete()
+            if row_count == 0:
+                # If no relationship is found, raise an error.
+                raise RelationshipNotFound(
+                    detail=f"There is no relationship between '{self.from_foreign_key}' and "
+                    f"'{self.to_foreign_key}: {getattr(child, self.to_foreign_key).pk}'."
+                )
+        finally:
+            CURRENT_INSTANCE.reset(token)
+            await self.meta.signals.post_delete.send_async(
+                real_class, instance=child, model_instance=child, row_count=row_count
+            )
 
     def __repr__(self) -> str:
         """
@@ -662,7 +695,30 @@ class SingleRelation(ManyRelationProtocol):
         # Expand the child into a 'to' model instance.
         child = self.expand_relationship(child)
         # Save the child, setting its foreign key to the current instance.
-        await child.save(values={self.to_foreign_key: self.instance})
+
+        token = CURRENT_INSTANCE.set(child)
+        try:
+            result = await child.real_save(
+                force_insert=False, values={self.to_foreign_key: self.instance}
+            )
+        except IntegrityError:
+            # one-to-one violation
+            return None
+        finally:
+            CURRENT_INSTANCE.reset(token)
+        if self.embed_parent:
+            embed_token = MODEL_GETATTR_BEHAVIOR.set("coro")
+            try:
+                new_result: Any = result
+                for part in self.embed_parent[0].split("__"):
+                    new_result = getattr(new_result, part)
+                    if isawaitable(new_result):
+                        new_result = await new_result
+            finally:
+                MODEL_GETATTR_BEHAVIOR.reset(embed_token)
+            if self.embed_parent[1]:
+                # object.__setattr__ will set it if extra="forbid" or "ignore" and not a field
+                setattr(child, self.embed_parent[1], new_result)
         return child
 
     async def add_many(self, *children: BaseModelType) -> list[BaseModelType | None]:
@@ -737,7 +793,14 @@ class SingleRelation(ManyRelationProtocol):
             raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
 
         # Save the child, setting its foreign key to None to remove the relationship.
-        await child.save(values={self.to_foreign_key: None})
+        # MAYBE: optimize the case if the foreign_key is not matching.
+        # We need to check if the model is loaded completely
+
+        token = CURRENT_INSTANCE.set(child)
+        try:
+            await child.real_save(force_insert=False, values={self.to_foreign_key: None})
+        finally:
+            CURRENT_INSTANCE.reset(token)
 
     def __repr__(self) -> str:
         """
