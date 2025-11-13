@@ -6,12 +6,6 @@ hide:
 
 # Release Notes
 
-## 0.35.1
-
-### Fixed
-- Fix m2m returning through model when using create.
-- Fix incorrect use of delete and save in relations. They should use the raw versions as they are not userfacing.
-
 ## 0.35.0
 
 ### Added
@@ -28,6 +22,8 @@ hide:
 ### Fixed
 
 - Fix `auto_create_schema` and `auto_drop_schema` of `TenantMixin` which were not used at all.
+- Fix m2m returning through model when using create.
+- Fix incorrect use of delete and save in relations. They should use the raw versions as they are not userfacing.
 
 ### Removed
 
