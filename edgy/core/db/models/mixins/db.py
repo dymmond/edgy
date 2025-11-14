@@ -5,6 +5,7 @@ import copy
 import inspect
 import sys
 import warnings
+from abc import ABC
 from collections.abc import Awaitable, Callable, Collection, Sequence
 from functools import partial
 from itertools import chain
@@ -53,12 +54,17 @@ if TYPE_CHECKING:
 _empty = cast(set[str], frozenset())
 
 
-class _EmptyClass: ...
+class _EmptyClass(ABC): ...  # noqa: B024
+
+
+class _EmptyPydantic(BaseModel):
+    def __init__(self) -> None:
+        """Stub init for triggering custom init path"""
 
 
 _removed_copy_keys = {
     # remove pydantic specific attrs from copying
-    *(k for k in BaseModel.__dict__ if k not in _EmptyClass.__dict__),
+    *(k for k in _EmptyPydantic.__dict__ if k not in _EmptyClass.__dict__),
     # remove extra
     "_db_loaded",
     "_db_deleted",
@@ -69,6 +75,7 @@ _removed_copy_keys = {
     "meta",
     "transaction",
 }
+_removed_copy_keys.discard("__init__")
 
 
 def _check_replace_related_field(
