@@ -158,7 +158,7 @@ class TenantMixin(edgy.Model):
                 await self.delete()
         return tenant
 
-    async def delete(self, force_drop: bool = False) -> int:
+    async def delete(self, force_drop: bool = False) -> None:
         """
         Deletes a tenant record and, if `auto_drop_schema` is True,
         also drops its associated database schema.
@@ -194,7 +194,7 @@ class TenantMixin(edgy.Model):
                 schema=self.schema_name, cascade=True, if_exists=True
             )
         # Call the parent's delete method to remove the tenant record from the database.
-        return await super().delete()
+        await super().delete()
 
 
 class DomainMixin(edgy.Model):
@@ -283,7 +283,7 @@ class DomainMixin(edgy.Model):
             # Call the parent's `real_save` method to persist the domain record.
             return await super().real_save(force_insert, values)
 
-    async def delete(self) -> int:
+    async def delete(self) -> None:
         """
         Deletes a domain record, with a safeguard to prevent accidental
         deletion of the public domain.
