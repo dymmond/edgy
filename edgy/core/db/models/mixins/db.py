@@ -75,6 +75,7 @@ _removed_copy_keys = {
     "meta",
     "transaction",
 }
+# we need to keep __init__ (included because of stub init)
 _removed_copy_keys.discard("__init__")
 
 
