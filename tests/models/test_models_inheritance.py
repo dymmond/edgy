@@ -32,8 +32,11 @@ def test_second_manager():
         objects2: ClassVar[edgy.Manager] = edgy.RedirectManager(redirect_name="query")
 
     DjangoBase.proxy_model  # noqa: B018
+    DjangoBase.copy_edgy_model().proxy_model  # noqa: B018
     Cat.proxy_model  # noqa: B018
+    Cat.copy_edgy_model().proxy_model  # noqa: B018
     Cat2.proxy_model  # noqa: B018
+    Cat2.copy_edgy_model().proxy_model  # noqa: B018
 
 
 def test_abstract_registry():
