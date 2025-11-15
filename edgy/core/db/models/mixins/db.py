@@ -53,7 +53,7 @@ if TYPE_CHECKING:
 _empty = cast(set[str], frozenset())
 
 
-class _EmptyClass: ...  # noqa: B024
+class _EmptyClass: ...
 
 
 class _EmptyPydantic(BaseModel):
