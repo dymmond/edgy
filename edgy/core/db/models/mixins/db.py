@@ -5,7 +5,6 @@ import copy
 import inspect
 import sys
 import warnings
-from abc import ABC
 from collections.abc import Awaitable, Callable, Collection, Sequence
 from functools import partial
 from itertools import chain
@@ -54,7 +53,7 @@ if TYPE_CHECKING:
 _empty = cast(set[str], frozenset())
 
 
-class _EmptyClass(ABC): ...  # noqa: B024
+class _EmptyClass: ...  # noqa: B024
 
 
 class _EmptyPydantic(BaseModel):
