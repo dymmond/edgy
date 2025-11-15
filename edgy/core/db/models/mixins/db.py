@@ -76,6 +76,9 @@ _removed_copy_keys = {
 }
 # we need to keep __init__ (included because of stub init)
 _removed_copy_keys.discard("__init__")
+# for python 3.14 workaround
+# see in models/metaclasses.py the other part of the workaround
+_removed_copy_keys.discard("__class_vars__")
 
 
 def _check_replace_related_field(

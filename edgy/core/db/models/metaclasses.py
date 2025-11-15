@@ -1094,7 +1094,12 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                 exclude=True, name="pk", inherit=False, no_copy=True
             )
 
-        new_class = cast(type["Model"], super().__new__(cls, name, bases, attrs, **kwargs))
+        # python 3.14 workaround
+        # FIXME: needs investigation why in py3.14 classvars are not found after copying
+        # see in models/mixins/db.py the the other part of the workaround
+        old_class_vars = attrs.pop("__class_vars__", None) or _empty_set
+        new_class = cast(type["Model"], super().__new__(cls, name, bases, attrs.copy(), **kwargs))
+        new_class.__class_vars__.update(old_class_vars)
 
         for k, _ in meta.managers.items():
             # reuse the var of pydantic
