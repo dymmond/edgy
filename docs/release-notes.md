@@ -6,6 +6,12 @@ hide:
 
 # Release Notes
 
+## 0.35.1
+
+### Fixed
+
+- Issue with classvars in python 3.14.
+
 ## 0.35.0
 
 ### Added
