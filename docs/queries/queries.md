@@ -289,53 +289,183 @@ users = await User.query.filter(and_.from_kwargs(**my_dict))
 
 #### OR
 
-Edgy QuerySet can do global ORs. This means you can attach new OR clauses also later.
+Edgy's `or_` operator supports **two modes**:
+
+* **Global OR** – promote the new condition(s) to a top-level OR against everything that came before.
+* **Local OR** – group the new condition(s) inside the current filter chain, keeping earlier filters as a hard AND constraint.
+
+At a high level:
+
+* `User.query.and_(A).or_(B)` -> rows matching **A OR B** (global OR mode, when `B` is a single clause)
+* `User.query.and_(A).or_(B, C)` -> rows matching **A AND (B OR C)** (local OR mode, when multiple clauses are given)
+
+Remember: `and_` is just a synonym for `filter` on a QuerySet.
+
+##### Global OR: extend an existing query
+
+When you pass a **single** set of keyword filters (or a single dict), `or_` acts in *global* mode. It promotes previous filters into the top-level OR group.
 
 ```python
-# actually and_ is a synonym for filter
-user_query = User.query.and_(active=True).or_(email="gmail")
-user_query._or(email="outlook")
-# active users with email gmail or outlook are retrieved
+# Start with a base filter for active users
+user_query = User.query.and_(active=True)
+
+# Promote the existing filter and the new clause into a global OR:
+# (active = TRUE) OR (email ILIKE '%gmail%')
+user_query = user_query.or_(email__icontains="gmail")
+
+# active users OR users with a gmail email are retrieved
 users = await user_query
 ```
 
-Note: when passing multiple clauses to `or_` a local OR is executed instead.
-Because of the broad scope this is only recommended for simple queries.
+Internally this becomes something like:
 
-You can do instead something like:
+* `(active = TRUE)` (from the original filter)
+* `OR (email ILIKE '%gmail%')` (from the `or_` call)
+
+You can chain global ORs as well:
+
+```python
+user_query = User.query.and_(active=True)
+user_query = user_query.or_(email__icontains="gmail")
+user_query = user_query.or_(email__icontains="outlook")
+
+# (active = TRUE) OR (email ILIKE '%gmail%') OR (email ILIKE '%outlook%')
+users = await user_query
+```
+
+##### Local OR: group conditions under an existing filter
+
+When you pass **multiple** clauses to `or_` (either as kwargs or as multiple dicts), `or_` switches to a local OR mode. Earlier filters stay as an AND constraint, and the new conditions are grouped together:
 
 ```python
 # actually and_ is a synonym for filter
 user_query = User.query.and_(active=True)
-# add a local or
-user_query = user_query.or_({"email": "outlook"}, {"email": "gmail"})
-# active users with email gmail or outlook are retrieved
+
+# add a local OR group:
+user_query = user_query.or_(
+    {"email__icontains": "outlook"},
+    {"email__icontains": "gmail"},
+)
+
+# SQL-like:
+# WHERE active = TRUE
+#   AND (email ILIKE '%outlook%' OR email ILIKE '%gmail%')
 users = await user_query
 ```
 
-or pass querysets:
+This is often preferable when you want some condition to always apply (e.g. `active=True`) and only OR over a subset of fields.
+
+You can also pass the additional filters as plain kwargs if you don't need dicts:
 
 ```python
-# actually and_ is a synonym for filter
-user_query = User.query.and_(active=True)
-user_query = user_query.or_(user_query, {"email": "outlook"}, {"email": "gmail"})
-# active users or users with email gmail or outlook are retrieved
+user_query = (
+    User.query
+    .and_(active=True)
+    .or_(
+        email__icontains="outlook",
+        email__icontains="gmail",
+    )
+)
+# Still: active = TRUE AND (email ILIKE '%outlook%' OR email ILIKE '%gmail%')
+users = await user_query
+```
+
+##### OR with querysets
+
+You can combine an existing QuerySet with additional conditions inside a single `or_` call. The QuerySet is treated as one operand in the OR group:
+
+```python
+base = User.query.and_(active=True)
+
+user_query = base.or_(
+    base,  # reuse the base query as one OR branch
+    {"email__icontains": "outlook"},
+    {"email__icontains": "gmail"},
+)
+
+# Roughly:
+# (active = TRUE) OR (email ILIKE '%outlook%') OR (email ILIKE '%gmail%')
 users = await user_query
 ```
 
 ##### Passing multiple keyword based filters
 
-You can also passing multiple keyword based filters by providing them as a dictionary
+You can also pass multiple keyword-based filters directly as dictionaries to `or_`:
 
 ```python
-user_query = User.query.or_({"active": True}, {"email": "outlook"}, {"email": "gmail"}).
-# active users or users with email gmail or outlook are retrieved
+user_query = User.query.or_(
+    {"active": True},
+    {"email__icontains": "outlook"},
+    {"email__icontains": "gmail"},
+)
+# active users OR users with email containing gmail or outlook are retrieved
 users = await user_query
 ```
+
+In this case all three dicts are treated as separate OR branches.
+
+If you prefer to keep earlier filters as mandatory and only OR over a subset of conditions, consider using `local_or` as described in the section below.
 ##### Local only OR
 
-If the special mode of or_ is not wanted there is a function named `local_or`. It is similar
-to the or_ function except it doesn't have the global OR mode.
+If the special global-OR mode of `or_` is not wanted there is a function named `local_or`.
+It is similar to `or_` but it **never promotes previous filters into a top-level OR**.
+Instead, it groups the new conditions together and keeps them **scoped locally** to the
+current filter chain.
+
+Roughly speaking:
+
+* `User.query.filter(A).local_or(B, C)` → rows matching **A AND (B OR C)**
+* `User.query.filter(A).or_(B, C)` (global OR mode) → rows matching **A OR (B OR C)**.
+
+This makes `local_or` useful when you want to keep an existing filter as a hard constraint
+and only "OR" inside a smaller group of conditions.
+
+###### Example: constrain by one field, OR over others
+
+```python
+# Active users whose email is either Outlook or Gmail
+users = await (
+    User.query
+    .filter(active=True)
+    .local_or(
+        email__icontains="outlook",
+        email__icontains="gmail",
+    )
+)
+# SQL‑like: WHERE active = TRUE AND (email ILIKE '%outlook%' OR email ILIKE '%gmail%')
+```
+
+###### Example: using dictionaries for grouped local OR
+
+You can also pass multiple keyword-based filters as dictionaries, similar to `or_`, but the
+semantics stay local:
+
+```python
+query = (
+    User.query
+    .filter(country="CH")
+    .local_or({"email__icontains": "outlook"}, {"email__icontains": "gmail"})
+)
+users = await query
+# SQL‑like: WHERE country = 'CH' AND (email ILIKE '%outlook%' OR email ILIKE '%gmail%')
+```
+
+Notice how `country='CH'` remains outside the OR group.
+
+###### Example: local_or as the first operator
+
+If you call `local_or` without any previous filters, it effectively behaves like a normal
+`filter` – the grouping is still there, but there is nothing to AND with:
+
+```python
+users = await User.query.local_or(active=True, email__icontains="gmail")
+# Equivalent to:
+# users = await User.query.filter(active=True, email__icontains="gmail")
+```
+
+Use `local_or` whenever you want to keep your existing filters mandatory and only apply
+OR inside a single grouped clause. Use `or_` when you want to promote new conditions to a
+true top-level OR against the earlier filters.
 
 ### Limit
 

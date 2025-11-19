@@ -3,8 +3,22 @@ hide:
   - navigation
 ---
 
-
 # Release Notes
+
+## 0.35.2
+
+### Added
+
+- Introduced improved global OR and local OR logic for QuerySet filtering.
+- Enhanced clarity and examples in the documentation for `or_` and `local_or` operators.
+
+### Changed
+
+- Updated query-building internals to properly promote filters during global OR operations.
+
+### Fixed
+
+- Correct handling of OR clauses when mixing global and local modes.
 
 ## 0.35.1
 

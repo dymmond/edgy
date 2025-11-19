@@ -552,10 +552,31 @@ class BaseQuerySet(
                     queryset._cached_select_related_expression = None
                 if or_ and extracted_clauses:
                     wrapper_and = clauses_mod.and_(*extracted_clauses, no_select_related=True)
+
                     if allow_global_or and len(clauses) == 1:
+                        # Global OR mode: promote existing AND filters into the OR group.
+                        # This turns:
+                        #   qs.filter(A).or_(B)
+                        # into:
+                        #   OR( AND(A), AND(B) )
+                        # instead of: OR(B) AND A.
                         assert not exclude
+
+                        if queryset.filter_clauses:
+                            # Wrap existing filters into a single AND group and move them to or_clauses
+                            existing_and = clauses_mod.and_(
+                                *queryset.filter_clauses, no_select_related=True
+                            )
+                            queryset.or_clauses.append(existing_and)
+                            # Clear filter_clauses so they are not ANDed again later
+                            queryset.filter_clauses = []
+
+                        # Add the new OR operand
                         queryset.or_clauses.append(wrapper_and)
                         return queryset
+
+                    # Non-global OR (e.g. local_or) or multiple clauses:
+                    # just collect and handle them at the end as a local OR group.
                     converted_clauses.append(wrapper_and)
                 else:
                     converted_clauses.extend(extracted_clauses)
