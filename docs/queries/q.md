@@ -166,7 +166,7 @@ You can combine related lookups with boolean logic:
 expr = Q(user__language="EN") | Q(user__language="PT")
 ```
 
-## 7. Q vs. Chained and_/or_ Calls
+## Q vs. Chained and_/or_ Calls
 
 These two are equivalent:
 
@@ -185,7 +185,7 @@ results = await User.query.or_(name="Adam").or_(name="Edgy")
 
 Both generate the same SQL, but Q is easier to read and more expressive.
 
-## 8. Q With SQLAlchemy Expressions
+## Q With SQLAlchemy Expressions
 
 Q objects can wrap SQLAlchemy comparison expressions:
 
@@ -200,7 +200,7 @@ Or combine them:
 expr = Q(User.columns.id > 10) & Q(User.columns.name.ilike("%edgy%"))
 ```
 
-## 9. Edge Cases & Notes
+## Edge Cases & Notes
 
 ### Q() — empty Q
 
