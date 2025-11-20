@@ -11,14 +11,22 @@ hide:
 
 - Introduced improved global OR and local OR logic for QuerySet filtering.
 - Enhanced clarity and examples in the documentation for `or_` and `local_or` operators.
+- Introduced pipe-style boolean filtering using `Q` objects (e.g. `Q(name="Adam") | Q(email__icontains="edgy")`).
+- Added support for nested `Q(Q(...))` expressions with automatic flattening.
+- Improved handling of relational lookups within nested clause trees.
+- New [Q Operator](./queries/q.md) documentation section.
 
 ### Changed
 
 - Updated query-building internals to properly promote filters during global OR operations.
+- Refined internal clause normalization to ensure `Q`, `and_`, and `or_` behave consistently across nested structures.
+- Improved propagation of `select_related` hints from nested Q expressions.
 
 ### Fixed
 
 - Correct handling of OR clauses when mixing global and local modes.
+- Fixed edge cases where nested Q expressions involving related fields (`user__email`, `product__id`, etc.) did not correctly promote join metadata.
+- Corrected boolean combination behavior when mixing `Q`, `or_`, and `local_or` in the same query chain.
 
 ## 0.35.1
 
