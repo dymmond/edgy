@@ -351,13 +351,10 @@ def _calculate_select_related_sum(queryset: QuerySetType, *, callables: Iterable
                   eagerly loaded based on all provided callables.
     """
     select_related: set[str] = set()
-    # Iterate through each callable in the provided list.
+    # Iterate through each callable in the provided list and aggregate their results.
     for callab in callables:
-        # Check if the callable has the special attribute for calculating select_related.
-        if hasattr(callab, "_edgy_calculate_select_related"):
-            # Invoke the _edgy_calculate_select_related callable with the queryset
-            # and update the main select_related set with its results.
-            select_related.update(callab(queryset))
+        # Each callable is expected to accept the queryset and return a set[str]
+        select_related.update(callab(queryset))
     return select_related
 
 
