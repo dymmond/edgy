@@ -5,6 +5,29 @@ hide:
 
 # Release Notes
 
+## 0.35.3
+
+### Added
+
+- Full support for `Q` filtering across **ManyToMany** relationships, including deeply nested lookups such as
+  `Q(products__role__name__icontains="shelf")`.
+- Automatic join‑promotion for M2M paths when using `Q` boolean expressions (`&`, `|`, `~`).
+- Support for combining `Q` objects with global OR (`or_`) and local OR (`local_or`), including mixed clause trees.
+- Expanded clause normalisation ensuring nested Q trees correctly propagate join metadata.
+
+### Changed
+
+- Improved relationship traversal inside `crawl_relationship` to properly detect ManyToMany paths and promote them into `tables_and_models`.
+- Enhanced clause builder to unify M2M join handling across Q, `and_`, `or_`, and normal keyword filters.
+- Upgraded join inference so nested Q expressions behave as a single logical unit with consistent table resolution.
+
+### Fixed
+
+- Fixed `KeyError` on ManyToMany lookups such as `products__name__icontains` and
+  `products__role__name__icontains`.
+- Resolved issues where nested Q groups (`Q(Q(...))`) failed to carry select_related metadata.
+- Corrected boolean combination evaluation where M2M joins were lost during normalization.
+
 ## 0.35.2
 
 ### Added
