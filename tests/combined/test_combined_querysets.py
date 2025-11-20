@@ -140,7 +140,7 @@ async def test_only_and_defer_propagation_across_union():
     assert _names(rows) == ["A", "B", "C"]
 
     # Ensure the deferred field isn't accidentally populated
-    # (It should still be present on the model, but not preloaded—access won’t error, but we check values())
+    # (It should still be present on the model, but not preloaded—access won't error, but we check values())
     data = await q1.union(q2).order_by("name").values(["id", "name"])
 
     assert list(data[0].keys()) == ["id", "name"]

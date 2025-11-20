@@ -17,7 +17,6 @@ jobs:
       - name: Install build dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          pip install click==8.2.2
           pip install hatch
       - name: "Build package"
         run: "hatch build"

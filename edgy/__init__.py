@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-__version__ = "0.35.1"
+__version__ = "0.35.2"
 from typing import TYPE_CHECKING
 
 from ._monkay import Instance, create_monkay
 from .core.utils.sync import run_sync
 
 if TYPE_CHECKING:
+    from .conf import settings
     from .conf.global_settings import EdgySettings
     from .core import files, marshalls
     from .core.connection import Database, DatabaseURL, Registry

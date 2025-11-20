@@ -201,3 +201,22 @@ async def test_filter_or_clause_mixed():
 
     assert len(results) == 1
     assert results[0].pk == user.pk
+
+
+async def test_simple_or():
+    await User.query.create(name="Adam", email="adam@edgy.dev")
+    nother = await User.query.create(name="Edgy", email="adam@edgy.dev")
+
+    results = await User.query.filter(name__iexact="Adam").or_(name__icontains=nother.name)
+
+    assert len(results) == 2
+
+
+async def test_simple_or_with_one_expected_result():
+    await User.query.create(name="Adam", email="adam@edgy.dev")
+    nother = await User.query.create(name="Edgy", email="adam@edgy.dev")
+
+    results = await User.query.filter(name__iexact="ed").or_(name__icontains=nother.name)
+
+    assert len(results) == 1
+    assert results[0].pk == nother.pk

@@ -590,8 +590,118 @@ and_.__doc__ = """
     This supports asynchronous functions and `select_related` inference.
 """
 
+
 # Alias for `and_`, commonly used in query building.
-Q = and_
+class Q:
+    """
+    Django-like combinable query clause for Edgy.
+
+    Allows expressions such as:
+
+        expr = Q(active=True) & ~Q(email__icontains="spam") | Q(email__icontains="gmail")
+        users = await User.query.filter(expr)
+
+    The resulting Q object is a callable queryset filter understood by
+    `parse_clause_arg` / `parse_clause_args`.
+    """
+
+    __slots__ = (
+        "clause",
+        "_edgy_force_callable_queryset_filter",
+        "_edgy_calculate_select_related",
+    )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """
+        Build the underlying clause using existing helpers.
+
+        Supported forms:
+            Q()                          -> no-op (sqlalchemy.true())
+            Q(**kwargs)                  -> AND over kwargs (via and_.from_kwargs)
+            Q(other_clause)              -> wrap another clause
+            Q(other_clause, **kwargs)    -> AND(other_clause, from_kwargs(kwargs))
+            Q(clause1, clause2, ...)     -> and_(clause1, clause2, ...)
+        """
+        if not args and not kwargs:
+            # Neutral element: AND(true, X) == X
+            base = sqlalchemy.true()
+        elif not args and kwargs:
+            # kwargs only -> use enhanced from_kwargs
+            base = and_.from_kwargs(None, **kwargs)
+        elif len(args) == 1 and not kwargs:
+            # single positional clause -> wrap it directly
+            base = args[0]
+        elif args and kwargs:
+            # positional + kwargs -> group via AND
+            kw_clause = and_.from_kwargs(None, **kwargs)
+            base = and_(args[0], *(args[1:]), kw_clause)
+        else:
+            # only positional clauses -> group via AND
+            base = and_(*args)
+
+        self.clause = base
+        # Make sure is_callable_queryset_filter() always treats this as special.
+        self._edgy_force_callable_queryset_filter = True
+
+        # Propagate select_related calculator if the underlying clause has one.
+        if hasattr(base, "_edgy_calculate_select_related"):
+            self._edgy_calculate_select_related = base._edgy_calculate_select_related
+
+    async def __call__(
+        self,
+        queryset: QuerySetType,
+        tables_and_models: tables_and_models_type,
+    ) -> Any:
+        """
+        Allow Q instances to act as callable queryset filters.
+
+        This plugs into `parse_clause_arg`, which will detect Q as a callable
+        filter and call it with (queryset, tables_and_models).
+        """
+        return await parse_clause_arg(self.clause, queryset, tables_and_models)
+
+    def _combine(self, other: Any, op: _EnhancedClausesHelper) -> Q:
+        """
+        Combine this Q with another Q or raw clause using the given operator
+        (`and_` or `or_`).
+        """
+        lhs = self.clause
+        rhs = other.clause if isinstance(other, Q) else other
+        combined = op(lhs, rhs)
+        return Q(combined)
+
+    def __and__(self, other: Any) -> Q:
+        """Q & other -> AND."""
+        return self._combine(other, and_)
+
+    def __rand__(self, other: Any) -> Q:
+        """other & Q -> AND (reverse)."""
+        if isinstance(other, Q):
+            return other.__and__(self)
+        return Q(other).__and__(self)
+
+    def __or__(self, other: Any) -> Q:
+        """Q | other -> OR."""
+        return self._combine(other, or_)
+
+    def __ror__(self, other: Any) -> Q:
+        """other | Q -> OR (reverse)."""
+        if isinstance(other, Q):
+            return other.__or__(self)
+        return Q(other).__or__(self)
+
+    def __invert__(self) -> Q:
+        """
+        ~Q -> logical NOT, via the existing `not_` helper.
+
+        This ensures negation is implemented consistently with all other
+        clause helpers (async, select_related, etc.).
+        """
+        negated = not_(self.clause)
+        return Q(negated)
+
+    def __repr__(self) -> str:
+        return f"<Q clause={self.clause!r}>"
 
 
 def not_(clause: Any, *, no_select_related: bool = False) -> Any:
