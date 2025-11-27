@@ -511,18 +511,34 @@ class BaseQuerySet(
         """
         results = [result async for result in self._execute_iterate(fetch_all_at_once=True)]
 
-        if len(results) > 1:
-            seen = set()
+        # Only attempt dedupe for "normal" querysets.
+        # Embedded querysets (e.g. album.tracks with embed_parent) must not go
+        # through this path – their model_class and returned objects differ.
+        if len(results) > 1 and self.embed_parent is None:
+            pk_names = tuple(self.model_class.pkcolumns)
+            if not pk_names:
+                # Nothing reliable to dedupe on
+                return results  # type: ignore
+
+            seen: set[tuple] = set()
             unique = []
-            pkname = self.model_class.pkcolumns[0]
 
             for obj in results:
-                pk = getattr(obj, pkname)
-                if pk not in seen:
-                    seen.add(pk)
+                try:
+                    key = tuple(getattr(obj, name) for name in pk_names)
+                except AttributeError:
+                    # The returned object does not expose the model_class PK attrs;
+                    # this can happen in advanced/embedded scenarios. In that case
+                    # we bail out and keep the original list to avoid breaking
+                    # existing behaviour.
+                    return results  # type: ignore
+
+                if key not in seen:
+                    seen.add(key)
                     unique.append(obj)
 
             results = unique
+
         return results  # type: ignore
 
     def _filter_or_exclude(
