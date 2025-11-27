@@ -5,6 +5,12 @@ hide:
 
 # Release Notes
 
+## 0.35.4
+
+### Fixed
+
+- Fixed collapsing of uniques when `Q` is provided.
+
 ## 0.35.3
 
 ### Added

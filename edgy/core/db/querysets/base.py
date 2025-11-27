@@ -509,7 +509,21 @@ class BaseQuerySet(
         """
         Still relies on _execute_iterate.
         """
-        return [result async for result in self._execute_iterate(fetch_all_at_once=True)]
+        results = [result async for result in self._execute_iterate(fetch_all_at_once=True)]
+
+        if len(results) > 1:
+            seen = set()
+            unique = []
+            pkname = self.model_class.pkcolumns[0]
+
+            for obj in results:
+                pk = getattr(obj, pkname)
+                if pk not in seen:
+                    seen.add(pk)
+                    unique.append(obj)
+
+            results = unique
+        return results  # type: ignore
 
     def _filter_or_exclude(
         self,
