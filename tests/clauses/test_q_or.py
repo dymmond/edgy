@@ -305,3 +305,101 @@ async def test_count_correct_with_or_duplicates_removed():
 
     # count() is a SQL count, not Python list length
     assert await qs.count() == 1
+
+
+async def test_q_or_multiple_workspaces_in_different_collections():
+    """
+    Ensure that Q(...) | Q(...) returns *all* matching workspaces across
+    different collections, and that de-duplication does not over-collapse.
+    """
+    g1 = await Group.query.create(name="gx1")
+    g2 = await Group.query.create(name="gx2")
+
+    c1 = await Collection.query.create(name="cx1")
+    c2 = await Collection.query.create(name="cx2")
+    await c1.groups.add(g1)
+    await c2.groups.add(g2)
+
+    ws1 = await Workspace.objects.create(name="ws-a", collection=c1)
+    ws2 = await Workspace.objects.create(name="ws-b", collection=c2)
+
+    qs = Workspace.objects.filter(
+        Q(collection__groups__name="gx1") | Q(collection__groups__name="gx2")
+    ).order_by("id")
+
+    results = await qs
+    ids = {w.id for w in results}
+    assert ids == {ws1.id, ws2.id}
+    assert len(results) == 2
+
+
+async def test_count_without_or_returns_all_rows():
+    """
+    Baseline: .count() on a simple filtered queryset (no OR, no joins fan-out)
+    should return the total number of rows, unaffected by the OR fixes.
+    """
+    g = await Group.query.create(name="simple-g")
+    col = await Collection.query.create(name="simple-col")
+    await col.groups.add(g)
+
+    await Workspace.objects.create(name="w1", collection=col)
+    await Workspace.objects.create(name="w2", collection=col)
+    await Workspace.objects.create(name="w3", collection=col)
+
+    qs = Workspace.objects.filter(collection=col)
+    assert await qs.count() == 3
+
+
+async def test_count_with_or_and_multiple_workspaces():
+    """
+    COUNT with Q(...) | Q(...) where multiple distinct workspaces match.
+    Ensures DISTINCT-based count returns the number of unique workspaces,
+    not the raw join row count.
+    """
+    g1 = await Group.query.create(name="cx1")
+    g2 = await Group.query.create(name="cx2")
+    g3 = await Group.query.create(name="cx3")
+
+    c1 = await Collection.query.create(name="cc1")
+    c2 = await Collection.query.create(name="cc2")
+    c3 = await Collection.query.create(name="cc3")
+
+    await c1.groups.add(g1)
+    await c2.groups.add(g2)
+    await c3.groups.add(g3)
+
+    await Workspace.objects.create(name="w1", collection=c1)
+    await Workspace.objects.create(name="w2", collection=c2)
+    await Workspace.objects.create(name="w3", collection=c3)
+
+    qs = Workspace.objects.filter(
+        Q(collection__groups__name="cx1") | Q(collection__groups__name="cx2")
+    )
+
+    # Only workspaces in cc1 and cc2 should be counted
+    assert await qs.count() == 2
+
+
+async def test_local_or_keeps_and_scope_and_does_not_duplicate():
+    """
+    local_or() should OR the given clauses but keep the existing AND scope.
+    It must not promote to a global OR and must still avoid duplicates.
+    """
+    g1 = await Group.query.create(name="lo1")
+    g2 = await Group.query.create(name="lo2")
+
+    col = await Collection.query.create(name="lo_col")
+    await col.groups.add(g1)
+    await col.groups.add(g2)
+
+    ws_target = await Workspace.objects.create(name="target", collection=col)
+    await Workspace.objects.create(name="other", collection=col)
+
+    qs = Workspace.objects.filter(name="target").local_or(
+        Q(collection__groups__name="lo1"),
+        Q(collection__groups__name="lo2"),
+    )
+
+    results = await qs
+    assert len(results) == 1
+    assert results[0].id == ws_target.id
