@@ -814,17 +814,42 @@ class QuerySet(BaseQuerySet):
 
         The result is cached internally to prevent redundant database calls for subsequent counts.
 
-        Returns:
-            The total number of records as an integer.
+        For queries that may produce duplicate rows at the SQL level
+        (e.g. OR across joined relations, select_related joins, GROUP BY),
+        this method counts DISTINCT primary keys to reflect the number of
+        unique model instances rather than raw joined rows.
         """
         if self._cache_count is not None:
             return self._cache_count
+
         queryset: QuerySet = self
-        expression = (await queryset.as_select()).alias("subquery_for_count")
-        expression = sqlalchemy.func.count().select().select_from(expression)
+
+        needs_distinct = (
+            bool(queryset.or_clauses) or bool(queryset._select_related) or bool(queryset._group_by)
+        )
+
+        base_select = await queryset.as_select()
+        subquery = base_select.subquery("subquery_for_count")
+
+        # Build COUNT expression
+        if needs_distinct:
+            # Support composite primary keys if present
+            pk_cols = [subquery.c[col] for col in queryset.model_class.pkcolumns]
+            if len(pk_cols) == 1:
+                count_expr = sqlalchemy.func.count(sqlalchemy.distinct(pk_cols[0]))
+            else:
+                # DISTINCT over a tuple of PK columns
+                count_expr = sqlalchemy.func.count(
+                    sqlalchemy.distinct(sqlalchemy.tuple_(*pk_cols))
+                )
+            count_query = sqlalchemy.select(count_expr)
+        else:
+            # Simple COUNT(*) over the subquery
+            count_query = sqlalchemy.select(sqlalchemy.func.count()).select_from(subquery)
+
         check_db_connection(queryset.database)
         async with queryset.database as database:
-            self._cache_count = count = cast("int", await database.fetch_val(expression))
+            self._cache_count = count = cast(int, await database.fetch_val(count_query))
         return count
 
     async def get_or_none(self, **kwargs: Any) -> EdgyEmbedTarget | None:

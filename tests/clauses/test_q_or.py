@@ -164,3 +164,144 @@ async def test_q_or_with_custom_queryset_returns_single_workspace():
     assert len(results) == 1, "Q(...) | Q(...) must not duplicate Workspace rows"
     assert results[0].id == workspace.id
     assert results[0].name == "ws-1"
+
+
+async def test_q_or_does_not_duplicate_with_and_condition():
+    """
+    Mix Q(...) | Q(...) with AND conditions.
+    Ensures AND does not multiply rows incorrectly.
+    """
+    g1 = await Group.query.create(name="ga")
+    g2 = await Group.query.create(name="gb")
+
+    col = await Collection.query.create(name="c")
+    await col.groups.add(g1)
+    await col.groups.add(g2)
+
+    ws = await Workspace.objects.create(name="w", collection=col)
+
+    qs = Workspace.objects.filter(
+        (Q(collection__groups__name="ga") | Q(collection__groups__name="gb")) & Q(name="w")
+    )
+
+    results = await qs
+    assert len(results) == 1
+    assert results[0].id == ws.id
+
+
+async def test_q_or_does_not_affect_exists_uniqueness_checks():
+    """
+    This mimics your real scenario:
+    slug+collection uniqueness checks must NOT be affected by OR.
+    """
+
+    g = await Group.query.create(name="support")
+
+    col = await Collection.query.create(name="main")
+    await col.groups.add(g)
+
+    # Create workspace
+    await Workspace.objects.create(name="exist", collection=col)
+
+    # Correct exists
+    assert await Workspace.objects.filter(name="exist", collection=col).exists()
+
+    # Unique lookup -- should remain False for nonexistent
+    assert not await Workspace.objects.filter(name="not-there", collection=col).exists()
+
+
+async def test_select_related_does_not_duplicate_rows():
+    g1 = await Group.query.create(name="g1")
+    g2 = await Group.query.create(name="g2")
+
+    col = await Collection.query.create(name="cc")
+    await col.groups.add(g1)
+    await col.groups.add(g2)
+
+    await Workspace.objects.create(name="ws", collection=col)
+
+    qs = Workspace.objects.select_related("collection").filter(
+        Q(collection__groups__name="g1") | Q(collection__groups__name="g2")
+    )
+
+    results = await qs
+    assert len(results) == 1
+    assert results[0].collection.id == col.id
+
+
+async def test_values_no_duplicates_on_q_or():
+    g1 = await Group.query.create(name="a1")
+    g2 = await Group.query.create(name="a2")
+
+    col = await Collection.query.create(name="vv")
+    await col.groups.add(g1)
+    await col.groups.add(g2)
+
+    await Workspace.objects.create(name="ws44", collection=col)
+
+    rows = await Workspace.objects.filter(
+        Q(collection__groups__name="a1") | Q(collection__groups__name="a2")
+    ).values("name")
+
+    assert len(rows) == 1
+    assert rows[0]["name"] == "ws44"
+
+
+async def test_values_list_no_duplicates_on_q_or():
+    g1 = await Group.query.create(name="b1")
+    g2 = await Group.query.create(name="b2")
+
+    col = await Collection.query.create(name="vv2")
+    await col.groups.add(g1)
+    await col.groups.add(g2)
+
+    await Workspace.objects.create(name="ws55", collection=col)
+
+    names = await Workspace.objects.filter(
+        Q(collection__groups__name="b1") | Q(collection__groups__name="b2")
+    ).values_list("name", flat=True)
+
+    assert names == ["ws55"]
+
+
+async def test_first_last_do_not_return_duplicates():
+    g1 = await Group.query.create(name="h1")
+    g2 = await Group.query.create(name="h2")
+
+    col = await Collection.query.create(name="h_col")
+    await col.groups.add(g1)
+    await col.groups.add(g2)
+
+    ws = await Workspace.objects.create(name="unique", collection=col)
+
+    qs = Workspace.objects.filter(
+        Q(collection__groups__name="h1") | Q(collection__groups__name="h2")
+    )
+
+    # first()
+    f = await qs.first()
+    assert f is not None
+    assert f.id == ws.id
+
+    # last()
+    last = await qs.last()
+    assert last is not None
+    assert last.id == ws.id
+
+
+async def test_count_correct_with_or_duplicates_removed():
+    g1 = await Group.query.create(name="c1")
+    g2 = await Group.query.create(name="c2")
+    col = await Collection.query.create(name="c_col")
+
+    await col.groups.add(g1)
+    await col.groups.add(g2)
+
+    await Workspace.objects.create(name="cws", collection=col)
+
+    qs = Workspace.objects.filter(
+        Q(collection__groups__name="c1") | Q(collection__groups__name="c2")
+    )
+
+    # count() is a SQL count, not Python list length
+    assert await qs.count() == 1
