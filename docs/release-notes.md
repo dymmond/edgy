@@ -5,11 +5,33 @@ hide:
 
 # Release Notes
 
-## 0.35.4
+## 0.35.5
 
 ### Fixed
 
 - Fixed collapsing of uniques when `Q` is provided.
+
+## 0.35.4
+
+### Added
+
+- Support for `queryset_class` in the managers. This allows to override the default `Queryset` with a custom one.
+This is useful when we need to have nested querysets that relies on an initial manager to be custom.
+
+#### Example
+
+```python
+from edgy import Manager, QuerySet
+
+class CustomQuerySet(QuerySet):
+
+  def filter(...):
+    ...
+
+
+class CustomManager(Manager):
+  queryset_class = CustomQuerySet
+```
 
 ## 0.35.3
 

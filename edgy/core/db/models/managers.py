@@ -9,6 +9,8 @@ if TYPE_CHECKING:
 
 
 class BaseManager:
+    queryset_class = QuerySet
+
     def __init__(
         self,
         *,
@@ -114,7 +116,7 @@ class Manager(BaseManager):
             database = self.owner.database
 
         # Return a new QuerySet initialized with the owner, schema, and database.
-        return QuerySet(self.owner, using_schema=using_schema, database=database)
+        return self.queryset_class(self.owner, using_schema=using_schema, database=database)
 
     def __getattr__(self, name: str) -> Any:
         """
