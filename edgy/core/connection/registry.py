@@ -1110,7 +1110,7 @@ class Registry:
                         and pattern_model.meta.exclude_pattern.match(table.name)
                     ):
                         continue
-                    if pattern_model.fields_not_supported_by_table(table):  # type: ignore
+                    if pattern_model.fields_not_supported_by_table(table):
                         continue
 
                     new_name = pattern_model.meta.template(table)
@@ -1125,7 +1125,7 @@ class Registry:
                             f"{pattern_model.__name__}"
                         )
                     # Create a concrete model from the pattern model.
-                    concrete_reflect_model = pattern_model.copy_edgy_model(
+                    concrete_reflect_model = pattern_model.copy_edgy_model(  # type: ignore
                         name=new_name, meta_info_class=MetaInfo
                     )
                     concrete_reflect_model.meta.no_copy = True

@@ -5,6 +5,22 @@ hide:
 
 # Release Notes
 
+## 0.35.5
+
+### Fixed
+
+- Resolved duplicate row issues when combining `Q` expressions with `|` (global OR).
+  Edgy now correctly collapses duplicates at hydration level for non-embedded querysets.
+- `.count()` now returns the correct number of **logical** rows when OR or join-fan-out is present
+  (uses `COUNT(DISTINCT pk)` automatically when required).
+- Fixed incorrect behaviour where OR clauses polluted `.exists()` uniqueness checks.
+- Ensured `select_related()` does not introduce duplicate rows under OR or complex joins.
+- Fixed `values()` and `values_list()` returning duplicated logical rows when OR joins were involved.
+- `first()` and `last()` now operate on deduped results in OR scenarios.
+- Prevented ManyToMany and embedded relation querysets from being deduped incorrectly
+  (avoid breaking `album.tracks.all()` and similar accessors).
+- Stabilised internal OR/local_OR clause handling to ensure consistent join inference.
+
 ## 0.35.4
 
 ### Added
