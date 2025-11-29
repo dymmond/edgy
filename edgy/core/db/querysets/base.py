@@ -188,6 +188,8 @@ class BaseQuerySet(
         if database is not None:
             self.database = database
 
+        self._suppress_pk_deduplication: bool = False
+
     def _clone(self) -> QuerySet:
         """
         This is core to the builder pattern
@@ -514,7 +516,11 @@ class BaseQuerySet(
         # Only attempt dedupe for "normal" querysets.
         # Embedded querysets (e.g. album.tracks with embed_parent) must not go
         # through this path – their model_class and returned objects differ.
-        if len(results) > 1 and self.embed_parent is None:
+        if (
+            len(results) > 1
+            and self.embed_parent is None
+            and not getattr(self, "_suppress_pk_deduplication", False)
+        ):
             pk_names = tuple(self.model_class.pkcolumns)
             if not pk_names:
                 # Nothing reliable to dedupe on

@@ -58,16 +58,17 @@ class QuerySet(BaseQuerySet):
         all_: bool = False,
     ) -> CombinedQuerySet:
         """
-        Internal helper method used by the public interface (union, intersect, except_)
-        to build and validate a CombinedQuerySet object.
+        Internal helper used by `union()`, `intersect()`, and `except_()` to build
+        a CombinedQuerySet.
 
-        This function enforces model class consistency and maps the requested set operation
-        (with or without ALL) to the canonical operation name used by `CombinedQuerySet`.
+        We keep the core set operation in `op` and pass the `all_` flag through
+        so that CombinedQuerySet (and its compiler) can decide whether to emit
+        e.g. `UNION` vs `UNION ALL`.
 
         Args:
             other: The secondary `QuerySet` to combine results with.
             op: The base set operation type ('union', 'intersect', or 'except').
-            all_: If `True`, requests the ALL variant of the set operation (e.g., UNION ALL).
+            all_: If `True`, requests the ALL variant of the set operation (e.g. UNION ALL).
 
         Returns:
             A `CombinedQuerySet` instance configured for the specified set operation.
@@ -85,7 +86,6 @@ class QuerySet(BaseQuerySet):
 
         # Check model class consistency
         if self.model_class is not other.model_class:
-            # QuerySetError detail string must be defined
             raise QuerySetError(detail="Both querysets must have the same model_class to combine.")
 
         # Map (op, all_) to a concrete set-op name understood by CombinedQuerySet

@@ -31,7 +31,7 @@ class CombinedQuerySet(QuerySet):
     ) -> None:
         # initialize as a normal QuerySet bound to the same model/database
         super().__init__(model_class=left.model_class, database=left.database)
-
+        self._suppress_pk_deduplication = True
         self._left = left
         self._right = right
         self._op: str = op
