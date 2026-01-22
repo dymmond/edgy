@@ -1022,11 +1022,11 @@ class QuerySet(BaseQuerySet):
         check_db_connection(queryset.database)
         token = CURRENT_INSTANCE.set(self)
         try:
-            obj_values = [await _iterate(obj) for obj in objs]
-            # early bail out if no objects were found. This prevents issues with the db
-            if not obj_values:
-                return
             async with queryset.database as database, database.transaction():
+                obj_values = [await _iterate(obj) for obj in objs]
+                # early bail out if no objects were found. This prevents issues with the db
+                if not obj_values:
+                    return
                 expression = queryset.table.insert().values(obj_values)
                 await database.execute_many(expression)
             self._clear_cache(keep_result_cache=True)
