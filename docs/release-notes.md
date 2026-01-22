@@ -5,6 +5,10 @@ hide:
 
 # Release Notes
 
+## 0.35.6
+
+- Fix queryset bulk calls with empty iterable.
+
 ## 0.35.5
 
 ### Fixed

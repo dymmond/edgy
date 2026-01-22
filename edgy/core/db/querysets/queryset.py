@@ -1022,8 +1022,12 @@ class QuerySet(BaseQuerySet):
         check_db_connection(queryset.database)
         token = CURRENT_INSTANCE.set(self)
         try:
+            obj_values = [await _iterate(obj) for obj in objs]
+            # early bail out if no objects were found. This prevents issues with the db
+            if not obj_values:
+                return
             async with queryset.database as database, database.transaction():
-                expression = queryset.table.insert().values([await _iterate(obj) for obj in objs])
+                expression = queryset.table.insert().values(obj_values)
                 await database.execute_many(expression)
             self._clear_cache(keep_result_cache=True)
             if new_objs:
@@ -1080,8 +1084,11 @@ class QuerySet(BaseQuerySet):
                     if "id" in update:
                         update["__id"] = update.pop("id")
                     update_list.append(update)
+                # prevent calling db with empty iterable, this causes errors
+                if not update_list:
+                    return
 
-                values_placeholder: Any = {
+                values_placeholder: dict[str, Any] = {
                     pkcol: sqlalchemy.bindparam(pkcol, type_=getattr(queryset.table.c, pkcol).type)
                     for field in fields
                     for pkcol in queryset.model_class.meta.field_to_column_names[field]

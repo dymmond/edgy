@@ -64,6 +64,10 @@ async def rollback_transactions():
         yield
 
 
+async def test_empty_bulk_get_or_create():
+    await Product.query.bulk_get_or_create([])
+
+
 async def test_bulk_bulk_get_or_create():
     await Product.query.bulk_get_or_create(
         [
