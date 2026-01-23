@@ -115,6 +115,11 @@ async def test_bulk_update():
     assert products[1].value == 2
 
 
+async def test_empty_bulk_update():
+    await Product.query.bulk_update([], fields=[])
+    await Product.query.bulk_update([], fields=["created_day", "status", "data", "value"])
+
+
 async def test_bulk_update_with_relation():
     album = await Album.query.create(name="foo")
     album2 = await Album.query.create(name="fighters")

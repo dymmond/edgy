@@ -1023,7 +1023,11 @@ class QuerySet(BaseQuerySet):
         token = CURRENT_INSTANCE.set(self)
         try:
             async with queryset.database as database, database.transaction():
-                expression = queryset.table.insert().values([await _iterate(obj) for obj in objs])
+                obj_values = [await _iterate(obj) for obj in objs]
+                # early bail out if no objects were found. This prevents issues with the db
+                if not obj_values:
+                    return
+                expression = queryset.table.insert().values(obj_values)
                 await database.execute_many(expression)
             self._clear_cache(keep_result_cache=True)
             if new_objs:
@@ -1046,8 +1050,11 @@ class QuerySet(BaseQuerySet):
             objs: A list of existing model instances to update.
             fields: A list of field names that should be updated across all instances.
         """
-        queryset: QuerySet = self._clone()
         fields = list(fields)
+        # we can't update anything without fields
+        if not fields:
+            return
+        queryset: QuerySet = self._clone()
 
         pk_query_placeholder = (
             getattr(queryset.table.c, pkcol)
@@ -1080,8 +1087,11 @@ class QuerySet(BaseQuerySet):
                     if "id" in update:
                         update["__id"] = update.pop("id")
                     update_list.append(update)
+                # prevent calling db with empty iterable, this causes errors
+                if not update_list:
+                    return
 
-                values_placeholder: Any = {
+                values_placeholder: dict[str, Any] = {
                     pkcol: sqlalchemy.bindparam(pkcol, type_=getattr(queryset.table.c, pkcol).type)
                     for field in fields
                     for pkcol in queryset.model_class.meta.field_to_column_names[field]
