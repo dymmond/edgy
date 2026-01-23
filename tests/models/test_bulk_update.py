@@ -116,7 +116,7 @@ async def test_bulk_update():
 
 
 async def test_empty_bulk_update():
-    await Product.query.bulk_update([])
+    await Product.query.bulk_update([], fields=[])
     await Product.query.bulk_update([], fields=["created_day", "status", "data", "value"])
 
 

@@ -1050,8 +1050,11 @@ class QuerySet(BaseQuerySet):
             objs: A list of existing model instances to update.
             fields: A list of field names that should be updated across all instances.
         """
-        queryset: QuerySet = self._clone()
         fields = list(fields)
+        # we can't update anything without fields
+        if not fields:
+            return
+        queryset: QuerySet = self._clone()
 
         pk_query_placeholder = (
             getattr(queryset.table.c, pkcol)
