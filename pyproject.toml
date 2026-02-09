@@ -83,7 +83,7 @@ testing = [
     "ipdb",
     "httpx",
     "uvicorn",
-    "mypy[faster-cache]>=1.16,<2.0",
+    "mypy[faster-cache]>=1.19.1,<2.0",
     "ordered-set"
 ]
 mime = ["python-magic"]
