@@ -2,9 +2,9 @@ from collections.abc import AsyncGenerator
 
 import pytest
 from anyio import from_thread, sleep, to_thread
-from esmerald import Esmerald, Gateway, post
 from httpx import ASGITransport, AsyncClient
 from pydantic import __version__
+from ravyn import Gateway, Ravyn, post
 
 import edgy
 from edgy.testclient import DatabaseTestClient
@@ -71,7 +71,7 @@ async def create_user(data: User) -> User:
 
 @pytest.fixture()
 def app():
-    app = Esmerald(
+    app = Ravyn(
         routes=[Gateway(handler=create_user)],
         on_startup=[models.__aenter__],
         on_shutdown=[models.__aexit__],
@@ -89,13 +89,13 @@ async def async_client(app) -> AsyncGenerator:
 async def test_creates_a_user_raises_value_error(async_client):
     data = {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
         "posts": {"comment": "A comment"},
     }
     response = await async_client.post("/create", json=data)
-    assert response.status_code == 400  # default from Esmerald POST
+    assert response.status_code == 400  # default from Ravyn POST
     assert response.json() == {
         "detail": "Validation failed for http://test/create with method POST.",
         "errors": [

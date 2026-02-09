@@ -1,7 +1,7 @@
 import pytest
-from esmerald import Esmerald, Gateway, post
-from esmerald.testclient import EsmeraldTestClient
 from pydantic import __version__
+from ravyn import Gateway, Ravyn, post
+from ravyn.testclient import EsmeraldTestClient
 
 import edgy
 from edgy.testclient import DatabaseTestClient
@@ -30,7 +30,7 @@ class User(edgy.StrictModel):
 async def create_user(data: User) -> None: ...  # pragma: no cover
 
 
-app = Esmerald(routes=[Gateway(handler=create_user)])
+app = Ravyn(routes=[Gateway(handler=create_user)])
 client = EsmeraldTestClient(app, raise_server_exceptions=True)
 
 
@@ -38,7 +38,7 @@ def test_raises_error_on_missing_not_null_fields():
     data = {"language": "EN", "description": "A description"}
 
     response = client.post("/create", json=data)
-    assert response.status_code == 400  # Raised by Esmerald when pydantic raises an error
+    assert response.status_code == 400  # Raised by Ravyn when pydantic raises an error
     assert response.json() == {
         "detail": "Validation failed for http://testserver/create with method POST.",
         "errors": [

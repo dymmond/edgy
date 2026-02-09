@@ -57,7 +57,7 @@ keywords = [
     "starlette",
     "fastapi",
     "framework",
-    "esmerald",
+    "ravyn",
     "orm",
 ]
 
@@ -77,7 +77,7 @@ types = []
 testing = [
     "anyio>=4.0.0,<5",
     "asyncpg>=0.27.0,<1",
-    "esmerald[standard,test]>=3.2.0",
+    "ravyn[standard,test]>=0.3.7",
     "pytest-timeout",
     "pytest-mock",
     "ipdb",
@@ -190,7 +190,7 @@ ignore = ["E501", "B008", "C901", "B026", "SIM115", "E731"]
 exclude = ["docs_src/*", ".pdbrc"]
 
 [tool.ruff.lint.isort]
-known-third-party = ["esmerald", "pydantic", "starlette", "databasez"]
+known-third-party = ["ravyn", "pydantic", "starlette", "databasez"]
 
 
 [tool.ruff.lint.pyupgrade]

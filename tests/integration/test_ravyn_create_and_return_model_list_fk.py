@@ -3,10 +3,10 @@ from collections.abc import AsyncGenerator, Generator
 
 import pytest
 from anyio import from_thread, sleep, to_thread
-from esmerald import Esmerald, Gateway, post
-from esmerald.testclient import EsmeraldTestClient
 from httpx import ASGITransport, AsyncClient
 from pydantic import __version__, field_validator
+from ravyn import Gateway, Ravyn, post
+from ravyn.testclient import RavynTestClient
 
 import edgy
 from edgy.exceptions import DatabaseNotConnectedWarning
@@ -74,7 +74,7 @@ async def create_user(data: User) -> User:
 
 @pytest.fixture()
 def app():
-    app = Esmerald(
+    app = Ravyn(
         routes=[Gateway(handler=create_user)],
         on_startup=[models.__aenter__],
         on_shutdown=[models.__aexit__],
@@ -91,7 +91,7 @@ async def async_client(app) -> AsyncGenerator:
 
 @pytest.fixture()
 def esmerald_client(app) -> Generator:
-    with EsmeraldTestClient(app, base_url="http://test") as ac:
+    with RavynTestClient(app, base_url="http://test") as ac:
         yield ac
 
 
@@ -100,13 +100,13 @@ async def test_creates_a_user_raises_value_error(async_client):
         warnings.simplefilter("error")
         data = {
             "name": "Edgy",
-            "email": "edgy@esmerald.dev",
+            "email": "edgy@ravyn.dev",
             "language": "EN",
             "description": "A description",
         }
         async with models:
             response = await async_client.post("/create", json=data)
-        assert response.status_code == 400  # default from Esmerald POST
+        assert response.status_code == 400  # default from Ravyn POST
         assert response.json() == {
             "detail": "Validation failed for http://test/create with method POST.",
             "errors": [
@@ -116,7 +116,7 @@ async def test_creates_a_user_raises_value_error(async_client):
                     "msg": "Field required",
                     "input": {
                         "name": "Edgy",
-                        "email": "edgy@esmerald.dev",
+                        "email": "edgy@ravyn.dev",
                         "language": "EN",
                         "description": "A description",
                     },
@@ -130,18 +130,18 @@ async def test_creates_a_user(async_client):
     async with models:
         data = {
             "name": "Edgy",
-            "email": "edgy@esmerald.dev",
+            "email": "edgy@ravyn.dev",
             "language": "EN",
             "description": "A description",
             "posts": [{"comment": "A comment"}],
         }
         response = await async_client.post("/create", json=data)
-        assert response.status_code == 201  # default from Esmerald POST
+        assert response.status_code == 201  # default from Ravyn POST
         reponse_json = response.json()
         reponse_json.pop("id")
         assert reponse_json == {
             "name": "Edgy",
-            "email": "edgy@esmerald.dev",
+            "email": "edgy@ravyn.dev",
             "language": "EN",
             "description": "A description",
             "comment": "A COMMENT",
@@ -152,19 +152,19 @@ async def test_creates_a_user(async_client):
 async def test_creates_a_user_warnings(async_client):
     data = {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
         "posts": [{"comment": "A comment"}],
     }
     with pytest.warns(DatabaseNotConnectedWarning):
         response = await async_client.post("/create", json=data)
-    assert response.status_code == 201  # default from Esmerald POST
+    assert response.status_code == 201  # default from Ravyn POST
     reponse_json = response.json()
     reponse_json.pop("id")
     assert reponse_json == {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
         "comment": "A COMMENT",
@@ -177,18 +177,18 @@ def test_creates_a_user_sync(esmerald_client):
         warnings.simplefilter("error")
         data = {
             "name": "Edgy",
-            "email": "edgy@esmerald.dev",
+            "email": "edgy@ravyn.dev",
             "language": "EN",
             "description": "A description",
             "posts": [{"comment": "A comment"}],
         }
         response = esmerald_client.post("/create", json=data)
-        assert response.status_code == 201  # default from Esmerald POST
+        assert response.status_code == 201  # default from Ravyn POST
         reponse_json = response.json()
         reponse_json.pop("id")
         assert reponse_json == {
             "name": "Edgy",
-            "email": "edgy@esmerald.dev",
+            "email": "edgy@ravyn.dev",
             "language": "EN",
             "description": "A description",
             "comment": "A COMMENT",

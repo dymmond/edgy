@@ -3,10 +3,10 @@ from typing import Any
 
 import pytest
 from anyio import from_thread, sleep, to_thread
-from esmerald import Esmerald, Gateway, Request, get
-from esmerald.core.protocols.middleware import MiddlewareProtocol
 from httpx import ASGITransport, AsyncClient
 from lilya.types import ASGIApp, Receive, Scope, Send
+from ravyn import Gateway, Ravyn, Request, get
+from ravyn.core.protocols.middleware import MiddlewareProtocol
 
 import edgy
 from edgy.contrib.multi_tenancy import TenantModel
@@ -100,7 +100,7 @@ async def get_products() -> list[Product]:
 @pytest.fixture()
 def app():
     app = models.asgi(
-        Esmerald(
+        Ravyn(
             routes=[Gateway(handler=get_products)],
             middleware=[TenantMiddleware],
         )
@@ -110,7 +110,7 @@ def app():
 
 @pytest.fixture()
 def another_app():
-    app = Esmerald(
+    app = Ravyn(
         routes=[Gateway("/no-tenant", handler=get_products)],
         on_startup=[models.__aenter__],
         on_shutdown=[models.__aexit__],
