@@ -65,7 +65,7 @@ came to be 😁.
 Edgy leverages the power of **Pydantic** while offering a friendly, familiar and easy to use interface.
 
 This ORM was designed to be flexible and compatible with pretty much every ASGI framework, like
-[Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic, Quart... With simple pluggable
+[Ravyn](https://ravyn.dymmond.com), Starlette, FastAPI, Sanic, Quart... With simple pluggable
 design thanks to its origins.
 
 ## Features
@@ -255,17 +255,17 @@ It does not matter if you type or not, Edgy knows what and how to validate via `
 Do you want to have more complex structures and connect to your favourite framework? Have a look
 at [connections](./docs/connection.md) to understand how to do it properly.
 
-## `Esmerald` ecosystem
+## `Ravyn` ecosystem
 
-This does not mean that only works with Esmerald! Edgy is also framework agnostic but the author
-of Edgy is the same of Saffier and Esmerald which makes it nicer to integrate directly with Esmerald.
+This does not mean that only works with Ravyn! Edgy is also framework agnostic but the author
+of Edgy is the same of Saffier and Ravyn which makes it nicer to integrate directly with Ravyn.
 
-How could you integrate `Edgy` with Esmerald (or any other framework)?
+How could you integrate `Edgy` with Ravyn (or any other framework)?
 
 Let us see an example. Since Edgy is fully Pydantic that means we can perform tasks directly.
 
 ```python
-from esmerald import Esmerald, Gateway, post
+from ravyn import Ravyn, Gateway, post
 
 import edgy
 from edgy.testclient import DatabaseTestClient as Database
@@ -296,7 +296,7 @@ async def create_user(data: User) -> User:
     return user
 
 
-app = Esmerald(
+app = Ravyn(
     routes=[Gateway(handler=create_user)],
     on_startup=[database.connect],
     on_shutdown=[database.disconnect],
@@ -310,7 +310,7 @@ The response of the API `/create` should have a format similar to this (assuming
 {
     "id": 1,
     "name": "Edgy",
-    "email": "edgy@esmerald.dev",
+    "email": "edgy@ravyn.dev",
     "language": "EN",
     "description": "A description",
 }

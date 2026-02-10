@@ -2,9 +2,9 @@ from collections.abc import AsyncGenerator
 
 import pytest
 from anyio import from_thread, sleep, to_thread
-from esmerald import Esmerald, Gateway, post
 from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel
+from ravyn import Gateway, Ravyn, post
 
 import edgy
 from edgy.testclient import DatabaseTestClient
@@ -41,7 +41,7 @@ class User(edgy.StrictModel):
     email: str = edgy.EmailField(max_length=100)
     language: str = edgy.CharField(max_length=200, null=True)
     description: str = edgy.TextField(max_length=5000, null=True)
-    # we hijack the test to test the CompositeField in esmerald context
+    # we hijack the test to test the CompositeField in ravyn context
     id_name_desc: IdNameDesc = edgy.CompositeField(
         inner_fields=[
             "id",
@@ -66,7 +66,7 @@ async def create_user(data: User) -> User:
 @pytest.fixture()
 def app():
     app = models.asgi(
-        Esmerald(
+        Ravyn(
             routes=[Gateway(handler=create_user)],
         )
     )
@@ -83,15 +83,15 @@ async def async_client(app) -> AsyncGenerator:
 async def test_creates_a_user_directly(async_client):
     data = {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
     }
     response = await async_client.post("/create", json=data)
-    assert response.status_code == 201  # default from Esmerald POST
+    assert response.status_code == 201  # default from Ravyn POST
     assert response.json() == {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "id_name_desc": {
             "description": "A description",
             "id": 1,
@@ -106,17 +106,17 @@ async def test_creates_a_user_directly(async_client):
 async def test_creates_many_users(async_client):
     data = {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
     }
 
     for i in range(5):
         response = await async_client.post("/create", json=data)
-        assert response.status_code == 201  # default from Esmerald POST
+        assert response.status_code == 201  # default from Ravyn POST
         assert response.json() == {
             "name": "Edgy",
-            "email": "edgy@esmerald.dev",
+            "email": "edgy@ravyn.dev",
             "id_name_desc": {
                 "description": "A description",
                 "id": i + 1,

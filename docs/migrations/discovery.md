@@ -42,7 +42,7 @@ title="myproject"
 ```
 
 !!! Tip
-    The application can be built using Esmerald, Starlette, Sanic, FastAPI, or other frameworks.
+    The application can be built using Ravyn, Starlette, Sanic, FastAPI, or other frameworks.
 
 Edgy follows these steps to locate the application:
 

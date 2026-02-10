@@ -2,9 +2,9 @@ from collections.abc import AsyncGenerator
 from typing import Optional
 
 import pytest
-from esmerald import Esmerald, Gateway, get, post
 from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel
+from ravyn import Gateway, Ravyn, get, post
 
 import edgy
 from edgy.contrib.pagination import CursorPaginator
@@ -149,7 +149,7 @@ async def create_blog_entry(data: BlogEntryMarshall) -> BlogEntryMarshall:
 
 @pytest.fixture()
 def app():
-    app = Esmerald(
+    app = Ravyn(
         routes=[
             Gateway(handler=create_blog_entry),
             index,

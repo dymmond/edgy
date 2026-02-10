@@ -82,19 +82,19 @@ async def test_q_not_operator_with_kwargs():
 
 async def test_q_mixed_and_or_expression():
     """
-    (Q(name='Adam') & Q(email__icontains='edgy')) | Q(name='Esmerald')
+    (Q(name='Adam') & Q(email__icontains='edgy')) | Q(name='Ravyn')
 
     Uses normal Python precedence where & binds tighter than |.
     """
     adam = await User.query.create(name="Adam", email="adam@edgy.dev")
     await User.query.create(name="Adam", email="other@domain.dev")
-    esmerald = await User.query.create(name="Esmerald", email="esmerald@edgy.dev")
+    ravyn = await User.query.create(name="Ravyn", email="ravyn@edgy.dev")
 
-    expr = (Q(name="Adam") & Q(email__icontains="edgy")) | Q(name="Esmerald")
+    expr = (Q(name="Adam") & Q(email__icontains="edgy")) | Q(name="Ravyn")
 
     results = await User.query.filter(expr)
 
-    assert {u.pk for u in results} == {adam.pk, esmerald.pk}
+    assert {u.pk for u in results} == {adam.pk, ravyn.pk}
 
 
 async def test_q_with_column_expressions():
@@ -216,7 +216,7 @@ async def test_q_complex_nested_expression():
 async def test_q_equivalence_complex():
     await User.query.create(name="Adam")
     await User.query.create(name="Edgy")
-    await User.query.create(name="Esmerald")
+    await User.query.create(name="Ravyn")
 
     expr = Q(name__icontains="a") | Q(name="Edgy")
     q_results = await User.query.filter(expr)
@@ -261,16 +261,16 @@ async def test_q_nested_inside_or_group():
     """Nested Q inside an OR group is equivalent to a non-nested expression."""
     adam = await User.query.create(name="Adam", email="adam@edgy.dev")
     await User.query.create(name="Adam", email="other@domain.dev")
-    esmerald = await User.query.create(name="Esmerald", email="esmerald@edgy.dev")
+    ravyn = await User.query.create(name="Ravyn", email="ravyn@edgy.dev")
 
     # Non-nested expression
-    flat_expr = (Q(name="Adam") & Q(email__icontains="edgy")) | Q(name="Esmerald")
+    flat_expr = (Q(name="Adam") & Q(email__icontains="edgy")) | Q(name="Ravyn")
     flat_results = await User.query.filter(flat_expr)
 
     # Nested equivalent using Q(Q(...))
     nested_inner = Q(name="Adam") & Q(email__icontains="edgy")
-    nested_expr = Q(nested_inner) | Q(name="Esmerald")
+    nested_expr = Q(nested_inner) | Q(name="Ravyn")
     nested_results = await User.query.filter(nested_expr)
 
-    assert {u.pk for u in flat_results} == {adam.pk, esmerald.pk}
-    assert {u.pk for u in nested_results} == {adam.pk, esmerald.pk}
+    assert {u.pk for u in flat_results} == {adam.pk, ravyn.pk}
+    assert {u.pk for u in nested_results} == {adam.pk, ravyn.pk}

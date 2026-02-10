@@ -1,8 +1,8 @@
 from collections.abc import AsyncGenerator
 
 import pytest
-from esmerald import Esmerald, post
 from httpx import ASGITransport, AsyncClient
+from ravyn import Ravyn, post
 
 import edgy
 from edgy.core.marshalls import ConfigMarshall, Marshall
@@ -63,7 +63,7 @@ async def update_user(id: int, data: UserUpdateMarshall) -> UserUpdateMarshall:
 
 @pytest.fixture()
 def app():
-    app = Esmerald(
+    app = Ravyn(
         routes=[create_user, update_user],
         on_startup=[database.connect],
         on_shutdown=[database.disconnect],
@@ -80,7 +80,7 @@ async def async_client(app) -> AsyncGenerator:
 async def test_simple_marshall(async_client):
     data = {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
     }
@@ -94,7 +94,7 @@ async def test_simple_marshall(async_client):
 async def test_simple_marshall_update(async_client):
     data = {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
     }
@@ -102,7 +102,7 @@ async def test_simple_marshall_update(async_client):
     assert response.status_code == 201
     result = response.json()
     id = result.pop("id")
-    data["email"] = "edgy@esmerald.foo"
+    data["email"] = "edgy@ravyn.foo"
 
     response = await async_client.post(f"/update/{id}", json=data)
-    assert response.json() == {"email": "edgy@esmerald.foo"}
+    assert response.json() == {"email": "edgy@ravyn.foo"}

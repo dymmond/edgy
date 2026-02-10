@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from esmerald import Esmerald, Include
+from ravyn import Ravyn, Include
 from my_project.utils import get_db_connection
 
 
@@ -34,7 +34,7 @@ def get_application():
     monkay.evaluate_settings(ignore_import_errors=False)
 
     app = registry.asgi(
-        Esmerald(
+        Ravyn(
             routes=[Include(namespace="my_project.urls")],
         )
     )

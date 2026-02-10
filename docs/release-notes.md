@@ -879,7 +879,7 @@ Thanks a lot to @kokoserver. He provided a *lot* of valuable bug reports and PRs
 ### Fixed
 
 - `Migrate` executed `refresh_metadata` everytime causing reflected models to vanish.
-- Fix edgy wrapping esmerald with the asgi helper causing esmeralds cli to disappear.
+- Fix edgy wrapping ravyn with the asgi helper causing esmeralds cli to disappear.
 
 ## 0.20.0
 
@@ -1098,7 +1098,7 @@ with with_schema("foo"):
 
 ### Fixed
 
-- Esmerald typing issues.
+- Ravyn typing issues.
 - Migration metadata was not completely initialized which caused problems.
 - Foreign keys None/null handling was inconsistent. Now we have a None for unset foreign keys.
 

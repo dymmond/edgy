@@ -211,7 +211,7 @@ Use `RefForeignKey` as a nested object in your API.
 ```json
 {
     "name": "Edgy",
-    "email": "edgy@esmerald.dev",
+    "email": "edgy@ravyn.dev",
     "language": "EN",
     "description": "A description",
     "comment": "A COMMENT",
@@ -226,7 +226,7 @@ Pydantic validations apply:
 ```json
 {
     "name": "Edgy",
-    "email": "edgy@esmerald.dev",
+    "email": "edgy@ravyn.dev",
     "language": "EN",
     "description": "A description"
 }
@@ -241,7 +241,7 @@ Response:
     "msg": "Field required",
     "input": {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
     },

@@ -1,5 +1,5 @@
 from typing import Optional
-from esmerald import Esmerald, Gateway, get, post
+from ravyn import Ravyn, Gateway, get, post
 from pydantic import BaseModel
 
 import edgy
@@ -131,7 +131,7 @@ async def create_blog_entry(data: BlogEntryMarshall) -> BlogEntryMarshall:
 
 
 def get_application():
-    app = Esmerald(
+    app = Ravyn(
         routes=[
             Gateway(handler=create_blog_entry),
             index,

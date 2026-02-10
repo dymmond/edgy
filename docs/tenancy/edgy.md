@@ -112,7 +112,7 @@ from edgy.core.db import with_tenant
 
 #### Practical Case
 
-Let's illustrate `with_tenant` with an Esmerald application example.
+Let's illustrate `with_tenant` with an Ravyn application example.
 
 **Building:**
 
@@ -150,7 +150,7 @@ The `with_tenant` context manager sets the tenant context for all API calls.
 
 ##### API
 
-Create an Esmerald API to retrieve product data:
+Create an Ravyn API to retrieve product data:
 
 ```python hl_lines="25"
 {!> ../docs_src/tenancy/example/api.py !}
@@ -176,5 +176,5 @@ The `with_tenant` context manager is particularly useful for large-scale multi-t
 [registry]: ../registry.md
 [schemas]: ../registry.md#schemas
 [using_with_db_registry]: ../registry.md#extra
-[esmerald]: [https://esmerald.dev](https://esmerald.dev)
-[middleware]: [https://esmerald.dev/middleware](https://esmerald.dev/middleware)
+[ravyn]: [https://ravyn.dev](https://ravyn.dev)
+[middleware]: [https://ravyn.dev/middleware](https://ravyn.dev/middleware)

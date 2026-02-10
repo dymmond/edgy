@@ -48,7 +48,7 @@ async def test_filter_with_not():
 async def test_filter_with_not_two():
     await User.query.create(name="Adam")
     await User.query.create(name="Edgy")
-    user = await User.query.create(name="Esmerald")
+    user = await User.query.create(name="Ravyn")
 
     results = await User.query.filter(not_(User.columns.name == "Edgy")).filter(
         not_(User.columns.name == "Adam")
@@ -61,7 +61,7 @@ async def test_filter_with_not_two():
 async def test_filter_with_not_style():
     await User.query.create(name="Adam")
     await User.query.create(name="Edgy")
-    user = await User.query.create(name="Esmerald")
+    user = await User.query.create(name="Ravyn")
 
     results = await User.query.not_(name="Edgy").not_(name="Adam")
 

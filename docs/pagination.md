@@ -54,10 +54,10 @@ They support the same arguments as `get_page` and `paginate` for the paginator (
 
 How would an application look like, using this feature?
 
-Here an example for esmerald with cursors and attributes:
+Here an example for ravyn with cursors and attributes:
 
 ```python
-{!> ../docs_src/pagination/esmerald_example.py !}
+{!> ../docs_src/pagination/ravyn_example.py !}
 ```
 
 ## Special features

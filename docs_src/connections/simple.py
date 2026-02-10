@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from esmerald import Esmerald
+from ravyn import Ravyn
 
 from edgy import Registry, Instance, monkay
 
@@ -7,12 +7,12 @@ models = Registry(database="sqlite:///db.sqlite", echo=True)
 
 
 @asynccontextmanager
-async def lifespan(app: Esmerald):
+async def lifespan(app: Ravyn):
     async with models:
         yield
 
 
-app = Esmerald(
+app = Ravyn(
     routes=[...],
     lifespan=lifespan,
 )

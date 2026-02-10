@@ -6,10 +6,10 @@ for i in range(5):
 for i in range(50):
     await Article.query.create(content="Comment number %s" % i, user=user)
 
-esmerald = await User.query.create(name="Esmerald")
+ravyn = await User.query.create(name="Ravyn")
 
 for i in range(15):
-    await Post.query.create(comment="Comment number %s" % i, user=esmerald)
+    await Post.query.create(comment="Comment number %s" % i, user=ravyn)
 
 for i in range(20):
-    await Article.query.create(content="Comment number %s" % i, user=esmerald)
+    await Article.query.create(content="Comment number %s" % i, user=ravyn)

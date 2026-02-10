@@ -25,7 +25,7 @@ These auto-generated `_relation` fields are SQLAlchemy relationships that provid
 
 The primary reason for this behavior is to facilitate compatibility and interoperability with tools and libraries that rely on SQLAlchemy's declarative models. While Edgy focuses on providing a high-level, asynchronous ORM, there are scenarios where deeper integration with SQLAlchemy's features is necessary.
 
-For instance, libraries like [Esmerald Admin](https://esmerald-admin.tarsild.io) leverage Edgy's declarative models to provide admin interfaces that can efficiently manage related data. These tools expect SQLAlchemy relationships to be available, and Edgy's `declarative()` method ensures that these relationships are generated automatically.
+For instance, libraries like [Ravyn Admin](https://ravyn-admin.tarsild.io) leverage Edgy's declarative models to provide admin interfaces that can efficiently manage related data. These tools expect SQLAlchemy relationships to be available, and Edgy's `declarative()` method ensures that these relationships are generated automatically.
 
 ## Impact on Edgy's Core Functionality
 
@@ -34,7 +34,7 @@ It's important to note that these `_relation` fields do not alter or impact Edgy
 ## Practical Implications and Use Cases
 
 * **Integration with SQLAlchemy-based tools:** If you're using tools or libraries that rely on SQLAlchemy's declarative models, generating `declarative()` models from Edgy ensures seamless integration.
-* **Admin interfaces:** Tools like Esmerald Admin, which utilize Edgy's declarative models, can efficiently manage related data through the generated SQLAlchemy relationships.
+* **Admin interfaces:** Tools like Ravyn Admin, which utilize Edgy's declarative models, can efficiently manage related data through the generated SQLAlchemy relationships.
 * **Advanced SQLAlchemy features:** If you need to leverage advanced SQLAlchemy features that require direct access to relationships, generating `declarative()` models provides the necessary access.
 
 ## When to Use `declarative()`

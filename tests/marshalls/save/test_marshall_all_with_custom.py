@@ -3,9 +3,9 @@ from typing import Any
 
 import pytest
 from anyio import from_thread, sleep, to_thread
-from esmerald import Esmerald, Gateway, post
 from httpx import ASGITransport, AsyncClient
 from pydantic import BaseModel
+from ravyn import Gateway, Ravyn, post
 
 import edgy
 from edgy.core.marshalls import Marshall, fields
@@ -83,7 +83,7 @@ async def create_user(data: UserMarshall) -> UserMarshall:
 
 @pytest.fixture()
 def app():
-    app = Esmerald(
+    app = Ravyn(
         routes=[Gateway(handler=create_user)],
         on_startup=[database.connect],
         on_shutdown=[database.disconnect],
@@ -101,7 +101,7 @@ async def async_client(app) -> AsyncGenerator:
 async def test_marshall_all_with_custom_fields(async_client):
     data = {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
     }
@@ -110,7 +110,7 @@ async def test_marshall_all_with_custom_fields(async_client):
     assert response.json() == {
         "id": 1,
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
         "details": "Details about Edgy",

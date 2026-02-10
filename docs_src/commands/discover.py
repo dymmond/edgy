@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from esmerald import Esmerald, Include
+from ravyn import Ravyn, Include
 from my_project.utils import get_db_connection
 
 
@@ -29,7 +29,7 @@ def get_application():
     registry = get_db_connection()
 
     app = registry.asgi(
-        Esmerald(
+        Ravyn(
             routes=[Include(namespace="my_project.urls")],
         )
     )

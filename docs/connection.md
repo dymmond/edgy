@@ -2,13 +2,13 @@
 
 Using Edgy is designed to be straightforward, but understanding connection management is crucial for optimal performance and stability.
 
-Edgy is built on SQLAlchemy Core, but it's an asynchronous implementation. This raises questions about its integration with popular frameworks like [Esmerald](https://esmerald.dymmond.com), Starlette, or FastAPI.
+Edgy is built on SQLAlchemy Core, but it's an asynchronous implementation. This raises questions about its integration with popular frameworks like [Ravyn](https://ravyn.dymmond.com), Starlette, or FastAPI.
 
 Edgy is framework-agnostic, meaning it can be seamlessly integrated into any framework that supports lifecycle events.
 
 ## Lifecycle Events
 
-Lifecycle events are common in frameworks built on Starlette, such as [Esmerald](https://esmerald.dymmond.com) and FastAPI. Other frameworks may offer similar functionality through different mechanisms.
+Lifecycle events are common in frameworks built on Starlette, such as [Ravyn](https://ravyn.dymmond.com) and FastAPI. Other frameworks may offer similar functionality through different mechanisms.
 
 The most common lifecycle events include:
 
@@ -22,7 +22,7 @@ This document focuses on `lifespan`, which is widely used.
 
 Integrating database connections is as simple as incorporating them into your framework's lifecycle events.
 
-For illustrative purposes, we'll use [Esmerald](https://esmerald.dymmond.com). However, the principles apply to any framework.
+For illustrative purposes, we'll use [Ravyn](https://ravyn.dymmond.com). However, the principles apply to any framework.
 
 Using ASGI integration:
 
@@ -64,10 +64,10 @@ The `__aenter__` and `__aexit__` methods can be called as `connect` and `disconn
 This approach is suitable for integration via `on_startup` and `on_shutdown`.
 
 ```python
-{!> ../docs_src/connections/manual_esmerald.py !}
+{!> ../docs_src/connections/manual_ravyn.py !}
 ```
 
-## Integration via middleware (lilya/esmerald)
+## Integration via middleware (lilya/ravyn)
 
 Supposed you have a multi-app environment where multiple ASGI apps are stitched to together in one application.
 And you have multiple edgy registries. Here we can use the `edgy.contrib.lilya.middleware.EdgyMiddleware` middleware.

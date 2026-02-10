@@ -2,7 +2,7 @@ import httpx
 
 data = {
     "name": "Edgy",
-    "email": "edgy@esmerald.dev",
+    "email": "edgy@ravyn.dev",
     "language": "EN",
     "description": "A description",
 }

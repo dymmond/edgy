@@ -1,4 +1,4 @@
-from esmerald import Esmerald, Gateway, post
+from ravyn import Ravyn, Gateway, post
 
 import edgy
 from edgy.testclient import DatabaseTestClient as Database
@@ -29,7 +29,7 @@ async def create_user(data: User) -> User:
 
 
 app = models.asgi(
-    Esmerald(
+    Ravyn(
         routes=[Gateway(handler=create_user)],
     )
 )
