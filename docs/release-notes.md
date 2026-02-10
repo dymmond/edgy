@@ -8,6 +8,7 @@ hide:
 ## 0.35.6
 
 - Fix queryset bulk calls with empty iterable.
+- Rename to esmerald references to ravyn.
 
 ## 0.35.5
 
