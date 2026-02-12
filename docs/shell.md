@@ -100,9 +100,9 @@ using.
 Let us see an example using example using Ravyn and we will have:
 
 * Three [models](./models.md):
-    * User - From an [ravyn application][esmerald_application] `accounts`.
-    * Customer - From an [ravyn application][esmerald_application] `customers`.
-    * Product - From an [ravyn application][esmerald_application] `products`.
+    * User - From an [ravyn application][ravyn_application] `accounts`.
+    * Customer - From an [ravyn application][ravyn_application] `customers`.
+    * Product - From an [ravyn application][ravyn_application] `products`.
 * Two [reflected models](./reflection/reflection.md):
     * Payment - From a payments table reflected from the existing database.
     * RecordView - From a SQL View reflected from the existing database.
@@ -114,4 +114,4 @@ And it will look like this:
 Pretty cool, right? Then it is a normal python shell where you can import whatever you want and
 need as per normal python shell interaction.
 
-[esmerald_application]: https://ravyn.dev/management/directives/#create-app
+[ravyn_application]: https://ravyn.dev/management/directives/#create-app

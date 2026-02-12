@@ -1,6 +1,6 @@
 # Settings in Edgy
 
-Have you ever wished you could easily configure database settings? Since Edgy is created by the same author as Ravyn, and Ravyn is [settings][esmerald_settings] oriented, Edgy adopts a similar approach, albeit in a simpler form.
+Have you ever wished you could easily configure database settings? Since Edgy is created by the same author as Ravyn, and Ravyn is [settings][ravyn_settings] oriented, Edgy adopts a similar approach, albeit in a simpler form.
 
 ## Edgy Settings Module
 
@@ -51,7 +51,7 @@ Edgy's settings are designed to be simple and easily overridable.
 
 #### How to Use It
 
-Similar to [Ravyn settings][esmerald_settings], Edgy uses the `EDGY_SETTINGS_MODULE` environment variable.
+Similar to [Ravyn settings][ravyn_settings], Edgy uses the `EDGY_SETTINGS_MODULE` environment variable.
 
 Using the example from [above](#custom-settings) and the location `myproject/configs/settings.py`, the settings should be called like this:
 
@@ -95,4 +95,4 @@ $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy migrate
 
 And so on. To see available commands, check the [commands](./migrations/migrations.md) and [shell support](./shell.md).
 
-[esmerald_settings]: https://ravyn.dev/application/settings/
+[ravyn_settings]: https://ravyn.dev/application/settings/

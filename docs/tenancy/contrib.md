@@ -211,7 +211,7 @@ Well with all the models and explanations covered, is time to create a practical
 of this is applied, this way it will make more sense to understand what is what and how everything
 works together 🔥.
 
-For this example we will be using [Ravyn][ravyn] and [Ravyn middleware][esmerald_middleware]
+For this example we will be using [Ravyn][ravyn] and [Ravyn middleware][ravyn_middleware]
 with Edgy. We will be also be creating:
 
 * [Tenant](#tenant)
@@ -352,6 +352,6 @@ be carefully managed by you from there on.
 
 [edgy]: ./edgy.md
 [ravyn]: https://ravyn.dev
-[esmerald_middleware]: https://ravyn.dev/middleware
+[ravyn_middleware]: https://ravyn.dev/middleware
 [django_tenants]: https://django-tenants.readthedocs.io/en/latest/
 [django_tenants_url]: https://django-tenants-url.tarsild.io/

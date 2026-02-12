@@ -1,7 +1,7 @@
 import pytest
 from pydantic import __version__
 from ravyn import Gateway, Ravyn, post
-from ravyn.testclient import EsmeraldTestClient
+from ravyn.testclient import RavynTestClient
 
 import edgy
 from edgy.testclient import DatabaseTestClient
@@ -31,7 +31,7 @@ async def create_user(data: User) -> None: ...  # pragma: no cover
 
 
 app = Ravyn(routes=[Gateway(handler=create_user)])
-client = EsmeraldTestClient(app, raise_server_exceptions=True)
+client = RavynTestClient(app, raise_server_exceptions=True)
 
 
 def test_raises_error_on_missing_not_null_fields():
