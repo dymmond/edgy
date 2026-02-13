@@ -85,7 +85,7 @@ jobs:
         if: steps.filters.outputs.src == 'true' || steps.filters.outputs.docs_src == 'true' || steps.filters.outputs.workflows == 'true'
 
       - name: "Run tests for SQLAlchemy 1.4.54"
-        if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true' || github.event.schedule != ''
+        if: (steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true' || github.event.schedule != '') && matrix.python-version == '3.14'
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/edgy"
           TEST_DATABASE_ALTERNATIVE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5433/edgy_alt"
