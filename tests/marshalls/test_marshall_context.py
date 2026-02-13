@@ -55,7 +55,7 @@ class UserMarshall(Marshall):
 async def test_marshall_without_context():
     data = {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
     }
@@ -64,7 +64,7 @@ async def test_marshall_without_context():
 
     assert user_marshalled.model_dump() == {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
         "extra_context": {},
@@ -74,7 +74,7 @@ async def test_marshall_without_context():
 async def test_marshall_with_empty_context():
     data = {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
     }
@@ -83,7 +83,7 @@ async def test_marshall_with_empty_context():
 
     assert user_marshalled.model_dump() == {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
         "extra_context": {},
@@ -93,7 +93,7 @@ async def test_marshall_with_empty_context():
 async def test_marshall_with_context():
     data = {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
     }
@@ -102,7 +102,7 @@ async def test_marshall_with_context():
 
     assert user_marshalled.model_dump() == {
         "name": "Edgy",
-        "email": "edgy@esmerald.dev",
+        "email": "edgy@ravyn.dev",
         "language": "EN",
         "description": "A description",
         "extra_context": {"foo": "bar"},

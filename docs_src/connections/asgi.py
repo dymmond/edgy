@@ -1,4 +1,4 @@
-from esmerald import Esmerald
+from ravyn import Ravyn
 
 from edgy import Registry, Instance, monkay
 
@@ -6,7 +6,7 @@ models = Registry(database="sqlite:///db.sqlite", echo=True)
 
 
 app = models.asgi(
-    Esmerald(
+    Ravyn(
         routes=[...],
     )
 )

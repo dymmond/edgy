@@ -1,7 +1,7 @@
 from uuid import UUID
 
 import pytest
-from esmerald import Esmerald
+from ravyn import Ravyn
 
 import edgy
 from edgy import Instance, Registry
@@ -49,7 +49,7 @@ async def test_migrate_objs_main_only():
     assert tenant.schema_name == "migrate_edgy"
     assert tenant.tenant_name == "migrate_edgy"
 
-    app = Esmerald()
+    app = Ravyn()
 
     with edgy.monkay.with_instance(Instance(app=app, registry=models)):
         registry = edgy.get_migration_prepared_registry()
@@ -80,7 +80,7 @@ async def test_migrate_objs_all():
     assert tenant.schema_name == "migrate_edgy"
     assert tenant.tenant_name == "migrate_edgy"
 
-    app = Esmerald()
+    app = Ravyn()
 
     with (
         edgy.monkay.with_instance(Instance(app=app, registry=models)),
@@ -131,7 +131,7 @@ async def test_migrate_objs_namespace_only():
     assert tenant.schema_name == "migrate_edgy"
     assert tenant.tenant_name == "migrate_edgy"
 
-    app = Esmerald()
+    app = Ravyn()
 
     with (
         edgy.monkay.with_instance(Instance(app=app, registry=models)),
@@ -157,7 +157,7 @@ async def test_migrate_objs_few():
     assert tenant.schema_name == "migrate_edgy"
     assert tenant.tenant_name == "migrate_edgy"
 
-    app = Esmerald()
+    app = Ravyn()
 
     # here test set_instance
     edgy.monkay.set_instance(Instance(app=app, registry=models))

@@ -70,7 +70,7 @@ came to be 😁.
 Edgy leverages the power of **Pydantic** while offering a friendly, familiar and easy to use interface.
 
 This ORM was designed to be flexible and compatible with pretty much every ASGI framework, like
-[Esmerald](https://esmerald.dymmond.com), Starlette, FastAPI, Sanic, Quart... With simple pluggable
+[Ravyn](https://ravyn.dymmond.com), Starlette, FastAPI, Sanic, Quart... With simple pluggable
 design thanks to its origins.
 
 ## Features
@@ -156,17 +156,17 @@ generates the name of the table for you by pluralising the class name.
 
 {! ../docs_src/shared/notes.md !}
 
-## `Esmerald` ecosystem
+## `Ravyn` ecosystem
 
-This does not mean that only works with Esmerald! Edgy is also framework agnostic but the author
-of Edgy is the same of Saffier and Esmerald which makes it nicer to integrate directly with Esmerald.
+This does not mean that only works with Ravyn! Edgy is also framework agnostic but the author
+of Edgy is the same of Saffier and Ravyn which makes it nicer to integrate directly with Ravyn.
 
-How could you integrate `Edgy` with Esmerald (or any other framework)?
+How could you integrate `Edgy` with Ravyn (or any other framework)?
 
 Let us see an example. Since Edgy is fully Pydantic that means we can perform tasks directly.
 
 ```python hl_lines="28"
-{!> ../docs_src/quickstart/esmerald.py!}
+{!> ../docs_src/quickstart/ravyn.py!}
 ```
 
 The response of the API `/create` should have a format similar to this (assuming the post with the following payload as well):
@@ -175,7 +175,7 @@ The response of the API `/create` should have a format similar to this (assuming
 {
     "id": 1,
     "name": "Edgy",
-    "email": "edgy@esmerald.dev",
+    "email": "edgy@ravyn.dev",
     "language": "EN",
     "description": "A description",
 }

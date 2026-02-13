@@ -1,4 +1,4 @@
-from esmerald import Esmerald, Gateway, post
+from ravyn import Ravyn, Gateway, post
 from pydantic import field_validator
 
 import edgy
@@ -58,7 +58,7 @@ async def create_user(data: User) -> User:
 
 def app():
     app = models.asgi(
-        Esmerald(
+        Ravyn(
             routes=[Gateway(handler=create_user)],
         )
     )

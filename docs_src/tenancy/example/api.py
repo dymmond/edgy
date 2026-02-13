@@ -1,6 +1,6 @@
 from typing import List
 
-from esmerald import Esmerald, Gateway, get
+from ravyn import Ravyn, Gateway, get
 
 import edgy
 
@@ -19,7 +19,7 @@ async def products() -> List[Product]:
 
 
 app = models.asgi(
-    Esmerald(
+    Ravyn(
         routes=[Gateway(handler=products)],
         middleware=[TenantMiddleware],
     )

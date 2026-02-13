@@ -1,6 +1,6 @@
 # Tips and Tricks for Edgy
 
-This section provides guidance on organizing your code, particularly within an [Esmerald](https://esmerald.dymmond.com) application. While the examples are Esmerald-centric, the principles apply to any framework you use with Edgy.
+This section provides guidance on organizing your code, particularly within an [Ravyn](https://ravyn.dymmond.com) application. While the examples are Ravyn-centric, the principles apply to any framework you use with Edgy.
 
 ## Centralizing Database Connections
 
@@ -8,7 +8,7 @@ Declaring database connections repeatedly throughout your application can lead t
 
 ### Global Settings File
 
-A common approach is to store connection details in a global settings file. This is especially convenient with Esmerald, which provides easy access to settings throughout your application.
+A common approach is to store connection details in a global settings file. This is especially convenient with Ravyn, which provides easy access to settings throughout your application.
 
 Example:
 
@@ -16,10 +16,10 @@ Example:
 {!> ../docs_src/tips/settings.py !}
 ```
 
-With this setup, you can access the `db_connection` from anywhere in your code. In Esmerald:
+With this setup, you can access the `db_connection` from anywhere in your code. In Ravyn:
 
 ```python hl_lines="3"
-from esmerald.conf import settings
+from ravyn.conf import settings
 
 registry = settings.db_connection
 ```

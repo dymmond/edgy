@@ -58,7 +58,7 @@ Edgy requires a `Migration` object to manage migrations consistently and cleanly
 
 This `Migration` class is framework-independent. Edgy ensures it integrates with any desired framework upon creation.
 
-This flexibility makes Edgy uniquely adaptable to frameworks like Esmerald, Starlette, FastAPI, and Sanic.
+This flexibility makes Edgy uniquely adaptable to frameworks like Ravyn, Starlette, FastAPI, and Sanic.
 
 ```python
 from edgy import Instance, monkay
@@ -106,7 +106,7 @@ This ensures object creation only once.
 
 Now, use the `Migration` object in your application.
 
-#### Using Esmerald
+#### Using Ravyn
 
 ```python title="my_project/main.py" hl_lines="6 36-40 42"
 {!> ../docs_src/migrations/migrations.py !}
@@ -322,7 +322,7 @@ Assume your `accounts` application models are in `models.py`. Define a `User` mo
 {!> ../docs_src/migrations/model.py !}
 ```
 
-Ensure the models are accessible for discovery. For Esmerald, add the `User` model to `my_project/apps/accounts/__init__.py`:
+Ensure the models are accessible for discovery. For Ravyn, add the `User` model to `my_project/apps/accounts/__init__.py`:
 
 ```python title="my_project/apps/accounts/__init__.py"
 from .models import User

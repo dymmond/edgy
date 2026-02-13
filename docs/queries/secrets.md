@@ -38,7 +38,7 @@ Let's create some data.
 
 ```python
 await User.query.create(name="Edgy", email="edgy@example.dev", password="A@Pass123")
-await User.query.create(name="Esmerald", email="esmerald@esmerald.dev", password="A@Pass321")
+await User.query.create(name="Ravyn", email="ravyn@ravyn.dev", password="A@Pass321")
 ```
 
 Now, let's query, excluding the secrets.

@@ -39,19 +39,19 @@ async def test_can_create_tenant_records():
     # Create the tenant
     # using the defaults from Edgy.
     await create_schema(
-        registry=models, schema_name="esmerald", if_not_exists=True, should_create_tables=True
+        registry=models, schema_name="ravyn", if_not_exists=True, should_create_tables=True
     )
 
     for i in range(10):
         await Item.query.create(name=f"item-{i}")
 
     for i in range(5):
-        await Item.query.using(schema="esmerald").create(name=f"item-schema-{i}")
+        await Item.query.using(schema="ravyn").create(name=f"item-schema-{i}")
 
     total = await Item.query.count()
 
     assert total == 10
 
-    total_schema = await Item.query.using(schema="esmerald").count()
+    total_schema = await Item.query.using(schema="ravyn").count()
 
     assert total_schema == 5

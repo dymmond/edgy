@@ -53,13 +53,13 @@ async def test_multiple_prefetch_model_calls_iterate_no_rollback():
         for i in range(50):
             await Article.query.create(content=f"Comment number {i}", user=user)
 
-        esmerald = await User.query.create(name="Esmerald")
+        ravyn = await User.query.create(name="Ravyn")
 
         for i in range(15):
-            await Post.query.create(comment=f"Comment number {i}", user=esmerald)
+            await Post.query.create(comment=f"Comment number {i}", user=ravyn)
 
         for i in range(20):
-            await Article.query.create(content=f"Comment number {i}", user=esmerald)
+            await Article.query.create(content=f"Comment number {i}", user=ravyn)
 
         users = [
             user
@@ -75,7 +75,7 @@ async def test_multiple_prefetch_model_calls_iterate_no_rollback():
         assert len(user1.to_posts) == 5
         assert len(user1.to_articles) == 50
 
-        user2 = [value for value in users if value.pk == esmerald.pk][0]
+        user2 = [value for value in users if value.pk == ravyn.pk][0]
         assert len(user2.to_posts) == 15
         assert len(user2.to_articles) == 20
 
@@ -90,13 +90,13 @@ async def test_multiple_prefetch_model_calls_iterate_force_rollback():
         for i in range(50):
             await Article.query.create(content=f"Comment number {i}", user=user)
 
-        esmerald = await User.query.create(name="Esmerald")
+        ravyn = await User.query.create(name="Ravyn")
 
         for i in range(15):
-            await Post.query.create(comment=f"Comment number {i}", user=esmerald)
+            await Post.query.create(comment=f"Comment number {i}", user=ravyn)
 
         for i in range(20):
-            await Article.query.create(content=f"Comment number {i}", user=esmerald)
+            await Article.query.create(content=f"Comment number {i}", user=ravyn)
 
         with pytest.warns(UserWarning):
             # it should warn agains the iterate feature in combination with force_rollback
@@ -115,6 +115,6 @@ async def test_multiple_prefetch_model_calls_iterate_force_rollback():
         assert len(user1.to_posts) == 5
         assert len(user1.to_articles) == 50
 
-        user2 = [value for value in users if value.pk == esmerald.pk][0]
+        user2 = [value for value in users if value.pk == ravyn.pk][0]
         assert len(user2.to_posts) == 15
         assert len(user2.to_articles) == 20

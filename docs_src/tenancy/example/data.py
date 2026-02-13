@@ -3,7 +3,7 @@ async def create_data():
     Creates mock data.
     """
     # Create some users in the main users table
-    esmerald = await User.query.create(name="esmerald")
+    ravyn = await User.query.create(name="ravyn")
 
     # Create a tenant for Edgy (only)
     tenant = await Tenant.query.create(
@@ -23,6 +23,6 @@ async def create_data():
             user=edgy,
         )
 
-    # Products for Esmerald (no schema associated, defaulting to the public schema or "shared")
+    # Products for Ravyn (no schema associated, defaulting to the public schema or "shared")
     for i in range(25):
-        await Product.query.create(name=f"Product-{i}", user=esmerald)
+        await Product.query.create(name=f"Product-{i}", user=ravyn)

@@ -20,7 +20,7 @@ The following examples will use a scenario where we create a `user` and a `profi
 
 Using transactions as decorators is less common but useful for ensuring entire endpoints are atomic.
 
-Consider an Esmerald endpoint (but this can be any web framework) that creates a `user` and a `profile` in one atomic operation:
+Consider an Ravyn endpoint (but this can be any web framework) that creates a `user` and a `profile` in one atomic operation:
 
 ```python hl_lines="18"
 {!> ../docs_src/transactions/decorator.py!}

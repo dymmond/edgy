@@ -1,11 +1,11 @@
-from esmerald import Esmerald
+from ravyn import Ravyn
 
 from edgy import Registry, Instance, monkay
 
 models = Registry(database="sqlite:///db.sqlite", echo=True)
 
 
-app = Esmerald(
+app = Ravyn(
     routes=[...],
     on_startup=[models.__aenter__],
     on_shutdown=[models.__aexit__],

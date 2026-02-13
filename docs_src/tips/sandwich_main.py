@@ -1,6 +1,6 @@
 from importlib import import_module
 
-from esmerald import Esmerald
+from ravyn import Ravyn
 
 
 def build_path():
@@ -29,7 +29,7 @@ def get_application():
     # load extensions and preloads
     # not evaluate_settings because maybe some preloads weren't resolved
     monkay.evaluate_settings(on_conflict="keep")
-    app = Esmerald()
+    app = Ravyn()
     # now apply the extensions
     edgy.monkay.set_instance(edgy.Instance(registry=registry, app=app))
     return app

@@ -1,5 +1,5 @@
 import pytest
-from esmerald import Esmerald
+from ravyn import Ravyn
 
 import edgy
 from edgy import Registry
@@ -45,7 +45,7 @@ class Contact(Profile):
     "instance_wrapper,deprecated", [("Instance", False), ("Migrate", True), ("EdgyExtra", True)]
 )
 def test_migrate_without_model_apps(instance_wrapper, deprecated):
-    app = Esmerald()
+    app = Ravyn()
     if deprecated:
         with pytest.warns(DeprecationWarning):
             migrate = getattr(edgy, instance_wrapper)(app=app, registry=models)
@@ -94,7 +94,7 @@ def test_migrate_without_model_apps_and_app():
     ids=["dict", "tuple", "list"],
 )
 def test_migrate_with_fake_model_apps(model_apps):
-    app = Esmerald()
+    app = Ravyn()
     nother.models = {}
 
     assert len(nother.models) == 0
@@ -112,7 +112,7 @@ def test_migrate_with_fake_model_apps(model_apps):
     ids=["set", "fronzenset", "int", "float", "string"],
 )
 def test_raises_assertation_error_on_model_apps(model_apps):
-    app = Esmerald()
+    app = Ravyn()
     nother.models = {}
 
     assert len(nother.models) == 0

@@ -1,7 +1,7 @@
 from typing import Any, Coroutine
 
-from esmerald import Request
-from esmerald.core.protocols.middleware import MiddlewareProtocol
+from ravyn import Request
+from ravyn.core.protocols.middleware import MiddlewareProtocol
 from lilya.types import ASGIApp, Receive, Scope, Send
 
 from edgy.core.db import with_tenant

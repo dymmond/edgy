@@ -1,7 +1,7 @@
 from typing import Optional
 
 from edgy import EdgySettings
-from esmerald.conf.enums import EnvironmentType
+from ravyn.conf.enums import EnvironmentType
 
 
 class MyCustomSettings(EdgySettings):

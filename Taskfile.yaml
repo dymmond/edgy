@@ -76,20 +76,20 @@ tasks:
   test:
     desc: Runs the suite tests
     env:
-      ESMERALD_SETTINGS_MODULE: tests.settings.TestSettings
+      RAVYN_SETTINGS_MODULE: tests.settings.TestSettings
     cmds:
       - hatch run test:test {{ .ARGS }}
 
   test_man:
     desc: Runs the manual tests with more output details and python breakpoints allowed
     env:
-      ESMERALD_SETTINGS_MODULE: tests.settings.TestSettings
+      RAVYN_SETTINGS_MODULE: tests.settings.TestSettings
     cmds:
       - hatch run test:test_man {{ .ARGS }}
 
   coverage:
     desc: Runs the coverage tests
     env:
-      ESMERALD_SETTINGS_MODULE: tests.settings.TestSettings
+      RAVYN_SETTINGS_MODULE: tests.settings.TestSettings
     cmds:
       - hatch run test:coverage {{ .ARGS }}

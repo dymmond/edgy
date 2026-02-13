@@ -57,7 +57,7 @@ class Group(edgy.Model):
     groups and OR-ing conditions.
     """
 
-    id: int = fields.IntegerField(primary_key=True)
+    id: int = fields.IntegerField(autoincrement=True, primary_key=True)
     name: str = fields.CharField(max_length=128)
 
     class Meta:
@@ -72,7 +72,7 @@ class Collection(edgy.Model):
     and workspaces are attached to a collection.
     """
 
-    id: int = fields.IntegerField(primary_key=True)
+    id: int = fields.IntegerField(autoincrement=True, primary_key=True)
     name: str = fields.CharField(max_length=128)
     groups: list[Group] = fields.ManyToManyField(  # type: ignore[assignment]
         "Group",
@@ -92,7 +92,7 @@ class Workspace(edgy.Model):
     which in turn uses UniqueWorkspaceQuerySet as queryset_class.
     """
 
-    id: int = fields.IntegerField(primary_key=True)
+    id: int = fields.IntegerField(autoincrement=True, primary_key=True)
     name: str = fields.CharField(max_length=128)
     collection: Collection = fields.ForeignKey(  # type: ignore[assignment]
         "Collection",
