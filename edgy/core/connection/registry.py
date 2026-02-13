@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast, overload
 
 import sqlalchemy
 from monkay.asgi import ASGIApp, LifespanHook
-from sqlalchemy import Engine
+from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio.engine import AsyncEngine
 from sqlalchemy.orm import declarative_base as sa_declarative_base
 
