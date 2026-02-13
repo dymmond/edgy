@@ -83,6 +83,16 @@ jobs:
       - name: "Run mypy"
         run: "hatch run test:check_types"
         if: steps.filters.outputs.src == 'true' || steps.filters.outputs.docs_src == 'true' || steps.filters.outputs.workflows == 'true'
+
+      - name: "Run tests for SQLAlchemy 1.4.54"
+        if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true' || github.event.schedule != ''
+        env:
+          TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/edgy"
+          TEST_DATABASE_ALTERNATIVE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5433/edgy_alt"
+        run: |
+          pip install sqlalchemy==1.4.54
+          hatch test
+
       - name: "Run tests"
         if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true' || github.event.schedule != ''
         env:
