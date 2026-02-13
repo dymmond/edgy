@@ -59,6 +59,11 @@ tasks:
     cmds:
       - hatch run test:check_types
 
+  format:
+    desc: Formats the code with isort and black
+    cmds:
+      - task lint
+      - task mypy
   #---------------------------- DOCS -------------------------------
 
   serve:

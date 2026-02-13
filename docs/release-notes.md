@@ -5,6 +5,12 @@ hide:
 
 # Release Notes
 
+## 0.35.7
+
+### Changed
+
+- Fix internal typing search for SQLAlchemy.
+
 ## 0.35.6
 
 ### Changed

@@ -1416,7 +1416,7 @@ class DatabaseMixin:
             *chain.from_iterable(
                 (
                     [field]
-                    if isinstance(field, sqlalchemy.TextClause)
+                    if isinstance(field, sqlalchemy.sql.expression.TextClause)
                     else cls.meta.field_to_column_names[field]
                 )
                 for field in index.fields

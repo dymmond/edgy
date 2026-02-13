@@ -37,7 +37,7 @@ class Index:
                                              Defaults to 63, a common limit in databases.
         name (str | None): The explicit name of the index. If None, a name will be
                            automatically generated based on the fields and suffix.
-        fields (Sequence[str | sqlalchemy.TextClause] | None): A sequence of field names
+        fields (Sequence[str | sqlalchemy.sql.expression.TextClause] | None): A sequence of field names
                                                                or SQLAlchemy TextClause
                                                                objects on which the index
                                                                should be created.
@@ -46,7 +46,7 @@ class Index:
     suffix: str = "idx"
     __max_name_length__: ClassVar[int] = 63
     name: str | None = None
-    fields: Sequence[str | sqlalchemy.TextClause] | None = None
+    fields: Sequence[str | sqlalchemy.sql.expression.TextClause] | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -66,7 +66,7 @@ class Index:
             ValueError:
                 - If the provided `name` exceeds `__max_name_length__`.
                 - If `fields` is not a list or tuple.
-                - If `fields` contains elements that are not strings or `sqlalchemy.TextClause`.
+                - If `fields` contains elements that are not strings or `sqlalchemy.sql.expression.TextClause`.
         """
         # Retrieve the name from the input values, defaulting to None.
         name = values.kwargs.get("name")
@@ -85,7 +85,9 @@ class Index:
             raise ValueError("Index.fields must be a list or a tuple.")
 
         # Validate that all elements in 'fields' are strings or SQLAlchemy TextClause objects.
-        if fields and not all(isinstance(field, str | sqlalchemy.TextClause) for field in fields):
+        if fields and not all(
+            isinstance(field, str | sqlalchemy.sql.expression.TextClause) for field in fields
+        ):
             raise ValueError(
                 "Index.fields must contain only strings with field names or text() clauses."
             )
