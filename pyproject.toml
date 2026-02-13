@@ -41,12 +41,12 @@ dependencies = [
     "monkay>=0.5.0",
     "orjson>=3.6.1",
     "alembic>=1.11.3,<2.0.0",
-    "databasez>=0.10.3",
+    "databasez>=0.11.5",
     "pydantic[email]>=2.5.3,<3.0.0",
     "pydantic-settings>=2.0.0,<3.0.0",
     "sayer>=0.7.0",
     "blinker>=1.8,<2.0",
-    'typing_extensions>=4.0; python_version<"3.11"'
+    'typing_extensions>=4.0; python_version<"3.11"',
 ]
 keywords = [
     "api",
@@ -84,7 +84,7 @@ testing = [
     "httpx",
     "uvicorn",
     "mypy[faster-cache]>=1.16,<2.0",
-    "ordered-set"
+    "ordered-set",
 ]
 mime = ["python-magic"]
 image = ["pillow"]
@@ -93,7 +93,13 @@ mysql = ["databasez[mysql]"]
 sqlite = ["databasez[sqlite]"]
 mssql = ["databasez[aioodbc]"]
 jdbc = ["databasez[jdbc]"]
-admin = ["lilya>=0.16.7", "uvicorn", "jinja2", "itsdangerous", "python-multipart"]
+admin = [
+    "lilya>=0.16.7",
+    "uvicorn",
+    "jinja2",
+    "itsdangerous",
+    "python-multipart",
+]
 # all except testing
 all = [
     "edgy[test,mime,image,postgres,mysql,sqlite,mssql,jdbc,admin]",
@@ -102,7 +108,11 @@ all = [
 ]
 
 [tool.hatch.envs.default]
-dependencies = ["pre-commit>=4.0.0,<5.0.0", "edgy[sqlite,admin,image,mime]", "mypy[faster-cache]>=1.16,<2.0"]
+dependencies = [
+    "pre-commit>=4.0.0,<5.0.0",
+    "edgy[sqlite,admin,image,mime]",
+    "mypy[faster-cache]>=1.16,<2.0",
+]
 
 [tool.hatch.envs.default.scripts]
 clean_pyc = "find . -type f -name \"*.pyc\" -delete"
