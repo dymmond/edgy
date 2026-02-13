@@ -12,7 +12,7 @@ from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
     from sqlalchemy import Table
-    from sqlalchemy.engine.result import Row
+    from sqlalchemy.engine.row import Row
 
     from edgy.core.connection import Database
     from edgy.core.db.models.model import Model
