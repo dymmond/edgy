@@ -61,6 +61,20 @@ async def test_filter_with_foreign_key():
     assert len(products) == 5
 
 
+async def test_where_with_foreign_key():
+    user = await User.query.insert(name="Adam")
+
+    for _ in range(5):
+        await Product.query.insert(name="sku", user=user, rating=4)
+
+    products = await Product.query.where(user=user)
+
+    assert len(products) == 5
+    products = await Product.query.where(user__id=user.pk)
+
+    assert len(products) == 5
+
+
 async def test_model_filter():
     await User.query.create(name="Test")
     await User.query.create(name="Jane")

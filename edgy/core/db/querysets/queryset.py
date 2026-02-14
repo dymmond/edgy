@@ -44,7 +44,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.mixins.combined import CombinedQuerySet
 
 
-class QuerySet(BaseQuerySet):
+class EdgyQuerySet(BaseQuerySet):
     @cached_property
     def sql(self) -> str:
         """Get SQL select query as string with inserted blanks. For debugging only!"""
@@ -282,7 +282,7 @@ class QuerySet(BaseQuerySet):
         """
         if clear_cache:
             self._clear_cache(keep_cached_selected=not self._has_dynamic_clauses)
-            return self
+            return cast(QuerySet, self)
         return self._clone()
 
     def or_(
@@ -801,7 +801,7 @@ class QuerySet(BaseQuerySet):
             filter_query = self.filter(**kwargs)
             filter_query._cache = self._cache
             return await filter_query.exists()
-        queryset: QuerySet = self
+        queryset: QuerySet = cast(QuerySet, self)
         expression = (await queryset.as_select()).exists().select()
         check_db_connection(queryset.database)
         async with queryset.database as database:
@@ -822,7 +822,7 @@ class QuerySet(BaseQuerySet):
         if self._cache_count is not None:
             return self._cache_count
 
-        queryset: QuerySet = self
+        queryset: QuerySet = cast(QuerySet, self)
 
         needs_distinct = (
             bool(queryset.or_clauses) or bool(queryset._select_related) or bool(queryset._group_by)
@@ -1012,7 +1012,7 @@ class QuerySet(BaseQuerySet):
                     new_objs.append(obj)
             original = obj.extract_db_fields()
             col_values: dict[str, Any] = obj.extract_column_values(
-                original, phase="prepare_insert", instance=self, model_instance=obj
+                original, phase="prepare_insert", instance=cast(QuerySet, self), model_instance=obj
             )
             col_values.update(
                 await obj.execute_pre_save_hooks(col_values, original, is_update=False)
@@ -1181,7 +1181,7 @@ class QuerySet(BaseQuerySet):
         async def _iterate(obj: EdgyModel) -> dict[str, Any]:
             original = obj.extract_db_fields()
             col_values: dict[str, Any] = obj.extract_column_values(
-                original, phase="prepare_insert", instance=self
+                original, phase="prepare_insert", instance=cast(QuerySet, self)
             )
             col_values.update(
                 await obj.execute_pre_save_hooks(col_values, original, is_update=False)
@@ -1427,3 +1427,94 @@ class QuerySet(BaseQuerySet):
     async def __aiter__(self) -> AsyncIterator[Any]:
         async for value in self._execute_iterate():
             yield value
+
+
+class QuerySet(EdgyQuerySet):
+    """
+    Introduces a new interface common to some existing ORMs
+    """
+
+    def where(
+        self,
+        *clauses: sqlalchemy.sql.expression.BinaryExpression
+        | Callable[
+            [QuerySetType],
+            sqlalchemy.sql.expression.BinaryExpression
+            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
+        ]
+        | dict[str, Any]
+        | QuerySet,
+        **kwargs: Any,
+    ) -> QuerySet:
+        """
+        Filters the QuerySet by the given clauses and keyword arguments, combining them with the AND operand.
+
+        This is the new alternative to "filter" and uses the same underlying interface.
+
+        This is the primary method for constructing the WHERE clause of a query. Multiple clauses
+        and kwargs are implicitly combined using AND.
+
+        Args:
+            *clauses: Positional arguments which can be:
+                      - SQLAlchemy Binary Expressions (e.g., `Model.field == value`).
+                      - Callables (sync/async) that accept the QuerySet and return a Binary Expression.
+                      - Dictionaries (Django-style lookups, e.g., `{"field__gt": 10}`).
+                      - Nested QuerySets (for subqueries).
+            **kwargs: Keyword arguments for Django-style lookups (e.g., `field__gt=10`).
+
+        Returns:
+            A new QuerySet instance with the additional filters applied.
+        """
+        return self._filter_or_exclude(clauses=clauses, kwargs=kwargs)
+
+    async def select(self, **kwargs: Any) -> EdgyEmbedTarget:
+        """
+        Fetches a single object matching the parameters.
+
+        The newest alternative to "get".
+
+        Args:
+            **kwargs: Filters to identify the single object.
+
+        Returns:
+            The matching model instance.
+
+        Raises:
+            ObjectNotFound: If no object is found.
+            MultipleObjectsReturned: If more than one object is found (implicitly handled by underlying `_get_raw`).
+        """
+        return cast(EdgyEmbedTarget, (await self._get_raw(**kwargs))[1])
+
+    async def select_or_none(self, **kwargs: Any) -> EdgyEmbedTarget | None:
+        """
+        Fetches a single object matching the parameters.
+
+        The newest alternative to "get_or_none".
+
+        If no object is found (raises `ObjectNotFound`), returns `None`.
+
+        Args:
+            **kwargs: Filters to identify the single object.
+
+        Returns:
+            The matching model instance, or `None`.
+        """
+        try:
+            return await self.get(**kwargs)
+        except ObjectNotFound:
+            return None
+
+    async def insert(self, *args: Any, **kwargs: Any) -> EdgyEmbedTarget:
+        """
+        Creates and saves a single record in the database table associated with the QuerySet's model.
+
+        Alternative to "create".
+
+        Args:
+            *args: Positional arguments for model instantiation.
+            **kwargs: Keyword arguments for model instantiation and field values.
+
+        Returns:
+            The newly created model instance.
+        """
+        return await self.create(*args, **kwargs)

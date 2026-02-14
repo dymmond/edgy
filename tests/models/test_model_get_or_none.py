@@ -53,3 +53,31 @@ async def test_get_or_none_without_get():
 
     user = await User.query.get_or_none(name="Charles")
     assert user.pk == 1
+
+
+async def test_select_or_none():
+    user = await User.query.insert(name="Charles")
+    query = User.query.where(name="Charles")
+    assert user == await query.select()
+
+    assert query._cache_count == 1
+    assert query._cache_first[1] == user
+    assert query._cache_last[1] == user
+
+    user = await User.query.select_or_none(name="Luigi")
+    assert user is None
+
+    user = await User.query.select_or_none(name="Charles")
+    assert user.pk == 1
+
+
+async def test_select_or_none_without_get():
+    user = await User.query.insert(name="Charles")
+    users = await User.query.where(name="Charles")
+    assert user == users[0]
+
+    user = await User.query.select_or_none(name="Luigi")
+    assert user is None
+
+    user = await User.query.select_or_none(name="Charles")
+    assert user.pk == 1
