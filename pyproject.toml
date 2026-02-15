@@ -111,7 +111,7 @@ all = [
 dependencies = [
     "pre-commit>=4.0.0,<5.0.0",
     "edgy[sqlite,admin,image,mime]",
-    "mypy[faster-cache]>=1.16,<2.0",
+    "mypy[faster-cache]>=1.19.1,<2.0",
 ]
 
 [tool.hatch.envs.default.scripts]

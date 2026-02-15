@@ -40,7 +40,10 @@ _excempted_attrs: set[str] = {
 
 class EdgyBaseModel(BaseModel, BaseModelType):
     model_config = ConfigDict(
-        extra="allow", arbitrary_types_allowed=True, validate_assignment=True
+        extra="allow",
+        arbitrary_types_allowed=True,
+        validate_assignment=True,
+        ser_json_bytes="base64",
     )
 
     _edgy_private_attrs: ClassVar[set[str]] = PrivateAttr(

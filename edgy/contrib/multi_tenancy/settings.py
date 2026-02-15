@@ -19,7 +19,9 @@ class TenancySettings(EdgySettings):
     tenant and domain model references, and default values.
     """
 
-    model_config = SettingsConfigDict(extra="allow", ignored_types=(cached_property,))
+    model_config = SettingsConfigDict(
+        extra="allow", ignored_types=(cached_property,), ser_json_bytes="base64"
+    )
     auto_create_schema: bool = True
     """
     A boolean flag indicating whether database schemas for new tenants

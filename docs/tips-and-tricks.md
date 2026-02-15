@@ -87,7 +87,7 @@ Project structure:
     │           ├── __init__.py
     │           ├── schemas.py
     │           ├── urls.py
-    │           └── views.py
+    │           └── controllers.py
     ├── configs
     │   ├── __init__.py
     │   ├── development

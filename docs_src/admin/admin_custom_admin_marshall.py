@@ -31,7 +31,9 @@ class User(edgy.Model):
         class AdminMarshall(edgy.marshalls.Marshall):
             # forbid triggers additionalProperties=false
             model_config: ClassVar[ConfigDict] = ConfigDict(
-                title=cls.__name__, extra="forbid" if for_schema else None
+                title=cls.__name__,
+                extra="forbid" if for_schema else None,
+                ser_json_bytes="base64",
             )
             marshall_config = edgy.marshalls.ConfigMarshall(
                 model=cls,

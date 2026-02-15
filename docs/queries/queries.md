@@ -198,6 +198,12 @@ These filters are the same **Django-style** lookups.
 users = await User.query.filter(is_active=True, email__icontains="gmail")
 ```
 
+You can also use `where` if you prefer a different syntax.
+
+```python
+users = await User.query.where(is_active=True, email__icontains="gmail")
+```
+
 The same special operators are also automatically added on every column.
 
 * **in** - SQL `IN` operator.
@@ -643,6 +649,18 @@ Create takes `ModelRef`s as positional arguments to automatically evaluate and s
 !!! Warning
     Because there is no model for reference, callables are not evaluated here.
 
+### Insert
+
+Used to create model instances and serves as an alternative to [create](#create)
+
+```python
+await User.query.insert(is_active=True, email="foo@bar.com")
+await User.query.insert(is_active=False, email="bar@foo.com")
+await User.query.insert(is_active=True, email="foo@bar.com", first_name="Foo", last_name="Bar")
+```
+
+Create takes `ModelRef`s as positional arguments to automatically evaluate and stage them.
+
 ### Delete
 
 Used to delete an instance.
@@ -721,6 +739,20 @@ You can mix the queryset returns with this operator as well.
 
 ```python
 user = await User.query.filter(email="foo@bar.com").get()
+```
+
+### Select
+
+Obtains a single record from the database and serves as alternative to [get](#get)
+
+```python
+user = await User.query.select(email="foo@bar.com")
+```
+
+You can mix the queryset returns with this operator as well.
+
+```python
+user = await User.query.filter(email="foo@bar.com").select()
 ```
 
 ### First
@@ -896,6 +928,17 @@ instead returns a `None`.
 
 ```python
 user = await User.query.get_or_none(id=1)
+```
+
+### Select or none
+
+When querying a model and do not want to raise a [ObjectNotFound](../exceptions.md#objectnotfound) and
+instead returns a `None`.
+
+This is an alternative to [get or none](#get-or-none)
+
+```python
+user = await User.query.select_or_none(id=1)
 ```
 
 ### Convert to select expression

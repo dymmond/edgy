@@ -5,6 +5,18 @@ hide:
 
 # Release Notes
 
+## 0.35.8
+
+### Added
+
+- [where](./queries/queries.md#filter), [select](./queries/queries.md#select), [select or none](./queries/queries.md#select-or-none)
+and [insert](./queries/queries.md#insert) as idiomatic alternatives to `filter`, `get`, `get_or_none` and `create`.
+
+### Fixed
+
+- Contrib parsing of UUID was not working correctly.
+- CSS of Edit of a model.
+
 ## 0.35.7
 
 ### Changed

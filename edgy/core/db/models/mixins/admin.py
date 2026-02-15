@@ -89,7 +89,9 @@ class AdminMixin:
             # 'title' is set to the model's name for clarity in schemas.
             # 'extra="forbid"' prevents unknown fields when generating schemas.
             model_config: ClassVar[ConfigDict] = ConfigDict(
-                title=cls.__name__, extra="forbid" if for_schema else None
+                title=cls.__name__,
+                extra="forbid" if for_schema else None,
+                ser_json_bytes="base64",
             )
             # Initialize the marshall configuration using the model and
             # the admin-specific configuration.

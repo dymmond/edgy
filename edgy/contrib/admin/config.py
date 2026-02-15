@@ -15,7 +15,9 @@ class AdminConfig(BaseSettings):
     titles, branding elements, and security keys.
     """
 
-    model_config = SettingsConfigDict(extra="allow", arbitrary_types_allowed=True)
+    model_config = SettingsConfigDict(
+        extra="allow", arbitrary_types_allowed=True, ser_json_bytes="base64"
+    )
     admin_prefix_url: str | None = None
     """
     The URL prefix under which the Edgy Admin interface will be mounted.
@@ -42,7 +44,7 @@ class AdminConfig(BaseSettings):
     The URL to the favicon for the admin interface.
     Defaults to the official Edgy favicon.
     """
-    sidebar_bg_colour: str = "#1C4C74"
+    sidebar_bg_colour: str = "#e92063"
     """
     The background color of the sidebar in the admin interface.
     Defaults to a shade of blue (#1C4C74).

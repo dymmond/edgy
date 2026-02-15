@@ -269,6 +269,8 @@ class QuerySet(BaseQuerySet):
         """
         return self._filter_or_exclude(clauses=clauses, kwargs=kwargs)
 
+    where = filter
+
     def all(self, clear_cache: bool = False) -> QuerySet:
         """
         Returns a cloned QuerySet instance, or simply clears the cache of the current instance.
@@ -852,6 +854,8 @@ class QuerySet(BaseQuerySet):
             self._cache_count = count = cast(int, await database.fetch_val(count_query))
         return count
 
+    total = count
+
     async def get_or_none(self, **kwargs: Any) -> EdgyEmbedTarget | None:
         """
         Fetches a single object matching the parameters.
@@ -869,6 +873,8 @@ class QuerySet(BaseQuerySet):
         except ObjectNotFound:
             return None
 
+    select_or_none = get_or_none
+
     async def get(self, **kwargs: Any) -> EdgyEmbedTarget:
         """
         Fetches a single object matching the parameters.
@@ -884,6 +890,8 @@ class QuerySet(BaseQuerySet):
             MultipleObjectsReturned: If more than one object is found (implicitly handled by underlying `_get_raw`).
         """
         return cast(EdgyEmbedTarget, (await self._get_raw(**kwargs))[1])
+
+    select = get
 
     async def first(self) -> EdgyEmbedTarget | None:
         """
@@ -984,6 +992,8 @@ class QuerySet(BaseQuerySet):
         finally:
             CHECK_DB_CONNECTION_SILENCED.reset(token)
 
+    insert = create
+
     async def bulk_create(self, objs: Iterable[dict[str, Any] | EdgyModel]) -> None:
         """
         Bulk creates multiple records in a single batch operation.
@@ -1012,7 +1022,10 @@ class QuerySet(BaseQuerySet):
                     new_objs.append(obj)
             original = obj.extract_db_fields()
             col_values: dict[str, Any] = obj.extract_column_values(
-                original, phase="prepare_insert", instance=self, model_instance=obj
+                original,
+                phase="prepare_insert",
+                instance=self,
+                model_instance=obj,
             )
             col_values.update(
                 await obj.execute_pre_save_hooks(col_values, original, is_update=False)
@@ -1034,10 +1047,12 @@ class QuerySet(BaseQuerySet):
                 keys = self.model_class.meta.fields.keys()
                 await run_concurrently(
                     [obj.execute_post_save_hooks(keys, is_update=False) for obj in new_objs],
-                    limit=1 if getattr(queryset.database, "force_rollback", False) else None,
+                    limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
                 )
         finally:
             CURRENT_INSTANCE.reset(token)
+
+    bulk_insert = bulk_create
 
     async def bulk_update(self, objs: list[EdgyModel], fields: list[str]) -> None:
         """
@@ -1059,7 +1074,8 @@ class QuerySet(BaseQuerySet):
         pk_query_placeholder = (
             getattr(queryset.table.c, pkcol)
             == sqlalchemy.bindparam(
-                "__id" if pkcol == "id" else pkcol, type_=getattr(queryset.table.c, pkcol).type
+                "__id" if pkcol == "id" else pkcol,
+                type_=getattr(queryset.table.c, pkcol).type,
             )
             for pkcol in queryset.pkcolumns
         )
@@ -1105,7 +1121,7 @@ class QuerySet(BaseQuerySet):
             ):
                 await run_concurrently(
                     [obj.execute_post_save_hooks(fields, is_update=True) for obj in objs],
-                    limit=1 if getattr(queryset.database, "force_rollback", False) else None,
+                    limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
                 )
         finally:
             CURRENT_INSTANCE.reset(token)
@@ -1202,12 +1218,14 @@ class QuerySet(BaseQuerySet):
                 keys = self.model_class.meta.fields.keys()
                 await run_concurrently(
                     [obj.execute_post_save_hooks(keys, is_update=False) for obj in new_objs],
-                    limit=1 if getattr(queryset.database, "force_rollback", False) else None,
+                    limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
                 )
         finally:
             CURRENT_INSTANCE.reset(token)
 
         return retrieved_objs
+
+    bulk_select_or_insert = bulk_get_or_create
 
     async def delete(self, use_models: bool = False) -> int:
         """
@@ -1248,7 +1266,11 @@ class QuerySet(BaseQuerySet):
         """
 
         column_values = self.model_class.extract_column_values(
-            kwargs, is_update=True, is_partial=True, phase="prepare_update", instance=self
+            kwargs,
+            is_update=True,
+            is_partial=True,
+            phase="prepare_update",
+            instance=self,
         )
 
         # Broadcast the initial update details
@@ -1331,6 +1353,8 @@ class QuerySet(BaseQuerySet):
                 await relation.add(model)
         return cast(EdgyEmbedTarget, get_instance), False
 
+    select_or_insert = get_or_create
+
     async def update_or_create(
         self, defaults: dict[str, Any] | Any | None = None, *args: Any, **kwargs: Any
     ) -> tuple[EdgyEmbedTarget, bool]:
@@ -1380,6 +1404,8 @@ class QuerySet(BaseQuerySet):
         self._clear_cache()
         return cast(EdgyEmbedTarget, get_instance), False
 
+    update_or_insert = update_or_create
+
     async def contains(self, instance: BaseModelType) -> bool:
         """
         Checks if the QuerySet contains a specific model instance by verifying its existence
@@ -1404,6 +1430,8 @@ class QuerySet(BaseQuerySet):
         except AttributeError:
             raise ValueError("'obj' must be a model or reflect model instance.") from None
         return await self.exists(**query)
+
+    like = contains
 
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
         """

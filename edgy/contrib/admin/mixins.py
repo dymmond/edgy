@@ -148,7 +148,7 @@ class AdminMixin:
                 instance.meta.fields[name].clean(name, getattr(instance, name), for_query=True)
             )
         # Serialize the dictionary to JSON and then base64 encode it to be URL-safe.
-        return urlsafe_b64encode(orjson.dumps(pk_dict)).decode()
+        return urlsafe_b64encode(orjson.dumps(pk_dict, default=str)).decode()
 
     def get_object_pk(self, request: Request) -> dict:
         """
@@ -170,7 +170,8 @@ class AdminMixin:
             # Retrieve the 'id' from path parameters and base64 decode it.
             # Then, parse the JSON string into a dictionary.
             result = cast(
-                dict, orjson.loads(urlsafe_b64decode(cast(str, request.path_params.get("id"))))
+                dict,
+                orjson.loads(urlsafe_b64decode(cast(str, request.path_params.get("id")))),
             )
             # Ensure the decoded result is actually a dictionary.
             if not isinstance(result, dict):
