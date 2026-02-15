@@ -7,7 +7,7 @@ import sqlalchemy
 
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.querysets import clauses as clauses_mod
-from edgy.core.db.querysets.queryset import EdgyQuerySet, QuerySet
+from edgy.core.db.querysets.queryset import QuerySet
 from edgy.exceptions import QuerySetError
 
 
@@ -24,8 +24,8 @@ class CombinedQuerySet(QuerySet):
 
     def __init__(
         self,
-        left: EdgyQuerySet | QuerySet,
-        right: EdgyQuerySet | QuerySet,
+        left: QuerySet,
+        right: QuerySet,
         *,
         op: str = "union",
     ) -> None:
