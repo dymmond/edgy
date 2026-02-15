@@ -1,69 +1,220 @@
 {% extends "admin/base.html.jinja" %}
 
-{% block header %}Edit {{ model_name | replace('_', ' ') | title }} #{{ object }}{% endblock %}
+{% block header %}Edit {{ model_name | replace('_', ' ') | title }} - {{ object }}{% endblock %}
 
 {% block content %}
-<div id="editor_holder"></div>
-<div class="pt-6 flex gap-4">
-  <form method="post" id="submit_form">
-        <button type="submit" disabled="disabled" id="submit_button" class="px-5 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:not-disabled:bg-blue-700">
-            Save Changes
-        </button>
-        <input type="hidden" name="editor_data" id="editor_data" value=''>
-    </form>
-      <button disabled="disabled" id="reset_button" class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:not-disabled:bg-gray-300">
-          Reset
-      </button>
-    <a href=".." class="px-5 py-2 bg-gray-200 text-gray-800 text-sm font-medium rounded hover:bg-gray-300">
-        Cancel
-    </a>
+<div class="max-w-6xl">
+  <div class="mb-6">
+    <h1 class="text-2xl font-semibold text-gray-900">
+      <span class="text-gray-500 font-normal">{{ object }}</span>
+    </h1>
+    <p class="mt-1 text-sm text-gray-600">Update fields and save your changes.</p>
+  </div>
+
+  <form method="post" id="submit_form" class="bg-white rounded-lg shadow-sm ring-1 ring-gray-200">
+    <div class="p-6">
+      <div id="editor_holder" class="json-editor"></div>
+      <input type="hidden" name="editor_data" id="editor_data" value="">
+    </div>
+
+    <div class="border-t border-gray-200 bg-gray-50 px-6 py-4 flex items-center justify-end gap-3">
+      <a href=".." class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-white text-gray-800 ring-1 ring-inset ring-gray-300 hover:bg-gray-50">Cancel</a>
+      <button type="button" disabled="disabled" id="reset_button" class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-white text-gray-800 ring-1 ring-inset ring-gray-300 hover:not-disabled:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">Reset</button>
+      <button type="submit" disabled="disabled" id="submit_button" class="inline-flex items-center px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:not-disabled:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed">Save changes</button>
+    </div>
+  </form>
 </div>
+
+<style>
+  /* --- 1. CLEANUP & HIDING --- */
+  /* Remove JSONEditor header chrome and type switchers */
+  .json-editor .je-header,
+  .json-editor .je-topbar,
+  .json-editor .je-switcher,
+  .json-editor .je-type-selector,
+  select[data-schematype],
+  .json-editor h3 select,
+  .json-editor h4 select {
+    display: none !important;
+  }
+
+  /* --- 2. LAYOUT: VERTICAL STACK --- */
+
+  /* Reset the row to be a simple block container (no grid, no side-by-side) */
+  .json-editor .je-row {
+    display: block !important;
+    width: 100%;
+    border: none !important;
+    padding: 0 !important;
+  }
+
+  /* The Main Field Container (Form Group)
+     This controls the vertical spacing between fields.
+  */
+  .json-editor .form-group {
+    display: block;
+    margin-bottom: 1.5rem; /* Space between fields */
+    width: 100%;
+  }
+
+  /* Remove margin from the very last field */
+  .json-editor .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  /* --- 3. FLATTENING WRAPPERS --- */
+  /* This is critical: We use display: contents to make the browser "ignore"
+     the oneOf/anyOf wrapper divs. This prevents them from ruining the
+     margins or creating nested indentations.
+  */
+  .json-editor div[data-schematype],
+  .json-editor .je-indented-panel,
+  .json-editor .je-object__container {
+    display: contents !important;
+  }
+
+  /* --- 4. LABEL STYLING --- */
+  /* Label sits on top of the input */
+  .json-editor label {
+    display: block !important;
+    margin-bottom: 0.5rem; /* Space between label and input */
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: rgb(17, 24, 39); /* gray-900 */
+  }
+
+  /* --- 5. INPUT STYLING --- */
+  /* Inputs take full width */
+  .json-editor input:not([type="checkbox"]):not([type="radio"]),
+  .json-editor textarea,
+  .json-editor select:not([data-schematype]),
+  .json-editor .form-control {
+    width: 100% !important;
+    max-width: 100% !important;
+    display: block;
+    border-radius: 0.5rem !important;
+    border: 1px solid rgb(229, 231, 235) !important; /* gray-200 */
+    background: rgb(249, 250, 251) !important; /* gray-50 */
+    padding: 0.75rem 1rem !important;
+    color: rgb(17, 24, 39) !important; /* gray-900 */
+    box-sizing: border-box;
+  }
+
+  /* Input Group (Email Pill) Fix */
+  .json-editor .input-group {
+    display: flex !important;
+    width: 100% !important;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  /* Focus States */
+  .json-editor input:focus,
+  .json-editor textarea:focus,
+  .json-editor select:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25) !important;
+    border-color: rgb(59, 130, 246) !important;
+  }
+
+  /* Helper / Error Text */
+  .json-editor .je-description,
+  .json-editor .form-text,
+  .json-editor .invalid-feedback {
+    display: block;
+    margin-top: 0.375rem;
+    font-size: 0.875rem;
+    color: rgb(107, 114, 128); /* gray-500 */
+  }
+
+  /* Hide empty containers */
+  .json-editor .form-group:empty { display: none !important; }
+  .json-editor .required { color: #dc2626; }
+</style>
+
 <script>
-    var startval = removeNull(JSON.parse('{{values_as_json | safe}}'))
-    var schema = JSON.parse('{{schema | safe}}')
-    const submit_form = document.getElementById("submit_form")
-    const submit_button = document.getElementById("submit_button")
-    const reset_button = document.getElementById("reset_button")
-    const editor_data = document.getElementById("editor_data")
-    document.addEventListener("DOMContentLoaded", function() {
-      var editor = new JSONEditor(document.getElementById('editor_holder'),{
-        required_by_default: false,
-        display_required_only: true,
-        enable_array_copy: true,
-        collapsed: true,
-        disable_properties: false,
-        object_layout: "table",
+  // 1. Prevent Switcher Options Generation (Logic)
+  JSONEditor.AbstractEditor.prototype.getSwitcherOptions = function(original) {
+        return [];
+  };
 
-        // The schema for the editor
-        schema: schema,
-        startval: startval
-      });
-      editor.on('change',function() {
-        submit_button.setAttribute("disabled", "disabled")
-        reset_button.setAttribute("disabled", "disabled")
-        const val = editor.getValue()
-        if(!deepSub(val,startval)){
-          reset_button.removeAttribute("disabled")
+  // 2. Disable Internal UI features
+  JSONEditor.defaults.options.show_opt_in = false;
+  JSONEditor.defaults.options.disable_edit_json = true;
+  JSONEditor.defaults.options.disable_properties = true;
+  JSONEditor.defaults.options.disable_collapse = true;
+  JSONEditor.defaults.options.keep_oneof_values = false;
+
+  var startval = removeNull(JSON.parse('{{values_as_json | safe}}'))
+  var schema = JSON.parse('{{schema | safe}}')
+
+  const submit_form = document.getElementById("submit_form")
+  const submit_button = document.getElementById("submit_button")
+  const reset_button = document.getElementById("reset_button")
+  const editor_data = document.getElementById("editor_data")
+
+  function setDisabled(el, disabled) {
+    if (disabled) {
+      el.setAttribute("disabled", "disabled")
+    } else {
+      el.removeAttribute("disabled")
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", function () {
+    var editor = new JSONEditor(document.getElementById('editor_holder'), {
+      theme: 'tailwind',
+      required_by_default: false,
+      display_required_only: true,
+      enable_array_copy: true,
+      collapsed: false,
+      disable_array_reorder: true,
+      show_errors: "interaction",
+      object_layout: "normal",
+      schema: schema,
+      startval: startval,
+    })
+
+    function syncButtons() {
+      setDisabled(submit_button, true)
+      setDisabled(reset_button, true)
+
+      const val = editor.getValue()
+      // Robust dirty check
+      const isDirty = (typeof deepSub !== 'undefined') ? !deepSub(val, startval) : JSON.stringify(val) !== JSON.stringify(startval);
+      const isValid = editor.validate().length === 0
+
+      if (isDirty) {
+        setDisabled(reset_button, false)
+      }
+
+      if (isValid) {
+        editor_data.value = JSON.stringify(val)
+        if (isDirty) {
+          setDisabled(submit_button, false)
         }
-        if(!editor.validate().length){
-          editor_data.value = JSON.stringify(val)
-          if(!deepSub(val, startval)){
-            submit_button.removeAttribute("disabled")
-          }
+      }
+    }
+
+    editor.on('change', syncButtons)
+
+    editor.on('ready', function () {
+      syncButtons()
+
+      // Safety cleanup for any rogue select elements
+      document.querySelectorAll('select[data-schematype]').forEach(el => el.style.display = 'none');
+
+      reset_button.addEventListener("click", () => {
+        editor.setValue(startval)
+        syncButtons()
+      })
+
+      submit_form.addEventListener("submit", function (ev) {
+        if (editor.validate().length) {
+          ev.preventDefault()
         }
-      });
-
-      editor.on('ready', function() {
-        reset_button.addEventListener("click", ()=>{
-          editor.setValue(startval);
-        })
-
-        submit_form.addEventListener("submit", async function(ev){
-          if(editor.validate().length){
-            ev.preventDefault()
-          }
-        })
       })
     })
+  })
 </script>
 {% endblock %}

@@ -42,7 +42,7 @@ class AdminConfig(BaseSettings):
     The URL to the favicon for the admin interface.
     Defaults to the official Edgy favicon.
     """
-    sidebar_bg_colour: str = "#1C4C74"
+    sidebar_bg_colour: str = "#e92063"
     """
     The background color of the sidebar in the admin interface.
     Defaults to a shade of blue (#1C4C74).
