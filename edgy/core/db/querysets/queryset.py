@@ -44,7 +44,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.mixins.combined import CombinedQuerySet
 
 
-class EdgyQuerySet(BaseQuerySet):
+class QuerySet(BaseQuerySet):
     @cached_property
     def sql(self) -> str:
         """Get SQL select query as string with inserted blanks. For debugging only!"""
@@ -269,6 +269,8 @@ class EdgyQuerySet(BaseQuerySet):
         """
         return self._filter_or_exclude(clauses=clauses, kwargs=kwargs)
 
+    where = filter
+
     def all(self, clear_cache: bool = False) -> QuerySet:
         """
         Returns a cloned QuerySet instance, or simply clears the cache of the current instance.
@@ -282,7 +284,7 @@ class EdgyQuerySet(BaseQuerySet):
         """
         if clear_cache:
             self._clear_cache(keep_cached_selected=not self._has_dynamic_clauses)
-            return cast(QuerySet, self)
+            return self
         return self._clone()
 
     def or_(
@@ -801,7 +803,7 @@ class EdgyQuerySet(BaseQuerySet):
             filter_query = self.filter(**kwargs)
             filter_query._cache = self._cache
             return await filter_query.exists()
-        queryset: QuerySet = cast(QuerySet, self)
+        queryset: QuerySet = self
         expression = (await queryset.as_select()).exists().select()
         check_db_connection(queryset.database)
         async with queryset.database as database:
@@ -822,7 +824,7 @@ class EdgyQuerySet(BaseQuerySet):
         if self._cache_count is not None:
             return self._cache_count
 
-        queryset: QuerySet = cast(QuerySet, self)
+        queryset: QuerySet = self
 
         needs_distinct = (
             bool(queryset.or_clauses) or bool(queryset._select_related) or bool(queryset._group_by)
@@ -852,6 +854,8 @@ class EdgyQuerySet(BaseQuerySet):
             self._cache_count = count = cast(int, await database.fetch_val(count_query))
         return count
 
+    total = count
+
     async def get_or_none(self, **kwargs: Any) -> EdgyEmbedTarget | None:
         """
         Fetches a single object matching the parameters.
@@ -869,6 +873,8 @@ class EdgyQuerySet(BaseQuerySet):
         except ObjectNotFound:
             return None
 
+    select_or_none = get_or_none
+
     async def get(self, **kwargs: Any) -> EdgyEmbedTarget:
         """
         Fetches a single object matching the parameters.
@@ -884,6 +890,8 @@ class EdgyQuerySet(BaseQuerySet):
             MultipleObjectsReturned: If more than one object is found (implicitly handled by underlying `_get_raw`).
         """
         return cast(EdgyEmbedTarget, (await self._get_raw(**kwargs))[1])
+
+    select = get
 
     async def first(self) -> EdgyEmbedTarget | None:
         """
@@ -984,6 +992,8 @@ class EdgyQuerySet(BaseQuerySet):
         finally:
             CHECK_DB_CONNECTION_SILENCED.reset(token)
 
+    insert = create
+
     async def bulk_create(self, objs: Iterable[dict[str, Any] | EdgyModel]) -> None:
         """
         Bulk creates multiple records in a single batch operation.
@@ -1012,7 +1022,10 @@ class EdgyQuerySet(BaseQuerySet):
                     new_objs.append(obj)
             original = obj.extract_db_fields()
             col_values: dict[str, Any] = obj.extract_column_values(
-                original, phase="prepare_insert", instance=cast(QuerySet, self), model_instance=obj
+                original,
+                phase="prepare_insert",
+                instance=self,
+                model_instance=obj,
             )
             col_values.update(
                 await obj.execute_pre_save_hooks(col_values, original, is_update=False)
@@ -1034,10 +1047,12 @@ class EdgyQuerySet(BaseQuerySet):
                 keys = self.model_class.meta.fields.keys()
                 await run_concurrently(
                     [obj.execute_post_save_hooks(keys, is_update=False) for obj in new_objs],
-                    limit=1 if getattr(queryset.database, "force_rollback", False) else None,
+                    limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
                 )
         finally:
             CURRENT_INSTANCE.reset(token)
+
+    bulk_insert = bulk_create
 
     async def bulk_update(self, objs: list[EdgyModel], fields: list[str]) -> None:
         """
@@ -1059,7 +1074,8 @@ class EdgyQuerySet(BaseQuerySet):
         pk_query_placeholder = (
             getattr(queryset.table.c, pkcol)
             == sqlalchemy.bindparam(
-                "__id" if pkcol == "id" else pkcol, type_=getattr(queryset.table.c, pkcol).type
+                "__id" if pkcol == "id" else pkcol,
+                type_=getattr(queryset.table.c, pkcol).type,
             )
             for pkcol in queryset.pkcolumns
         )
@@ -1105,7 +1121,7 @@ class EdgyQuerySet(BaseQuerySet):
             ):
                 await run_concurrently(
                     [obj.execute_post_save_hooks(fields, is_update=True) for obj in objs],
-                    limit=1 if getattr(queryset.database, "force_rollback", False) else None,
+                    limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
                 )
         finally:
             CURRENT_INSTANCE.reset(token)
@@ -1181,7 +1197,7 @@ class EdgyQuerySet(BaseQuerySet):
         async def _iterate(obj: EdgyModel) -> dict[str, Any]:
             original = obj.extract_db_fields()
             col_values: dict[str, Any] = obj.extract_column_values(
-                original, phase="prepare_insert", instance=cast(QuerySet, self)
+                original, phase="prepare_insert", instance=self
             )
             col_values.update(
                 await obj.execute_pre_save_hooks(col_values, original, is_update=False)
@@ -1202,12 +1218,14 @@ class EdgyQuerySet(BaseQuerySet):
                 keys = self.model_class.meta.fields.keys()
                 await run_concurrently(
                     [obj.execute_post_save_hooks(keys, is_update=False) for obj in new_objs],
-                    limit=1 if getattr(queryset.database, "force_rollback", False) else None,
+                    limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
                 )
         finally:
             CURRENT_INSTANCE.reset(token)
 
         return retrieved_objs
+
+    bulk_select_or_insert = bulk_get_or_create
 
     async def delete(self, use_models: bool = False) -> int:
         """
@@ -1248,7 +1266,11 @@ class EdgyQuerySet(BaseQuerySet):
         """
 
         column_values = self.model_class.extract_column_values(
-            kwargs, is_update=True, is_partial=True, phase="prepare_update", instance=self
+            kwargs,
+            is_update=True,
+            is_partial=True,
+            phase="prepare_update",
+            instance=self,
         )
 
         # Broadcast the initial update details
@@ -1331,6 +1353,8 @@ class EdgyQuerySet(BaseQuerySet):
                 await relation.add(model)
         return cast(EdgyEmbedTarget, get_instance), False
 
+    select_or_insert = get_or_create
+
     async def update_or_create(
         self, defaults: dict[str, Any] | Any | None = None, *args: Any, **kwargs: Any
     ) -> tuple[EdgyEmbedTarget, bool]:
@@ -1380,6 +1404,8 @@ class EdgyQuerySet(BaseQuerySet):
         self._clear_cache()
         return cast(EdgyEmbedTarget, get_instance), False
 
+    update_or_insert = update_or_create
+
     async def contains(self, instance: BaseModelType) -> bool:
         """
         Checks if the QuerySet contains a specific model instance by verifying its existence
@@ -1405,6 +1431,8 @@ class EdgyQuerySet(BaseQuerySet):
             raise ValueError("'obj' must be a model or reflect model instance.") from None
         return await self.exists(**query)
 
+    like = contains
+
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
         """
         Returns a database transaction context manager for the assigned database.
@@ -1427,94 +1455,3 @@ class EdgyQuerySet(BaseQuerySet):
     async def __aiter__(self) -> AsyncIterator[Any]:
         async for value in self._execute_iterate():
             yield value
-
-
-class QuerySet(EdgyQuerySet):
-    """
-    Introduces a new interface common to some existing ORMs
-    """
-
-    def where(
-        self,
-        *clauses: sqlalchemy.sql.expression.BinaryExpression
-        | Callable[
-            [QuerySetType],
-            sqlalchemy.sql.expression.BinaryExpression
-            | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
-        ]
-        | dict[str, Any]
-        | QuerySet,
-        **kwargs: Any,
-    ) -> QuerySet:
-        """
-        Filters the QuerySet by the given clauses and keyword arguments, combining them with the AND operand.
-
-        This is the new alternative to "filter" and uses the same underlying interface.
-
-        This is the primary method for constructing the WHERE clause of a query. Multiple clauses
-        and kwargs are implicitly combined using AND.
-
-        Args:
-            *clauses: Positional arguments which can be:
-                      - SQLAlchemy Binary Expressions (e.g., `Model.field == value`).
-                      - Callables (sync/async) that accept the QuerySet and return a Binary Expression.
-                      - Dictionaries (Django-style lookups, e.g., `{"field__gt": 10}`).
-                      - Nested QuerySets (for subqueries).
-            **kwargs: Keyword arguments for Django-style lookups (e.g., `field__gt=10`).
-
-        Returns:
-            A new QuerySet instance with the additional filters applied.
-        """
-        return self._filter_or_exclude(clauses=clauses, kwargs=kwargs)
-
-    async def select(self, **kwargs: Any) -> EdgyEmbedTarget:
-        """
-        Fetches a single object matching the parameters.
-
-        The newest alternative to "get".
-
-        Args:
-            **kwargs: Filters to identify the single object.
-
-        Returns:
-            The matching model instance.
-
-        Raises:
-            ObjectNotFound: If no object is found.
-            MultipleObjectsReturned: If more than one object is found (implicitly handled by underlying `_get_raw`).
-        """
-        return cast(EdgyEmbedTarget, (await self._get_raw(**kwargs))[1])
-
-    async def select_or_none(self, **kwargs: Any) -> EdgyEmbedTarget | None:
-        """
-        Fetches a single object matching the parameters.
-
-        The newest alternative to "get_or_none".
-
-        If no object is found (raises `ObjectNotFound`), returns `None`.
-
-        Args:
-            **kwargs: Filters to identify the single object.
-
-        Returns:
-            The matching model instance, or `None`.
-        """
-        try:
-            return await self.get(**kwargs)
-        except ObjectNotFound:
-            return None
-
-    async def insert(self, *args: Any, **kwargs: Any) -> EdgyEmbedTarget:
-        """
-        Creates and saves a single record in the database table associated with the QuerySet's model.
-
-        Alternative to "create".
-
-        Args:
-            *args: Positional arguments for model instantiation.
-            **kwargs: Keyword arguments for model instantiation and field values.
-
-        Returns:
-            The newly created model instance.
-        """
-        return await self.create(*args, **kwargs)
