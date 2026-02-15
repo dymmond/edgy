@@ -56,7 +56,9 @@ class BaseMarshall(DumpMixin, BaseModel):
     """
 
     marshall_config: ClassVar[ConfigMarshall]
-    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", arbitrary_types_allowed=True)
+    model_config: ClassVar[ConfigDict] = ConfigDict(
+        extra="ignore", arbitrary_types_allowed=True, ser_json_bytes="base64"
+    )
 
     __show_pk__: ClassVar[bool] = False
     __lazy__: ClassVar[bool] = False
@@ -328,7 +330,8 @@ class BaseMarshall(DumpMixin, BaseModel):
                 exclude.add(column.key)
             # Dump marshall data excluding PK and only unset values.
             data = self.model_dump(
-                include=set(model.meta.fields.keys()).difference(exclude), exclude_unset=True
+                include=set(model.meta.fields.keys()).difference(exclude),
+                exclude_unset=True,
             )
             # Update and save the existing instance.
             instance = await self.instance.save(values=data)

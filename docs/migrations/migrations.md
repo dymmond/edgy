@@ -33,7 +33,7 @@ For clarity, we'll use the following project structure in our examples:
     │           ├── __init__.py
     │           ├── schemas.py
     │           ├── urls.py
-    │           └── views.py
+    │           └── controllers.py
     ├── configs
     │   ├── __init__.py
     │   ├── development
@@ -152,7 +152,7 @@ Consider an application with the following structure:
     │           ├── __init__.py
     │           ├── schemas.py
     │           ├── urls.py
-    │           └── views.py
+    │           └── controllers.py
     ├── configs
     │   ├── __init__.py
     │   ├── development
@@ -262,7 +262,7 @@ After generating the migrations, the project structure will resemble this:
     │           ├── __init__.py
     │           ├── schemas.py
     │           ├── urls.py
-    │           └── views.py
+    │           └── controllers.py
     ├── configs
     │   ├── __init__.py
     │   ├── development

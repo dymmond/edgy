@@ -127,7 +127,7 @@ def admin_serve(
             'You need to specify an app which registry is used. For experimenting use: --app="tests.cli.main"'
         )
     from edgy.contrib.admin.application import create_admin_app
-    from edgy.contrib.admin.views import admin_not_found
+    from edgy.contrib.admin.controllers import admin_not_found
 
     print_pw = False
     if auth_pw is None:
@@ -148,7 +148,10 @@ def admin_serve(
             app=admin_app,
             permissions=[
                 DefinePermission(
-                    BasicAuthAccess, print_pw=print_pw, username=auth_name, password=auth_pw
+                    BasicAuthAccess,
+                    print_pw=print_pw,
+                    username=auth_name,
+                    password=auth_pw,
                 )
             ],
             middleware=admin_middleware,

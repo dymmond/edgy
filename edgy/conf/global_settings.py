@@ -196,7 +196,9 @@ class EdgySettings(ConcurrencySettings):
     including general application behavior, extensions, preloads, and CLI tools.
     """
 
-    model_config = SettingsConfigDict(extra="allow", ignored_types=(cached_property,))
+    model_config = SettingsConfigDict(
+        extra="allow", ignored_types=(cached_property,), ser_json_bytes="base64"
+    )
 
     allow_auto_compute_server_defaults: bool = True
     """

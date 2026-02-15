@@ -126,6 +126,7 @@ class DumpMixin:
 
         # Perform the initial `model_dump` using Pydantic's default implementation.
         # This will handle most fields and apply the initial exclusion rules.
+
         result_dict: dict[str, Any] = super().model_dump(
             exclude=exclude_passed, include=include, mode=mode, **kwargs
         )

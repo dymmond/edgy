@@ -9,7 +9,7 @@ from lilya.routing import RoutePath
 
 from edgy.contrib.lilya.middleware import EdgyMiddleware
 
-from .views import (
+from .controllers import (
     AdminDashboard,
     JSONSchemaView,
     ModelDetailView,
@@ -66,8 +66,16 @@ def create_admin_app(
             RoutePath("/models", handler=ModelOverview, name="models"),
             RoutePath("/models/{name}", handler=ModelDetailView, name="model-details"),
             RoutePath("/models/{name}/json", handler=JSONSchemaView, name="model-schema"),
-            RoutePath("/models/{name}/create", handler=ModelObjectCreateView, name="model-create"),
-            RoutePath("/models/{name}/{id}", handler=ModelObjectDetailView, name="model-object"),
+            RoutePath(
+                "/models/{name}/create",
+                handler=ModelObjectCreateView,
+                name="model-create",
+            ),
+            RoutePath(
+                "/models/{name}/{id}",
+                handler=ModelObjectDetailView,
+                name="model-object",
+            ),
             RoutePath(
                 "/models/{name}/{id}/edit",
                 handler=ModelObjectEditView,

@@ -139,7 +139,9 @@ class AdminDashboard(AdminMixin, TemplateController):
         total_records = sum(m["count"] for m in model_stats)
         # Find the model with the maximum record count.
         top_model = max(
-            model_stats, key=lambda m: m["count"], default={"verbose": "N/A", "count": 0}
+            model_stats,
+            key=lambda m: m["count"],
+            default={"verbose": "N/A", "count": 0},
         )
 
         context.update(
@@ -377,7 +379,10 @@ class BaseObjectView:
     """
 
     async def save_model(
-        self, instance: edgy.Model | type[edgy.Model], json_data: dict, create: bool = False
+        self,
+        instance: edgy.Model | type[edgy.Model],
+        json_data: dict,
+        create: bool = False,
     ) -> edgy.Model:
         """
         Saves an Edgy model instance based on provided JSON data.
@@ -595,7 +600,6 @@ class ModelObjectEditView(BaseObjectView, AdminMixin, TemplateController):
         )
         if not instance:
             raise NotFound()  # Raise 404 if instance is not found.
-
         context["title"] = f"Edit {instance}"  # Page title.
         context["object"] = instance  # The model instance being edited.
         # Generate the JSON schema for the edit form.

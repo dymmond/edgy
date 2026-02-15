@@ -15,7 +15,9 @@ class AdminConfig(BaseSettings):
     titles, branding elements, and security keys.
     """
 
-    model_config = SettingsConfigDict(extra="allow", arbitrary_types_allowed=True)
+    model_config = SettingsConfigDict(
+        extra="allow", arbitrary_types_allowed=True, ser_json_bytes="base64"
+    )
     admin_prefix_url: str | None = None
     """
     The URL prefix under which the Edgy Admin interface will be mounted.
