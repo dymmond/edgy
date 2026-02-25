@@ -17,7 +17,7 @@ jobs:
       - name: Install build dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
-          pip install hatch virtualenv<21
+          pip install hatch virtualenv==20.39.1
       - name: "Build package"
         run: "hatch build"
       - name: "Publish to PyPI"
