@@ -76,7 +76,7 @@ jobs:
       - name: "Install dependencies"
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
         run: |
-          pip install hatch
+          pip install hatch virtualenv<21
       - name: "Run linting"
         if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true'
         run: "hatch fmt"
