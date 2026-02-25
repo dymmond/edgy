@@ -20,6 +20,10 @@
 <a href="https://pypi.org/project/edgy" target="_blank">
     <img src="https://img.shields.io/pypi/pyversions/edgy.svg?color=%2334D058" alt="Supported Python versions">
 </a>
+
+<a href="https://codspeed.io/dymmond/edgy?utm_source=badge" target="_blank">
+    <img src="https://img.shields.io/endpoint?url=https://codspeed.io/badge.json&label=CodSpeed" alt="CodSpeed">
+</a>
 </p>
 
 ---
