@@ -220,7 +220,8 @@ database table.
 
     <sup>Default: `None`<sup>
 
-* **indexes** - The extra custom indexes you want to add to the model
+* **indexes** - The extra custom indexes you want to add to the model.
+* **table_prefix** - Prefix your table with a string. This is useful for multi-tenancy or just to have a better organisation of your tables in the database.
 
 ### Registry
 
