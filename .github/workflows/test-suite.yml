@@ -76,7 +76,7 @@ jobs:
       - name: "Install dependencies"
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
         run: |
-          pip install hatch==1.14.2
+          pip install hatch
       - name: "Run linting"
         if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true'
         run: "hatch fmt"
