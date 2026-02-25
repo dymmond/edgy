@@ -404,6 +404,7 @@ class MetaInfo:
         "in_admin",
         "no_admin_create",
         "tablename",
+        "table_prefix",
         "unique_together",
         "indexes",
         "constraints",
@@ -462,6 +463,8 @@ class MetaInfo:
     no_admin_create: bool | None
     registry: Registry | Literal[False] | None
     tablename: str | None
+    table_name: str | None
+    table_prefix: str | None
     _fields_are_initialized: bool
     _field_stats_are_initialized: bool
     _needs_special_serialization: bool | None
@@ -502,6 +505,7 @@ class MetaInfo:
         self.no_admin_create = getattr(meta, "no_admin_create", None)
         self.registry = getattr(meta, "registry", None)
         self.tablename = getattr(meta, "tablename", None)
+        self.table_prefix = getattr(meta, "table_prefix", None)
         for attr in ["unique_together", "indexes", "constraints"]:
             attr_val: Any = getattr(meta, attr, [])
             if not isinstance(attr_val, list | tuple):
@@ -1150,6 +1154,7 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                     meta.constraints.extend(base.meta.constraints)
         meta.in_admin = get_model_meta_attr("in_admin", bases, meta)
         meta.no_admin_create = get_model_meta_attr("no_admin_create", bases, meta)
+        meta.table_prefix = get_model_meta_attr("table_prefix", bases, meta)
 
         if meta.unique_together:
             unique_together = meta.unique_together
@@ -1178,6 +1183,10 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         # Making sure the tablename is always set if the value is not provided
         if getattr(meta, "tablename", None) is None:
             tablename = f"{name.lower()}s"
+
+            # if there is a parent with the same tablename, we add the name of the class as prefix to avoid conflicts
+            if getattr(meta, "table_prefix", None):
+                tablename = f"{meta.table_prefix}_{tablename}"
             meta.tablename = tablename
         meta.model = new_class
 
@@ -1316,7 +1325,8 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             A Transaction object.
         """
         return cast(
-            "Transaction", cls.database.transaction(force_rollback=force_rollback, **kwargs)
+            "Transaction",
+            cls.database.transaction(force_rollback=force_rollback, **kwargs),
         )
 
     def table_schema(

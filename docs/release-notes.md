@@ -11,6 +11,8 @@ hide:
 
 - [where](./queries/queries.md#filter), [select](./queries/queries.md#select), [select or none](./queries/queries.md#select-or-none)
 and [insert](./queries/queries.md#insert) as idiomatic alternatives to `filter`, `get`, `get_or_none` and `create`.
+- `table_prefix` is now allowed in the Meta of models. This allows to prefix tables and inherit any prefix to related models.
+This is useful for multi-tenancy and sharding.
 
 ### Fixed
 
