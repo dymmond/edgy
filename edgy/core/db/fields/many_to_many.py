@@ -355,6 +355,12 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
                 cast(str, self.through_tablename).format(field=self)[:M2M_TABLE_NAME_LIMIT].lower()
             )
 
+        # If the owner model has a table prefix (e.g., for multi-tenancy)
+        # prepend it to the through table name.
+        owner_prefix = self.owner.meta.table_prefix
+        if owner_prefix:
+            tablename = f"{owner_prefix}_{tablename}"
+
         meta_args = {
             "tablename": tablename,
             "multi_related": {(self.from_foreign_key, self.to_foreign_key)},
