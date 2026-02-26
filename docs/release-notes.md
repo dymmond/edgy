@@ -5,6 +5,12 @@ hide:
 
 # Release Notes
 
+## 0.35.9
+
+### Fixed
+
+- Missing `table_prefix` when `ManyToMany` is declared.
+
 ## 0.35.8
 
 ### Added
