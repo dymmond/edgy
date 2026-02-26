@@ -152,7 +152,7 @@ EDGY_TESTCLIENT_USE_EXISTING = "true"
 
 [tool.hatch.envs.test.scripts]
 test = "hatch test -- {args}"
-test_parallel = "hatch test -- -n auto --dist=loadscope {args}"
+test_parallel = "hatch test -- -n auto --dist=loadgroup {args}"
 test_man = "hatch test -- {args} -s -vv"
 check_types = "mypy -p edgy {args}"
 

@@ -137,6 +137,9 @@ class UserFK(edgy.StrictModel):
         registry = models
 
 
+ADMIN_MODELS = tuple(sorted(models.admin_models))
+
+
 async def test_settings(app):
     assert edgy.monkay.settings.admin_config.admin_prefix_url is None
     assert "ContentType" in models.admin_models
@@ -168,7 +171,7 @@ async def test_models(async_client):
         assert model in response.text
 
 
-@pytest.mark.parametrize("model", models.admin_models)
+@pytest.mark.parametrize("model", ADMIN_MODELS)
 async def test_models_create_and_delete(async_client, model):
     editor_data = {"name": "foo1234"}
     if model == "UserFK":

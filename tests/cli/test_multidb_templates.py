@@ -30,6 +30,31 @@ outer_database2 = DatabaseTestClient(
 )
 
 
+def _get_database_name(url: str) -> str:
+    database_name = sqlalchemy.engine.make_url(url).database
+    assert database_name is not None
+    return database_name
+
+
+def _get_admin_connection_url(url: str) -> str:
+    """
+    CLI multidb setup uses DATABASE_URL / DATABASE_ALTERNATIVE_URL as admin connections.
+
+    In xdist runs those URLs may be worker-suffixed for test isolation, but the admin
+    databases (`edgy`, `edgy_alt`) are static and usually pre-created.
+    """
+    worker = os.environ.get("PYTEST_XDIST_WORKER")
+    if not worker:
+        return url
+
+    suffix = f"_{worker}"
+    sqla_url = sqlalchemy.engine.make_url(url)
+    database_name = sqla_url.database
+    if not database_name or not database_name.endswith(suffix):
+        return url
+    return str(sqla_url.set(database=database_name[: -len(suffix)]))
+
+
 @pytest.fixture(scope="function", autouse=True)
 def cleanup_folders():
     with contextlib.suppress(OSError):
@@ -46,15 +71,22 @@ def cleanup_folders():
 
 @pytest.fixture(scope="function", autouse=True)
 async def prepare_db():
-    for url in [DATABASE_ALTERNATIVE_URL, DATABASE_URL]:
-        engine = create_async_engine(url, isolation_level="AUTOCOMMIT")
+    for admin_url, test_url in (
+        (DATABASE_ALTERNATIVE_URL, TEST_ALTERNATIVE_DATABASE),
+        (DATABASE_URL, TEST_DATABASE),
+    ):
+        engine = create_async_engine(
+            _get_admin_connection_url(admin_url),
+            isolation_level="AUTOCOMMIT",
+        )
+        test_database_name = _get_database_name(test_url)
         try:
             async with engine.connect() as conn:
-                await conn.execute(sqlalchemy.text("DROP DATABASE test_edgy"))
+                await conn.execute(sqlalchemy.text(f"DROP DATABASE {test_database_name}"))
         except Exception:
             pass
         async with engine.connect() as conn:
-            await conn.execute(sqlalchemy.text("CREATE DATABASE test_edgy"))
+            await conn.execute(sqlalchemy.text(f"CREATE DATABASE {test_database_name}"))
         await engine.dispose()
 
 

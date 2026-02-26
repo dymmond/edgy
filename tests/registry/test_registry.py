@@ -24,6 +24,7 @@ database = DatabaseTestClient(DATABASE_URL)
 registry = edgy.Registry(database=database)
 
 pytestmark = pytest.mark.anyio
+DROP_SCHEMA_CASES = ("drop_schema_5", "drop_schema_7chars", "drop_schema_8chars", "drop_s6")
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -73,7 +74,7 @@ async def test_can_drop_schema():
 
 @pytest.mark.parametrize(
     "schema",
-    [get_random_string(5), get_random_string(7), get_random_string(8), get_random_string(6)],
+    DROP_SCHEMA_CASES,
 )
 async def test_drop_schemas(schema):
     await registry.schema.create_schema(schema=schema, if_not_exists=False)
