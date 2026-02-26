@@ -89,4 +89,4 @@ jobs:
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/edgy"
           TEST_DATABASE_ALTERNATIVE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5433/edgy_alt"
-        run: "hatch test"
+        run: "hatch run test:test_parallel"
