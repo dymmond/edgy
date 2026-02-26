@@ -132,6 +132,9 @@ class Permission(BasePermission):
         unique_together = [("name", "name_model", "obj")]
 
 
+ADMIN_MODELS = tuple(sorted(models.admin_models))
+
+
 async def test_settings(app):
     assert edgy.monkay.settings.admin_config.admin_prefix_url == "/foobar"
     assert "ContentType" in models.admin_models
@@ -159,7 +162,7 @@ async def test_models(async_client, prefix_url):
         assert model in response.text
 
 
-@pytest.mark.parametrize("model", models.admin_models)
+@pytest.mark.parametrize("model", ADMIN_MODELS)
 async def test_models_create_and_delete(async_client, model, prefix_url):
     response = await async_client.post(
         f"{prefix_url}/models/{model}/create",
