@@ -6,6 +6,29 @@ Edgy is built on SQLAlchemy Core, but it's an asynchronous implementation. This 
 
 Edgy is framework-agnostic, meaning it can be seamlessly integrated into any framework that supports lifecycle events.
 
+If you want the bigger picture first, check the [Architecture Overview](./concepts/architecture.md) and [Request and Query Lifecycle](./concepts/request-lifecycle.md).
+
+## Choose an Integration Style
+
+Not sure where to start? Use this quick rule:
+
+* **ASGI app with lifespan support**: prefer lifespan integration (best default).
+* **Framework with startup/shutdown hooks only**: use manual `connect` / `disconnect`.
+* **Pure sync code or sync-first framework**: wrap execution with `with_async_env` and call `run_sync`.
+* **Multi-app/multi-registry ASGI deployment**: consider the middleware integration.
+
+```mermaid
+flowchart TD
+    A["Need to integrate Edgy lifecycle"] --> B{"ASGI lifespan available?"}
+    B -- Yes --> C["Use registry.asgi(...) integration"]
+    B -- No --> D{"Sync-first runtime?"}
+    D -- Yes --> E["Use with_async_env + run_sync"]
+    D -- No --> F["Use manual connect/disconnect hooks"]
+    C --> G["Optional: middleware for multi-app/multi-registry"]
+```
+
+If commands cannot resolve your app instance, see [Application Discovery](./migrations/discovery.md).
+
 ## Lifecycle Events
 
 Lifecycle events are common in frameworks built on Starlette, such as [Ravyn](https://ravyn.dymmond.com) and FastAPI. Other frameworks may offer similar functionality through different mechanisms.
@@ -30,6 +53,8 @@ Using ASGI integration:
 {!> ../docs_src/connections/asgi.py !}
 ```
 
+This is the recommended default for Ravyn/FastAPI/Starlette projects with lifespan support.
+
 Manual integration (applicable to all frameworks):
 
 ```python hl_lines="11-12"
@@ -41,6 +66,8 @@ Using an asynchronous context manager:
 ```python
 {!> ../docs_src/connections/asynccontextmanager.py !}
 ```
+
+If you are working from scripts/workers, this pattern is usually the cleanest.
 
 Once the connection is integrated into your application's lifecycle, you can use the ORM throughout your application. Failing to do so will result in performance warnings, as the databasez backend will be reinitialized for each operation.
 
@@ -85,6 +112,8 @@ Despite the warning being non-fatal, you should establish proper connections as 
 !!! Note
     Ensure that `Database` objects passed via `using` are connected. They are not guaranteed to be connected outside of `extra`.
 
+If you hit this warning repeatedly in real code, check [Troubleshooting](./troubleshooting.md#databasenotconnectedwarning).
+
 ## Integration in Synchronous Environments
 
 When the framework is synchronous and no asynchronous loop is active, we can use `run_sync`. It's necessary to create an asynchronous environment using the `with_async_env` method of the registry. Otherwise, you'll encounter performance issues and `DatabaseNotConnectedWarning` warnings. `run_sync` calls must occur within the scope of `with_async_env`. `with_async_env` is re-entrant and accepts an optional loop parameter.
@@ -117,6 +146,8 @@ A subloop is an event loop running in a separate thread. This allows multiple ev
 
 However, given that event loops can be sticky, we additionally check if the old loop has stopped.
 
+If you are using sync integration for tests or scripts, pair this section with [Testing](./testing/index.md) and [Troubleshooting](./troubleshooting.md#databasenotconnectedwarning).
+
 ## Querying Other Schemas
 
 Edgy supports querying other schemas. Refer to the [tenancy](./tenancy/edgy.md) section for details.
@@ -134,3 +165,5 @@ See [Migrations](./migrations/migrations.md#migrate-from-flask-migrate) for more
 ## Note
 
 Check the [tips and tricks](./tips-and-tricks.md) and learn how to make your connections even cleaner.
+
+Also see [Registry](./registry.md) for multi-database/schema lifecycle details.

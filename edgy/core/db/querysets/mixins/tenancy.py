@@ -47,15 +47,13 @@ class TenancyMixin:
                                its use is discouraged. It will be treated as the
                                `schema` argument.
             database (str | Database | None): Specifies the database to use.
-              - `str`: Name of an extra database connection registered in the model's registry.
-              - `Database`: A Database instance to use directly.
-              - `None`: Uses the default database from the model's registry.
-              - `Undefined` (default): Retains the current database of the queryset.
+                Use an extra connection name (`str`), a `Database` instance, `None`
+                (for the default registry database), or keep it `Undefined` to retain
+                the current queryset database.
             schema (str | None | Literal[False]): Specifies the database schema to use.
-              - `str`: The schema name to activate.
-              - `False`: Unsets the schema, reverting to the active default schema for the model.
-              - `None`: Uses no specific schema.
-              - `Undefined` (default): Retains the current schema of the queryset.
+                Use a schema name (`str`), `False` (unset schema and use model default),
+                `None` (no specific schema), or keep it `Undefined` to retain
+                the current queryset schema.
 
         Returns:
             QuerySet: A new QuerySet instance configured with the specified database
@@ -130,10 +128,8 @@ class TenancyMixin:
                                    in the model's registry's `extra` connections)
                                    to switch to.
             schema (str | None | Literal[False]): The schema name to use.
-              - `str`: The schema name to activate.
-              - `False`: Unsets the schema, reverting to the active default schema.
-              - `None`: Uses no specific schema.
-              - `Undefined` (default): Retains the current schema.
+                Use a schema name (`str`), `False` (unset schema and use default),
+                `None` (no specific schema), or `Undefined` (retain current schema).
 
         Returns:
             QuerySet: A new QuerySet instance configured with the specified database

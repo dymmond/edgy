@@ -1,8 +1,3 @@
----
-hide:
-  - navigation
----
-
 # Edgy
 
 <p align="center">
@@ -34,6 +29,40 @@ hide:
 **Source Code**: [https://github.com/dymmond/edgy](https://github.com/dymmond/edgy)
 
 ---
+
+## Choose Your Path
+
+If this is your first contact with Edgy:
+
+1. Start with [Getting Started](./getting-started/index.md)
+2. Run [Install and First Query](./getting-started/install-and-first-query.md)
+3. Continue to [First Migration Cycle](./getting-started/first-migration-cycle.md)
+4. Learn [Connection Management](./connection.md)
+5. Move to [Models](./models.md) and [Queries](./queries/queries.md)
+6. Continue with [Tutorials](./tutorials/index.md)
+
+If you are already using another ORM and want the Edgy mapping quickly:
+
+* Model declaration and meta options: [Models](./models.md)
+* Lifecycle and connection scope: [Connection Management](./connection.md)
+* Query composition and execution: [Queries](./queries/queries.md)
+* Operational commands: [CLI Commands](./cli/commands.md)
+* Settings and runtime tuning: [Settings](./settings.md)
+
+If you need internals and architecture first:
+
+* [Architecture Overview](./concepts/architecture.md)
+* [Request and Query Lifecycle](./concepts/request-lifecycle.md)
+* [Component Interactions](./concepts/component-interactions.md)
+* [Registry](./registry.md)
+* [API Reference](./references/index.md)
+* [Troubleshooting](./troubleshooting.md)
+
+If you want task-oriented documentation:
+
+* [Tutorials](./tutorials/index.md)
+* [How-To Guides](./guides/index.md)
+* [CLI Commands](./cli/commands.md)
 
 ## Motivation
 
@@ -137,6 +166,8 @@ $ pip install edgy[mysql]
 ```shell
 $ pip install edgy[sqlite]
 ```
+
+After installing, you can jump directly to [Quick Start](#quick-start), or if you prefer understanding the lifecycle first, read [Connection Management](./connection.md).
 
 ## Quick Start
 

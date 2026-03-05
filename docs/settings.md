@@ -1,67 +1,201 @@
 # Settings in Edgy
 
-Have you ever wished you could easily configure database settings? Since Edgy is created by the same author as Ravyn, and Ravyn is [settings][ravyn_settings] oriented, Edgy adopts a similar approach, albeit in a simpler form.
+Have you ever wished you could centrally control migrations, media files, shell behavior, and runtime tuning? Edgy was built with that in mind.
+
+Settings are plain **[Pydantic BaseSettings](https://pypi.org/project/pydantic-settings/)** classes, so they are typed, extensible, and easy to override.
 
 ## Edgy Settings Module
 
-Edgy uses the following environment variable to locate its settings:
+Edgy uses one environment variable to locate its settings class:
 
 * **EDGY_SETTINGS_MODULE**
 
-All settings are **[Pydantic BaseSettings](https://pypi.org/project/pydantic-settings/)** objects, making them easy to use and override.
-
 ### EDGY_SETTINGS_MODULE
 
-Edgy looks for the `EDGY_SETTINGS_MODULE` environment variable to load and apply settings.
+Edgy reads `EDGY_SETTINGS_MODULE` in the format:
 
-If `EDGY_SETTINGS_MODULE` is not found, Edgy uses its internal default settings.
+`path.to.module.SettingsClass`
+
+If it is not set, Edgy uses the internal default `EdgySettings`.
 
 #### Custom Settings
 
-To create custom settings, inherit from `EdgySettings` (or `TenancySettings` for multi-tenancy). `EdgySettings` handles Edgy's internal settings, which you can extend or override.
-
-Example:
+To create your own settings, inherit from `EdgySettings` (or `TenancySettings` for tenancy-focused projects) and override only what you need.
 
 ```python title="myproject/configs/settings.py"
 {!> ../docs_src/settings/custom_settings.py !}
 ```
 
-Edgy's settings are designed to be simple and easily overridable.
+### Practical Preload Example
+
+If your app instance is set in `myproject.main`, you can preload it once and run commands without passing `--app` every time.
+
+```python title="myproject/configs/settings.py"
+from edgy.conf import EdgySettings
+
+
+class MyCustomSettings(EdgySettings):
+    preloads = ("myproject.main",)
+```
+
+Then run:
+
+```shell
+$ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy shell
+$ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy makemigrations
+```
+
+For discovery behavior details, see [Application Discovery](./migrations/discovery.md).
+
+### Runtime Resolution Map
+
+```mermaid
+flowchart TD
+    A["Process starts"] --> B{"EDGY_SETTINGS_MODULE set?"}
+    B -- Yes --> C["Load custom settings class"]
+    B -- No --> D["Load default EdgySettings"]
+    C --> E["Apply preloads and extensions"]
+    D --> E
+    E --> F{"Instance already set?"}
+    F -- Yes --> G["Reuse instance"]
+    F -- No --> H["Use --app / EDGY_DEFAULT_APP / autodiscovery"]
+```
 
 !!! Danger
     Exercise caution when overriding settings, as it may break functionality.
 
-##### Parameters
+## What You Can Configure
 
-* **preloads**: List of imports to preload. Non-existent imports are ignored. Can be used to inject a path to a module in which the instance is set. Takes strings in format `module` and `module:fn`. In the latter case the function or callable is executed without arguments.
+### Core Runtime
 
-    <sup>Default: `[]`</sup>
+* **preloads**: Modules loaded early. Supports `module` and `module:callable`.
 
-* **extensions**: List of Monkay extensions for Edgy. See [Extensions](./extensions.md) for details. Extensions can also preload imports.
+    <sup>Default: `()`</sup>
 
-    <sup>Default: `[]`</sup>
+* **extensions**: Monkay extensions loaded by Edgy.
 
-* **ipython_args**: List of arguments passed to `ipython` when starting `edgy shell`.
+    <sup>Default: `()`</sup>
 
-    <sup>Default: `["--no-banner"]`</sup>
+* **allow_auto_compute_server_defaults**: Enables implicit server-default handling for supported fields.
 
-* **ptpython_config_file**: Config file loaded into `ptpython` when starting `edgy shell --kernel ptpython`.
+    <sup>Default: `True`</sup>
+
+### Migration Settings
+
+* **allow_automigrations**: Allow automatic migration execution during registry startup when configured.
+
+    <sup>Default: `True`</sup>
+
+* **multi_schema**: Multi-schema migration mode (`False`, `True`, or regex/pattern string).
+
+    <sup>Default: `False`</sup>
+
+* **ignore_schema_pattern**: Pattern for ignored schemas during multi-schema operations.
+
+    <sup>Default: `"information_schema"`</sup>
+
+* **migrate_databases**: Databases included in migrations (`None` means default/main DB).
+
+    <sup>Default: `(None,)`</sup>
+
+* **migration_directory**: Path to your migration directory.
+
+    <sup>Default: `"migrations/"`</sup>
+
+* **alembic_ctx_kwargs**: Extra kwargs forwarded to Alembic context.
+
+    <sup>Default: `{"compare_type": True, "render_as_batch": True}`</sup>
+
+### Media & Storage Settings
+
+* **file_upload_temp_dir**: Optional temporary upload directory.
+
+    <sup>Default: `None`</sup>
+
+* **file_upload_permissions**: Default file mode for uploaded files.
+
+    <sup>Default: `0o644`</sup>
+
+* **file_upload_directory_permissions**: Default directory mode for upload folders.
+
+    <sup>Default: `None`</sup>
+
+* **media_root**: Filesystem location where media is stored.
+
+    <sup>Default: `"media/"`</sup>
+
+* **media_url**: URL prefix used by storages for generated file URLs.
+
+    <sup>Default: `""`</sup>
+
+* **storages**: Storage backend mapping. The `default` storage is used by file/image fields unless overridden.
+
+    <sup>Default backend: `edgy.core.files.storage.filesystem.FileSystemStorage`</sup>
+
+### ORM Concurrency Settings
+
+* **orm_concurrency_enabled**: Global switch for internal ORM concurrency limits.
+
+    <sup>Default: `True`</sup>
+
+* **orm_concurrency_limit**: Max concurrency for high-level fan-out operations (prefetch/lazy relation loading).
+
+    <sup>Default: `10`</sup>
+
+* **orm_row_prefetch_limit**: Concurrency limit for row-level prefetch workloads.
+
+    <sup>Default: `5`</sup>
+
+* **orm_clauses_concurrency_limit**: Concurrency limit for dynamic clause evaluation.
+
+    <sup>Default: `20`</sup>
+
+* **orm_registry_ops_limit**: Concurrency limit for registry-level operations.
+
+    <sup>Default: `10`</sup>
+
+### Shell Settings
+
+* **ipython_args**: Arguments passed to IPython in `edgy shell`.
+
+    <sup>Default: derived from `IPYTHON_ARGUMENTS`, fallback `"--no-banner"`</sup>
+
+* **ptpython_config_file**: Configuration file for `edgy shell --kernel ptpython`.
 
     <sup>Default: `"~/.config/ptpython/config.py"`</sup>
 
-#### How to Use It
+### Admin Settings
 
-Similar to [Ravyn settings][ravyn_settings], Edgy uses the `EDGY_SETTINGS_MODULE` environment variable.
+* **admin_config**: Lazy-loaded `AdminConfig` object with admin-related options such as:
+  `admin_prefix_url`, `admin_extra_templates`, `title`, `menu_title`, `dashboard_title`, `favicon`, `sidebar_bg_colour`, `SECRET_KEY`.
 
-Using the example from [above](#custom-settings) and the location `myproject/configs/settings.py`, the settings should be called like this:
+For details see [Admin](./admin/admin.md).
+
+### Tenancy Settings
+
+If you inherit from `TenancySettings`, you also get tenancy-specific settings like:
+
+* `auto_create_schema`
+* `auto_drop_schema`
+* `tenant_schema_default`
+* `tenant_model`
+* `domain`
+* `domain_name`
+* `auth_user_model`
+
+For details see [Contrib Tenancy](./tenancy/contrib.md).
+
+## How to Use It
+
+Using the example above (`myproject.configs.settings.MyCustomSettings`):
 
 ```shell
 $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy <COMMAND>
 ```
 
-Optional prerequisite: set one of the preload imports to the application path. This way you can skip providing the `--app` parameter or providing the `EDGY_DEFAULT_APP`.
+Optional prerequisite: set one of the preload imports to the application path. This way you can skip providing the `--app` parameter or `EDGY_DEFAULT_APP`.
 
-Example:
+### Practical Calls
 
 **Starting the default shell:**
 
@@ -69,7 +203,7 @@ Example:
 $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy shell
 ```
 
-**Starting the PTPython shell:**
+**Starting PTPython shell:**
 
 ```shell
 $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy shell --kernel ptpython
@@ -93,6 +227,10 @@ $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy makemigr
 $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy migrate
 ```
 
-And so on. To see available commands, check the [commands](./migrations/migrations.md) and [shell support](./shell.md).
+## See Also
 
-[ravyn_settings]: https://ravyn.dev/application/settings/
+* [Architecture Overview](./concepts/architecture.md)
+* [Connection Management](./connection.md)
+* [Migrations](./migrations/migrations.md)
+* [Shell Support](./shell.md)
+* [Troubleshooting](./troubleshooting.md)

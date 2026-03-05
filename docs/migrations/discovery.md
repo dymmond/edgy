@@ -5,6 +5,8 @@ Edgy provides multiple ways to identify and run commands. The two primary method
 - [Environment variables](#environment-variables)
 - [Auto-discovery](#auto-discovery)
 
+If you want a command-by-command map first, check [CLI Commands](../cli/commands.md).
+
 ## Auto-Discovery
 
 If you're familiar with frameworks like Django, you might know how `manage.py` serves as a command-line interface for running internal commands. While Edgy doesn't work exactly the same way, it does attempt to automatically detect the appropriate application and will raise an error if none is found or if neither an [environment variable](#environment-variables) nor `--app` is provided.
@@ -57,6 +59,22 @@ Edgy follows these steps to locate the application:
 2. If none of these files are found, Edgy checks the first-level subdirectories and repeats the search.
 3. If still not found, it raises a `CommandEnvironmentError` exception.
 4. Once a matching file is located, Edgy verifies whether the instance is correctly set.
+
+### Discovery Resolution Order
+
+```mermaid
+flowchart TD
+    A["Run edgy command"] --> B{"--app provided?"}
+    B -- Yes --> C["Use --app module path"]
+    B -- No --> D{"EDGY_DEFAULT_APP set?"}
+    D -- Yes --> E["Use EDGY_DEFAULT_APP"]
+    D -- No --> F{"Preloaded module set instance?"}
+    F -- Yes --> G["Use preloaded instance"]
+    F -- No --> H["Auto-discover main/app/application/asgi"]
+    H --> I{"Found valid instance?"}
+    I -- Yes --> J["Execute command"]
+    I -- No --> K["Raise CommandEnvironmentError"]
+```
 
 ## Environment Variables
 
@@ -126,6 +144,8 @@ Since no `--app` or `EDGY_DEFAULT_APP` is provided, Edgy automatically discovers
 
 Edgy supports automatic registration via preloads. Instead of explicitly providing `--app` or `EDGY_DEFAULT_APP`, you can use the `preloads` setting in your configuration to specify an import path. When an instance is set in a preloaded file, auto-discovery is skipped.
 
+See [Settings](../settings.md) for preload configuration details.
+
 #### Using `--app` or `EDGY_DEFAULT_APP`
 
 ##### `--app`
@@ -184,3 +204,10 @@ Then run:
 ```shell
 $ edgy makemigrations
 ```
+
+## See Also
+
+* [CLI Commands](../cli/commands.md)
+* [Settings](../settings.md)
+* [Connection Management](../connection.md)
+* [Getting Started: First Migration Cycle](../getting-started/first-migration-cycle.md)

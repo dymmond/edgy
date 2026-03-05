@@ -12,6 +12,8 @@ perform those same actions.
 If you haven't yet seen the [models][model] and [managers][managers] section, now would
 be a great time to have a look and get yourself acquainted.
 
+For end-to-end lifecycle context, also see [Request and Query Lifecycle](../concepts/request-lifecycle.md).
+
 ## QuerySet
 
 When making queries within Edgy, this return or an object if you want only one result or a
@@ -63,6 +65,15 @@ For schema it is valid to use a string for a schema, None for the main schema or
 
 It is the merge of the former methods `using` (with a positional argument) and `using_with_db` which are still valid but deprecated and have usability problems.
 
+```mermaid
+flowchart TD
+    A["Need query context override"] --> B{"Different DB?"}
+    B -- Yes --> C["using(database='name')"]
+    B -- No --> D{"Different schema?"}
+    D -- Yes --> E["using(schema='schema') or with_schema('schema')"]
+    D -- No --> F["Use default registry database/schema"]
+```
+
 
 ### Using with `with_schema`
 
@@ -76,7 +87,7 @@ write `using(...)`.
 Importing is as simple as this:
 
 ```python
-from edgy.core.db import with_schema
+from edgy.core.db import set_schema, with_schema
 ```
 
 Let us see an example:
@@ -109,7 +120,7 @@ There is also a method called `set_schema` which returns a reset token:
 
 ```python
 # Using the 'main' schema
-token = set_schema("main"):
+token = set_schema("main")
 
 try:
     # Query the 'User' from the 'main' schema
@@ -805,28 +816,28 @@ total = await User.query.count()
 Returns the model results in a dictionary like format.
 
 ```python
-await User.query.create(name="John" email="foo@bar.com")
+await User.query.create(name="John", email="foo@bar.com")
 
 # All values
-user = User.query.values()
+users = await User.query.values()
 users == [
     {"id": 1, "name": "John", "email": "foo@bar.com"},
 ]
 
 # Only the name
-user = User.query.values("name")
+users = await User.query.values("name")
 users == [
     {"name": "John"},
 ]
 # Or as a list
 # Only the name
-user = User.query.values(["name"])
+users = await User.query.values(["name"])
 users == [
     {"name": "John"},
 ]
 
 # Exclude some values
-user = User.query.values(exclude=["id"])
+users = await User.query.values(exclude=["id"])
 users == [
     {"name": "John", "email": "foo@bar.com"},
 ]
@@ -849,34 +860,34 @@ The `values()` can also be combined with `filter`, `only`, `exclude` as per usua
 Returns the model results in a tuple like format.
 
 ```python
-await User.query.create(name="John" email="foo@bar.com")
+await User.query.create(name="John", email="foo@bar.com")
 
 # All values
-user = User.query.values_list()
+users = await User.query.values_list()
 users == [
-    (1, "John" "foo@bar.com"),
+    (1, "John", "foo@bar.com"),
 ]
 
 # Only the name
-user = User.query.values_list("name")
+users = await User.query.values_list("name")
 users == [
     ("John",),
 ]
 # Or as a list
 # Only the name
-user = User.query.values_list(["name"])
+users = await User.query.values_list(["name"])
 users == [
     ("John",),
 ]
 
 # Exclude some values
-user = User.query.values(exclude=["id"])
+users = await User.query.values_list(exclude=["id"])
 users == [
     ("John", "foo@bar.com"),
 ]
 
 # Flattened
-user = User.query.values_list("email", flat=True)
+users = await User.query.values_list("email", flat=True)
 users == [
     "foo@bar.com",
 ]
@@ -900,7 +911,7 @@ The `values_list()` can also be combined with `filter`, `only`, `exclude` as per
 Returns the results containing **only** the fields in the query and nothing else.
 
 ```python
-await User.query.create(name="John" email="foo@bar.com")
+await User.query.create(name="John", email="foo@bar.com")
 
 user = await User.query.only("name")
 ```
@@ -913,7 +924,7 @@ user = await User.query.only("name")
 Returns the results containing all the fields **but the ones you want to exclude**.
 
 ```python
-await User.query.create(name="John" email="foo@bar.com")
+await User.query.create(name="John", email="foo@bar.com")
 
 user = await User.query.defer("name")
 ```

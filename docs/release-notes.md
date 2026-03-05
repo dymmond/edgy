@@ -1,8 +1,3 @@
----
-hide:
-  - navigation
----
-
 # Release Notes
 
 ## 0.35.9
@@ -1296,7 +1291,7 @@ with with_schema("foo"):
 
 ### Added
 
-- [create_schema](./tenancy/edgy.md#the-schema-creation) allowing a dynamic and programatically
+- [create_schema](./tenancy/edgy.md#schema-creation) allowing a dynamic and programatically
 way of creating schemas in the database.
 
 ### Changed

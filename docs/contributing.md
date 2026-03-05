@@ -107,12 +107,25 @@ than postgres.
 
 ### Documentation
 
-Improving the documentation is quite easy and it is placed inside the `edgy/docs` folder.
+Improving the documentation is quite easy and it is placed inside the `docs` folder.
+Code snippets used in docs live in `docs_src`.
 
-To start the docs, run:
+To generate the build-ready docs markdown (includes expanded), run:
+
+```shell
+$ hatch run docs:prepare
+```
+
+To start the docs preview with live reload, run:
 
 ```shell
 $ hatch run docs:serve
+```
+
+To build the static docs site, run:
+
+```shell
+$ hatch run docs:build
 ```
 
 ## Building Edgy

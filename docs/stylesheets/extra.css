@@ -1,0 +1,82 @@
+:root {
+  --edgy-primary: #e92063;
+  --edgy-primary-strong: #bf184a;
+  --edgy-colour-default: #ffffff;
+}
+
+[data-md-color-scheme="default"] .md-header {
+  background: linear-gradient(90deg, var(--edgy-primary), var(--edgy-primary-strong));
+  color: #fff;
+}
+
+[data-md-color-scheme="default"] .md-header .md-header__button,
+[data-md-color-scheme="default"] .md-header .md-header__topic,
+[data-md-color-scheme="default"] .md-header .md-header__title,
+[data-md-color-scheme="default"] .md-header .md-source__repository,
+[data-md-color-scheme="default"] .md-header .md-source__icon {
+  color: #fff;
+}
+
+[data-md-color-scheme="default"] .md-tabs {
+  background-color: var(--edgy-primary-strong);
+  color: var(--edgy-colour-default);
+}
+
+[data-md-color-scheme="default"] .md-header .md-search__button {
+  color: #fff;
+}
+
+[data-md-color-scheme="default"] .md-header .md-search__button:hover,
+[data-md-color-scheme="default"] .md-header .md-search__button:focus {
+  color: #fff;
+}
+
+[data-md-color-scheme="default"] .md-header .md-search__button:before {
+  background-color: #fff;
+}
+
+[data-md-color-scheme="default"] .md-header .md-search__button:after {
+  background: #f2f2f2;
+  color: #111;
+}
+
+[data-md-color-scheme="default"] .md-search__form {
+  background-color: #fff;
+}
+
+[data-md-color-scheme="default"] .md-search__form:hover,
+[data-md-color-scheme="default"] .md-search__form:focus-within {
+  background-color: #fff;
+}
+
+[data-md-color-scheme="default"] .md-search__input,
+[data-md-color-scheme="default"] .md-search__icon,
+[data-md-color-scheme="default"] .md-search__icon svg {
+  color: #111;
+}
+
+[data-md-color-scheme="default"] .md-search__input::placeholder {
+  color: #5f6368;
+}
+
+[data-md-color-scheme="default"] .md-sidebar,
+[data-md-color-scheme="default"] .md-nav,
+[data-md-color-scheme="default"] .md-nav__list {
+  background-color: transparent;
+}
+
+.md-typeset a {
+  text-decoration: none;
+  box-shadow: none;
+  border-bottom: 0;
+}
+
+.md-typeset a:hover,
+.md-typeset a:focus-visible {
+  text-decoration: none;
+  box-shadow: none;
+}
+
+.text-justify {
+  text-align: justify;
+}

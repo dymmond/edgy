@@ -2,6 +2,8 @@
 
 Edgy provides several debugging features, also through databasez. It aims to maintain an efficient event loop and execute queries in the most performant manner. For example, asyncio pools are thread-protected in databasez, allowing connections to the database to remain open.
 
+For quick issue-based fixes, also check [Troubleshooting](./troubleshooting.md).
+
 However, this requires that databases and registries are not simply discarded but kept open during operation. To ensure a proper lifespan, a reference counter is used.
 
 When the reference count drops to 0, the database is uninitialized, and connections are closed.

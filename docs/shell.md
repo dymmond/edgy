@@ -1,5 +1,3 @@
-Absolutely! Let's expand on this section with thorough explanations for the end user.
-
 # Shell Support
 
 Have you ever found yourself needing to quickly interact with your database models directly from the command line? Perhaps you wanted to test a query, inspect data, or perform some quick data manipulation without writing a full script. If you've struggled with setting up such an environment in the past, Edgy's shell support is designed to make your life easier.
@@ -85,7 +83,7 @@ $ edgy shell --kernel ptpython
 
 ### How does it look like
 
-Edgy doesn't want to load all python globals and locals for you. Instead loads all the
+Edgy doesn't want to load all python globals and locals for you. Instead, it loads all the
 essentials for the models and reflected models and some python packages.
 
 It looks like this:
@@ -97,7 +95,7 @@ using.
 
 #### Example
 
-Let us see an example using example using Ravyn and we will have:
+Let us see an example using Ravyn and we will have:
 
 * Three [models](./models.md):
     * User - From an [ravyn application][ravyn_application] `accounts`.

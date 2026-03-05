@@ -71,6 +71,21 @@ tasks:
     cmds:
       - hatch run docs:serve
 
+  docs_prepare:
+    desc: Generates build-ready docs markdown (expands include directives)
+    cmds:
+      - hatch run docs:prepare
+
+  docs_build:
+    desc: Builds the documentation site with Zensical
+    cmds:
+      - hatch run docs:build
+
+  docs_clean:
+    desc: Cleans generated docs and docs build cache
+    cmds:
+      - hatch run docs:clean
+
   dashboard:
     desc: Run BE for admin
     cmds:
