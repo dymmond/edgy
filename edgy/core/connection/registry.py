@@ -1142,24 +1142,36 @@ class Registry:
         """
         Asynchronously connects to all registered databases (primary and extra)
         and initializes models. This method is designed to be used with `async with`.
+        If any connection fails, successfully connected databases are disconnected
+        and the original exception is re-raised.
         """
         dbs: list[tuple[str | None, Database]] = [(None, self.database)]
         for name, db in self.extra.items():
             dbs.append((name, db))
         # Initiate connection and initialization for all databases concurrently.
         ops = [self._connect_and_init(name, db) for name, db in dbs]
-        results: list[BaseException | bool] = await asyncio.gather(*ops, return_exceptions=True)
+        results: list[BaseException | None] = await asyncio.gather(*ops, return_exceptions=True)
 
         # Handle any connection failures.
-        if any(isinstance(x, BaseException) for x in results):
-            ops2 = []
-            for num, value in enumerate(results):
-                if not isinstance(value, BaseException):
-                    # Disconnect successfully connected databases if others failed.
-                    ops2.append(dbs[num][1].disconnect())
-                else:
-                    logger.error("Failed to connect database.", exc_info=value)
-            await asyncio.gather(*ops2)  # Await disconnections.
+        errors: list[BaseException] = []
+        for value in results:
+            if isinstance(value, BaseException):
+                errors.append(value)
+                logger.error("Failed to connect database.", exc_info=value)
+        if errors:
+            ops2 = [
+                dbs[num][1].disconnect()
+                for num, value in enumerate(results)
+                if not isinstance(value, BaseException)
+            ]
+            disconnect_results = await asyncio.gather(*ops2, return_exceptions=True)
+            for disconnect_error in disconnect_results:
+                if isinstance(disconnect_error, BaseException):
+                    logger.error(
+                        "Failed to disconnect database during rollback.",
+                        exc_info=disconnect_error,
+                    )
+            raise errors[0]
         return self
 
     async def __aexit__(

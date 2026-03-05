@@ -110,6 +110,8 @@ You can manipulate files by setting a file-like object or `None`, or use the fol
 
 `content` supports file-like objects, bytes, `FileStruct`, and `File` instances.
 
+For non-seekable streams (for example, pipes or certain upload wrappers), Edgy still reads content in chunks correctly. If a stream cannot seek back to position `0`, Edgy proceeds from the current cursor position.
+
 !!! Tip
     Overwrite files with `overwrite=True` and the old file name.
 

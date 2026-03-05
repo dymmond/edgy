@@ -32,8 +32,8 @@ async def run_concurrently(coros: Sequence[Awaitable[T]], limit: int | None = No
             None for using the orm_concurrency_limit setting.
 
     Returns:
-        A list containing the results of the awaited coroutines. The order of results
-        is determined by the completion time of the tasks.
+        A list containing the results of the awaited coroutines in the same order
+        as the input sequence.
     """
     if not coros:
         return []
@@ -45,6 +45,13 @@ async def run_concurrently(coros: Sequence[Awaitable[T]], limit: int | None = No
 
     if not enabled:
         eff_limit = 1
+    if eff_limit == 1:
+        # Fast path for explicit sequential execution. This avoids creating
+        # short-lived asyncio.gather() calls for each single-item batch.
+        sequential_results: list[T] = []
+        for coro in coros:
+            sequential_results.append(await coro)
+        return sequential_results
     if eff_limit is None or eff_limit <= 0:
         return await asyncio.gather(*coros)
     results: list[T] = []

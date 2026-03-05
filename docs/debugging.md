@@ -49,7 +49,7 @@ If the database is slow due to numerous Edgy connections, and no `DatabaseNotCon
 
 ### Debugging Deferred Loads
 
-For debugging purposes (at the cost of deferred loads), you can set the `ContextVariable` `edgy.core.context_vars.MODEL_GETATTR_BEHAVIOR` to `"passdown"` instead of `"load"`.
+For debugging purposes (at the cost of deferred loads), you can set the `ContextVariable` `edgy.core.db.context_vars.MODEL_GETATTR_BEHAVIOR` to `"passdown"` instead of `"load"`.
 
 This will cause crashes if an implicitly loaded variable is accessed.
 
@@ -61,6 +61,24 @@ There are two ways to work around this:
 
 1.  Use the model instance dictionary instead (e.g., `model.__dict__.get("foo")` or `"foo" in model.__dict__`).
 2.  Add the optional available attributes to `__no_load_trigger_attrs__`. They will no longer trigger a load.
+
+## Benchmarking Locally
+
+Edgy includes a benchmark suite under `tests/benchmarks` and runs it in CI via CodSpeed.
+
+Run it locally:
+
+```shell
+$ pytest tests/benchmarks/ --codspeed
+```
+
+Or run the suite with normal pytest timings:
+
+```shell
+$ pytest tests/benchmarks/ -q
+```
+
+Use this before/after flow when changing query compilation, model construction, or serialization internals.
 
 ## Hangs
 
