@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-__version__ = "0.35.9"
+__version__ = "0.35.10"
 from typing import TYPE_CHECKING
 
 from ._monkay import Instance, create_monkay
@@ -68,6 +68,7 @@ if TYPE_CHECKING:
         ModelRef,
         RedirectManager,
         ReflectModel,
+        SQLAlchemyModelMixin,
         StrictModel,
     )
     from .core.db.querysets import Prefetch, Q, QuerySet, and_, not_, or_
@@ -115,6 +116,7 @@ __all__ = [
     "ModelRef",
     "Manager",
     "RedirectManager",
+    "SQLAlchemyModelMixin",
     # fields
     "fields",
     "BigIntegerField",

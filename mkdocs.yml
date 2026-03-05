@@ -102,6 +102,7 @@ nav:
       - File Handling: "file-handling.md"
       - Queries:
           - Queries: "queries/queries.md"
+          - SQLAlchemy Compatibility Mode: "queries/sqlalchemy-compatibility.md"
           - The Q Operator: "queries/q.md"
           - Combined Queries: "queries/combined-queries.md"
           - Annotations: "queries/annotate.md"

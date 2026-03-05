@@ -116,7 +116,15 @@ def create_monkay(global_dict: dict, all_var: list[str]) -> Monkay[Instance, Edg
         monkay.add_lazy_import(name, f"edgy.core.db.querysets.{name}")
 
     # Add lazy imports for model-related classes
-    for name in ["Manager", "Model", "ModelRef", "RedirectManager", "ReflectModel", "StrictModel"]:
+    for name in [
+        "Manager",
+        "Model",
+        "ModelRef",
+        "RedirectManager",
+        "ReflectModel",
+        "SQLAlchemyModelMixin",
+        "StrictModel",
+    ]:
         monkay.add_lazy_import(name, f"edgy.core.db.models.{name}")
 
     # Dynamically add lazy imports for field types
