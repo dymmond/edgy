@@ -122,21 +122,22 @@ lint = "hatch fmt {args}; hatch run test:check_types"
 
 [tool.hatch.envs.docs]
 dependencies = [
-    "griffe-typingdoc>=0.2.2",
-    "mkautodoc>=0.2.0,<0.3.0",
-    "mkdocs>=1.1.2,<2.0.0",
-    "mkdocs-material>=9.4.4,<10.0.0",
-    "mdx-include>=1.4.2,<2.0.0",
-    "mkdocs-macros-plugin>=1.0.0,<2.0.0",
+    "sayer>=0.7.4",
+    "zensical>=0.0.23,<0.1.0",
+    "griffe-typingdoc>=0.2.2,<1.0",
     "mkdocs-meta-descriptions-plugin>=2.3.0",
-    "mkdocstrings[python]>=0.23.0,<0.30.0",
+    "mkdocstrings>=0.28.3",
+    "mkdocstrings-python>=2.0.3",
     "pyyaml>=6.0,<7.0.0",
     # for signature cleaning
     "ruff",
 ]
 [tool.hatch.envs.docs.scripts]
-build = "mkdocs build {args}"
-serve = "mkdocs serve --dev-addr localhost:8000"
+prepare = "scripts/docs.py prepare"
+clean = "scripts/docs.py clean"
+build = "scripts/docs.py build --clean {args}"
+serve = "scripts/docs.py serve {args}"
+dev = "scripts/docs.py serve {args}"
 
 
 [tool.hatch.envs.test]

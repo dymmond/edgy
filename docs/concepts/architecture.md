@@ -124,6 +124,8 @@ Common extension points:
 
 ## See Also
 
+* [Request and Query Lifecycle](./request-lifecycle.md)
+* [Component Interactions](./component-interactions.md)
 * [Connection Management](../connection.md)
 * [Registry](../registry.md)
 * [Queries](../queries/queries.md)

@@ -22,7 +22,7 @@ If you need centralized command behavior (preloads, migration directory, shell s
 
 | Goal | Typical Commands |
 | --- | --- |
-| Setup migration repository | `list_templates`, `init` |
+| Setup migration repository | `list-templates`, `init` |
 | Generate revision files | `revision`, `makemigrations`, `merge`, `edit` |
 | Apply or revert revisions | `migrate`, `downgrade`, `stamp` |
 | Inspect migration state | `current`, `heads`, `branches`, `history`, `show`, `check` |
@@ -30,14 +30,14 @@ If you need centralized command behavior (preloads, migration directory, shell s
 
 ## Migration Bootstrap
 
-### `edgy list_templates`
+### `edgy list-templates`
 
 **What:** Show available migration repository templates.
 
 **When:** Before `edgy init`, when choosing a template.
 
 ```shell
-$ edgy list_templates
+$ edgy list-templates
 ```
 
 ### `edgy init`

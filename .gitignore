@@ -16,6 +16,8 @@ dist/
 node_modules/
 results/
 site/
+docs-generated/
+.cache/
 target/
 tests/cli/migrations
 tests/cli/migrations2

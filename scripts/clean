@@ -6,6 +6,15 @@ fi
 if [ -d 'site' ] ; then
     rm -r site
 fi
+if [ -d 'docs-generated' ] ; then
+    rm -r docs-generated
+fi
+if [ -d '.docs-generated' ] ; then
+    rm -r .docs-generated
+fi
+if [ -d '.cache' ] ; then
+    rm -r .cache
+fi
 if [ -d 'htmlcov' ] ; then
     rm -r htmlcov
 fi

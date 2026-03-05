@@ -301,7 +301,7 @@ edgy init -t plain
 List all available templates:
 
 ```shell
-edgy list_templates
+edgy list-templates
 ```
 
 You can also use templates from the filesystem:

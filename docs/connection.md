@@ -6,7 +6,7 @@ Edgy is built on SQLAlchemy Core, but it's an asynchronous implementation. This 
 
 Edgy is framework-agnostic, meaning it can be seamlessly integrated into any framework that supports lifecycle events.
 
-If you want the bigger picture first, check the [Architecture Overview](./concepts/architecture.md).
+If you want the bigger picture first, check the [Architecture Overview](./concepts/architecture.md) and [Request and Query Lifecycle](./concepts/request-lifecycle.md).
 
 ## Choose an Integration Style
 

@@ -12,6 +12,8 @@ perform those same actions.
 If you haven't yet seen the [models][model] and [managers][managers] section, now would
 be a great time to have a look and get yourself acquainted.
 
+For end-to-end lifecycle context, also see [Request and Query Lifecycle](../concepts/request-lifecycle.md).
+
 ## QuerySet
 
 When making queries within Edgy, this return or an object if you want only one result or a
@@ -76,7 +78,7 @@ write `using(...)`.
 Importing is as simple as this:
 
 ```python
-from edgy.core.db import with_schema
+from edgy.core.db import set_schema, with_schema
 ```
 
 Let us see an example:
@@ -109,7 +111,7 @@ There is also a method called `set_schema` which returns a reset token:
 
 ```python
 # Using the 'main' schema
-token = set_schema("main"):
+token = set_schema("main")
 
 try:
     # Query the 'User' from the 'main' schema

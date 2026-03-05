@@ -1,11 +1,11 @@
 site_name: Edgy
 site_description: 🔥 The perfect ORM to work with complex databases 🔥.
 site_url: https://edgy.dymmond.com
-watch:
-  - docs_src
+docs_dir: docs-generated
+site_dir: site
 theme:
   name: "material"
-  custom_dir: docs/overrides
+  custom_dir: docs-generated/overrides
   language: en
   palette:
     - scheme: "default"
@@ -34,11 +34,12 @@ theme:
     - content.code.select
     - navigation.indexes
     - navigation.path
-    - navigation.tabs
 
 repo_name: dymmond/edgy
 repo_url: https://github.com/dymmond/edgy
 edit_uri: ""
+extra_css:
+  - stylesheets/extra.css
 plugins:
   - search
   - meta-descriptions:
@@ -48,7 +49,6 @@ plugins:
       min_length: 50
       max_length: 160
       trim: false
-  - macros
   - mkdocstrings:
       handlers:
         python:
@@ -73,6 +73,8 @@ nav:
   - Edgy: "index.md"
   - Core:
       - Architecture Overview: "concepts/architecture.md"
+      - Request and Query Lifecycle: "concepts/request-lifecycle.md"
+      - Component Interactions: "concepts/component-interactions.md"
       - Connection: "connection.md"
       - Models: "models.md"
       - Declarative Models: "declarative-models.md"
@@ -154,19 +156,19 @@ nav:
       - Contributing: "contributing.md"
       - Sponsorship: "sponsorship.md"
   - Release Notes: "release-notes.md"
+
 markdown_extensions:
   - attr_list
   - toc:
       permalink: true
-  - mdx_include:
-      base_path: docs
   - admonition
-  - extra
+  - abbr
+  - def_list
+  - footnotes
   - pymdownx.superfences:
       custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: '!!python/name:pymdownx.superfences.fence_code_format ""'
+      - name: mermaid
+        class: mermaid
   - pymdownx.tabbed:
       alternate_style: true
   - md_in_html
@@ -176,3 +178,8 @@ extra:
     - link: /
       name: English
       lang: en
+  social:
+    - icon: fontawesome/brands/github-alt
+      link: https://github.com/dymmond/edgy
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/XVeWXSrJ

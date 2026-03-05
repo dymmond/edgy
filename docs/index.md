@@ -1,8 +1,3 @@
----
-hide:
-  - navigation
----
-
 # Edgy
 
 <p align="center">
@@ -56,6 +51,8 @@ If you are already using another ORM and want the Edgy mapping quickly:
 If you need internals and architecture first:
 
 * [Architecture Overview](./concepts/architecture.md)
+* [Request and Query Lifecycle](./concepts/request-lifecycle.md)
+* [Component Interactions](./concepts/component-interactions.md)
 * [Registry](./registry.md)
 * [API Reference](./references/index.md)
 * [Troubleshooting](./troubleshooting.md)
