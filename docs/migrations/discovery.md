@@ -60,6 +60,22 @@ Edgy follows these steps to locate the application:
 3. If still not found, it raises a `CommandEnvironmentError` exception.
 4. Once a matching file is located, Edgy verifies whether the instance is correctly set.
 
+### Discovery Resolution Order
+
+```mermaid
+flowchart TD
+    A["Run edgy command"] --> B{"--app provided?"}
+    B -- Yes --> C["Use --app module path"]
+    B -- No --> D{"EDGY_DEFAULT_APP set?"}
+    D -- Yes --> E["Use EDGY_DEFAULT_APP"]
+    D -- No --> F{"Preloaded module set instance?"}
+    F -- Yes --> G["Use preloaded instance"]
+    F -- No --> H["Auto-discover main/app/application/asgi"]
+    H --> I{"Found valid instance?"}
+    I -- Yes --> J["Execute command"]
+    I -- No --> K["Raise CommandEnvironmentError"]
+```
+
 ## Environment Variables
 
 Edgy uses environment variables to determine the correct database when generating migrations:
@@ -188,3 +204,10 @@ Then run:
 ```shell
 $ edgy makemigrations
 ```
+
+## See Also
+
+* [CLI Commands](../cli/commands.md)
+* [Settings](../settings.md)
+* [Connection Management](../connection.md)
+* [Getting Started: First Migration Cycle](../getting-started/first-migration-cycle.md)

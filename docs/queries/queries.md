@@ -65,6 +65,15 @@ For schema it is valid to use a string for a schema, None for the main schema or
 
 It is the merge of the former methods `using` (with a positional argument) and `using_with_db` which are still valid but deprecated and have usability problems.
 
+```mermaid
+flowchart TD
+    A["Need query context override"] --> B{"Different DB?"}
+    B -- Yes --> C["using(database='name')"]
+    B -- No --> D{"Different schema?"}
+    D -- Yes --> E["using(schema='schema') or with_schema('schema')"]
+    D -- No --> F["Use default registry database/schema"]
+```
+
 
 ### Using with `with_schema`
 

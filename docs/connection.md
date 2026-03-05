@@ -17,6 +17,16 @@ Not sure where to start? Use this quick rule:
 * **Pure sync code or sync-first framework**: wrap execution with `with_async_env` and call `run_sync`.
 * **Multi-app/multi-registry ASGI deployment**: consider the middleware integration.
 
+```mermaid
+flowchart TD
+    A["Need to integrate Edgy lifecycle"] --> B{"ASGI lifespan available?"}
+    B -- Yes --> C["Use registry.asgi(...) integration"]
+    B -- No --> D{"Sync-first runtime?"}
+    D -- Yes --> E["Use with_async_env + run_sync"]
+    D -- No --> F["Use manual connect/disconnect hooks"]
+    C --> G["Optional: middleware for multi-app/multi-registry"]
+```
+
 If commands cannot resolve your app instance, see [Application Discovery](./migrations/discovery.md).
 
 ## Lifecycle Events

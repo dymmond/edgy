@@ -71,10 +71,22 @@ plugins:
 
 nav:
   - Edgy: "index.md"
-  - Core:
+  - Getting Started:
+      - "getting-started/index.md"
+      - Install and First Query: "getting-started/install-and-first-query.md"
+      - First Migration Cycle: "getting-started/first-migration-cycle.md"
+  - Concepts:
       - Architecture Overview: "concepts/architecture.md"
       - Request and Query Lifecycle: "concepts/request-lifecycle.md"
       - Component Interactions: "concepts/component-interactions.md"
+  - Tutorials:
+      - "tutorials/index.md"
+      - Build a Ravyn API with Edgy: "tutorials/build-a-ravyn-api.md"
+      - Multi-Database and Schema Workflow: "tutorials/multi-db-and-schema-workflow.md"
+  - How-To Guides:
+      - "guides/index.md"
+      - Developer Workflow: "guides/developer-workflow-local-dev-test-debug.md"
+  - Core:
       - Connection: "connection.md"
       - Models: "models.md"
       - Declarative Models: "declarative-models.md"

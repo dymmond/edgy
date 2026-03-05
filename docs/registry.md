@@ -8,6 +8,19 @@ It's a simple yet effective object with a crucial role. The registry is also use
 
 If you want to understand where the registry sits in the full runtime, check [Architecture Overview](./concepts/architecture.md).
 
+## Registry Topology
+
+```mermaid
+graph TD
+    A["Monkay Instance"] --> B["Registry"]
+    B --> C["Main Database"]
+    B --> D["Extra Databases"]
+    B --> E["Model Registry"]
+    E --> F["SQLAlchemy Metadata"]
+    E --> G["Model callbacks"]
+    B --> H["Schema operations"]
+```
+
 ```python hl_lines="19"
 {!> ../docs_src/registry/model.py !}
 ```
@@ -160,3 +173,10 @@ Use `register_callback(model_or_name, callback, one_time)`.
 Generally, use `one_time=True` for model-specific callbacks and `one_time=False` for model-unspecific callbacks.
 
 If `one_time` is not provided, the logic mentioned above is applied.
+
+## See Also
+
+* [Connection Management](./connection.md)
+* [Models](./models.md)
+* [Queries](./queries/queries.md#selecting-the-database-and-schema)
+* [Tenancy (Edgy)](./tenancy/edgy.md)

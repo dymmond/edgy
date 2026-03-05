@@ -47,6 +47,20 @@ $ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy makemigr
 
 For discovery behavior details, see [Application Discovery](./migrations/discovery.md).
 
+### Runtime Resolution Map
+
+```mermaid
+flowchart TD
+    A["Process starts"] --> B{"EDGY_SETTINGS_MODULE set?"}
+    B -- Yes --> C["Load custom settings class"]
+    B -- No --> D["Load default EdgySettings"]
+    C --> E["Apply preloads and extensions"]
+    D --> E
+    E --> F{"Instance already set?"}
+    F -- Yes --> G["Reuse instance"]
+    F -- No --> H["Use --app / EDGY_DEFAULT_APP / autodiscovery"]
+```
+
 !!! Danger
     Exercise caution when overriding settings, as it may break functionality.
 

@@ -34,11 +34,12 @@
 
 If this is your first contact with Edgy:
 
-1. Start with [Installation](#installation)
-2. Run the [Quick Start](#quick-start)
-3. Learn [Connection Management](./connection.md)
-4. Move to [Models](./models.md) and [Queries](./queries/queries.md)
-5. Use [CLI Commands](./cli/commands.md) and [Migrations](./migrations/migrations.md)
+1. Start with [Getting Started](./getting-started/index.md)
+2. Run [Install and First Query](./getting-started/install-and-first-query.md)
+3. Continue to [First Migration Cycle](./getting-started/first-migration-cycle.md)
+4. Learn [Connection Management](./connection.md)
+5. Move to [Models](./models.md) and [Queries](./queries/queries.md)
+6. Continue with [Tutorials](./tutorials/index.md)
 
 If you are already using another ORM and want the Edgy mapping quickly:
 
@@ -56,6 +57,12 @@ If you need internals and architecture first:
 * [Registry](./registry.md)
 * [API Reference](./references/index.md)
 * [Troubleshooting](./troubleshooting.md)
+
+If you want task-oriented documentation:
+
+* [Tutorials](./tutorials/index.md)
+* [How-To Guides](./guides/index.md)
+* [CLI Commands](./cli/commands.md)
 
 ## Motivation
 
