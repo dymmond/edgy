@@ -45,12 +45,24 @@ def _configure_worker_isolation() -> None:
 _configure_worker_isolation()
 
 _DB_MARKER_CACHE: dict[str, bool] = {}
-_SERIAL_PATHS = {"tests/test_automigrations.py"}
-_SERIAL_PATH_PREFIXES = ("tests/cli/",)
+_SERIAL_PATHS = {
+    "tests/test_automigrations.py",
+    "tests/registry/test_registry.py",
+}
+_SERIAL_PATH_PREFIXES = (
+    "tests/cli",
+    "tests/contrib/admin",
+)
 
 
 def _get_node_path(item: pytest.Item) -> str:
     return item.nodeid.split("::", 1)[0].replace("\\", "/")
+
+
+def _is_serial_path(path: str) -> bool:
+    if path in _SERIAL_PATHS:
+        return True
+    return any(path == prefix or path.startswith(f"{prefix}/") for prefix in _SERIAL_PATH_PREFIXES)
 
 
 def _is_database_test(path: str) -> bool:
@@ -68,7 +80,7 @@ def _is_database_test(path: str) -> bool:
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for item in items:
         path = _get_node_path(item)
-        if path in _SERIAL_PATHS or path.startswith(_SERIAL_PATH_PREFIXES):
+        if _is_serial_path(path):
             item.add_marker("serial")
         if path.startswith("tests/cli/"):
             item.add_marker("cli")
@@ -77,6 +89,19 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         if _is_database_test(path):
             item.add_marker("db")
             item.add_marker("postgres")
+
+
+def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool:
+    markexpr = (getattr(config.option, "markexpr", "") or "").replace(" ", "")
+    numprocesses = int(getattr(config.option, "numprocesses", 0) or 0)
+    if numprocesses <= 0 or "notserial" not in markexpr:
+        return False
+    rootpath = Path(str(config.rootpath))
+    try:
+        path = collection_path.relative_to(rootpath).as_posix()
+    except ValueError:
+        return False
+    return _is_serial_path(path)
 
 
 @pytest.fixture(scope="session", autouse=True)

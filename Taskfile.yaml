@@ -96,42 +96,42 @@ tasks:
   test:
     desc: Runs the suite tests
     env:
-      RAVYN_SETTINGS_MODULE: tests.settings.TestSettings
+      RAVYN_SETTINGS_MODULE: ravyn.conf.global_settings.RavynSettings
     cmds:
       - hatch run test:test {{ .ARGS }}
 
   test_man:
     desc: Runs the manual tests with more output details and python breakpoints allowed
     env:
-      RAVYN_SETTINGS_MODULE: tests.settings.TestSettings
+      RAVYN_SETTINGS_MODULE: ravyn.conf.global_settings.RavynSettings
     cmds:
       - hatch run test:test_man {{ .ARGS }}
 
   test_parallel:
     desc: Runs parallel-safe tests with pytest-xdist
     env:
-      RAVYN_SETTINGS_MODULE: tests.settings.TestSettings
+      RAVYN_SETTINGS_MODULE: ravyn.conf.global_settings.RavynSettings
     cmds:
       - hatch run test:test -n auto --dist=loadscope -m "not serial" {{ .ARGS }}
 
   test_serial:
     desc: Runs tests marked as serial
     env:
-      RAVYN_SETTINGS_MODULE: tests.settings.TestSettings
+      RAVYN_SETTINGS_MODULE: ravyn.conf.global_settings.RavynSettings
     cmds:
       - hatch run test:test -n 0 -m "serial" {{ .ARGS }}
 
   test_split_validate:
     desc: Validates serial/non-serial split covers the full suite once
     env:
-      RAVYN_SETTINGS_MODULE: tests.settings.TestSettings
+      RAVYN_SETTINGS_MODULE: ravyn.conf.global_settings.RavynSettings
     cmds:
       - hatch run test:python scripts/validate_pytest_split.py
 
   test_ci:
     desc: Runs split suite (parallel-safe + serial)
     env:
-      RAVYN_SETTINGS_MODULE: tests.settings.TestSettings
+      RAVYN_SETTINGS_MODULE: ravyn.conf.global_settings.RavynSettings
     cmds:
       - task test_split_validate
       - task test_parallel
@@ -140,6 +140,6 @@ tasks:
   coverage:
     desc: Runs the coverage tests
     env:
-      RAVYN_SETTINGS_MODULE: tests.settings.TestSettings
+      RAVYN_SETTINGS_MODULE: ravyn.conf.global_settings.RavynSettings
     cmds:
       - hatch run test:coverage {{ .ARGS }}

@@ -240,6 +240,7 @@ markers = [
     "integration: integration tests with broader app/database interaction.",
     "db: tests that rely on DatabaseTestClient-backed databases.",
     "postgres: tests targeting PostgreSQL test databases.",
+    "benchmark: performance benchmarks used by benchmark test modules.",
 ]
 xfail_strict = true
 junit_family = "xunit2"
