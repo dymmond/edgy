@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 from collections.abc import Callable, Generator, Sequence
 from copy import copy
@@ -134,7 +135,7 @@ class File:
 
     def __hash__(self) -> int:
         """Returns the hash of the file's name."""
-        return hash(self._name)  # Assuming _name exists or is a typo for self.name
+        return hash(self.name)
 
     def __str__(self) -> str:
         """Returns the file's name as its string representation."""
@@ -219,18 +220,14 @@ class File:
         assert self.file is not None, "File is closed"
         chunk_size = chunk_size or self.DEFAULT_CHUNK_SIZE
 
-        try:
+        with contextlib.suppress(AttributeError, OSError):
             # Attempt to seek to the beginning of the file.
             self.file.seek(0)
-        except (AttributeError, OSError):
-            # Ignore if seeking is not supported or fails.
-            pass
-        else:
-            while True:
-                data = self.file.read(chunk_size)
-                if not data:  # End of file
-                    break
-                yield data
+        while True:
+            data = self.file.read(chunk_size)
+            if not data:  # End of file
+                break
+            yield data
 
     def multiple_chunks(self, chunk_size: int | None = None) -> bool:
         """
@@ -273,7 +270,8 @@ class File:
         """
         if not self.closed:
             # If already open, just seek to the beginning.
-            self.file.seek(0)
+            with contextlib.suppress(AttributeError, OSError):
+                self.file.seek(0)
         elif self.name and self.storage.exists(self.name):
             # If closed but has a name and exists in storage, reopen from storage.
             self.file = self.storage.open(self.name, mode or self.mode)

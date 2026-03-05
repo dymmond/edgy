@@ -48,6 +48,17 @@ graph TD
 
 Registries support the asynchronous context manager protocol and the ASGI lifespan protocol. This ensures all databases specified in `database` or `extra` are properly referenced and dereferenced (triggering initialization and teardown when the reference count reaches 0). This allows safe use of databases across different contexts.
 
+If any configured database fails to initialize, the registry tears down connections that were already initialized and re-raises the original exception.
+
+```python
+try:
+    async with registry:
+        ...
+except Exception:
+    # registry already rolled back initialized connections
+    ...
+```
+
 ## Accessing ContentType
 
 The registry has a `content_type` attribute for accessing the active `ContentType`.

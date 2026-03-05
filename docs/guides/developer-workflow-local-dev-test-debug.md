@@ -43,6 +43,18 @@ If you see lifecycle warnings:
 * verify registry/database scope in code (`async with registry:` or `with registry.with_async_env():`),
 * confirm app discovery settings (`--app`, `EDGY_DEFAULT_APP`, or preload setup).
 
+## 6. Run Benchmark Guardrails for Performance-Sensitive Changes
+
+```shell
+$ pytest tests/benchmarks/ -q
+```
+
+When validating against CodSpeed-compatible behavior:
+
+```shell
+$ pytest tests/benchmarks/ --codspeed
+```
+
 ## Workflow Map
 
 ```mermaid
