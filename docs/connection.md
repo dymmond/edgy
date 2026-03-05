@@ -6,6 +6,8 @@ Edgy is built on SQLAlchemy Core, but it's an asynchronous implementation. This 
 
 Edgy is framework-agnostic, meaning it can be seamlessly integrated into any framework that supports lifecycle events.
 
+If you want the bigger picture first, check the [Architecture Overview](./concepts/architecture.md).
+
 ## Lifecycle Events
 
 Lifecycle events are common in frameworks built on Starlette, such as [Ravyn](https://ravyn.dymmond.com) and FastAPI. Other frameworks may offer similar functionality through different mechanisms.
@@ -84,6 +86,8 @@ Despite the warning being non-fatal, you should establish proper connections as 
 
 !!! Note
     Ensure that `Database` objects passed via `using` are connected. They are not guaranteed to be connected outside of `extra`.
+
+If you hit this warning repeatedly in real code, check [Troubleshooting](./troubleshooting.md#databasenotconnectedwarning).
 
 ## Integration in Synchronous Environments
 

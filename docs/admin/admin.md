@@ -2,8 +2,8 @@
 
 ## What is the admin feature?
 
-This is an Web-GUI to expose the database to the webbrowser.
-Admins can use the GUI to fix some problems or you can use it as an permissioned interface in your application.
+This is a Web GUI to expose the database in the browser.
+Admins can use the GUI to fix some problems, or you can use it as a permissioned interface in your application.
 
 ## Using Admin from cli
 
@@ -15,7 +15,7 @@ or **only** if you want to test the feature:
 
 `edgy --app tests.cli.main admin_serve --create-all`
 
-and watch the console output for an automic generated password. It is required for
+and watch the console output for an automatically generated password. It is required for
 accessing the admin. The default username is `admin`.
 
 You can however customize them all via:
@@ -34,11 +34,13 @@ You can leave out `--admin-prefix-url /proxy_path/admin` when `/` is passed to t
 !!! Warning
     Only use `--create-all` when not using migrations.
 
+For a CLI overview, check [CLI Commands](../cli/commands.md).
+
 ### Limitations
 
-Despite this is a quite non-invasive way to use the admin feature, you have a quite limited
-way of integration. There is no user management only a basic auth.
-For more
+Despite this being a quite non-invasive way to use the admin feature, you have a limited
+way of integration. There is no user management, only basic auth.
+For full integration, embed the admin in your application and manage authentication there.
 
 ## Embedding Admin
 
@@ -73,7 +75,7 @@ By default the `admin_prefix_url` is automatically inferred. For special cases l
 
 !!! Warning
     Prior to version `0.32.4` examples used `settings.admin_config.admin_prefix_url` for the `Include` `path` parameter.
-    This was inaccurate and let to problems for reverse proxy users.
+    This was inaccurate and led to problems for reverse proxy users.
 
 ## Excluding models
 
@@ -101,7 +103,7 @@ We can however change this:
 One nice feature of edgy admin is the optional customization of the admin interface.
 
 By default it doesn't care for user permissions but can be adapted to do so on a per model base.
-Here it is quite unoppinionated. You can use every connection information you like for adding or removing fields.
+Here it is quite unopinionated. You can use any connection information you like for adding or removing fields.
 
 For example the request.user when embedding the admin in a bigger application.
 
@@ -123,7 +125,7 @@ So if you need some references to e.g. the `Request` or `Connection` you will ne
 - **get_admin_marshall_class(cls, *, phase, for_schema=False) -> type[Marshall]** - Customize the whole marshall. This allows replacing the Marshall completely, adding some fields and other goodies.
 - **get_admin_marshall_for_save(cls, instance= None, /, \*\*kwargs) -> Marshall** - Classmethod called for getting the final marshall to save. Kwargs contains all the kwargs provided by the extraction. You might can build some customization around the saving here.
 
-Here an simpler example how to use this:
+Here is a simpler example showing how to use this:
 
 ```python title="Basic customization example"
 {!> ../docs_src/admin/admin_custom_admin_marshall.py !}
@@ -131,16 +133,18 @@ Here an simpler example how to use this:
 
 ### Admin marshall phase and for_schema parameters
 
-The `phase` parameter can contain following values:
+The `phase` parameter can contain the following values:
 - `list`: Marshall used for the model list representation in admin. Only for viewing.
 - `view`: Marshall used for the model detail view representation in admin. Only for viewing.
 - `create`: Marshall used for creating new model instances in admin (when saving). You may can remove some fields.
 - `update`: Marshall used for updating model instances in admin (when saving). You may can remove some fields.
 
 The `for_schema` parameter contains the information if the marshall is used for a json_schema or for validation. When used for a json_schema,
-we change in model_config the parameter extra to `forbid` so no arbitary editors are shown.
+we change in model_config the parameter extra to `forbid` so no arbitrary editors are shown.
 
 ## Customizing the admin templates
 
 You can customize the admin templates by providing `admin_extra_templates` to `settings.admin_config`.
 All templates specified here will be loaded first.
+
+If something does not behave as expected, check [Troubleshooting](../troubleshooting.md).

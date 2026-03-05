@@ -6,13 +6,15 @@ Think of the registry as a mapping between your models and the database where da
 
 It's a simple yet effective object with a crucial role. The registry is also used for generating migrations with Alembic.
 
+If you want to understand where the registry sits in the full runtime, check [Architecture Overview](./concepts/architecture.md).
+
 ```python hl_lines="19"
 {!> ../docs_src/registry/model.py !}
 ```
 
 ## Parameters
 
-* **database**: An instance of `edgy.core.db.Database` or a connection string. When using a string, unparsed keyword arguments are passed to the created `Database` object.
+* **database**: An instance of `edgy.Database` (or `databasez.Database`) or a connection string. When using a string, unparsed keyword arguments are passed to the created `Database` object.
 
     !!! Warning
         Using `Database` from the `databases` package raises an assertion error. Edgy uses the `databasez` fork, and it's recommended to use a string, `edgy.Database`, or `edgy.testclient.TestClient`. Future versions may add more Edgy-specific functionality.

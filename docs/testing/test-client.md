@@ -18,10 +18,10 @@ from edgy.testclient import DatabaseTestClient
 
 ### Parameters
 
-* **url**: The database URL, either as a string or a `databases.DatabaseURL` object.
+* **url**: The database URL, either as a string or a `edgy.DatabaseURL` object.
 
     ```python
-    from databases import DatabaseURL
+    from edgy import DatabaseURL
     ```
 
 * **force_rollback**: Ensures all database operations are executed within a transaction that rolls back upon disconnection.
@@ -48,7 +48,7 @@ from edgy.testclient import DatabaseTestClient
 
 Most default parameters can be overridden using capitalized environment variables prefixed with `EDGY_TESTCLIENT_`.
 
-For example: `EDGY_TESTCLIENT_DEFAULT_PREFIX=foobar` or `EDGY_TESTCLIENT_FORCE_ROLLBACK=true`.
+For example: `EDGY_TESTCLIENT_TEST_PREFIX=foobar`, `EDGY_TESTCLIENT_LAZY_SETUP=false`, or `EDGY_TESTCLIENT_FORCE_ROLLBACK=true`.
 
 This is particularly useful for configuring tests in CI/CD environments.
 

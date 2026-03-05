@@ -403,6 +403,8 @@ $ edgy migrate
 
 Access available commands with `--help`:
 
+For a command-by-command practical map, see [CLI Commands](../cli/commands.md).
+
 ## Edgy Command-Line
 
 List available Edgy options:
@@ -433,20 +435,22 @@ Options:
 
 This applies to all Edgy commands.
 
+If a command is rejected or the migration graph is confusing, check [Troubleshooting](../troubleshooting.md).
+
 ### References
 
 Edgy's command-line interface is user-friendly.
 
 Edgy migrations use Alembic, so commands are similar, with two exceptions:
 
-* `makemigrations`: Calls Alembic's `migrate`.
+* `makemigrations`: Alias for `revision --autogenerate`.
 * `migrate`: Calls Alembic's `upgrade`.
 
 Edgy uses more intuitive names.
 
 ## Migrate to new non-nullable fields
 
-Sometimes you want to add fields to a model which are required afterwards in the database. Here are some ways to archive this.
+Sometimes you want to add fields to a model which are required afterwards in the database. Here are some ways to achieve this.
 
 ### With explicit server_default (`allow_auto_compute_server_defaults=False`)
 
@@ -466,7 +470,7 @@ Here is a basic example:
     ```
 2.  Generate the migrations and migrate
     ``` sh
-    edgy makemigration
+    edgy makemigrations
     edgy migrate
     ```
 3. Remove the server_default
@@ -477,7 +481,7 @@ Here is a basic example:
     ```
 4.  Generate the migrations without the server_default and migrate
     ``` sh
-    edgy makemigration
+    edgy makemigrations
     edgy migrate
     ```
 ### With implicit server_default (`allow_auto_compute_server_defaults=True` (default))
@@ -495,7 +499,7 @@ You just add a default... and that was it.
     ```
 2.  Generate the migrations and migrate
     ``` sh
-    edgy makemigration
+    edgy makemigrations
     edgy migrate
     ```
 
@@ -512,7 +516,7 @@ To disable the behaviour for one field you can either pass `auto_compute_server_
 
 ### With null-field
 
-Null-field is a feature to make fields nullable for one makemigration/revision. You can either specify
+Null-field is a feature to make fields nullable for one makemigrations/revision run. You can either specify
 `model:field_name` or just `:field_name` for automatic detection of models.
 Non-existing models are ignored, and only models in `registry.models` are migrated.
 In the migration file, you will find a construct `monkay.instance.registry.apply_default_force_nullable_fields(...)`.
@@ -528,12 +532,12 @@ Let's see how to implement the last example with null-field and we add also Cont
     ```
 2. Apply null-field to CustomModel:active and also for all models with active content_type.
     ``` sh
-    edgy makemigration --nf CustomModel:active --nf :content_type
+    edgy makemigrations --nf CustomModel:active --nf :content_type
     edgy migrate
     ```
 3. Now create a cleanup migration.
     ``` sh
-    edgy makemigration
+    edgy makemigrations
     edgy migrate
     ```
 

@@ -255,13 +255,13 @@ import edgy
 
 class MyModel(edgy.Model):
     email: str = edgy.EmailField(max_length=60, null=True)
-    sent: datetime.datetime = edgy.DateTimeField(, null=True)
+    sent: datetime.datetime = edgy.DateTimeField(null=True)
     composite: edgy.CompositeField = edgy.CompositeField(inner_fields=["email", "sent"])
     ...
 
 class MyModel(edgy.Model):
     email: str = edgy.EmailField(max_length=60, null=True, read_only=True)
-    sent: datetime.datetime = edgy.DateTimeField(, null=True, read_only=True)
+    sent: datetime.datetime = edgy.DateTimeField(null=True, read_only=True)
     composite = edgy.CompositeField(inner_fields=["email", "sent"])
     ...
 
@@ -783,7 +783,7 @@ import edgy
 
 
 class MyModel(edgy.Model):
-    data: bytes = edgy.Binary()
+    data: bytes = edgy.BinaryField()
     ...
 
 ```

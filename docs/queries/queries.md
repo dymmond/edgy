@@ -805,28 +805,28 @@ total = await User.query.count()
 Returns the model results in a dictionary like format.
 
 ```python
-await User.query.create(name="John" email="foo@bar.com")
+await User.query.create(name="John", email="foo@bar.com")
 
 # All values
-user = User.query.values()
+users = await User.query.values()
 users == [
     {"id": 1, "name": "John", "email": "foo@bar.com"},
 ]
 
 # Only the name
-user = User.query.values("name")
+users = await User.query.values("name")
 users == [
     {"name": "John"},
 ]
 # Or as a list
 # Only the name
-user = User.query.values(["name"])
+users = await User.query.values(["name"])
 users == [
     {"name": "John"},
 ]
 
 # Exclude some values
-user = User.query.values(exclude=["id"])
+users = await User.query.values(exclude=["id"])
 users == [
     {"name": "John", "email": "foo@bar.com"},
 ]
@@ -849,34 +849,34 @@ The `values()` can also be combined with `filter`, `only`, `exclude` as per usua
 Returns the model results in a tuple like format.
 
 ```python
-await User.query.create(name="John" email="foo@bar.com")
+await User.query.create(name="John", email="foo@bar.com")
 
 # All values
-user = User.query.values_list()
+users = await User.query.values_list()
 users == [
-    (1, "John" "foo@bar.com"),
+    (1, "John", "foo@bar.com"),
 ]
 
 # Only the name
-user = User.query.values_list("name")
+users = await User.query.values_list("name")
 users == [
     ("John",),
 ]
 # Or as a list
 # Only the name
-user = User.query.values_list(["name"])
+users = await User.query.values_list(["name"])
 users == [
     ("John",),
 ]
 
 # Exclude some values
-user = User.query.values(exclude=["id"])
+users = await User.query.values_list(exclude=["id"])
 users == [
     ("John", "foo@bar.com"),
 ]
 
 # Flattened
-user = User.query.values_list("email", flat=True)
+users = await User.query.values_list("email", flat=True)
 users == [
     "foo@bar.com",
 ]
@@ -900,7 +900,7 @@ The `values_list()` can also be combined with `filter`, `only`, `exclude` as per
 Returns the results containing **only** the fields in the query and nothing else.
 
 ```python
-await User.query.create(name="John" email="foo@bar.com")
+await User.query.create(name="John", email="foo@bar.com")
 
 user = await User.query.only("name")
 ```
@@ -913,7 +913,7 @@ user = await User.query.only("name")
 Returns the results containing all the fields **but the ones you want to exclude**.
 
 ```python
-await User.query.create(name="John" email="foo@bar.com")
+await User.query.create(name="John", email="foo@bar.com")
 
 user = await User.query.defer("name")
 ```
