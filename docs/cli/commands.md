@@ -16,6 +16,18 @@ You can provide it by:
 
 See [Discovery](../migrations/discovery.md) for details.
 
+If you need centralized command behavior (preloads, migration directory, shell settings), check [Settings](../settings.md).
+
+## Command Families At a Glance
+
+| Goal | Typical Commands |
+| --- | --- |
+| Setup migration repository | `list_templates`, `init` |
+| Generate revision files | `revision`, `makemigrations`, `merge`, `edit` |
+| Apply or revert revisions | `migrate`, `downgrade`, `stamp` |
+| Inspect migration state | `current`, `heads`, `branches`, `history`, `show`, `check` |
+| Runtime utilities | `shell`, `inspectdb`, `admin_serve` |
+
 ## Migration Bootstrap
 
 ### `edgy list_templates`
@@ -202,6 +214,40 @@ $ edgy admin_serve --auth-name=admin --auth-pw='<strong-password>'
 2. `edgy makemigrations`
 3. `edgy migrate`
 4. repeat 2-3 as models evolve
+
+```mermaid
+graph LR
+    A["Model changes"] --> B["edgy makemigrations"]
+    B --> C["Review revision file"]
+    C --> D["edgy migrate"]
+    D --> E["Verify with edgy current/check"]
+```
+
+## Common Journeys
+
+### First migration in a new project
+
+```shell
+$ edgy init
+$ edgy makemigrations -m "Initial schema"
+$ edgy migrate
+```
+
+### Investigating migration drift in CI
+
+```shell
+$ edgy check
+$ edgy current
+$ edgy heads
+```
+
+### Resolving multiple heads
+
+```shell
+$ edgy heads
+$ edgy merge -m "Merge heads" <rev_a> <rev_b>
+$ edgy migrate
+```
 
 ## See Also
 

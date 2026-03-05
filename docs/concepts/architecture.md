@@ -14,6 +14,21 @@ At runtime, Edgy is mostly these components:
 
 If you already use Edgy comfortably, this page is mainly for when you need to reason about lifecycle, advanced integrations, or debugging.
 
+## Runtime Map
+
+```mermaid
+graph TD
+    A["Settings (EdgySettings)"] --> B["Monkay Instance"]
+    B --> C["Registry"]
+    C --> D["Model Metadata"]
+    D --> E["QuerySet Build"]
+    E --> F["Database (main/extra)"]
+    F --> G["Rows -> Model Parsing"]
+    G --> H["Signals / Callbacks"]
+```
+
+The diagram is the high-level flow. For setup details, read [Connection Management](../connection.md). For schema/database switching, read [Queries](../queries/queries.md#selecting-the-database-and-schema).
+
 ## Why It Is Structured This Way
 
 The design optimizes for:
@@ -71,6 +86,25 @@ Rows are parsed back into model instances, including relationship handling (`sel
 5. Result rows are parsed into model instances.
 6. Hooks/signals run where applicable (save/update/delete/migrate).
 7. Lifecycle exits and registry disconnects databases.
+
+### Query Lifecycle Diagram
+
+```mermaid
+sequenceDiagram
+    participant App
+    participant Registry
+    participant QuerySet
+    participant DB as Database
+    participant Model
+
+    App->>Registry: enter lifecycle (connect)
+    App->>QuerySet: build query (Model.query...)
+    QuerySet->>DB: compile + execute SQL
+    DB-->>QuerySet: rows
+    QuerySet-->>Model: parse rows to instances
+    Model-->>App: return model objects
+    App->>Registry: exit lifecycle (disconnect)
+```
 
 ## Extension Points
 

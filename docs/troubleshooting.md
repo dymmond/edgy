@@ -2,6 +2,17 @@
 
 This page collects common Edgy issues and the fastest way to fix them.
 
+## Quick Diagnostic Checklist
+
+Before diving into specific errors, check these first:
+
+1. Confirm app discovery: `edgy --app path.to.module shell`
+2. Confirm migration state: `edgy current`, `edgy heads`
+3. Confirm lifecycle scope in code (`async with registry:` or `with registry.with_async_env():`)
+4. Confirm test isolation settings when running tests (`EDGY_TESTCLIENT_*`)
+
+For the command context itself, see [CLI Commands](./cli/commands.md) and [Discovery](./migrations/discovery.md).
+
 ## `Could not find edgy application via autodiscovery`
 
 **What it means:** Edgy could not resolve your app context automatically.
@@ -90,6 +101,18 @@ See [Queries](./queries/queries.md#only).
   `EDGY_TESTCLIENT_DROP_DATABASE`.
 
 See [Test Client](./testing/test-client.md).
+
+## `edgy check` Finds Changes Repeatedly
+
+**What it means:** Model metadata and migration state are out of sync, or your model imports are incomplete during discovery.
+
+**How to fix:**
+
+* Ensure all model modules are loaded (via `preloads` or explicit imports).
+* Regenerate with `edgy makemigrations` and inspect generated revision.
+* Confirm the same settings/app module is used in local and CI runs.
+
+See [Settings](./settings.md), [Discovery](./migrations/discovery.md), and [Migrations](./migrations/migrations.md).
 
 ## Admin Login/Path Issues
 

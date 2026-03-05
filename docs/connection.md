@@ -8,6 +8,17 @@ Edgy is framework-agnostic, meaning it can be seamlessly integrated into any fra
 
 If you want the bigger picture first, check the [Architecture Overview](./concepts/architecture.md).
 
+## Choose an Integration Style
+
+Not sure where to start? Use this quick rule:
+
+* **ASGI app with lifespan support**: prefer lifespan integration (best default).
+* **Framework with startup/shutdown hooks only**: use manual `connect` / `disconnect`.
+* **Pure sync code or sync-first framework**: wrap execution with `with_async_env` and call `run_sync`.
+* **Multi-app/multi-registry ASGI deployment**: consider the middleware integration.
+
+If commands cannot resolve your app instance, see [Application Discovery](./migrations/discovery.md).
+
 ## Lifecycle Events
 
 Lifecycle events are common in frameworks built on Starlette, such as [Ravyn](https://ravyn.dymmond.com) and FastAPI. Other frameworks may offer similar functionality through different mechanisms.
@@ -32,6 +43,8 @@ Using ASGI integration:
 {!> ../docs_src/connections/asgi.py !}
 ```
 
+This is the recommended default for Ravyn/FastAPI/Starlette projects with lifespan support.
+
 Manual integration (applicable to all frameworks):
 
 ```python hl_lines="11-12"
@@ -43,6 +56,8 @@ Using an asynchronous context manager:
 ```python
 {!> ../docs_src/connections/asynccontextmanager.py !}
 ```
+
+If you are working from scripts/workers, this pattern is usually the cleanest.
 
 Once the connection is integrated into your application's lifecycle, you can use the ORM throughout your application. Failing to do so will result in performance warnings, as the databasez backend will be reinitialized for each operation.
 
@@ -121,6 +136,8 @@ A subloop is an event loop running in a separate thread. This allows multiple ev
 
 However, given that event loops can be sticky, we additionally check if the old loop has stopped.
 
+If you are using sync integration for tests or scripts, pair this section with [Testing](./testing/index.md) and [Troubleshooting](./troubleshooting.md#databasenotconnectedwarning).
+
 ## Querying Other Schemas
 
 Edgy supports querying other schemas. Refer to the [tenancy](./tenancy/edgy.md) section for details.
@@ -138,3 +155,5 @@ See [Migrations](./migrations/migrations.md#migrate-from-flask-migrate) for more
 ## Note
 
 Check the [tips and tricks](./tips-and-tricks.md) and learn how to make your connections even cleaner.
+
+Also see [Registry](./registry.md) for multi-database/schema lifecycle details.

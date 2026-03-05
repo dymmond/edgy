@@ -5,6 +5,8 @@ Edgy provides multiple ways to identify and run commands. The two primary method
 - [Environment variables](#environment-variables)
 - [Auto-discovery](#auto-discovery)
 
+If you want a command-by-command map first, check [CLI Commands](../cli/commands.md).
+
 ## Auto-Discovery
 
 If you're familiar with frameworks like Django, you might know how `manage.py` serves as a command-line interface for running internal commands. While Edgy doesn't work exactly the same way, it does attempt to automatically detect the appropriate application and will raise an error if none is found or if neither an [environment variable](#environment-variables) nor `--app` is provided.
@@ -125,6 +127,8 @@ Since no `--app` or `EDGY_DEFAULT_APP` is provided, Edgy automatically discovers
 #### Using Preloads
 
 Edgy supports automatic registration via preloads. Instead of explicitly providing `--app` or `EDGY_DEFAULT_APP`, you can use the `preloads` setting in your configuration to specify an import path. When an instance is set in a preloaded file, auto-discovery is skipped.
+
+See [Settings](../settings.md) for preload configuration details.
 
 #### Using `--app` or `EDGY_DEFAULT_APP`
 

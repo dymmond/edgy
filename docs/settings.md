@@ -26,6 +26,27 @@ To create your own settings, inherit from `EdgySettings` (or `TenancySettings` f
 {!> ../docs_src/settings/custom_settings.py !}
 ```
 
+### Practical Preload Example
+
+If your app instance is set in `myproject.main`, you can preload it once and run commands without passing `--app` every time.
+
+```python title="myproject/configs/settings.py"
+from edgy.conf import EdgySettings
+
+
+class MyCustomSettings(EdgySettings):
+    preloads = ("myproject.main",)
+```
+
+Then run:
+
+```shell
+$ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy shell
+$ EDGY_SETTINGS_MODULE=myproject.configs.settings.MyCustomSettings edgy makemigrations
+```
+
+For discovery behavior details, see [Application Discovery](./migrations/discovery.md).
+
 !!! Danger
     Exercise caution when overriding settings, as it may break functionality.
 

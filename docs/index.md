@@ -35,6 +35,31 @@ hide:
 
 ---
 
+## Choose Your Path
+
+If this is your first contact with Edgy:
+
+1. Start with [Installation](#installation)
+2. Run the [Quick Start](#quick-start)
+3. Learn [Connection Management](./connection.md)
+4. Move to [Models](./models.md) and [Queries](./queries/queries.md)
+5. Use [CLI Commands](./cli/commands.md) and [Migrations](./migrations/migrations.md)
+
+If you are already using another ORM and want the Edgy mapping quickly:
+
+* Model declaration and meta options: [Models](./models.md)
+* Lifecycle and connection scope: [Connection Management](./connection.md)
+* Query composition and execution: [Queries](./queries/queries.md)
+* Operational commands: [CLI Commands](./cli/commands.md)
+* Settings and runtime tuning: [Settings](./settings.md)
+
+If you need internals and architecture first:
+
+* [Architecture Overview](./concepts/architecture.md)
+* [Registry](./registry.md)
+* [API Reference](./references/index.md)
+* [Troubleshooting](./troubleshooting.md)
+
 ## Motivation
 
 From the same author of [Saffier][saffier], Edgy is also an ORM but different from its predecessor.
@@ -137,6 +162,8 @@ $ pip install edgy[mysql]
 ```shell
 $ pip install edgy[sqlite]
 ```
+
+After installing, you can jump directly to [Quick Start](#quick-start), or if you prefer understanding the lifecycle first, read [Connection Management](./connection.md).
 
 ## Quick Start
 
