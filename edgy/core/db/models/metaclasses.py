@@ -816,6 +816,19 @@ def get_model_registry(
 _occluded_sentinel = object()
 
 
+def _is_sqlalchemy_compatibility_enabled(model_class: type) -> bool:
+    """
+    Check whether a model class explicitly enables SQLAlchemy compatibility mode.
+
+    The check is performed against class dictionaries in the MRO to avoid
+    triggering custom `__getattr__` chains while resolving a missing attribute.
+    """
+    for base in type.__getattribute__(model_class, "__mro__"):
+        if base.__dict__.get("__edgy_sqlalchemy_compatibility__", False):
+            return True
+    return False
+
+
 def _extract_fields_and_managers(base: type, attrs: dict[str, Any]) -> None:
     """
     Recursively extracts fields and managers from base classes and updates the
@@ -1275,9 +1288,31 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         Custom attribute access to provide manager descriptors, allowing managers
         to be accessed directly as attributes of the model.
         """
+        if name.startswith("__") and name.endswith("__"):
+            return super().__getattr__(name)
+
         manager = cls.meta.managers.get(name)
         if manager is not None:
             return manager
+
+        meta = cls.__dict__.get("meta")
+        if (
+            meta is not None
+            and meta.model is cls
+            and not meta.abstract
+            and cls.__dict__.get("__pydantic_complete__", False)
+            and _is_sqlalchemy_compatibility_enabled(cls)
+        ):
+            try:
+                resolver = type.__getattribute__(cls, "_resolve_sqlalchemy_compatible_attribute")
+            except AttributeError:
+                resolver = None
+            if resolver is not None:
+                try:
+                    return resolver(name)
+                except AttributeError:
+                    # keep the default missing-attribute behavior for unknown names
+                    pass
         return super().__getattr__(name)
 
     @property

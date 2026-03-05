@@ -1,5 +1,18 @@
 # Release Notes
 
+## 0.35.10
+
+### Added
+
+- Add explicit SQLAlchemy compatibility mode via `SQLAlchemyModelMixin` for opted-in models.
+  This enables SQLAlchemy Core expressions such as `select(Model.id).where(Model.id == value)`.
+- Add foreign key scalar alias support in compatibility mode (for example `Model.owner_id`).
+- Compatibility mode can be declared once on an abstract base model and inherited by concrete models.
+
+### Fixed
+
+- Preserve existing Edgy query behavior for non-opted-in models and relationship handling.
+
 ## 0.35.9
 
 ### Fixed

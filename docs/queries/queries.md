@@ -251,6 +251,10 @@ There is a detailed section about [how to use the Q operator] in your queries.
 Since Edgy uses SQLAlchemy core, it is also possible to do queries in SQLAlchemy style.
 The filter accepts also those.
 
+If you are migrating a legacy SQLAlchemy codebase and need `Model.field` style access
+for SQLAlchemy Core expressions, see
+[SQLAlchemy Compatibility Mode](./sqlalchemy-compatibility.md).
+
 ##### Example
 
 ```python
