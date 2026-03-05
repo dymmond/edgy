@@ -9,5 +9,10 @@ DATABASE_ALTERNATIVE_URL = os.environ.get(
     "postgresql+asyncpg://postgres:postgres@localhost:5433/edgy_alt",
 )
 
-TEST_DATABASE = "postgresql+asyncpg://postgres:postgres@localhost:5432/test_edgy"
-TEST_ALTERNATIVE_DATABASE = "postgresql+asyncpg://postgres:postgres@localhost:5433/test_edgy"
+TEST_DATABASE = os.environ.get(
+    "TEST_DATABASE", "postgresql+asyncpg://postgres:postgres@localhost:5432/test_edgy"
+)
+TEST_ALTERNATIVE_DATABASE = os.environ.get(
+    "TEST_ALTERNATIVE_DATABASE",
+    "postgresql+asyncpg://postgres:postgres@localhost:5433/test_edgy",
+)

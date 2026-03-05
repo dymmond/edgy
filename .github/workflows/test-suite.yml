@@ -84,9 +84,20 @@ jobs:
         run: "hatch run test:check_types"
         if: steps.filters.outputs.src == 'true' || steps.filters.outputs.docs_src == 'true' || steps.filters.outputs.workflows == 'true'
 
-      - name: "Run tests"
+      - name: "Validate test split"
+        if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true' || github.event.schedule != ''
+        run: "hatch run test:python scripts/validate_pytest_split.py"
+
+      - name: "Run tests (parallel-safe subset)"
         if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true' || github.event.schedule != ''
         env:
           TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/edgy"
           TEST_DATABASE_ALTERNATIVE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5433/edgy_alt"
-        run: "hatch test"
+        run: "hatch test -- -n auto --dist=loadscope -m 'not serial'"
+
+      - name: "Run tests (serial subset)"
+        if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true' || github.event.schedule != ''
+        env:
+          TEST_DATABASE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5432/edgy"
+          TEST_DATABASE_ALTERNATIVE_URL: "postgresql+asyncpg://postgres:postgres@localhost:5433/edgy_alt"
+        run: "hatch test -- -n 0 -m 'serial'"

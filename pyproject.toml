@@ -78,6 +78,7 @@ testing = [
     "anyio>=4.0.0,<5",
     "asyncpg>=0.27.0,<1",
     "ravyn[standard,test]>=0.3.0",
+    "pytest-xdist>=3.8.0",
     "pytest-timeout",
     "pytest-mock",
     "ipdb",
@@ -228,9 +229,17 @@ ignore_errors = true
 [tool.pytest.ini_options]
 timeout = 30
 addopts = [
+    "-ra",
     "--strict-config",
     "--strict-markers",
     "--pdbcls=IPython.terminal.debugger:Pdb",
+]
+markers = [
+    "serial: tests that must run with -n 0 due to shared resources.",
+    "cli: CLI tests that run migration commands and mutate process cwd/filesystem.",
+    "integration: integration tests with broader app/database interaction.",
+    "db: tests that rely on DatabaseTestClient-backed databases.",
+    "postgres: tests targeting PostgreSQL test databases.",
 ]
 xfail_strict = true
 junit_family = "xunit2"

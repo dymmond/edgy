@@ -84,6 +84,26 @@ To run the tests, use:
 $ hatch test
 ```
 
+For faster local runs, split the suite:
+
+```shell
+$ hatch run test:test -n auto --dist=loadscope -m "not serial"
+$ hatch run test:test -n 0 -m "serial"
+```
+
+Equivalent `task` commands:
+
+```shell
+$ task test_parallel
+$ task test_serial
+```
+
+To validate the split and run both phases exactly once:
+
+```shell
+$ task test_ci
+```
+
 To run a single test_script:
 
 ```shell
@@ -91,6 +111,13 @@ $ hatch test tests/test_apiviews.py
 ```
 
 Pytest native arguments can be passed after passing `--`.
+
+### Test markers used for parallel safety
+
+* `serial`: Must run without xdist workers (`-n 0`) because tests share mutable global resources.
+* `cli`: CLI/migration tests; these are also marked `serial`.
+* `integration`: Integration coverage for app-level behavior.
+* `db` / `postgres`: Tests backed by `DatabaseTestClient` on PostgreSQL URLs.
 
 To run the linting, use:
 

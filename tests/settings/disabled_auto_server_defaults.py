@@ -7,5 +7,7 @@ from edgy.contrib.multi_tenancy.settings import TenancySettings
 class TestSettings(TenancySettings):
     tenant_model: str = "Tenant"
     auth_user_model: str = "User"
-    media_root: str | os.PathLike = Path(__file__).parent.parent / "test_media/"
+    media_root: str | os.PathLike = Path(
+        os.environ.get("EDGY_TEST_MEDIA_ROOT", str(Path(__file__).parent.parent / "test_media/"))
+    )
     allow_auto_compute_server_defaults: bool = False
