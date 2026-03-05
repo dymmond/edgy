@@ -41,8 +41,7 @@ else:  # pragma: no cover
     from typing_extensions import Self
 
 if TYPE_CHECKING:
-    from databasez.core.transaction import Transaction
-
+    from edgy._db.transaction import Transaction
     from edgy.core.connection.database import Database
     from edgy.core.connection.registry import Registry
     from edgy.core.db.fields.types import FIELD_CONTEXT_TYPE, BaseFieldType

@@ -248,7 +248,7 @@ class InspectDB:
 
         Args:
             column (sqlalchemy.Column): The SQLAlchemy column to convert.
-            database (databasez.core.database.Database): The database used for inspection.
+            database (edgy.Database): The database used for inspection.
             is_fk (bool, optional): A flag indicating if the column is part of a
                                     foreign key relationship. If `True`, it will
                                     return "ForeignKey" or "OneToOne". Defaults to `False`.
@@ -425,7 +425,7 @@ class InspectDB:
 
         Args:
             table_details (list[Any]): A list of dictionaries, each detailing a reflected table.
-            database (databasez.core.database.Database): The database used for inspection.
+            database (edgy.Database): The database used for inspection.
             schema (str | None, optional): The schema name if one was used during reflection.
                                            Defaults to `None`.
 

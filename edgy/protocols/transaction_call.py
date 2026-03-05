@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
-    from databasez.core.transaction import Transaction
+    from edgy._db.transaction import Transaction
 
 
 class TransactionCallProtocol(Protocol):
@@ -38,7 +38,7 @@ class TransactionCallProtocol(Protocol):
                             configure the transaction (e.g., isolation level).
 
         Returns:
-            Transaction: An instance of `databasez.core.transaction.Transaction`
+            Transaction: An instance of `edgy._db.transaction.Transaction`
                          representing the started database transaction.
         """
         ...

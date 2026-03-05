@@ -39,8 +39,7 @@ from .types import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from databasez.core.transaction import Transaction
-
+    from edgy._db.transaction import Transaction
     from edgy.core.db.querysets.mixins.combined import CombinedQuerySet
 
 
@@ -1173,7 +1172,7 @@ class QuerySet(BaseQuerySet):
                 if lookup_key is not None and lookup_key in existing_records:
                     continue
                 found = False
-                # This fixes edgy-guardian bug when using databasez.iterate indirectly and
+                # This fixes edgy-guardian bug when using streamed iteration indirectly and
                 # is safe in case force_rollback is active
                 # Models can also issue loads by accessing attrs for building unique_fields
                 # For limiting use something like QuerySet.limit(100).bulk_get_or_create(...)

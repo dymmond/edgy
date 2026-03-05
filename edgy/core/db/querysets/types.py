@@ -8,8 +8,8 @@ from edgy.types import Undefined
 
 if TYPE_CHECKING:
     import sqlalchemy
-    from databasez.core.transaction import Transaction
 
+    from edgy._db.transaction import Transaction
     from edgy.core.connection import Database
     from edgy.core.db.models.types import BaseModelType
 

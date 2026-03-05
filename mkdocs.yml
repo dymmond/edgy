@@ -57,7 +57,7 @@ plugins:
               - griffe_typingdoc
             show_root_heading: true
             show_if_no_docstring: true
-            preload_modules: [databasez]
+            preload_modules: [sqlalchemy]
             inherited_members: true
             members_order: source
             separate_signature: true

@@ -1,6 +1,6 @@
 # Transactions in Edgy
 
-Edgy, leveraging the `databasez` package, provides robust transaction support that will feel familiar to many developers. Transactions ensure atomicity, meaning that a series of database operations either all succeed or all fail, maintaining data consistency.
+Edgy provides robust transaction support built directly on SQLAlchemy 2.x primitives. Transactions ensure atomicity, meaning that a series of database operations either all succeed or all fail, maintaining data consistency.
 
 !!! Tip
     For a deeper understanding of atomicity, refer to the [Atomicity in Database Systems](https://en.wikipedia.org/wiki/Atomicity_(database_systems)#:~:text=An%20atomic%20transaction%20is%20an,rejecting%20the%20whole%20series%20outright) documentation.
@@ -54,6 +54,4 @@ This ensures that the operations within the `async with` block are executed atom
 
 ## Important Notes
 
-Edgy, while built on top of [Databasez](https://databasez.dymmond.com/), offers unique features beyond those provided by SQLAlchemy. These include JDBC support and compatibility with mixed threading/async environments.
-
-For more information on the low-level APIs of Databasez, refer to the [Databasez repository](https://github.com/dymmond/databasez) and its [documentation](https://databasez.dymmond.com/).
+Edgy transaction helpers are layered on top of SQLAlchemy Core/async engines while preserving Edgy's model/query ergonomics.

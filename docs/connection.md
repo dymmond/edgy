@@ -69,7 +69,7 @@ Using an asynchronous context manager:
 
 If you are working from scripts/workers, this pattern is usually the cleanest.
 
-Once the connection is integrated into your application's lifecycle, you can use the ORM throughout your application. Failing to do so will result in performance warnings, as the databasez backend will be reinitialized for each operation.
+Once the connection is integrated into your application's lifecycle, you can use the ORM throughout your application. Failing to do so will result in performance warnings, as the database backend may be reinitialized for each operation.
 
 You can also define additional database connections in the registry and switch between them.
 

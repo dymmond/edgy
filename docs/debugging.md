@@ -1,6 +1,6 @@
 # Debugging & Performance
 
-Edgy provides several debugging features, also through databasez. It aims to maintain an efficient event loop and execute queries in the most performant manner. For example, asyncio pools are thread-protected in databasez, allowing connections to the database to remain open.
+Edgy provides several debugging features on top of SQLAlchemy async engines. It aims to maintain an efficient event loop and execute queries in the most performant manner.
 
 For quick issue-based fixes, also check [Troubleshooting](./troubleshooting.md).
 
@@ -84,4 +84,4 @@ Use this before/after flow when changing query compilation, model construction, 
 
 Hangs typically occur when only **one** connection is available or the database is blocked. This is usually easily debuggable, often with the same methods mentioned earlier, due to the same reasons. If there are hard-to-debug stack traces, it suggests that threads and asyncio are mixed.
 
-Here, you can enforce hard timeouts via the `DATABASEZ_RESULT_TIMEOUT` environment variable.
+Here, you can enforce hard timeouts using your database driver or SQLAlchemy engine timeout settings.

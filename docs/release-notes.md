@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.35.11
+
+### Changed
+
+- Database layer refactor
+  Edgy no longer depends on Databasez and now uses SQLAlchemy 2.x engines directly.
+  This change preserves the public API and existing behavior.
+
 ## 0.35.10
 
 ### Added

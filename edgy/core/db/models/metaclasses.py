@@ -33,8 +33,7 @@ from edgy.core.utils.functional import extract_field_annotations_and_defaults
 from edgy.exceptions import ImproperlyConfigured, TableBuildError
 
 if TYPE_CHECKING:
-    from databasez.core.transaction import Transaction
-
+    from edgy._db.transaction import Transaction
     from edgy.core.connection import Database
     from edgy.core.db.models import Model
     from edgy.core.db.models.types import BaseModelType

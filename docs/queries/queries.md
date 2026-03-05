@@ -190,7 +190,7 @@ users = await User.query.exclude_secrets().exclude_secrets(False)
 
 ### Batch size
 
-When iterating it is sometimes useful to set the batch size. By default (or when providing None) the default of databasez is used.
+When iterating it is sometimes useful to set the batch size. By default (or when providing None) backend defaults are used.
 
 Note: this is just for tweaking memory usage/performance when using iterations and has currently no user visible effect.
 
@@ -1509,7 +1509,7 @@ It is called lambda statement.
 ## Raw database queries
 
 Sometimes it is necessary to skip all edgy query modifications and issue raw queries.
-We can simply use the `database` and `table` attribute of a Model or QuerySet like we can do in databasez.
+We can simply use the `database` and `table` attribute of a Model or QuerySet.
 For getting the right objects QuerySet has the async function `build_where_clause` which evaluates all dynamic queries and returns an expression.
 The pendant in a model are `identifying_clauses`.
 
@@ -1524,7 +1524,7 @@ async with query.database as database:
     print(str(expression))
     # as dialect specific sql
     print(expression.compile(database.engine))
-    # use with sqlalchemy/databasez
+    # use with sqlalchemy
     await database.fetch_all()
 ```
 
@@ -1538,7 +1538,7 @@ async with model.database as database:
     print(str(expression))
     # as dialect specific sql
     print(expression.compile(database.engine))
-    # use with sqlalchemy/databasez
+    # use with sqlalchemy
     await database.fetch_all(expression)
 ```
 

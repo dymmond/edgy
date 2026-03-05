@@ -41,7 +41,7 @@ dependencies = [
     "monkay>=0.5.0",
     "orjson>=3.6.1",
     "alembic>=1.11.3,<2.0.0",
-    "databasez>=0.11.5",
+    "sqlalchemy>=2.0.0,<3.0.0",
     "pydantic[email]>=2.5.3,<3.0.0",
     "pydantic-settings>=2.0.0,<3.0.0",
     "sayer>=0.7.0",
@@ -88,11 +88,11 @@ testing = [
 ]
 mime = ["python-magic"]
 image = ["pillow"]
-postgres = ["databasez[postgresql]"]
-mysql = ["databasez[mysql]"]
-sqlite = ["databasez[sqlite]"]
-mssql = ["databasez[aioodbc]"]
-jdbc = ["databasez[jdbc]"]
+postgres = ["asyncpg>=0.27.0,<1"]
+mysql = ["aiomysql>=0.2.0"]
+sqlite = ["aiosqlite>=0.19.0"]
+mssql = ["aioodbc>=0.5.0"]
+jdbc = []
 admin = [
     "lilya>=0.16.7",
     "uvicorn",
@@ -201,7 +201,7 @@ ignore = ["E501", "B008", "C901", "B026", "SIM115", "E731"]
 exclude = ["docs_src/*", ".pdbrc"]
 
 [tool.ruff.lint.isort]
-known-third-party = ["ravyn", "pydantic", "starlette", "databasez"]
+known-third-party = ["ravyn", "pydantic", "starlette", "sqlalchemy"]
 
 
 [tool.ruff.lint.pyupgrade]

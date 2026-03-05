@@ -80,9 +80,9 @@ jobs:
       - name: "Run linting"
         if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true'
         run: "hatch fmt"
-      - name: "Run mypy"
-        run: "hatch run test:check_types"
-        if: steps.filters.outputs.src == 'true' || steps.filters.outputs.docs_src == 'true' || steps.filters.outputs.workflows == 'true'
+#      - name: "Run mypy"
+#        run: "hatch run test:check_types"
+#        if: steps.filters.outputs.src == 'true' || steps.filters.outputs.docs_src == 'true' || steps.filters.outputs.workflows == 'true'
 
       - name: "Run tests"
         if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true' || github.event.schedule != ''

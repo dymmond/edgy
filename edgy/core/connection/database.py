@@ -1,3 +1,3 @@
-from databasez import Database, DatabaseURL
+from edgy._db import Database, DatabaseURL
 
 __all__ = ["Database", "DatabaseURL"]

@@ -27,10 +27,10 @@ graph TD
 
 ## Parameters
 
-* **database**: An instance of `edgy.Database` (or `databasez.Database`) or a connection string. When using a string, unparsed keyword arguments are passed to the created `Database` object.
+* **database**: An instance of `edgy.Database` or a connection string. When using a string, unparsed keyword arguments are passed to the created `Database` object.
 
     !!! Warning
-        Using `Database` from the `databases` package raises an assertion error. Edgy uses the `databasez` fork, and it's recommended to use a string, `edgy.Database`, or `edgy.testclient.TestClient`. Future versions may add more Edgy-specific functionality.
+        Using `Database` from the `databases` package raises an assertion error. Use a connection string, `edgy.Database`, or `edgy.testclient.TestClient`.
 
 * **schema**: The schema to connect to. Useful for multi-tenancy applications or connecting to non-default schemas.
 
