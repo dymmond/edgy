@@ -258,6 +258,8 @@ class BaseField(BaseFieldType, FieldInfo):
                     return isnull
                 else:
                     # emulation for special fields
+                    # NOTE: tested by "tests/models/test_model_isnull.py",
+                    #       it is not solvable by just using sqla.true()/false()
                     return sqlalchemy.not_(isnull)  # type: ignore
 
             # Handle various string containment and prefix/suffix matching operations.
