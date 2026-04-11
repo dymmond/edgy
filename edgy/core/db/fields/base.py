@@ -253,7 +253,14 @@ class BaseField(BaseFieldType, FieldInfo):
                 isnull = column == None  # noqa: E711
                 # is_(None) doesn't work for all fields
                 # column == None is required for IPAddressField, DateField, DateTimeField
-                return isnull if value else sqlalchemy.not_(isnull)
+                if value:
+                    # we use the native way
+                    return isnull
+                else:
+                    # emulation for special fields
+                    # NOTE: tested by "tests/models/test_model_isnull.py",
+                    #       it is not solvable by just using sqla.true()/false()
+                    return sqlalchemy.not_(isnull)  # type: ignore
 
             # Handle various string containment and prefix/suffix matching operations.
             case (
