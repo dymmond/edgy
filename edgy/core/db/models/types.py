@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Container, Iterable, Sequence
+from collections.abc import Collection, Container, Iterable, Sequence
 from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
@@ -346,7 +346,7 @@ class BaseModelType(ABC):
         """
 
     @abstractmethod
-    async def execute_post_save_hooks(self, fields: Sequence[str], is_update: bool) -> None:
+    async def execute_post_save_hooks(self, fields: Collection[str], is_update: bool) -> None:
         """
         Abstract asynchronous method to execute post-save hooks for the model.
 
@@ -355,7 +355,7 @@ class BaseModelType(ABC):
         They can be used for side effects, logging, or triggering further operations.
 
         Args:
-            fields (Sequence[str]): A sequence of field names that were affected during the save operation.
+            fields (Collection[str]): A sequence of field names that were affected during the save operation.
             is_update (bool): `True` if the save operation was an update; `False` if it was an insert.
         """
         ...

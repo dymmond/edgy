@@ -804,7 +804,7 @@ class DatabaseMixin:
             self.__dict__.update(new_kwargs)
 
         # updates aren't required to change the db, they can also just affect the meta fields
-        await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()), is_update=True)
+        await self.execute_post_save_hooks(kwargs.keys(), is_update=True)
 
         if column_values or kwargs:
             # Ensure on access refresh the results is active
@@ -1091,7 +1091,7 @@ class DatabaseMixin:
         self.__dict__.update(new_kwargs)
 
         if self.meta.post_save_fields:
-            await self.execute_post_save_hooks(cast(Sequence[str], kwargs.keys()), is_update=False)
+            await self.execute_post_save_hooks(kwargs.keys(), is_update=False)
         # Ensure on access refresh the results is active
         self._db_loaded = False
         self._db_deleted = False

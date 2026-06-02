@@ -36,6 +36,7 @@ from .mixins import QuerySetPropsMixin, TenancyMixin
 from .parser import ResultParser
 from .prefetch import Prefetch, PrefetchMixin
 from .types import (
+    EdgyEmbedTarget,
     EdgyModel,
     QuerySetType,
     reference_select_type,
@@ -50,7 +51,7 @@ if TYPE_CHECKING:  # pragma: no cover
 _empty_set = cast(Sequence[Any], frozenset())
 
 
-def _extract_unique_lookup_key(obj: Any, unique_fields: Sequence[str]) -> tuple | None:
+def _extract_unique_lookup_key(obj: Any, unique_fields: Iterable[str]) -> tuple | None:
     """
     Extracts a unique lookup key from an object or dictionary.
     (Helper function, stays in base)
@@ -83,7 +84,7 @@ class BaseQuerySet(
     TenancyMixin,
     QuerySetPropsMixin,
     PrefetchMixin,
-    QuerySetType,
+    QuerySetType[EdgyEmbedTarget, EdgyModel],
 ):
     """
     Internal definitions for queryset.
@@ -92,7 +93,7 @@ class BaseQuerySet(
 
     def __init__(
         self,
-        model_class: type[BaseModelType] | None = None,
+        model_class: type[EdgyModel],
         *,
         database: Database | None = None,
         filter_clauses: Iterable[Any] = _empty_set,
@@ -119,7 +120,7 @@ class BaseQuerySet(
         reference_select: reference_select_type | None = None,
     ) -> None:
         if model_class.__is_proxy_model__:
-            model_class = model_class.__parent__
+            model_class = cast(type[EdgyModel], model_class.__parent__)
 
         super().__init__(model_class=model_class)
         self.filter_clauses: list[Any] = list(filter_clauses)

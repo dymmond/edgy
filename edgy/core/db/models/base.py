@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import inspect
 import warnings
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
@@ -419,7 +419,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 CURRENT_MODEL_INSTANCE.reset(token2)
         return retdict
 
-    async def execute_post_save_hooks(self, fields: Sequence[str], is_update: bool) -> None:
+    async def execute_post_save_hooks(self, fields: Collection[str], is_update: bool) -> None:
         """
         Executes post-save hooks for relevant fields.
 

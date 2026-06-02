@@ -1,5 +1,13 @@
 # Release Notes
 
+## 0.35.11
+
+### Fixed
+
+- Improved typings for QuerySet.
+- `bulk_get_or_create` supports now officially also other types than lists and is exposed in `QuerySetType`.
+- Update `.gitignore`.
+
 ## 0.35.10
 
 ### Added

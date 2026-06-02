@@ -1,3 +1,7 @@
+# files/folders
+/.venv
+/venv
+
 # folders
 *.egg-info/
 .hypothesis/
@@ -6,8 +10,6 @@
 .pytest_cache/
 .scannerwork/
 .tox/
-.venv/
-venv/
 .vscode/
 __pycache__/
 virtualenv/
