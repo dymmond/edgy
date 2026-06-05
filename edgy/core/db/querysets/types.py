@@ -1,7 +1,15 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator, Awaitable, Callable, Generator, Iterable, Sequence
+from collections.abc import (
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Collection,
+    Generator,
+    Iterable,
+    Sequence,
+)
 from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Union
 
 from edgy.types import Undefined
@@ -499,6 +507,30 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
         ...
 
     @abstractmethod
+    async def bulk_get_or_create(
+        self,
+        objs: Sequence[dict[str, Any] | EdgyModel],
+        unique_fields: Collection[str] | None = None,
+    ) -> list[EdgyModel]:
+        """
+        Bulk gets or creates records in a table.
+
+        If records exist based on unique fields, they are retrieved.
+        Otherwise, new records are created.
+
+        Args:
+            objs (Sequence[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
+            unique_fields (Collection[str] | None): Fields that determine uniqueness.
+                                                    If None, all records are treated as new.
+
+        Returns:
+            list[EdgyModel]: A list of retrieved or newly created objects.
+        """
+        ...
+
+    bulk_select_or_insert = bulk_get_or_create
+
+    @abstractmethod
     async def delete(self) -> int:
         """
         Abstract method to delete all objects matching the QuerySet criteria from the database.
@@ -611,6 +643,8 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
         """
         ...
 
+    update_or_insert = update_or_create
+
     @abstractmethod
     async def contains(self, instance: BaseModelType) -> bool:
         """
@@ -623,6 +657,8 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
             bool: True if the QuerySet contains the instance, False otherwise.
         """
         ...
+
+    like = contains
 
     @abstractmethod
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:

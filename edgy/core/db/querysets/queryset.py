@@ -1054,7 +1054,7 @@ class QuerySet(BaseQuerySet):
 
     bulk_insert = bulk_create
 
-    async def bulk_update(self, objs: list[EdgyModel], fields: list[str]) -> None:
+    async def bulk_update(self, objs: Sequence[EdgyModel], fields: Iterable[str]) -> None:
         """
         Bulk updates records in a table based on the provided list of model instances and fields.
 
@@ -1128,8 +1128,8 @@ class QuerySet(BaseQuerySet):
 
     async def bulk_get_or_create(
         self,
-        objs: list[dict[str, Any] | EdgyModel],
-        unique_fields: list[str] | None = None,
+        objs: Sequence[dict[str, Any] | EdgyModel],
+        unique_fields: Iterable[str] | None = None,
     ) -> list[EdgyModel]:
         """
         Bulk gets or creates records in a table.
@@ -1148,14 +1148,15 @@ class QuerySet(BaseQuerySet):
         new_objs: list[EdgyModel] = []
         retrieved_objs: list[EdgyModel] = []
         check_db_connection(queryset.database)
+        _unique_fields = tuple(unique_fields) if unique_fields is not None else ()
 
-        if unique_fields:
+        if _unique_fields:
             existing_records: dict[tuple, EdgyModel] = {}
             for obj in objs:
                 filter_kwargs = {}
                 dict_fields = {}
                 if isinstance(obj, dict):
-                    for field in unique_fields:
+                    for field in _unique_fields:
                         if field in obj:
                             value = obj[field]
                             if isinstance(value, dict):
@@ -1163,13 +1164,13 @@ class QuerySet(BaseQuerySet):
                             else:
                                 filter_kwargs[field] = value
                 else:
-                    for field in unique_fields:
+                    for field in _unique_fields:
                         value = getattr(obj, field)
                         if isinstance(value, dict):
                             dict_fields[field] = value
                         else:
                             filter_kwargs[field] = value
-                lookup_key = _extract_unique_lookup_key(obj, unique_fields)
+                lookup_key = _extract_unique_lookup_key(obj, _unique_fields)
                 if lookup_key is not None and lookup_key in existing_records:
                     continue
                 found = False
@@ -1179,7 +1180,7 @@ class QuerySet(BaseQuerySet):
                 # For limiting use something like QuerySet.limit(100).bulk_get_or_create(...)
                 for model in await queryset.filter(**filter_kwargs):
                     if all(getattr(model, k) == expected for k, expected in dict_fields.items()):
-                        lookup_key = _extract_unique_lookup_key(model, unique_fields)
+                        lookup_key = _extract_unique_lookup_key(model, _unique_fields)
                         assert lookup_key is not None, "invalid fields/attributes in unique_fields"
                         if lookup_key not in existing_records:
                             existing_records[lookup_key] = model
