@@ -244,7 +244,7 @@ users = await User.query.filter(id__in=[1, 2, 3])
 
 ##### Using `Q` or other boolean clauses outside of filter
 
-There is a detailed section about [how to use the Q operator] in your queries.
+There is a detailed section about [how to use the Q operator](./q.md) in your queries.
 
 #### SQLAlchemy style
 
@@ -984,11 +984,11 @@ select_for_update(
 ) -> QuerySet
 ```
 
-* nowait=True – fail immediately if the row is locked elsewhere.
-* skip_locked=True – do not wait; simply skip locked rows (useful for work stealing).
-* read=True – shared lock (Postgres FOR SHARE).
-* key_share=True – Postgres FOR KEY SHARE.
-* of=[ModelA, ...] – restrict locking to specific tables of the current SELECT (Postgres).
+* `nowait=True` – fail immediately if the row is locked elsewhere.
+* `skip_locked=True` – do not wait; simply skip locked rows (useful for work stealing).
+* `read=True` – shared lock (Postgres FOR SHARE).
+* `key_share=True` – Postgres FOR KEY SHARE.
+* `of=[ModelA, ...]` – restrict locking to specific tables of the current SELECT (Postgres).
 
 !!! Tip
     Include related models with select_related(...) if you intend to lock them.
@@ -1084,7 +1084,7 @@ async with database.transaction():
     )
 ```
 
-Edgy maps the models in of=[...] to the actual (possibly aliased) tables used in the compiled SELECT.
+Edgy maps the models in `of=[...]` to the actual (possibly aliased) tables used in the compiled SELECT.
 
 Chaining with filter(), all(), only()/defer(), etc.
 

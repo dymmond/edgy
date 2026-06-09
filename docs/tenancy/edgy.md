@@ -173,8 +173,4 @@ This is inherited.
 
 The `with_tenant` context manager is particularly useful for large-scale multi-tenant applications, simplifying tenant data management.
 
-[registry]: ../registry.md
 [schemas]: ../registry.md#schemas
-[using_with_db_registry]: ../registry.md#extra
-[ravyn]: [https://ravyn.dev](https://ravyn.dev)
-[middleware]: [https://ravyn.dev/middleware](https://ravyn.dev/middleware)
