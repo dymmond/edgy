@@ -120,8 +120,8 @@ So if you need some references to e.g. the `Request` or `Connection` you will ne
 
 ### Hooks in detail
 
-- **get_admin_marshall_config(cls, *, phase, for_schema=False) -> dict** - Customize quickly the marshall_config of the generated Marshall. Use this for excluding fields depending on the phase.
-- **get_admin_marshall_class(cls, *, phase, for_schema=False) -> type[Marshall]** - Customize the whole marshall. This allows replacing the Marshall completely, adding some fields and other goodies.
+- **get_admin_marshall_config(cls, \*, phase, for_schema=False) -> dict** - Customize quickly the marshall_config of the generated Marshall. Use this for excluding fields depending on the phase.
+- **get_admin_marshall_class(cls, \*, phase, for_schema=False) -> type\[Marshall\]** - Customize the whole marshall. This allows replacing the Marshall completely, adding some fields and other goodies.
 - **get_admin_marshall_for_save(cls, instance= None, /, \*\*kwargs) -> Marshall** - Classmethod called for getting the final marshall to save. Kwargs contains all the kwargs provided by the extraction. You might can build some customization around the saving here.
 
 Here is a simpler example showing how to use this:
