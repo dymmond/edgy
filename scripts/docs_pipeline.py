@@ -7,7 +7,7 @@ from pathlib import Path
 
 INCLUDE_PATTERN = re.compile(r"\{!\s*>?\s*(?P<path>[^!]+?)\s*!\}")
 FENCED_INCLUDE_PATTERN = re.compile(
-    r"```(?P<lang>[^\n`]*)\n[ \t]*\{!\s*>?\s*(?P<path>[^!]+?)\s*!\}[ \t]*\n```",
+    r"[ \t]*```(?P<lang>[^\n`]*)\n[ \t]*\{!\s*>?\s*(?P<path>[^!]+?)\s*!\}[ \t]*\n[ \t]*```",
     re.MULTILINE,
 )
 
