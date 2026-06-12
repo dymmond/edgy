@@ -253,6 +253,4 @@ $ edgy migrate
 
 * [Migrations](../migrations/migrations.md)
 * [Discovery](../migrations/discovery.md)
-* [Shell Support](../shell.md)
-* [Inspect DB](../inspectdb.md)
 * [Admin](../admin/admin.md)

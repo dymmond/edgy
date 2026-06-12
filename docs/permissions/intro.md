@@ -46,9 +46,9 @@ Edgy provides three additional manager methods for working with permissions:
 
 The `users` and `groups` methods accept the following parameters (except for `permissions`, all are optional):
 
--   `permissions` (str | Sequence[str]): The names of the permissions to check.
--   `model_names` (str | Sequence[str] | None): Model names, used if `name_model` or `obj` is present.
--   `objects` (Object | Sequence[Object] | None): Objects associated with the permissions.
+-   `permissions` (str | `Sequence[str]`): The names of the permissions to check.
+-   `model_names` (str | `Sequence[str]` | None): Model names, used if `name_model` or `obj` is present.
+-   `objects` (Object | `Sequence[Object]` | None): Objects associated with the permissions.
 -   `include_null_model_name` (bool, default: True): Automatically includes a check for a `null` model name when `model_names` is not `None`.
 -   `include_null_object` (bool, default: True): Automatically includes a check for a `null` object when `objects` is not `None`.
 

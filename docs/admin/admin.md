@@ -44,7 +44,7 @@ For full integration, embed the admin in your application and manage authenticat
 
 ## Embedding Admin
 
-For embedding the admin you need a lilya session or something compatible (provide scope["session"] with a dict like interface).
+For embedding the admin you need a lilya session or something compatible (provide `scope["session"]` with a dict like interface).
 You can either declare a global session or provide a `session_cookie` name to prevent collisions.
 You can either use the global edgy instance or pass `registry` and/or `settings` to `create_admin_app`. This will cause a local overwrite (and doesn't require a global instance), so you
 can have even more than one admin in the same application.
@@ -94,7 +94,6 @@ For m2m models `in_admin` defaults to false and `no_admin_create` to true.
 We can however change this:
 
 ```python title="Creatable ContentType" hl_lines="11"
-
 {!> ../docs_src/admin/admin_content_type.py !}
 ```
 
@@ -121,8 +120,8 @@ So if you need some references to e.g. the `Request` or `Connection` you will ne
 
 ### Hooks in detail
 
-- **get_admin_marshall_config(cls, *, phase, for_schema=False) -> dict:** - Customize quickly the marshall_config of the generated Marshall. Use this for excluding fields depending on the phase.
-- **get_admin_marshall_class(cls, *, phase, for_schema=False) -> type[Marshall]** - Customize the whole marshall. This allows replacing the Marshall completely, adding some fields and other goodies.
+- **get_admin_marshall_config(cls, \*, phase, for_schema=False) -> dict** - Customize quickly the marshall_config of the generated Marshall. Use this for excluding fields depending on the phase.
+- **get_admin_marshall_class(cls, \*, phase, for_schema=False) -> type\[Marshall\]** - Customize the whole marshall. This allows replacing the Marshall completely, adding some fields and other goodies.
 - **get_admin_marshall_for_save(cls, instance= None, /, \*\*kwargs) -> Marshall** - Classmethod called for getting the final marshall to save. Kwargs contains all the kwargs provided by the extraction. You might can build some customization around the saving here.
 
 Here is a simpler example showing how to use this:

@@ -180,5 +180,4 @@ Perfect! We have the expected results.
 While this model design might not be ideal for production, it demonstrates the depth achievable with related name reverse queries.
 
 [relationships]: ../relationships.md
-[fields]: ../fields/index.md
 [foreign_keys]: ../fields/index.md#foreignkey
