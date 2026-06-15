@@ -28,11 +28,19 @@ doing password hashing.
 Two good libraries are `passlib` (general including argon2) and `argon2-cffi` (only argon2 family).
 
 === "With argon2-cffi"
+
     ```python
     {!> ../docs_src/permissions/passwordargon2id.py !}
     ```
 
+=== "With cryptography"
+
+    ```python
+    {!> ../docs_src/permissions/passwordcryptography.py !}
+    ```
+
 === "With passlib"
+
     ```python
     {!> ../docs_src/permissions/passwordpasslib.py !}
     ```

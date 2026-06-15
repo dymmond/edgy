@@ -3,11 +3,12 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import textwrap
 from pathlib import Path
 
 INCLUDE_PATTERN = re.compile(r"\{!\s*>?\s*(?P<path>[^!]+?)\s*!\}")
 FENCED_INCLUDE_PATTERN = re.compile(
-    r"[ \t]*```(?P<lang>[^\n`]*)\n[ \t]*\{!\s*>?\s*(?P<path>[^!]+?)\s*!\}[ \t]*\n[ \t]*```",
+    r"(?P<indent>[ \t]*)```(?P<lang>[^\n`]*)\n[ \t]*\{!\s*>?\s*(?P<path>[^!]+?)\s*!\}[ \t]*\n[ \t]*```",
     re.MULTILINE,
 )
 
@@ -74,14 +75,15 @@ def render_markdown_with_includes(
 
     def replace_fenced(match: re.Match[str]) -> str:
         include_expr = match.group("path").strip()
+        indentation = match.group("indent")
         include_path = _resolve_include_path(include_expr, source_file, include_base_dir)
 
         included = _normalize_newlines(include_path.read_text(encoding="utf-8"))
         body = included.rstrip("\n")
         language = match.group("lang").strip() or infer_language(include_path)
         if body:
-            return f"```{language}\n{body}\n```"
-        return f"```{language}\n```"
+            return textwrap.indent(f"```{language}\n{body}\n```", indentation)
+        return textwrap.indent(f"```{language}\n```", indentation)
 
     def replace(match: re.Match[str]) -> str:
         include_expr = match.group("path").strip()
