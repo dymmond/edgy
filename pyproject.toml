@@ -234,6 +234,9 @@ addopts = [
 ]
 xfail_strict = true
 junit_family = "xunit2"
+markers = [
+    "benchmark: Codespeed benchmark tests",
+]
 
 [tool.hatch.build.targets.sdist]
 include = ["/edgy"]
