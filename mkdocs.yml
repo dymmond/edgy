@@ -184,6 +184,11 @@ markdown_extensions:
         class: mermaid
   - pymdownx.tabbed:
       alternate_style: true
+  - pymdownx.highlight:
+      use_pygments: true
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
   - md_in_html
 
 extra:
