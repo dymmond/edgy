@@ -25,11 +25,16 @@ providing an explicit secret parameter.
 Despite edgy has no inbuilt password hasher it provides an easy to use interface for the integration of thirdparty libraries
 doing password hashing.
 
-Two good libraries are `passlib` (general including argon2) and `argon2-cffi` (only argon2 family).
+Three good libraries are `passlib` (general including argon2), `argon2-cffi` (only argon2 family) and `cryptography` (supports argon2 family phc strings since version 44).
 
 === "With argon2-cffi"
     ```python
     {!> ../docs_src/permissions/passwordargon2id.py !}
+    ```
+
+=== "With cryptography"
+    ```python
+    {!> ../docs_src/permissions/passwordcryptography.py !}
     ```
 
 === "With passlib"
