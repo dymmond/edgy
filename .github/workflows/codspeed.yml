@@ -23,7 +23,7 @@ jobs:
           python-version: "3.13"
 
       - name: Install dependencies
-        run: pip install -e ".[sqlite]" pytest-codspeed==4.3.0
+        run: pip install -e ".[sqlite]" pytest-timeout pytest-codspeed==4.3.0
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v4
