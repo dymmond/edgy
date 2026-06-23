@@ -6,10 +6,17 @@ from edgy.core.db.querysets.queryset import QuerySet
 
 if TYPE_CHECKING:
     from edgy.core.db.models.base import BaseModelType
+if TYPE_CHECKING:
+
+    class _BaseManager(QuerySet): ...
+
+else:
+
+    class _BaseManager: ...
 
 
-class BaseManager:
-    queryset_class = QuerySet
+class BaseManager(_BaseManager):
+    queryset_class: type[QuerySet] = QuerySet
 
     def __init__(
         self,
@@ -36,17 +43,6 @@ class BaseManager:
         self.inherit = inherit
         self.name = name
         self.instance = instance
-
-    @property
-    def model_class(self) -> Any:
-        """
-        Provides a legacy name for the owner property.
-
-        Returns:
-            Any: The owner model class.
-        """
-        # This property serves as a legacy name for 'owner'.
-        return self.owner
 
     def get_queryset(self) -> QuerySet:
         """
@@ -140,6 +136,9 @@ class Manager(BaseManager):
         # Prevent infinite recursion and access to internal attributes or the manager's own name.
         if name.startswith("_") or name == self.name:
             return super().__getattr__(name)
+        if name == "model_class":
+            # legacy fallback
+            return self.owner
         try:
             # Attempt to get the attribute from the queryset first. This allows
             # methods like .filter(), .get() to be called directly on the manager.
