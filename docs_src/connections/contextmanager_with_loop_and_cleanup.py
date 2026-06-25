@@ -9,11 +9,11 @@ monkay.evaluate_settings(ignore_import_errors=False)
 monkay.set_instance(Instance(registry=models))
 
 loop = asyncio.new_event_loop()
-with models.with_loop(loop):
+with models.with_async_env(loop):
     edgy.run_sync(User.query.all())
 
 # uses the same loop
-with models.with_loop(loop):
+with models.with_async_env(loop):
     edgy.run_sync(User.query.all())
 
 
