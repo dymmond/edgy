@@ -9,7 +9,6 @@ from uuid import UUID
 
 import edgy
 from edgy.core.db.models.model import Model
-from edgy.core.db.models.utils import get_model
 from edgy.core.utils.db import check_db_connection
 from edgy.exceptions import ModelSchemaError, ObjectNotFound
 
@@ -352,8 +351,8 @@ class TenantUserMixin(edgy.Model):
         try:
             # Get the model dynamically from the registry using its name.
             # Query for a tenant user record that is active and linked to the provided user.
-            tenant_user_mapping = await get_model(
-                registry=registry, model_name=cls.__name__
+            tenant_user_mapping: TenantUserMixin = await registry.get_model(
+                model_name=cls.__name__
             ).query.get(user=user, is_active=True)
             # Load the actual tenant instance associated with the mapping.
             await tenant_user_mapping.tenant.load()
@@ -402,7 +401,7 @@ class TenantUserMixin(edgy.Model):
             # Filter for active mappings for the same user, excluding the current one.
             # Update these mappings to set `is_active` to False.
             await (
-                get_model(registry=registry, model_name=type(self).__name__)
+                registry.get_model(type(self).__name__)
                 .query.filter(is_active=True, user=self.user)
                 .exclude(pk=self.pk)
                 .update(is_active=False)

@@ -489,7 +489,7 @@ class ModelObjectDetailView(BaseObjectView, AdminMixin, TemplateController):
         model: type[Model] = context["model"]
 
         # Retrieve the model instance using its primary key.
-        instance = await model.query.get_or_none(pk=self.get_object_pk(request))
+        instance: Model = await model.query.get_or_none(pk=self.get_object_pk(request))
         if not instance:
             raise NotFound()  # Raise 404 if instance is not found.
 
@@ -722,7 +722,7 @@ class ModelObjectDeleteView(AdminMixin, Controller):
 
         try:
             # Retrieve the instance to be deleted.
-            instance = await model.query.get(pk=self.get_object_pk(request))
+            instance: Model = await model.query.get(pk=self.get_object_pk(request))
         except ObjectNotFound:
             # If instance not found, add an error message and redirect.
             add_message("error", f"There is no record with this ID: '{obj_id}'.")

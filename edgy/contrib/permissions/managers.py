@@ -46,7 +46,7 @@ class PermissionManager(Manager):
             sources = [sources]
         if len(sources) == 0:
             # If no sources are provided, return an empty queryset
-            return cast("QuerySet", self.filter(and_()))
+            return self.filter(and_())
 
         # Access the 'users' field definition from the owner model's metadata.
         UserField = self.owner.meta.fields["users"]
@@ -80,7 +80,7 @@ class PermissionManager(Manager):
                 # Raise an error for invalid source types.
                 raise ValueError(f"Invalid source: {source}.")
         # Combine all clauses with an OR condition and return the queryset.
-        return cast("QuerySet", self.or_(*clauses))
+        return self.or_(*clauses)
 
     def users(
         self,
