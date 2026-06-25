@@ -15,7 +15,7 @@ def handle_request():
         # eventloops die by default with the thread
         loop = asyncio.new_event_loop()
         event_loop.set(loop)
-    with models.with_loop(loop):
+    with models.with_async_env(loop):
         edgy.run_sync(User.query.all())
 
 
