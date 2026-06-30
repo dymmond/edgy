@@ -464,9 +464,25 @@ class MyModel(edgy.Model):
 * `gt` - An integer indicating the exclusive minimum.
 * `lte` - An integer indicating the maximum.
 * `lt` - An integer indicating the exclusive maximum.
-* `max_digits` - An integer indicating the total maximum digits. Optional.
-* `decimal_places` - An integer indicating the total decimal places.
 * `multiple_of` - An integer, float or decimal indicating the multiple of.
+* `max_digits` - An integer indicating the total maximum digits. Can be `None` for an unconstrained numeric mode if supported (postgres).
+* `decimal_places` - An integer indicating the total decimal places. Can be `None` for an unconstrained numeric mode if supported (postgres).
+                     Negative values are not supported despite some database systems define a logic for negative scales.
+
+**Warning**
+
+If `max_digits` and/or `decimal_places` is set to `None` the behavior differs among databse systems, some will even crash.
+It is basically just postgresql which supports an unconstrained numeric mode.
+However setting `max_digits` to `None` is better supported.
+
+Here a short excerpt about the behavior of different database systems:
+
+- `mysql` - `decimal_places` defaults to 0 when `None`. `max_digits` defaults to 10 when `None`.
+- `oracle` - `decimal_places` defaults to 0 when `None`.
+- `sqlite` - `decimal_places` defaults to 0 when `None`.
+
+Currently a `UserWarning` is issued for backward compatibility if no `max_digits` or no `decimal_places` are provided and as fallback `None` is used.
+This may changes in future depending how the unconstrained numeric mode support develops among database systems.
 
 #### EmailField
 

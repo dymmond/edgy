@@ -27,7 +27,7 @@ class User(edgy.StrictModel):
         active = edgy.fields.BooleanField(default=True)
         is_staff = edgy.fields.BooleanField(default=False)
         age = edgy.fields.IntegerField(default=18)
-        size = edgy.fields.DecimalField(default="1.8", decimal_places=2)
+        size = edgy.fields.DecimalField(default="1.8", decimal_places=2, max_digits=None)
         blob = edgy.fields.BinaryField(default=b"abc")
         # needs special library for alembic enum migrations
         # user_type = edgy.fields.ChoiceField(choices=UserTypeEnum, default=UserTypeEnum.INTERNAL)

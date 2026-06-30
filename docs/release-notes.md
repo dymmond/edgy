@@ -1,5 +1,12 @@
 # Release Notes
 
+## 0.36.0
+
+### Changed
+
+- `DecimalField` supports now also `None` for `decimal_places` and `max_digits`.
+  It emits an `UserWarning` and falls back to `None` for each of both parameters not provided.
+
 ## 0.35.11
 
 ### Fixed

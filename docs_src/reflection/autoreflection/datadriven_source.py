@@ -14,7 +14,7 @@ class Trouser(edgy.Model):
 
 
 class Shoe(edgy.Model):
-    price = edgy.DecimalField(decimal_places=2)
+    price = edgy.DecimalField(decimal_places=2, max_digits=None)
     name = edgy.CharField(max_length=50)
     waterproof = edgy.BooleanField()
     size = edgy.FloatField()

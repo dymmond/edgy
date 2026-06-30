@@ -11,7 +11,7 @@ registry = edgy.Registry(
 
 
 class Product(AutoReflectModel):
-    price = edgy.DecimalField(decimal_places=2)
+    price = edgy.DecimalField(decimal_places=2, max_digits=None)
     name = edgy.CharField(max_length=50)
 
     class Meta:
@@ -21,7 +21,7 @@ class Product(AutoReflectModel):
 
 
 class AncientProduct(edgy.ReflectModel):
-    price = edgy.DecimalField(decimal_places=2)
+    price = edgy.DecimalField(decimal_places=2, max_digits=None)
     name = edgy.CharField(max_length=50)
     __using_schema__ = None
 

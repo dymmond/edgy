@@ -125,6 +125,8 @@ class BaseFieldType(BaseFieldDefinitions, ABC):
     generating SQLAlchemy columns, cleaning/converting values, and more.
     """
 
+    operator_mapping: dict[str, str]
+
     @abstractmethod
     def is_required(self) -> bool:
         """
