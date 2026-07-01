@@ -648,15 +648,15 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             A new QuerySet clone with the `_only` set attribute containing the selected fields.
         """
         queryset: QuerySet = self._clone()
-        only_fields = set(fields)
+        only_fields: set[str] = set(fields)
         if self.model_class.pknames:
             for pkname in self.model_class.pknames:
                 if pkname not in fields:
                     for pkcolumn in self.model_class.meta.get_columns_for_name(pkname):
                         only_fields.add(pkcolumn.key)
         else:
-            for pkcolumn in self.model_class.pkcolumns:
-                only_fields.add(pkcolumn.key)
+            for pkcolumnname in self.model_class.pkcolumns:
+                only_fields.add(pkcolumnname)
         queryset._only = only_fields
         return queryset
 
@@ -982,7 +982,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 [result],
                 cache_keys=[self._cache.create_cache_key(self.model_class, result[0])],
             )
-            return cast(EdgyEmbedTarget, result[1])
+            return result[1]
         finally:
             CHECK_DB_CONNECTION_SILENCED.reset(token)
 
