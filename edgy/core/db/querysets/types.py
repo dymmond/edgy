@@ -409,6 +409,15 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
+    def use_plain_objects(self) -> QuerySetType:
+        """
+        Abstract method to remove embed_parent for objects.
+
+        Note: this doesn't affect embed_parent for filters.
+        """
+        ...
+
+    @abstractmethod
     async def exists(self) -> bool:
         """
         Abstract method to check if any objects matching the QuerySet criteria exist.

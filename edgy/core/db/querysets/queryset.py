@@ -988,6 +988,17 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
 
     insert = create
 
+    def use_plain_objects(self) -> QuerySetType:
+        """
+        Remove embed_parent forwards.
+
+        In case of embeddings this method is recommended to be called before
+        bulk operations if the embedding isn't required. Otherwise it may can be costly.
+        """
+        queryset = self._clone()
+        queryset.embed_parent = None
+        return queryset
+
     async def bulk_create(
         self, objs: Iterable[dict[str, Any] | EdgyModel]
     ) -> list[EdgyEmbedTarget]:
