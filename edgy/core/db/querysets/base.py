@@ -18,7 +18,6 @@ from typing import (
     Generic,
     Literal,
     cast,
-    overload,
 )
 
 import orjson
@@ -725,7 +724,6 @@ class BaseQuerySet(
         executor = QueryExecutor(self, compiler, parser)
         return await executor.get_one()
 
-    @overload
     async def _bulk_get_update_or_create(
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
@@ -733,27 +731,7 @@ class BaseQuerySet(
         update_fields: Collection[str],
         update: bool,
         retrieve: bool,
-        no_embed: Literal[False] = False,
-    ) -> list[EdgyEmbedTarget]: ...
-    @overload
-    async def _bulk_get_update_or_create(
-        self,
-        objs: Iterable[dict[str, Any] | EdgyModel],
-        unique_fields: tuple[str, ...],
-        update_fields: Collection[str],
-        update: bool,
-        retrieve: bool,
-        no_embed: Literal[True],
-    ) -> list[EdgyModel]: ...
-    async def _bulk_get_update_or_create(
-        self,
-        objs: Iterable[dict[str, Any] | EdgyModel],
-        unique_fields: tuple[str, ...],
-        update_fields: Collection[str],
-        update: bool,
-        retrieve: bool,
-        no_embed: bool = False,
-    ) -> list[EdgyEmbedTarget] | list[EdgyModel]:
+    ) -> list[EdgyEmbedTarget]:
         """
         Bulk gets, updates or creates records in a table.
 
@@ -943,7 +921,8 @@ class BaseQuerySet(
         finally:
             CURRENT_INSTANCE.reset(token)
 
-        if no_embed or not self.embed_parent:
+        if not self.embed_parent:
+            # shortcut for preventing running costly run_concurrently
             self._cache.update(
                 self.model_class,
                 [(obj, obj) for obj in retrieved_objs],
@@ -951,10 +930,6 @@ class BaseQuerySet(
                     self._cache.create_cache_key(self.model_class, obj) for obj in retrieved_objs
                 ],
             )
-        if no_embed:
-            return retrieved_objs
-        elif not self.embed_parent:
-            # shortcut for preventing costly run_concurrently
             return cast("list[EdgyEmbedTarget]", retrieved_objs)
         retrieved_embedded = await run_concurrently(
             [self._embed_parent_in_result(obj) for obj in retrieved_objs],
