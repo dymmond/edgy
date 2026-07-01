@@ -730,7 +730,7 @@ class BaseQuerySet(
         unique_fields: tuple[str, ...],
         update_fields: Collection[str],
         update: bool,
-        retrieve: bool,
+        retrieve_create: bool,
     ) -> list[EdgyEmbedTarget]:
         """
         Bulk gets, updates or creates records in a table.
@@ -752,7 +752,7 @@ class BaseQuerySet(
         update_objs: list[EdgyModel] = []
         retrieved_objs: list[EdgyModel] = []
         existing_records: dict[tuple, EdgyModel] = {}
-        if retrieve:
+        if retrieve_create:
             if unique_fields:
                 for obj in objs:
                     filter_kwargs = {}
