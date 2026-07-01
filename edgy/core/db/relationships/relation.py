@@ -672,7 +672,7 @@ class SingleRelation(ManyRelationProtocol):
         # Set the foreign key in kwargs to link the new child to the current instance.
         kwargs[self.to_foreign_key] = self.instance
         # Create the new instance using the 'to' model's query manager.
-        return await cast("QuerySet", self.to.query).create(*args, **kwargs)
+        return await cast("QuerySet[BaseModelType]", self.to.query).create(*args, **kwargs)
 
     async def add(self, child: BaseModelType) -> BaseModelType | None:
         """

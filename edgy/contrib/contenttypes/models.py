@@ -28,10 +28,11 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
 
     async def get_instance(self) -> edgy.Model:
         reverse_name = f"reverse_{self.name.lower()}"
-        return (
+        return cast(
+            "edgy.Model",
             await cast("QuerySet", getattr(self, reverse_name))
             .using(schema=self.schema_name)
-            .get()
+            .get(),
         )
 
     async def raw_delete(

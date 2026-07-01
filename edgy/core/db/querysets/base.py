@@ -486,20 +486,6 @@ class BaseQuerySet(
             setattr(new_result, self.embed_parent[1], result)
         return result, new_result
 
-    @overload
-    async def _embed_parent_in_result_single(
-        self, result: EdgyModel | Awaitable[EdgyModel], original: Literal[False] = False
-    ) -> EdgyEmbedTarget: ...
-    @overload
-    async def _embed_parent_in_result_single(
-        self, result: EdgyModel | Awaitable[EdgyModel], original: Literal[True]
-    ) -> EdgyModel: ...
-
-    async def _embed_parent_in_result_single(
-        self, result: EdgyModel | Awaitable[EdgyModel], original: bool = False
-    ) -> EdgyModel | EdgyEmbedTarget:
-        return (await self._embed_parent_in_result(result))[0 if original else 1]
-
     def get_schema(self) -> str | None:
         schema = self.using_schema
         if schema is Undefined:
@@ -739,6 +725,7 @@ class BaseQuerySet(
         executor = QueryExecutor(self, compiler, parser)
         return await executor.get_one()
 
+    @overload
     async def _bulk_get_update_or_create(
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
@@ -746,7 +733,27 @@ class BaseQuerySet(
         update_fields: Collection[str],
         update: bool,
         retrieve: bool,
-    ) -> list[EdgyEmbedTarget]:
+        no_embed: Literal[False] = False,
+    ) -> list[EdgyEmbedTarget]: ...
+    @overload
+    async def _bulk_get_update_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        unique_fields: tuple[str, ...],
+        update_fields: Collection[str],
+        update: bool,
+        retrieve: bool,
+        no_embed: Literal[True],
+    ) -> list[EdgyModel]: ...
+    async def _bulk_get_update_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        unique_fields: tuple[str, ...],
+        update_fields: Collection[str],
+        update: bool,
+        retrieve: bool,
+        no_embed: bool = False,
+    ) -> list[EdgyEmbedTarget] | list[EdgyModel]:
         """
         Bulk gets, updates or creates records in a table.
 
@@ -912,7 +919,9 @@ class BaseQuerySet(
                     retrieved_objs.extend(create_objs)
 
                 if update_objs or create_objs:
-                    self._clear_cache()
+                    # only the results change
+                    # MAYBE: we can even keep the result cache, except for updates. Needs tests
+                    self._clear_cache(keep_cached_selected=True)
                     if self.model_class.meta.post_save_fields:
                         await run_concurrently(
                             [
@@ -934,7 +943,29 @@ class BaseQuerySet(
         finally:
             CURRENT_INSTANCE.reset(token)
 
-        return await run_concurrently(
+        if no_embed or not self.embed_parent:
+            self._cache.update(
+                self.model_class,
+                [(obj, obj) for obj in retrieved_objs],
+                cache_keys=[
+                    self._cache.create_cache_key(self.model_class, obj) for obj in retrieved_objs
+                ],
+            )
+        if no_embed:
+            return retrieved_objs
+        elif not self.embed_parent:
+            # shortcut for preventing costly run_concurrently
+            return cast("list[EdgyEmbedTarget]", retrieved_objs)
+        retrieved_embedded = await run_concurrently(
             [self._embed_parent_in_result(obj) for obj in retrieved_objs],
             limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
         )
+        self._cache.update(
+            self.model_class,
+            retrieved_embedded,
+            cache_keys=[
+                self._cache.create_cache_key(self.model_class, tup[0])
+                for tup in retrieved_embedded
+            ],
+        )
+        return [tup[1] for tup in retrieved_embedded]

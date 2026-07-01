@@ -58,7 +58,8 @@ class QueryExecutor:
             compiler: The QueryCompiler to be used for WHERE clauses (e.g., in deletes).
             parser: The ResultParser to be used for turning rows into models.
         """
-        self.queryset = queryset
+        # we need so many internals, so we just cast to a QuerySet
+        self.queryset = cast("QuerySet", queryset)
         self.compiler = compiler
         self.parser = parser
         self.database = queryset.database
@@ -118,7 +119,7 @@ class QueryExecutor:
             return
 
         if qs.embed_parent:
-            qs = qs.distinct()  # type: ignore
+            qs = qs.distinct()
 
         expression, tables_and_models = await qs.as_select_with_tables()
 
@@ -329,8 +330,8 @@ class QueryExecutor:
             async with self.database as database:
                 row_count = cast(int, await database.execute(expression))
 
-        # clear cache before executing post_delete.
-        self.queryset._clear_cache()
+        # clear cache after deletion.
+        self.queryset._clear_cache(keep_cached_selected=True)
         return row_count
 
     async def _model_based_delete(self, remove_referenced_call: str | bool) -> int:
@@ -357,11 +358,11 @@ class QueryExecutor:
         queryset.embed_parent = None
         row_count = 0
 
-        compiler = QueryCompiler(queryset)  # type: ignore
+        compiler = QueryCompiler(queryset)
         parser = ResultParser(queryset)
 
         # Instantiate the QueryExecutor recursively for the new queryset
-        executor = QueryExecutor(queryset, compiler, parser)  # type: ignore
+        executor = QueryExecutor(queryset, compiler, parser)
 
         # Uuse the new executor's iterate method
         models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
@@ -376,7 +377,8 @@ class QueryExecutor:
                     row_count += 1
 
                 # clear cache and fetch new batch
-                queryset._clear_cache(keep_result_cache=False)
+                # reuse cached query
+                queryset._clear_cache(keep_cached_selected=True)
                 models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
         finally:
             CURRENT_INSTANCE.reset(token)
