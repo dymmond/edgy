@@ -1016,7 +1016,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             unique_fields=(),
             update_fields=tuple(self.model_class.fields.keys()),
             update=False,
-            retrieve=False,
+            retrieve_create=True,
         )
 
     bulk_insert = bulk_create
@@ -1047,7 +1047,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             unique_fields=_unique_fields,
             update_fields=tuple(self.model_class.meta.fields.keys() if fields is None else fields),
             update=True,
-            retrieve=False,
+            retrieve_create=False,
         )
 
     async def bulk_update_or_create(
@@ -1078,7 +1078,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             unique_fields=_unique_fields,
             update_fields=tuple(self.model_class.meta.fields.keys() if fields is None else fields),
             update=True,
-            retrieve=True,
+            retrieve_create=True,
         )
 
     async def bulk_get_or_create(
@@ -1109,7 +1109,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             unique_fields=_unique_fields,
             update_fields=(),
             update=False,
-            retrieve=True,
+            retrieve_create=True,
         )
 
     bulk_select_or_insert = bulk_get_or_create
