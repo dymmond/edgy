@@ -10,12 +10,7 @@ from collections.abc import (
     Sequence,
 )
 from functools import cached_property
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Literal,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast
 
 import sqlalchemy
 
@@ -24,9 +19,8 @@ from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
-from edgy.core.db.querysets.base import BaseQuerySet, _extract_unique_lookup_key
+from edgy.core.db.querysets.base import BaseQuerySet
 from edgy.core.db.querysets.parser import ResultParser
-from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import CHECK_DB_CONNECTION_SILENCED, check_db_connection
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ObjectNotFound, QuerySetError
@@ -44,7 +38,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.mixins.combined import CombinedQuerySet
 
 
-class QuerySet(BaseQuerySet):
+class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, EdgyEmbedTarget]):
     @cached_property
     def sql(self) -> str:
         """Get SQL select query as string with inserted blanks. For debugging only!"""
@@ -994,7 +988,9 @@ class QuerySet(BaseQuerySet):
 
     insert = create
 
-    async def bulk_create(self, objs: Iterable[dict[str, Any] | EdgyModel]) -> None:
+    async def bulk_create(
+        self, objs: Iterable[dict[str, Any] | EdgyModel]
+    ) -> list[EdgyEmbedTarget]:
         """
         Bulk creates multiple records in a single batch operation.
 
@@ -1004,57 +1000,22 @@ class QuerySet(BaseQuerySet):
         Args:
             objs: An iterable of dictionaries or model instances to be created.
         """
-        queryset: QuerySet = self._clone()
-
-        new_objs: list[EdgyModel] = []
-
-        async def _iterate(obj_or_dict: EdgyModel | dict[str, Any]) -> dict[str, Any]:
-            if isinstance(obj_or_dict, dict):
-                obj: EdgyModel = queryset.model_class(**obj_or_dict)
-                if (
-                    self.model_class.meta.post_save_fields
-                    and not self.model_class.meta.post_save_fields.isdisjoint(obj_or_dict.keys())
-                ):
-                    new_objs.append(obj)
-            else:
-                obj = obj_or_dict
-                if self.model_class.meta.post_save_fields:
-                    new_objs.append(obj)
-            original = obj.extract_db_fields()
-            col_values: dict[str, Any] = obj.extract_column_values(
-                original,
-                phase="prepare_insert",
-                instance=self,
-                model_instance=obj,
-            )
-            col_values.update(
-                await obj.execute_pre_save_hooks(col_values, original, is_update=False)
-            )
-            return col_values
-
-        check_db_connection(queryset.database)
-        token = CURRENT_INSTANCE.set(self)
-        try:
-            async with queryset.database as database, database.transaction():
-                obj_values = [await _iterate(obj) for obj in objs]
-                # early bail out if no objects were found. This prevents issues with the db
-                if not obj_values:
-                    return
-                expression = queryset.table.insert().values(obj_values)
-                await database.execute_many(expression)
-            self._clear_cache(keep_result_cache=True)
-            if new_objs:
-                keys = self.model_class.meta.fields.keys()
-                await run_concurrently(
-                    [obj.execute_post_save_hooks(keys, is_update=False) for obj in new_objs],
-                    limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
-                )
-        finally:
-            CURRENT_INSTANCE.reset(token)
+        return await self._bulk_get_update_or_create(
+            objs=objs,
+            unique_fields=(),
+            update_fields=tuple(self.model_class.fields.keys()),
+            update=False,
+            retrieve=False,
+        )
 
     bulk_insert = bulk_create
 
-    async def bulk_update(self, objs: Sequence[EdgyModel], fields: Iterable[str]) -> None:
+    async def bulk_update(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+    ) -> list[EdgyEmbedTarget]:
         """
         Bulk updates records in a table based on the provided list of model instances and fields.
 
@@ -1065,72 +1026,25 @@ class QuerySet(BaseQuerySet):
             objs: A list of existing model instances to update.
             fields: A list of field names that should be updated across all instances.
         """
-        fields = list(fields)
-        # we can't update anything without fields
-        if not fields:
-            return
-        queryset: QuerySet = self._clone()
-
-        pk_query_placeholder = (
-            getattr(queryset.table.c, pkcol)
-            == sqlalchemy.bindparam(
-                "__id" if pkcol == "id" else pkcol,
-                type_=getattr(queryset.table.c, pkcol).type,
-            )
-            for pkcol in queryset.pkcolumns
+        _unique_fields = (
+            tuple(self.model_class.pknames) if unique_fields is None else tuple(unique_fields)
         )
-        expression = queryset.table.update().where(*pk_query_placeholder)
+        if not _unique_fields:
+            raise ValueError("`unique_fields` empty.")
+        return await self._bulk_get_update_or_create(
+            objs=objs,
+            unique_fields=_unique_fields,
+            update_fields=tuple(self.model_class.meta.fields.keys() if fields is None else fields),
+            update=True,
+            retrieve=False,
+        )
 
-        update_list = []
-        fields_plus_pk = {*fields, *queryset.model_class.pkcolumns}
-        check_db_connection(queryset.database)
-        token = CURRENT_INSTANCE.set(self)
-        try:
-            async with queryset.database as database, database.transaction():
-                for obj in objs:
-                    extracted = obj.extract_db_fields(fields_plus_pk)
-                    update = queryset.model_class.extract_column_values(
-                        extracted,
-                        is_update=True,
-                        is_partial=True,
-                        phase="prepare_update",
-                        instance=self,
-                        model_instance=obj,
-                    )
-                    update.update(
-                        await obj.execute_pre_save_hooks(update, extracted, is_update=True)
-                    )
-                    if "id" in update:
-                        update["__id"] = update.pop("id")
-                    update_list.append(update)
-                # prevent calling db with empty iterable, this causes errors
-                if not update_list:
-                    return
-
-                values_placeholder: dict[str, Any] = {
-                    pkcol: sqlalchemy.bindparam(pkcol, type_=getattr(queryset.table.c, pkcol).type)
-                    for field in fields
-                    for pkcol in queryset.model_class.meta.field_to_column_names[field]
-                }
-                expression = expression.values(values_placeholder)
-                await database.execute_many(expression, update_list)
-            self._clear_cache()
-            if (
-                self.model_class.meta.post_save_fields
-                and not self.model_class.meta.post_save_fields.isdisjoint(fields)
-            ):
-                await run_concurrently(
-                    [obj.execute_post_save_hooks(fields, is_update=True) for obj in objs],
-                    limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
-                )
-        finally:
-            CURRENT_INSTANCE.reset(token)
-
-    async def bulk_get_or_create(
+    async def bulk_update_or_create(
         self,
-        objs: Sequence[dict[str, Any] | EdgyModel],
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        fields: Iterable[str] | None = None,
         unique_fields: Iterable[str] | None = None,
-    ) -> list[EdgyModel]:
+    ) -> list[EdgyEmbedTarget]:
         """
         Bulk gets or creates records in a table.
 
@@ -1139,92 +1053,53 @@ class QuerySet(BaseQuerySet):
 
         Args:
             objs (list[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
-            unique_fields (list[str] | None): Fields that determine uniqueness. If None, all records are treated as new.
 
         Returns:
-            list[EdgyModel]: A list of retrieved or newly created objects.
+            list[EdgyEmbedTarget]: A list of retrieved or newly created objects.
         """
-        queryset: QuerySet = self._clone()
-        new_objs: list[EdgyModel] = []
-        retrieved_objs: list[EdgyModel] = []
-        check_db_connection(queryset.database)
-        _unique_fields = tuple(unique_fields) if unique_fields is not None else ()
+        _unique_fields = (
+            tuple(self.model_class.pknames) if unique_fields is None else tuple(unique_fields)
+        )
+        if not _unique_fields:
+            raise ValueError("`unique_fields` empty.")
+        return await self._bulk_get_update_or_create(
+            objs=objs,
+            unique_fields=_unique_fields,
+            update_fields=tuple(self.model_class.meta.fields.keys() if fields is None else fields),
+            update=True,
+            retrieve=True,
+        )
 
-        if _unique_fields:
-            existing_records: dict[tuple, EdgyModel] = {}
-            for obj in objs:
-                filter_kwargs = {}
-                dict_fields = {}
-                if isinstance(obj, dict):
-                    for field in _unique_fields:
-                        if field in obj:
-                            value = obj[field]
-                            if isinstance(value, dict):
-                                dict_fields[field] = value
-                            else:
-                                filter_kwargs[field] = value
-                else:
-                    for field in _unique_fields:
-                        value = getattr(obj, field)
-                        if isinstance(value, dict):
-                            dict_fields[field] = value
-                        else:
-                            filter_kwargs[field] = value
-                lookup_key = _extract_unique_lookup_key(obj, _unique_fields)
-                if lookup_key is not None and lookup_key in existing_records:
-                    continue
-                found = False
-                # This fixes edgy-guardian bug when using databasez.iterate indirectly and
-                # is safe in case force_rollback is active
-                # Models can also issue loads by accessing attrs for building unique_fields
-                # For limiting use something like QuerySet.limit(100).bulk_get_or_create(...)
-                for model in await queryset.filter(**filter_kwargs):
-                    if all(getattr(model, k) == expected for k, expected in dict_fields.items()):
-                        lookup_key = _extract_unique_lookup_key(model, _unique_fields)
-                        assert lookup_key is not None, "invalid fields/attributes in unique_fields"
-                        if lookup_key not in existing_records:
-                            existing_records[lookup_key] = model
-                        found = True
-                        break
-                if found is False:
-                    new_objs.append(queryset.model_class(**obj) if isinstance(obj, dict) else obj)
+    async def bulk_get_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        unique_fields: Iterable[str] | None = None,
+    ) -> list[EdgyEmbedTarget]:
+        """
+        Bulk gets or creates records in a table.
 
-            retrieved_objs.extend(existing_records.values())
-        else:
-            new_objs.extend(
-                [queryset.model_class(**obj) if isinstance(obj, dict) else obj for obj in objs]
-            )
+        If records exist based on unique fields, they are retrieved.
+        Otherwise, new records are created.
 
-        async def _iterate(obj: EdgyModel) -> dict[str, Any]:
-            original = obj.extract_db_fields()
-            col_values: dict[str, Any] = obj.extract_column_values(
-                original, phase="prepare_insert", instance=self
-            )
-            col_values.update(
-                await obj.execute_pre_save_hooks(col_values, original, is_update=False)
-            )
-            return col_values
-
-        token = CURRENT_INSTANCE.set(self)
-
-        try:
-            async with queryset.database as database, database.transaction():
-                if new_objs:
-                    new_obj_values = [await _iterate(obj) for obj in new_objs]
-                    expression = queryset.table.insert().values(new_obj_values)
-                    await database.execute_many(expression)
-                    retrieved_objs.extend(new_objs)
-
-                self._clear_cache()
-                keys = self.model_class.meta.fields.keys()
-                await run_concurrently(
-                    [obj.execute_post_save_hooks(keys, is_update=False) for obj in new_objs],
-                    limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
-                )
-        finally:
-            CURRENT_INSTANCE.reset(token)
-
-        return retrieved_objs
+        Args:
+            objs (Iterable[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
+            unique_fields (Iterable[str] | None): Fields that determine uniqueness.
+                                                  If None, pknames are used. If empty it fails.
+        Returns:
+            list[EdgyEmbedTarget]: A list of retrieved or newly created objects.
+        """
+        _unique_fields = (
+            tuple(self.model_class.pknames) if unique_fields is None else tuple(unique_fields)
+        )
+        if not _unique_fields:
+            raise ValueError("`unique_fields` empty.")
+        return await self._bulk_get_update_or_create(
+            objs=objs,
+            unique_fields=_unique_fields,
+            update_fields=(),
+            update=False,
+            retrieve=True,
+        )
 
     bulk_select_or_insert = bulk_get_or_create
 

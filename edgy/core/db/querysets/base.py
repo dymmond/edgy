@@ -5,6 +5,7 @@ from collections.abc import (
     AsyncIterator,
     Awaitable,
     Callable,
+    Collection,
     Iterable,
     Sequence,
 )
@@ -14,18 +15,22 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
+    Generic,
     Literal,
     cast,
+    overload,
 )
 
 import orjson
 import sqlalchemy
 
-from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR, get_schema
+from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR, get_schema
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.relationships.utils import crawl_relationship
+from edgy.core.utils.concurrency import run_concurrently
+from edgy.core.utils.db import check_db_connection
 from edgy.exceptions import QuerySetError
 from edgy.types import Undefined
 
@@ -84,7 +89,8 @@ class BaseQuerySet(
     TenancyMixin,
     QuerySetPropsMixin,
     PrefetchMixin,
-    QuerySetType[EdgyEmbedTarget, EdgyModel],
+    QuerySetType[EdgyModel, EdgyEmbedTarget],
+    Generic[EdgyModel, EdgyEmbedTarget],
 ):
     """
     Internal definitions for queryset.
@@ -459,14 +465,14 @@ class BaseQuerySet(
 
     async def _embed_parent_in_result(
         self, result: EdgyModel | Awaitable[EdgyModel]
-    ) -> tuple[EdgyModel, Any]:
+    ) -> tuple[EdgyModel, EdgyEmbedTarget]:
         """
         This is a result transformation, called by the Parser.
         """
         if isawaitable(result):
             result = await result
         if not self.embed_parent:
-            return result, result
+            return result, cast(EdgyEmbedTarget, result)
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
             new_result: Any = result
@@ -479,6 +485,20 @@ class BaseQuerySet(
         if self.embed_parent[1]:
             setattr(new_result, self.embed_parent[1], result)
         return result, new_result
+
+    @overload
+    async def _embed_parent_in_result_single(
+        self, result: EdgyModel | Awaitable[EdgyModel], original: Literal[False] = False
+    ) -> EdgyEmbedTarget: ...
+    @overload
+    async def _embed_parent_in_result_single(
+        self, result: EdgyModel | Awaitable[EdgyModel], original: Literal[True]
+    ) -> EdgyModel: ...
+
+    async def _embed_parent_in_result_single(
+        self, result: EdgyModel | Awaitable[EdgyModel], original: bool = False
+    ) -> EdgyModel | EdgyEmbedTarget:
+        return (await self._embed_parent_in_result(result))[0 if original else 1]
 
     def get_schema(self) -> str | None:
         schema = self.using_schema
@@ -718,3 +738,203 @@ class BaseQuerySet(
         parser = ResultParser(self)
         executor = QueryExecutor(self, compiler, parser)
         return await executor.get_one()
+
+    async def _bulk_get_update_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        unique_fields: tuple[str, ...],
+        update_fields: Collection[str],
+        update: bool,
+        retrieve: bool,
+    ) -> list[EdgyEmbedTarget]:
+        """
+        Bulk gets, updates or creates records in a table.
+
+        If records exist based on unique fields, they are retrieved.
+        Otherwise, new records are created.
+
+        Args:
+            objs (Iterable[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
+            unique_fields (tuple[str, ...]): Fields that determine uniqueness.
+            update (bool): Update retrieved objects.
+            retrieve (bool): Retrieve objects. Otherwise update only path.
+
+        Returns:
+            list[EdgyModel]: A list of retrieved or newly created objects.
+        """
+        queryset: QuerySet = self._clone()
+        create_objs: list[EdgyModel] = []
+        update_objs: list[EdgyModel] = []
+        retrieved_objs: list[EdgyModel] = []
+        existing_records: dict[tuple, EdgyModel] = {}
+        if retrieve:
+            if unique_fields:
+                for obj in objs:
+                    filter_kwargs = {}
+                    dict_fields = {}
+                    if isinstance(obj, dict):
+                        for field in unique_fields:
+                            if field in obj:
+                                value = obj[field]
+                                if isinstance(value, dict):
+                                    dict_fields[field] = value
+                                else:
+                                    filter_kwargs[field] = value
+                    else:
+                        for field in unique_fields:
+                            value = getattr(obj, field)
+                            if isinstance(value, dict):
+                                dict_fields[field] = value
+                            else:
+                                filter_kwargs[field] = value
+                    lookup_key = _extract_unique_lookup_key(obj, unique_fields)
+                    if lookup_key is not None and lookup_key in existing_records:
+                        continue
+                    found_obj: EdgyModel | None = None
+                    found = False
+                    # This fixes edgy-guardian bug when using databasez.iterate indirectly and
+                    # is safe in case force_rollback is active
+                    # Models can also issue loads by accessing attrs for building unique_fields
+                    # For limiting use something like QuerySet.limit(100).bulk_get_or_create(...)
+                    for instance in await queryset.filter(**filter_kwargs):
+                        if all(
+                            getattr(instance, k) == expected for k, expected in dict_fields.items()
+                        ):
+                            lookup_key = _extract_unique_lookup_key(instance, unique_fields)
+                            assert lookup_key is not None, (
+                                "invalid fields/attributes in unique_fields"
+                            )
+                            if lookup_key not in existing_records:
+                                found_obj = existing_records[lookup_key] = instance
+                            found = True
+                            break
+                    if not found:
+                        created = (
+                            cast(EdgyModel, queryset.model_class(**obj))
+                            if isinstance(obj, dict)
+                            else obj
+                        )
+                        create_objs.append(created)
+                        retrieved_objs.append(created)
+                    elif update and found_obj is not None:
+                        if isinstance(obj, dict):
+                            for k, v in obj.items():
+                                setattr(found_obj, k, v)
+                        else:
+                            for key in obj.meta.fields:
+                                setattr(found_obj, key, getattr(obj, key))
+                        update_objs.append(found_obj)
+                        retrieved_objs.append(found_obj)
+            else:
+                # behaves like bulk_create for unique_fields = ()
+                for obj in objs:
+                    created = (
+                        cast(EdgyModel, queryset.model_class(**obj))
+                        if isinstance(obj, dict)
+                        else obj
+                    )
+                    create_objs.append(created)
+                    retrieved_objs.append(created)
+        else:
+            assert update
+            for obj in objs:
+                updated = (
+                    cast(EdgyModel, queryset.model_class(**obj)) if isinstance(obj, dict) else obj
+                )
+                update_objs.append(updated)
+                retrieved_objs.append(updated)
+
+        async def _iterate_create(obj: EdgyModel) -> dict[str, Any]:
+            original = obj.extract_db_fields()
+            col_values: dict[str, Any] = obj.extract_column_values(
+                original, phase="prepare_insert", instance=self
+            )
+            if self.model_class.meta.pre_save_fields:
+                col_values.update(
+                    await obj.execute_pre_save_hooks(col_values, original, is_update=False)
+                )
+            return col_values
+
+        async def _iterate_update(obj: EdgyModel) -> dict[str, Any]:
+            extracted = obj.extract_db_fields(update_fields)
+            update_dict: dict[str, Any] = queryset.model_class.extract_column_values(
+                extracted,
+                is_update=True,
+                is_partial=True,
+                phase="prepare_update",
+                instance=self,
+                model_instance=obj,
+            )
+            if self.model_class.meta.pre_save_fields:
+                update_dict.update(
+                    await obj.execute_pre_save_hooks(update_dict, extracted, is_update=True)
+                )
+            if "id" in update_dict:
+                update_dict["__id"] = update_dict.pop("id")
+            return update_dict
+
+        check_db_connection(queryset.database, 4)
+        token = CURRENT_INSTANCE.set(self)
+        try:
+            async with queryset.database as database, database.transaction():
+                # prevent calling db with empty iterable, this causes errors
+                if update_objs:
+                    update_obj_values = await run_concurrently(
+                        [_iterate_update(obj) for obj in update_objs],
+                        limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
+                    )
+                    # by default pknames
+                    pk_query_placeholder = (
+                        getattr(queryset.table.c, col)
+                        == sqlalchemy.bindparam(
+                            "__id" if col == "id" else col,
+                            type_=getattr(queryset.table.c, col).type,
+                        )
+                        for field in unique_fields
+                        for col in queryset.model_class.meta.field_to_column_names[field]
+                    )
+                    expression_update = queryset.table.update().where(*pk_query_placeholder)
+                    values_placeholder: dict[str, Any] = {
+                        col: sqlalchemy.bindparam(col, type_=getattr(queryset.table.c, col).type)
+                        for field in update_fields
+                        for col in queryset.model_class.meta.field_to_column_names[field]
+                    }
+                    expression_update = expression_update.values(values_placeholder)
+                    await database.execute_many(expression_update, update_obj_values)
+
+                if create_objs:
+                    create_obj_values = await run_concurrently(
+                        [_iterate_create(obj) for obj in create_objs],
+                        limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
+                    )
+                    expression_create = queryset.table.insert().values(create_obj_values)
+                    await database.execute_many(expression_create)
+                    retrieved_objs.extend(create_objs)
+
+                if update_objs or create_objs:
+                    self._clear_cache()
+                    if self.model_class.meta.post_save_fields:
+                        await run_concurrently(
+                            [
+                                *(
+                                    obj.execute_post_save_hooks(update_fields, is_update=True)
+                                    for obj in update_objs
+                                ),
+                                *(
+                                    obj.execute_post_save_hooks(
+                                        set(self.model_class.meta.fields.keys()), is_update=False
+                                    )
+                                    for obj in create_objs
+                                ),
+                            ],
+                            limit=(
+                                1 if getattr(queryset.database, "force_rollback", False) else None
+                            ),
+                        )
+        finally:
+            CURRENT_INSTANCE.reset(token)
+
+        return await run_concurrently(
+            [self._embed_parent_in_result(obj) for obj in retrieved_objs],
+            limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
+        )
