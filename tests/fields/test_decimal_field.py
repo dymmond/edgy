@@ -7,6 +7,7 @@ import edgy
 from edgy.core.db import fields
 from edgy.exceptions import FieldDefinitionError
 from edgy.testclient import DatabaseTestClient
+from edgy.types import Undefined
 from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
@@ -38,6 +39,9 @@ class Employee(edgy.StrictModel):
     salary: decimal.Decimal = fields.DecimalField(
         max_digits=9, decimal_places=2, null=True, strict=False
     )
+    salary_btc: decimal.Decimal = fields.DecimalField(
+        max_digits=None, decimal_places=None, null=True
+    )
 
     class Meta:
         registry = models
@@ -47,9 +51,12 @@ class Employee(edgy.StrictModel):
 
 
 async def test_can_use_decimal_field():
-    employee = await Employee.query.create(name="Edgy", salary=150000)
+    employee = await Employee.query.create(
+        name="Edgy", salary=150000, salary_btc=decimal.Decimal("10.0002")
+    )
 
     assert employee.salary == 150000
+    assert employee.salary_btc == decimal.Decimal("10.0002")
 
 
 async def test_can_use_decimal_field_raise_exception():
@@ -57,36 +64,29 @@ async def test_can_use_decimal_field_raise_exception():
         await Employee.query.create(name="Another", salary=15000000)
 
 
-async def test_raises_field_definition_error_missing_decimal_places():
-    with pytest.raises(FieldDefinitionError):  # noqa
+@pytest.mark.parametrize(
+    "max_digits,decimal_places", [(1, Undefined), (Undefined, 1), (Undefined, Undefined)]
+)
+async def test_warn_field_definition_missing_decimal_places(max_digits, decimal_places):
+    with pytest.warns(UserWarning):
 
         class AnotherEmployee(edgy.Model):
-            name: str = fields.CharField(max_length=255, null=True)
-            date_of_birth: date = fields.DateField(auto_now=True)
-            salary: decimal.Decimal = fields.DecimalField(max_digits=9, null=True)
+            salary: decimal.Decimal = fields.DecimalField(
+                max_digits=max_digits, decimal_places=decimal_places, null=True
+            )
 
             class Meta:
-                registry = models
-
-            def __str__(self):
-                return f"Employee: {self.name}, Age: {self.date_of_birth}, Salary: {self.salary}"
+                abstract = True
 
 
-@pytest.mark.parametrize(
-    "max_digits,decimal_places", [(-1, None), (None, -2), (None, None), (-1, -2)]
-)
+@pytest.mark.parametrize("max_digits,decimal_places", [(-1, None), (None, -2)])
 async def test_raises_field_definition_error_on_values(max_digits, decimal_places):
     with pytest.raises(FieldDefinitionError):  # noqa
 
         class AnotherEmployee(edgy.Model):
-            name: str = fields.CharField(max_length=255, null=True)
-            date_of_birth: date = fields.DateField(auto_now=True)
             salary: decimal.Decimal = fields.DecimalField(
-                decimal_places=decimal_places, max_digits=max_digits, null=True
+                decimal_places=decimal_places, max_digits=-1, null=True
             )
 
             class Meta:
-                registry = models
-
-            def __str__(self):
-                return f"Employee: {self.name}, Age: {self.date_of_birth}, Salary: {self.salary}"
+                abstract = True
