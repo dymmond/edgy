@@ -5,7 +5,6 @@ from collections.abc import (
     AsyncIterator,
     Awaitable,
     Callable,
-    Collection,
     Iterable,
     Sequence,
 )
@@ -727,8 +726,8 @@ class BaseQuerySet(
     async def _bulk_get_update_or_create(
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
-        unique_fields: tuple[str, ...],
-        update_fields: Collection[str],
+        unique_fields: set[str],
+        update_fields: set[str],
         update: bool,
         retrieve_create: bool,
     ) -> list[EdgyEmbedTarget]:
@@ -740,7 +739,8 @@ class BaseQuerySet(
 
         Args:
             objs (Iterable[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
-            unique_fields (tuple[str, ...]): Fields that determine uniqueness.
+            unique_fields (set[str]): Fields that determine uniqueness.
+            update_fields (set[str]): Fields which are updated.
             update (bool): Update retrieved objects.
             retrieve (bool): Retrieve objects. Otherwise update only path.
 
@@ -832,7 +832,7 @@ class BaseQuerySet(
         async def _iterate_create(obj: EdgyModel) -> dict[str, Any]:
             original = obj.extract_db_fields()
             col_values: dict[str, Any] = obj.extract_column_values(
-                original, phase="prepare_insert", instance=self
+                original, phase="prepare_insert", instance=self, model_instance=obj
             )
             if self.model_class.meta.pre_save_fields:
                 col_values.update(
@@ -840,8 +840,10 @@ class BaseQuerySet(
                 )
             return col_values
 
+        _unique_and_update: set = update_fields.union(unique_fields)
+
         async def _iterate_update(obj: EdgyModel) -> dict[str, Any]:
-            extracted = obj.extract_db_fields(update_fields)
+            extracted = obj.extract_db_fields(_unique_and_update)
             update_dict: dict[str, Any] = queryset.model_class.extract_column_values(
                 extracted,
                 is_update=True,
@@ -869,7 +871,7 @@ class BaseQuerySet(
                         limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
                     )
                     # by default pknames
-                    pk_query_placeholder = (
+                    unique_query_placeholder = (
                         getattr(queryset.table.c, col)
                         == sqlalchemy.bindparam(
                             "__id" if col == "id" else col,
@@ -878,7 +880,7 @@ class BaseQuerySet(
                         for field in unique_fields
                         for col in queryset.model_class.meta.field_to_column_names[field]
                     )
-                    expression_update = queryset.table.update().where(*pk_query_placeholder)
+                    expression_update = queryset.table.update().where(*unique_query_placeholder)
                     values_placeholder: dict[str, Any] = {
                         col: sqlalchemy.bindparam(col, type_=getattr(queryset.table.c, col).type)
                         for field in update_fields
@@ -894,7 +896,6 @@ class BaseQuerySet(
                     )
                     expression_create = queryset.table.insert().values(create_obj_values)
                     await database.execute_many(expression_create)
-                    retrieved_objs.extend(create_objs)
 
                 if update_objs or create_objs:
                     # only the results change

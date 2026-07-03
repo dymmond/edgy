@@ -1013,8 +1013,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         """
         return await self._bulk_get_update_or_create(
             objs=objs,
-            unique_fields=(),
-            update_fields=tuple(self.model_class.fields.keys()),
+            unique_fields=set(self.model_class.pknames),
+            update_fields=set(),
             update=False,
             retrieve_create=True,
         )
@@ -1037,15 +1037,15 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             objs: A list of existing model instances to update.
             fields: A list of field names that should be updated across all instances.
         """
-        _unique_fields = (
-            tuple(self.model_class.pknames) if unique_fields is None else tuple(unique_fields)
+        _unique_fields: set[str] = set(
+            self.model_class.pknames if unique_fields is None else unique_fields
         )
         if not _unique_fields:
             raise ValueError("`unique_fields` empty.")
         return await self._bulk_get_update_or_create(
             objs=objs,
             unique_fields=_unique_fields,
-            update_fields=tuple(self.model_class.meta.fields.keys() if fields is None else fields),
+            update_fields=set(self.model_class.meta.fields.keys() if fields is None else fields),
             update=True,
             retrieve_create=False,
         )
@@ -1068,15 +1068,19 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         Returns:
             list[EdgyEmbedTarget]: A list of retrieved or newly created objects.
         """
-        _unique_fields = (
-            tuple(self.model_class.pknames) if unique_fields is None else tuple(unique_fields)
+        _unique_fields: set[str] = set(
+            self.model_class.pknames if unique_fields is None else unique_fields
         )
         if not _unique_fields:
             raise ValueError("`unique_fields` empty.")
         return await self._bulk_get_update_or_create(
             objs=objs,
             unique_fields=_unique_fields,
-            update_fields=tuple(self.model_class.meta.fields.keys() if fields is None else fields),
+            update_fields=set(self.model_class.meta.fields.keys()).difference(
+                self.model_class.pknames
+            )
+            if fields is None
+            else set(fields),
             update=True,
             retrieve_create=True,
         )
@@ -1099,15 +1103,15 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         Returns:
             list[EdgyEmbedTarget]: A list of retrieved or newly created objects.
         """
-        _unique_fields = (
-            tuple(self.model_class.pknames) if unique_fields is None else tuple(unique_fields)
+        _unique_fields: set[str] = set(
+            self.model_class.pknames if unique_fields is None else unique_fields
         )
         if not _unique_fields:
             raise ValueError("`unique_fields` empty.")
         return await self._bulk_get_update_or_create(
             objs=objs,
             unique_fields=_unique_fields,
-            update_fields=(),
+            update_fields=set(),
             update=False,
             retrieve_create=True,
         )
