@@ -10,7 +10,7 @@
 
 - `DecimalField` supports now also `None` for `decimal_places` and `max_digits`.
   It emits an `UserWarning` and falls back to `None` for each of both parameters not provided.
-- `bulk_get_or_create` mirrors now `get_or_create` and returns tuples with the create information. Also not all instances are maybe complete.
+- `bulk_get_or_create` mirrors now `get_or_create` and returns tuples with the create information. The returned instances are not always complete.
 
 ## 0.35.11
 
