@@ -47,8 +47,8 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: "actions/checkout@v5"
-      - uses: "dorny/paths-filter@v3"
+      - uses: "actions/checkout@v7"
+      - uses: "dorny/paths-filter@v4"
         id: filters
         with:
           filters: |
@@ -68,7 +68,7 @@ jobs:
         with:
           python-version: "${{ matrix.python-version }}"
           allow-prereleases: true
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         id: cache
         with:
           path: ${{ env.pythonLocation }}

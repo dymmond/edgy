@@ -4,7 +4,7 @@ name: Publish
 on:
   push:
     tags:
-      - '[0-9]*'
+      - "[0-9]*"
 
 jobs:
   publish:
@@ -12,8 +12,8 @@ jobs:
     runs-on: "ubuntu-latest"
 
     steps:
-      - uses: "actions/checkout@v4"
-      - uses: "actions/setup-python@v5"
+      - uses: "actions/checkout@v7"
+      - uses: "actions/setup-python@v6"
       - name: Install build dependencies
         if: steps.cache.outputs.cache-hit != 'true'
         run: |
