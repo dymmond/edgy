@@ -834,11 +834,13 @@ class BaseQuerySet(
                     else:
                         if update:
                             if isinstance(obj, dict):
-                                for k, v in obj.items():
-                                    setattr(found_obj, k, v)
+                                for key in update_fields:
+                                    if key in obj:
+                                        setattr(found_obj, key, obj[key])
                             else:
-                                for key in obj.meta.fields:
-                                    setattr(found_obj, key, getattr(obj, key))
+                                for key in update_fields:
+                                    if hasattr(obj, key):
+                                        setattr(found_obj, key, getattr(obj, key))
                             update_objs.append(found_obj)
                         return found_obj, False
 
@@ -897,9 +899,7 @@ class BaseQuerySet(
                 update_dict.update(
                     await obj.execute_pre_save_hooks(update_dict, extracted, is_update=True)
                 )
-            if "id" in update_dict:
-                update_dict["__id"] = update_dict.pop("id")
-            return update_dict
+            return {f"__{item[0]}": item[1] for item in update_dict.items()}
 
         token = CURRENT_INSTANCE.set(self)
         try:
@@ -914,14 +914,16 @@ class BaseQuerySet(
                     unique_query_placeholder = (
                         getattr(queryset.table.c, col)
                         == sqlalchemy.bindparam(
-                            "__id" if col == "id" else col,
+                            f"__{col}",
                             type_=getattr(queryset.table.c, col).type,
                         )
                         for col in unique_columns
                     )
                     expression_update = queryset.table.update().where(*unique_query_placeholder)
                     values_placeholder: dict[str, Any] = {
-                        col: sqlalchemy.bindparam(col, type_=getattr(queryset.table.c, col).type)
+                        col: sqlalchemy.bindparam(
+                            f"__{col}", type_=getattr(queryset.table.c, col).type
+                        )
                         for field in update_fields
                         for col in queryset.model_class.meta.field_to_column_names[field]
                     }
