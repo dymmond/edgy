@@ -1016,8 +1016,9 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                              Warning: for performance reasons no embedding is applied and returned objects
                              are maybe incomplete (check `can_load` property please).
         """
-        return (
-            await self._bulk_get_update_or_create(
+        return [
+            tup[0]
+            for tup in await self._bulk_get_update_or_create(
                 objs=objs,
                 unique_fields=set(self.model_class.pknames),
                 unique_columns=self.model_class.pkcolumns,
@@ -1025,7 +1026,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 update=False,
                 retrieve=False,
             )
-        )[0]
+        ]
 
     bulk_insert = bulk_create
 
@@ -1063,8 +1064,9 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 for field in _unique_fields
                 for col in self.model_class.meta.field_to_column_names[field]
             )
-        return (
-            await self._bulk_get_update_or_create(
+        return [
+            tup[0]
+            for tup in await self._bulk_get_update_or_create(
                 objs=objs,
                 unique_fields=_unique_fields,
                 unique_columns=_unique_columns,
@@ -1074,7 +1076,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 update=True,
                 retrieve=False,
             )
-        )[0]
+        ]
 
     async def bulk_update_or_create(
         self,
@@ -1111,24 +1113,17 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 for field in _unique_fields
                 for col in self.model_class.meta.field_to_column_names[field]
             )
-        return list(
-            zip(
-                *(
-                    await self._bulk_get_update_or_create(
-                        objs=objs,
-                        unique_fields=_unique_fields,
-                        unique_columns=_unique_columns,
-                        update_fields=set(self.model_class.meta.fields.keys()).difference(
-                            self.model_class.pknames
-                        )
-                        if fields is None
-                        else set(fields),
-                        update=True,
-                        retrieve=True,
-                    )
-                ),
-                strict=True,
+        return await self._bulk_get_update_or_create(
+            objs=objs,
+            unique_fields=_unique_fields,
+            unique_columns=_unique_columns,
+            update_fields=set(self.model_class.meta.fields.keys()).difference(
+                self.model_class.pknames
             )
+            if fields is None
+            else set(fields),
+            update=True,
+            retrieve=True,
         )
 
     async def bulk_get_or_create(
@@ -1167,20 +1162,13 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 for field in _unique_fields
                 for col in self.model_class.meta.field_to_column_names[field]
             )
-        return list(
-            zip(
-                *(
-                    await self._bulk_get_update_or_create(
-                        objs=objs,
-                        unique_fields=_unique_fields,
-                        unique_columns=_unique_columns,
-                        update_fields=set(),
-                        update=False,
-                        retrieve=True,
-                    )
-                ),
-                strict=True,
-            )
+        return await self._bulk_get_update_or_create(
+            objs=objs,
+            unique_fields=_unique_fields,
+            unique_columns=_unique_columns,
+            update_fields=set(),
+            update=False,
+            retrieve=True,
         )
 
     bulk_select_or_insert = bulk_get_or_create

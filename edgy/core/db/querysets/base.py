@@ -731,7 +731,7 @@ class BaseQuerySet(
         update_fields: set[str],
         update: bool,
         retrieve: bool,
-    ) -> tuple[list[EdgyModel], list[bool]]:
+    ) -> list[tuple[EdgyModel, bool]]:
         """
         Bulk gets, updates or creates records in a table.
 
@@ -753,8 +753,7 @@ class BaseQuerySet(
         queryset: QuerySet = self._clone()
         create_objs: list[EdgyModel] = []
         update_objs: list[EdgyModel] = []
-        returned_objs: list[EdgyModel] = []
-        was_created: list[bool] = []
+        returned_objs_with_created: list[tuple[EdgyModel, bool]] = []
         create_skip_post_save: set[int] = set()
         existing_records: dict[tuple, EdgyModel] = {}
         model_class = self.model_class
@@ -764,8 +763,10 @@ class BaseQuerySet(
                 for colname in unique_columns
                 if colname not in model_class.meta.columns_to_field
             }
+
             if unique_fields or free_unique_columns:
-                for obj in objs:
+
+                async def _iterate_retrieve(obj: EdgyModel | dict) -> tuple[EdgyModel, bool]:
                     filter_kwargs = {}
                     dict_fields = {}
                     if isinstance(obj, dict):
@@ -795,9 +796,8 @@ class BaseQuerySet(
                                 filter_kwargs[column] = value
                     lookup_key = _extract_unique_lookup_key(obj, unique_fields)
                     if lookup_key is not None and lookup_key in existing_records:
-                        continue
+                        return existing_records[lookup_key], False
                     found_obj: EdgyModel | None = None
-                    found = False
                     # This fixes edgy-guardian bug when using databasez.iterate indirectly and
                     # is safe in case force_rollback is active
                     # Models can also issue loads by accessing attrs for building unique_fields
@@ -814,60 +814,63 @@ class BaseQuerySet(
                             )
                             if lookup_key not in existing_records:
                                 found_obj = existing_records[lookup_key] = instance
-                            found = True
+                            else:
+                                found_obj = existing_records[lookup_key]
                             break
-                    if not found:
+                    if found_obj is None:
                         created = (
                             cast(EdgyModel, queryset.model_class(**obj))
                             if isinstance(obj, dict)
                             else obj
                         )
                         create_objs.append(created)
-                        returned_objs.append(created)
-                        was_created.append(True)
                         if (
                             self.model_class.meta.post_save_fields
                             and isinstance(obj, dict)
                             and self.model_class.meta.post_save_fields.isdisjoint(obj.keys())
                         ):
                             create_skip_post_save.add(id(created))
-                    elif update and found_obj is not None:
-                        if isinstance(obj, dict):
-                            for k, v in obj.items():
-                                setattr(found_obj, k, v)
-                        else:
-                            for key in obj.meta.fields:
-                                setattr(found_obj, key, getattr(obj, key))
-                        update_objs.append(found_obj)
-                        returned_objs.append(found_obj)
-                        was_created.append(False)
+                        return created, True
+                    else:
+                        if update:
+                            if isinstance(obj, dict):
+                                for k, v in obj.items():
+                                    setattr(found_obj, k, v)
+                            else:
+                                for key in obj.meta.fields:
+                                    setattr(found_obj, key, getattr(obj, key))
+                            update_objs.append(found_obj)
+                        return found_obj, False
+
+                returned_objs_with_created = await run_concurrently(
+                    [_iterate_retrieve(obj) for obj in objs],
+                    limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
+                )
         elif update:
             for obj in objs:
                 updated = (
                     cast(EdgyModel, queryset.model_class(**obj)) if isinstance(obj, dict) else obj
                 )
                 update_objs.append(updated)
-                returned_objs.append(updated)
-                was_created.append(False)
+                returned_objs_with_created.append((updated, False))
         else:
             for obj in objs:
                 created = (
                     cast(EdgyModel, queryset.model_class(**obj)) if isinstance(obj, dict) else obj
                 )
-                create_objs.append(created)
-                returned_objs.append(created)
-                was_created.append(True)
                 if (
                     self.model_class.meta.post_save_fields
                     and isinstance(obj, dict)
                     and self.model_class.meta.post_save_fields.isdisjoint(obj.keys())
                 ):
                     create_skip_post_save.add(id(created))
+                create_objs.append(created)
+                returned_objs_with_created.append((created, True))
 
         _unique_and_update: set = update_fields.union(unique_fields)
         check_db_connection(queryset.database, 4)
         full_defined_for_cache: list[tuple[EdgyModel, EdgyModel]] = [
-            (obj, obj) for obj in returned_objs if obj.can_load
+            (tup[0], tup[0]) for tup in returned_objs_with_created if tup[0].can_load
         ]
 
         async def _iterate_create(obj: EdgyModel) -> dict[str, Any]:
@@ -937,7 +940,8 @@ class BaseQuerySet(
                     # only the results change
                     self._clear_cache(
                         keep_cached_selected=True,
-                        keep_result_cache=len(full_defined_for_cache) == len(returned_objs),
+                        keep_result_cache=len(full_defined_for_cache)
+                        == len(returned_objs_with_created),
                     )
                     operations: list[Awaitable] = []
                     if self.model_class.meta.post_save_fields:
@@ -973,6 +977,6 @@ class BaseQuerySet(
                 ],
             )
         # do this after caching
-        for obj in returned_objs:
-            obj.identifying_db_fields = unique_columns
-        return returned_objs, was_created
+        for tup in returned_objs_with_created:
+            tup[0].identifying_db_fields = unique_columns
+        return returned_objs_with_created
