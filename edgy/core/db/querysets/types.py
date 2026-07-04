@@ -409,11 +409,15 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def use_plain_objects(self) -> QuerySetType:
+    def update_embed_parent(self, embed_parent: tuple[str, str | str] | None) -> QuerySetType:
         """
-        Abstract method to remove embed_parent for objects.
-
+        Abstract method to update or remove (provide None) embed_parent applied on instances.
         Note: this doesn't affect embed_parent for filters.
+
+        Args:
+            embed_parent: define the new embed_parent.
+        Returns:
+            QuerySetType: A new QuerySet instance with the new embedding.
         """
         ...
 
@@ -501,9 +505,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    async def bulk_create(
-        self, objs: Iterable[dict[str, Any] | EdgyModel]
-    ) -> list[EdgyEmbedTarget]:
+    async def bulk_create(self, objs: Iterable[dict[str, Any] | EdgyModel]) -> list[EdgyModel]:
         """
         Abstract method to create multiple objects in a single bulk operation.
 
@@ -511,7 +513,8 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             objs (Iterable[dict[str, Any] | EdgyModel]): An iterable of dictionaries or
                                                          model instances to create.
         Returns:
-            list[EdgyEmbedTarget]: A list of retrieved or newly created objects.
+            list[EdgyModel]: A list of newly created objects.
+                             Warning: for performance reasons no embedding is applied.
         """
         ...
 
@@ -521,7 +524,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         objs: Iterable[EdgyModel],
         fields: Iterable[str] | None = None,
         unique_fields: Iterable[str] | None = None,
-    ) -> list[EdgyEmbedTarget]:
+    ) -> list[EdgyModel]:
         """
         Abstract method to update multiple objects in a single bulk operation.
 
@@ -532,7 +535,8 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
                                                     If None, pknames are used. If empty it fails.
 
         Returns:
-            list[EdgyEmbedTarget]: A list of retrieved or newly created objects.
+            list[EdgyModel]: A list of updated objects.
+                             Warning: for performance reasons no embedding is applied.
         """
         ...
 
@@ -542,9 +546,9 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         objs: Iterable[dict[str, Any] | EdgyModel],
         fields: Iterable[str] | None = None,
         unique_fields: Iterable[str] | None = None,
-    ) -> list[EdgyEmbedTarget]:
+    ) -> list[tuple[EdgyModel, bool]]:
         """
-        Bulk gets or creates records in a table.
+        Bulk updates or creates records in a table.
 
         If records exist based on unique fields, they are retrieved.
         Otherwise, new records are created.
@@ -557,7 +561,10 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
                                                   If None, pknames are used. If empty it fails.
 
         Returns:
-            list[EdgyEmbedTarget]: A list of retrieved or newly created objects.
+            list[tuple[EdgyModel, bool]]: A list of tuples with retrieved or newly created objects in the same order
+                                          as provided and as second entry if the instance was created.
+                                          Warning: for performance reasons no embedding is applied and returned objects
+                                          are maybe incomplete (check `can_load` property please).
         """
         ...
 
@@ -566,7 +573,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
         unique_fields: Iterable[str] | None = None,
-    ) -> list[EdgyEmbedTarget]:
+    ) -> list[tuple[EdgyModel, bool]]:
         """
         Bulk gets or creates records in a table.
 
@@ -579,7 +586,9 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
                                                   If None, pknames are used. If empty it fails.
 
         Returns:
-            list[EdgyEmbedTarget]: A list of retrieved or newly created objects.
+            list[tuple[EdgyModel, bool]]: A list of tuples with retrieved or newly created objects and if created.
+                                          Warning: for performance reasons no embedding is applied and returned objects
+                                                   are maybe incomplete (check `can_load` property please)
         """
         ...
 
@@ -792,7 +801,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    async def __aiter__(self) -> AsyncIterator[EdgyEmbedTarget]:
+    def __aiter__(self) -> AsyncIterator[EdgyEmbedTarget]:
         """
         Abstract method to make the QuerySet asynchronously iterable.
 

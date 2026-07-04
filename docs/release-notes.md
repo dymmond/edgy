@@ -3,12 +3,14 @@
 ## 0.36.0
 
 ### Added
- Support for unconstraint numeric mode of postgresql for `DecimalField`.
+- Support for unconstraint numeric mode of postgresql for `DecimalField`.
+- `bulk_update_or_create`
 
 ### Changed
 
 - `DecimalField` supports now also `None` for `decimal_places` and `max_digits`.
   It emits an `UserWarning` and falls back to `None` for each of both parameters not provided.
+- `bulk_get_or_create` mirrors now `get_or_create` and returns tuples with the create information. Also not all instances are maybe complete.
 
 ## 0.35.11
 

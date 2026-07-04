@@ -499,7 +499,7 @@ class BaseQuerySet(
 
     async def _execute_iterate(
         self, fetch_all_at_once: bool = False
-    ) -> AsyncIterator[BaseModelType]:
+    ) -> AsyncIterator[EdgyEmbedTarget]:
         """
         (Refactored: Now delegates to the Executor)
         """
@@ -512,7 +512,7 @@ class BaseQuerySet(
         async for model in executor.iterate(fetch_all_at_once=fetch_all_at_once):  # type: ignore
             yield model
 
-    async def _execute_all(self) -> list[EdgyModel]:
+    async def _execute_all(self) -> list[EdgyEmbedTarget]:
         """
         Still relies on _execute_iterate.
         """
@@ -730,7 +730,7 @@ class BaseQuerySet(
         update_fields: set[str],
         update: bool,
         retrieve_create: bool,
-    ) -> list[EdgyEmbedTarget]:
+    ) -> tuple[list[EdgyModel], list[bool]]:
         """
         Bulk gets, updates or creates records in a table.
 
@@ -745,12 +745,15 @@ class BaseQuerySet(
             retrieve (bool): Retrieve objects. Otherwise update only path.
 
         Returns:
-            list[EdgyModel]: A list of retrieved or newly created objects.
+            tuple[list[EdgyModel], list[bool]]: A list of retrieved or newly created objects.
+                                                Second list is True if it was an update.
         """
         queryset: QuerySet = self._clone()
         create_objs: list[EdgyModel] = []
         update_objs: list[EdgyModel] = []
-        retrieved_objs: list[EdgyModel] = []
+        returned_objs: list[EdgyModel] = []
+        was_created: list[bool] = []
+        create_skip_post_save: set[int] = set()
         existing_records: dict[tuple, EdgyModel] = {}
         if retrieve_create:
             if unique_fields:
@@ -800,7 +803,14 @@ class BaseQuerySet(
                             else obj
                         )
                         create_objs.append(created)
-                        retrieved_objs.append(created)
+                        returned_objs.append(created)
+                        was_created.append(True)
+                        if (
+                            self.model_class.meta.post_save_fields
+                            and isinstance(obj, dict)
+                            and self.model_class.meta.post_save_fields.isdisjoint(obj.keys())
+                        ):
+                            create_skip_post_save.add(id(created))
                     elif update and found_obj is not None:
                         if isinstance(obj, dict):
                             for k, v in obj.items():
@@ -809,7 +819,8 @@ class BaseQuerySet(
                             for key in obj.meta.fields:
                                 setattr(found_obj, key, getattr(obj, key))
                         update_objs.append(found_obj)
-                        retrieved_objs.append(found_obj)
+                        returned_objs.append(found_obj)
+                        was_created.append(False)
             else:
                 # behaves like bulk_create for unique_fields = ()
                 for obj in objs:
@@ -819,7 +830,14 @@ class BaseQuerySet(
                         else obj
                     )
                     create_objs.append(created)
-                    retrieved_objs.append(created)
+                    returned_objs.append(created)
+                    was_created.append(True)
+                    if (
+                        self.model_class.meta.post_save_fields
+                        and isinstance(obj, dict)
+                        and self.model_class.meta.post_save_fields.isdisjoint(obj.keys())
+                    ):
+                        create_skip_post_save.add(id(created))
         else:
             assert update
             for obj in objs:
@@ -827,20 +845,24 @@ class BaseQuerySet(
                     cast(EdgyModel, queryset.model_class(**obj)) if isinstance(obj, dict) else obj
                 )
                 update_objs.append(updated)
-                retrieved_objs.append(updated)
+                returned_objs.append(updated)
+                was_created.append(False)
+
+        _unique_and_update: set = update_fields.union(unique_fields)
+        check_db_connection(queryset.database, 4)
+        full_defined_for_cache: list[tuple[EdgyModel, EdgyModel]] = [
+            (obj, obj) for obj in returned_objs if obj.can_load
+        ]
 
         async def _iterate_create(obj: EdgyModel) -> dict[str, Any]:
             original = obj.extract_db_fields()
             col_values: dict[str, Any] = obj.extract_column_values(
                 original, phase="prepare_insert", instance=self, model_instance=obj
             )
-            if self.model_class.meta.pre_save_fields:
-                col_values.update(
-                    await obj.execute_pre_save_hooks(col_values, original, is_update=False)
-                )
+            col_values.update(
+                await obj.execute_pre_save_hooks(col_values, original, is_update=False)
+            )
             return col_values
-
-        _unique_and_update: set = update_fields.union(unique_fields)
 
         async def _iterate_update(obj: EdgyModel) -> dict[str, Any]:
             extracted = obj.extract_db_fields(_unique_and_update)
@@ -860,7 +882,6 @@ class BaseQuerySet(
                 update_dict["__id"] = update_dict.pop("id")
             return update_dict
 
-        check_db_connection(queryset.database, 4)
         token = CURRENT_INSTANCE.set(self)
         try:
             async with queryset.database as database, database.transaction():
@@ -899,22 +920,27 @@ class BaseQuerySet(
 
                 if update_objs or create_objs:
                     # only the results change
-                    # MAYBE: we can even keep the result cache, except for updates. Needs tests
-                    self._clear_cache(keep_cached_selected=True)
+                    self._clear_cache(
+                        keep_cached_selected=True,
+                        keep_result_cache=len(full_defined_for_cache) == len(returned_objs),
+                    )
+                    operations: list[Awaitable] = []
                     if self.model_class.meta.post_save_fields:
+                        operations.extend(
+                            obj.execute_post_save_hooks(
+                                set(self.model_class.meta.fields.keys()), is_update=False
+                            )
+                            for obj in create_objs
+                            if id(obj) not in create_skip_post_save
+                        )
+                        if not self.model_class.meta.post_save_fields.isdisjoint(update_fields):
+                            operations.extend(
+                                obj.execute_post_save_hooks(update_fields, is_update=True)
+                                for obj in update_objs
+                            )
+                    if operations:
                         await run_concurrently(
-                            [
-                                *(
-                                    obj.execute_post_save_hooks(update_fields, is_update=True)
-                                    for obj in update_objs
-                                ),
-                                *(
-                                    obj.execute_post_save_hooks(
-                                        set(self.model_class.meta.fields.keys()), is_update=False
-                                    )
-                                    for obj in create_objs
-                                ),
-                            ],
+                            operations,
                             limit=(
                                 1 if getattr(queryset.database, "force_rollback", False) else None
                             ),
@@ -923,25 +949,12 @@ class BaseQuerySet(
             CURRENT_INSTANCE.reset(token)
 
         if not self.embed_parent:
-            # shortcut for preventing running costly run_concurrently
             self._cache.update(
                 self.model_class,
-                [(obj, obj) for obj in retrieved_objs],
+                full_defined_for_cache,
                 cache_keys=[
-                    self._cache.create_cache_key(self.model_class, obj) for obj in retrieved_objs
+                    self._cache.create_cache_key(self.model_class, tup[0])
+                    for tup in full_defined_for_cache
                 ],
             )
-            return cast("list[EdgyEmbedTarget]", retrieved_objs)
-        retrieved_embedded = await run_concurrently(
-            [self._embed_parent_in_result(obj) for obj in retrieved_objs],
-            limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
-        )
-        self._cache.update(
-            self.model_class,
-            retrieved_embedded,
-            cache_keys=[
-                self._cache.create_cache_key(self.model_class, tup[0])
-                for tup in retrieved_embedded
-            ],
-        )
-        return [tup[1] for tup in retrieved_embedded]
+        return returned_objs, was_created

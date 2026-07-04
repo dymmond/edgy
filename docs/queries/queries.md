@@ -1226,20 +1226,34 @@ will use that value with the `defaults` provided to create a new instance.
 
 You can pass positional ModelRefs to this method.
 
+### Update embedding
+
+For updating `embed_parent` on the fly use `update_embed_parent`. This allows for example to strip an embedding
+of M2M endpoints and access the M2M intermediate models directly.
+
+
+TODO
+
 ### Bulk create
 
 When you need to create many instances in one go, or `in bulk`.
 
+!!! Limitation
+    In the database created primary keys can't be retrieved, so check if the returned objects
+    are complete with `can_load`.
+
 ```python
-await User.query.bulk_create([
+returned_objs = await User.query.bulk_create([
     {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
+    {"id": 100, "email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
 ])
+assert not returned_objs[0].can_load  # this is incomplete
+assert returned_objs[1].can_load  # this is complete
 ```
 
 ### Bulk update
 
-When you need to update many instances in one go, or `in bulk`.
+When you need to update many instances in one go, or **in bulk**.
 
 ```python
 await User.query.bulk_create([
@@ -1252,8 +1266,11 @@ users = await User.query.all()
 for user in users:
     user.is_active = False
 
-await User.query.bulk_update(users, fields=['is_active'])
+retrieved_objects = await User.query.bulk_update(users, fields=['is_active'])
 ```
+
+
+### Bulk Update or Create
 
 ### Bulk Get or Create
 

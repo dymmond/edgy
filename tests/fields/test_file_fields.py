@@ -246,6 +246,8 @@ async def test_bulk_create2(create_test_database, mocker):
     spy = mocker.spy(MyModel, "execute_post_save_hooks")
     await MyModel.query.bulk_create(obj_list)
     spy.assert_not_called()
+    for obj in await MyModel.query.all():
+        assert obj.file_field.file is None
 
 
 async def test_update_bulk(create_test_database):
