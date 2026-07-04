@@ -26,6 +26,7 @@ from edgy.core.db.fields.base import Field
 from edgy.core.db.fields.factories import FieldFactory
 from edgy.core.db.fields.types import BaseFieldType
 from edgy.exceptions import FieldDefinitionError
+from edgy.types import Undefined
 
 from .mixins import AutoNowMixin as _AutoNowMixin
 from .mixins import IncrementOnSaveBaseField, TimezonedField
@@ -415,13 +416,13 @@ class DecimalField(FieldFactory, decimal.Decimal):
     def __new__(
         cls,
         *,
+        decimal_places: int | None = cast(Any, Undefined),
+        max_digits: int | None = cast(Any, Undefined),
         ge: int | float | decimal.Decimal | None = None,
         gt: int | float | decimal.Decimal | None = None,
         le: int | float | decimal.Decimal | None = None,
         lt: int | float | decimal.Decimal | None = None,
         multiple_of: int | decimal.Decimal | None = None,
-        max_digits: int | None = None,
-        decimal_places: int | None = None,
         **kwargs: Any,
     ) -> BaseFieldType:
         """
@@ -453,13 +454,36 @@ class DecimalField(FieldFactory, decimal.Decimal):
         """
         Validates the keyword arguments for a DecimalField.
 
-        Ensures that 'decimal_places' is provided and is not negative.
+        Ensures that 'decimal_places' and 'max_digits' are provided and is not negative.
         """
         super().validate(kwargs)
 
         decimal_places = kwargs.get("decimal_places")
-        if decimal_places is None or decimal_places < 0:
-            raise FieldDefinitionError("decimal_places are required for DecimalField")
+        if decimal_places is Undefined:
+            decimal_places = kwargs["decimal_places"] = None
+            warnings.warn(
+                (
+                    "`decimal_places` was not specified, fall back to None (free floating). "
+                    "This is maybe not supported by your db system and/or has an unusual fallback."
+                ),
+                category=UserWarning,
+                stacklevel=4,
+            )
+        if decimal_places is not None and decimal_places < 0:
+            raise FieldDefinitionError("`decimal_places` should not be negative")
+        max_digits = kwargs.get("max_digits")
+        if max_digits is Undefined:
+            max_digits = kwargs["max_digits"] = None
+            warnings.warn(
+                (
+                    "`max_digits` was not specified, fall back to None (free floating). "
+                    "This is maybe not supported by your db system and/or has an unusual fallback."
+                ),
+                category=UserWarning,
+                stacklevel=4,
+            )
+        if max_digits is not None and max_digits < 0:
+            raise FieldDefinitionError("`max_digits` should not be negative")
 
     @classmethod
     def operator_to_clause(

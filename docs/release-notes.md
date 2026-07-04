@@ -1,5 +1,15 @@
 # Release Notes
 
+## 0.36.0
+
+### Added
+ Support for unconstraint numeric mode of postgresql for `DecimalField`.
+
+### Changed
+
+- `DecimalField` supports now also `None` for `decimal_places` and `max_digits`.
+  It emits an `UserWarning` and falls back to `None` for each of both parameters not provided.
+
 ## 0.35.11
 
 ### Fixed

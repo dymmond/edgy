@@ -12,7 +12,7 @@ models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 class MyModel(edgy.StrictModel):
-    price = edgy.DecimalField(decimal_places=2)
+    price = edgy.DecimalField(decimal_places=2, max_digits=None)
     name: str = edgy.CharField(max_length=255)
 
     class Meta:
