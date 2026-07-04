@@ -728,7 +728,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         if fields is not None and not isinstance(fields, Iterable):
             raise QuerySetError(detail="Fields must be a suitable sequence of strings or unset.")
 
-        rows: list[BaseModelType] = await self
+        rows = cast("list[BaseModelType]", await self)
         if fields:
             return [
                 row.model_dump(exclude=exclude, exclude_none=exclude_none, include=fields)

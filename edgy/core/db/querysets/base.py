@@ -529,7 +529,7 @@ class BaseQuerySet(
             pk_names = tuple(self.model_class.pkcolumns)
             if not pk_names:
                 # Nothing reliable to dedupe on
-                return results  # type: ignore
+                return results
 
             seen: set[tuple] = set()
             unique = []
@@ -542,7 +542,7 @@ class BaseQuerySet(
                     # this can happen in advanced/embedded scenarios. In that case
                     # we bail out and keep the original list to avoid breaking
                     # existing behaviour.
-                    return results  # type: ignore
+                    return results
 
                 if key not in seen:
                     seen.add(key)
@@ -550,7 +550,7 @@ class BaseQuerySet(
 
             results = unique
 
-        return results  # type: ignore
+        return results
 
     def _filter_or_exclude(
         self,
