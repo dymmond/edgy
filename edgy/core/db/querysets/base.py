@@ -802,7 +802,9 @@ class BaseQuerySet(
                     # is safe in case force_rollback is active
                     # Models can also issue loads by accessing attrs for building unique_fields
                     # For limiting use something like QuerySet.limit(100).bulk_get_or_create(...)
-                    for instance in await queryset.filter(**filter_kwargs):
+                    for instance in await queryset.update_embed_parent(None).filter(
+                        **filter_kwargs
+                    ):
                         if all(
                             getattr(instance, k) == expected for k, expected in dict_fields.items()
                         ):
