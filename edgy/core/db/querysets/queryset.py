@@ -1020,9 +1020,10 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             await self._bulk_get_update_or_create(
                 objs=objs,
                 unique_fields=set(self.model_class.pknames),
+                unique_columns=self.model_class.pkcolumns,
                 update_fields=set(),
                 update=False,
-                retrieve_create=True,
+                retrieve=False,
             )
         )[0]
 
@@ -1048,20 +1049,30 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             list[EdgyModel]: A list of updated objects.
                              Warning: for performance reasons no embedding is applied.
         """
-        _unique_fields: set[str] = set(
-            self.model_class.pknames if unique_fields is None else unique_fields
-        )
-        if not _unique_fields:
-            raise ValueError("`unique_fields` empty.")
+        _unique_fields: set[str]
+        _unique_columns: Sequence[str]
+        if unique_fields is None:
+            _unique_fields = set(self.model_class.pknames)
+            _unique_columns = self.model_class.pkcolumns
+        else:
+            _unique_fields = set(unique_fields)
+            if not _unique_fields:
+                raise ValueError("`unique_fields` empty.")
+            _unique_columns = tuple(
+                col
+                for field in _unique_fields
+                for col in self.model_class.meta.field_to_column_names[field]
+            )
         return (
             await self._bulk_get_update_or_create(
                 objs=objs,
                 unique_fields=_unique_fields,
+                unique_columns=_unique_columns,
                 update_fields=set(
                     self.model_class.meta.fields.keys() if fields is None else fields
                 ),
                 update=True,
-                retrieve_create=False,
+                retrieve=False,
             )
         )[0]
 
@@ -1086,24 +1097,34 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                                           Warning: for performance reasons no embedding is applied and returned objects
                                           are maybe incomplete (check `can_load` property please).
         """
-        _unique_fields: set[str] = set(
-            self.model_class.pknames if unique_fields is None else unique_fields
-        )
-        if not _unique_fields:
-            raise ValueError("`unique_fields` empty.")
+        _unique_fields: set[str]
+        _unique_columns: Sequence[str]
+        if unique_fields is None:
+            _unique_fields = set(self.model_class.pknames)
+            _unique_columns = self.model_class.pkcolumns
+        else:
+            _unique_fields = set(unique_fields)
+            if not _unique_fields:
+                raise ValueError("`unique_fields` empty.")
+            _unique_columns = tuple(
+                col
+                for field in _unique_fields
+                for col in self.model_class.meta.field_to_column_names[field]
+            )
         return list(
             zip(
                 *(
                     await self._bulk_get_update_or_create(
                         objs=objs,
                         unique_fields=_unique_fields,
+                        unique_columns=_unique_columns,
                         update_fields=set(self.model_class.meta.fields.keys()).difference(
                             self.model_class.pknames
                         )
                         if fields is None
                         else set(fields),
                         update=True,
-                        retrieve_create=True,
+                        retrieve=True,
                     )
                 ),
                 strict=True,
@@ -1131,20 +1152,31 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                                           Warning: for performance reasons no embedding is applied and returned objects
                                           are maybe incomplete (check `can_load` property please).
         """
-        _unique_fields: set[str] = set(
-            self.model_class.pknames if unique_fields is None else unique_fields
-        )
-        if not _unique_fields:
-            raise ValueError("`unique_fields` empty.")
+
+        _unique_fields: set[str]
+        _unique_columns: Sequence[str]
+        if unique_fields is None:
+            _unique_fields = set(self.model_class.pknames)
+            _unique_columns = self.model_class.pkcolumns
+        else:
+            _unique_fields = set(unique_fields)
+            if not _unique_fields:
+                raise ValueError("`unique_fields` empty.")
+            _unique_columns = tuple(
+                col
+                for field in _unique_fields
+                for col in self.model_class.meta.field_to_column_names[field]
+            )
         return list(
             zip(
                 *(
                     await self._bulk_get_update_or_create(
                         objs=objs,
                         unique_fields=_unique_fields,
+                        unique_columns=_unique_columns,
                         update_fields=set(),
                         update=False,
-                        retrieve_create=True,
+                        retrieve=True,
                     )
                 ),
                 strict=True,

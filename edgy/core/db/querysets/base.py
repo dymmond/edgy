@@ -727,9 +727,10 @@ class BaseQuerySet(
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
         unique_fields: set[str],
+        unique_columns: Sequence[str],
         update_fields: set[str],
         update: bool,
-        retrieve_create: bool,
+        retrieve: bool,
     ) -> tuple[list[EdgyModel], list[bool]]:
         """
         Bulk gets, updates or creates records in a table.
@@ -740,6 +741,7 @@ class BaseQuerySet(
         Args:
             objs (Iterable[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
             unique_fields (set[str]): Fields that determine uniqueness.
+            unique_columns (Sequence[str]): Columns that determine uniqueness.
             update_fields (set[str]): Fields which are updated.
             update (bool): Update retrieved objects.
             retrieve (bool): Retrieve objects. Otherwise update only path.
@@ -755,8 +757,14 @@ class BaseQuerySet(
         was_created: list[bool] = []
         create_skip_post_save: set[int] = set()
         existing_records: dict[tuple, EdgyModel] = {}
-        if retrieve_create:
-            if unique_fields:
+        model_class = self.model_class
+        if retrieve:
+            free_unique_columns: set[str] = {
+                colname
+                for colname in unique_columns
+                if colname not in model_class.meta.columns_to_field
+            }
+            if unique_fields or free_unique_columns:
                 for obj in objs:
                     filter_kwargs = {}
                     dict_fields = {}
@@ -768,6 +776,11 @@ class BaseQuerySet(
                                     dict_fields[field] = value
                                 else:
                                     filter_kwargs[field] = value
+                        for column in free_unique_columns:
+                            if column in obj:
+                                value = obj[column]
+                                assert not isinstance(value, dict)
+                                filter_kwargs[column] = value
                     else:
                         for field in unique_fields:
                             value = getattr(obj, field)
@@ -775,6 +788,11 @@ class BaseQuerySet(
                                 dict_fields[field] = value
                             else:
                                 filter_kwargs[field] = value
+                        for column in free_unique_columns:
+                            if hasattr(obj, column):
+                                value = getattr(obj, column)
+                                assert not isinstance(value, dict)
+                                filter_kwargs[column] = value
                     lookup_key = _extract_unique_lookup_key(obj, unique_fields)
                     if lookup_key is not None and lookup_key in existing_records:
                         continue
@@ -821,25 +839,7 @@ class BaseQuerySet(
                         update_objs.append(found_obj)
                         returned_objs.append(found_obj)
                         was_created.append(False)
-            else:
-                # behaves like bulk_create for unique_fields = ()
-                for obj in objs:
-                    created = (
-                        cast(EdgyModel, queryset.model_class(**obj))
-                        if isinstance(obj, dict)
-                        else obj
-                    )
-                    create_objs.append(created)
-                    returned_objs.append(created)
-                    was_created.append(True)
-                    if (
-                        self.model_class.meta.post_save_fields
-                        and isinstance(obj, dict)
-                        and self.model_class.meta.post_save_fields.isdisjoint(obj.keys())
-                    ):
-                        create_skip_post_save.add(id(created))
-        else:
-            assert update
+        elif update:
             for obj in objs:
                 updated = (
                     cast(EdgyModel, queryset.model_class(**obj)) if isinstance(obj, dict) else obj
@@ -847,6 +847,20 @@ class BaseQuerySet(
                 update_objs.append(updated)
                 returned_objs.append(updated)
                 was_created.append(False)
+        else:
+            for obj in objs:
+                created = (
+                    cast(EdgyModel, queryset.model_class(**obj)) if isinstance(obj, dict) else obj
+                )
+                create_objs.append(created)
+                returned_objs.append(created)
+                was_created.append(True)
+                if (
+                    self.model_class.meta.post_save_fields
+                    and isinstance(obj, dict)
+                    and self.model_class.meta.post_save_fields.isdisjoint(obj.keys())
+                ):
+                    create_skip_post_save.add(id(created))
 
         _unique_and_update: set = update_fields.union(unique_fields)
         check_db_connection(queryset.database, 4)
@@ -898,8 +912,7 @@ class BaseQuerySet(
                             "__id" if col == "id" else col,
                             type_=getattr(queryset.table.c, col).type,
                         )
-                        for field in unique_fields
-                        for col in queryset.model_class.meta.field_to_column_names[field]
+                        for col in unique_columns
                     )
                     expression_update = queryset.table.update().where(*unique_query_placeholder)
                     values_placeholder: dict[str, Any] = {
@@ -957,4 +970,7 @@ class BaseQuerySet(
                     for tup in full_defined_for_cache
                 ],
             )
+        # do this after caching
+        for obj in returned_objs:
+            obj.identifying_db_fields = unique_columns
         return returned_objs, was_created
