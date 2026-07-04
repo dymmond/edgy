@@ -279,10 +279,10 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         return f"{type(self).__name__}({self.join_identifiers_to_string()})"
 
     @cached_property
-    def identifying_db_fields(self) -> Any:
+    def identifying_db_fields(self) -> Sequence[str]:
         """
         Returns the columns used for loading the model instance.
-        Defaults to primary key columns.
+        Defaults to primary key columns (`pkcolumns`).
         """
         return self.pkcolumns
 
@@ -297,7 +297,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     def can_load(self) -> bool:
         """
         Checks if the model instance can be loaded from the database.
-        Requires a registry, not to be abstract, and all identifying fields to have values.
+        Requires a registry, not to be abstract, and all identifying columns to have values.
 
         :return: True if the model can be loaded, False otherwise.
         """

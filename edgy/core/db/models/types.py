@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Collection, Iterable, Sequence
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
@@ -101,17 +102,17 @@ class BaseModelType(ABC):
             type[BaseModelType]: A type representing the proxy model.
         """
 
-    @property
+    @cached_property
     @abstractmethod
-    def identifying_db_fields(self) -> Any:
+    def identifying_db_fields(self) -> Sequence[str]:
         """
         Abstract property that returns the columns used for loading a model instance.
 
-        By default, this will be the primary key names (`pknames`), but it can be
+        By default, this will be the primary key columns (`pkcolumns`), but it can be
         overridden for specific instances if alternative fields are used for identification.
 
         Returns:
-            Any: A representation of the identifying database fields.
+            Any: A representation of the identifying database columns.
         """
 
     @property
