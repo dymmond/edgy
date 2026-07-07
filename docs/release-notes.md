@@ -4,13 +4,19 @@
 
 ### Added
 - Support for unconstraint numeric mode of postgresql for `DecimalField`.
-- `bulk_update_or_create`
+- `bulk_update_or_create` operation to the queryset.
 
 ### Changed
 
 - `DecimalField` supports now also `None` for `decimal_places` and `max_digits`.
   It emits an `UserWarning` and falls back to `None` for each of both parameters not provided.
 - `bulk_get_or_create` mirrors now `get_or_create` and returns tuples with the create information. The returned instances are not always complete.
+
+### Breaking
+
+- When not setting one of the parameters: `decimal_places` and `max_digits` edgy now emits an `UserWarning`. You need to set them explicit to `None` to silence the warning.
+- `bulk_get_or_create` doesn't reflect embedding anymore and returns also user objects which may cannot load because attributes are set in db (like the automatic `id`).
+- This applies for all bulk operations: you need to check `can_load` first before using nested or not set attributes.
 
 ## 0.35.11
 

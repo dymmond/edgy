@@ -51,7 +51,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.querysets.queryset import QuerySet
 
-_empty_set = cast(Sequence[Any], frozenset())
+_empty_set = cast(set[Any], frozenset())
 
 
 def _extract_unique_lookup_key(obj: Any, unique_fields: Iterable[str]) -> tuple | None:
@@ -725,13 +725,15 @@ class BaseQuerySet(
 
     async def _bulk_get_update_or_create(
         self,
+        *,
         objs: Iterable[dict[str, Any] | EdgyModel],
-        unique_fields: set[str],
+        resolve_embed: bool,
+        unique_fields: set[str] = _empty_set,
         unique_columns: Sequence[str],
-        update_fields: set[str],
+        update_fields: set[str] = _empty_set,
         update: bool,
         retrieve: bool,
-    ) -> list[tuple[EdgyModel, bool]]:
+    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
         """
         Bulk gets, updates or creates records in a table.
 
@@ -825,9 +827,9 @@ class BaseQuerySet(
                         )
                         create_objs.append(created)
                         if (
-                            self.model_class.meta.post_save_fields
+                            model_class.meta.post_save_fields
                             and isinstance(obj, dict)
-                            and self.model_class.meta.post_save_fields.isdisjoint(obj.keys())
+                            and model_class.meta.post_save_fields.isdisjoint(obj.keys())
                         ):
                             create_skip_post_save.add(id(created))
                         return created, True
@@ -861,19 +863,24 @@ class BaseQuerySet(
                     cast(EdgyModel, queryset.model_class(**obj)) if isinstance(obj, dict) else obj
                 )
                 if (
-                    self.model_class.meta.post_save_fields
+                    model_class.meta.post_save_fields
                     and isinstance(obj, dict)
-                    and self.model_class.meta.post_save_fields.isdisjoint(obj.keys())
+                    and model_class.meta.post_save_fields.isdisjoint(obj.keys())
                 ):
                     create_skip_post_save.add(id(created))
                 create_objs.append(created)
                 returned_objs_with_created.append((created, True))
 
         _unique_and_update: set = update_fields.union(unique_fields)
-        check_db_connection(queryset.database, 4)
         full_defined_for_cache: list[tuple[EdgyModel, EdgyModel]] = [
             (tup[0], tup[0]) for tup in returned_objs_with_created if tup[0].can_load
         ]
+        if resolve_embed and len(full_defined_for_cache) != len(returned_objs_with_created):
+            raise ValueError(
+                "Not all provided objects are fully defined for loading and `resolve_embed=True`"
+            )
+
+        check_db_connection(queryset.database, 4)
 
         async def _iterate_create(obj: EdgyModel) -> dict[str, Any]:
             original = obj.extract_db_fields()
@@ -895,7 +902,7 @@ class BaseQuerySet(
                 instance=self,
                 model_instance=obj,
             )
-            if self.model_class.meta.pre_save_fields:
+            if model_class.meta.pre_save_fields:
                 update_dict.update(
                     await obj.execute_pre_save_hooks(update_dict, extracted, is_update=True)
                 )
@@ -946,15 +953,15 @@ class BaseQuerySet(
                         == len(returned_objs_with_created),
                     )
                     operations: list[Awaitable] = []
-                    if self.model_class.meta.post_save_fields:
+                    if model_class.meta.post_save_fields:
                         operations.extend(
                             obj.execute_post_save_hooks(
-                                set(self.model_class.meta.fields.keys()), is_update=False
+                                set(model_class.meta.fields.keys()), is_update=False
                             )
                             for obj in create_objs
                             if id(obj) not in create_skip_post_save
                         )
-                        if not self.model_class.meta.post_save_fields.isdisjoint(update_fields):
+                        if not model_class.meta.post_save_fields.isdisjoint(update_fields):
                             operations.extend(
                                 obj.execute_post_save_hooks(update_fields, is_update=True)
                                 for obj in update_objs
@@ -971,14 +978,34 @@ class BaseQuerySet(
 
         if not self.embed_parent:
             self._cache.update(
-                self.model_class,
+                model_class,
                 full_defined_for_cache,
                 cache_keys=[
-                    self._cache.create_cache_key(self.model_class, tup[0])
+                    self._cache.create_cache_key(model_class, tup[0])
                     for tup in full_defined_for_cache
                 ],
             )
-        # do this after caching
-        for tup in returned_objs_with_created:
-            tup[0].identifying_db_fields = unique_columns
+        elif resolve_embed:
+            minstances, values = zip(
+                *(
+                    await run_concurrently(
+                        [
+                            self._embed_parent_in_result(res[0])
+                            for res in returned_objs_with_created
+                        ],
+                        limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
+                    )
+                ),
+                strict=True,
+            )
+            self._cache.update(
+                self.model_class,
+                values,
+                cache_keys=[self._cache.create_cache_key(model_class, key) for key in minstances],
+            )
+
+            return cast(
+                "list[tuple[EdgyEmbedTarget, bool]]",
+                list(zip(values, (res[1] for res in returned_objs_with_created), strict=True)),
+            )
         return returned_objs_with_created

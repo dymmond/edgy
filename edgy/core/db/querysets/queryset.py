@@ -10,7 +10,7 @@ from collections.abc import (
     Sequence,
 )
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Generic, Literal, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast, overload
 
 import sqlalchemy
 
@@ -1002,7 +1002,19 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset.embed_parent = embed_parent
         return queryset
 
-    async def bulk_create(self, objs: Iterable[dict[str, Any] | EdgyModel]) -> list[EdgyModel]:
+    @overload
+    async def bulk_create(
+        self, objs: Iterable[dict[str, Any] | EdgyModel], *, resolve_embed: Literal[True]
+    ) -> list[EdgyEmbedTarget]: ...
+
+    @overload
+    async def bulk_create(
+        self, objs: Iterable[dict[str, Any] | EdgyModel], *, resolve_embed: Literal[False] = False
+    ) -> list[EdgyModel]: ...
+
+    async def bulk_create(
+        self, objs: Iterable[dict[str, Any] | EdgyModel], resolve_embed: bool = False
+    ) -> list[EdgyModel] | list[EdgyEmbedTarget]:
         """
         Bulk creates multiple records in a single batch operation.
 
@@ -1016,26 +1028,52 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                              Warning: for performance reasons no embedding is applied and returned objects
                              are maybe incomplete (check `can_load` property please).
         """
-        return [
-            tup[0]
-            for tup in await self._bulk_get_update_or_create(
-                objs=objs,
-                unique_fields=set(self.model_class.pknames),
-                unique_columns=self.model_class.pkcolumns,
-                update_fields=set(),
-                update=False,
-                retrieve=False,
-            )
-        ]
+        return cast(
+            "list[EdgyModel] | list[EdgyEmbedTarget]",
+            [
+                tup[0]
+                for tup in await self._bulk_get_update_or_create(
+                    objs=objs,
+                    unique_fields=set(self.model_class.pknames),
+                    unique_columns=self.model_class.pkcolumns,
+                    update=False,
+                    retrieve=False,
+                    resolve_embed=resolve_embed,
+                )
+            ],
+        )
 
     bulk_insert = bulk_create
+
+    @overload
+    async def bulk_update(
+        self,
+        objs: Iterable[EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[True],
+    ) -> list[EdgyEmbedTarget]: ...
+
+    @overload
+    async def bulk_update(
+        self,
+        objs: Iterable[EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[False] = False,
+    ) -> list[EdgyModel]: ...
 
     async def bulk_update(
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
-        fields: Iterable[str] | None = None,
+        *,
+        update_fields: Iterable[str] | None = None,
         unique_fields: Iterable[str] | None = None,
-    ) -> list[EdgyModel]:
+        fields: Iterable[str] | None = None,
+        resolve_embed: bool = False,
+    ) -> list[EdgyModel] | list[EdgyEmbedTarget]:
         """
         Bulk updates records in a table based on the provided list of model instances and fields.
 
@@ -1050,6 +1088,10 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             list[EdgyModel]: A list of updated objects.
                              Warning: for performance reasons no embedding is applied.
         """
+        if fields is not None:
+            warnings.warn(
+                "Use `update_fields` instead `fields`.", DeprecationWarning, stacklevel=2
+            )
         _unique_fields: set[str]
         _unique_columns: Sequence[str]
         if unique_fields is None:
@@ -1064,26 +1106,54 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 for field in _unique_fields
                 for col in self.model_class.meta.field_to_column_names[field]
             )
-        return [
-            tup[0]
-            for tup in await self._bulk_get_update_or_create(
-                objs=objs,
-                unique_fields=_unique_fields,
-                unique_columns=_unique_columns,
-                update_fields=set(
-                    self.model_class.meta.fields.keys() if fields is None else fields
-                ),
-                update=True,
-                retrieve=False,
-            )
-        ]
+        return cast(
+            "list[EdgyModel] | list[EdgyEmbedTarget]",
+            [
+                tup[0]
+                for tup in await self._bulk_get_update_or_create(
+                    objs=objs,
+                    unique_fields=_unique_fields,
+                    unique_columns=_unique_columns,
+                    update_fields=set(
+                        self.model_class.meta.fields.keys()
+                        if update_fields is None
+                        else update_fields
+                    ),
+                    update=True,
+                    retrieve=False,
+                    resolve_embed=True,
+                )
+            ],
+        )
+
+    @overload
+    async def bulk_update_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[True],
+    ) -> list[tuple[EdgyEmbedTarget, bool]]: ...
+
+    @overload
+    async def bulk_update_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[False] = False,
+    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]: ...
 
     async def bulk_update_or_create(
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
-        fields: Iterable[str] | None = None,
+        *,
+        update_fields: Iterable[str] | None = None,
         unique_fields: Iterable[str] | None = None,
-    ) -> list[tuple[EdgyModel, bool]]:
+        resolve_embed: bool = False,
+    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
         """
         Bulk updates or creates records in a table.
 
@@ -1120,17 +1190,53 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             update_fields=set(self.model_class.meta.fields.keys()).difference(
                 self.model_class.pknames
             )
-            if fields is None
-            else set(fields),
+            if update_fields is None
+            else set(update_fields),
             update=True,
             retrieve=True,
+            resolve_embed=resolve_embed,
         )
+
+    @overload
+    async def bulk_get_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[True],
+    ) -> list[tuple[EdgyEmbedTarget, bool]]:
+        """
+        Args:
+            resolve_embed (True): Enables embedding.
+
+        Returns:
+            list[tuple[EdgyEmbedTarget, bool]]: A list of tuples with retrieved or newly created objects and if created.
+                                                Warning: All models must be loadable (`can_load` property is true)
+                                                otherwise an error is raised
+        """
+
+    @overload
+    async def bulk_get_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[False] = False,
+    ) -> list[tuple[EdgyModel, bool]]:
+        """
+        Returns:
+            list[tuple[EdgyModel, bool]]: A list of tuples with retrieved or newly created objects and if created.
+                                          Warning: for performance reasons no embedding is applied by default and
+                                         the returned objects are maybe incomplete (check `can_load` property)
+        """
 
     async def bulk_get_or_create(
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
         unique_fields: Iterable[str] | None = None,
-    ) -> list[tuple[EdgyModel, bool]]:
+        resolve_embed: bool = False,
+    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
         """
         Bulk gets or creates records in a table.
 
@@ -1166,9 +1272,9 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             objs=objs,
             unique_fields=_unique_fields,
             unique_columns=_unique_columns,
-            update_fields=set(),
             update=False,
             retrieve=True,
+            resolve_embed=resolve_embed,
         )
 
     bulk_select_or_insert = bulk_get_or_create
