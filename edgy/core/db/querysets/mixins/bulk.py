@@ -29,8 +29,10 @@ from ..types import (
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.queryset import QuerySet
 
+    QuerySetAsType = QuerySet
+
 else:
-    QuerySet = object
+    QuerySetAsType = object
 
 _empty_set = cast(set[Any], frozenset())
 
@@ -64,7 +66,7 @@ def _extract_unique_lookup_key(obj: Any, unique_fields: Iterable[str]) -> tuple 
     return tuple(lookup_key)
 
 
-class BulkMixin(QuerySet):
+class BulkMixin(QuerySetAsType):
     async def _bulk_get_update_or_create(
         self,
         *,

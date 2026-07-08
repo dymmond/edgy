@@ -7,14 +7,19 @@ from edgy.core.connection.database import Database
 from edgy.core.db.context_vars import set_schema
 from edgy.types import Undefined
 
-if TYPE_CHECKING:
-    from edgy import QuerySet
+if TYPE_CHECKING:  # pragma: no cover
+    from edgy.core.db.querysets.queryset import QuerySet
+
+    QuerySetAsType = QuerySet
+
+else:
+    QuerySetAsType = object
 
 # A sentinel object used to detect when a keyword-only argument has not been provided.
 _sentinel = object()
 
 
-class TenancyMixin:
+class TenancyMixin(QuerySetAsType):
     """
     Mixin used for querying a multi-tenant and/or multi-database application.
 
