@@ -8,12 +8,10 @@ import sqlalchemy
 from edgy.core.connection.database import Database
 
 if TYPE_CHECKING:
-    from edgy.core.db.querysets.queryset import QuerySet as QuerySetAsTypingBase
-else:
-    QuerySetAsTypingBase = object
+    pass
 
 
-class QuerySetPropsMixin(QuerySetAsTypingBase):
+class QuerySetPropsMixin:
     """
     A mixin class providing essential properties for QuerySet objects.
 

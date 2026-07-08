@@ -35,7 +35,7 @@ from .types import (
 if TYPE_CHECKING:  # pragma: no cover
     from databasez.core.transaction import Transaction
 
-    from edgy.core.db.querysets.mixins.combined import CombinedQuerySet
+    from edgy.core.db.querysets.combined import CombinedQuerySet
 
 
 class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, EdgyEmbedTarget]):
@@ -72,7 +72,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             QuerySetError: If the models (`self.model_class` and `other.model_class`)
                            of the two querysets do not match.
         """
-        from edgy.core.db.querysets.mixins.combined import CombinedQuerySet
+        from edgy.core.db.querysets.combined import CombinedQuerySet
 
         # Check type of the other object
         if not isinstance(other, QuerySet):

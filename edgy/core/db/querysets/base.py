@@ -543,7 +543,7 @@ class BaseQuerySet(
         """
         from edgy.core.db.querysets.queryset import QuerySet
 
-        queryset: QuerySet = self._clone()
+        queryset: QuerySet[EdgyModel, EdgyEmbedTarget] = self._clone()
         if kwargs:
             clauses = [*clauses, kwargs]
         converted_clauses: Sequence[
