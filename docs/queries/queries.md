@@ -1232,71 +1232,7 @@ For updating `embed_parent` on the fly use `update_embed_parent`. This allows fo
 of M2M endpoints and access the M2M intermediate models directly.
 
 
-TODO
-
-### Bulk create
-
-When you need to create many instances in one go, or `in bulk`.
-
-!!! Limitation
-    In the database created primary keys can't be retrieved, so check if the returned objects
-    are complete with `can_load`.
-
-```python
-returned_objs = await User.query.bulk_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"id": 100, "email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-])
-assert not returned_objs[0].can_load  # this is incomplete
-assert returned_objs[1].can_load  # this is complete
-```
-
-### Bulk update
-
-When you need to update many instances in one go, or **in bulk**.
-
-```python
-await User.query.bulk_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-])
-
-users = await User.query.all()
-
-for user in users:
-    user.is_active = False
-
-retrieved_objects = await User.query.bulk_update(users, fields=['is_active'])
-```
-
-
-### Bulk Update or Create
-
-### Bulk Get or Create
-
-When you need to perform in bulk a `get_or_create` in your models. The normal behavior would
-be like the `bulk_create` but this bring an additional `unique_fields` where we can make sure
-we do not insert duplicates by filtering the unique keys of the model data being inserted.
-
-```python
-await User.query.bulk_get_or_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-], unique_fields=["email"])
-
-# Try to reinsert the same values
-await User.query.bulk_get_or_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-], unique_fields=["email"])
-
-
-users = await User.query.all() # 2 as total
-```
-
-!!! Note
-    `bulk_get_or_create` fetches when using `unique_fields` all matching entries in a list.
-    For reducing the amount searched, use something like `limit(100).bulk_get_or_create(..., unique_fields=[...])`.
+[Bulk operations](./bulk.md)
 
 ## Operators
 

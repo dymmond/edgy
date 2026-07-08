@@ -217,7 +217,11 @@ class BulkMixin:
         full_defined_for_cache: list[tuple[EdgyModel, EdgyModel]] = [
             (tup[0], tup[0]) for tup in returned_objs_with_created if tup[0].can_load
         ]
-        if resolve_embed and len(full_defined_for_cache) != len(returned_objs_with_created):
+        if (
+            resolve_embed
+            and self.embed_parent
+            and len(full_defined_for_cache) != len(returned_objs_with_created)
+        ):
             raise BulkOperationModelsIncompatible(
                 detail="Not all resulting objects are fully defined for loading and `resolve_embed=True`",
                 instances_and_created=cast(
