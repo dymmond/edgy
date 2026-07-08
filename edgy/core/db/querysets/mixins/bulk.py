@@ -220,7 +220,9 @@ class BulkMixin:
         if resolve_embed and len(full_defined_for_cache) != len(returned_objs_with_created):
             raise BulkOperationModelsIncompatible(
                 detail="Not all resulting objects are fully defined for loading and `resolve_embed=True`",
-                instances=cast("list[tuple[BaseModelType, bool]]", returned_objs_with_created),
+                instances_and_created=cast(
+                    "list[tuple[BaseModelType, bool]]", returned_objs_with_created
+                ),
             )
 
         check_db_connection(queryset.database, 4)
