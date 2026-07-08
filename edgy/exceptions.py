@@ -178,16 +178,16 @@ class BulkOperationModelsIncompatible(QuerySetError):
     and resolve_embed is used.
     """
 
-    provided: list[tuple[BaseModelType, bool]]
+    instances: list[tuple[BaseModelType, bool]]
 
     def __init__(
         self,
         *args: typing.Any,
         detail: str = "",
-        provided: list[tuple[BaseModelType, bool]],
+        instances: list[tuple[BaseModelType, bool]],
     ):
         super().__init__(*args, detail=detail)
-        self.provided = provided
+        self.instances = instances
 
 
 class ModelReferenceError(EdgyException):

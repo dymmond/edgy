@@ -219,8 +219,8 @@ class BulkMixin:
         ]
         if resolve_embed and len(full_defined_for_cache) != len(returned_objs_with_created):
             raise BulkOperationModelsIncompatible(
-                detail="Not all provided objects are fully defined for loading and `resolve_embed=True`",
-                provided=cast("list[tuple[BaseModelType, bool]]", returned_objs_with_created),
+                detail="Not all resulting objects are fully defined for loading and `resolve_embed=True`",
+                instances=cast("list[tuple[BaseModelType, bool]]", returned_objs_with_created),
             )
 
         check_db_connection(queryset.database, 4)
@@ -359,6 +359,7 @@ class BulkMixin:
     ) -> list[EdgyEmbedTarget]:
         """
         Args:
+            ...
             resolve_embed (True): Enables embedding.
 
         Returns:
@@ -373,6 +374,7 @@ class BulkMixin:
     ) -> list[EdgyModel]:
         """
         Args:
+            ...
             resolve_embed (False): Disables embedding. Default.
         Returns:
             list[EdgyModel]: A list of created objects.
@@ -428,6 +430,7 @@ class BulkMixin:
     ) -> list[EdgyEmbedTarget]:
         """
         Args:
+            ...
             resolve_embed (True): Enables embedding.
 
         Returns:
@@ -447,6 +450,7 @@ class BulkMixin:
     ) -> list[EdgyModel]:
         """
         Args:
+            ...
             resolve_embed (False): Disables embedding. Default.
         Returns:
             list[EdgyModel]: A list of updated objects.
@@ -464,10 +468,7 @@ class BulkMixin:
         resolve_embed: bool = False,
     ) -> list[EdgyModel] | list[EdgyEmbedTarget]:
         """
-        Bulk updates records in a table based on the provided list of model instances and fields.
-
-        The primary key of each model instance is used to identify the record to update.
-        This operation is performed within a database transaction.
+        Update multiple objects in a single bulk operation.
 
         Args:
             objs (Iterable[EdgyModel]): A sequence of model instances to update.
@@ -515,7 +516,7 @@ class BulkMixin:
                     ),
                     update=True,
                     retrieve=False,
-                    resolve_embed=True,
+                    resolve_embed=resolve_embed,
                 )
             ],
         )
@@ -528,7 +529,17 @@ class BulkMixin:
         update_fields: Iterable[str] | None = None,
         unique_fields: Iterable[str] | None = None,
         resolve_embed: Literal[True],
-    ) -> list[tuple[EdgyEmbedTarget, bool]]: ...
+    ) -> list[tuple[EdgyEmbedTarget, bool]]:
+        """
+        Args:
+            ...
+            resolve_embed (True): Enables embedding.
+
+        Returns:
+            list[tuple[EdgyEmbedTarget, bool]]: A list of tuples with updated or created objects and created flag.
+                                                Warning: All models must be loadable (`can_load` property is true)
+                                                otherwise  `BulkOperationModelsIncompatible` is raised.
+        """
 
     @overload
     async def bulk_update_or_create(
@@ -538,7 +549,15 @@ class BulkMixin:
         update_fields: Iterable[str] | None = None,
         unique_fields: Iterable[str] | None = None,
         resolve_embed: Literal[False] = False,
-    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]: ...
+    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+        """
+        Args:
+            resolve_embed (False): Disables embedding. Default.
+        Returns:
+            list[tuple[EdgyModel, bool]]: A list of tuples with updated or created objects and created flag.
+                                          Warning: for performance reasons no embedding is applied and
+                                          the returned objects are maybe incomplete (check `can_load` property).
+        """
 
     async def bulk_update_or_create(
         self,
@@ -555,13 +574,18 @@ class BulkMixin:
         Otherwise, new records are created.
 
         Args:
-            objs (list[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
+            objs (Sequence[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
+            update_fields (Iterable[str]): A list of field names to update for each object (when found).
+                                    If None use all fields.
+            unique_fields (Iterable[str] | None): Fields that determine uniqueness.
+                                                  If None, pknames are used. If empty it fails.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
 
         Returns:
-            list[tuple[EdgyModel, bool]]: A list of tuples with retrieved or newly created objects in the same order
-                                          as provided and as second entry if the instance was created.
-                                          Warning: for performance reasons no embedding is applied and returned objects
-                                          are maybe incomplete (check `can_load` property please).
+            list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+                A list of tuples with retrieved or created objects and created flag.
+                Warning: for performance reasons no embedding is applied by default and
+                the returned objects are maybe incomplete (check `can_load` property).
         """
         _unique_fields: set[str]
         _unique_columns: Sequence[str]
@@ -601,12 +625,13 @@ class BulkMixin:
     ) -> list[tuple[EdgyEmbedTarget, bool]]:
         """
         Args:
+            ...
             resolve_embed (True): Enables embedding.
 
         Returns:
-            list[tuple[EdgyEmbedTarget, bool]]: A list of tuples with retrieved or newly created objects and if created.
+            list[tuple[EdgyEmbedTarget, bool]]: A list of tuples with retrieved or created objects and created flag.
                                                 Warning: All models must be loadable (`can_load` property is true)
-                                                otherwise an error is raised
+                                                otherwise `BulkOperationModelsIncompatible` is raised.
         """
 
     @overload
@@ -618,10 +643,13 @@ class BulkMixin:
         resolve_embed: Literal[False] = False,
     ) -> list[tuple[EdgyModel, bool]]:
         """
+        Args:
+            ...
+            resolve_embed (False): Disables embedding. Default.
         Returns:
-            list[tuple[EdgyModel, bool]]: A list of tuples with retrieved or newly created objects and if created.
-                                          Warning: for performance reasons no embedding is applied by default and
-                                         the returned objects are maybe incomplete (check `can_load` property)
+            list[tuple[EdgyModel, bool]]: A list of tuples with retrieved or created objects and created flag.
+                                          Warning: for performance reasons no embedding is applied and
+                                          the returned objects are maybe incomplete (check `can_load` property).
         """
 
     async def bulk_get_or_create(
@@ -641,11 +669,13 @@ class BulkMixin:
             objs (Iterable[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
             unique_fields (Iterable[str] | None): Fields that determine uniqueness.
                                                   If None, pknames are used. If empty it fails.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
+
         Returns:
-            list[tuple[EdgyModel, bool]]: A list of tuples with retrieved or newly created objects in the same order
-                                          as provided and as second entry if the instance was created.
-                                          Warning: for performance reasons no embedding is applied and returned objects
-                                          are maybe incomplete (check `can_load` property please).
+            list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+                A list of tuples with retrieved or newly created objects and created flag.
+                Warning: for performance reasons no embedding is applied by default and
+                the returned objects are maybe incomplete (check `can_load` property).
         """
 
         _unique_fields: set[str]

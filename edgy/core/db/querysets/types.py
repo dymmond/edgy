@@ -512,6 +512,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     ) -> list[EdgyEmbedTarget]:
         """
         Args:
+            ...
             resolve_embed (True): Enables embedding.
 
         Returns:
@@ -526,6 +527,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     ) -> list[EdgyModel]:
         """
         Args:
+            ...
             resolve_embed (False): Disables embedding. Default.
         Returns:
             list[EdgyModel]: A list of created objects.
@@ -564,6 +566,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     ) -> list[EdgyEmbedTarget]:
         """
         Args:
+            ...
             resolve_embed (True): Enables embedding.
 
         Returns:
@@ -583,6 +586,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     ) -> list[EdgyModel]:
         """
         Args:
+            ...
             resolve_embed (False): Disables embedding. Default.
         Returns:
             list[EdgyModel]: A list of updated objects.
@@ -628,10 +632,11 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     ) -> list[tuple[EdgyEmbedTarget, bool]]:
         """
         Args:
+            ...
             resolve_embed (True): Enables embedding.
 
         Returns:
-            list[tuple[EdgyEmbedTarget, bool]]: A list of tuples with updated or newly created objects and if created.
+            list[tuple[EdgyEmbedTarget, bool]]: A list of tuples with updated or created objects and created flag.
                                                 Warning: All models must be loadable (`can_load` property is true)
                                                 otherwise  `BulkOperationModelsIncompatible` is raised.
         """
@@ -647,9 +652,10 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
         """
         Args:
+            ...
             resolve_embed (False): Disables embedding. Default.
         Returns:
-            list[tuple[EdgyModel, bool]]: A list of tuples with updated or newly created objects and if created.
+            list[tuple[EdgyModel, bool]]: A list of tuples with updated or created objects and  created flag.
                                           Warning: for performance reasons no embedding is applied and
                                           the returned objects are maybe incomplete (check `can_load` property).
         """
@@ -664,7 +670,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         resolve_embed: bool = False,
     ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
         """
-        Bulk updates or creates records in a table.
+        Abstract method to bulk updates or creates records in a table.
 
         If records exist based on unique fields, they are retrieved.
         Otherwise, new records are created.
@@ -679,9 +685,9 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
 
         Returns:
             list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
-                A list of tuples with retrieved or newly created objects and if created.
+                A list of tuples with retrieved or created objects and created flag.
                 Warning: for performance reasons no embedding is applied by default and
-                the returned objects are maybe incomplete (check `can_load` property)
+                the returned objects are maybe incomplete (check `can_load` property).
         """
         ...
 
@@ -695,10 +701,11 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     ) -> list[tuple[EdgyEmbedTarget, bool]]:
         """
         Args:
+            ...
             resolve_embed (True): Enables embedding.
 
         Returns:
-            list[tuple[EdgyEmbedTarget, bool]]: A list of tuples with retrieved or newly created objects and if created.
+            list[tuple[EdgyEmbedTarget, bool]]: A list of tuples with retrieved or created objects and created flag.
                                                 Warning: All models must be loadable (`can_load` property is true)
                                                 otherwise `BulkOperationModelsIncompatible` is raised.
         """
@@ -713,9 +720,10 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     ) -> list[tuple[EdgyModel, bool]]:
         """
         Args:
+            ...
             resolve_embed (False): Disables embedding. Default.
         Returns:
-            list[tuple[EdgyModel, bool]]: A list of tuples with retrieved or newly created objects and if created.
+            list[tuple[EdgyModel, bool]]: A list of tuples with retrieved or created objects and created flag.
                                           Warning: for performance reasons no embedding is applied and
                                           the returned objects are maybe incomplete (check `can_load` property).
         """
@@ -729,7 +737,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         resolve_embed: bool = False,
     ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
         """
-        Bulk gets or creates records in a table.
+        Abstract method to bulk get or create records in a table.
 
         If records exist based on unique fields, they are retrieved.
         Otherwise, new records are created.
@@ -742,7 +750,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
 
         Returns:
             list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
-                A list of tuples with retrieved or newly created objects and if created.
+                A list of tuples with retrieved or newly created objects and created flag.
                 Warning: for performance reasons no embedding is applied by default and
                 the returned objects are maybe incomplete (check `can_load` property).
         """
