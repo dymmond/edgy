@@ -543,6 +543,8 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         Args:
             objs (Iterable[dict[str, Any] | EdgyModel]): An iterable of dictionaries or
                                                          model instances to create.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
+
         Returns:
             list[EdgyModel] | list[EdgyEmbedTarget]:
                 A list of created objects.
