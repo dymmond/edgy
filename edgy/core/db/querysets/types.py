@@ -636,7 +636,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             resolve_embed (True): Enables embedding.
 
         Returns:
-            list[tuple[EdgyEmbedTarget, bool]]: A list of tuples with updated or created objects and created flag.
+            list[tuple[EdgyEmbedTarget, bool]]: A list of `(instance, created)` tuples.
                                                 Warning: All models must be loadable (`can_load` property is true)
                                                 otherwise  `BulkOperationModelsIncompatible` is raised.
         """
@@ -685,7 +685,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
 
         Returns:
             list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
-                A list of tuples with retrieved or created objects and created flag.
+                A list of `(instance, created)` tuples.
                 Warning: for performance reasons no embedding is applied by default and
                 the returned objects are maybe incomplete (check `can_load` property).
         """
@@ -705,7 +705,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             resolve_embed (True): Enables embedding.
 
         Returns:
-            list[tuple[EdgyEmbedTarget, bool]]: A list of tuples with retrieved or created objects and created flag.
+            list[tuple[EdgyEmbedTarget, bool]]: A list of `(instance, created)` tuples.
                                                 Warning: All models must be loadable (`can_load` property is true)
                                                 otherwise `BulkOperationModelsIncompatible` is raised.
         """
@@ -723,7 +723,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             ...
             resolve_embed (False): Disables embedding. Default.
         Returns:
-            list[tuple[EdgyModel, bool]]: A list of tuples with retrieved or created objects and created flag.
+            list[tuple[EdgyModel, bool]]: A list of `(instance, created)` tuples.
                                           Warning: for performance reasons no embedding is applied and
                                           the returned objects are maybe incomplete (check `can_load` property).
         """

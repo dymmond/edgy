@@ -1229,8 +1229,31 @@ You can pass positional ModelRefs to this method.
 ### Update embedding
 
 For updating `embed_parent` on the fly use `update_embed_parent`. This allows for example to strip an embedding
-of M2M endpoints and access the M2M intermediate models directly.
+of ManyToMany relations and access the ManyToMany intermediate models directly.
 
+```python
+
+class User(edgy.Model):
+    ...
+
+class Group(edgy.Model):
+    active: bool = edgy.BooleanField()
+
+class Room()
+    users = edgy.ManyToMany(User, through=Group)
+
+
+room = Room.query.first()
+
+users =  await room.users.all()
+groups = await room.users.update_embed_parent(None).all()  # access the immediate model
+users =  await room.users.update_embed_parent(("user", "group_used")).all()  # users with group as group_used attribute
+```
+
+## Bulk operations
+
+When updating or creating a lot of records the normal QuerySet operations are too imperformant. Luckily we have optimized
+bulk operations.
 
 [Bulk operations](./bulk.md)
 
