@@ -1,5 +1,8 @@
 import typing
 
+if typing.TYPE_CHECKING:
+    from edgy.core.db.models.types import BaseModelType
+
 
 class EdgyException(Exception):
     """
@@ -167,6 +170,24 @@ class QuerySetError(EdgyException):
     This covers a range of issues that can occur during database queries,
     filtering, ordering, or data retrieval.
     """
+
+
+class BulkOperationModelsIncompatible(QuerySetError):
+    """
+    Exception raised when the values provided are incomplete for loading
+    and resolve_embed is used.
+    """
+
+    provided: list[tuple[BaseModelType, bool]]
+
+    def __init__(
+        self,
+        *args: typing.Any,
+        detail: str = "",
+        provided: list[tuple[BaseModelType, bool]],
+    ):
+        super().__init__(*args, detail=detail)
+        self.provided = provided
 
 
 class ModelReferenceError(EdgyException):

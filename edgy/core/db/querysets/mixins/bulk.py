@@ -20,6 +20,7 @@ import sqlalchemy
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import check_db_connection
+from edgy.exceptions import BulkOperationModelsIncompatible
 
 from ..types import (
     EdgyEmbedTarget,
@@ -27,12 +28,12 @@ from ..types import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
+    from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.querysets.queryset import QuerySet
-
-    QuerySetAsType = QuerySet
+    from edgy.core.db.querysets.queryset import QuerySet as QuerySetAsTypingBase
 
 else:
-    QuerySetAsType = object
+    QuerySetAsTypingBase = object
 
 _empty_set = cast(set[Any], frozenset())
 
@@ -66,7 +67,7 @@ def _extract_unique_lookup_key(obj: Any, unique_fields: Iterable[str]) -> tuple 
     return tuple(lookup_key)
 
 
-class BulkMixin(QuerySetAsType):
+class BulkMixin(QuerySetAsTypingBase):
     async def _bulk_get_update_or_create(
         self,
         *,
@@ -99,6 +100,7 @@ class BulkMixin(QuerySetAsType):
         queryset: QuerySet = self._clone()
         create_objs: list[EdgyModel] = []
         update_objs: list[EdgyModel] = []
+
         returned_objs_with_created: list[tuple[EdgyModel, bool]] = []
         create_skip_post_save: set[int] = set()
         existing_records: dict[tuple, EdgyModel] = {}
@@ -220,8 +222,9 @@ class BulkMixin(QuerySetAsType):
             (tup[0], tup[0]) for tup in returned_objs_with_created if tup[0].can_load
         ]
         if resolve_embed and len(full_defined_for_cache) != len(returned_objs_with_created):
-            raise ValueError(
-                "Not all provided objects are fully defined for loading and `resolve_embed=True`"
+            raise BulkOperationModelsIncompatible(
+                detail="Not all provided objects are fully defined for loading and `resolve_embed=True`",
+                provided=cast("list[tuple[BaseModelType, bool]]", returned_objs_with_created),
             )
 
         check_db_connection(queryset.database, 4)
@@ -391,11 +394,15 @@ class BulkMixin(QuerySetAsType):
         and returns plain instances which **may** are incomplete.
 
         Args:
-            objs: An iterable of dictionaries or model instances to be created.
+            objs (Iterable[dict[str, Any] | EdgyModel]): An iterable of dictionaries or
+                                                         model instances to create.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
+
         Returns:
-            list[EdgyModel]: A list of newly created objects.
-                             Warning: for performance reasons no embedding is applied and returned objects
-                             are maybe incomplete (check `can_load` property please).
+            list[EdgyModel] | list[EdgyEmbedTarget]:
+                A list of created objects.
+                Warning: for performance reasons no embedding is applied by default and
+                the returned objects are maybe incomplete (check `can_load` property).
         """
         return cast(
             "list[EdgyModel] | list[EdgyEmbedTarget]",
