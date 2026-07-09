@@ -10,6 +10,10 @@ and can't load.
 
 The returned array is in the same order as the values/objects provided. And contains for `bulk_get_or_create` and `bulk_update_or_create` a state flag if this object was created is added.
 
+**Input**
+
+Input for all bulk operations are models of the right type or dictionaries. They can be intermixed and must be provided in an `Iterable`.
+
 ## Operations
 
 ### Bulk create
@@ -31,7 +35,8 @@ assert returned_objs[1].can_load  # the pks are complete
 
 ### Bulk update
 
-When you need to update many instances in one go, or **in bulk**.
+When you need to update many instances in one go, or **in bulk**. With `update_fields` you can define the fields updated.
+By default all fields are updatable.
 
 ```python
 await User.query.bulk_create([
@@ -55,6 +60,7 @@ retrieved_objects = await User.query.bulk_update(users, update_fields=['is_activ
 When you need to perform in bulk a `get_or_create` in your models. The normal behavior would
 be like the `bulk_create` but this bring an additional `unique_fields` where we can make sure
 we do not insert duplicates by filtering the unique keys of the model data being inserted.
+When not provided `unique_fields` default to the primary keys.
 
 ```python
 results = await User.query.bulk_get_or_create([
@@ -104,7 +110,7 @@ assert not results[1][1]  # updated
 users = await User.query.all() # 2 as total
 ```
 
-By default `unique_fields` are the primary keys or columns and `update_fields` are all fields defined.
+By default `unique_fields` are the primary keys or columns and `update_fields` are all the fields defined in the model class.
 
 ## Advanced Topics
 
@@ -124,4 +130,57 @@ This exception contains an attribute named `instances_and_created` a list with t
 You can check which instances caused the problems by probing `can_load` for each instance.
 
 !!! Note
-    Despite the created flag, no updating database operation was executed yet. Only the retrieval (`bulk_get_or_create` and `bulk_update_or_create`).
+    Despite the created flag, no updating database operation was executed yet. At most the retrieval operation for (`bulk_get_or_create` and `bulk_update_or_create`)
+    is executed, otherwise only instances are built which can be saved.
+
+**How to use**
+
+Imagine you don't know if a set of provided objects or dicts has all primary keys defined and you need to use embed_parent. Then you can use a pattern like this:
+```python
+
+try:
+    results = await User.query.bulk_get_or_create([
+        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
+        {"id": 100, "email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
+    ], unique_fields=["email"], resolve_embed=True)
+except BulkOperationModelsIncompatible as exc:
+    finished = []
+    compatible = []
+    incompatible = []
+    for instance, created in exc.instances_and_created:
+        if not created:
+            finished.append(instance)
+        elif instance.can_load:
+            compatible.append(instance)
+        else:
+            incompatible.append(instance)
+        await User.query.bulk_create(compatible)
+        for instance in incompatible:
+            await instance.save()
+    # references resolve to the correct results
+    results = exc.instances_and_created
+```
+
+For `bulk_update_or_create` we would need to merge `finished` and `compatible` like this:
+
+```python
+
+try:
+    results = await User.query.bulk_update_or_create([
+        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
+        {"id": 100, "email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
+    ], unique_fields=["email"], resolve_embed=True)
+except BulkOperationModelsIncompatible as exc:
+    compatible = []
+    incompatible = []
+    for instance, created in exc.instances_and_created:
+        if instance.can_load:
+            compatible.append(instance)
+        else:
+            incompatible.append(instance)
+        await User.query.bulk_create(compatible)
+        for instance in incompatible:
+            await instance.save()
+    # references resolve to the correct results
+    results = exc.instances_and_created
+```

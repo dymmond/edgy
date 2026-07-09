@@ -111,6 +111,10 @@ class BulkMixin:
             if unique_fields or free_unique_columns:
 
                 async def _iterate_retrieve(obj: EdgyModel | dict) -> tuple[EdgyModel, bool]:
+                    if not isinstance(obj, (model_class, dict)):
+                        raise ValueError(
+                            f"Instance provided of wrong type: `{type(obj)!r}` required: `{model_class!r}`."
+                        )
                     filter_kwargs = {}
                     dict_fields = {}
                     if isinstance(obj, dict):
@@ -162,18 +166,16 @@ class BulkMixin:
                                 found_obj = existing_records[lookup_key]
                             break
                     if found_obj is None:
-                        created = (
-                            cast(EdgyModel, queryset.model_class(**obj))
-                            if isinstance(obj, dict)
-                            else obj
-                        )
-                        create_objs.append(created)
-                        if (
-                            model_class.meta.post_save_fields
-                            and isinstance(obj, dict)
-                            and model_class.meta.post_save_fields.isdisjoint(obj.keys())
-                        ):
-                            create_skip_post_save.add(id(created))
+                        created: EdgyModel
+                        if isinstance(obj, dict):
+                            created = queryset.model_class(**obj)
+                            if (
+                                model_class.meta.post_save_fields
+                                and model_class.meta.post_save_fields.isdisjoint(obj.keys())
+                            ):
+                                create_skip_post_save.add(id(created))
+                        else:
+                            created = obj
                         return created, True
                     else:
                         if update:
@@ -194,22 +196,33 @@ class BulkMixin:
                 )
         elif update:
             for obj in objs:
-                updated = (
-                    cast(EdgyModel, queryset.model_class(**obj)) if isinstance(obj, dict) else obj
-                )
+                updated: EdgyModel
+                if isinstance(obj, dict):
+                    updated = queryset.model_class(**obj)
+                else:
+                    updated = obj
+                    if not isinstance(updated, model_class):
+                        raise ValueError(
+                            f"Instance provided of wrong type: `{type(updated)!r}` required: `{model_class!r}`."
+                        )
                 update_objs.append(updated)
                 returned_objs_with_created.append((updated, False))
         else:
             for obj in objs:
-                created = (
-                    cast(EdgyModel, queryset.model_class(**obj)) if isinstance(obj, dict) else obj
-                )
-                if (
-                    model_class.meta.post_save_fields
-                    and isinstance(obj, dict)
-                    and model_class.meta.post_save_fields.isdisjoint(obj.keys())
-                ):
-                    create_skip_post_save.add(id(created))
+                created: EdgyModel
+                if isinstance(obj, dict):
+                    created = queryset.model_class(**obj)
+                    if (
+                        model_class.meta.post_save_fields
+                        and model_class.meta.post_save_fields.isdisjoint(obj.keys())
+                    ):
+                        create_skip_post_save.add(id(created))
+                else:
+                    created = obj
+                    if not isinstance(created, model_class):
+                        raise ValueError(
+                            f"Instance provided of wrong type: `{type(created)!r}` required: `{model_class!r}`."
+                        )
                 create_objs.append(created)
                 returned_objs_with_created.append((created, True))
 
