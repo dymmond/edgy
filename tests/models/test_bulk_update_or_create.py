@@ -47,6 +47,22 @@ class Product(edgy.StrictModel):
         registry = models
 
 
+class Album(edgy.Model):
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Track(edgy.Model):
+    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE)
+    title = edgy.CharField(max_length=100)
+    position = edgy.IntegerField()
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     # this creates and drops the database
@@ -153,14 +169,14 @@ async def test_bulk_update_or_create_update():
 
 
 async def test_bulk_update_or_create_no_duplicates_filter_by_dict():
-    await Product.query.bulk_get_or_create(
+    await Product.query.bulk_update_or_create(
         [
             {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
             {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
         ]
     )
 
-    await Product.query.bulk_get_or_create(
+    await Product.query.bulk_update_or_create(
         [
             {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
             {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
@@ -176,3 +192,45 @@ async def test_bulk_update_or_create_no_duplicates_filter_by_dict():
     assert products[1].data == {"foo": 456}
     assert products[1].value == 456.789
     assert products[1].status == StatusEnum.DRAFT
+
+
+async def test_bulk_bulk_update_or_create_resolve_embed():
+    album = Album(name="foo")
+    albums = await Track.query.update_embed_parent(("album", "embedded")).bulk_update_or_create(
+        [
+            {"album": album, "position": 1, "title": "foo"},
+            {"album": album, "position": 2, "title": "fighters"},
+        ],
+        resolve_embed=True,
+    )
+    assert albums[0][0].get_real_class() is Album
+    assert albums[0][0].embedded.get_real_class() is Track
+    assert albums[0][0].id
+    assert albums[1][0].get_real_class() is Album
+    assert albums[1][0].embedded.get_real_class() is Track
+    assert albums[1][0].id
+    tracks = await Track.query.all()
+    assert tracks[0].album.pk == albums[0][0].pk
+    assert tracks[1].album.pk == albums[1][0].pk
+
+    tracks[0].title = "boo"
+    tracks[1].title = "zoo"
+    albums = await Track.query.update_embed_parent(("album", "embedded")).bulk_update_or_create(
+        tracks,
+        resolve_embed=True,
+    )
+    assert albums[0][0].embedded.title == "boo"
+    assert albums[1][0].embedded.title == "zoo"
+
+
+async def test_bulk_bulk_update_or_create_fail():
+    # FIXME: causes warning RuntimeWarning: coroutine 'BulkMixin._bulk_get_update_or_create.<locals>._iterate_retrieve'
+    # was never awaited
+    with pytest.raises(ValueError):
+        await Track.query.update_embed_parent(("album", "embedded")).bulk_update_or_create(
+            [
+                {"position": 1, "title": "foo"},
+                {"album": Album(name="fighters"), "position": 2, "title": "fighters"},
+            ],
+            resolve_embed=True,
+        )

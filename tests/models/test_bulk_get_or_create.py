@@ -47,6 +47,22 @@ class Product(edgy.StrictModel):
         registry = models
 
 
+class Album(edgy.Model):
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Track(edgy.Model):
+    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE)
+    title = edgy.CharField(max_length=100)
+    position = edgy.IntegerField()
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     # this creates and drops the database
@@ -65,7 +81,11 @@ async def rollback_transactions():
 
 
 async def test_empty_bulk_get_or_create():
-    await Product.query.bulk_get_or_create([])
+    query = Product.query.all()
+    await query
+    assert query._cache_count == 0
+    await query.bulk_get_or_create([])
+    assert query._cache_count == 0
 
 
 async def test_bulk_bulk_get_or_create():
@@ -88,12 +108,31 @@ async def test_bulk_bulk_get_or_create():
     # retry
     products = await Product.query.all()
     assert len(products) == 2
+    assert products[0].id
     assert products[0].data == {"foo": 123}
     assert products[0].value == 123.456
     assert products[0].status == StatusEnum.RELEASED
+    assert products[1].id
     assert products[1].data == {"foo": 456}
     assert products[1].value == 456.789
     assert products[1].status == StatusEnum.DRAFT
+
+
+async def test_bulk_bulk_get_or_create_resolve_embed():
+    albums = await Track.query.update_embed_parent(("album", "embedded")).bulk_get_or_create(
+        [
+            {"album": Album(name="foo"), "position": 1, "title": "foo"},
+            {"album": Album(name="fighters"), "position": 2, "title": "fighters"},
+        ],
+        resolve_embed=True,
+    )
+    assert albums[0][0].get_real_class() is Album
+    assert albums[0][0].id
+    assert albums[1][0].get_real_class() is Album
+    assert albums[1][0].id
+    tracks = await Track.query.all()
+    assert tracks[0].album.pk == albums[0][0].pk
+    assert tracks[1].album.pk == albums[1][0].pk
 
 
 async def test_bulk_get_or_create_no_duplicates():

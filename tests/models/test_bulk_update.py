@@ -5,6 +5,7 @@ import pytest
 
 import edgy
 from edgy.core.db import fields
+from edgy.exceptions import BulkOperationModelsIncompatible
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -142,3 +143,44 @@ async def test_bulk_update_with_relation():
     tracks = await Track.query.all()
     assert tracks[0].album.pk == album2.pk
     assert tracks[1].album.pk == album2.pk
+
+
+async def test_bulk_update_with_relation_unique():
+    album = Album(name="foo")
+    await Track.query.bulk_create(
+        [
+            {"album": album, "position": 1, "title": "foo"},
+            {"album": album, "position": 2, "title": "fighters"},
+        ]
+    )
+    albums = await Track.query.update_embed_parent(("album", "embedded")).bulk_update(
+        [
+            {"position": 4, "title": "foo"},
+            {"position": 5, "title": "fighters"},
+        ],
+        resolve_embed=True,
+        unique_fields=["title"],
+    )
+    assert albums[0].embedded.position == 4
+    assert albums[1].embedded.position == 5
+
+
+async def test_bulk_update_with_relation_recover():
+    album = Album(name="foo")
+    try:
+        await Track.query.update_embed_parent(("album", "embedded")).bulk_update(
+            [
+                {"album": album, "position": 4, "title": "foo"},
+                {"album": album, "position": 5, "title": "fighters"},
+            ],
+            resolve_embed=True,
+        )
+    except BulkOperationModelsIncompatible as exc:
+        results = [
+            ((await op[0].save(force_insert=True)).album, op[1])
+            for op in exc.instances_with_created
+        ]
+        assert results[0][0].id
+        assert results[0][1]
+        assert results[1][0].id
+        assert results[1][1]

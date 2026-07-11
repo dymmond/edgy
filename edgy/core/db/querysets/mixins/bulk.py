@@ -181,6 +181,7 @@ class BulkMixin:
                                 create_skip_post_save.add(id(created))
                         else:
                             created = obj
+                        create_objs.append(created)
                         return created, True
                     else:
                         if update:
@@ -247,7 +248,7 @@ class BulkMixin:
         check_db_connection(queryset.database, 4)
 
         async def _iterate_create(obj: EdgyModel) -> dict[str, Any] | None:
-            if resolve_embed and not obj.can_load:
+            if resolve_embed and self.embed_parent and not obj.can_load:
                 await obj.real_save(force_insert=True, values=None)
                 create_skip_post_save.add(id(obj))
                 return None
@@ -265,7 +266,7 @@ class BulkMixin:
 
         async def _iterate_update(obj: EdgyModel) -> dict[str, Any]:
             original_field_values = obj.extract_db_fields(_unique_and_update)
-            col_values: dict[str, Any] = queryset.model_class.extract_column_values(
+            col_values: dict[str, Any] = model_class.extract_column_values(
                 original_field_values,
                 is_update=True,
                 is_partial=True,
@@ -280,7 +281,9 @@ class BulkMixin:
                     )
                 )
             if not _update_columns.issubset(col_values):
-                raise ValueError(f"Missing columns: {_update_columns.difference(col_values)}")
+                raise Exception(
+                    f"Missing columns: {_update_columns.difference(col_values)}. Check `update_fields` or may define this parameter."
+                )
             return {f"__{item[0]}": item[1] for item in col_values.items()}
 
         token = CURRENT_INSTANCE.set(self)
@@ -316,10 +319,15 @@ class BulkMixin:
                         [_iterate_create(obj) for obj in create_objs],
                         limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
                     )
-                    expression_create = queryset.table.insert().values(
-                        [values for values in create_obj_values if values is not None]
-                    )
-                    await database.execute_many(expression_create)
+                    create_obj_values = [
+                        values for values in create_obj_values if values is not None
+                    ]
+                    # we need to recheck if the conditions are still valid
+                    if create_obj_values:
+                        expression_create = queryset.table.insert().values(
+                            [values for values in create_obj_values if values is not None]
+                        )
+                        await database.execute_many(expression_create)
 
                 if update_objs or create_objs:
                     # only the results change
@@ -535,8 +543,13 @@ class BulkMixin:
                 for field in _unique_fields
                 for col in self.model_class.meta.field_to_column_names[field]
             )
+
         _update_fields = (
-            set(self.model_class.meta.fields.keys()).difference(self.model_class.pknames)
+            {
+                key
+                for key, value in self.model_class.meta.fields.items()
+                if not value.read_only and not value.primary_key
+            }
             if update_fields is None
             else set(update_fields)
         )
@@ -637,7 +650,11 @@ class BulkMixin:
                 for col in self.model_class.meta.field_to_column_names[field]
             )
         _update_fields = (
-            set(self.model_class.meta.fields.keys()).difference(self.model_class.pknames)
+            {
+                key
+                for key, value in self.model_class.meta.fields.items()
+                if not value.read_only and not value.primary_key
+            }
             if update_fields is None
             else set(update_fields)
         )

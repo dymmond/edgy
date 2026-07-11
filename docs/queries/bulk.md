@@ -120,32 +120,33 @@ By default `embed_parent` isn't honored for bulk operations. If you need to reso
 `embed_target=True`.
 This mode has 2 effects:
 
-- It is ensured that all returned instances `can_load` when `embed_parent` is in use.
-  When not [`BulkOperationModelsIncompatible`](#bulkoperationmodelsincompatible) is raised.
+- It is ensured that all returned instances `can_load` when `embed_parent` is set. If necessary
 - The embedding is resolved if `embed_parent` is set. You get the child with the embedded parent.
 
 ### `BulkOperationModelsIncompatible`
 
 This exception contains an attribute named `instances_and_created` a list with tuple of instances together with the created flag.
-You can check which instances caused the problems by probing `can_load` for each instance.
+You can check which instances caused the problems by probing `can_load` for each instance. This exception will only be raised with `resolve_embed=True` in combination with
+`bulk_update` or `bulk_update_or_create`. For the last it can only happen when using `only`.
 
 !!! Note
-    Despite the created flag, no updating database operation was executed yet. At most the retrieval operation for (`bulk_get_or_create` and `bulk_update_or_create`)
-    is executed, otherwise only instances are built which can be saved.
+    Despite the created flag, no updating database operations except for retrieval are executed yet.
 
 **How to use**
 
 Imagine you don't know if a set of provided objects or dicts has all primary keys defined and you need to use `resolve_embed`. Then you can use a pattern like this:
 
 ```python
-
 try:
-    results = await User.query.update_parent_embed(("profile", "")).bulk_update_or_create([
-        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True, "profile": Profile()},
-        {"id": 100, "email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True, "profile": Profile()},
+    # id is primary key and wasn't specified
+    results = await User.query.update_parent_embed(("profile", "user")).bulk_update([
+        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
+        {"id": 100, "email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
     ], unique_fields=["email"], resolve_embed=True)
 except BulkOperationModelsIncompatible as exc:
     results = []
     for instance, created in exc.instances_and_created:
-        results.append(((await instance.save()).profile, created))
+        temp_obj = (await instance.save()).profile
+        temp_obj.user = instance
+        results.append((temp_obj, created))
 ```
