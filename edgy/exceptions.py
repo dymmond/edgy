@@ -2,9 +2,6 @@ from __future__ import annotations
 
 import typing
 
-if typing.TYPE_CHECKING:
-    from edgy.core.db.models.types import BaseModelType
-
 
 class EdgyException(Exception):
     """
@@ -172,24 +169,6 @@ class QuerySetError(EdgyException):
     This covers a range of issues that can occur during database queries,
     filtering, ordering, or data retrieval.
     """
-
-
-class ResolveEmbedIncompatible(QuerySetError):
-    """
-    Exception raised when the values provided are incomplete for loading
-    and resolve_embed is used.
-    """
-
-    instances_and_created: list[tuple[BaseModelType, bool]]
-
-    def __init__(
-        self,
-        *args: typing.Any,
-        detail: str = "",
-        instances_and_created: list[tuple[BaseModelType, bool]],
-    ):
-        super().__init__(*args, detail=detail)
-        self.instances_and_created = instances_and_created
 
 
 class ModelReferenceError(EdgyException):

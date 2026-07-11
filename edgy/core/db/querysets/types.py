@@ -572,7 +572,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         Returns:
             list[EdgyEmbedTarget]: A list of updated objects.
                                    Warning: All models must be loadable (`can_load` property is true)
-                                   otherwise `ResolveEmbedIncompatible` is raised.
+                                   otherwise an `QuerySetError` is raised.
         """
 
     @overload
@@ -638,7 +638,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         Returns:
             list[tuple[EdgyEmbedTarget, bool]]: A list of `(instance, created)` tuples.
                                                 Warning: All models must be loadable (`can_load` property is true)
-                                                otherwise  `ResolveEmbedIncompatible` is raised.
+                                                otherwise an `QuerySetError` is raised.
         """
 
     @overload

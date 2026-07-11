@@ -20,7 +20,7 @@ import sqlalchemy
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import check_db_connection
-from edgy.exceptions import QuerySetError, ResolveEmbedIncompatible
+from edgy.exceptions import QuerySetError
 
 from ..types import (
     EdgyEmbedTarget,
@@ -28,7 +28,6 @@ from ..types import (
 )
 
 if TYPE_CHECKING:  # pragma: no cover
-    from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.querysets.queryset import QuerySet
 
 _empty_set = cast(set[Any], frozenset())
@@ -237,11 +236,8 @@ class BulkMixin:
         if resolve_embed and self.embed_parent:
             # check if all are elligable and can be resolved
             if not all(res[0].can_load or res[1] for res in returned_objs_with_created):
-                raise ResolveEmbedIncompatible(
+                raise QuerySetError(
                     detail="Not all resulting objects are fully defined for loading and `resolve_embed=True`",
-                    instances_and_created=cast(
-                        "list[tuple[BaseModelType, bool]]", returned_objs_with_created
-                    ),
                 )
             can_result_cache = True
 
@@ -586,7 +582,7 @@ class BulkMixin:
         Returns:
             list[tuple[EdgyEmbedTarget, bool]]: A list of `(instance, created)` tuples.
                                                 Warning: All models must be loadable (`can_load` property is true)
-                                                otherwise  `ResolveEmbedIncompatible` is raised.
+                                                otherwise an `QuerySetError` is raised.
         """
 
     @overload

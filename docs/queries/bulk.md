@@ -4,8 +4,7 @@ Bulk operations are different from normal queryset operations.
 They don't adher the embed_parent attribute by default (so they don't load nested objects) and are not necessarily
 complete.
 
-Why? Because they are optimized for performance. You can however provide `resolve_embed=True` to try to resolve. In case
-or to fail with [`ResolveEmbedIncompatible`](#ResolveEmbedIncompatible) when the values/objects provided/retrieved doesn't have all keys defined for loading
+Why? Because they are optimized for performance. You can however provide `resolve_embed=True` to try to resolve. In case operations may fail with an `QuerySetError` when the values/objects provided/retrieved doesn't have all keys defined for loading (by default primary keys)
 and can't load.
 
 The returned array is in the same order as the values/objects provided. And contains for `bulk_get_or_create` and `bulk_update_or_create` a state flag if this object was created is added.
@@ -118,35 +117,7 @@ By default `unique_fields` are the primary keys or columns and `update_fields` a
 
 By default `embed_parent` isn't honored for bulk operations. If you need to resolve to embedded child when possible, you can specify
 `embed_target=True`.
-This mode has 2 effects:
+This mode has two effects:
 
-- It is ensured that all returned instances `can_load` when `embed_parent` is set. If necessary
+- It is ensured that all returned instances `can_load` when `embed_parent` is active. If necessary, it will issue an `real_save`.
 - The embedding is resolved if `embed_parent` is set. You get the child with the embedded parent.
-
-### `ResolveEmbedIncompatible`
-
-This exception contains an attribute named `instances_and_created` a list with tuple of instances together with the created flag.
-You can check which instances caused the problems by probing `can_load` for each instance. This exception will only be raised with `resolve_embed=True` in combination with
-`bulk_update` or `bulk_update_or_create`. For the last it can only happen when using `only`.
-
-!!! Note
-    Despite the created flag, no updating database operations except for retrieval are executed yet.
-
-**How to use**
-
-Imagine you don't know if a set of provided objects or dicts has all primary keys defined and you need to use `resolve_embed`. Then you can use a pattern like this:
-
-```python
-try:
-    # id is primary key and wasn't specified
-    results = await User.query.update_parent_embed(("profile", "user")).bulk_update([
-        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-        {"id": 100, "email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-    ], unique_fields=["email"], resolve_embed=True)
-except ResolveEmbedIncompatible as exc:
-    results = []
-    for instance, created in exc.instances_and_created:
-        temp_obj = (await instance.save()).profile
-        temp_obj.user = instance
-        results.append((temp_obj, created))
-```
