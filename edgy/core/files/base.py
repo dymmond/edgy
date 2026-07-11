@@ -621,8 +621,13 @@ class FieldFile(File):
             direct_name = False
             name = getattr(content, "name", "")
 
-        # Convert content to a standard File object if it's not already.
-        if isinstance(content, File):
+        if isinstance(content, FieldFile):
+            content = content.to_file()
+            if content is None:
+                self.delete()  # If content is None, mark for deletion.
+                return
+        elif isinstance(content, File):
+            # Convert content to a standard File object if it's not already.
             content = content.open("rb").file
         elif isinstance(content, bytes):
             content = BytesIO(content)
