@@ -5,7 +5,7 @@ import pytest
 
 import edgy
 from edgy.core.db import fields
-from edgy.exceptions import BulkOperationModelsIncompatible
+from edgy.exceptions import ResolveEmbedIncompatible
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -175,7 +175,7 @@ async def test_bulk_update_with_relation_recover():
             ],
             resolve_embed=True,
         )
-    except BulkOperationModelsIncompatible as exc:
+    except ResolveEmbedIncompatible as exc:
         results = [
             ((await op[0].save(force_insert=True)).album, op[1])
             for op in exc.instances_with_created

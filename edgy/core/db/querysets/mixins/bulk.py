@@ -20,7 +20,7 @@ import sqlalchemy
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import check_db_connection
-from edgy.exceptions import BulkOperationModelsIncompatible
+from edgy.exceptions import QuerySetError, ResolveEmbedIncompatible
 
 from ..types import (
     EdgyEmbedTarget,
@@ -237,7 +237,7 @@ class BulkMixin:
         if resolve_embed and self.embed_parent:
             # check if all are elligable and can be resolved
             if not all(res[0].can_load or res[1] for res in returned_objs_with_created):
-                raise BulkOperationModelsIncompatible(
+                raise ResolveEmbedIncompatible(
                     detail="Not all resulting objects are fully defined for loading and `resolve_embed=True`",
                     instances_and_created=cast(
                         "list[tuple[BaseModelType, bool]]", returned_objs_with_created
@@ -281,8 +281,8 @@ class BulkMixin:
                     )
                 )
             if not _update_columns.issubset(col_values):
-                raise Exception(
-                    f"Missing columns: {_update_columns.difference(col_values)}. Check `update_fields` or may define this parameter."
+                raise QuerySetError(
+                    detail=f"Missing columns: {_update_columns.difference(col_values)}. Check `update_fields` or the input values."
                 )
             return {f"__{item[0]}": item[1] for item in col_values.items()}
 
@@ -586,7 +586,7 @@ class BulkMixin:
         Returns:
             list[tuple[EdgyEmbedTarget, bool]]: A list of `(instance, created)` tuples.
                                                 Warning: All models must be loadable (`can_load` property is true)
-                                                otherwise  `BulkOperationModelsIncompatible` is raised.
+                                                otherwise  `ResolveEmbedIncompatible` is raised.
         """
 
     @overload

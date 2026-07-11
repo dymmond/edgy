@@ -174,7 +174,7 @@ class QuerySetError(EdgyException):
     """
 
 
-class BulkOperationModelsIncompatible(QuerySetError):
+class ResolveEmbedIncompatible(QuerySetError):
     """
     Exception raised when the values provided are incomplete for loading
     and resolve_embed is used.
