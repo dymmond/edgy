@@ -69,21 +69,21 @@ async def test_empty_bulk_get_or_create():
 
 
 async def test_bulk_bulk_get_or_create():
-    products_with_c_state = await Product.query.bulk_get_or_create(
+    products_with_created = await Product.query.bulk_get_or_create(
         [
             {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
             {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
         ]
     )
-    assert len(products_with_c_state) == 2
-    assert products_with_c_state[0][1]
-    assert products_with_c_state[0][0].data == {"foo": 123}
-    assert products_with_c_state[0][0].value == 123.456
-    assert products_with_c_state[0][0].status == StatusEnum.RELEASED
-    assert products_with_c_state[1][0].data == {"foo": 456}
-    assert products_with_c_state[1][0].value == 456.789
-    assert products_with_c_state[1][0].status == StatusEnum.DRAFT
-    assert products_with_c_state[1][1]
+    assert len(products_with_created) == 2
+    assert products_with_created[0][1]
+    assert products_with_created[0][0].data == {"foo": 123}
+    assert products_with_created[0][0].value == 123.456
+    assert products_with_created[0][0].status == StatusEnum.RELEASED
+    assert products_with_created[1][0].data == {"foo": 456}
+    assert products_with_created[1][0].value == 456.789
+    assert products_with_created[1][0].status == StatusEnum.DRAFT
+    assert products_with_created[1][1]
 
     # retry
     products = await Product.query.all()
@@ -105,6 +105,7 @@ async def test_bulk_get_or_create_no_duplicates():
     )
     assert results[0][1]
     assert results[1][1]
+    assert await Product.query.count() == 2
 
     results = await Product.query.bulk_get_or_create(
         [

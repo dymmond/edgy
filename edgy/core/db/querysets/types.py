@@ -517,8 +517,8 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
 
         Returns:
             list[EdgyEmbedTarget]: A list of created objects.
-                                   Warning: All models must be loadable (`can_load` property is true)
-                                   otherwise `BulkOperationModelsIncompatible` is raised.
+                                   Warning: Instances which are not compatible (`can_load` is False)
+                                   will execute an extra save.
         """
 
     @overload
@@ -706,8 +706,8 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
 
         Returns:
             list[tuple[EdgyEmbedTarget, bool]]: A list of `(instance, created)` tuples.
-                                                Warning: All models must be loadable (`can_load` property is true)
-                                                otherwise `BulkOperationModelsIncompatible` is raised.
+                                                Warning: Instances which are not compatible (`can_load` is False)
+                                                will execute an extra save.
         """
 
     @overload

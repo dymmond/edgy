@@ -265,6 +265,6 @@ async def test_update_bulk(create_test_database):
         assert obj.file_field.path not in seen
         seen.add(obj.file_field.path)
         obj.file_field = None
-    await MyModel.query.bulk_update([model1, model2, model3], fields=["file_field"])
+    await MyModel.query.bulk_update([model1, model2, model3], update_fields=["file_field"])
     for path in seen:
         assert not os.path.exists(path)

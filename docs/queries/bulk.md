@@ -4,7 +4,7 @@ Bulk operations are different from normal queryset operations.
 They don't adher the embed_parent attribute by default (so they don't load nested objects) and are not necessarily
 complete.
 
-Why? Because they are optimized for performance. You can however provide `resolve_embed=True` to either resolve
+Why? Because they are optimized for performance. You can however provide `resolve_embed=True` to try to resolve. In case
 or to fail with [`BulkOperationModelsIncompatible`](#bulkoperationmodelsincompatible) when the values/objects provided/retrieved doesn't have all primary keys defined
 and can't load.
 
@@ -135,52 +135,17 @@ You can check which instances caused the problems by probing `can_load` for each
 
 **How to use**
 
-Imagine you don't know if a set of provided objects or dicts has all primary keys defined and you need to use embed_parent. Then you can use a pattern like this:
-```python
-
-try:
-    results = await User.query.bulk_get_or_create([
-        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-        {"id": 100, "email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-    ], unique_fields=["email"], resolve_embed=True)
-except BulkOperationModelsIncompatible as exc:
-    finished = []
-    compatible = []
-    incompatible = []
-    for instance, created in exc.instances_and_created:
-        if not created:
-            finished.append(instance)
-        elif instance.can_load:
-            compatible.append(instance)
-        else:
-            incompatible.append(instance)
-        await User.query.bulk_create(compatible)
-        for instance in incompatible:
-            await instance.save()
-    # references resolve to the correct results
-    results = exc.instances_and_created
-```
-
-For `bulk_update_or_create` we would need to merge `finished` and `compatible` like this:
+Imagine you don't know if a set of provided objects or dicts has all primary keys defined and you need to use `resolve_embed`. Then you can use a pattern like this:
 
 ```python
 
 try:
-    results = await User.query.bulk_update_or_create([
-        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-        {"id": 100, "email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
+    results = await User.query.update_parent_embed(("profile", "")).bulk_update_or_create([
+        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True, "profile": Profile()},
+        {"id": 100, "email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True, "profile": Profile()},
     ], unique_fields=["email"], resolve_embed=True)
 except BulkOperationModelsIncompatible as exc:
-    compatible = []
-    incompatible = []
+    results = []
     for instance, created in exc.instances_and_created:
-        if instance.can_load:
-            compatible.append(instance)
-        else:
-            incompatible.append(instance)
-        await User.query.bulk_create(compatible)
-        for instance in incompatible:
-            await instance.save()
-    # references resolve to the correct results
-    results = exc.instances_and_created
+        results.append(((await instance.save()).profile, created))
 ```

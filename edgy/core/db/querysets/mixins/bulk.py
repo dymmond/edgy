@@ -100,6 +100,11 @@ class BulkMixin:
         returned_objs_with_created: list[tuple[EdgyModel, bool]] = []
         create_skip_post_save: set[int] = set()
         existing_records: dict[tuple, EdgyModel] = {}
+        _update_columns: set[str] = {
+            col
+            for field in update_fields
+            for col in queryset.model_class.meta.field_to_column_names[field]
+        }
         model_class = self.model_class
         if retrieve:
             free_unique_columns: set[str] = {
@@ -170,8 +175,8 @@ class BulkMixin:
                         if isinstance(obj, dict):
                             created = queryset.model_class(**obj)
                             if (
-                                model_class.meta.post_save_fields
-                                and model_class.meta.post_save_fields.isdisjoint(obj.keys())
+                                not model_class.meta.post_save_fields
+                                or model_class.meta.post_save_fields.isdisjoint(obj.keys())
                             ):
                                 create_skip_post_save.add(id(created))
                         else:
@@ -213,8 +218,8 @@ class BulkMixin:
                 if isinstance(obj, dict):
                     created = queryset.model_class(**obj)
                     if (
-                        model_class.meta.post_save_fields
-                        and model_class.meta.post_save_fields.isdisjoint(obj.keys())
+                        not model_class.meta.post_save_fields
+                        or model_class.meta.post_save_fields.isdisjoint(obj.keys())
                     ):
                         create_skip_post_save.add(id(created))
                 else:
@@ -227,37 +232,41 @@ class BulkMixin:
                 returned_objs_with_created.append((created, True))
 
         _unique_and_update: set = update_fields.union(unique_fields)
-        full_defined_for_cache: list[tuple[EdgyModel, EdgyModel]] = [
-            (tup[0], tup[0]) for tup in returned_objs_with_created if tup[0].can_load
-        ]
-        if (
-            resolve_embed
-            and self.embed_parent
-            and len(full_defined_for_cache) != len(returned_objs_with_created)
-        ):
-            raise BulkOperationModelsIncompatible(
-                detail="Not all resulting objects are fully defined for loading and `resolve_embed=True`",
-                instances_and_created=cast(
-                    "list[tuple[BaseModelType, bool]]", returned_objs_with_created
-                ),
-            )
+        can_result_cache = not self.embed_parent
+        if resolve_embed and self.embed_parent:
+            # check if all are elligable and can be resolved
+            if not all(res[0].can_load or res[1] for res in returned_objs_with_created):
+                raise BulkOperationModelsIncompatible(
+                    detail="Not all resulting objects are fully defined for loading and `resolve_embed=True`",
+                    instances_and_created=cast(
+                        "list[tuple[BaseModelType, bool]]", returned_objs_with_created
+                    ),
+                )
+            can_result_cache = True
 
         check_db_connection(queryset.database, 4)
 
-        async def _iterate_create(obj: EdgyModel) -> dict[str, Any]:
-            original = obj.extract_db_fields()
+        async def _iterate_create(obj: EdgyModel) -> dict[str, Any] | None:
+            if resolve_embed and not obj.can_load:
+                await obj.real_save(force_insert=True, values=None)
+                create_skip_post_save.add(id(obj))
+                return None
+            original_field_values = obj.extract_db_fields()
             col_values: dict[str, Any] = obj.extract_column_values(
-                original, phase="prepare_insert", instance=self, model_instance=obj
+                original_field_values, phase="prepare_insert", instance=self, model_instance=obj
             )
-            col_values.update(
-                await obj.execute_pre_save_hooks(col_values, original, is_update=False)
-            )
+            if model_class.meta.pre_save_fields:
+                col_values.update(
+                    await obj.execute_pre_save_hooks(
+                        col_values, original_field_values, is_update=False
+                    )
+                )
             return col_values
 
         async def _iterate_update(obj: EdgyModel) -> dict[str, Any]:
-            extracted = obj.extract_db_fields(_unique_and_update)
-            update_dict: dict[str, Any] = queryset.model_class.extract_column_values(
-                extracted,
+            original_field_values = obj.extract_db_fields(_unique_and_update)
+            col_values: dict[str, Any] = queryset.model_class.extract_column_values(
+                original_field_values,
                 is_update=True,
                 is_partial=True,
                 phase="prepare_update",
@@ -265,10 +274,14 @@ class BulkMixin:
                 model_instance=obj,
             )
             if model_class.meta.pre_save_fields:
-                update_dict.update(
-                    await obj.execute_pre_save_hooks(update_dict, extracted, is_update=True)
+                col_values.update(
+                    await obj.execute_pre_save_hooks(
+                        col_values, original_field_values, is_update=True
+                    )
                 )
-            return {f"__{item[0]}": item[1] for item in update_dict.items()}
+            if not _update_columns.issubset(col_values):
+                raise ValueError(f"Missing columns: {_update_columns.difference(col_values)}")
+            return {f"__{item[0]}": item[1] for item in col_values.items()}
 
         token = CURRENT_INSTANCE.set(self)
         try:
@@ -293,8 +306,7 @@ class BulkMixin:
                         col: sqlalchemy.bindparam(
                             f"__{col}", type_=getattr(queryset.table.c, col).type
                         )
-                        for field in update_fields
-                        for col in queryset.model_class.meta.field_to_column_names[field]
+                        for col in _update_columns
                     }
                     expression_update = expression_update.values(values_placeholder)
                     await database.execute_many(expression_update, update_obj_values)
@@ -304,15 +316,16 @@ class BulkMixin:
                         [_iterate_create(obj) for obj in create_objs],
                         limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
                     )
-                    expression_create = queryset.table.insert().values(create_obj_values)
+                    expression_create = queryset.table.insert().values(
+                        [values for values in create_obj_values if values is not None]
+                    )
                     await database.execute_many(expression_create)
 
                 if update_objs or create_objs:
                     # only the results change
                     self._clear_cache(
                         keep_cached_selected=True,
-                        keep_result_cache=len(full_defined_for_cache)
-                        == len(returned_objs_with_created),
+                        keep_result_cache=can_result_cache,
                     )
                     operations: list[Awaitable] = []
                     if model_class.meta.post_save_fields:
@@ -341,10 +354,11 @@ class BulkMixin:
         if not self.embed_parent:
             self._cache.update(
                 model_class,
-                full_defined_for_cache,
+                [tup[0] for tup in returned_objs_with_created if tup[0].can_load],
                 cache_keys=[
                     self._cache.create_cache_key(model_class, tup[0])
-                    for tup in full_defined_for_cache
+                    for tup in returned_objs_with_created
+                    if tup[0].can_load
                 ],
             )
         elif resolve_embed:
@@ -383,8 +397,8 @@ class BulkMixin:
 
         Returns:
             list[EdgyEmbedTarget]: A list of created objects.
-                                   Warning: All models must be loadable (`can_load` property is true)
-                                   otherwise an error is raised.
+                                   Warning: Instances which are not compatible (`can_load` is False)
+                                   will execute an extra save.
         """
 
     @overload
@@ -506,6 +520,7 @@ class BulkMixin:
             warnings.warn(
                 "Use `update_fields` instead `fields`.", DeprecationWarning, stacklevel=2
             )
+            update_fields = fields
         _unique_fields: set[str]
         _unique_columns: Sequence[str]
         if unique_fields is None:
@@ -520,6 +535,11 @@ class BulkMixin:
                 for field in _unique_fields
                 for col in self.model_class.meta.field_to_column_names[field]
             )
+        _update_fields = (
+            set(self.model_class.meta.fields.keys()).difference(self.model_class.pknames)
+            if update_fields is None
+            else set(update_fields)
+        )
         return cast(
             "list[EdgyModel] | list[EdgyEmbedTarget]",
             [
@@ -528,11 +548,7 @@ class BulkMixin:
                     objs=objs,
                     unique_fields=_unique_fields,
                     unique_columns=_unique_columns,
-                    update_fields=set(
-                        self.model_class.meta.fields.keys()
-                        if update_fields is None
-                        else update_fields
-                    ),
+                    update_fields=_update_fields,
                     update=True,
                     retrieve=False,
                     resolve_embed=resolve_embed,
@@ -620,15 +636,16 @@ class BulkMixin:
                 for field in _unique_fields
                 for col in self.model_class.meta.field_to_column_names[field]
             )
+        _update_fields = (
+            set(self.model_class.meta.fields.keys()).difference(self.model_class.pknames)
+            if update_fields is None
+            else set(update_fields)
+        )
         return await self._bulk_get_update_or_create(
             objs=objs,
             unique_fields=_unique_fields,
             unique_columns=_unique_columns,
-            update_fields=set(self.model_class.meta.fields.keys()).difference(
-                self.model_class.pknames
-            )
-            if update_fields is None
-            else set(update_fields),
+            update_fields=_update_fields,
             update=True,
             retrieve=True,
             resolve_embed=resolve_embed,
@@ -649,8 +666,8 @@ class BulkMixin:
 
         Returns:
             list[tuple[EdgyEmbedTarget, bool]]: A list of `(instance, created)` tuples.
-                                                Warning: All models must be loadable (`can_load` property is true)
-                                                otherwise `BulkOperationModelsIncompatible` is raised.
+                                                Warning: Instances which are not compatible (`can_load` is False)
+                                                will execute an extra save.
         """
 
     @overload

@@ -54,6 +54,22 @@ class FooReflected(edgy.Model):
         registry = models
 
 
+class Album(edgy.Model):
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Track(edgy.Model):
+    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE)
+    title = edgy.CharField(max_length=100)
+    position = edgy.IntegerField()
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     # this creates and drops the database
@@ -107,3 +123,19 @@ async def test_bulk_create_reflected():
     assert results[1].can_load
     assert results[1].foo == 3
     assert results[1].id == 100
+
+
+async def test_bulk_create_resolve_through():
+    results = await Track.query.update_embed_parent(("album", "track_used")).bulk_create(
+        [
+            {"album": Album(name="test"), "position": 1, "title": "foo"},
+            {"id": 100, "album": Album(name="foo"), "position": 2, "title": "fighters"},
+        ],
+        resolve_embed=True,
+    )
+    assert results[0].get_real_class() is Album
+    assert results[0].id
+    assert results[0].track_used.title == "foo"
+    assert results[1].get_real_class() is Album
+    assert results[1].id
+    assert results[1].track_used.title == "fighters"
