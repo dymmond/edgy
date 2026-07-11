@@ -600,8 +600,12 @@ class FieldFile(File):
             overwrite (bool): If True, allows overwriting an existing file with the same name.
                               If False, an alternative name will be generated.
         """
+        # unwrap FieldFile first, if it is empty/None it was set to None (delete or unset)
+        if isinstance(content, FieldFile) and not content:
+            # mark it for deletion
+            content = None
         if content is None:
-            self.delete()  # If content is None, mark for deletion.
+            self.delete()  # If content is None, mark for deletion when not deleted.
             return
 
         direct_name = True  # Flag to indicate if name was directly provided
@@ -621,12 +625,7 @@ class FieldFile(File):
             direct_name = False
             name = getattr(content, "name", "")
 
-        if isinstance(content, FieldFile):
-            content = content.to_file()
-            if content is None:
-                self.delete()  # If content is None, mark for deletion.
-                return
-        elif isinstance(content, File):
+        if isinstance(content, File):
             # Convert content to a standard File object if it's not already.
             content = content.open("rb").file
         elif isinstance(content, bytes):
