@@ -12,11 +12,17 @@
 - `DecimalField` supports now also `None` for `decimal_places` and `max_digits`.
   It emits an `UserWarning` and falls back to `None` for each of both parameters not provided.
 - `bulk_get_or_create` mirrors now `get_or_create` and returns a list with `(instance, created)` tuples. The returned instances are not always complete.
+- `CombinedQuerySet` is moved from `edgy.core.db.queryset.mixins.combined` to `edgy.core.db.queryset.combined`. It is not a mixin.
+- The bulk operations are moved to a mixin.
+- The typings changed for QuerySet: it is now Generic.
+- The typings changed for QuerySetType: `EdgyEmbedTarget` and `EdgyModel` (the queryset model) are switched in the `Generic` definition.
 
 ### Breaking
 
 - When not setting one of the parameters: `decimal_places` and `max_digits` edgy now emits an `UserWarning`. You need to set them explicit to `None` to silence the warning.
+  Reason? Interoperability. We have not a consistent logic in the database systems for handling `None`. So make sure that it is really intended.
 - Bulk operations return now a result instead `None`. For `bulk_get_or_create` the returned list format changes to `(instance, created)` tuples.
+- The typings changed for QuerySetType: `EdgyEmbedTarget` and `EdgyModel` (the queryset model) are switched in the `Generic` definition.
 
 ## 0.35.11
 

@@ -1,7 +1,7 @@
 # Bulk operations
 
 Bulk operations are different from normal queryset operations.
-They don't adher the embed_parent attribute by default (so they don't load nested objects) and are not necessarily
+They don't adher the `embed_parent` attribute by default (so they don't load nested objects) and are not necessarily
 complete.
 
 Why? Because they are optimized for performance. You can however provide `resolve_embed=True` to try to resolve. In case operations may fail with an `QuerySetError` when the values/objects provided/retrieved doesn't have all keys defined for loading (by default primary keys)
