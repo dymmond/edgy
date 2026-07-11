@@ -199,20 +199,8 @@ class BulkMixin:
                     [_iterate_retrieve(obj) for obj in objs],
                     limit=(1 if getattr(queryset.database, "force_rollback", False) else None),
                 )
-        elif update:
-            for obj in objs:
-                updated: EdgyModel
-                if isinstance(obj, dict):
-                    updated = queryset.model_class(**obj)
-                else:
-                    updated = obj
-                    if not isinstance(updated, model_class):
-                        raise ValueError(
-                            f"Instance provided of wrong type: `{type(updated)!r}` required: `{model_class!r}`."
-                        )
-                update_objs.append(updated)
-                returned_objs_with_created.append((updated, False))
         else:
+            assert not update, "update needs retrieval=True"
             for obj in objs:
                 created: EdgyModel
                 if isinstance(obj, dict):
@@ -559,7 +547,7 @@ class BulkMixin:
                     unique_columns=_unique_columns,
                     update_fields=_update_fields,
                     update=True,
-                    retrieve=False,
+                    retrieve=True,
                     resolve_embed=resolve_embed,
                 )
             ],

@@ -51,7 +51,7 @@ class Album(BaseModel):
 
 
 class Track(BaseModel):
-    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE)
+    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE, null=True)
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()
 
