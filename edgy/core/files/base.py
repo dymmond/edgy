@@ -605,7 +605,7 @@ class FieldFile(File):
             # mark it for deletion
             content = None
         if content is None:
-            self.delete()  # If content is None, mark for deletion when not deleted.
+            self.delete()  # If content is None, mark for deletion.
             return
 
         direct_name = True  # Flag to indicate if name was directly provided
