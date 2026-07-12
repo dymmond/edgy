@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-import sqlalchemy
+if TYPE_CHECKING:
+    import sqlalchemy
 
-from edgy.core.connection.database import Database
+    from edgy.core.connection.database import Database
 
 
 class QuerySetPropsMixin:
