@@ -47,6 +47,29 @@ class Product(edgy.StrictModel):
         registry = models
 
 
+class FooReflected(edgy.Model):
+    foo = edgy.IntegerField()
+
+    class Meta:
+        registry = models
+
+
+class Album(edgy.Model):
+    name = edgy.CharField(max_length=100)
+
+    class Meta:
+        registry = models
+
+
+class Track(edgy.Model):
+    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE)
+    title = edgy.CharField(max_length=100)
+    position = edgy.IntegerField()
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
     # this creates and drops the database
@@ -69,17 +92,50 @@ async def test_empty_bulk_create():
 
 
 async def test_bulk_create():
-    await Product.query.bulk_create(
+    products = await Product.query.bulk_create(
         [
             {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
             {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
         ]
     )
-    products = await Product.query.all()
     assert len(products) == 2
     assert products[0].data == {"foo": 123}
     assert products[0].value == 123.456
     assert products[0].status == StatusEnum.RELEASED
+    assert not products[0].can_load
     assert products[1].data == {"foo": 456}
     assert products[1].value == 456.789
     assert products[1].status == StatusEnum.DRAFT
+    assert not products[1].can_load
+
+
+async def test_bulk_create_reflected():
+    # we delete "id" as field to simulate reflection models
+    del FooReflected.meta.fields["id"]
+    results = await FooReflected.query.bulk_create(
+        [
+            {"foo": 2},
+            {"foo": 3, "id": 100},
+        ]
+    )
+    assert results[0].foo == 2
+    assert not results[0].can_load
+    assert results[1].can_load
+    assert results[1].foo == 3
+    assert results[1].id == 100
+
+
+async def test_bulk_create_resolve_through():
+    results = await Track.query.update_embed_parent(("album", "track_used")).bulk_create(
+        [
+            {"album": Album(name="test"), "position": 1, "title": "foo"},
+            {"id": 100, "album": Album(name="foo"), "position": 2, "title": "fighters"},
+        ],
+        resolve_embed=True,
+    )
+    assert results[0].get_real_class() is Album
+    assert results[0].id
+    assert results[0].track_used.title == "foo"
+    assert results[1].get_real_class() is Album
+    assert results[1].id
+    assert results[1].track_used.title == "fighters"

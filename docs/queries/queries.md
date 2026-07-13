@@ -1226,60 +1226,36 @@ will use that value with the `defaults` provided to create a new instance.
 
 You can pass positional ModelRefs to this method.
 
-### Bulk create
+### Update embedding
 
-When you need to create many instances in one go, or `in bulk`.
-
-```python
-await User.query.bulk_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-])
-```
-
-### Bulk update
-
-When you need to update many instances in one go, or `in bulk`.
+For updating `embed_parent` on the fly use `update_embed_parent`. This allows for example to strip an embedding
+of ManyToMany relations and access the ManyToMany intermediate models directly.
 
 ```python
-await User.query.bulk_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-])
 
-users = await User.query.all()
+class User(edgy.Model):
+    ...
 
-for user in users:
-    user.is_active = False
+class Group(edgy.Model):
+    active: bool = edgy.BooleanField()
 
-await User.query.bulk_update(users, fields=['is_active'])
+class Room()
+    users = edgy.ManyToMany(User, through=Group)
+
+
+room = Room.query.first()
+
+users =  await room.users.all()
+groups = await room.users.update_embed_parent(None).all()  # access the immediate model
+users =  await room.users.update_embed_parent(("user", "group_used")).all()  # users with group as group_used attribute
 ```
 
-### Bulk Get or Create
+## Bulk operations
 
-When you need to perform in bulk a `get_or_create` in your models. The normal behavior would
-be like the `bulk_create` but this bring an additional `unique_fields` where we can make sure
-we do not insert duplicates by filtering the unique keys of the model data being inserted.
+When updating or creating a lot of records the normal QuerySet operations are too imperformant. Luckily we have optimized
+bulk operations.
 
-```python
-await User.query.bulk_get_or_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-], unique_fields=["email"])
-
-# Try to reinsert the same values
-await User.query.bulk_get_or_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-], unique_fields=["email"])
-
-
-users = await User.query.all() # 2 as total
-```
-
-!!! Note
-    `bulk_get_or_create` fetches when using `unique_fields` all matching entries in a list.
-    For reducing the amount searched, use something like `limit(100).bulk_get_or_create(..., unique_fields=[...])`.
+[Bulk operations](./bulk.md)
 
 ## Operators
 

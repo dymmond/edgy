@@ -14,11 +14,11 @@ from itertools import chain
 from typing import (
     TYPE_CHECKING,
     Any,
+    Generic,
     Literal,
     cast,
 )
 
-import orjson
 import sqlalchemy
 
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR, get_schema
@@ -32,7 +32,7 @@ from edgy.types import Undefined
 from . import clauses as clauses_mod
 from .compiler import QueryCompiler
 from .executor import QueryExecutor, get_current_row
-from .mixins import QuerySetPropsMixin, TenancyMixin
+from .mixins import BulkMixin, QuerySetPropsMixin, TenancyMixin
 from .parser import ResultParser
 from .prefetch import Prefetch, PrefetchMixin
 from .types import (
@@ -48,43 +48,16 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.querysets.queryset import QuerySet
 
-_empty_set = cast(Sequence[Any], frozenset())
-
-
-def _extract_unique_lookup_key(obj: Any, unique_fields: Iterable[str]) -> tuple | None:
-    """
-    Extracts a unique lookup key from an object or dictionary.
-    (Helper function, stays in base)
-    """
-    lookup_key = []
-    if isinstance(obj, dict):
-        for field in unique_fields:
-            if field not in obj:
-                return None
-            value = obj[field]
-            lookup_key.append(
-                orjson.dumps(value, option=orjson.OPT_SORT_KEYS)
-                if isinstance(value, dict | list)
-                else value
-            )
-    else:
-        for field in unique_fields:
-            if not hasattr(obj, field):
-                return None
-            value = getattr(obj, field)
-            lookup_key.append(
-                orjson.dumps(value, option=orjson.OPT_SORT_KEYS)
-                if isinstance(value, dict | list)
-                else value
-            )
-    return tuple(lookup_key)
+_empty_set = cast(set[Any], frozenset())
 
 
 class BaseQuerySet(
     TenancyMixin,
     QuerySetPropsMixin,
     PrefetchMixin,
-    QuerySetType[EdgyEmbedTarget, EdgyModel],
+    BulkMixin,
+    QuerySetType[EdgyModel, EdgyEmbedTarget],
+    Generic[EdgyModel, EdgyEmbedTarget],
 ):
     """
     Internal definitions for queryset.
@@ -459,14 +432,14 @@ class BaseQuerySet(
 
     async def _embed_parent_in_result(
         self, result: EdgyModel | Awaitable[EdgyModel]
-    ) -> tuple[EdgyModel, Any]:
+    ) -> tuple[EdgyModel, EdgyEmbedTarget]:
         """
         This is a result transformation, called by the Parser.
         """
         if isawaitable(result):
             result = await result
         if not self.embed_parent:
-            return result, result
+            return result, cast(EdgyEmbedTarget, result)
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
             new_result: Any = result
@@ -495,7 +468,7 @@ class BaseQuerySet(
 
     async def _execute_iterate(
         self, fetch_all_at_once: bool = False
-    ) -> AsyncIterator[BaseModelType]:
+    ) -> AsyncIterator[EdgyEmbedTarget]:
         """
         (Refactored: Now delegates to the Executor)
         """
@@ -508,7 +481,7 @@ class BaseQuerySet(
         async for model in executor.iterate(fetch_all_at_once=fetch_all_at_once):  # type: ignore
             yield model
 
-    async def _execute_all(self) -> list[EdgyModel]:
+    async def _execute_all(self) -> list[EdgyEmbedTarget]:
         """
         Still relies on _execute_iterate.
         """
@@ -525,7 +498,7 @@ class BaseQuerySet(
             pk_names = tuple(self.model_class.pkcolumns)
             if not pk_names:
                 # Nothing reliable to dedupe on
-                return results  # type: ignore
+                return results
 
             seen: set[tuple] = set()
             unique = []
@@ -538,7 +511,7 @@ class BaseQuerySet(
                     # this can happen in advanced/embedded scenarios. In that case
                     # we bail out and keep the original list to avoid breaking
                     # existing behaviour.
-                    return results  # type: ignore
+                    return results
 
                 if key not in seen:
                     seen.add(key)
@@ -546,7 +519,7 @@ class BaseQuerySet(
 
             results = unique
 
-        return results  # type: ignore
+        return results
 
     def _filter_or_exclude(
         self,
@@ -570,7 +543,7 @@ class BaseQuerySet(
         """
         from edgy.core.db.querysets.queryset import QuerySet
 
-        queryset: QuerySet = self._clone()
+        queryset: QuerySet[EdgyModel, EdgyEmbedTarget] = self._clone()
         if kwargs:
             clauses = [*clauses, kwargs]
         converted_clauses: Sequence[

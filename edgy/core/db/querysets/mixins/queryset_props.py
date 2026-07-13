@@ -3,12 +3,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
-import sqlalchemy
-
-from edgy.core.connection.database import Database
-
 if TYPE_CHECKING:
-    from edgy import QuerySet
+    import sqlalchemy
+
+    from edgy.core.connection.database import Database
 
 
 class QuerySetPropsMixin:
@@ -47,7 +45,7 @@ class QuerySetPropsMixin:
         return self._database
 
     @database.setter
-    def database(self: QuerySet, value: Database) -> None:
+    def database(self, value: Database) -> None:
         """
         Sets the database instance for the queryset and clears any cached table
         definitions.
@@ -83,7 +81,7 @@ class QuerySetPropsMixin:
         return self._table
 
     @table.setter
-    def table(self: QuerySet, value: sqlalchemy.Table | None) -> None:
+    def table(self, value: sqlalchemy.Table | None) -> None:
         """
         Sets the SQLAlchemy Table object for the queryset and clears the cache.
 

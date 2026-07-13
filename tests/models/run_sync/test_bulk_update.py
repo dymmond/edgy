@@ -104,7 +104,9 @@ async def test_bulk_update():
     products[1].value = 2
 
     edgy.run_sync(
-        Product.query.bulk_update(products, fields=["created_day", "status", "data", "value"])
+        Product.query.bulk_update(
+            products, update_fields=["created_day", "status", "data", "value"]
+        )
     )
 
     products = edgy.run_sync(Product.query.all())
@@ -135,7 +137,7 @@ async def test_bulk_update_with_relation():
     for track in tracks:
         track.album = album2
 
-    edgy.run_sync(Track.query.bulk_update(tracks, fields=["album"]))
+    edgy.run_sync(Track.query.bulk_update(tracks, update_fields=["album"]))
     tracks = edgy.run_sync(Track.query.all())
     assert tracks[0].album.pk == album2.pk
     assert tracks[1].album.pk == album2.pk

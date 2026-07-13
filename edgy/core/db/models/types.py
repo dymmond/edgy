@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Collection, Container, Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar
 
 if TYPE_CHECKING:
@@ -11,7 +12,7 @@ if TYPE_CHECKING:
     from edgy.core.db.models.managers import BaseManager
     from edgy.core.db.models.metaclasses import MetaInfo
     from edgy.core.db.models.model import Model
-    from edgy.core.db.querysets.queryset import QuerySet
+    from edgy.core.db.querysets.types import QuerySetType
     from edgy.protocols.transaction_call import TransactionCallProtocol
 
 
@@ -101,17 +102,17 @@ class BaseModelType(ABC):
             type[BaseModelType]: A type representing the proxy model.
         """
 
-    @property
+    @cached_property
     @abstractmethod
-    def identifying_db_fields(self) -> Any:
+    def identifying_db_fields(self) -> Sequence[str]:
         """
         Abstract property that returns the columns used for loading a model instance.
 
-        By default, this will be the primary key names (`pknames`), but it can be
+        By default, this will be the primary key columns (`pkcolumns`), but it can be
         overridden for specific instances if alternative fields are used for identification.
 
         Returns:
-            Any: A representation of the identifying database fields.
+            Any: A representation of the identifying database columns.
         """
 
     @property
@@ -392,7 +393,7 @@ class BaseModelType(ABC):
         is_update: bool = False,
         is_partial: bool = False,
         phase: str = "",
-        instance: BaseModelType | QuerySet | None = None,
+        instance: BaseModelType | QuerySetType | None = None,
         model_instance: BaseModelType | None = None,
         evaluate_kwarg_values: bool = False,
     ) -> dict[str, Any]:
@@ -442,7 +443,7 @@ class BaseModelType(ABC):
         # Return the parent class if this is a proxy model, otherwise return the class itself.
         return cls.__parent__ if cls.__is_proxy_model__ else cls
 
-    def extract_db_fields(self, only: Container[str] | None = None) -> dict[str, Any]:
+    def extract_db_fields(self, only: Collection[str] | None = None) -> dict[str, Any]:
         """
         Extracts and returns a dictionary of database-related fields from the model instance.
 
@@ -450,7 +451,7 @@ class BaseModelType(ABC):
         related fields which are handled separately due to their disjoint nature.
 
         Args:
-            only (Container[str] | None): An optional container of field names to include
+            only (Collection[str] | None): An optional collection of field names to include
                                           in the extraction. If `None`, all relevant fields
                                           are extracted. Defaults to `None`.
 

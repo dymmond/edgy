@@ -7,8 +7,8 @@ from edgy.core.connection.database import Database
 from edgy.core.db.context_vars import set_schema
 from edgy.types import Undefined
 
-if TYPE_CHECKING:
-    from edgy import QuerySet
+if TYPE_CHECKING:  # pragma: no cover
+    from edgy.core.db.querysets.queryset import QuerySet
 
 # A sentinel object used to detect when a keyword-only argument has not been provided.
 _sentinel = object()

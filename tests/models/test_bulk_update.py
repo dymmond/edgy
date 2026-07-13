@@ -51,7 +51,7 @@ class Album(BaseModel):
 
 
 class Track(BaseModel):
-    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE)
+    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE, null=True)
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()
 
@@ -101,7 +101,7 @@ async def test_bulk_update():
     products[0].value = 1
     products[1].value = 2
 
-    await Product.query.bulk_update(products, fields=["created_day", "status", "data", "value"])
+    await Product.query.bulk_update(products)
 
     products = await Product.query.all()
 
@@ -116,8 +116,9 @@ async def test_bulk_update():
 
 
 async def test_empty_bulk_update():
-    await Product.query.bulk_update([], fields=[])
-    await Product.query.bulk_update([], fields=["created_day", "status", "data", "value"])
+    await Product.query.bulk_update([])
+    await Product.query.bulk_update([], update_fields=[])
+    await Product.query.bulk_update([], update_fields=["created_day", "status", "data", "value"])
 
 
 async def test_bulk_update_with_relation():
@@ -134,7 +135,30 @@ async def test_bulk_update_with_relation():
     for track in tracks:
         track.album = album2
 
-    await Track.query.bulk_update(tracks, fields=["album"])
+    albums = await Track.query.update_embed_parent(("album", "")).bulk_update(
+        tracks, update_fields=["album"], resolve_embed=True
+    )
+    assert isinstance(albums[0], Album)
     tracks = await Track.query.all()
     assert tracks[0].album.pk == album2.pk
     assert tracks[1].album.pk == album2.pk
+
+
+async def test_bulk_update_with_relation_unique():
+    album = Album(name="foo")
+    await Track.query.bulk_create(
+        [
+            {"album": album, "position": 1, "title": "foo"},
+            {"album": album, "position": 2, "title": "fighters"},
+        ]
+    )
+    albums = await Track.query.update_embed_parent(("album", "embedded")).bulk_update(
+        [
+            {"position": 4, "title": "foo"},
+            {"position": 5, "title": "fighters"},
+        ],
+        resolve_embed=True,
+        unique_fields=["title"],
+    )
+    assert albums[0].embedded.position == 4
+    assert albums[1].embedded.position == 5

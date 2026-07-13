@@ -1,16 +1,16 @@
 from __future__ import annotations
 
+import sys
 from abc import ABC, abstractmethod
 from collections.abc import (
     AsyncIterator,
     Awaitable,
     Callable,
-    Collection,
     Generator,
     Iterable,
     Sequence,
 )
-from typing import TYPE_CHECKING, Any, Generic, Literal, TypeAlias, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generic, Literal, ParamSpec, TypeAlias, Union, overload
 
 from edgy.types import Undefined
 
@@ -21,11 +21,18 @@ if TYPE_CHECKING:
     from edgy.core.connection import Database
     from edgy.core.db.models.types import BaseModelType
 
+if sys.version_info >= (3, 13):  # pragma: no cover
+    from typing import TypeVar
+else:  # pragma: no cover
+    from typing_extensions import TypeVar
+
+P = ParamSpec("P")
+
 EdgyModel = TypeVar("EdgyModel", bound="BaseModelType")
 """
 Type variable representing an Edgy BaseModelType.
 """
-EdgyEmbedTarget = TypeVar("EdgyEmbedTarget")
+EdgyEmbedTarget = TypeVar("EdgyEmbedTarget", default=EdgyModel)
 """
 Type variable representing the target type for embedded objects in a QuerySet.
 """
@@ -44,7 +51,7 @@ references, allowing for nested selections, strings, None, or SQLAlchemy Columns
 """
 
 
-class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
+class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     """
     Abstract base class defining the interface for all QuerySet operations in Edgy.
 
@@ -54,6 +61,8 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
 
     __slots__ = ("model_class",)
     model_class: type[EdgyModel]
+    table: sqlalchemy.Table
+    database: Database
     """
     The model class associated with this QuerySet.
     """
@@ -402,6 +411,19 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
         ...
 
     @abstractmethod
+    def update_embed_parent(self, embed_parent: tuple[str, str | str] | None) -> QuerySetType:
+        """
+        Abstract method to update or remove (provide None) embed_parent applied on instances.
+        Note: this doesn't affect embed_parent for filters.
+
+        Args:
+            embed_parent: define the new embed_parent.
+        Returns:
+            QuerySetType: A new QuerySet instance with the new embedding.
+        """
+        ...
+
+    @abstractmethod
     async def exists(self) -> bool:
         """
         Abstract method to check if any objects matching the QuerySet criteria exist.
@@ -484,47 +506,253 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
         """
         ...
 
+    @overload
+    async def bulk_create(
+        self, objs: Iterable[dict[str, Any] | EdgyModel], *, resolve_embed: Literal[True]
+    ) -> list[EdgyEmbedTarget]:
+        """
+        Args:
+            ...
+            resolve_embed (True): Enables embedding.
+
+        Returns:
+            list[EdgyEmbedTarget]: A list of created objects.
+                                   Warning: Instances which are not compatible (`can_load` is False)
+                                   will execute an extra save.
+        """
+
+    @overload
+    async def bulk_create(
+        self, objs: Iterable[dict[str, Any] | EdgyModel], *, resolve_embed: Literal[False] = False
+    ) -> list[EdgyModel]:
+        """
+        Args:
+            ...
+            resolve_embed (False): Disables embedding. Default.
+        Returns:
+            list[EdgyModel]: A list of created objects.
+                             Warning: for performance reasons no embedding is applied and
+                             the returned objects are maybe incomplete (check `can_load` property).
+        """
+
     @abstractmethod
-    async def bulk_create(self, objs: Iterable[dict[str, Any] | EdgyModel]) -> None:
+    async def bulk_create(
+        self, objs: Iterable[dict[str, Any] | EdgyModel], *, resolve_embed: bool = False
+    ) -> list[EdgyModel] | list[EdgyEmbedTarget]:
         """
         Abstract method to create multiple objects in a single bulk operation.
 
         Args:
             objs (Iterable[dict[str, Any] | EdgyModel]): An iterable of dictionaries or
                                                          model instances to create.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
+
+        Returns:
+            list[EdgyModel] | list[EdgyEmbedTarget]:
+                A list of created objects.
+                Warning: for performance reasons no embedding is applied by default and
+                the returned objects are maybe incomplete (check `can_load` property).
         """
         ...
 
+    @overload
+    async def bulk_update(
+        self,
+        objs: Iterable[EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[True],
+    ) -> list[EdgyEmbedTarget]:
+        """
+        Args:
+            ...
+            resolve_embed (True): Enables embedding.
+
+        Returns:
+            list[EdgyEmbedTarget]: A list of updated objects.
+                                   Warning: All models must be loadable (`can_load` property is true)
+                                   otherwise an `QuerySetError` is raised.
+        """
+
+    @overload
+    async def bulk_update(
+        self,
+        objs: Iterable[EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[False] = False,
+    ) -> list[EdgyModel]:
+        """
+        Args:
+            ...
+            resolve_embed (False): Disables embedding. Default.
+        Returns:
+            list[EdgyModel]: A list of updated objects.
+                             Warning: for performance reasons no embedding is applied and
+                             the returned objects are maybe incomplete (check `can_load` property).
+        """
+
     @abstractmethod
-    async def bulk_update(self, objs: Sequence[EdgyModel], fields: list[str]) -> None:
+    async def bulk_update(
+        self,
+        objs: Iterable[EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: bool = False,
+    ) -> list[EdgyModel] | list[EdgyEmbedTarget]:
         """
         Abstract method to update multiple objects in a single bulk operation.
 
         Args:
-            objs (Sequence[EdgyModel]): A sequence of model instances to update.
-            fields (list[str]): A list of field names to update for each object.
+            objs (Iterable[EdgyModel]): A sequence of model instances to update.
+            update_fields (Iterable[str]): A list of field names to update for each object. If None use all fields.
+            unique_fields (Iterable[str] | None): Fields that determine uniqueness.
+                                                    If None, pknames are used. If empty it fails.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
+
+        Returns:
+            list[EdgyModel] | list[EdgyEmbedTarget]:
+                A list of updated objects.
+                Warning: for performance reasons no embedding is applied by default and
+                the returned objects are maybe incomplete (check `can_load` property).
         """
         ...
 
-    @abstractmethod
-    async def bulk_get_or_create(
+    @overload
+    async def bulk_update_or_create(
         self,
-        objs: Sequence[dict[str, Any] | EdgyModel],
-        unique_fields: Collection[str] | None = None,
-    ) -> list[EdgyModel]:
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[True],
+    ) -> list[tuple[EdgyEmbedTarget, bool]]:
         """
-        Bulk gets or creates records in a table.
+        Args:
+            ...
+            resolve_embed (True): Enables embedding.
+
+        Returns:
+            list[tuple[EdgyEmbedTarget, bool]]: A list of `(instance, created)` tuples.
+                                                Warning: All models must be loadable (`can_load` property is true)
+                                                otherwise an `QuerySetError` is raised.
+        """
+
+    @overload
+    async def bulk_update_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[False] = False,
+    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+        """
+        Args:
+            ...
+            resolve_embed (False): Disables embedding. Default.
+        Returns:
+            list[tuple[EdgyModel, bool]]: A list of tuples with updated or created objects and  created flag.
+                                          Warning: for performance reasons no embedding is applied and
+                                          the returned objects are maybe incomplete (check `can_load` property).
+        """
+
+    @abstractmethod
+    async def bulk_update_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: bool = False,
+    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+        """
+        Abstract method to bulk updates or creates records in a table.
 
         If records exist based on unique fields, they are retrieved.
         Otherwise, new records are created.
 
         Args:
             objs (Sequence[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
-            unique_fields (Collection[str] | None): Fields that determine uniqueness.
-                                                    If None, all records are treated as new.
+            update_fields (Iterable[str]): A list of field names to update for each object (when found).
+                                    If None use all fields.
+            unique_fields (Iterable[str] | None): Fields that determine uniqueness.
+                                                  If None, pknames are used. If empty it fails.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
 
         Returns:
-            list[EdgyModel]: A list of retrieved or newly created objects.
+            list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+                A list of `(instance, created)` tuples.
+                Warning: for performance reasons no embedding is applied by default and
+                the returned objects are maybe incomplete (check `can_load` property).
+        """
+        ...
+
+    @overload
+    async def bulk_get_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[True],
+    ) -> list[tuple[EdgyEmbedTarget, bool]]:
+        """
+        Args:
+            ...
+            resolve_embed (True): Enables embedding.
+
+        Returns:
+            list[tuple[EdgyEmbedTarget, bool]]: A list of `(instance, created)` tuples.
+                                                Warning: Instances which are not compatible (`can_load` is False)
+                                                will execute an extra save.
+        """
+
+    @overload
+    async def bulk_get_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[False] = False,
+    ) -> list[tuple[EdgyModel, bool]]:
+        """
+        Args:
+            ...
+            resolve_embed (False): Disables embedding. Default.
+        Returns:
+            list[tuple[EdgyModel, bool]]: A list of `(instance, created)` tuples.
+                                          Warning: for performance reasons no embedding is applied and
+                                          the returned objects are maybe incomplete (check `can_load` property).
+        """
+
+    @abstractmethod
+    async def bulk_get_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: bool = False,
+    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+        """
+        Abstract method to bulk get or create records in a table.
+
+        If records exist based on unique fields, they are retrieved.
+        Otherwise, new records are created.
+
+        Args:
+            objs (Iterable[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
+            unique_fields (Iterable[str] | None): Fields that determine uniqueness.
+                                                  If None, pknames are used. If empty it fails.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
+
+        Returns:
+            list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+                A list of tuples with retrieved or newly created objects and created flag.
+                Warning: for performance reasons no embedding is applied by default and
+                the returned objects are maybe incomplete (check `can_load` property).
         """
         ...
 
@@ -737,7 +965,7 @@ class QuerySetType(ABC, Generic[EdgyEmbedTarget, EdgyModel]):
         ...
 
     @abstractmethod
-    async def __aiter__(self) -> AsyncIterator[EdgyEmbedTarget]:
+    def __aiter__(self) -> AsyncIterator[EdgyEmbedTarget]:
         """
         Abstract method to make the QuerySet asynchronously iterable.
 

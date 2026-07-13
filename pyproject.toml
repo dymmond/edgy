@@ -46,7 +46,7 @@ dependencies = [
     "pydantic-settings>=2.0.0,<3.0.0",
     "sayer>=0.7.0",
     "blinker>=1.8,<2.0",
-    'typing_extensions>=4.0; python_version<"3.11"',
+    'typing_extensions>=4.0; python_version<"3.13"',
 ]
 keywords = [
     "api",
