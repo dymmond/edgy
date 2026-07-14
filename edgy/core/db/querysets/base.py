@@ -55,7 +55,7 @@ class BaseQuerySet(
     TenancyMixin,
     QuerySetPropsMixin,
     PrefetchMixin,
-    BulkMixin,
+    BulkMixin[EdgyModel],
     QuerySetType[EdgyModel, EdgyEmbedTarget],
     Generic[EdgyModel, EdgyEmbedTarget],
 ):
@@ -431,13 +431,15 @@ class BaseQuerySet(
         return tables_and_models[crawl_result.forward_path][0].columns[crawl_result.field_name]
 
     async def _embed_parent_in_result(
-        self, result: EdgyModel | Awaitable[EdgyModel]
-    ) -> tuple[EdgyModel, EdgyEmbedTarget]:
+        self, result: EdgyModel | Awaitable[EdgyModel] | None
+    ) -> tuple[EdgyModel, EdgyEmbedTarget] | tuple[None, None]:
         """
         This is a result transformation, called by the Parser.
         """
         if isawaitable(result):
             result = await result
+        if result is None:
+            return None, None
         if not self.embed_parent:
             return result, cast(EdgyEmbedTarget, result)
         token = MODEL_GETATTR_BEHAVIOR.set("coro")

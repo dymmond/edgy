@@ -173,7 +173,8 @@ class QueryCompiler:
                 if not prefix:
                     columns_and_extra.append(column)
                 else:
-                    columns_and_extra.append(column.label(f"{table.name}_{column_key}"))
+                    # FIXME: label is visible to database, so we should use the column.name
+                    columns_and_extra.append(column.label(f"{table.name}_{column.key}"))
 
         assert columns_and_extra, "no columns or extra_select specified"
         return columns_and_extra

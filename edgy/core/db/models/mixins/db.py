@@ -775,7 +775,7 @@ class DatabaseMixin:
             is_partial=is_partial,
             is_update=True,
             phase="prepare_update",
-            instance=self,
+            instance=instance,
             model_instance=self,
             evaluate_values=True,
         )
@@ -800,7 +800,9 @@ class DatabaseMixin:
                 row_count = cast(int, await database.execute(expression))
 
             # Update the model instance.
-            new_kwargs = self.transform_input(column_values, phase="post_update", instance=self)
+            new_kwargs = self.transform_input(
+                column_values, phase="post_update", instance=instance, model_instance=self
+            )
             self.__dict__.update(new_kwargs)
 
         # updates aren't required to change the db, they can also just affect the meta fields
@@ -809,6 +811,7 @@ class DatabaseMixin:
         if column_values or kwargs:
             # Ensure on access refresh the results is active
             self._db_deleted = False if row_count is None else row_count == 0
+            # TODO: maybe can be unchanged in case of not self._db_deleted
             self._db_loaded = False
         await post_fn(
             real_class,
@@ -997,7 +1000,11 @@ class DatabaseMixin:
             self._db_loaded = True
             raise ObjectNotFound("row does not exist anymore")
         # Update the instance.
-        self.__dict__.update(self.transform_input(dict(row._mapping), phase="load", instance=self))
+        self.__dict__.update(
+            self.transform_input(
+                dict(row._mapping), phase="load", instance=self, model_instance=self
+            )
+        )
         self._db_deleted = False
         self._db_loaded = True
 
@@ -1071,23 +1078,47 @@ class DatabaseMixin:
             values=kwargs,
         )
         check_db_connection(self.database, stacklevel=4)
-        async with self.database as database, database.transaction():
+        table: sqlalchemy.Table = self.table
+        async with (
+            self.database as database,
+            database.connection() as connection,
+            connection.transaction(),
+        ):
+            insert_returning = database.engine.dialect.insert_returning
             # can update column_values
             column_values.update(
                 await self.execute_pre_save_hooks(column_values, kwargs, is_update=False)
             )
-            expression = self.table.insert().values(**column_values)
-            autoincrement_value = await database.execute(expression)
-        # sqlalchemy supports only one autoincrement column
-        if autoincrement_value:
-            column = self.table.autoincrement_column
-            if column is not None and hasattr(autoincrement_value, "_mapping"):
-                autoincrement_value = autoincrement_value._mapping[column.key]
-            # can be explicit set, which causes an invalid value returned
-            if column is not None and column.key not in column_values:
-                column_values[column.key] = autoincrement_value
+            # we can't just use label. If the column.key has an invalid name for the db
+            # we would cause an foo AS invalid clause
+            returning = (
+                [
+                    col
+                    for col in table.columns.values()
+                    if col.key not in column_values
+                    and (col.server_default is not None or col.autoincrement)
+                ]
+                if insert_returning
+                else []
+            )
 
-        new_kwargs = self.transform_input(column_values, phase="post_insert", instance=self)
+            if returning:
+                expression: Any = table.insert().values(**column_values).returning(*returning)
+                returned_mapping = dict((await connection.fetch_one(expression))._mapping)
+            else:
+                expression = table.insert().values(**column_values)
+                pk_values = await connection.execute(expression)
+                returned_mapping = (
+                    dict(pk_values._mapping) if hasattr(pk_values, "_mapping") else {}
+                )
+        for col_name, col_key in self.meta.columns_remapping.items():
+            if col_name in returned_mapping:
+                returned_mapping[col_key] = returned_mapping.pop(col_name)
+        column_values.update(returned_mapping)
+
+        new_kwargs = self.transform_input(
+            column_values, phase="post_insert", instance=instance, model_instance=self
+        )
         self.__dict__.update(new_kwargs)
 
         if self.meta.post_save_fields:

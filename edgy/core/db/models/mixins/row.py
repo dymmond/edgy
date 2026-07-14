@@ -221,10 +221,10 @@ class ModelRowMixin:
 
             # Collect foreign key column values from the row mapping.
             for column_name in columns_to_check:
-                column = getattr(table_columns, column_name, None)
-                if column_name is None:
+                if (column := table_columns.get(column_name)) is None:
                     continue
-                columnkeyhash = column_name
+                # FIXME: should be column.name because it is visible to database
+                columnkeyhash = column.key
                 if prefix:
                     columnkeyhash = f"{tables_and_models[prefix][0].name}_{column.key}"
 

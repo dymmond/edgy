@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from edgy.core.connection.database import Database
     from edgy.core.db.fields.types import FIELD_CONTEXT_TYPE, BaseFieldType
     from edgy.core.db.models.model import Model
-    from edgy.core.db.querysets.queryset import QuerySet
+    from edgy.core.db.querysets.types import QuerySetType
 
 
 _empty = cast(set[str], frozenset())
@@ -142,6 +142,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             kwargs,
             phase=__phase__,
             instance=self,
+            model_instance=self,
             drop_extra_kwargs=__drop_extra_kwargs__,
         )
         # Remove temporary _db_loaded and _db_deleted from __dict__ before super().__init__.
@@ -194,7 +195,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         cls,
         kwargs: dict[str, Any],
         phase: str = "",
-        instance: BaseModelType | None = None,
+        instance: BaseModelType | QuerySetType | None = None,
+        model_instance: BaseModelType | None = None,
         drop_extra_kwargs: bool = False,
     ) -> Any:
         """
@@ -203,7 +205,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
 
         :param kwargs: The input keyword arguments to transform.
         :param phase: The current phase of transformation.
-        :param instance: The model instance being transformed.
+        :param instance: The instance being transformed.
+        :param model_instance: The model instance being transformed.
         :param drop_extra_kwargs: If True, extra kwargs not defined in model fields
                                    will be dropped.
         :return: The transformed keyword arguments.
@@ -216,7 +219,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         fields = cls.meta.fields
         # Set context variables for the current instance, model instance, and phase.
         token = CURRENT_INSTANCE.set(instance)
-        token2 = CURRENT_MODEL_INSTANCE.set(instance)
+        token2 = CURRENT_MODEL_INSTANCE.set(model_instance)
         token3 = CURRENT_PHASE.set(phase)
         try:
             # Phase 1: Apply input modifying fields.
@@ -460,7 +463,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         is_update: bool = False,
         is_partial: bool = False,
         phase: str = "",
-        instance: BaseModelType | QuerySet | None = None,
+        instance: BaseModelType | QuerySetType | None = None,
         model_instance: BaseModelType | None = None,
         evaluate_values: bool = False,
     ) -> dict[str, Any]:

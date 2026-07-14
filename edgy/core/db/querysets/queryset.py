@@ -612,7 +612,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             queryset._update_select_related_weak(queryset._order_by, clear=False)
         return queryset
 
-    def distinct(self, first: bool | str = True, *distinct_on: str) -> QuerySet:
+    def distinct(self, first: bool | str = True, /, *distinct_on: str) -> QuerySet:
         """
         Returns a queryset with distinct results.
 
