@@ -33,6 +33,10 @@
 
 - Private `batched` implementation for `run_concurrently`.
 
+### Fixed
+
+- Testing utility `ModelFactory` failing for `DecimalField`, `TimeField` and `UUIDField`.
+
 ### Breaking
 
 - When not setting one of the parameters: `decimal_places` and `max_digits` edgy now emits an `UserWarning`. You need to set them explicit to `None` to silence the warning.

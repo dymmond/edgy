@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal
 
 from edgy.core.db.relationships.related_field import RelatedField
@@ -167,6 +168,38 @@ def ImageField_callback(
     return context["faker"].image(**parameters)
 
 
+def DecimalField_callback(
+    field: FactoryField, context: ModelFactoryContext, parameters: dict[str, Any]
+) -> Any:
+    edgy_field = field.owner.meta.model.meta.fields[field.name]
+    max_digits = getattr(edgy_field, "max_digits", None)
+    right_digits = getattr(edgy_field, "decimal_places", None)
+    if max_digits is None:
+        if right_digits is not None:
+            parameters.setdefault(
+                "right_digits", context["faker"].random_int(min=0, max=right_digits)
+            )
+    elif right_digits is None:
+        parameters.setdefault(
+            "right_digits", context["faker"].random_int(min=0, max=max_digits - 1)
+        )
+        parameters.setdefault(
+            "left_digits",
+            context["faker"].random_int(min=1, max=max_digits - parameters["right_digits"]),
+        )
+    else:
+        parameters.setdefault(
+            "left_digits", context["faker"].random_int(min=1, max=max_digits - right_digits)
+        )
+        parameters.setdefault("right_digits", context["faker"].random_int(min=0, max=right_digits))
+    # remapping
+    if getattr(edgy_field, "gt", None) is not None:
+        parameters.setdefault("min_value", edgy_field.gt + Decimal("0.0000000001"))
+    if getattr(edgy_field, "lt", None) is not None:
+        parameters.setdefault("max_value", edgy_field.lt - Decimal("0.0000000001"))
+    return context["faker"].pydecimal(**parameters)
+
+
 DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
     "IntegerField": edgy_field_param_extractor(
         "random_int",
@@ -207,22 +240,7 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
             ),
         },
     ),
-    "DecimalField": edgy_field_param_extractor(
-        "pydecimal",
-        remapping={
-            # TODO: find better definition
-            "gt": (
-                "min",
-                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name)
-                - 0.0000000001,
-            ),
-            "lt": (
-                "max",
-                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name)
-                + 0.0000000001,
-            ),
-        },
-    ),
+    "DecimalField": DecimalField_callback,
     "FloatField": edgy_field_param_extractor(
         "pyfloat",
         remapping={
@@ -262,8 +280,8 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
             ),
         },
     ),
-    "TimeField": edgy_field_param_extractor("time"),
-    "UUIDField": edgy_field_param_extractor("uuid4"),
+    "TimeField": edgy_field_param_extractor("time_object"),
+    "UUIDField": edgy_field_param_extractor("uuid4", defaults={"cast_to": None}),
     "JSONField": edgy_field_param_extractor("json"),
     "ForeignKey": ForeignKey_callback,
     "OneToOneField": ForeignKey_callback,
