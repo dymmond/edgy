@@ -1,13 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from inspect import isawaitable
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pydantic import BaseModel
-from sqlalchemy.exc import IntegrityError
 
-from edgy.core.db.context_vars import CURRENT_INSTANCE, MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import RelationshipField
 from edgy.exceptions import ObjectNotFound, RelationshipIncompatible, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
@@ -124,7 +122,7 @@ class ManyRelation(ManyRelationProtocol):
             if not self.through.meta.fields[self.to_foreign_key].is_cross_db():
                 # not initialized yet
                 queryset._select_related.add(self.to_foreign_key)
-        return queryset
+        return queryset.using(schema=self.instance.get_active_instance_schema())
 
     async def save_related(self) -> None:
         """
@@ -132,17 +130,24 @@ class ManyRelation(ManyRelationProtocol):
         This method iterates through the `refs` (staged children) and adds them
         to the relationship.
         """
-        # TODO: improve performance
-        # Get the foreign key field on the 'through' model that points back to the 'from' model.
-        fk = self.through.meta.fields[self.from_foreign_key]
-        # Iterate while there are references in the list.
-        while self.refs:
-            # Pop the last reference from the list.
-            ref = self.refs.pop()
-            # Clean the foreign key value and update the reference's dictionary.
-            ref.__dict__.update(fk.clean(fk.name, self.instance))
-            # Asynchronously add the reference to the relationship.
-            await self.add(ref)
+        refs = list(self.refs)
+        self.refs.clear()
+        if not refs:
+            return
+        await self.get_queryset()._bulk_get_update_or_create(
+            objs=refs,
+            unique_columns={
+                col
+                for field in [self.from_foreign_key, self.to_foreign_key]
+                for col in self.through.meta.field_to_column_names[field]
+            },
+            ignore_create_conflicts=True,
+            create=True,
+            retrieve=False,
+            update=False,
+            used_instance=self.instance,
+            resolve_embed=False,
+        )
 
     def __getattr__(self, item: Any) -> Any:
         """
@@ -199,6 +204,14 @@ class ManyRelation(ManyRelationProtocol):
             Any: An instance of the `through` model or its proxy, ready for use
                  in the relationship.
         """
+        # Validate that the child is compatible with the relationship.
+        if not isinstance(
+            value,
+            self.to | self.to.proxy_model | self.through | self.through.proxy_model | dict,
+        ):
+            raise RelationshipIncompatible(
+                f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
+            )
         through = self.through
 
         # If the value is already an instance of the through model or its proxy, return it directly.
@@ -207,11 +220,15 @@ class ManyRelation(ManyRelationProtocol):
 
         # Create a new proxy model instance of the 'through' model.
         # This instance links the current 'from' model instance with the 'to' model instance.
-        instance = through.proxy_model(
+        instance = cast("type[BaseModelType]", through.proxy_model)(
             **{self.from_foreign_key: self.instance, self.to_foreign_key: value}
         )
         # Set identifying database fields for the 'through' model instance.
-        instance.identifying_db_fields = [self.from_foreign_key, self.to_foreign_key]  # type: ignore
+        instance.identifying_db_fields = tuple(
+            col
+            for field in [self.from_foreign_key, self.to_foreign_key]
+            for col in through.meta.field_to_column_names[field]
+        )
         # If the 'through' model is a tenant model, set the active schema for the instance.
         if getattr(through.meta, "is_tenant", False):
             instance.__using_schema__ = self.instance.get_active_instance_schema()  # type: ignore
@@ -231,15 +248,6 @@ class ManyRelation(ManyRelationProtocol):
                                       `to` model, `through` model, or a dictionary.
         """
         for child in children:
-            # Validate that the child is compatible with the relationship.
-            if not isinstance(
-                child,
-                self.to | self.to.proxy_model | self.through | self.through.proxy_model | dict,
-            ):
-                raise RelationshipIncompatible(
-                    f"The child is not from the types '{self.to.__name__}', "
-                    f"'{self.through.__name__}'."
-                )
             # Expand the child into a 'through' model instance and append it to refs.
             self.refs.append(self.expand_relationship(child))
 
@@ -274,11 +282,32 @@ class ManyRelation(ManyRelationProtocol):
                                         or None for each record that already exists
                                         (IntegrityError).
         """
-        results = []
+        prepared = []
+        through = self.through
         for child in children:
-            result = await self.add(child)
-            results.append(result)
-        return results
+            prepared.append(self.expand_relationship(child))
+        if not prepared:
+            return []
+        return cast(
+            "list[BaseModelType | None]",
+            [
+                tup[0]
+                for tup in await self.get_queryset()._bulk_get_update_or_create(
+                    objs=prepared,
+                    unique_columns={
+                        col
+                        for field in [self.from_foreign_key, self.to_foreign_key]
+                        for col in through.meta.field_to_column_names[field]
+                    },
+                    ignore_create_conflicts=True,
+                    create=True,
+                    retrieve=False,
+                    update=False,
+                    used_instance=self.instance,
+                    resolve_embed=True,
+                )
+            ],
+        )
 
     async def add(self, child: BaseModelType) -> BaseModelType | None:
         """
@@ -297,43 +326,7 @@ class ManyRelation(ManyRelationProtocol):
         Raises:
             RelationshipIncompatible: If the child type is not compatible.
         """
-        # Validate that the child is compatible with the relationship.
-        if not isinstance(
-            child,
-            self.to | self.to.proxy_model | self.through | self.through.proxy_model | dict,
-        ):
-            raise RelationshipIncompatible(
-                f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
-            )
-        # Expand the child into a 'through' model instance.
-        through_instance = self.expand_relationship(child)
-
-        token = CURRENT_INSTANCE.set(through_instance)
-        try:
-            # Attempt to save the intermediate model. If it fails due to IntegrityError,
-            # it means the record already exists, so return None.
-            result = await through_instance.real_save(force_insert=True, values=None)
-        except IntegrityError:
-            # The record already exists.
-            return None
-        finally:
-            CURRENT_INSTANCE.reset(token)
-        if isinstance(child, self.through | self.through.proxy_model | dict):
-            return cast("BaseModelType", getattr(result, self.to_foreign_key))
-        if self.embed_parent:
-            embed_token = MODEL_GETATTR_BEHAVIOR.set("coro")
-            try:
-                new_result: Any = result
-                for part in self.embed_parent[0].split("__"):
-                    new_result = getattr(new_result, part)
-                    if isawaitable(new_result):
-                        new_result = await new_result
-            finally:
-                MODEL_GETATTR_BEHAVIOR.reset(embed_token)
-            if self.embed_parent[1]:
-                # object.__setattr__ will set it if extra="forbid" or "ignore" and not a field
-                setattr(child, self.embed_parent[1], new_result)
-        return child
+        return (await self.add_many(child))[0]
 
     async def remove_many(self, *children: BaseModelType) -> None:
         """
@@ -383,14 +376,6 @@ class ManyRelation(ManyRelationProtocol):
                 # If no child is specified and the foreign key is not unique, raise an error.
                 raise RelationshipNotFound(detail="No child specified.")
 
-        # Validate that the child is compatible before removal.
-        if not isinstance(
-            child,
-            self.to | self.to.proxy_model | self.through | self.through.proxy_model,
-        ):
-            raise RelationshipIncompatible(
-                f"The child is not from the types '{self.to.__name__}', '{self.through.__name__}'."
-            )
         # Cast the child to BaseModelType as it is now confirmed to be a model instance.
         child = cast("BaseModelType", self.expand_relationship(child))
         # Count the number of relationships based on the identifying clauses of the child.
@@ -578,9 +563,12 @@ class SingleRelation(ManyRelationProtocol):
                  in the relationship.
         """
         target = self.to
+        if not isinstance(value, self.to | self.to.proxy_model | dict):
+            raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
 
         # If the value is already an instance of the target model or its proxy, return it directly.
         if isinstance(value, target | target.proxy_model):
+            setattr(value, self.to_foreign_key, self.instance)
             return value
 
         related_columns = self.to.meta.fields[self.to_foreign_key].related_columns.keys()
@@ -589,13 +577,14 @@ class SingleRelation(ManyRelationProtocol):
         if len(related_columns) == 1 and not isinstance(value, dict | BaseModel):
             value = {next(iter(related_columns)): value}
         # Create a new proxy model instance of the 'to' model using the value.
-        instance = target.proxy_model(**value)
+        target_instance = target.proxy_model(**value)
+        setattr(target_instance, self.to_foreign_key, self.instance)
         # Set identifying database fields for the 'to' model instance.
-        instance.identifying_db_fields = related_columns  # type: ignore
+        target_instance.identifying_db_fields = related_columns  # type: ignore
         # If the 'to' model is a tenant model, set the active schema for the instance.
         if getattr(target.meta, "is_tenant", False):
-            instance.__using_schema__ = self.instance.get_active_instance_schema()  # type: ignore
-        return instance
+            target_instance.__using_schema__ = self.instance.get_active_instance_schema()  # type: ignore
+        return target_instance
 
     def stage(self, *children: BaseModelType) -> None:
         """
@@ -611,12 +600,6 @@ class SingleRelation(ManyRelationProtocol):
                                       `to` model or a dictionary.
         """
         for child in children:
-            # Validate that the child is compatible with the relationship.
-            if not isinstance(child, self.to | self.to.proxy_model | dict):
-                raise RelationshipIncompatible(
-                    f"The child is not from the types '{self.to.__name__}', "
-                    f"'{self.through.__name__}'."
-                )
             # Expand the child into a 'to' model instance and append it to refs.
             self.refs.append(self.expand_relationship(child))
 
@@ -652,10 +635,22 @@ class SingleRelation(ManyRelationProtocol):
         This method iterates through the `refs` (staged children) and adds them
         to the relationship.
         """
-        # Iterate while there are references in the list.
-        while self.refs:
-            # Pop the last reference from the list and add it to the relationship.
-            await self.add(self.refs.pop())
+        refs = list(self.refs)
+        self.refs.clear()
+        if not refs:
+            return
+        to = self.to
+        await self.get_queryset()._bulk_get_update_or_create(
+            objs=refs,
+            unique_columns=to.pkcolumns,
+            update_fields={self.to_foreign_key},
+            ignore_create_conflicts=True,
+            retrieve=False,
+            create=True,
+            update=True,
+            used_instance=self.instance,
+            resolve_embed=False,
+        )
 
     async def create(self, *args: Any, **kwargs: Any) -> BaseModelType | None:
         """
@@ -669,10 +664,7 @@ class SingleRelation(ManyRelationProtocol):
         Returns:
             BaseModelType | None: The newly created and added child instance.
         """
-        # Set the foreign key in kwargs to link the new child to the current instance.
-        kwargs[self.to_foreign_key] = self.instance
-        # Create the new instance using the 'to' model's query manager.
-        return await cast("QuerySet[BaseModelType]", self.to.query).create(*args, **kwargs)
+        return await self.add(self.to(*args, **kwargs))
 
     async def add(self, child: BaseModelType) -> BaseModelType | None:
         """
@@ -689,37 +681,7 @@ class SingleRelation(ManyRelationProtocol):
         Raises:
             RelationshipIncompatible: If the child type is not compatible.
         """
-        # Validate that the child is compatible with the relationship.
-        if not isinstance(child, self.to | self.to.proxy_model | dict):
-            raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
-        # Expand the child into a 'to' model instance.
-        child = self.expand_relationship(child)
-        # Save the child, setting its foreign key to the current instance.
-
-        token = CURRENT_INSTANCE.set(child)
-        try:
-            result = await child.real_save(
-                force_insert=False, values={self.to_foreign_key: self.instance}
-            )
-        except IntegrityError:
-            # one-to-one violation
-            return None
-        finally:
-            CURRENT_INSTANCE.reset(token)
-        if self.embed_parent:
-            embed_token = MODEL_GETATTR_BEHAVIOR.set("coro")
-            try:
-                new_result: Any = result
-                for part in self.embed_parent[0].split("__"):
-                    new_result = getattr(new_result, part)
-                    if isawaitable(new_result):
-                        new_result = await new_result
-            finally:
-                MODEL_GETATTR_BEHAVIOR.reset(embed_token)
-            if self.embed_parent[1]:
-                # object.__setattr__ will set it if extra="forbid" or "ignore" and not a field
-                setattr(child, self.embed_parent[1], new_result)
-        return child
+        return (await self.add_many(child))[0]
 
     async def add_many(self, *children: BaseModelType) -> list[BaseModelType | None]:
         """
@@ -737,11 +699,30 @@ class SingleRelation(ManyRelationProtocol):
         Raises:
             RelationshipIncompatible: If a child type is not compatible.
         """
-        results = []
+
+        prepared = []
+        to = self.to
         for child in children:
-            result = await self.add(child)
-            results.append(result)
-        return results
+            prepared.append(self.expand_relationship(child))
+        if not prepared:
+            return []
+        return cast(
+            "list[BaseModelType | None]",
+            [
+                tup[0]
+                for tup in await self.get_queryset()._bulk_get_update_or_create(
+                    objs=prepared,
+                    unique_columns=to.pkcolumns,
+                    update_fields={self.to_foreign_key},
+                    ignore_create_conflicts=True,
+                    retrieve=False,
+                    create=True,
+                    update=True,
+                    used_instance=self.instance,
+                    resolve_embed=True,
+                )
+            ],
+        )
 
     async def remove_many(self, *children: BaseModelType) -> None:
         """
