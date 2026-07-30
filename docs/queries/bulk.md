@@ -32,6 +32,27 @@ assert not returned_objs[0].can_load  # the pks are incomplete
 assert returned_objs[1].can_load  # the pks are complete
 ```
 
+#### `ignore_conflicts`
+
+When the database is compatible and we don't need the returned values, we can use `ignore_conflicts=True` instead `bulk_get_or_create`.
+Assuming email is the primary key, we can do something like this:
+
+```python
+await User.query.bulk_create([
+    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
+    ...
+], ignore_conflicts=True)
+
+# is ignored
+await User.query.bulk_create([
+    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": False},
+    ...
+], ignore_conflicts=True)
+```
+
+What does it do? Simply skipping rows which would cause a conflict. It is maybe not as performant because single inserts are issued.
+Deduped objects are returned as `None` for `ignore_conflicts=True`.
+
 ### Bulk update
 
 When you need to update many instances in one go, or **in bulk**. With `update_fields` you can define the fields updated.
@@ -73,7 +94,6 @@ await User.query.bulk_get_or_create([
     {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
 ], unique_fields=["email"])
 
-
 users = await User.query.all() # 2 as total
 ```
 
@@ -109,9 +129,22 @@ assert not results[1][1]  # updated
 users = await User.query.all() # 2 as total
 ```
 
-By default `unique_fields` are the primary keys or columns and `update_fields` are all the fields defined in the model class.
+By default `unique_fields` are the primary keys and columns and `update_fields` are all the fields defined in the model class.
+Note that `None` can be returned in case of input that doesn't contain enough information to generate an update (notably: the instance must be loadable).
+
+#### What is the difference to `bulk_update`?
+
+- It is possible to define `unique_fields`.
+- It can create instances on the fly, not just update them.
+- It can return `None` for instances which couldn't be inserted but have not enough information to generate an update.
 
 ## Advanced Topics
+
+### `unique_fields`
+
+`unique_fields` are explicit provided fields or database columns for deduplication. They are also used for the retrieval of instances.
+Caching and deduplication only work if an input object has all `unique_fields` defined.
+When left on `None` the primary keys and columns are used for `unique_fields`.
 
 ### `resolve_embed`
 
@@ -119,5 +152,15 @@ By default `embed_parent` isn't honored for bulk operations. If you need to reso
 `embed_target=True`.
 This mode has two effects:
 
-- It is ensured that all returned instances `can_load` when `embed_parent` is active. If necessary, it will issue an `real_save`.
+- It is ensured that all returned instances `can_load` when `embed_parent` is active. If necessary, it will issue serialized single inserts.
 - The embedding is resolved if `embed_parent` is set. You get the child with the embedded parent.
+
+### loadable
+
+An instances is loadable if its `can_load` property signals it is loadable. For dictionaries the on the fly generated instance is used.
+But if you provide a correct instance you can do some tricks:
+
+You can set the `identifying_db_fields` so a provided instance becomes suddenly loadable and for `bulk_update_or_create` the update succeeds instead returning `None`.
+Other effects are that `resolve_embed` succeeds for such crafted instances.
+
+It is planned to add signals so you will be able to manipulate the immediate instances via signals so you can do this trick also for dict inputs.

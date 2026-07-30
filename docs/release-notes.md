@@ -3,9 +3,11 @@
 ## 0.36.0
 
 ### Added
+
 - Support for unconstraint numeric mode of postgresql for `DecimalField`.
-- Add `bulk_update_or_create` operation to the queryset.
-- Add `update_embed_parent` operation to the queryset.
+- Add the `bulk_update_or_create` operation to querysets.
+- Add the `update_embed_parent` operation to querysets.
+- Add the `ignore_conflicts` parameter to `bulk_create`.
 
 ### Changed
 
@@ -14,8 +16,20 @@
 - `bulk_get_or_create` mirrors now `get_or_create` and returns a list with `(instance, created)` tuples. The returned instances are not always complete.
 - `CombinedQuerySet` is moved from `edgy.core.db.queryset.mixins.combined` to `edgy.core.db.queryset.combined`. It is not a mixin.
 - The bulk operations are moved to a mixin.
-- The typings changed for QuerySet: it is now Generic.
+- The typings changed for QuerySet: it is now a `Generic`.
 - The typings changed for QuerySetType: `EdgyEmbedTarget` and `EdgyModel` (the queryset model) are switched in the `Generic` definition.
+- Bulk operations are now keywords only (except the first `objs` parameter).
+- Dedupe `bulk_create`, `bulk_get_or_create`, and `bulk_update_or_create` inputs.
+
+### Fixed
+
+- Relations did not use the tenancy/used schema properly when querying.
+- Bulk operations with reflected fields did not always work properly.
+- `run_concurrently` now properly cleans up not executed coroutines in case of an error.
+
+### Removed
+
+- Private `batched` implementation for `run_concurrently`.
 
 ### Breaking
 
