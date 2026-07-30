@@ -5,6 +5,7 @@ from collections.abc import (
     AsyncIterator,
     Awaitable,
     Callable,
+    Collection,
     Generator,
     Iterable,
     Sequence,
@@ -25,6 +26,7 @@ from edgy.core.utils.db import CHECK_DB_CONNECTION_SILENCED, check_db_connection
 from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ObjectNotFound, QuerySetError
 
+from .bulk import BulkOperation
 from .types import (
     EdgyEmbedTarget,
     EdgyModel,
@@ -1207,6 +1209,271 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         return await self.exists(**query)
 
     like = contains
+
+    async def bulk_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        ignore_conflicts: bool = False,
+        resolve_embed: bool = False,
+    ) -> list[EdgyModel | None] | list[EdgyEmbedTarget | None]:
+        """
+        Bulk creates multiple records in a single batch operation.
+
+        This method bypasses model-level save hooks (except for pre/post-save) for efficiency,
+        and returns plain instances which **may** are incomplete.
+
+        Args:
+            objs (Iterable[dict[str, Any] | EdgyModel]): An iterable of dictionaries or
+                                                         model instances to create.
+        Kwargs:
+            ignore_conflicts (bool): Ignore insert conflicts. Support varies between database systems.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
+
+        Returns:
+            list[EdgyModel] | list[EdgyEmbedTarget]:
+                A list of created objects.
+                Warning: for performance reasons no embedding is applied by default and
+                the returned objects are maybe incomplete (check `can_load` property).
+        """
+        return cast(
+            "list[EdgyModel | None] | list[EdgyEmbedTarget | None]",
+            [
+                tup[0]
+                for tup in await BulkOperation(
+                    owner=self,
+                    unique_columns=self.model_class.pkcolumns,
+                    create=True,
+                    update=False,
+                    retrieve=False,
+                    signal_postfix="bulk",
+                    signal_params={
+                        "operation": "bulk_create",
+                        "ignore_conflicts": ignore_conflicts,
+                        "resolve_embed": resolve_embed,
+                    },
+                    resolve_embed=resolve_embed,
+                    none_on_existing=ignore_conflicts,
+                    ignore_create_conflicts=ignore_conflicts,
+                )(objs)
+            ],
+        )
+
+    bulk_insert = bulk_create
+
+    async def bulk_update(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        fields: Iterable[str] | None = None,
+        resolve_embed: bool = False,
+    ) -> list[EdgyModel | None] | list[EdgyEmbedTarget | None]:
+        """
+        Update multiple objects in a single bulk operation.
+
+        Args:
+            objs (Iterable[dict[str, Any] | EdgyModel]): A sequence of model instances to update.
+        Kwargs:
+            update_fields (Iterable[str]): A list of field names to update for each object. If None use all fields.
+            unique_fields (Iterable[str] | None): Fields that determine uniqueness.
+                                                    If None, pknames are used. If empty it fails.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
+
+        Returns:
+            list[EdgyModel] | list[EdgyEmbedTarget]:
+                A list of updated objects.
+                Warning: for performance reasons no embedding is applied by default and
+                the returned objects are maybe incomplete (check `can_load` property).
+        """
+        if fields is not None:
+            warnings.warn(
+                "Use `update_fields` instead `fields`.", DeprecationWarning, stacklevel=2
+            )
+            update_fields = fields
+        _unique_fields: set[str] = set()
+        _unique_columns: Sequence[str]
+        if unique_fields is None:
+            _unique_columns = self.model_class.pkcolumns
+        else:
+            _unique_fields = set(unique_fields)
+            if not _unique_fields:
+                raise ValueError("`unique_fields` empty.")
+            _unique_columns = tuple(
+                col
+                for field in _unique_fields
+                for col in self.model_class.meta.field_to_column_names[field]
+            )
+
+        _update_fields = (
+            {
+                key
+                for key, value in self.model_class.meta.fields.items()
+                if not value.read_only and not value.primary_key
+            }
+            if update_fields is None
+            else set(update_fields)
+        )
+        return cast(
+            "list[EdgyModel | None] | list[EdgyEmbedTarget | None]",
+            [
+                tup[0]
+                for tup in await BulkOperation(
+                    owner=self,
+                    signal_postfix="bulk",
+                    signal_params={
+                        "operation": "bulk_update",
+                        "resolve_embed": resolve_embed,
+                    },
+                    # Somehow this is required to be non-empty
+                    unique_fields=_unique_fields or _unique_columns,
+                    unique_columns=_unique_columns,
+                    update_fields=_update_fields,
+                    update=True,
+                    retrieve=resolve_embed,
+                    create=False,
+                    resolve_embed=resolve_embed,
+                )(objs)
+            ],
+        )
+
+    async def bulk_update_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: bool = False,
+    ) -> list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget | None, bool]]:
+        """
+        Bulk updates or creates records in a table.
+
+        If records exist based on unique fields, they are retrieved.
+        Otherwise, new records are created.
+
+        Args:
+            objs (Sequence[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
+        Kwargs:
+            update_fields (Iterable[str]): A list of field names to update for each object (when found).
+                                    If None use all fields.
+            unique_fields (Iterable[str] | None): Fields that determine uniqueness.
+                                                  If None, pknames are used. If empty it fails.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
+
+        Returns:
+            list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+                A list of `(instance, created)` tuples.
+                Warning: for performance reasons no embedding is applied by default and
+                the returned objects are maybe incomplete (check `can_load` property).
+                Warning: you might want to issue a load to get correct data outside of update_fields.
+        """
+        _unique_fields: set[str] = set()
+        _unique_columns: set[str]
+        if unique_fields is None:
+            _unique_columns = set(self.model_class.pkcolumns)
+        else:
+            _unique_fields = set(unique_fields)
+            if not _unique_fields:
+                raise ValueError("`unique_fields` empty.")
+            _unique_columns = {
+                col
+                for field in _unique_fields
+                for col in self.model_class.meta.field_to_column_names[field]
+            }
+        _update_fields = (
+            {
+                key
+                for key, value in self.model_class.meta.fields.items()
+                if not value.read_only and not value.primary_key
+            }
+            if update_fields is None
+            else set(update_fields)
+        )
+        unique_equals_pk = set(self.model_class.pkcolumns) == _unique_columns
+        return cast(
+            "list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget  | None, bool]]",
+            await BulkOperation(
+                owner=self,
+                signal_postfix="bulk",
+                signal_params={
+                    "operation": "bulk_update_or_create",
+                    "resolve_embed": resolve_embed,
+                },
+                unique_fields=_unique_fields,
+                unique_columns=_unique_columns,
+                update_fields=_update_fields,
+                create=True,
+                update=True,
+                # if unique_equals_pk we can just issue an insert and check if there was a conflict
+                # this allows us to sidestep the retrieve mechanic
+                # for resolve_embed the other mechanic is implicitly used
+                retrieve=not unique_equals_pk,
+                ignore_create_conflicts=unique_equals_pk,
+                resolve_embed=resolve_embed,
+            )(objs),
+        )
+
+    async def bulk_get_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: bool = False,
+    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+        """
+        Bulk gets or creates records in a table.
+
+        If records exist based on unique fields, they are retrieved.
+        Otherwise, new records are created.
+
+        Args:
+            objs (Iterable[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
+        Kwargs:
+            unique_fields (Iterable[str] | None): Fields that determine uniqueness.
+                                                  If None, pknames are used. If empty it fails.
+            resolve_embed (bool): Triggers mode in which embedding is applied when True.
+
+        Returns:
+            list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+                A list of tuples with retrieved or newly created objects and created flag.
+                Warning: for performance reasons no embedding is applied by default and
+                the returned objects are maybe incomplete (check `can_load` property).
+        """
+
+        _unique_fields: set[str] = set()
+        _unique_columns: Collection[str]
+        if unique_fields is None:
+            _unique_fields = set(self.model_class.pknames)
+            _unique_columns = self.model_class.pkcolumns
+        else:
+            _unique_fields = set(unique_fields)
+            if not _unique_fields:
+                raise ValueError("`unique_fields` empty.")
+            _unique_columns = {
+                col
+                for field in _unique_fields
+                for col in self.model_class.meta.field_to_column_names[field]
+            }
+        return cast(
+            "list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]",
+            await BulkOperation(
+                owner=self,
+                signal_postfix="bulk",
+                signal_params={
+                    "operation": "bulk_get_or_create",
+                    "resolve_embed": resolve_embed,
+                },
+                unique_fields=_unique_fields,
+                unique_columns=_unique_columns,
+                create=True,
+                update=False,
+                retrieve=True,
+                resolve_embed=resolve_embed,
+            )(objs),
+        )
+
+    bulk_select_or_insert = bulk_get_or_create  # type: ignore
 
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
         """

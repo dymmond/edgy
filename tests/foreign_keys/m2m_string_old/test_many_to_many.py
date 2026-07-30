@@ -172,7 +172,7 @@ async def test_raises_RelationshipNotFound():
 
     assert (
         raised.value.args[0]
-        == f"There is no relationship between 'album' and 'track: {track3.pk}'."
+        == f"There is no relationship through 'tracks' to {album} from {track3}."
     )
 
 

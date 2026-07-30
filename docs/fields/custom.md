@@ -97,6 +97,7 @@ For  `extract_column_values` following phases exist (except called manually):
 * `prepare_insert`: Called in extract_column_values for insert.
 * `prepare_update`: Called in extract_column_values for update.
 * `compare`: Called when comparing model instances.
+* `delete`: Called when preparing deletion.
 
 ### Using the field context
 

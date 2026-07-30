@@ -8,14 +8,18 @@ from edgy.exceptions import SignalError
 
 # Define standard lifecycle signals using Blinker's Signal class.
 # These signals are used to dispatch events before/after database operations.
-post_delete = Signal()
-post_save = Signal()
-post_update = Signal()
-pre_delete = Signal()
-post_migrate = Signal()
-pre_save = Signal()
-pre_update = Signal()
 pre_migrate = Signal()
+post_migrate = Signal()
+pre_delete = Signal()
+post_delete = Signal()
+pre_save = Signal()
+post_save = Signal()
+pre_update = Signal()
+post_update = Signal()
+pre_relation = Signal()
+post_relation = Signal()
+pre_bulk = Signal()
+post_bulk = Signal()
 
 
 class Broadcaster(dict):
@@ -80,12 +84,17 @@ class Broadcaster(dict):
         """
         # List of common lifecycle signal names to process.
         for name in (
-            "post_delete",
-            "post_save",
-            "post_update",
             "pre_delete",
+            "post_delete",
             "pre_save",
+            "post_save",
             "pre_update",
+            "post_update",
+            "pre_relation",
+            "post_relation",
+            "pre_bulk",
+            "post_bulk",
+            # no migrate
         ):
             if overwrite:
                 # Overwrite the signal if 'overwrite' is True.
@@ -98,12 +107,16 @@ class Broadcaster(dict):
 __all__ = [
     "Signal",
     "Broadcaster",
-    "post_delete",
-    "post_save",
-    "post_update",
+    "pre_migrate",
     "post_migrate",
     "pre_delete",
+    "post_delete",
     "pre_save",
+    "post_save",
     "pre_update",
-    "pre_migrate",
+    "post_update",
+    "pre_relation",
+    "post_relation",
+    "pre_bulk",
+    "post_bulk",
 ]

@@ -32,7 +32,7 @@ from edgy.types import Undefined
 from . import clauses as clauses_mod
 from .compiler import QueryCompiler
 from .executor import QueryExecutor, get_current_row
-from .mixins import BulkMixin, QuerySetPropsMixin, TenancyMixin
+from .mixins import QuerySetPropsMixin, TenancyMixin
 from .parser import ResultParser
 from .prefetch import Prefetch, PrefetchMixin
 from .types import (
@@ -55,7 +55,6 @@ class BaseQuerySet(
     TenancyMixin,
     QuerySetPropsMixin,
     PrefetchMixin,
-    BulkMixin[EdgyModel],
     QuerySetType[EdgyModel, EdgyEmbedTarget],
     Generic[EdgyModel, EdgyEmbedTarget],
 ):
@@ -92,6 +91,7 @@ class BaseQuerySet(
         extra_select: Iterable[sqlalchemy.ClauseElement] | None = None,
         reference_select: reference_select_type | None = None,
     ) -> None:
+        # ensure only the real model_class is used here not a proxy
         if model_class.__is_proxy_model__:
             model_class = cast(type[EdgyModel], model_class.__parent__)
 
