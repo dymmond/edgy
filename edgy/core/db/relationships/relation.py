@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal, cast
@@ -84,10 +85,18 @@ class ManyRelation(ManyRelationProtocol):
 
     @cached_property
     def _shared_relation_signals_params(self) -> dict:
-        fk = self.through.meta.fields[self.from_foreign_key]
-        source = fk.target
-        fk_source = source.meta.fields[fk.reverse_name]
-        return {"source": source, "field": fk_source.name, "relation": "many_to_many"}
+        fk_to_defining_model = self.through.meta.fields[
+            self.to_foreign_key if self.reverse else self.from_foreign_key
+        ]
+        fk_defining_model = fk_to_defining_model.target.meta.fields[
+            fk_to_defining_model.reverse_name
+        ]
+        return {
+            "target": fk_defining_model.owner if self.reverse else fk_defining_model.target,
+            "source": fk_defining_model.target if self.reverse else fk_defining_model.owner,
+            "field": fk_defining_model.related_name if self.reverse else fk_defining_model.name,
+            "relation": "many_to_many",
+        }
 
     def get_queryset(self) -> QuerySet:
         """
@@ -143,7 +152,7 @@ class ManyRelation(ManyRelationProtocol):
         self.refs.clear()
         if not refs:
             return
-        await BulkOperation(
+        operation = BulkOperation(
             owner=self.get_queryset(),
             unique_columns={
                 col
@@ -151,14 +160,26 @@ class ManyRelation(ManyRelationProtocol):
                 for col in self.through.meta.field_to_column_names[field]
             },
             ignore_create_conflicts=True,
-            signal_postfix="relation",
+            signal_models=[
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+                self.through,
+            ],
+            signal_postfix="relation_add",
             signal_params={"operation": "save_related", **self._shared_relation_signals_params},
             create=True,
             retrieve=False,
             update=False,
             used_instance=self.instance,
             resolve_embed=False,
-        )(refs)
+        )
+        await operation.prepare(refs)
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        # no cache update because the queryset is temporarysignal
+        # both parameters are the same here
+        operation.signal_params["row_count"] = operation.signal_params.get("row_count_create")
+        await operation.send_post_signal()
 
     def __getattr__(self, item: Any) -> Any:
         """
@@ -299,27 +320,38 @@ class ManyRelation(ManyRelationProtocol):
             prepared.append(self.expand_relationship(child))
         if not prepared:
             return []
+        operation = BulkOperation(
+            owner=self.get_queryset(),
+            unique_columns={
+                col
+                for field in [self.from_foreign_key, self.to_foreign_key]
+                for col in through.meta.field_to_column_names[field]
+            },
+            ignore_create_conflicts=True,
+            signal_models=[
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+                self.through,
+            ],
+            signal_postfix="relation_add",
+            signal_params={"operation": "add", **self._shared_relation_signals_params},
+            create=True,
+            retrieve=False,
+            update=False,
+            used_instance=self.instance,
+            resolve_embed=True,
+        )
+        await operation.prepare(prepared)
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        # no cache update because the queryset is temporary
+        # we can just rename the signals parameters for the post signal
+        # both parameters are the same here
+        operation.signal_params["row_count"] = operation.signal_params.get("row_count_create")
+        await operation.send_post_signal()
         return cast(
             "list[BaseModelType | None]",
-            [
-                tup[0]
-                for tup in await BulkOperation(
-                    owner=self.get_queryset(),
-                    unique_columns={
-                        col
-                        for field in [self.from_foreign_key, self.to_foreign_key]
-                        for col in through.meta.field_to_column_names[field]
-                    },
-                    ignore_create_conflicts=True,
-                    signal_postfix="relation",
-                    signal_params={"operation": "add", **self._shared_relation_signals_params},
-                    create=True,
-                    retrieve=False,
-                    update=False,
-                    used_instance=self.instance,
-                    resolve_embed=True,
-                )(prepared)
-            ],
+            [tup[0] for tup in operation.result],
         )
 
     async def add(self, child: BaseModelType) -> BaseModelType | None:
@@ -363,25 +395,41 @@ class ManyRelation(ManyRelationProtocol):
             return self.expand_relationship(child)
 
         prepared = [_helper_prepare(child) for child in children]
+        if not prepared:
+            return
         through = self.through.get_real_class()
         fk = self.through.meta.fields[self.from_foreign_key]
         fk_source = fk.target.meta.fields[fk.reverse_name]
         model_based_deletion = (
             fk.use_model_based_deletion or through.__require_model_based_deletion__
         )
-        await through.meta.signals.pre_relation.send_async(
+        ops = []
+        seen_signals: set[int] = set()
+        for model_class in [
+            self._shared_relation_signals_params["source"],
+            self._shared_relation_signals_params["target"],
             through,
-            instance=self.instance,
-            values=prepared,
-            operation="delete",
-            model_based_deletion=model_based_deletion,
-            **self._shared_relation_signals_params,
-        )
-        queryset = self.get_queryset()
-        clauses = [and_(*child.identifying_clauses()) for child in prepared]
-        expression = queryset.filter(or_(*clauses))
+        ]:
+            signal = model_class.meta.signals.pre_relation_remove
+            if (signal_id := id(signal)) in seen_signals:
+                continue
+            seen_signals.add(signal_id)
+            ops.append(
+                model_class.meta.signals.pre_relation_remove.send_async(
+                    through,
+                    instance=self.instance,
+                    raw_values=prepared,
+                    model_based_deletion=model_based_deletion,
+                    **self._shared_relation_signals_params,
+                )
+            )
+        await asyncio.gather(*ops)
+        queryset = self.get_queryset().update_embed_parent(None)
+        # children can be removed by setting them to None
+        clauses = [and_(*child.identifying_clauses()) for child in prepared if child is not None]
+        query = queryset.filter(or_(*clauses))
         async with queryset.transaction():
-            row_count = await expression.delete(model_based_deletion)
+            row_count = await query.raw_delete(use_models=model_based_deletion)
             if row_count is not None and row_count != len(clauses):
                 related_name = fk_source.name
                 raise RelationshipNotFound(
@@ -391,16 +439,29 @@ class ManyRelation(ManyRelationProtocol):
                         f"{', '.join(str(getattr(child, self.to_foreign_key)) for child in prepared)}."
                     )
                 )
-        await through.meta.signals.post_relation.send_async(
+        ops = []
+        # not really necessary but be safe
+        seen_signals.clear()
+        for model_class in [
+            self._shared_relation_signals_params["source"],
+            self._shared_relation_signals_params["target"],
             through,
-            instance=self.instance,
-            values=prepared,
-            field=self.from_foreign_key,
-            operation="delete_many",
-            relation="many_to_many",
-            row_count=row_count,
-            model_based_deletion=model_based_deletion,
-        )
+        ]:
+            signal = model_class.meta.signals.post_relation_remove
+            if (signal_id := id(signal)) in seen_signals:
+                continue
+            seen_signals.add(signal_id)
+            ops.append(
+                signal.send_async(
+                    through,
+                    instance=self.instance,
+                    raw_values=prepared,
+                    row_count=row_count,
+                    model_based_deletion=model_based_deletion,
+                    **self._shared_relation_signals_params,
+                )
+            )
+        await asyncio.gather(*ops)
 
     async def remove(self, child: BaseModelType | None = None) -> None:
         """
@@ -519,9 +580,15 @@ class SingleRelation(ManyRelationProtocol):
 
     @cached_property
     def _shared_relation_signals_params(self) -> dict:
+        assert self.instance is not None
         fk = self.to.meta.fields[self.to_foreign_key]
         # here reverse_name=related_name
-        return {"source": self.to, "field": fk.reverse_name, "relation": "one_to_many"}
+        return {
+            "source": type(self.instance),
+            "target": self.to,
+            "field": fk.reverse_name,
+            "relation": "one_to_many",
+        }
 
     def get_queryset(self) -> QuerySet:
         """
@@ -680,11 +747,15 @@ class SingleRelation(ManyRelationProtocol):
         if not refs:
             return
         to = self.to
-        await BulkOperation(
+        operation = BulkOperation(
             owner=self.get_queryset(),
             unique_columns=to.pkcolumns,
             update_fields={self.to_foreign_key},
-            signal_postfix="relation",
+            signal_models=[
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+            ],
+            signal_postfix="relation_add",
             signal_params={"operation": "save_related", **self._shared_relation_signals_params},
             ignore_create_conflicts=True,
             retrieve=False,
@@ -692,7 +763,19 @@ class SingleRelation(ManyRelationProtocol):
             update=True,
             used_instance=self.instance,
             resolve_embed=False,
-        )(refs)
+        )
+        await operation.prepare(refs)
+        operation.signal_params["instance"] = self.instance
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        # no cache update because the queryset is temporary
+        # we can just rename the signals parameters for the post signal
+        operation.signal_params["row_count"] = operation.signal_params.pop("row_count_update")
+        if operation.signal_params["row_count"] is not None:
+            # keep the amount of created in the params
+            operation.signal_params["row_count"] += operation.signal_params.get("row_count_create")
+        operation.signal_params["instance"] = self.instance
+        await operation.send_post_signal()
 
     async def create(self, *args: Any, **kwargs: Any) -> BaseModelType | None:
         """
@@ -748,24 +831,36 @@ class SingleRelation(ManyRelationProtocol):
             prepared.append(self.expand_relationship(child))
         if not prepared:
             return []
+        operation = BulkOperation(
+            owner=self.get_queryset(),
+            unique_columns=to.pkcolumns,
+            update_fields={self.to_foreign_key},
+            signal_models=[
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+            ],
+            signal_postfix="relation_add",
+            signal_params={"operation": "add", **self._shared_relation_signals_params},
+            ignore_create_conflicts=True,
+            retrieve=False,
+            create=True,
+            update=True,
+            used_instance=self.instance,
+            resolve_embed=True,
+        )
+        await operation.prepare(prepared)
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        # no cache update because the queryset is temporary
+        # we can just rename the signals parameters for the post signal
+        operation.signal_params["row_count"] = operation.signal_params.pop("row_count_update")
+        if operation.signal_params["row_count"] is not None:
+            # keep the amount of created in the params
+            operation.signal_params["row_count"] += operation.signal_params.get("row_count_create")
+        await operation.send_post_signal()
         return cast(
             "list[BaseModelType | None]",
-            [
-                tup[0]
-                for tup in await BulkOperation(
-                    owner=self.get_queryset(),
-                    unique_columns=to.pkcolumns,
-                    update_fields={self.to_foreign_key},
-                    signal_postfix="relation",
-                    signal_params={"operation": "add", **self._shared_relation_signals_params},
-                    ignore_create_conflicts=True,
-                    retrieve=False,
-                    create=True,
-                    update=True,
-                    used_instance=self.instance,
-                    resolve_embed=True,
-                )(prepared)
-            ],
+            [tup[0] for tup in operation.result],
         )
 
     async def remove_many(self, *children: BaseModelType) -> None:
@@ -793,25 +888,44 @@ class SingleRelation(ManyRelationProtocol):
             setattr(child, self.to_foreign_key, None)
             return child
 
+        prepared = [_helper_prepare(child) for child in children]
+        if not prepared:
+            return
+
         to = self.to
         queryset = self.get_queryset()
         operation = BulkOperation(
             owner=queryset,
             unique_columns=to.pkcolumns,
             update_fields={self.to_foreign_key},
-            signal_postfix="relation",
-            signal_params={"operation": "delete", **self._shared_relation_signals_params},
+            signal_models=[
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+            ],
+            signal_postfix="relation_remove",
+            signal_params=self._shared_relation_signals_params,
             retrieve=False,
             create=False,
             update=True,
             used_instance=self.instance,
             resolve_embed=False,
         )
-        prepared = [_helper_prepare(child) for child in children]
+        await operation.prepare(prepared)
+        # replace raw_values
+        raw_values = [tup[0] for tup in operation.instances_and_created]
+        del operation.signal_params["create_params"]
+        del operation.signal_params["update_params"]
+        operation.signal_params["raw_values"] = raw_values
+        await operation.send_pre_signal()
+        # allow modification via raw_values
+        obj_ids = [id(obj) for obj in raw_values]
+        operation.update_params = [tup for tup in operation.update_params if id(tup[0]) in obj_ids]
+
         async with queryset.transaction():
-            await operation(prepared)
-            if operation.row_count_update != len(operation.instances_and_created):
-                related_name = self.to.meta.fields[self.to_foreign_key].related_name
+            await operation.apply_db()
+            # the queryset is temporary and maybe even resetted, so we don't need to update the cache
+            if operation.row_count_update != len(raw_values):
+                related_name = self._shared_relation_signals_params["field"]
                 raise RelationshipNotFound(
                     detail=(
                         f"There is no relationship through '{related_name}' to {self.instance} from "
@@ -819,6 +933,13 @@ class SingleRelation(ManyRelationProtocol):
                         f"{', '.join(str(child) for child in prepared)}."
                     )
                 )
+        # replace unsuitable parameters
+        operation.signal_params["raw_values"] = raw_values
+        operation.signal_params["row_count"] = operation.signal_params.pop("row_count_update")
+        del operation.signal_params["values"]
+        del operation.signal_params["create_params"]
+        del operation.signal_params["update_params"]
+        await operation.send_post_signal()
 
     async def remove(self, child: BaseModelType | None = None) -> None:
         """

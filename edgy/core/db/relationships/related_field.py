@@ -50,6 +50,7 @@ class RelatedField(RelationshipField):
         """
         self.foreign_key_name = foreign_key_name
         self.related_from = related_from
+
         super().__init__(
             # Do not inherit properties from parent fields.
             inherit=False,

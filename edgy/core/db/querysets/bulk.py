@@ -5,7 +5,6 @@ from collections.abc import (
     Awaitable,
     Collection,
     Iterable,
-    Sequence,
 )
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, cast
@@ -105,6 +104,7 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
     update_fields: set[str] = _empty_set
     signal_postfix: str | None = None
     signal_params: dict[str, Any] = field(default_factory=dict)
+    signal_models: None | Iterable[type[BaseModelType]] = None
     ignore_create_conflicts: bool = False
     none_on_existing: bool = False
     used_instance: BaseModelType | QuerySet = field(default=cast(Any, None))
@@ -118,41 +118,39 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
     instances_and_created: list[tuple[EdgyModel | None, bool]] = field(
         init=False, default_factory=list
     )
+    result: list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget | None, bool]] = (
+        field(init=False, default_factory=list)
+    )
     existing_records: dict[tuple, EdgyModel] = field(init=False, default_factory=dict)
+    execution_step: int = field(default=0, init=False)
+    provided_signal_params: dict = field(init=False)
 
     def __post_init__(self) -> None:
         if cast(Any, self.used_instance) is None:
             self.used_instance = self.owner
         self.model_class = self.owner.model_class
         self.proxy_model_class = cast(type[EdgyModel], self.model_class.proxy_model)
+        self.provided_signal_params = self.signal_params
+        # we can edit the signals now
+        self.signal_params = {}
+        if self.signal_models is None:
+            self.signal_models = [self.model_class]
+        else:
+            self.signal_models = [*self.signal_models]
 
-    async def __call__(
-        self, objs: Iterable[dict[str, Any] | EdgyModel]
-    ) -> Sequence[tuple[EdgyModel | None, bool]] | Sequence[tuple[EdgyEmbedTarget | None, bool]]:
+    async def prepare(self, objs: Iterable[dict[str, Any] | EdgyModel]) -> None:
         """
-        Bulk gets, updates or creates records in a table.
-
-        If records exist based on unique fields, they are retrieved.
-        Otherwise, new records are created.
+        Prepares objects and retrieve. No modifying database operations are executed yet.
+        This method also initializes `signal_params` for execution with `apply_db`.
 
         Args:
             objs (Iterable[Union[dict[str, Any], EdgyModel]]): A list of objects or dictionaries.
-
-        Returns:
-           Sequence[tuple[EdgyModel | None, bool]] | Sequence[tuple[EdgyEmbedTarget | None, bool]]:
-               A list of retrieved or newly created objects. Second entry is True if instance was created.
         """
+        if self.execution_step >= 1:
+            raise Exception("Was already executed")
+        self.execution_step = 1
 
-        queryset: QuerySet[EdgyModel, EdgyEmbedTarget] = self.owner._clone()
-
-        _unique_cols_and_update_fields: set = self.update_fields.union(self.unique_columns)
-        _update_columns: set[str] = {
-            col
-            for field in self.update_fields
-            for col in self.model_class.meta.field_to_column_names[field]
-        }
-        concurrent_limit = 1 if getattr(queryset.database, "force_rollback", False) else None
-        can_result_cache = not self.owner.embed_parent
+        concurrent_limit = 1 if getattr(self.owner.database, "force_rollback", False) else None
 
         def _add_create_obj(
             obj: EdgyModel | dict,
@@ -255,7 +253,7 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                         # is safe in case force_rollback is active
                         # Models can also issue loads by accessing attrs for building unique_fields
                         # For limiting use something like QuerySet.limit(100).bulk_get_or_create(...)
-                        for instance in await queryset.update_embed_parent(None).filter(
+                        for instance in await self.owner.update_embed_parent(None).filter(
                             **filter_kwargs
                         ):
                             if all(
@@ -331,7 +329,53 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                     self.instances_and_created.append((updated, False))
                 else:
                     self.instances_and_created.append((None, False))
+        self.signal_params = {
+            "instance": self.used_instance,
+            "raw_values": self.instances_and_created,
+            "create_params": self.create_params,
+            "update_params": self.update_params,
+            **self.provided_signal_params,
+        }
 
+    async def send_pre_signal(self) -> None:
+        if self.execution_step >= 2:
+            raise Exception("Was already executed")
+        self.execution_step = 2
+        ops = []
+        seen_signals: set[int] = set()
+        for model_class in self.signal_models:
+            signal = getattr(model_class.meta.signals, f"pre_{self.signal_postfix}")
+            if (signal_id := id(signal)) in seen_signals:
+                continue
+            seen_signals.add(signal_id)
+            ops.append(
+                signal.send_async(
+                    self.model_class,
+                    **self.signal_params,
+                )
+            )
+        await asyncio.gather(*ops)
+
+    async def apply_db(self) -> None:
+        """
+        Modify the database.
+        It resets the signal_params at the end of the method, so we can modify it again for `send_post_signal`.
+        """
+        if self.execution_step >= 3:
+            raise Exception("Was already executed")
+        self.execution_step = 3
+
+        concurrent_limit = 1 if getattr(self.owner.database, "force_rollback", False) else None
+
+        queryset: QuerySet[EdgyModel, EdgyEmbedTarget] = self.owner._clone()
+        _unique_cols_and_update_fields: set = self.update_fields.union(self.unique_columns)
+        _update_columns: set[str] = {
+            col
+            for field in self.update_fields
+            for col in self.model_class.meta.field_to_column_names[field]
+        }
+
+        can_result_cache = not self.owner.embed_parent
         if self.resolve_embed and queryset.embed_parent:
             # check if all are elligable and can be resolved
             if not all(
@@ -445,15 +489,6 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
             obj.__dict__.update(new_kwargs)
             return {f"__{item[0]}": item[1] for item in col_values.items()}
 
-        if self.signal_postfix:
-            await getattr(self.model_class.meta.signals, f"pre_{self.signal_postfix}").send_async(
-                self.model_class,
-                instance=self.used_instance,
-                values=self.instances_and_created,
-                create_params=self.create_params,
-                update_params=self.update_params,
-                **self.signal_params,
-            )
         token = CURRENT_INSTANCE.set(self.used_instance)
         try:
             async with (
@@ -490,13 +525,13 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                     # we need to recheck if the conditions are still valid
                     if create_obj_values:
                         expression_create = queryset.table.insert().values(create_obj_values)
-                        row_count_create = cast(
+                        create_return_result = cast(
                             None | int | list, await connection.execute_many(expression_create)
                         )
                         self.row_count_create = (
-                            len(row_count_create)
-                            if isinstance(row_count_create, list)
-                            else row_count_create
+                            len(create_return_result)
+                            if isinstance(create_return_result, list)
+                            else create_return_result
                         )
                 if self.row_count_create is not None:
                     self.row_count_create += row_count_create_single
@@ -523,9 +558,14 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                         for col in _update_columns
                     }
                     expression_update = expression_update.values(values_placeholder)
-                    self.row_count_update = cast(
-                        None | int,
+                    update_result_return = cast(
+                        None | int | list,
                         await connection.execute_many(expression_update, update_obj_values),
+                    )
+                    self.row_count_update = (
+                        len(update_result_return)
+                        if isinstance(update_result_return, list)
+                        else update_result_return
                     )
 
                 if self.update_params or self.create_params:
@@ -557,7 +597,58 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                         )
         finally:
             CURRENT_INSTANCE.reset(token)
-        if not queryset.embed_parent:
+        if queryset.embed_parent and self.resolve_embed:
+            immediate = await run_concurrently(
+                [queryset._embed_parent_in_result(tup[0]) for tup in self.instances_and_created],
+                limit=concurrent_limit,
+            )
+            self.result = list(
+                zip(
+                    [item[1] for item in immediate],
+                    (res[1] for res in self.instances_and_created),
+                    strict=True,
+                )
+            )
+        else:
+            self.result = self.instances_and_created
+        # reinitialize
+        self.signal_params = {
+            "instance": self.used_instance,
+            "raw_values": self.instances_and_created,
+            "values": self.result,
+            "create_params": self.create_params,
+            "update_params": self.update_params,
+            **self.provided_signal_params,
+        }
+        if self.create:
+            self.signal_params["row_count_create"] = self.row_count_create
+        if self.update:
+            self.signal_params["row_count_update"] = self.row_count_update
+
+    def update_cache(self) -> None:
+        if self.execution_step >= 4:
+            raise Exception("Was already executed")
+        self.execution_step = 4
+        if self.resolve_embed and self.owner.embed_parent:
+            # embed can be None so only check None from instances if the entry really not exists
+            immediate = [
+                tup
+                for tup in zip(
+                    (res[0] for res in self.instances_and_created),
+                    [item[0] for item in self.result],
+                    strict=True,
+                )
+                if tup[0] is not None
+            ]
+            self.owner._cache.update(
+                self.model_class,
+                [item[1] for item in immediate],
+                cache_keys=[
+                    self.owner._cache.create_cache_key(self.model_class, item[0])
+                    for item in immediate
+                ],
+            )
+        elif not self.owner.embed_parent:
             self.owner._cache.update(
                 self.model_class,
                 [
@@ -571,45 +662,22 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                     if tup[0] is not None and tup[0].can_load
                 ],
             )
-            result: (
-                list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget | None, bool]]
-            ) = self.instances_and_created
-        elif self.resolve_embed:
-            immediate = await run_concurrently(
-                [queryset._embed_parent_in_result(tup[0]) for tup in self.instances_and_created],
-                limit=concurrent_limit,
-            )
-            self.owner._cache.update(
-                self.model_class,
-                [item[1] for item in immediate if item[0] is not None],
-                cache_keys=[
-                    self.owner._cache.create_cache_key(self.model_class, item[0])
-                    for item in immediate
-                    if item[0] is not None
-                ],
-            )
 
-            result = list(
-                zip(
-                    [item[1] for item in immediate],
-                    (res[1] for res in self.instances_and_created),
-                    strict=True,
+    async def send_post_signal(self) -> None:
+        if self.execution_step >= 5:
+            raise Exception("Was already executed")
+        self.execution_step = 5
+        ops = []
+        seen_signals: set[int] = set()
+        for model_class in self.signal_models:
+            signal = getattr(model_class.meta.signals, f"post_{self.signal_postfix}")
+            if (signal_id := id(signal)) in seen_signals:
+                continue
+            seen_signals.add(signal_id)
+            ops.append(
+                signal.send_async(
+                    self.model_class,
+                    **self.signal_params,
                 )
             )
-        else:
-            result = self.instances_and_created
-
-        if self.signal_postfix:
-            signal_params = self.signal_params.copy()
-            if self.create:
-                signal_params["row_count_create"] = self.row_count_create
-            if self.update:
-                signal_params["row_count_update"] = self.row_count_update
-            await getattr(self.model_class.meta.signals, f"post_{self.signal_postfix}").send_async(
-                self.model_class,
-                instance=self.used_instance,
-                raw_values=self.instances_and_created,
-                values=result,
-                **signal_params,
-            )
-        return result
+        await asyncio.gather(*ops)

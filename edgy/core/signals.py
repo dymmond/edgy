@@ -16,8 +16,10 @@ pre_save = Signal()
 post_save = Signal()
 pre_update = Signal()
 post_update = Signal()
-pre_relation = Signal()
-post_relation = Signal()
+pre_relation_add = Signal()
+post_relation_add = Signal()
+pre_relation_remove = Signal()
+post_relation_remove = Signal()
 pre_bulk = Signal()
 post_bulk = Signal()
 
@@ -90,8 +92,10 @@ class Broadcaster(dict):
             "post_save",
             "pre_update",
             "post_update",
-            "pre_relation",
-            "post_relation",
+            "pre_relation_add",
+            "post_relation_add",
+            "pre_relation_remove",
+            "post_relation_remove",
             "pre_bulk",
             "post_bulk",
             # no migrate
@@ -115,8 +119,10 @@ __all__ = [
     "post_save",
     "pre_update",
     "post_update",
-    "pre_relation",
-    "post_relation",
+    "pre_relation_add",
+    "post_relation_add",
+    "pre_relation_remove",
+    "post_relation_remove",
     "pre_bulk",
     "post_bulk",
 ]

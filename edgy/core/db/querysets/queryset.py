@@ -11,7 +11,7 @@ from collections.abc import (
     Sequence,
 )
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Generic, Literal, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast, overload
 
 import sqlalchemy
 
@@ -194,7 +194,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         read: bool = False,
         key_share: bool = False,
         of: Sequence[type[BaseModelType]] | None = None,
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Request row-level locks on the rows selected by this queryset, using
         dialect-appropriate SELECT ... FOR UPDATE semantics via SQLAlchemy's
@@ -245,7 +245,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         | dict[str, Any]
         | QuerySet,
         **kwargs: Any,
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Filters the QuerySet by the given clauses and keyword arguments, combining them with the AND operand.
 
@@ -267,7 +267,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
 
     where = filter
 
-    def all(self, clear_cache: bool = False) -> QuerySet:
+    def all(self, clear_cache: bool = False) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Returns a cloned QuerySet instance, or simply clears the cache of the current instance.
 
@@ -294,7 +294,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         | dict[str, Any]
         | QuerySet,
         **kwargs: Any,
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Filters the QuerySet by the given clauses and keyword arguments, combining them with the OR operand.
 
@@ -320,7 +320,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         | dict[str, Any]
         | QuerySet,
         **kwargs: Any,
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Filters the QuerySet using the OR operand, but only applies the OR logic locally.
 
@@ -348,7 +348,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         ]
         | dict[str, Any],
         **kwargs: Any,
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Filters the QuerySet by the given clauses and keyword arguments, using the AND operand.
 
@@ -374,7 +374,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         | dict[str, Any]
         | QuerySet,
         **kwargs: Any,
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Excludes results from the QuerySet by negating the given clauses and keyword arguments.
 
@@ -400,7 +400,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         | dict[str, Any]
         | QuerySet,
         **kwargs: Any,
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Excludes results from the QuerySet by negating the given clauses and keyword arguments.
 
@@ -419,7 +419,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
     def exclude_secrets(
         self,
         exclude_secrets: bool = True,
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Marks the QuerySet to exclude any model fields declared with `secret=True` from being leaked
         or serialized in the final result set.
@@ -468,7 +468,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
     def batch_size(
         self,
         batch_size: int | None = None,
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Sets the batch or chunk size for results. This is primarily used in conjunction
         with iteration methods (like `QuerySet.iterate()`) to control memory usage.
@@ -484,7 +484,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset._batch_size = batch_size
         return queryset
 
-    def lookup(self, term: Any) -> QuerySet:
+    def lookup(self, term: Any) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Performs a broader, case-insensitive search for a given term across all
         CharField and TextField instances defined on the model.
@@ -519,7 +519,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
 
         return queryset
 
-    def order_by(self, *order_by: str) -> QuerySet:
+    def order_by(self, *order_by: str) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Returns a QuerySet ordered by the given fields.
 
@@ -538,7 +538,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             queryset._update_select_related_weak(queryset._group_by, clear=False)
         return queryset
 
-    def reverse(self) -> QuerySet:
+    def reverse(self) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Reverses the established order of the QuerySet.
 
@@ -570,7 +570,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             queryset._cache_fetch_all = True
         return queryset
 
-    def limit(self, limit_count: int) -> QuerySet:
+    def limit(self, limit_count: int) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Limits the number of results returned by the QuerySet (SQL LIMIT clause).
 
@@ -584,7 +584,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset.limit_count = limit_count
         return queryset
 
-    def offset(self, offset: int) -> QuerySet:
+    def offset(self, offset: int) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Skips the specified number of results before starting to return rows (SQL OFFSET clause).
 
@@ -598,7 +598,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset._offset = offset
         return queryset
 
-    def group_by(self, *group_by: str) -> QuerySet:
+    def group_by(self, *group_by: str) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Groups the results of the QuerySet by the given fields (SQL GROUP BY clause).
 
@@ -614,7 +614,9 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             queryset._update_select_related_weak(queryset._order_by, clear=False)
         return queryset
 
-    def distinct(self, first: bool | str = True, /, *distinct_on: str) -> QuerySet:
+    def distinct(
+        self, first: bool | str = True, /, *distinct_on: str
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Returns a queryset with distinct results.
 
@@ -635,7 +637,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             queryset.distinct_on = [first, *distinct_on]
         return queryset
 
-    def only(self, *fields: str) -> QuerySet:
+    def only(self, *fields: str) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Restricts the QuerySet to retrieve **only** the specified fields from the database
         for the model instances, along with the primary key field(s).
@@ -662,7 +664,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset._only = only_fields
         return queryset
 
-    def defer(self, *fields: str) -> QuerySet:
+    def defer(self, *fields: str) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Excludes the specified fields from being retrieved from the database.
 
@@ -681,7 +683,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset._defer = set(fields)
         return queryset
 
-    def select_related(self, *related: str) -> QuerySet:
+    def select_related(self, *related: str) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
         related-object data when it executes its query.
@@ -958,7 +960,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             The newly created model instance.
         """
         # for tenancy
-        queryset: QuerySet = self._clone()
+        queryset = self._clone()
         check_db_connection(queryset.database)
         token = CHECK_DB_CONNECTION_SILENCED.set(True)
         try:
@@ -974,7 +976,10 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             # values=set(kwargs.keys()) is required for marking the provided kwargs as explicit provided kwargs
             token2 = CURRENT_INSTANCE.set(self)
             try:
-                instance = await instance.real_save(force_insert=True, values=set(kwargs.keys()))
+                instance = cast(
+                    EdgyModel,
+                    await instance.real_save(force_insert=True, values=set(kwargs.keys())),
+                )
             finally:
                 CURRENT_INSTANCE.reset(token2)
             result = await self._embed_parent_in_result(instance)
@@ -990,7 +995,15 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
 
     insert = create
 
-    def update_embed_parent(self, embed_parent: tuple[str, str | str] | None) -> QuerySetType:
+    @overload
+    def update_embed_parent(self, embed_parent: None) -> QuerySet[EdgyModel, EdgyModel]: ...
+    @overload
+    def update_embed_parent(
+        self, embed_parent: tuple[str, str]
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]: ...
+    def update_embed_parent(
+        self, embed_parent: tuple[str, str] | None
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget] | QuerySet[EdgyModel, EdgyModel]:
         """
         Update or remove (provide None) embed_parent applied on instances.
         Note: this doesn't affect embed_parent for filters.
@@ -1236,27 +1249,30 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 Warning: for performance reasons no embedding is applied by default and
                 the returned objects are maybe incomplete (check `can_load` property).
         """
+        operation = BulkOperation(
+            owner=self,
+            unique_columns=self.model_class.pkcolumns,
+            create=True,
+            update=False,
+            retrieve=False,
+            signal_postfix="bulk",
+            signal_params={
+                "operation": "bulk_create",
+                "ignore_conflicts": ignore_conflicts,
+                "resolve_embed": resolve_embed,
+            },
+            resolve_embed=resolve_embed,
+            none_on_existing=ignore_conflicts,
+            ignore_create_conflicts=ignore_conflicts,
+        )
+        await operation.prepare(objs)
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        operation.update_cache()
+        await operation.send_post_signal()
         return cast(
             "list[EdgyModel | None] | list[EdgyEmbedTarget | None]",
-            [
-                tup[0]
-                for tup in await BulkOperation(
-                    owner=self,
-                    unique_columns=self.model_class.pkcolumns,
-                    create=True,
-                    update=False,
-                    retrieve=False,
-                    signal_postfix="bulk",
-                    signal_params={
-                        "operation": "bulk_create",
-                        "ignore_conflicts": ignore_conflicts,
-                        "resolve_embed": resolve_embed,
-                    },
-                    resolve_embed=resolve_embed,
-                    none_on_existing=ignore_conflicts,
-                    ignore_create_conflicts=ignore_conflicts,
-                )(objs)
-            ],
+            [tup[0] for tup in operation.result],
         )
 
     bulk_insert = bulk_create
@@ -1282,10 +1298,11 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             resolve_embed (bool): Triggers mode in which embedding is applied when True.
 
         Returns:
-            list[EdgyModel] | list[EdgyEmbedTarget]:
+            list[EdgyModel | None] | list[EdgyEmbedTarget | None]:
                 A list of updated objects.
                 Warning: for performance reasons no embedding is applied by default and
                 the returned objects are maybe incomplete (check `can_load` property).
+                When an input doesn't succeed in creating an update `None` is used as placeholder.
         """
         if fields is not None:
             warnings.warn(
@@ -1315,27 +1332,31 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             if update_fields is None
             else set(update_fields)
         )
+        operation = BulkOperation(
+            owner=self,
+            signal_postfix="bulk",
+            signal_params={
+                "operation": "bulk_update",
+                "resolve_embed": resolve_embed,
+                "update_fields": frozenset(_update_fields),
+            },
+            # Somehow this is required to be non-empty
+            unique_fields=_unique_fields or _unique_columns,
+            unique_columns=_unique_columns,
+            update_fields=_update_fields,
+            update=True,
+            retrieve=resolve_embed,
+            create=False,
+            resolve_embed=resolve_embed,
+        )
+        await operation.prepare(objs)
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        operation.update_cache()
+        await operation.send_post_signal()
         return cast(
             "list[EdgyModel | None] | list[EdgyEmbedTarget | None]",
-            [
-                tup[0]
-                for tup in await BulkOperation(
-                    owner=self,
-                    signal_postfix="bulk",
-                    signal_params={
-                        "operation": "bulk_update",
-                        "resolve_embed": resolve_embed,
-                    },
-                    # Somehow this is required to be non-empty
-                    unique_fields=_unique_fields or _unique_columns,
-                    unique_columns=_unique_columns,
-                    update_fields=_update_fields,
-                    update=True,
-                    retrieve=resolve_embed,
-                    create=False,
-                    resolve_embed=resolve_embed,
-                )(objs)
-            ],
+            [tup[0] for tup in operation.result],
         )
 
     async def bulk_update_or_create(
@@ -1391,28 +1412,32 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             else set(update_fields)
         )
         unique_equals_pk = set(self.model_class.pkcolumns) == _unique_columns
-        return cast(
-            "list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget  | None, bool]]",
-            await BulkOperation(
-                owner=self,
-                signal_postfix="bulk",
-                signal_params={
-                    "operation": "bulk_update_or_create",
-                    "resolve_embed": resolve_embed,
-                },
-                unique_fields=_unique_fields,
-                unique_columns=_unique_columns,
-                update_fields=_update_fields,
-                create=True,
-                update=True,
-                # if unique_equals_pk we can just issue an insert and check if there was a conflict
-                # this allows us to sidestep the retrieve mechanic
-                # for resolve_embed the other mechanic is implicitly used
-                retrieve=not unique_equals_pk,
-                ignore_create_conflicts=unique_equals_pk,
-                resolve_embed=resolve_embed,
-            )(objs),
+        operation = BulkOperation(
+            owner=self,
+            signal_postfix="bulk",
+            signal_params={
+                "operation": "bulk_update_or_create",
+                "resolve_embed": resolve_embed,
+                "update_fields": frozenset(_update_fields),
+            },
+            unique_fields=_unique_fields,
+            unique_columns=_unique_columns,
+            update_fields=_update_fields,
+            create=True,
+            update=True,
+            # if unique_equals_pk we can just issue an insert and check if there was a conflict
+            # this allows us to sidestep the retrieve mechanic
+            # for resolve_embed the other mechanic is implicitly used
+            retrieve=not unique_equals_pk,
+            ignore_create_conflicts=unique_equals_pk,
+            resolve_embed=resolve_embed,
         )
+        await operation.prepare(objs)
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        operation.update_cache()
+        await operation.send_post_signal()
+        return operation.result
 
     async def bulk_get_or_create(
         self,
@@ -1455,23 +1480,26 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 for field in _unique_fields
                 for col in self.model_class.meta.field_to_column_names[field]
             }
-        return cast(
-            "list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]",
-            await BulkOperation(
-                owner=self,
-                signal_postfix="bulk",
-                signal_params={
-                    "operation": "bulk_get_or_create",
-                    "resolve_embed": resolve_embed,
-                },
-                unique_fields=_unique_fields,
-                unique_columns=_unique_columns,
-                create=True,
-                update=False,
-                retrieve=True,
-                resolve_embed=resolve_embed,
-            )(objs),
+        operation = BulkOperation(
+            owner=self,
+            signal_postfix="bulk",
+            signal_params={
+                "operation": "bulk_get_or_create",
+                "resolve_embed": resolve_embed,
+            },
+            unique_fields=_unique_fields,
+            unique_columns=_unique_columns,
+            create=True,
+            update=False,
+            retrieve=True,
+            resolve_embed=resolve_embed,
         )
+        await operation.prepare(objs)
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        operation.update_cache()
+        await operation.send_post_signal()
+        return operation.result
 
     bulk_select_or_insert = bulk_get_or_create  # type: ignore
 
