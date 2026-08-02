@@ -193,10 +193,14 @@ def DecimalField_callback(
         )
         parameters.setdefault("right_digits", context["faker"].random_int(min=0, max=right_digits))
     # remapping
-    if getattr(edgy_field, "gt", None) is not None:
-        parameters.setdefault("min_value", edgy_field.gt + Decimal("0.0000000001"))
-    if getattr(edgy_field, "lt", None) is not None:
-        parameters.setdefault("max_value", edgy_field.lt - Decimal("0.0000000001"))
+    if getattr(edgy_field, "ge", None) is not None:
+        parameters.setdefault("min_value", edgy_field.ge)
+    elif getattr(edgy_field, "gt", None) is not None:
+        parameters.setdefault("min_value", Decimal(edgy_field.gt) + Decimal("0.0000000001"))
+    if getattr(edgy_field, "le", None) is not None:
+        parameters.setdefault("max_value", edgy_field.le)
+    elif getattr(edgy_field, "lt", None) is not None:
+        parameters.setdefault("max_value", Decimal(edgy_field.lt) - Decimal("0.0000000001"))
     return context["faker"].pydecimal(**parameters)
 
 
