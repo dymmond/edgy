@@ -1223,6 +1223,41 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
 
     like = contains
 
+    @overload
+    async def bulk_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        ignore_conflicts: Literal[True],
+        resolve_embed: Literal[True],
+    ) -> list[EdgyEmbedTarget | None]: ...
+
+    @overload
+    async def bulk_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        ignore_conflicts: Literal[False] = False,
+        resolve_embed: Literal[True],
+    ) -> list[EdgyEmbedTarget]: ...
+
+    @overload
+    async def bulk_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        ignore_conflicts: Literal[True],
+        resolve_embed: Literal[False] = False,
+    ) -> list[EdgyModel | None]: ...
+
+    @overload
+    async def bulk_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        ignore_conflicts: Literal[False] = False,
+        resolve_embed: Literal[False] = False,
+    ) -> list[EdgyModel]: ...
     async def bulk_create(
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
@@ -1276,6 +1311,26 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         )
 
     bulk_insert = bulk_create
+
+    @overload
+    async def bulk_update(
+        self,
+        objs: Iterable[EdgyModel | dict[str, Any]],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[True],
+    ) -> list[EdgyEmbedTarget | None]: ...
+
+    @overload
+    async def bulk_update(
+        self,
+        objs: Iterable[EdgyModel | dict[str, Any]],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[False] = False,
+    ) -> list[EdgyModel | None]: ...
 
     async def bulk_update(
         self,
@@ -1359,6 +1414,26 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             [tup[0] for tup in operation.result],
         )
 
+    @overload
+    async def bulk_update_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[True],
+    ) -> list[tuple[EdgyEmbedTarget | None, bool]]: ...
+
+    @overload
+    async def bulk_update_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        update_fields: Iterable[str] | None = None,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[False] = False,
+    ) -> list[tuple[EdgyModel | None, bool]]: ...
+
     async def bulk_update_or_create(
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
@@ -1439,6 +1514,24 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         await operation.send_post_signal()
         return operation.result
 
+    @overload
+    async def bulk_get_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[True],
+    ) -> list[tuple[EdgyEmbedTarget, bool]]: ...
+
+    @overload
+    async def bulk_get_or_create(
+        self,
+        objs: Iterable[dict[str, Any] | EdgyModel],
+        *,
+        unique_fields: Iterable[str] | None = None,
+        resolve_embed: Literal[False] = False,
+    ) -> list[tuple[EdgyModel, bool]]: ...
+
     async def bulk_get_or_create(
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
@@ -1501,7 +1594,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         await operation.send_post_signal()
         return operation.result
 
-    bulk_select_or_insert = bulk_get_or_create  # type: ignore
+    bulk_select_or_insert = bulk_get_or_create
 
     def transaction(self, *, force_rollback: bool = False, **kwargs: Any) -> Transaction:
         """
