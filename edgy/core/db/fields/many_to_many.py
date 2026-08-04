@@ -345,6 +345,11 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         if not self.to_foreign_key:
             self.to_foreign_key = target_name.lower()
 
+            if self.to_foreign_key == self.from_foreign_key:
+                self.to_foreign_key = f"to_{self.to_foreign_key}"
+
+        assert self.to_foreign_key != self.from_foreign_key, "Colliding foreign keys"
+
         # Determine the through table name based on conventions or explicit name.
         if self.through_tablename is OLD_M2M_NAMING:
             tablename: str = f"{self.from_foreign_key}s_{self.to_foreign_key}s"

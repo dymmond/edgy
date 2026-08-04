@@ -29,7 +29,7 @@ async def create_test_database():
 
 async def test_add_friend():
     user = await User.query.create(name="a")
-    # await user.friends.add(user)
+    await user.friends.add(user)
     friend1 = await user.friends.create(name="b")
     friend2 = await user.friends.create(name="c")
     friend3 = await user.friends.create(name="d")
