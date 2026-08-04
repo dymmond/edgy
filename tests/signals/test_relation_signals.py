@@ -177,6 +177,7 @@ async def test_basic_m2m():
     logs = await Log.query.all()
     assert len(logs) == 2
     assert logs[0].signal == "pre_relation_add"
+    # see docs for parameters
     assert len(logs[0].params) == 9
     assert logs[1].signal == "post_relation_add"
     assert len(logs[1].params) == 12
@@ -213,6 +214,7 @@ async def test_basic_m2m():
     assert "create_params" not in logs[2].params
     assert "update_params" not in logs[2].params
     assert logs[3].signal == "post_relation_remove"
+    # see docs for parameters
     assert len(logs[3].params) == 8
     assert logs[3].params["instance"] == str(user)
     assert "operation" not in logs[3].params
@@ -252,6 +254,7 @@ async def test_basic_one_to_many():
     logs = await Log.query.all()
     assert len(logs) == 6
     assert logs[4].signal == "pre_relation_remove"
+    # see docs for parameters
     assert len(logs[4].params) == 6
     assert "operation" not in logs[4].params
     assert "values" not in logs[4].params
@@ -260,6 +263,7 @@ async def test_basic_one_to_many():
     assert logs[4].params["instance"] == str(profile)
     assert "model_based_deletion" not in logs[4].params
     assert logs[5].signal == "post_relation_remove"
+    # see docs for parameters
     assert len(logs[5].params) == 7
     assert "operation" not in logs[5].params
     assert "values" not in logs[5].params
