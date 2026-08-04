@@ -139,12 +139,12 @@ async def test_signals():
         logs = await Log.query.filter(signal__icontains="delete").all()
         assert len(logs) == 2
     finally:
-        user.meta.signals.pre_delete.disconnect(pre_deleting)
-        user.meta.signals.post_delete.disconnect(post_deleting)
-        user.meta.signals.pre_save.disconnect(pre_saving)
-        user.meta.signals.post_save.disconnect(post_saving)
-        user.meta.signals.pre_update.disconnect(pre_updating)
-        user.meta.signals.post_update.disconnect(post_updating)
+        User.meta.signals.pre_delete.disconnect(pre_deleting)
+        User.meta.signals.post_delete.disconnect(post_deleting)
+        User.meta.signals.pre_save.disconnect(pre_saving)
+        User.meta.signals.post_save.disconnect(post_saving)
+        User.meta.signals.pre_update.disconnect(pre_updating)
+        User.meta.signals.post_update.disconnect(post_updating)
 
     users = await User.query.all()
     assert len(users) == 1

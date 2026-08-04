@@ -424,21 +424,26 @@ class ManyRelation(ManyRelationProtocol):
                 )
             )
         await asyncio.gather(*ops)
-        queryset = self.get_queryset().update_embed_parent(None)
-        # children can be removed by setting them to None
-        clauses = [and_(*child.identifying_clauses()) for child in prepared if child is not None]
-        query = queryset.filter(or_(*clauses))
-        async with queryset.transaction():
-            row_count = await query.raw_delete(use_models=model_based_deletion)
-            if row_count is not None and row_count != len(clauses):
-                related_name = fk_source.name
-                raise RelationshipNotFound(
-                    detail=(
-                        f"There is no relationship through '{related_name}' to {self.instance} from "
-                        f"{('one of ' if len(clauses) > 1 else '')}"
-                        f"{', '.join(str(getattr(child, self.to_foreign_key)) for child in prepared)}."
+        if prepared:
+            queryset = self.get_queryset().update_embed_parent(None)
+            # children can be removed by setting them to None
+            clauses = [
+                and_(*child.identifying_clauses()) for child in prepared if child is not None
+            ]
+            query = queryset.filter(or_(*clauses))
+            async with queryset.transaction():
+                row_count = await query.raw_delete(use_models=model_based_deletion)
+                if row_count is not None and row_count != len(clauses):
+                    related_name = fk_source.name
+                    raise RelationshipNotFound(
+                        detail=(
+                            f"There is no relationship through '{related_name}' to {self.instance} from "
+                            f"{('one of ' if len(clauses) > 1 else '')}"
+                            f"{', '.join(str(getattr(child, self.to_foreign_key)) for child in prepared)}."
+                        )
                     )
-                )
+        else:
+            row_count = 0
         ops = []
         # not really necessary but be safe
         seen_signals.clear()

@@ -128,8 +128,8 @@ class Log(edgy.StrictModel):
 async def test_calibrate():
     factory = ProductFactory(price=None, uuid=None)
     product = await factory.build(overwrites={"created_time": time()}).save()
-    await product.update(name="saffier")
-    await Product.query.update(name="edgy")
+    await product.update(description="saffier")
+    await Product.query.update(description="edgy")
     logs = await Log.query.all()
     assert len(logs) == 3
     assert logs[0].signal == "post_save"

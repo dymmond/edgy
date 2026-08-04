@@ -229,7 +229,7 @@ For Many-to-Many relations the sender is the through model.
 #### Parameters of `*_relation_remove signals`
 
 - `instance`: Source instance.
-- `row_count` (post): How many rows were updated/created? `None` for db systems not supporting it.
+- `row_count` (post): How many rows were updated/deleted? `None` for db systems not supporting it.
 - `raw_values`: Raw model instances **without created flag** of either the source model (`one_to_many`) or the `through` model (`many_to_many`). There is **no** resolving via `resolve_embed`. You can
 - `field`: RelationField name on `source` triggering this signal.
 - `source`: Source model which contains the RelationField triggering the signals.
