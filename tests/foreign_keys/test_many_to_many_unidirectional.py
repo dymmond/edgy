@@ -37,4 +37,5 @@ async def test_add_friend():
     friends = await user.friends.all()
     assert friends == [user, friend1, friend2, friend3]
     friends = await friend1.friends.all()
-    assert friends == [user, friend3]
+    # unidirectional is not symmetrical
+    assert friends == [friend3]
