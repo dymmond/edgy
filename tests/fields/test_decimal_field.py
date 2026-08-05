@@ -26,7 +26,7 @@ async def create_test_database():
             await models.drop_all()
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(scope="function")
 async def rollback_transactions():
     # this rolls back
     async with models:
@@ -50,13 +50,23 @@ class Employee(edgy.StrictModel):
         return f"Employee: {self.name}, Age: {self.date_of_birth}, Salary: {self.salary}"
 
 
-async def test_can_use_decimal_field():
+async def test_can_use_decimal_field(rollback_transactions):
     employee = await Employee.query.create(
         name="Edgy", salary=150000, salary_btc=decimal.Decimal("10.0002")
     )
 
     assert employee.salary == 150000
     assert employee.salary_btc == decimal.Decimal("10.0002")
+
+
+async def test_can_use_decimal_places_left_zero(rollback_transactions):
+    employee = await Employee.query.create(
+        name="Edgy", salary=decimal.Decimal("0.02"), salary_btc=decimal.Decimal("0.0000000002")
+    )
+    await employee.load()
+
+    assert employee.salary == decimal.Decimal("0.02")
+    assert employee.salary_btc == decimal.Decimal("0.0000000002")
 
 
 async def test_can_use_decimal_field_raise_exception():
@@ -79,7 +89,7 @@ async def test_warn_field_definition_missing_decimal_places(max_digits, decimal_
                 abstract = True
 
 
-@pytest.mark.parametrize("max_digits,decimal_places", [(-1, None), (None, -2)])
+@pytest.mark.parametrize("max_digits,decimal_places", [(-1, None), (None, -2), (1, 2)])
 async def test_raises_field_definition_error_on_values(max_digits, decimal_places):
     with pytest.raises(FieldDefinitionError):  # noqa
 

@@ -15,17 +15,25 @@ from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = DatabaseTestClient(DATABASE_URL, force_rollback=False, drop_database=True)
-models = edgy.Registry(database=database)
+database = DatabaseTestClient(DATABASE_URL, drop_database=True, use_existing=False)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
-@pytest.fixture(autouse=True, scope="function")
+@pytest.fixture(autouse=True, scope="module")
 async def create_test_database():
-    async with models:
+    # this creates and drops the database
+    async with database:
         await models.create_all()
         yield
         if not database.drop:
             await models.drop_all()
+
+
+@pytest.fixture(autouse=True, scope="function")
+async def rollback_transactions():
+    # this rolls back
+    async with models:
+        yield
 
 
 def time():
@@ -49,9 +57,17 @@ class Product(edgy.StrictModel):
     data: dict[Any, Any] = fields.JSONField(default=dict)
     description: str = fields.CharField(null=True, max_length=255)
     huge_number: int = fields.BigIntegerField(default=0)
-    price1: decimal.Decimal = fields.DecimalField(max_digits=9, decimal_places=2, null=True)
-    price2: decimal.Decimal = fields.DecimalField(max_digits=9, decimal_places=None, null=True)
-    price3: decimal.Decimal = fields.DecimalField(max_digits=None, decimal_places=2, null=True)
+    price1: decimal.Decimal = fields.DecimalField(max_digits=9, decimal_places=2, ge=0, null=True)
+    price2: decimal.Decimal = fields.DecimalField(
+        max_digits=9, decimal_places=None, le=0, null=True
+    )
+    price3: decimal.Decimal = fields.DecimalField(
+        max_digits=None, decimal_places=2, lt=100, null=True
+    )
+    price4: decimal.Decimal = fields.DecimalField(
+        max_digits=2, decimal_places=2, ge=0, lt=1, null=True
+    )
+    price5: decimal.Decimal = fields.DecimalField(max_digits=3, decimal_places=2, gt=0, null=True)
     status: str = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
     value: float = fields.FloatField(null=True)
 

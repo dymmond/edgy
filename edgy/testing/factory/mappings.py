@@ -172,8 +172,8 @@ def DecimalField_callback(
     field: FactoryField, context: ModelFactoryContext, parameters: dict[str, Any]
 ) -> Any:
     edgy_field = field.owner.meta.model.meta.fields[field.name]
-    max_digits = getattr(edgy_field, "max_digits", None)
-    right_digits = getattr(edgy_field, "decimal_places", None)
+    max_digits: int | None = getattr(edgy_field, "max_digits", None)
+    right_digits: int | None = getattr(edgy_field, "decimal_places", None)
     if max_digits is None:
         if right_digits is not None:
             parameters.setdefault(
@@ -183,24 +183,44 @@ def DecimalField_callback(
         parameters.setdefault(
             "right_digits", context["faker"].random_int(min=0, max=max_digits - 1)
         )
-        parameters.setdefault(
-            "left_digits",
-            context["faker"].random_int(min=1, max=max_digits - parameters["right_digits"]),
-        )
+        if parameters["right_digits"] == 0:
+            parameters.setdefault(
+                "left_digits",
+                context["faker"].random_int(min=1, max=max_digits),
+            )
+        else:
+            parameters.setdefault(
+                "left_digits",
+                context["faker"].random_int(min=0, max=max_digits - parameters["right_digits"]),
+            )
     else:
+        leftplaces_remaining = max_digits - right_digits
+        if leftplaces_remaining == 0:
+            parameters.setdefault("left_digits", 0)
+        else:
+            parameters.setdefault(
+                "left_digits", context["faker"].random_int(min=0, max=leftplaces_remaining)
+            )
         parameters.setdefault(
-            "left_digits", context["faker"].random_int(min=1, max=max_digits - right_digits)
+            "right_digits",
+            context["faker"].random_int(
+                min=1 if parameters["left_digits"] == 0 else 0, max=right_digits
+            ),
         )
-        parameters.setdefault("right_digits", context["faker"].random_int(min=0, max=right_digits))
     # remapping
+    remapping_right_places = right_digits if right_digits is not None else 10
     if getattr(edgy_field, "ge", None) is not None:
         parameters.setdefault("min_value", edgy_field.ge)
     elif getattr(edgy_field, "gt", None) is not None:
-        parameters.setdefault("min_value", Decimal(edgy_field.gt) + Decimal("0.0000000001"))
+        parameters.setdefault(
+            "min_value", Decimal(edgy_field.gt) + (Decimal("1") / 10**remapping_right_places)
+        )
     if getattr(edgy_field, "le", None) is not None:
         parameters.setdefault("max_value", edgy_field.le)
     elif getattr(edgy_field, "lt", None) is not None:
-        parameters.setdefault("max_value", Decimal(edgy_field.lt) - Decimal("0.0000000001"))
+        parameters.setdefault(
+            "max_value", Decimal(edgy_field.lt) - (Decimal("1") / 10**remapping_right_places)
+        )
     return context["faker"].pydecimal(**parameters)
 
 
