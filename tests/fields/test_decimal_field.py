@@ -89,7 +89,9 @@ async def test_warn_field_definition_missing_decimal_places(max_digits, decimal_
                 abstract = True
 
 
-@pytest.mark.parametrize("max_digits,decimal_places", [(-1, None), (None, -2), (1, 2)])
+@pytest.mark.parametrize(
+    "max_digits,decimal_places", [(-1, None), (None, -2), (1, 2), (-1, 1), (1, -1)]
+)
 async def test_raises_field_definition_error_on_values(max_digits, decimal_places):
     with pytest.raises(FieldDefinitionError):  # noqa
 
