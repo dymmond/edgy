@@ -193,13 +193,24 @@ def DecimalField_callback(
                 "left_digits",
                 context["faker"].random_int(min=0, max=max_digits - parameters["right_digits"]),
             )
+    elif right_digits == 0:
+        parameters.setdefault("left_digits", context["faker"].random_int(min=1, max=max_digits))
+        parameters.setdefault("right_digits", 0)
     else:
-        leftplaces_remaining = max_digits - right_digits
+        leftplaces_remaining: int = max_digits - right_digits
+        right_digits_value = parameters.get("right_digits")
+        min_value_left_places = 0
+        if right_digits_value is not None and right_digits_value == 0:
+            min_value_left_places = 1
         if leftplaces_remaining == 0:
             parameters.setdefault("left_digits", 0)
         else:
+            if right_digits_value is not None:
+                # update
+                leftplaces_remaining = min(leftplaces_remaining, max_digits - right_digits_value)
             parameters.setdefault(
-                "left_digits", context["faker"].random_int(min=0, max=leftplaces_remaining)
+                "left_digits",
+                context["faker"].random_int(min=min_value_left_places, max=leftplaces_remaining),
             )
         parameters.setdefault(
             "right_digits",

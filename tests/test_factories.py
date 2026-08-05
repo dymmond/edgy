@@ -68,6 +68,7 @@ class Product(edgy.StrictModel):
         max_digits=2, decimal_places=2, ge=0, lt=1, null=True
     )
     price5: decimal.Decimal = fields.DecimalField(max_digits=3, decimal_places=2, gt=0, null=True)
+    price6: decimal.Decimal = fields.DecimalField(max_digits=3, decimal_places=0, ge=0, null=True)
     status: str = fields.ChoiceField(StatusEnum, default=StatusEnum.DRAFT)
     value: float = fields.FloatField(null=True)
 
@@ -96,3 +97,20 @@ async def test_generate_some_save():
     factory = ProductFactory()
     inputs = [await factory.build().save() for i in range(100)]
     assert all(not isawaitable(inp) for inp in inputs)
+
+
+async def test_generate_some_left_parametrized():
+    factory = ProductFactory()
+    [factory.build(parameters={"price5": {"left_digits": 0}}, save=True) for i in range(10)]
+    [factory.build(parameters={"price5": {"left_digits": 1}}, save=True) for i in range(10)]
+
+
+async def test_generate_some_right_parametrized():
+    factory = ProductFactory()
+    [
+        factory.build(
+            parameters={"price1": {"right_digits": 0}, "price5": {"right_digits": 0}}, save=True
+        )
+        for i in range(10)
+    ]
+    [factory.build(parameters={"price1": {"right_digits": 1}}, save=True) for i in range(10)]
