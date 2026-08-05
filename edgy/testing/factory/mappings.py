@@ -220,7 +220,11 @@ def DecimalField_callback(
         )
     # remapping
     remapping_right_places = right_digits - 1 if right_digits is not None else 10
-    dmin = Decimal(f"0.{'0' * remapping_right_places}1")
+    if remapping_right_places < 0:
+        # right_digits was 0
+        dmin = Decimal("1")
+    else:
+        dmin = Decimal(f"0.{'0' * remapping_right_places}1")
     if getattr(edgy_field, "ge", None) is not None:
         parameters.setdefault("min_value", edgy_field.ge)
     elif getattr(edgy_field, "gt", None) is not None:
