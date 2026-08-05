@@ -2,7 +2,7 @@ import decimal
 from datetime import date, datetime
 from enum import Enum
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -28,7 +28,7 @@ class StatusEnum(Enum):
 
 class Product(edgy.StrictModel):
     id: int = fields.IntegerField(primary_key=True, autoincrement=True)
-    uuid: UUID = fields.UUIDField(null=True)
+    uuid: UUID = fields.UUIDField(null=True, unique=True)
     created: datetime = fields.DateTimeField(default=datetime.now)
     created_day: datetime = fields.DateField(default=date.today)
     created_time: datetime = fields.TimeField(default=time)
@@ -224,8 +224,6 @@ async def test_bulk_bulk_update_or_create_resolve_embed():
 
 
 async def test_bulk_bulk_update_or_create_fail():
-    # FIXME: causes warning RuntimeWarning: coroutine 'BulkMixin._bulk_get_update_or_create.<locals>._iterate_retrieve'
-    # was never awaited
     with pytest.raises(ValueError):
         await Track.query.update_embed_parent(("album", "embedded")).bulk_update_or_create(
             [
@@ -234,3 +232,64 @@ async def test_bulk_bulk_update_or_create_fail():
             ],
             resolve_embed=True,
         )
+
+
+async def test_bulk_update_or_create_create_new():
+    await Album.query.bulk_update_or_create([{"name": "foo"}, {"name": "boo"}])
+    assert await Album.query.count() == 2
+    await Album.query.bulk_update_or_create([{"name": "foo"}, {"name": "boo"}])
+    assert await Album.query.count() == 4
+
+
+async def test_bulk_update_or_create_existing_pk():
+    await Album.query.bulk_update_or_create([{"name": "foo"}, {"name": "boo"}])
+    albums = await Album.query.all()
+    assert len(albums) == 2
+    await Album.query.bulk_update_or_create(albums)
+    assert await Album.query.count() == 2
+
+
+async def test_bulk_update_or_create_existing_unique():
+    await Album.query.bulk_update_or_create(
+        [{"name": "foo"}, {"name": "boo"}], unique_fields=["name"]
+    )
+    assert await Album.query.count() == 2
+    await Album.query.bulk_update_or_create(
+        [{"name": "foo"}, {"name": "boo"}], unique_fields=["name"]
+    )
+    assert await Album.query.count() == 2
+
+
+async def test_bulk_update_or_create_unsuitable_unique():
+    # uuid is here unique but not part of unique_fields
+    products1 = await Product.query.bulk_create(
+        [
+            {"uuid": uuid4(), "status": StatusEnum.RELEASED},
+            {"uuid": uuid4(), "status": StatusEnum.DRAFT},
+            {"uuid": uuid4(), "status": StatusEnum.DRAFT},
+        ],
+    )
+    assert len(products1) == 3
+    products = await Product.query.bulk_update_or_create(
+        [
+            {"uuid": products1[0].uuid, "status": StatusEnum.RELEASED},
+            {"uuid": products1[0].uuid, "status": StatusEnum.DRAFT},
+            {"uuid": products1[0].uuid, "status": StatusEnum.DRAFT},
+        ],
+    )
+    assert len(products) == 3
+    assert products[0][0] is None
+    products = await Product.query.all()
+    assert len(products) == 3
+    products = await Product.query.bulk_update_or_create(
+        [
+            {"uuid": products1[0].uuid, "status": StatusEnum.RELEASED},
+            {"uuid": products1[0].uuid, "status": StatusEnum.DRAFT},
+            {"uuid": products1[0].uuid, "status": StatusEnum.DRAFT},
+        ],
+        unique_fields=["id"],
+    )
+    assert len(products) == 3
+    assert products[0][0] is None
+    products = await Product.query.all()
+    assert len(products) == 3

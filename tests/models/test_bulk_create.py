@@ -109,9 +109,34 @@ async def test_bulk_create():
     assert not products[1].can_load
 
 
+async def test_bulk_create_ignore_conflicts():
+    await Product.query.bulk_create(
+        [
+            {"id": 40, "value": 123.456, "status": StatusEnum.RELEASED},
+            {"id": 41, "value": 456.789, "status": StatusEnum.DRAFT},
+        ],
+        ignore_conflicts=True,
+    )
+
+    await Product.query.bulk_create(
+        [
+            {"id": 41, "value": 1, "status": StatusEnum.RELEASED},
+            {"id": 42, "value": 456.789, "status": StatusEnum.DRAFT},
+        ],
+        ignore_conflicts=True,
+    )
+    products = await Product.query.order_by("id")
+    assert len(products) == 3
+    assert products[0].id == 40
+    assert products[0].value == 123.456
+    assert products[1].id == 41
+    assert products[1].value == 456.789
+    assert products[2].id == 42
+
+
 async def test_bulk_create_reflected():
     # we delete "id" as field to simulate reflection models
-    del FooReflected.meta.fields["id"]
+    FooReflected.meta.fields.pop("id", None)
     results = await FooReflected.query.bulk_create(
         [
             {"foo": 2},
@@ -120,9 +145,26 @@ async def test_bulk_create_reflected():
     )
     assert results[0].foo == 2
     assert not results[0].can_load
+    assert not results[1].can_load
+    assert results[1].foo == 3
+    assert results[1].id != 100
+
+
+async def test_bulk_create_reflected_ignore():
+    # we delete "id" as field to simulate reflection models
+    FooReflected.meta.fields.pop("id", None)
+    results = await FooReflected.query.bulk_create(
+        [
+            {"foo": 2},
+            {"foo": 3, "id": 100},
+        ],
+        ignore_conflicts=True,
+    )
+    assert results[0].foo == 2
+    assert results[0].can_load
     assert results[1].can_load
     assert results[1].foo == 3
-    assert results[1].id == 100
+    assert results[1].id != 100
 
 
 async def test_bulk_create_resolve_through():
@@ -139,3 +181,26 @@ async def test_bulk_create_resolve_through():
     assert results[1].get_real_class() is Album
     assert results[1].id
     assert results[1].track_used.title == "fighters"
+
+
+async def test_bulk_create_dedupe():
+    results = await Product.query.bulk_create(
+        [
+            {"id": 40, "value": 123.456, "status": StatusEnum.RELEASED},
+            {"id": 40, "value": 456.789, "status": StatusEnum.DRAFT},
+        ]
+    )
+    assert results[1] is results[0]
+    assert await Product.query.count() == 1
+
+
+async def test_bulk_create_dedupe_ignore():
+    results = await Product.query.bulk_create(
+        [
+            {"id": 40, "value": 123.456, "status": StatusEnum.RELEASED},
+            {"id": 40, "value": 456.789, "status": StatusEnum.DRAFT},
+        ],
+        ignore_conflicts=True,
+    )
+    assert results[1] is None
+    assert await Product.query.count() == 1

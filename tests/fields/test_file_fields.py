@@ -1,5 +1,6 @@
 import os
 from typing import Any
+from unittest.mock import call
 from uuid import uuid4
 
 import pytest
@@ -244,8 +245,8 @@ async def test_bulk_create2(create_test_database, mocker):
         {},
     ]
     spy = mocker.spy(MyModel, "execute_post_save_hooks")
-    await MyModel.query.bulk_create(obj_list)
-    spy.assert_not_called()
+    results = await MyModel.query.bulk_create(obj_list)
+    assert spy.call_args_list == [call(res, set(), is_update=False) for res in results]
     for obj in await MyModel.query.all():
         assert obj.file_field.file is None
 

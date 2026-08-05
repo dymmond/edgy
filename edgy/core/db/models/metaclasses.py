@@ -262,7 +262,7 @@ class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
 
 class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
     """
-    Manages the mapping from field names to their corresponding SQLAlchemy column names.
+    Manages the mapping from field names to their corresponding SQLAlchemy column key names.
     """
 
     def __getitem__(self, name: str) -> frozenset[str]:
@@ -277,8 +277,8 @@ class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
         """
         if name in self.data:
             return cast(frozenset[str], self.data[name])
-        column_names = frozenset(column.key for column in self.meta.field_to_columns[name])
-        result = self.data[name] = column_names
+        column_keys = frozenset(column.key for column in self.meta.field_to_columns[name])
+        result = self.data[name] = column_keys
         return result
 
 
@@ -367,10 +367,55 @@ class ColumnsToField(UserDict, dict[str, str]):
         return super().__iter__()
 
 
+class ColumnsRemapping(UserDict, dict[str, str]):
+    """
+    Renames column.name to column.key
+    """
+
+    meta: MetaInfo
+    _init: bool
+
+    def __init__(self, meta: MetaInfo):
+        """
+        Initializes the ColumnsToField object.
+
+        Args:
+            meta: The MetaInfo object associated with these mappings.
+        """
+        self.meta = meta
+        self._init = False
+        super().__init__()
+
+    def init(self) -> None:
+        """
+        Initializes the mapping from column names to field names.
+        This method ensures that the mapping is built only once.
+
+        Raises:
+            ValueError: If a column name collision is detected.
+        """
+        if not self._init:
+            self._init = True
+            _columns_remapping: dict[str, str] = {}
+            for field_name in self.meta.fields:
+                # init structure
+                columns = self.meta.field_to_columns[field_name]
+                for column in columns:
+                    if column.key != column.name:
+                        _columns_remapping[column.name] = column.key
+            self.data.update(_columns_remapping)
+
+    def __getattribute__(self, name: str) -> Any:
+        if name not in {"init", "_init", "data"}:
+            self.init()
+        return object.__getattribute__(self, name)
+
+
 _trigger_attributes_fields_MetaInfo: set[str] = {
     "field_to_columns",
     "field_to_column_names",
     "columns_to_field",
+    "columns_remapping",
 }
 
 _trigger_attributes_field_stats_MetaInfo: set[str] = {
@@ -420,6 +465,7 @@ class MetaInfo:
         "field_to_columns",
         "field_to_column_names",
         "columns_to_field",
+        "columns_remapping",
         "special_getter_fields",
         "excluded_fields",
         "secret_fields",
@@ -449,6 +495,7 @@ class MetaInfo:
     field_to_columns: FieldToColumns
     field_to_column_names: FieldToColumnNames
     columns_to_field: ColumnsToField
+    columns_remapping: ColumnsRemapping
     unique_together: list[str | tuple | UniqueConstraint]
     indexes: list[Index]
     constraints: list[sqlalchemy.Constraint]
@@ -661,6 +708,7 @@ class MetaInfo:
         self.field_to_columns = FieldToColumns(self)
         self.field_to_column_names = FieldToColumnNames(self)
         self.columns_to_field = ColumnsToField(self)
+        self.columns_remapping = ColumnsRemapping(self)
         if self.model is not None:
             self.model.model_rebuild(force=True)
         self._fields_are_initialized = True
@@ -706,6 +754,7 @@ class MetaInfo:
                 "field_to_columns",
                 "field_to_column_names",
                 "columns_to_field",
+                "columns_remapping",
             ):
                 with contextlib.suppress(AttributeError):
                     delattr(self, attr)

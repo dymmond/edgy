@@ -2,9 +2,10 @@ import decimal
 from datetime import date, datetime
 from enum import Enum
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 
 import edgy
 from edgy.core.db import fields
@@ -28,7 +29,7 @@ class StatusEnum(Enum):
 
 class Product(edgy.StrictModel):
     id: int = fields.IntegerField(primary_key=True, autoincrement=True)
-    uuid: UUID = fields.UUIDField(null=True)
+    uuid: UUID = fields.UUIDField(null=True, unique=True)
     created: datetime = fields.DateTimeField(default=datetime.now)
     created_day: datetime = fields.DateField(default=date.today)
     created_time: datetime = fields.TimeField(default=time)
@@ -190,3 +191,47 @@ async def test_bulk_get_or_create_no_duplicates_filter_by_dict():
     assert products[1].data == {"foo": 456}
     assert products[1].value == 456.789
     assert products[1].status == StatusEnum.DRAFT
+
+
+async def test_bulk_get_or_create_many():
+    await Product.query.bulk_get_or_create(
+        [
+            {"data": {"foo": 123}, "value": 123.456, "status": StatusEnum.RELEASED},
+            {"data": {"foo": 456}, "value": 356.789, "status": StatusEnum.DRAFT},
+            {"data": {"foo": 456}, "value": 456.789, "status": StatusEnum.DRAFT},
+        ],
+        unique_fields=["data"],
+    )
+    products = await Product.query.order_by("id")
+    assert len(products) == 2
+    assert products[0].value == 123.456
+    assert products[1].value == 356.789
+
+
+async def test_bulk_get_or_create_unsuitable_unique():
+    # uuid is here unique but not part of unique_fields
+    products1 = await Product.query.bulk_create(
+        [
+            {"uuid": uuid4(), "status": StatusEnum.RELEASED},
+            {"uuid": uuid4(), "status": StatusEnum.DRAFT},
+            {"uuid": uuid4(), "status": StatusEnum.DRAFT},
+        ],
+    )
+    assert len(products1) == 3
+    with pytest.raises(IntegrityError):
+        await Product.query.bulk_get_or_create(
+            [
+                {"uuid": products1[0].uuid, "status": StatusEnum.RELEASED},
+                {"uuid": products1[0].uuid, "status": StatusEnum.DRAFT},
+                {"uuid": products1[0].uuid, "status": StatusEnum.DRAFT},
+            ],
+        )
+    # this works
+    await Product.query.bulk_get_or_create(
+        [
+            {"uuid": products1[0].uuid, "status": StatusEnum.RELEASED},
+            {"uuid": products1[0].uuid, "status": StatusEnum.DRAFT},
+            {"uuid": products1[0].uuid, "status": StatusEnum.DRAFT},
+        ],
+        unique_fields=["uuid"],
+    )

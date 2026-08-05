@@ -37,22 +37,23 @@ async def rollback_transactions():
 async def test_partial_overwrite():
     obj = await MyModel.query.create(first_name="foobar")
     assert obj.first_name == "foobar"
-    assert "last_name" not in obj.__dict__
-    assert obj.last_name == "edge"
-    # lazy load
+    assert obj.can_load
+    # using returning
     assert "last_name" in obj.__dict__
+    assert obj.last_name == "edge"
 
 
 async def test_export_without_load():
     obj = await MyModel.query.create(first_name="foobar")
-    assert obj.model_dump(exclude=["id"]) == {
-        "first_name": "foobar",
-    }
+    assert "last_name" in obj.__dict__
+    assert obj.model_dump(exclude=["id"]) == {"first_name": "foobar", "last_name": "edge"}
 
 
 async def test_export_with_implicit_load():
     obj = await MyModel.query.create(first_name="foobar")
-    # triggers also implicit load
+    del obj.__dict__["last_name"]
+    assert obj.model_dump(exclude=["id"]) == {"first_name": "foobar"}
+    # triggers implicit load
     assert obj.last_name == "edge"
     assert obj.model_dump(exclude=["id"]) == {"first_name": "foobar", "last_name": "edge"}
 

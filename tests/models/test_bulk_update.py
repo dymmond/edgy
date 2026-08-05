@@ -138,7 +138,7 @@ async def test_bulk_update_with_relation():
     albums = await Track.query.update_embed_parent(("album", "")).bulk_update(
         tracks, update_fields=["album"], resolve_embed=True
     )
-    assert isinstance(albums[0], Album)
+    assert isinstance(albums[0], Album.proxy_model)
     tracks = await Track.query.all()
     assert tracks[0].album.pk == album2.pk
     assert tracks[1].album.pk == album2.pk
@@ -162,3 +162,13 @@ async def test_bulk_update_with_relation_unique():
     )
     assert albums[0].embedded.position == 4
     assert albums[1].embedded.position == 5
+
+
+async def test_bulk_update_not_existing():
+    await Album.query.bulk_update([{"name": "foo"}, {"name": "boo"}])
+    assert await Album.query.count() == 0
+
+
+async def test_bulk_update_no_create():
+    await Album.query.bulk_update([{"name": "foo"}, {"name": "boo"}], unique_fields=["name"])
+    assert await Album.query.count() == 0
