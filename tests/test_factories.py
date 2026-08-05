@@ -101,16 +101,17 @@ async def test_generate_some_save():
 
 async def test_generate_some_left_parametrized():
     factory = ProductFactory()
-    [factory.build(parameters={"price5": {"left_digits": 0}}, save=True) for i in range(10)]
-    [factory.build(parameters={"price5": {"left_digits": 1}}, save=True) for i in range(10)]
+    for _i in range(10):
+        factory.build(parameters={"price5": {"left_digits": 0}}, save=True)
+        factory.build(parameters={"price5": {"left_digits": 1}}, save=True)
+    assert await Product.query.count() == 20
 
 
 async def test_generate_some_right_parametrized():
     factory = ProductFactory()
-    [
+    for _i in range(10):
         factory.build(
             parameters={"price1": {"right_digits": 0}, "price5": {"right_digits": 0}}, save=True
         )
-        for i in range(10)
-    ]
-    [factory.build(parameters={"price1": {"right_digits": 1}}, save=True) for i in range(10)]
+        factory.build(parameters={"price1": {"right_digits": 1}}, save=True)
+    assert await Product.query.count() == 20
