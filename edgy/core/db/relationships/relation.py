@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Sequence
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal, cast
 
 from pydantic import BaseModel
 
-from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.fields.base import RelationshipField
+from edgy.core.db.querysets.bulk import BulkOperation
+from edgy.core.db.querysets.clauses import and_, or_
 from edgy.exceptions import ObjectNotFound, RelationshipIncompatible, RelationshipNotFound
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
@@ -80,6 +83,21 @@ class ManyRelation(ManyRelationProtocol):
         # Stage the initial references.
         self.stage(*refs)
 
+    @cached_property
+    def _shared_relation_signals_params(self) -> dict:
+        fk_to_defining_model = self.through.meta.fields[
+            self.to_foreign_key if self.reverse else self.from_foreign_key
+        ]
+        fk_defining_model = fk_to_defining_model.target.meta.fields[
+            fk_to_defining_model.reverse_name
+        ]
+        return {
+            "target": fk_defining_model.owner if self.reverse else fk_defining_model.target,
+            "source": fk_defining_model.target if self.reverse else fk_defining_model.owner,
+            "field": fk_defining_model.related_name if self.reverse else fk_defining_model.name,
+            "relation": "many_to_many",
+        }
+
     def get_queryset(self) -> QuerySet:
         """
         Returns a `QuerySet` for fetching related instances through the `through` model.
@@ -115,7 +133,7 @@ class ManyRelation(ManyRelationProtocol):
         if self.embed_through != "":
             queryset.embed_parent_filters = queryset.embed_parent
         if self.reverse:
-            if not self.through.meta.fields[self.from_foreign_key].is_cross_db():
+            if not fk.is_cross_db():
                 # not initialized yet
                 queryset._select_related.add(self.from_foreign_key)
         else:
@@ -134,20 +152,34 @@ class ManyRelation(ManyRelationProtocol):
         self.refs.clear()
         if not refs:
             return
-        await self.get_queryset()._bulk_get_update_or_create(
-            objs=refs,
+        operation = BulkOperation(
+            owner=self.get_queryset(),
             unique_columns={
                 col
                 for field in [self.from_foreign_key, self.to_foreign_key]
                 for col in self.through.meta.field_to_column_names[field]
             },
             ignore_create_conflicts=True,
+            signal_models=[
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+                self.through,
+            ],
+            signal_postfix="relation_add",
+            signal_params={"operation": "save_related", **self._shared_relation_signals_params},
             create=True,
             retrieve=False,
             update=False,
             used_instance=self.instance,
             resolve_embed=False,
         )
+        await operation.prepare(refs)
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        # no cache update because the queryset is temporarysignal
+        # both parameters are the same here
+        operation.signal_params["row_count"] = operation.signal_params.get("row_count_create")
+        await operation.send_post_signal()
 
     def __getattr__(self, item: Any) -> Any:
         """
@@ -189,7 +221,7 @@ class ManyRelation(ManyRelationProtocol):
         # get_queryset already returns a fresh queryset, so no need to make a copy.
         return self.get_queryset()
 
-    def expand_relationship(self, value: Any) -> Any:
+    def expand_relationship(self, value: Any) -> BaseModelType:
         """
         Expands a given value into an instance of the `through` model or its
         proxy model, preparing it for inclusion in the relationship. This
@@ -220,7 +252,7 @@ class ManyRelation(ManyRelationProtocol):
 
         # Create a new proxy model instance of the 'through' model.
         # This instance links the current 'from' model instance with the 'to' model instance.
-        instance = cast("type[BaseModelType]", through.proxy_model)(
+        instance = through.proxy_model(
             **{self.from_foreign_key: self.instance, self.to_foreign_key: value}
         )
         # Set identifying database fields for the 'through' model instance.
@@ -288,25 +320,38 @@ class ManyRelation(ManyRelationProtocol):
             prepared.append(self.expand_relationship(child))
         if not prepared:
             return []
+        operation = BulkOperation(
+            owner=self.get_queryset(),
+            unique_columns={
+                col
+                for field in [self.from_foreign_key, self.to_foreign_key]
+                for col in through.meta.field_to_column_names[field]
+            },
+            ignore_create_conflicts=True,
+            signal_models=[
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+                self.through,
+            ],
+            signal_postfix="relation_add",
+            signal_params={"operation": "add", **self._shared_relation_signals_params},
+            create=True,
+            retrieve=False,
+            update=False,
+            used_instance=self.instance,
+            resolve_embed=True,
+        )
+        await operation.prepare(prepared)
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        # no cache update because the queryset is temporary
+        # we can just rename the signals parameters for the post signal
+        # both parameters are the same here
+        operation.signal_params["row_count"] = operation.signal_params.get("row_count_create")
+        await operation.send_post_signal()
         return cast(
             "list[BaseModelType | None]",
-            [
-                tup[0]
-                for tup in await self.get_queryset()._bulk_get_update_or_create(
-                    objs=prepared,
-                    unique_columns={
-                        col
-                        for field in [self.from_foreign_key, self.to_foreign_key]
-                        for col in through.meta.field_to_column_names[field]
-                    },
-                    ignore_create_conflicts=True,
-                    create=True,
-                    retrieve=False,
-                    update=False,
-                    used_instance=self.instance,
-                    resolve_embed=True,
-                )
-            ],
+            [tup[0] for tup in operation.result],
         )
 
     async def add(self, child: BaseModelType) -> BaseModelType | None:
@@ -341,8 +386,87 @@ class ManyRelation(ManyRelationProtocol):
             RelationshipNotFound: If no child is found or specified for removal.
             RelationshipIncompatible: If a child type is not compatible.
         """
-        for child in children:
-            await self.remove(child)
+
+        def _helper_prepare(child: Any) -> Any:
+            # Validate that the child is not a dict.
+            if isinstance(child, dict):
+                # this fails later and is wanted
+                child = None
+            return self.expand_relationship(child)
+
+        prepared = [_helper_prepare(child) for child in children]
+        if not prepared:
+            return
+        through = self.through.get_real_class()
+        fk = self.through.meta.fields[self.from_foreign_key]
+        fk_source = fk.target.meta.fields[fk.reverse_name]
+        model_based_deletion = (
+            fk.use_model_based_deletion or through.__require_model_based_deletion__
+        )
+        ops = []
+        seen_signals: set[int] = set()
+        for model_class in [
+            self._shared_relation_signals_params["source"],
+            self._shared_relation_signals_params["target"],
+            through,
+        ]:
+            signal = model_class.meta.signals.pre_relation_remove
+            if (signal_id := id(signal)) in seen_signals:
+                continue
+            seen_signals.add(signal_id)
+            ops.append(
+                model_class.meta.signals.pre_relation_remove.send_async(
+                    through,
+                    instance=self.instance,
+                    raw_values=prepared,
+                    model_based_deletion=model_based_deletion,
+                    **self._shared_relation_signals_params,
+                )
+            )
+        await asyncio.gather(*ops)
+        if prepared:
+            queryset = self.get_queryset().update_embed_parent(None)
+            # children can be removed by setting them to None
+            clauses = [
+                and_(*child.identifying_clauses()) for child in prepared if child is not None
+            ]
+            query = queryset.filter(or_(*clauses))
+            async with queryset.transaction():
+                row_count = await query.raw_delete(use_models=model_based_deletion)
+                if row_count is not None and row_count != len(clauses):
+                    related_name = fk_source.name
+                    raise RelationshipNotFound(
+                        detail=(
+                            f"There is no relationship through '{related_name}' to {self.instance} from "
+                            f"{('one of ' if len(clauses) > 1 else '')}"
+                            f"{', '.join(str(getattr(child, self.to_foreign_key)) for child in prepared)}."
+                        )
+                    )
+        else:
+            row_count = 0
+        ops = []
+        # not really necessary but be safe
+        seen_signals.clear()
+        for model_class in [
+            self._shared_relation_signals_params["source"],
+            self._shared_relation_signals_params["target"],
+            through,
+        ]:
+            signal = model_class.meta.signals.post_relation_remove
+            if (signal_id := id(signal)) in seen_signals:
+                continue
+            seen_signals.add(signal_id)
+            ops.append(
+                signal.send_async(
+                    through,
+                    instance=self.instance,
+                    raw_values=prepared,
+                    row_count=row_count,
+                    model_based_deletion=model_based_deletion,
+                    **self._shared_relation_signals_params,
+                )
+            )
+        await asyncio.gather(*ops)
 
     async def remove(self, child: BaseModelType | None = None) -> None:
         """
@@ -358,13 +482,13 @@ class ManyRelation(ManyRelationProtocol):
             RelationshipNotFound: If no child is found or specified for removal.
             RelationshipIncompatible: If the child type is not compatible.
         """
-        # Determine the foreign key based on whether it's a reverse relationship.
-        if self.reverse:
-            fk = self.through.meta.fields[self.from_foreign_key]
-        else:
-            fk = self.through.meta.fields[self.to_foreign_key]
 
         if child is None:
+            # Determine the foreign key based on whether it's a reverse relationship.
+            if self.reverse:
+                fk = self.through.meta.fields[self.from_foreign_key]
+            else:
+                fk = self.through.meta.fields[self.to_foreign_key]
             # If no child is specified and the foreign key is unique, attempt to get a single child.
             if fk.unique:
                 try:
@@ -375,31 +499,7 @@ class ManyRelation(ManyRelationProtocol):
             else:
                 # If no child is specified and the foreign key is not unique, raise an error.
                 raise RelationshipNotFound(detail="No child specified.")
-
-        # Cast the child to BaseModelType as it is now confirmed to be a model instance.
-        child = cast("BaseModelType", self.expand_relationship(child))
-        # Count the number of relationships based on the identifying clauses of the child.
-        real_class = self.get_real_class()
-        await child.meta.signals.pre_delete.send_async(
-            real_class, instance=child, model_instance=child
-        )
-        token = CURRENT_INSTANCE.set(child)
-        try:
-            row_count = await child.raw_delete(
-                skip_post_delete_hooks=False,
-                remove_referenced_call=False,
-            )
-            if row_count == 0:
-                # If no relationship is found, raise an error.
-                raise RelationshipNotFound(
-                    detail=f"There is no relationship between '{self.from_foreign_key}' and "
-                    f"'{self.to_foreign_key}: {getattr(child, self.to_foreign_key).pk}'."
-                )
-        finally:
-            CURRENT_INSTANCE.reset(token)
-            await self.meta.signals.post_delete.send_async(
-                real_class, instance=child, model_instance=child, row_count=row_count
-            )
+        await self.remove_many(cast("BaseModelType", child))
 
     def __repr__(self) -> str:
         """
@@ -482,6 +582,18 @@ class SingleRelation(ManyRelationProtocol):
             refs = [refs]
         # Stage the initial references.
         self.stage(*refs)
+
+    @cached_property
+    def _shared_relation_signals_params(self) -> dict:
+        assert self.instance is not None
+        fk = self.to.meta.fields[self.to_foreign_key]
+        # here reverse_name=related_name
+        return {
+            "source": type(self.instance),
+            "target": self.to,
+            "field": fk.reverse_name,
+            "relation": "one_to_many",
+        }
 
     def get_queryset(self) -> QuerySet:
         """
@@ -571,7 +683,7 @@ class SingleRelation(ManyRelationProtocol):
             setattr(value, self.to_foreign_key, self.instance)
             return value
 
-        related_columns = self.to.meta.fields[self.to_foreign_key].related_columns.keys()
+        related_columns = tuple(self.to.meta.fields[self.to_foreign_key].related_columns.keys())
         # If there's only one related column and the value is not a dict or BaseModel,
         # wrap it in a dictionary with the related column name as key.
         if len(related_columns) == 1 and not isinstance(value, dict | BaseModel):
@@ -580,7 +692,7 @@ class SingleRelation(ManyRelationProtocol):
         target_instance = target.proxy_model(**value)
         setattr(target_instance, self.to_foreign_key, self.instance)
         # Set identifying database fields for the 'to' model instance.
-        target_instance.identifying_db_fields = related_columns  # type: ignore
+        target_instance.identifying_db_fields = related_columns
         # If the 'to' model is a tenant model, set the active schema for the instance.
         if getattr(target.meta, "is_tenant", False):
             target_instance.__using_schema__ = self.instance.get_active_instance_schema()  # type: ignore
@@ -640,10 +752,16 @@ class SingleRelation(ManyRelationProtocol):
         if not refs:
             return
         to = self.to
-        await self.get_queryset()._bulk_get_update_or_create(
-            objs=refs,
+        operation = BulkOperation(
+            owner=self.get_queryset(),
             unique_columns=to.pkcolumns,
             update_fields={self.to_foreign_key},
+            signal_models=[
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+            ],
+            signal_postfix="relation_add",
+            signal_params={"operation": "save_related", **self._shared_relation_signals_params},
             ignore_create_conflicts=True,
             retrieve=False,
             create=True,
@@ -651,6 +769,18 @@ class SingleRelation(ManyRelationProtocol):
             used_instance=self.instance,
             resolve_embed=False,
         )
+        await operation.prepare(refs)
+        operation.signal_params["instance"] = self.instance
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        # no cache update because the queryset is temporary
+        # we can just rename the signals parameters for the post signal
+        operation.signal_params["row_count"] = operation.signal_params.pop("row_count_update")
+        if operation.signal_params["row_count"] is not None:
+            # keep the amount of created in the params
+            operation.signal_params["row_count"] += operation.signal_params.get("row_count_create")
+        operation.signal_params["instance"] = self.instance
+        await operation.send_post_signal()
 
     async def create(self, *args: Any, **kwargs: Any) -> BaseModelType | None:
         """
@@ -706,22 +836,36 @@ class SingleRelation(ManyRelationProtocol):
             prepared.append(self.expand_relationship(child))
         if not prepared:
             return []
+        operation = BulkOperation(
+            owner=self.get_queryset(),
+            unique_columns=to.pkcolumns,
+            update_fields={self.to_foreign_key},
+            signal_models=[
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+            ],
+            signal_postfix="relation_add",
+            signal_params={"operation": "add", **self._shared_relation_signals_params},
+            ignore_create_conflicts=True,
+            retrieve=False,
+            create=True,
+            update=True,
+            used_instance=self.instance,
+            resolve_embed=True,
+        )
+        await operation.prepare(prepared)
+        await operation.send_pre_signal()
+        await operation.apply_db()
+        # no cache update because the queryset is temporary
+        # we can just rename the signals parameters for the post signal
+        operation.signal_params["row_count"] = operation.signal_params.pop("row_count_update")
+        if operation.signal_params["row_count"] is not None:
+            # keep the amount of created in the params
+            operation.signal_params["row_count"] += operation.signal_params.get("row_count_create")
+        await operation.send_post_signal()
         return cast(
             "list[BaseModelType | None]",
-            [
-                tup[0]
-                for tup in await self.get_queryset()._bulk_get_update_or_create(
-                    objs=prepared,
-                    unique_columns=to.pkcolumns,
-                    update_fields={self.to_foreign_key},
-                    ignore_create_conflicts=True,
-                    retrieve=False,
-                    create=True,
-                    update=True,
-                    used_instance=self.instance,
-                    resolve_embed=True,
-                )
-            ],
+            [tup[0] for tup in operation.result],
         )
 
     async def remove_many(self, *children: BaseModelType) -> None:
@@ -739,8 +883,68 @@ class SingleRelation(ManyRelationProtocol):
             RelationshipNotFound: If no child is found or specified for removal.
             RelationshipIncompatible: If a child type is not compatible.
         """
-        for child in children:
-            await self.remove(child)
+
+        def _helper_prepare(child: Any) -> Any:
+            # Validate that the child is not a dict.
+            if isinstance(child, dict):
+                # this fails later and is wanted
+                child = None
+            child = self.expand_relationship(child)
+            setattr(child, self.to_foreign_key, None)
+            return child
+
+        prepared = [_helper_prepare(child) for child in children]
+        if not prepared:
+            return
+
+        to = self.to
+        queryset = self.get_queryset()
+        operation = BulkOperation(
+            owner=queryset,
+            unique_columns=to.pkcolumns,
+            update_fields={self.to_foreign_key},
+            signal_models=[
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+            ],
+            signal_postfix="relation_remove",
+            signal_params=self._shared_relation_signals_params,
+            retrieve=False,
+            create=False,
+            update=True,
+            used_instance=self.instance,
+            resolve_embed=False,
+        )
+        await operation.prepare(prepared)
+        # replace raw_values
+        raw_values = [tup[0] for tup in operation.instances_and_created]
+        del operation.signal_params["create_params"]
+        del operation.signal_params["update_params"]
+        operation.signal_params["raw_values"] = raw_values
+        await operation.send_pre_signal()
+        # allow modification via raw_values
+        obj_ids = [id(obj) for obj in raw_values]
+        operation.update_params = [tup for tup in operation.update_params if id(tup[0]) in obj_ids]
+
+        async with queryset.transaction():
+            await operation.apply_db()
+            # the queryset is temporary and maybe even resetted, so we don't need to update the cache
+            if operation.row_count_update != len(raw_values):
+                related_name = self._shared_relation_signals_params["field"]
+                raise RelationshipNotFound(
+                    detail=(
+                        f"There is no relationship through '{related_name}' to {self.instance} from "
+                        f"{('one of ' if len(prepared) > 1 else '')}"
+                        f"{', '.join(str(child) for child in prepared)}."
+                    )
+                )
+        # replace unsuitable parameters
+        operation.signal_params["raw_values"] = raw_values
+        operation.signal_params["row_count"] = operation.signal_params.pop("row_count_update")
+        del operation.signal_params["values"]
+        del operation.signal_params["create_params"]
+        del operation.signal_params["update_params"]
+        await operation.send_post_signal()
 
     async def remove(self, child: BaseModelType | None = None) -> None:
         """
@@ -769,19 +973,7 @@ class SingleRelation(ManyRelationProtocol):
             else:
                 # If no child is specified and the foreign key is not unique, raise an error.
                 raise RelationshipNotFound(detail="no child specified")
-        # Validate that the child is an instance of the 'to' model.
-        if not isinstance(child, self.to):
-            raise RelationshipIncompatible(f"The child is not from the type '{self.to.__name__}'.")
-
-        # Save the child, setting its foreign key to None to remove the relationship.
-        # MAYBE: optimize the case if the foreign_key is not matching.
-        # We need to check if the model is loaded completely
-
-        token = CURRENT_INSTANCE.set(child)
-        try:
-            await child.real_save(force_insert=False, values={self.to_foreign_key: None})
-        finally:
-            CURRENT_INSTANCE.reset(token)
+        await self.remove_many(cast("BaseModelType", child))
 
     def __repr__(self) -> str:
         """

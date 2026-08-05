@@ -18,18 +18,6 @@ class DeclarativeMixin:
     Table representation into a full SQLAlchemy Declarative model. This allows Edgy
     models to be used seamlessly within contexts that expect SQLAlchemy Declarative
     Base models, enabling advanced features like ORM relationships.
-
-    Attributes:
-        meta: A ClassVar of type `MetaInfo` (inferred from usage), providing access
-              to model metadata, including the SQLAlchemy Table object and field definitions.
-    """
-
-    # This attribute is typically provided by the Edgy model's metaclass.
-    meta: Any
-    """
-    Metadata object associated with the Edgy model, containing configuration details
-    such as the SQLAlchemy Table object, field definitions, and the declarative base
-    registry.
     """
 
     @classmethod

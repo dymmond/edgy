@@ -60,89 +60,91 @@ async def test_invalid_signal():
 
 
 async def test_signals():
-    @pre_save.connect_via(User)
-    async def pre_saving(sender, instance, model_instance, **kwargs):
-        await Log.query.create(
-            signal="pre_save", instance=model_instance.model_dump(), params=kwargs
-        )
-        print(f"pre_save signal broadcasted for {model_instance.get_instance_name()}")
+    try:
 
-    @post_save.connect_via(User)
-    async def post_saving(sender, instance, model_instance, **kwargs):
-        await Log.query.create(
-            signal="post_save", instance=model_instance.model_dump(), params=kwargs
-        )
-        print(f"post_save signal broadcasted for {model_instance.get_instance_name()}")
+        @pre_save.connect_via(User)
+        async def pre_saving(sender, instance, model_instance, **kwargs):
+            await Log.query.create(
+                signal="pre_save", instance=model_instance.model_dump(), params=kwargs
+            )
+            print(f"pre_save signal broadcasted for {model_instance.get_instance_name()}")
 
-    @pre_update.connect_via(User)
-    async def pre_updating(sender, instance, model_instance, **kwargs):
-        await Log.query.create(
-            signal="pre_update", instance=model_instance.model_dump(), params=kwargs
-        )
-        print(f"pre_update signal broadcasted for {model_instance.get_instance_name()}")
+        @post_save.connect_via(User)
+        async def post_saving(sender, instance, model_instance, **kwargs):
+            await Log.query.create(
+                signal="post_save", instance=model_instance.model_dump(), params=kwargs
+            )
+            print(f"post_save signal broadcasted for {model_instance.get_instance_name()}")
 
-    @post_update.connect_via(User)
-    async def post_updating(sender, instance, model_instance, **kwargs):
-        await Log.query.create(
-            signal="post_update", instance=model_instance.model_dump(), params=kwargs
-        )
-        print(f"post_update signal broadcasted for {model_instance.get_instance_name()}")
+        @pre_update.connect_via(User)
+        async def pre_updating(sender, instance, model_instance, **kwargs):
+            await Log.query.create(
+                signal="pre_update", instance=model_instance.model_dump(), params=kwargs
+            )
+            print(f"pre_update signal broadcasted for {model_instance.get_instance_name()}")
 
-    @pre_delete.connect_via(User)
-    async def pre_deleting(sender, instance, model_instance, **kwargs):
-        await Log.query.create(signal="pre_delete", instance=model_instance.model_dump())
-        print(f"pre_delete signal broadcasted for {model_instance.get_instance_name()}")
+        @post_update.connect_via(User)
+        async def post_updating(sender, instance, model_instance, **kwargs):
+            await Log.query.create(
+                signal="post_update", instance=model_instance.model_dump(), params=kwargs
+            )
+            print(f"post_update signal broadcasted for {model_instance.get_instance_name()}")
 
-    @post_delete.connect_via(User)
-    async def post_deleting(sender, instance, model_instance, **kwargs):
-        await Log.query.create(signal="post_delete", instance=model_instance.model_dump())
-        print(f"post_delete signal broadcasted for {model_instance.get_instance_name()}")
+        @pre_delete.connect_via(User)
+        async def pre_deleting(sender, instance, model_instance, **kwargs):
+            await Log.query.create(signal="pre_delete", instance=model_instance.model_dump())
+            print(f"pre_delete signal broadcasted for {model_instance.get_instance_name()}")
 
-    # Signals for the create
-    user = await User.query.create(name="Edgy")
-    logs = await Log.query.all()
+        @post_delete.connect_via(User)
+        async def post_deleting(sender, instance, model_instance, **kwargs):
+            await Log.query.create(signal="post_delete", instance=model_instance.model_dump())
+            print(f"post_delete signal broadcasted for {model_instance.get_instance_name()}")
 
-    assert len(logs) == 2
-    assert logs[0].signal == "pre_save"
-    assert logs[0].instance["name"] == user.name
-    assert logs[1].signal == "post_save"
+        # Signals for the create
+        user = await User.query.create(name="Edgy")
+        logs = await Log.query.all()
 
-    user = await User.query.create(name="Saffier")
-    logs = await Log.query.offset(2)
+        assert len(logs) == 2
+        assert logs[0].signal == "pre_save"
+        assert logs[0].instance["name"] == user.name
+        assert logs[1].signal == "post_save"
 
-    assert len(logs) == 2
-    assert logs[0].signal == "pre_save"
-    assert logs[0].instance["name"] == user.name
-    assert logs[1].signal == "post_save"
+        user = await User.query.create(name="Saffier")
+        logs = await Log.query.offset(2)
 
-    # For the updates
-    user = await user.update(name="Another Saffier")
-    logs = await Log.query.filter(signal__icontains="update").all()
+        assert len(logs) == 2
+        assert logs[0].signal == "pre_save"
+        assert logs[0].instance["name"] == user.name
+        assert logs[1].signal == "post_save"
 
-    assert len(logs) == 2
-    assert logs[0].signal == "pre_update"
-    assert logs[0].instance["name"] == "Saffier"
-    assert logs[1].signal == "post_update"
+        # For the updates
+        user = await user.update(name="Another Saffier")
+        logs = await Log.query.filter(signal__icontains="update").all()
 
-    user.meta.signals.pre_update.disconnect(pre_updating)
-    user.meta.signals.post_update.disconnect(post_updating)
+        assert len(logs) == 2
+        assert logs[0].signal == "pre_update"
+        assert logs[0].instance["name"] == "Saffier"
+        assert logs[1].signal == "post_update"
 
-    # Disconnect the signals
-    user = await user.update(name="Saffier")
-    logs = await Log.query.filter(signal__icontains="update").all()
-    assert len(logs) == 2
+        user.meta.signals.pre_update.disconnect(pre_updating)
+        user.meta.signals.post_update.disconnect(post_updating)
 
-    # Delete
-    await user.delete()
-    logs = await Log.query.filter(signal__icontains="delete").all()
-    assert len(logs) == 2
+        # Disconnect the signals
+        user = await user.update(name="Saffier")
+        logs = await Log.query.filter(signal__icontains="update").all()
+        assert len(logs) == 2
 
-    user.meta.signals.pre_delete.disconnect(pre_deleting)
-    user.meta.signals.post_delete.disconnect(post_deleting)
-    user.meta.signals.pre_save.disconnect(pre_saving)
-    user.meta.signals.post_save.disconnect(post_saving)
-    user.meta.signals.pre_update.disconnect(pre_updating)
-    user.meta.signals.post_update.disconnect(post_updating)
+        # Delete
+        await user.delete()
+        logs = await Log.query.filter(signal__icontains="delete").all()
+        assert len(logs) == 2
+    finally:
+        User.meta.signals.pre_delete.disconnect(pre_deleting)
+        User.meta.signals.post_delete.disconnect(post_deleting)
+        User.meta.signals.pre_save.disconnect(pre_saving)
+        User.meta.signals.post_save.disconnect(post_saving)
+        User.meta.signals.pre_update.disconnect(pre_updating)
+        User.meta.signals.post_update.disconnect(post_updating)
 
     users = await User.query.all()
     assert len(users) == 1

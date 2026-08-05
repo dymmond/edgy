@@ -23,7 +23,7 @@ def get_ipython(app: typing.Any, registry: Registry, options: typing.Any = None)
         )
 
         def run_ipython() -> None:
-            ipython_arguments = getattr(settings, "ipython_args", [])
+            ipython_arguments: list[str] = getattr(settings, "ipython_args", [])
             loop: asyncio.BaseEventLoop = get_asyncio_loop()  # type: ignore
             ctx = None if app is None else Lifespan(app)
             if ctx is not None:
@@ -32,7 +32,9 @@ def get_ipython(app: typing.Any, registry: Registry, options: typing.Any = None)
                 with registry.with_async_env(loop):
                     # we need an initialized registry first to detect reflected models
                     imported_objects: dict[str, typing.Any] = import_objects(app, registry)
-                    start_ipython(argv=ipython_arguments, user_ns=imported_objects)  # type: ignore
+                    typing.cast(typing.Any, start_ipython)(
+                        argv=ipython_arguments, user_ns=imported_objects
+                    )
             finally:
                 if ctx is not None:
                     loop.run_until_complete(ctx.__aexit__())

@@ -89,18 +89,13 @@ class BaseModelType(ABC):
     # `__reflected__` indicates if the model is reflected from an existing database table.
     __reflected__: ClassVar[bool] = False
 
-    @property
-    @abstractmethod
-    def proxy_model(self) -> type[BaseModelType]:
-        """
-        Abstract property that returns a proxy model instance for the current model.
+    proxy_model: ClassVar[type[BaseModelType]]
+    """
+    Property that returns a proxy model instance for the current model.
 
-        This is typically a shallow copy used for specific internal operations
-        without affecting the main model.
-
-        Returns:
-            type[BaseModelType]: A type representing the proxy model.
-        """
+    This is typically a shallow copy used for specific internal operations
+    without affecting the main model.
+    """
 
     @cached_property
     @abstractmethod

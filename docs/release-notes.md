@@ -8,6 +8,8 @@
 - Add the `bulk_update_or_create` operation to querysets.
 - Add the `update_embed_parent` operation to querysets.
 - Add the `ignore_conflicts` parameter to `bulk_create`.
+- Add relationship signals (`pre/post_relation_add` and `pre/post_relation_remove`).
+- Add bulk signals (`pre/post_bulk`).
 
 ### Changed
 
@@ -37,6 +39,7 @@
   Reason? Interoperability. We have not a consistent logic in the database systems for handling `None`. So make sure that it is really intended.
 - Bulk operations return now a result instead `None`. For `bulk_get_or_create` the returned list format changes to `(instance, created)` tuples.
 - The typings changed for QuerySetType: `EdgyEmbedTarget` and `EdgyModel` (the queryset model) are switched in the `Generic` definition.
+- Stop issuing `pre_delete` and `post_delete` signals during relation operations; use `pre_relation_remove` and `post_relation_remove` signals instead.
 
 ## 0.35.11
 

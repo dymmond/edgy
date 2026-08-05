@@ -106,7 +106,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         | dict[str, Any]
         | QuerySetType,
         **kwargs: Any,
-    ) -> QuerySetType:
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to filter the QuerySet based on provided clauses or keyword arguments.
 
@@ -122,7 +122,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def all(self, clear_cache: bool = False) -> QuerySetType:
+    def all(self, clear_cache: bool = False) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to return a QuerySet representing all objects of the model.
 
@@ -145,7 +145,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ]
         | QuerySetType,
         **kwargs: Any,
-    ) -> QuerySetType:
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Filters the QuerySet by the OR operand.
 
@@ -172,7 +172,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ]
         | QuerySetType,
         **kwargs: Any,
-    ) -> QuerySetType:
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Filters the QuerySet by the OR operand.
 
@@ -201,7 +201,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         | dict[str, Any]
         | QuerySetType,
         **kwargs: Any,
-    ) -> QuerySetType:
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Filters the QuerySet by the AND operand. Alias of filter.
 
@@ -230,7 +230,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         | dict[str, Any]
         | QuerySetType,
         **kwargs: Any,
-    ) -> QuerySetType:
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Filters the QuerySet by the NOT operand. Alias of exclude.
 
@@ -261,7 +261,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         | dict[str, Any]
         | QuerySetType,
         **kwargs: Any,
-    ) -> QuerySetType:
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to exclude objects from the QuerySet based on provided clauses or keyword arguments.
 
@@ -277,7 +277,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def lookup(self, term: Any) -> QuerySetType:
+    def lookup(self, term: Any) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to perform a generic lookup on the QuerySet.
 
@@ -292,7 +292,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def order_by(self, *columns: str) -> QuerySetType:
+    def order_by(self, *columns: str) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to order the QuerySet results by one or more columns.
 
@@ -305,7 +305,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def reverse(self) -> QuerySetType:
+    def reverse(self) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to reverse the current ordering of the QuerySet.
 
@@ -315,7 +315,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def limit(self, limit_count: int) -> QuerySetType:
+    def limit(self, limit_count: int) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to limit the number of results returned by the QuerySet.
 
@@ -328,7 +328,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def offset(self, offset: int) -> QuerySetType:
+    def offset(self, offset: int) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to set the offset for the QuerySet results.
 
@@ -341,7 +341,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def group_by(self, *group_by: str) -> QuerySetType:
+    def group_by(self, *group_by: str) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to group the QuerySet results by one or more columns.
 
@@ -354,7 +354,9 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def distinct(self, first: bool | str = True, /, *distinct_on: str) -> QuerySetType:
+    def distinct(
+        self, first: bool | str = True, /, *distinct_on: str
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to select distinct rows based on specific columns or all columns.
 
@@ -369,7 +371,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def select_related(self, *related: str) -> QuerySetType:
+    def select_related(self, *related: str) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to perform an eager load of related objects using SQL JOINs.
 
@@ -382,7 +384,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def only(self, *fields: str) -> QuerySetType:
+    def only(self, *fields: str) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to select only a specific set of fields from the model.
 
@@ -395,7 +397,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def defer(self, *fields: str) -> QuerySetType:
+    def defer(self, *fields: str) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to defer the loading of specific fields from the model.
 
@@ -410,8 +412,16 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         """
         ...
 
+    @overload
+    def update_embed_parent(self, embed_parent: None) -> QuerySetType[EdgyModel, EdgyModel]: ...
+    @overload
+    def update_embed_parent(
+        self, embed_parent: tuple[str, str]
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]: ...
     @abstractmethod
-    def update_embed_parent(self, embed_parent: tuple[str, str | str] | None) -> QuerySetType:
+    def update_embed_parent(
+        self, embed_parent: tuple[str, str] | None
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget] | QuerySetType[EdgyModel, EdgyModel]:
         """
         Abstract method to update or remove (provide None) embed_parent applied on instances.
         Note: this doesn't affect embed_parent for filters.
@@ -647,10 +657,11 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             resolve_embed (bool): Triggers mode in which embedding is applied when True.
 
         Returns:
-            list[EdgyModel] | list[EdgyEmbedTarget]:
+            list[EdgyModel | None] | list[EdgyEmbedTarget | None]:
                 A list of updated objects.
                 Warning: for performance reasons no embedding is applied by default and
                 the returned objects are maybe incomplete (check `can_load` property).
+                When an input doesn't succeed in creating an update `None` is used as placeholder.
         """
         ...
 
@@ -943,7 +954,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         *,
         database: str | Any | None | Database = Undefined,
         schema: str | Any | None | Literal[False] = Undefined,
-    ) -> QuerySetType:
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to specify the database connection and/or schema to use for the QuerySet.
 
@@ -960,7 +971,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     def extra_select(
         self,
         *extra: sqlalchemy.ClauseElement,
-    ) -> QuerySetType:
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to add extra select clauses to the QuerySet.
 
@@ -974,7 +985,9 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    def reference_select(self, references: reference_select_type) -> QuerySetType:
+    def reference_select(
+        self, references: reference_select_type
+    ) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
         """
         Abstract method to select specific references (related fields) to be included in the results.
 

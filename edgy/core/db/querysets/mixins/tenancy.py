@@ -1,20 +1,22 @@
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any, Literal, cast
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast
 
 from edgy.core.connection.database import Database
 from edgy.core.db.context_vars import set_schema
+from edgy.core.db.querysets.types import EdgyEmbedTarget, EdgyModel
 from edgy.types import Undefined
 
 if TYPE_CHECKING:  # pragma: no cover
+    from edgy.core.connection.registry import Registry
     from edgy.core.db.querysets.queryset import QuerySet
 
 # A sentinel object used to detect when a keyword-only argument has not been provided.
 _sentinel = object()
 
 
-class TenancyMixin:
+class TenancyMixin(Generic[EdgyModel, EdgyEmbedTarget]):
     """
     Mixin used for querying a multi-tenant and/or multi-database application.
 
@@ -31,7 +33,7 @@ class TenancyMixin:
         *,
         database: str | Any | None | Database = Undefined,
         schema: str | Any | None | Literal[False] = Undefined,
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Enables and switches the database schema and/or database connection for
         the queryset.
@@ -79,23 +81,24 @@ class TenancyMixin:
                 schema = False
 
         # Create a clone of the current queryset to avoid modifying the original.
-        queryset = cast("QuerySet", self._clone())
+        queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)._clone()
 
         # Process the 'database' argument.
         if database is not Undefined:
+            registry = cast("Registry", queryset.model_class.meta.registry)
             if isinstance(database, Database):
                 connection: Database = database
             elif database is None:
                 # Use the default database from the model's registry.
-                connection = self.model_class.meta.registry.database
+                connection = registry.database
             else:
                 # Assert that the database name exists in the extra connections.
-                assert database is None or database in self.model_class.meta.registry.extra, (
+                assert database in registry.extra, (
                     f"`{database}` is not in the connections extra of the model"
-                    f"`{self.model_class.__name__}` registry"
+                    f"`{queryset.model_class.__name__}` registry"
                 )
                 # Retrieve the database from extra connections.
-                connection = self.model_class.meta.registry.extra[database]
+                connection = registry.extra[database]
             # Assign the determined connection to the new queryset's database.
             queryset.database = connection
 
@@ -116,7 +119,7 @@ class TenancyMixin:
 
     def using_with_db(
         self, connection_name: str, schema: str | Any | None | Literal[False] = Undefined
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Switches the database connection and optionally the schema for the queryset.
 

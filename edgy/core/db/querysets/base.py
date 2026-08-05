@@ -17,6 +17,7 @@ from typing import (
     Generic,
     Literal,
     cast,
+    overload,
 )
 
 import sqlalchemy
@@ -32,7 +33,7 @@ from edgy.types import Undefined
 from . import clauses as clauses_mod
 from .compiler import QueryCompiler
 from .executor import QueryExecutor, get_current_row
-from .mixins import BulkMixin, QuerySetPropsMixin, TenancyMixin
+from .mixins import QuerySetPropsMixin, TenancyMixin
 from .parser import ResultParser
 from .prefetch import Prefetch, PrefetchMixin
 from .types import (
@@ -52,10 +53,9 @@ _empty_set = cast(set[Any], frozenset())
 
 
 class BaseQuerySet(
-    TenancyMixin,
+    TenancyMixin[EdgyModel, EdgyEmbedTarget],
     QuerySetPropsMixin,
     PrefetchMixin,
-    BulkMixin[EdgyModel],
     QuerySetType[EdgyModel, EdgyEmbedTarget],
     Generic[EdgyModel, EdgyEmbedTarget],
 ):
@@ -92,6 +92,7 @@ class BaseQuerySet(
         extra_select: Iterable[sqlalchemy.ClauseElement] | None = None,
         reference_select: reference_select_type | None = None,
     ) -> None:
+        # ensure only the real model_class is used here not a proxy
         if model_class.__is_proxy_model__:
             model_class = cast(type[EdgyModel], model_class.__parent__)
 
@@ -164,7 +165,7 @@ class BaseQuerySet(
 
         self._suppress_pk_deduplication: bool = False
 
-    def _clone(self) -> QuerySet:
+    def _clone(self) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         This is core to the builder pattern
         """
@@ -430,6 +431,12 @@ class BaseQuerySet(
         )
         return tables_and_models[crawl_result.forward_path][0].columns[crawl_result.field_name]
 
+    @overload
+    async def _embed_parent_in_result(self, result: None) -> tuple[None, None]: ...
+    @overload
+    async def _embed_parent_in_result(
+        self, result: EdgyModel | Awaitable[EdgyModel]
+    ) -> tuple[EdgyModel, EdgyEmbedTarget]: ...
     async def _embed_parent_in_result(
         self, result: EdgyModel | Awaitable[EdgyModel] | None
     ) -> tuple[EdgyModel, EdgyEmbedTarget] | tuple[None, None]:
@@ -539,13 +546,13 @@ class BaseQuerySet(
         exclude: bool = False,
         or_: bool = False,
         allow_global_or: bool = True,
-    ) -> QuerySet:
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         This is the core 'filter' builder logic.
         """
         from edgy.core.db.querysets.queryset import QuerySet
 
-        queryset: QuerySet[EdgyModel, EdgyEmbedTarget] = self._clone()
+        queryset = self._clone()
         if kwargs:
             clauses = [*clauses, kwargs]
         converted_clauses: Sequence[
