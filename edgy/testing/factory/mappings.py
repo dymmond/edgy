@@ -219,19 +219,16 @@ def DecimalField_callback(
             ),
         )
     # remapping
-    remapping_right_places = right_digits if right_digits is not None else 10
+    remapping_right_places = right_digits - 1 if right_digits is not None else 10
+    dmin = Decimal(f"0.{'0' * remapping_right_places}1")
     if getattr(edgy_field, "ge", None) is not None:
         parameters.setdefault("min_value", edgy_field.ge)
     elif getattr(edgy_field, "gt", None) is not None:
-        parameters.setdefault(
-            "min_value", Decimal(edgy_field.gt) + (Decimal("1") / 10**remapping_right_places)
-        )
+        parameters.setdefault("min_value", Decimal(edgy_field.gt) + dmin)
     if getattr(edgy_field, "le", None) is not None:
         parameters.setdefault("max_value", edgy_field.le)
     elif getattr(edgy_field, "lt", None) is not None:
-        parameters.setdefault(
-            "max_value", Decimal(edgy_field.lt) - (Decimal("1") / 10**remapping_right_places)
-        )
+        parameters.setdefault("max_value", Decimal(edgy_field.lt) - dmin)
     return context["faker"].pydecimal(**parameters)
 
 

@@ -97,7 +97,7 @@ async def test_raises_field_definition_error_on_values(max_digits, decimal_place
 
         class AnotherEmployee(edgy.Model):
             salary: decimal.Decimal = fields.DecimalField(
-                decimal_places=decimal_places, max_digits=-1, null=True
+                max_digits=max_digits, decimal_places=decimal_places, null=True
             )
 
             class Meta:
