@@ -484,6 +484,8 @@ class DecimalField(FieldFactory, decimal.Decimal):
             )
         if max_digits is not None and max_digits < 0:
             raise FieldDefinitionError("`max_digits` should not be negative")
+        if max_digits is not None and decimal_places is not None and max_digits < decimal_places:
+            raise FieldDefinitionError("`max_digits` should not be lower than `decimal_places`")
 
     @classmethod
     def operator_to_clause(

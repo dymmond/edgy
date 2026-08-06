@@ -126,8 +126,8 @@ class Log(edgy.StrictModel):
 
 
 async def test_calibrate():
-    factory = ProductFactory(price=None, uuid=None)
-    product = await factory.build(overwrites={"created_time": time()}).save()
+    factory = ProductFactory()
+    product = await factory.build().save()
     await product.update(description="saffier")
     await Product.query.update(description="edgy")
     logs = await Log.query.all()
@@ -139,8 +139,8 @@ async def test_calibrate():
 
 @pytest.mark.parametrize("method", ["bulk_create", "bulk_update_or_create", "bulk_get_or_create"])
 async def test_bulk_create_like(method):
-    factory = ProductFactory(price=None, uuid=None)
-    inputs = [factory.build(overwrites={"created_time": time()}) for i in range(100)]
+    factory = ProductFactory()
+    inputs = [factory.build() for i in range(100)]
     await getattr(Product.query, method)(inputs)
     logs = await Log.query.all()
     assert all(log.signal in {"pre_bulk", "post_bulk"} for log in logs)
@@ -148,8 +148,8 @@ async def test_bulk_create_like(method):
 
 
 async def test_bulk_create_bulk_ignore():
-    factory = ProductFactory(price=None, uuid=None)
-    inputs = [factory.build(overwrites={"created_time": time()}) for i in range(100)]
+    factory = ProductFactory()
+    inputs = [factory.build() for i in range(100)]
     await Product.query.bulk_create(inputs, ignore_conflicts=True)
     logs = await Log.query.all()
     assert all(log.signal in {"pre_bulk", "post_bulk"} for log in logs)
@@ -159,10 +159,8 @@ async def test_bulk_create_bulk_ignore():
 @pytest.mark.parametrize("rollback", [True, False])
 @pytest.mark.parametrize("method", ["bulk_update", "bulk_update_or_create"])
 async def test_bulk_update_like(method, rollback):
-    factory = ProductFactory(price=None, uuid=None)
-    await Product.query.bulk_create(
-        [factory.build(overwrites={"created_time": time()}) for i in range(100)]
-    )
+    factory = ProductFactory()
+    await Product.query.bulk_create([factory.build() for i in range(100)])
     logs = await Log.query.all()
     assert all(log.signal in {"pre_bulk", "post_bulk"} for log in logs)
     assert len(logs) == 2

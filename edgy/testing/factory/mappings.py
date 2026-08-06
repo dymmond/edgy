@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Literal
 
 from edgy.core.db.relationships.related_field import RelatedField
@@ -167,6 +168,74 @@ def ImageField_callback(
     return context["faker"].image(**parameters)
 
 
+def DecimalField_callback(
+    field: FactoryField, context: ModelFactoryContext, parameters: dict[str, Any]
+) -> Any:
+    edgy_field = field.owner.meta.model.meta.fields[field.name]
+    max_digits: int | None = getattr(edgy_field, "max_digits", None)
+    right_digits: int | None = getattr(edgy_field, "decimal_places", None)
+    if max_digits is None:
+        if right_digits is not None:
+            parameters.setdefault(
+                "right_digits", context["faker"].random_int(min=0, max=right_digits)
+            )
+    elif right_digits is None:
+        parameters.setdefault(
+            "right_digits", context["faker"].random_int(min=0, max=max_digits - 1)
+        )
+        if parameters["right_digits"] == 0:
+            parameters.setdefault(
+                "left_digits",
+                context["faker"].random_int(min=1, max=max_digits),
+            )
+        else:
+            parameters.setdefault(
+                "left_digits",
+                context["faker"].random_int(min=0, max=max_digits - parameters["right_digits"]),
+            )
+    elif right_digits == 0:
+        parameters.setdefault("left_digits", context["faker"].random_int(min=1, max=max_digits))
+        parameters.setdefault("right_digits", 0)
+    else:
+        leftplaces_remaining: int = max_digits - right_digits
+        right_digits_value = parameters.get("right_digits")
+        min_value_left_places = 0
+        if right_digits_value is not None and right_digits_value == 0:
+            min_value_left_places = 1
+        if leftplaces_remaining == 0:
+            parameters.setdefault("left_digits", 0)
+        else:
+            if right_digits_value is not None:
+                # update
+                leftplaces_remaining = min(leftplaces_remaining, max_digits - right_digits_value)
+            parameters.setdefault(
+                "left_digits",
+                context["faker"].random_int(min=min_value_left_places, max=leftplaces_remaining),
+            )
+        parameters.setdefault(
+            "right_digits",
+            context["faker"].random_int(
+                min=1 if parameters["left_digits"] == 0 else 0, max=right_digits
+            ),
+        )
+    # remapping
+    remapping_right_places = right_digits - 1 if right_digits is not None else 10
+    if remapping_right_places < 0:
+        # right_digits was 0
+        dmin = Decimal("1")
+    else:
+        dmin = Decimal(f"0.{'0' * remapping_right_places}1")
+    if getattr(edgy_field, "ge", None) is not None:
+        parameters.setdefault("min_value", edgy_field.ge)
+    elif getattr(edgy_field, "gt", None) is not None:
+        parameters.setdefault("min_value", Decimal(edgy_field.gt) + dmin)
+    if getattr(edgy_field, "le", None) is not None:
+        parameters.setdefault("max_value", edgy_field.le)
+    elif getattr(edgy_field, "lt", None) is not None:
+        parameters.setdefault("max_value", Decimal(edgy_field.lt) - dmin)
+    return context["faker"].pydecimal(**parameters)
+
+
 DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
     "IntegerField": edgy_field_param_extractor(
         "random_int",
@@ -207,22 +276,7 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
             ),
         },
     ),
-    "DecimalField": edgy_field_param_extractor(
-        "pydecimal",
-        remapping={
-            # TODO: find better definition
-            "gt": (
-                "min",
-                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name)
-                - 0.0000000001,
-            ),
-            "lt": (
-                "max",
-                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name)
-                + 0.0000000001,
-            ),
-        },
-    ),
+    "DecimalField": DecimalField_callback,
     "FloatField": edgy_field_param_extractor(
         "pyfloat",
         remapping={
@@ -262,8 +316,8 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
             ),
         },
     ),
-    "TimeField": edgy_field_param_extractor("time"),
-    "UUIDField": edgy_field_param_extractor("uuid4"),
+    "TimeField": edgy_field_param_extractor("time_object"),
+    "UUIDField": edgy_field_param_extractor("uuid4", defaults={"cast_to": None}),
     "JSONField": edgy_field_param_extractor("json"),
     "ForeignKey": ForeignKey_callback,
     "OneToOneField": ForeignKey_callback,
