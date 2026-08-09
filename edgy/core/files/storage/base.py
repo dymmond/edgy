@@ -224,7 +224,9 @@ class Storage(ABC):
 
         # Check for path traversal attempts in the directory component.
         if ".." in pathlib.PurePath(dir_name).parts:
-            raise SuspiciousFileOperation(f"Detected path traversal attempt in '{dir_name}'")
+            raise SuspiciousFileOperation(
+                detail=f"Detected path traversal attempt in '{dir_name}'"
+            )
 
         # Sanitize the file name component.
         validate_file_name(file_name)
@@ -257,9 +259,11 @@ class Storage(ABC):
                     if not file_root:
                         # If file_root becomes empty after truncation, raise an error.
                         raise SuspiciousFileOperation(
-                            f'Storage can not find an available filename for "{name}". '
-                            "Please make sure that the corresponding file field "
-                            'allows sufficient "max_length".'
+                            detail=(
+                                f'Storage can not find an available filename for "{name}". '
+                                "Please make sure that the corresponding file field "
+                                'allows sufficient "max_length".'
+                            )
                         )
                     # Regenerate the name with the truncated file_root.
                     if not overwrite:

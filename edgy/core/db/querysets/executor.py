@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator, Iterable, Sequence
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, cast
 
@@ -12,14 +12,12 @@ from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.db import check_db_connection, hash_tablekey
-from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
+from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError, SkipOperation
 
 from .types import EdgyEmbedTarget, EdgyModel
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.base import BaseQuerySet
-    from edgy.core.db.querysets.compiler import QueryCompiler
-    from edgy.core.db.querysets.parser import ResultParser
     from edgy.core.db.querysets.queryset import QuerySet
 
     from .types import tables_and_models_type
@@ -47,21 +45,23 @@ class QueryExecutor:
     def __init__(
         self,
         queryset: BaseQuerySet,
-        compiler: QueryCompiler,
-        parser: ResultParser,
     ):
         """
         Initializes the QueryExecutor.
 
         Args:
             queryset: The BaseQuerySet instance holding the query state.
-            compiler: The QueryCompiler to be used for WHERE clauses (e.g., in deletes).
-            parser: The ResultParser to be used for turning rows into models.
         """
+        self.set_queryset(queryset)
+
+    def set_queryset(self, queryset: BaseQuerySet):
+        from .compiler import QueryCompiler
+        from .parser import ResultParser
+
         # we need so many internals, so we just cast to a QuerySet
         self.queryset = cast("QuerySet", queryset)
-        self.compiler = compiler
-        self.parser = parser
+        self.compiler = QueryCompiler(self.queryset)
+        self.parser = ResultParser(self.queryset)
         self.database = queryset.database
         self.model_class = queryset.model_class
 
@@ -295,7 +295,10 @@ class QueryExecutor:
         return prepared_prefetches
 
     async def delete(
-        self, use_models: bool = False, remove_referenced_call: str | bool = False
+        self,
+        use_models: bool = False,
+        remove_referenced_call: str | bool = False,
+        injected_filters: Iterable = (),
     ) -> int:
         """
         Executes a delete operation.
@@ -317,6 +320,8 @@ class QueryExecutor:
             or self.model_class.meta.post_delete_fields
         ):
             use_models = True
+        if injected_filters:
+            self.set_queryset(self.queryset.filter(*injected_filters))
 
         if use_models:
             row_count = await self._model_based_delete(
@@ -347,39 +352,48 @@ class QueryExecutor:
         Returns:
             The total number of models deleted.
         """
-        from edgy.core.db.querysets.compiler import QueryCompiler
-        from edgy.core.db.querysets.parser import ResultParser
 
         queryset = (
             self.queryset.limit(self.queryset._batch_size)
-            if not self.queryset._cache_fetch_all
-            else self.queryset
+            if self.queryset._batch_size is not None
+            else self.queryset.all()
         )
         queryset.embed_parent = None
+        self.set_queryset(queryset)
         row_count = 0
 
-        compiler = QueryCompiler(queryset)
-        parser = ResultParser(queryset)
-
-        # Instantiate the QueryExecutor recursively for the new queryset
-        executor = QueryExecutor(queryset, compiler, parser)
-
         # Uuse the new executor's iterate method
-        models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
+        models = [model async for model in self.iterate(fetch_all_at_once=True)]  # type: ignore
+
+        signal = queryset.model_class.meta.signals.post_delete
+
+        # introspect via temporary signal
+        @signal.connect_via(queryset.model_class)
+        def raise_SkipOperation(sender, operation_skipped=False, **kwargs) -> None:
+            # reraise in post
+            if operation_skipped:
+                raise SkipOperation()
 
         token = CURRENT_INSTANCE.set(self.queryset)
         try:
             while models:
                 for model in models:
-                    await model.raw_delete(
+                    _row_count = await model.raw_delete(
                         skip_post_delete_hooks=False, remove_referenced_call=remove_referenced_call
                     )
-                    row_count += 1
+                    if _row_count != 0:
+                        row_count += 1
 
-                # clear cache and fetch new batch
-                # reuse cached query
-                queryset._clear_cache(keep_cached_selected=True)
-                models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
+                # clear parent cache
+                self.queryset._clear_cache(keep_cached_selected=True)
+                if not self.queryset._cache_fetch_all:
+                    # clear cache and fetch new batch
+                    queryset._clear_cache(keep_cached_selected=True)
+                    models = [model async for model in self.iterate(fetch_all_at_once=True)]  # type: ignore
+        except SkipOperation:
+            # raised from temporary signal
+            return row_count
         finally:
             CURRENT_INSTANCE.reset(token)
+            signal.disconnect(raise_SkipOperation)
         return row_count

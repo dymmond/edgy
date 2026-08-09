@@ -179,8 +179,7 @@ async def test_basic_m2m():
     assert logs[0].signal == "pre_relation_add"
     # see docs for parameters
     assert len(logs[0].params) == 9
-    assert logs[1].signal == "post_relation_add"
-    assert len(logs[1].params) == 12
+    assert len(logs[1].params) == 13
     assert logs[0].params["raw_values"]
     assert "User" in logs[0].params["source"]
     assert "Friend" in logs[0].params["target"]
@@ -194,6 +193,8 @@ async def test_basic_m2m():
     assert "values" not in logs[0].params
     assert "row_count" not in logs[0].params
     assert "row_count_create" not in logs[0].params
+    assert logs[1].signal == "post_relation_add"
+    assert logs[1].params["operation_skipped"] == "False"
     assert logs[1].params["instance"] == str(user)
     assert logs[1].signal == "post_relation_add"
     assert logs[1].params["values"]
@@ -215,7 +216,7 @@ async def test_basic_m2m():
     assert "update_params" not in logs[2].params
     assert logs[3].signal == "post_relation_remove"
     # see docs for parameters
-    assert len(logs[3].params) == 8
+    assert len(logs[3].params) == 9
     assert logs[3].params["instance"] == str(user)
     assert "operation" not in logs[3].params
     assert "values" not in logs[3].params
@@ -223,6 +224,7 @@ async def test_basic_m2m():
     assert "create_params" not in logs[3].params
     assert "update_params" not in logs[3].params
     assert logs[3].params["row_count"] == "1"
+    assert logs[3].params["operation_skipped"] == "False"
     assert await Log.query.filter(signal="post_delete").count() == 0
     assert await Log.query.filter(signal="pre_delete").count() == 0
 
@@ -264,7 +266,7 @@ async def test_basic_one_to_many():
     assert "model_based_deletion" not in logs[4].params
     assert logs[5].signal == "post_relation_remove"
     # see docs for parameters
-    assert len(logs[5].params) == 7
+    assert len(logs[5].params) == 8
     assert "operation" not in logs[5].params
     assert "values" not in logs[5].params
     assert "create_params" not in logs[5].params

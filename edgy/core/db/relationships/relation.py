@@ -10,7 +10,12 @@ from pydantic import BaseModel
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.querysets.bulk import BulkOperation
 from edgy.core.db.querysets.clauses import and_, or_
-from edgy.exceptions import ObjectNotFound, RelationshipIncompatible, RelationshipNotFound
+from edgy.exceptions import (
+    ObjectNotFound,
+    RelationshipIncompatible,
+    RelationshipNotFound,
+    SkipOperation,
+)
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
@@ -174,7 +179,13 @@ class ManyRelation(ManyRelationProtocol):
             resolve_embed=False,
         )
         await operation.prepare(refs)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            operation.signal_params["row_count"] = 0
+            operation.signal_params["row_count_create"] = 0
+            await operation.send_post_signal()
+            return
         await operation.apply_db()
         # no cache update because the queryset is temporarysignal
         # both parameters are the same here
@@ -342,7 +353,13 @@ class ManyRelation(ManyRelationProtocol):
             resolve_embed=True,
         )
         await operation.prepare(prepared)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            operation.signal_params["row_count"] = 0
+            operation.signal_params["row_count_create"] = 0
+            await operation.send_post_signal()
+            return []
         await operation.apply_db()
         # no cache update because the queryset is temporary
         # we can just rename the signals parameters for the post signal
@@ -423,7 +440,34 @@ class ManyRelation(ManyRelationProtocol):
                     **self._shared_relation_signals_params,
                 )
             )
-        await asyncio.gather(*ops)
+        try:
+            await asyncio.gather(*ops)
+        except SkipOperation:
+            ops = []
+            # not really necessary but be safe
+            seen_signals.clear()
+            for model_class in [
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+                through,
+            ]:
+                signal = model_class.meta.signals.post_relation_remove
+                if (signal_id := id(signal)) in seen_signals:
+                    continue
+                seen_signals.add(signal_id)
+                ops.append(
+                    signal.send_async(
+                        through,
+                        instance=self.instance,
+                        raw_values=prepared,
+                        row_count=0,
+                        operation_skipped=True,
+                        model_based_deletion=model_based_deletion,
+                        **self._shared_relation_signals_params,
+                    )
+                )
+            await asyncio.gather(*ops)
+            return
         if prepared:
             queryset = self.get_queryset().update_embed_parent(None)
             # children can be removed by setting them to None
@@ -462,6 +506,7 @@ class ManyRelation(ManyRelationProtocol):
                     instance=self.instance,
                     raw_values=prepared,
                     row_count=row_count,
+                    operation_skipped=False,
                     model_based_deletion=model_based_deletion,
                     **self._shared_relation_signals_params,
                 )
@@ -771,7 +816,13 @@ class SingleRelation(ManyRelationProtocol):
         )
         await operation.prepare(refs)
         operation.signal_params["instance"] = self.instance
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            operation.signal_params["row_count"] = 0
+            operation.signal_params["row_count_create"] = 0
+            await operation.send_post_signal()
+            return
         await operation.apply_db()
         # no cache update because the queryset is temporary
         # we can just rename the signals parameters for the post signal
@@ -854,7 +905,11 @@ class SingleRelation(ManyRelationProtocol):
             resolve_embed=True,
         )
         await operation.prepare(prepared)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            await operation.send_post_signal()
+            return []
         await operation.apply_db()
         # no cache update because the queryset is temporary
         # we can just rename the signals parameters for the post signal
@@ -921,7 +976,12 @@ class SingleRelation(ManyRelationProtocol):
         del operation.signal_params["create_params"]
         del operation.signal_params["update_params"]
         operation.signal_params["raw_values"] = raw_values
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            operation.signal_params["row_count"] = 0
+            await operation.send_post_signal()
+            return
         # allow modification via raw_values
         obj_ids = [id(obj) for obj in raw_values]
         operation.update_params = [tup for tup in operation.update_params if id(tup[0]) in obj_ids]
@@ -1026,5 +1086,5 @@ class VirtualCascadeDeletionSingleRelation(SingleRelation):
             # Determine whether to use model-based deletion from the foreign key's configuration.
             use_models=self.to.meta.fields[self.to_foreign_key].use_model_based_deletion,
             # Specify the foreign key that references the deleted instance to ensure correct removal.
-            remove_referenced_call=self.to_foreign_key,
+            remove_referenced_call=self.to_foreign_key or True,
         )

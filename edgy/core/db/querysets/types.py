@@ -813,12 +813,14 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         ...
 
     @abstractmethod
-    async def update(self, **kwargs: Any) -> None:
+    async def update(self, **kwargs: Any) -> int | None:
         """
         Abstract method to update fields for all objects matching the QuerySet criteria.
 
         Args:
             **kwargs: Keyword arguments representing the fields and their new values to update.
+        Returns:
+            int | None: Amount of rows changed if known for the database.
         """
         ...
 

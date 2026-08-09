@@ -1,10 +1,8 @@
 import pytest
 
 import edgy
-from edgy.core.signals import (
-    post_delete,
-    pre_delete,
-)
+from edgy.core.signals import Signal, post_delete, pre_delete
+from edgy.exceptions import SkipOperation
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -29,6 +27,7 @@ class User(edgy.StrictModel):
 
     class Meta:
         registry = models
+        signals = {"pre_delete": Signal()}
 
 
 class Profile(edgy.StrictModel):
@@ -37,14 +36,13 @@ class Profile(edgy.StrictModel):
 
     class Meta:
         registry = models
+        signals = {"pre_delete": Signal()}
 
 
 class Log(edgy.StrictModel):
     signal = edgy.CharField(max_length=255)
-    is_queryset: bool = edgy.BooleanField()
-    model_instance_id = edgy.BigIntegerField(null=True)
-    row_count = edgy.BigIntegerField(null=True)
-    class_name: str = edgy.CharField(max_length=255)
+    class_name = edgy.CharField(max_length=255)
+    params = edgy.JSONField()
 
     class Meta:
         registry = models
@@ -65,41 +63,39 @@ async def create_test_database():
 
 @pytest.fixture(autouse=True, scope="function")
 async def connect_signals():
-    @pre_delete.connect_via(Profile, weak=True)
-    @pre_delete.connect_via(User, weak=True)
-    async def pre_deleting(sender, instance, model_instance, **kwargs):
+    @Profile.meta.signals.pre_delete.connect_via(Profile, weak=True)
+    @User.meta.signals.pre_delete.connect_via(User, weak=True)
+    async def pre_deleting(sender, **kwargs):
         await Log.query.create(
             signal="pre_delete",
-            is_queryset=model_instance is None,
-            model_instance_id=None if model_instance is None else model_instance.id,
-            class_name=instance.model_class.__name__
-            if model_instance is None
-            else type(model_instance).__name__,
+            class_name=sender.__name__,
+            params={k: str(v) for k, v in kwargs.items()},
         )
 
-    @post_delete.connect_via(Profile, weak=True)
-    @post_delete.connect_via(User, weak=True)
-    async def post_deleting(sender, instance, model_instance, row_count, **kwargs):
+    @Profile.meta.signals.post_delete.connect_via(Profile, weak=True)
+    @User.meta.signals.post_delete.connect_via(User, weak=True)
+    async def post_deleting(sender, **kwargs):
         await Log.query.create(
             signal="post_delete",
-            is_queryset=model_instance is None,
-            model_instance_id=None if model_instance is None else model_instance.id,
-            class_name=instance.model_class.__name__
-            if model_instance is None
-            else type(model_instance).__name__,
-            row_count=row_count,
+            class_name=sender.__name__,
+            params={k: str(v) for k, v in kwargs.items()},
         )
 
     try:
         yield
     finally:
-        pre_delete.disconnect(pre_deleting)
-        post_delete.disconnect(post_deleting)
+        Profile.meta.signals.pre_delete.disconnect(pre_deleting)
+        User.meta.signals.pre_delete.disconnect(pre_deleting)
+        Profile.meta.signals.post_delete.disconnect(post_deleting)
+        User.meta.signals.post_delete.disconnect(post_deleting)
 
 
 @pytest.mark.parametrize("klass", [User, Profile])
 async def test_correct_connection(klass):
-    assert pre_delete.has_receivers_for(klass)
+    assert klass.meta.signals.pre_delete is not pre_delete
+    assert klass.meta.signals.post_delete is post_delete
+    assert not pre_delete.has_receivers_for(klass)
+    assert klass.meta.signals.pre_delete.has_receivers_for(klass)
     assert post_delete.has_receivers_for(klass)
 
 
@@ -113,23 +109,57 @@ async def test_deletion_called_once_model(klass):
     assert len(logs) == 2
     assert logs[0].signal == "pre_delete"
     assert logs[0].class_name == klass.__name__
+    assert logs[0].params["instance"].startswith(f"{klass.__name__}")
+    assert logs[0].params["model_instance"].startswith(f"{klass.__name__}")
+    assert "row_count" not in logs[0].params
     assert logs[1].signal == "post_delete"
     assert logs[1].class_name == klass.__name__
+    assert logs[1].params["instance"].startswith(f"{klass.__name__}")
+    assert logs[1].params["model_instance"].startswith(f"{klass.__name__}")
+    assert logs[1].params["row_count"] == "1"
 
 
-async def test_deletion_called_once_query():
-    await User.query.create(name="Edgy")
+@pytest.mark.parametrize("klass", [User, Profile])
+async def test_deletion_called_once_query(klass):
+    await klass.query.create(name="Edgy")
     logs = await Log.query.all()
     assert len(logs) == 0
-    await User.query.delete()
+    await klass.query.delete()
     logs = await Log.query.all()
-    assert len(logs) == 2
-    assert logs[0].signal == "pre_delete"
-    assert logs[0].class_name == "User"
-    assert logs[0].is_queryset
-    assert logs[1].signal == "post_delete"
-    assert logs[1].class_name == "User"
-    assert logs[1].is_queryset
+    if klass.__deletion_with_signals__:
+        assert len(logs) == 4
+        assert logs[0].signal == "pre_delete"
+        assert logs[0].class_name == klass.__name__
+        assert logs[0].params["instance"].startswith(f"QuerySet<for <{klass.__name__}>")
+        assert logs[0].params["model_instance"] == "None"
+        assert "row_count" not in logs[0].params
+        assert logs[1].signal == "pre_delete"
+        assert logs[2].params["instance"].startswith(f"QuerySet<for <{klass.__name__}>")
+        assert logs[1].params["model_instance"].startswith(f"{klass.__name__}")
+        assert "row_count" not in logs[0].params
+        assert logs[2].signal == "post_delete"
+        assert logs[2].class_name == klass.__name__
+        assert logs[2].params["instance"].startswith(f"QuerySet<for <{klass.__name__}>")
+        assert logs[2].params["model_instance"].startswith(f"{klass.__name__}")
+        assert logs[2].params["row_count"] == "1"
+        assert logs[3].signal == "post_delete"
+        assert logs[3].class_name == klass.__name__
+        assert logs[3].params["instance"].startswith(f"QuerySet<for <{klass.__name__}>")
+        assert logs[3].params["model_instance"] == "None"
+        assert logs[3].params["row_count"] == "1"
+
+    else:
+        assert len(logs) == 2
+        assert logs[0].signal == "pre_delete"
+        assert logs[0].class_name == klass.__name__
+        assert logs[0].params["instance"].startswith(f"QuerySet<for <{klass.__name__}>")
+        assert logs[0].params["model_instance"] == "None"
+        assert "row_count" not in logs[0].params
+        assert logs[1].signal == "post_delete"
+        assert logs[1].class_name == klass.__name__
+        assert logs[1].params["instance"].startswith(f"QuerySet<for <{klass.__name__}>")
+        assert logs[1].params["model_instance"] == "None"
+        assert logs[1].params["row_count"] == "1"
 
 
 async def test_deletion_called_referenced():
@@ -142,9 +172,13 @@ async def test_deletion_called_referenced():
     logs = await Log.query.all()
     assert len(logs) == 4
     assert logs[0].signal == "pre_delete"
+    assert logs[0].class_name == "User"
     assert logs[1].signal == "pre_delete"
+    assert logs[1].class_name == "Profile"
     assert logs[2].signal == "post_delete"
+    assert logs[2].class_name == "Profile"
     assert logs[3].signal == "post_delete"
+    assert logs[3].class_name == "User"
 
 
 async def test_deletion_called_cascade():
@@ -187,3 +221,16 @@ async def test_deletion_called_cascade_with_signals():
     assert logs[4].class_name == "User"
     assert logs[5].signal == "post_delete"
     assert logs[5].class_name == "Profile"
+
+
+async def test_deletion_prevent_loop():
+    @Profile.meta.signals.pre_delete.connect_via(Profile, weak=True)
+    async def pre_deleting(sender, model_instance, **kwargs):
+        if model_instance:
+            raise SkipOperation()
+
+    try:
+        await Profile.query.create(name="Edgy")
+        await Profile.query.delete()
+    finally:
+        Profile.meta.signals.pre_delete.disconnect(pre_deleting)

@@ -20,11 +20,11 @@ from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
-from edgy.core.db.querysets.base import BaseQuerySet
+from edgy.core.db.querysets.base import BaseQuerySet, _injected_filters_deletion
 from edgy.core.db.querysets.parser import ResultParser
 from edgy.core.utils.db import CHECK_DB_CONNECTION_SILENCED, check_db_connection
 from edgy.core.utils.sync import run_sync
-from edgy.exceptions import ObjectNotFound, QuerySetError
+from edgy.exceptions import ObjectNotFound, QuerySetError, SkipOperation
 
 from .bulk import BulkOperation
 from .types import (
@@ -1032,16 +1032,36 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         Returns:
             int: The number of rows deleted.
         """
-        await self.model_class.meta.signals.pre_delete.send_async(
-            self.model_class, instance=self, model_instance=None
-        )
+        injected_filters: list[Any] = []
+        try:
+            await self.model_class.meta.signals.pre_delete.send_async(
+                self.model_class,
+                instance=self,
+                model_instance=None,
+                injected_filters=injected_filters,
+            )
+        except SkipOperation:
+            await self.model_class.meta.signals.post_delete.send_async(
+                self.model_class,
+                instance=self,
+                model_instance=None,
+                row_count=0,
+                operation_skipped=True,
+            )
+
+            return 0
+        _injected_filters_deletion.set(injected_filters)
         row_count = await self.raw_delete(use_models=use_models, remove_referenced_call=False)
         await self.model_class.meta.signals.post_delete.send_async(
-            self.model_class, instance=self, model_instance=None, row_count=row_count
+            self.model_class,
+            instance=self,
+            model_instance=None,
+            row_count=row_count,
+            operation_skipped=False,
         )
         return row_count
 
-    async def update(self, **kwargs: Any) -> None:
+    async def update(self, **kwargs: Any) -> None | int:
         """
         Updates records in a specific table with the given keyword arguments, matching the QuerySet's filters.
 
@@ -1053,6 +1073,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
 
         Args:
             **kwargs: The field names and new values to apply to the matching records.
+        Returns:
+            int | None: Amount of rows changed if known for the database.
         """
 
         column_values = self.model_class.extract_column_values(
@@ -1065,21 +1087,36 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
 
         # Broadcast the initial update details
         # add is_update to match save
-        await self.model_class.meta.signals.pre_update.send_async(
-            self.model_class,
-            instance=self,
-            model_instance=None,
-            values=kwargs,
-            column_values=column_values,
-            is_update=True,
-            is_migration=False,
-        )
+        try:
+            await self.model_class.meta.signals.pre_update.send_async(
+                self.model_class,
+                instance=self,
+                model_instance=None,
+                values=kwargs,
+                column_values=column_values,
+                is_update=True,
+                is_migration=False,
+            )
+        except SkipOperation:
+            await self.model_class.meta.signals.post_update.send_async(
+                self.model_class,
+                instance=self,
+                model_instance=None,
+                values=kwargs,
+                column_values=column_values,
+                is_update=True,
+                is_migration=False,
+                row_count=0,
+                operation_skipped=True,
+            )
+            return 0
 
         expression = self.table.update().values(**column_values)
         expression = expression.where(await self.build_where_clause())
         check_db_connection(self.database)
+        row_count: int | None = None
         async with self.database as database:
-            await database.execute(expression)
+            row_count = cast(int | None, await database.execute(expression))
 
         # Broadcast the update executed
         # add is_update to match save
@@ -1091,8 +1128,11 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             column_values=column_values,
             is_update=True,
             is_migration=False,
+            row_count=row_count,
+            operation_skipped=False,
         )
         self._clear_cache()
+        return row_count
 
     async def get_or_create(
         self, defaults: dict[str, Any] | Any | None = None, *args: Any, **kwargs: Any
@@ -1301,7 +1341,11 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             ignore_create_conflicts=ignore_conflicts,
         )
         await operation.prepare(objs)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            await operation.send_post_signal()
+            return []
         await operation.apply_db()
         operation.update_cache()
         await operation.send_post_signal()
@@ -1405,7 +1449,11 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             resolve_embed=resolve_embed,
         )
         await operation.prepare(objs)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            await operation.send_post_signal()
+            return []
         await operation.apply_db()
         operation.update_cache()
         await operation.send_post_signal()
@@ -1508,7 +1556,11 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             resolve_embed=resolve_embed,
         )
         await operation.prepare(objs)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            await operation.send_post_signal()
+            return []
         await operation.apply_db()
         operation.update_cache()
         await operation.send_post_signal()
@@ -1588,7 +1640,11 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             resolve_embed=resolve_embed,
         )
         await operation.prepare(objs)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            await operation.send_post_signal()
+            return []
         await operation.apply_db()
         operation.update_cache()
         await operation.send_post_signal()
@@ -1609,6 +1665,9 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             A `Transaction` context manager.
         """
         return self.database.transaction(force_rollback=force_rollback, **kwargs)
+
+    def __repr__(self) -> str:
+        return f"QuerySet<for <{self.model_class.__name__}> at {hex(id(self))}>"
 
     def __await__(
         self,

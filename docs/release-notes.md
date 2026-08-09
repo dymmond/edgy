@@ -10,6 +10,8 @@
 - Add the `ignore_conflicts` parameter to `bulk_create`.
 - Add relationship signals (`pre/post_relation_add` and `pre/post_relation_remove`).
 - Add bulk signals (`pre/post_bulk`).
+- Add `SkipOperation` exception for signals.
+- Add `inject_filters` parameter for `pre_delete` to dynamically inject protection rules.
 
 ### Changed
 
@@ -22,12 +24,15 @@
 - The typings changed for QuerySetType: `EdgyEmbedTarget` and `EdgyModel` (the queryset model) are switched in the `Generic` definition.
 - Bulk operations are now keywords only (except the first `objs` parameter).
 - Dedupe `bulk_create`, `bulk_get_or_create`, and `bulk_update_or_create` inputs.
+- Refactor `QueryExecutor` so it can update itself.
 
 ### Fixed
 
 - Relations did not use the tenancy/used schema properly when querying.
 - Bulk operations with reflected fields did not always work properly.
 - `run_concurrently` now properly cleans up not executed coroutines in case of an error.
+- `SuspiciousFileOperation` inherits now correctly from `EdgyException`.
+- Return row count for update.
 
 ### Removed
 

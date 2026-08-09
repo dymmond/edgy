@@ -8,6 +8,7 @@ from collections.abc import (
     Iterable,
     Sequence,
 )
+from contextvars import ContextVar
 from functools import cached_property
 from inspect import isawaitable
 from itertools import chain
@@ -34,7 +35,6 @@ from . import clauses as clauses_mod
 from .compiler import QueryCompiler
 from .executor import QueryExecutor, get_current_row
 from .mixins import QuerySetPropsMixin, TenancyMixin
-from .parser import ResultParser
 from .prefetch import Prefetch, PrefetchMixin
 from .types import (
     EdgyEmbedTarget,
@@ -50,6 +50,9 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.queryset import QuerySet
 
 _empty_set = cast(set[Any], frozenset())
+_injected_filters_deletion: ContextVar[Iterable] = ContextVar(
+    "_injected_filters_deletion", default=()
+)
 
 
 class BaseQuerySet(
@@ -482,9 +485,7 @@ class BaseQuerySet(
         (Refactored: Now delegates to the Executor)
         """
         # Create the specialists
-        compiler = QueryCompiler(self)
-        parser = ResultParser(self)
-        executor = QueryExecutor(self, compiler, parser)
+        executor = QueryExecutor(self)
 
         # Delegate the work
         async for model in executor.iterate(fetch_all_at_once=fetch_all_at_once):  # type: ignore
@@ -669,12 +670,12 @@ class BaseQuerySet(
         """
         # We must create new specialists *every time* because the queryset
         # state might have changed (e.g., in _model_based_delete)
-        compiler = QueryCompiler(self)
-        parser = ResultParser(self)  # Delete doesn't use parser, but good practice
-        executor = QueryExecutor(self, compiler, parser)
+        executor = QueryExecutor(self)
 
         return await executor.delete(
-            use_models=use_models, remove_referenced_call=remove_referenced_call
+            use_models=use_models,
+            remove_referenced_call=remove_referenced_call,
+            injected_filters=_injected_filters_deletion.get(),
         )
 
     async def _get_raw(self, **kwargs: Any) -> tuple[BaseModelType, Any]:
@@ -695,8 +696,5 @@ class BaseQuerySet(
                 return self._cache_first
             elif self._cache_last is not None:
                 return self._cache_last
-
-        compiler = QueryCompiler(self)
-        parser = ResultParser(self)
-        executor = QueryExecutor(self, compiler, parser)
+        executor = QueryExecutor(self)
         return await executor.get_one()
