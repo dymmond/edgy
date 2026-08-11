@@ -99,7 +99,7 @@ async def connect_signals():
         Unrelated.meta.signals.pre_delete.disconnect(pre_deleting)
         Profile.meta.signals.pre_delete.disconnect(pre_deleting)
         User.meta.signals.pre_delete.disconnect(pre_deleting)
-        Unrelated.meta.signals.post_delete.disconnect(pre_deleting)
+        Unrelated.meta.signals.post_delete.disconnect(post_deleting)
         Profile.meta.signals.post_delete.disconnect(post_deleting)
         User.meta.signals.post_delete.disconnect(post_deleting)
 

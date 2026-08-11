@@ -20,27 +20,27 @@ class ResultParser:
     including caching and relationship embedding.
     """
 
-    def __init__(self, queryset: BaseQuerySet | Any) -> None:
+    def __init__(self, queryset: BaseQuerySet, tables_and_models: tables_and_models_type) -> None:
         self.queryset = queryset
         self.model_class = queryset.model_class
+        self.tables_and_models = tables_and_models
+        self.is_defer_fields = bool(self.queryset._defer)
 
-    async def row_to_model_raw(
+    async def row_to_model_uncached(
         self,
         row: sqlalchemy.Row | Any,
-        tables_and_models: tables_and_models_type,
     ) -> EdgyModel:
         """
-        Parses a single row into a model instance, bypassing the cache.
+        Parses a single row into a model instance, without using the cache.
         """
-        is_defer_fields = bool(self.queryset._defer)
         return cast(
             "EdgyModel",
             await self.model_class.from_sqla_row(
                 row,
-                tables_and_models=tables_and_models,
+                tables_and_models=self.tables_and_models,
                 select_related=self.queryset._select_related,
                 only_fields=self.queryset._only,
-                is_defer_fields=is_defer_fields,
+                is_defer_fields=self.is_defer_fields,
                 prefetch_related=self.queryset._prefetch_related,
                 exclude_secrets=self.queryset._exclude_secrets,
                 using_schema=self.queryset.active_schema,
@@ -52,29 +52,15 @@ class ResultParser:
     async def row_to_model(
         self,
         row: sqlalchemy.Row | Any,
-        tables_and_models: tables_and_models_type,
     ) -> tuple[EdgyModel, EdgyEmbedTarget]:
         """
         Parses a single row into a model instance, using the cache.
         (Refactored from _get_or_cache_row)
         """
-        is_defer_fields = bool(self.queryset._defer)
-
         result = await self.queryset._cache.aget_or_cache_many(
             self.model_class,
             [row],
-            cache_fn=lambda _row: self.model_class.from_sqla_row(
-                _row,
-                tables_and_models=tables_and_models,
-                select_related=self.queryset._select_related,
-                only_fields=self.queryset._only,
-                is_defer_fields=is_defer_fields,
-                prefetch_related=self.queryset._prefetch_related,
-                exclude_secrets=self.queryset._exclude_secrets,
-                using_schema=self.queryset.active_schema,
-                database=self.queryset.database,
-                reference_select=self.queryset._reference_select,
-            ),
+            cache_fn=self.row_to_model_uncached,
             transform_fn=self.queryset._embed_parent_in_result,
         )
         return cast(tuple[EdgyModel, EdgyEmbedTarget], result[0])
@@ -82,7 +68,6 @@ class ResultParser:
     async def batch_to_models(
         self,
         batch: Sequence[sqlalchemy.Row],
-        tables_and_models: tables_and_models_type,
         prefetch_list: list[Prefetch],
         new_cache: QueryModelResultCache,
     ) -> Sequence[tuple[EdgyModel, EdgyEmbedTarget]]:
@@ -90,7 +75,6 @@ class ResultParser:
         Parses a batch of rows into model instances.
         (This is the parsing half of the original _handle_batch method)
         """
-        is_defer_fields = bool(self.queryset._defer)
         qs = self.queryset
 
         return await new_cache.aget_or_cache_many(
@@ -98,10 +82,10 @@ class ResultParser:
             batch,
             cache_fn=lambda row: self.model_class.from_sqla_row(
                 row,
-                tables_and_models=tables_and_models,
+                tables_and_models=self.tables_and_models,
                 select_related=qs._select_related,
                 only_fields=qs._only,
-                is_defer_fields=is_defer_fields,
+                is_defer_fields=self.is_defer_fields,
                 prefetch_related=prefetch_list,  # Use the prepared list
                 exclude_secrets=qs._exclude_secrets,
                 using_schema=qs.active_schema,

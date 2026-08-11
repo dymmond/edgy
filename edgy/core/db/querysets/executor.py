@@ -10,6 +10,7 @@ import sqlalchemy
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.querysets.clauses import and_, or_
+from edgy.core.db.querysets.parser import ResultParser
 from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.db import check_db_connection, hash_tablekey
@@ -57,19 +58,22 @@ class QueryExecutor:
 
     def set_queryset(self, queryset: BaseQuerySet) -> None:
         from .compiler import QueryCompiler
-        from .parser import ResultParser
 
         # we need so many internals, so we just cast to a QuerySet
         self.queryset = cast("QuerySet", queryset)
         self.compiler = QueryCompiler(self.queryset)
-        self.parser = ResultParser(self.queryset)
+        self.parser: None | ResultParser = None
         self.database = queryset.database
         self.model_class = queryset.model_class
+
+    def init_parser(self, tables_and_models: tables_and_models_type) -> None:
+        from .parser import ResultParser
+
+        self.parser = ResultParser(self.queryset, tables_and_models)
 
     async def _process_and_yield_batch(
         self,
         batch: Sequence[sqlalchemy.Row],
-        tables_and_models: tables_and_models_type,
         new_cache: QueryModelResultCache,
     ) -> AsyncGenerator[tuple[tuple[EdgyModel, EdgyEmbedTarget], sqlalchemy.Row], None]:
         """
@@ -88,9 +92,10 @@ class QueryExecutor:
                 - (result_tuple): The (raw_model, embed_target) tuple.
                 - (row): The raw SQLAlchemy Row.
         """
-        prefetches = await self._prepare_prefetches_for_batch(batch, tables_and_models)
+        prefetches = await self._prepare_prefetches_for_batch(batch, self.parser.tables_and_models)
+        assert self.parser is not None, "parser not initialized"
         results: Sequence[tuple[EdgyModel, EdgyEmbedTarget]] = await self.parser.batch_to_models(
-            batch, tables_and_models, prefetches, new_cache
+            batch, prefetches, new_cache
         )
 
         for row_num, result_tuple in enumerate(results):
@@ -123,6 +128,7 @@ class QueryExecutor:
             qs = qs.distinct()
 
         expression, tables_and_models = await qs.as_select_with_tables()
+        self.init_parser(tables_and_models)
 
         if not fetch_all_at_once and bool(self.database.force_rollback):
             warnings.warn(
@@ -147,9 +153,7 @@ class QueryExecutor:
                     batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
 
                 # Use the new helper to process the single, large batch
-                async for result, row in self._process_and_yield_batch(
-                    batch, tables_and_models, new_cache
-                ):
+                async for result, row in self._process_and_yield_batch(batch, new_cache):
                     if counter == 0:
                         # qs is maybe a copy, so update cache on self.queryset
                         self.queryset._cache_first = result
@@ -173,9 +177,7 @@ class QueryExecutor:
                         qs._cache_fetch_all = False
 
                         # Use the new helper to process each batch
-                        async for result, row in self._process_and_yield_batch(
-                            batch, tables_and_models, new_cache
-                        ):
+                        async for result, row in self._process_and_yield_batch(batch, new_cache):
                             if counter == 0:
                                 self.queryset._cache_first = result
                             last_element = result
@@ -193,6 +195,7 @@ class QueryExecutor:
         # qs is maybe a copy, so update cache on self.queryset
         self.queryset._cache_count = counter
         self.queryset._cache_last = last_element
+        self.parser = None
 
     async def get_one(
         self, no_update_result_cache: bool = False
@@ -209,6 +212,7 @@ class QueryExecutor:
             MultipleObjectsReturned: If more than one record is found.
         """
         expression, tables_and_models = await self.queryset.as_select_with_tables()
+        self.init_parser(tables_and_models)
         check_db_connection(self.database, stacklevel=4)
 
         async with self.database as database:
@@ -222,19 +226,16 @@ class QueryExecutor:
 
         self.queryset._cache_count = 1
         if no_update_result_cache:
-            resultsingle: EdgyModel = await self.parser.row_to_model_raw(
-                rows[0], tables_and_models
-            )
+            resultsingle: EdgyModel = await self.parser.row_to_model_uncached(rows[0])
             return resultsingle, cast(EdgyEmbedTarget, resultsingle)
 
-        result: tuple[EdgyModel, EdgyEmbedTarget] = await self.parser.row_to_model(
-            rows[0], tables_and_models
-        )
+        result: tuple[EdgyModel, EdgyEmbedTarget] = await self.parser.row_to_model(rows[0])
 
         # Update cache attributes
         self.queryset._cache_fetch_all = True
         self.queryset._cache_first = result
         self.queryset._cache_last = result
+        self.parser = None
         return result
 
     async def _prepare_prefetches_for_batch(

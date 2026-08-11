@@ -778,7 +778,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             resolve_embed (bool): Triggers mode in which embedding is applied when True.
 
         Returns:
-            list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+            list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget | None, bool]]:
                 A list of tuples with retrieved or newly created objects and created flag.
                 Warning: for performance reasons no embedding is applied by default and
                 the returned objects are maybe incomplete (check `can_load` property).

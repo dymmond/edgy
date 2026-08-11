@@ -913,10 +913,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         async with queryset.database as database:
             row = await database.fetch_one(expression, pos=0)
         if row:
-            parser = ResultParser(self)
-            result_tuple: tuple[Any, EdgyEmbedTarget] = await parser.row_to_model(
-                row, tables_and_models
-            )
+            parser = ResultParser(self, tables_and_models)
+            result_tuple: tuple[Any, EdgyEmbedTarget] = await parser.row_to_model(row)
             self._cache_first = result_tuple
             return result_tuple[1]
         else:
@@ -942,10 +940,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             row = await database.fetch_one(expression, pos=0)
         if row:
             # NEW FIXED LINES:
-            parser = ResultParser(self)
-            result_tuple: tuple[Any, EdgyEmbedTarget] = await parser.row_to_model(
-                row, tables_and_models
-            )
+            parser = ResultParser(self, tables_and_models)
+            result_tuple: tuple[Any, EdgyEmbedTarget] = await parser.row_to_model(row)
             self._cache_last = result_tuple
             return result_tuple[1]
         else:

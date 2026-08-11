@@ -323,7 +323,7 @@ class ManyRelation(ManyRelationProtocol):
         Returns:
             list[BaseModelType | None]: A list of saved intermediate model instances,
                                         or None for each record that already exists
-                                        (IntegrityError) or when operation was skipped.
+                                        or for each child None when operation was skipped.
         """
         prepared = []
         through = self.through
@@ -880,8 +880,7 @@ class SingleRelation(ManyRelationProtocol):
 
         Returns:
             list[BaseModelType | None]: A list of saved intermediate model instances,
-                                        or None for each record that already exists
-                                        (IntegrityError) or when operation was skipped.
+                                        or None for each record when the operation was skipped.
 
         Raises:
             RelationshipIncompatible: If a child type is not compatible.
