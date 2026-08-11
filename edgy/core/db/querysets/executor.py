@@ -54,7 +54,7 @@ class QueryExecutor:
         """
         self.set_queryset(queryset)
 
-    def set_queryset(self, queryset: BaseQuerySet):
+    def set_queryset(self, queryset: BaseQuerySet) -> None:
         from .compiler import QueryCompiler
         from .parser import ResultParser
 
@@ -369,7 +369,7 @@ class QueryExecutor:
 
         # introspect via temporary signal
         @signal.connect_via(queryset.model_class)
-        def raise_SkipOperation(sender, operation_skipped=False, **kwargs) -> None:
+        def raise_SkipOperation(sender, operation_skipped: bool = False, **kwargs: Any) -> None:
             # reraise in post
             if operation_skipped:
                 raise SkipOperation()
