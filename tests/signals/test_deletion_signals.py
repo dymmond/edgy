@@ -234,3 +234,4 @@ async def test_deletion_prevent_loop():
         await Profile.query.delete()
     finally:
         Profile.meta.signals.pre_delete.disconnect(pre_deleting)
+    assert await Profile.query.count() == 1
