@@ -1236,7 +1236,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 )
                 relation = getattr(raw_instance, arg.__related_name__)
                 await relation.add(model)
-        # we can keep the result cache because we update it
+        # we can keep the result cache because we update it and the results are only used for parsing
         self._clear_cache(keep_cached_selected=True, keep_result_cache=True)
         # now resolve again
         resolved = (await self._embed_parent_in_result(raw_instance))[1]

@@ -92,8 +92,8 @@ class QueryExecutor:
                 - (result_tuple): The (raw_model, embed_target) tuple.
                 - (row): The raw SQLAlchemy Row.
         """
-        prefetches = await self._prepare_prefetches_for_batch(batch, self.parser.tables_and_models)
         assert self.parser is not None, "parser not initialized"
+        prefetches = await self._prepare_prefetches_for_batch(batch, self.parser.tables_and_models)
         results: Sequence[tuple[EdgyModel, EdgyEmbedTarget]] = await self.parser.batch_to_models(
             batch, prefetches, new_cache
         )
