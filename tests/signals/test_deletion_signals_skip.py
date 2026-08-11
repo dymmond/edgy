@@ -81,6 +81,7 @@ async def connect_signals():
             if model_instance.protection:
                 raise SkipOperation()
         elif injected_filters is not None:
+            # only those without protection are retrieved
             injected_filters.append({"protection": False})
 
     @Unrelated.meta.signals.post_delete.connect_via(Unrelated, weak=True)
