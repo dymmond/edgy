@@ -35,4 +35,4 @@ async def handle_active_duplicate_bulk(sender, raw_values, create_params, update
         if item[0].active > 0:
             item[0].active -= 1
         if item[0].duplicate:
-            create_params.append((item[0].model_copy()))
+            create_params.append((item[0].model_copy(), item[1], item[2]))
