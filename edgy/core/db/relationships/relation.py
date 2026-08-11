@@ -388,7 +388,9 @@ class ManyRelation(ManyRelationProtocol):
         Raises:
             RelationshipIncompatible: If the child type is not compatible.
         """
-        return (await self.add_many(child))[0]
+        results = await self.add_many(child)
+        # bail out if no results are returned, in case the result list is modified in signals
+        return results[0] if results else None
 
     async def remove_many(self, *children: BaseModelType) -> None:
         """
@@ -862,7 +864,9 @@ class SingleRelation(ManyRelationProtocol):
         Raises:
             RelationshipIncompatible: If the child type is not compatible.
         """
-        return (await self.add_many(child))[0]
+        results = await self.add_many(child)
+        # bail out if no results are returned, in case the result list is modified in signals
+        return results[0] if results else None
 
     async def add_many(self, *children: BaseModelType) -> list[BaseModelType | None]:
         """
