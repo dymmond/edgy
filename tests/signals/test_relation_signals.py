@@ -18,9 +18,7 @@ from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = DatabaseTestClient(
-    DATABASE_URL, drop_database=True, force_rollback=False, full_isolation=False
-)
+database = DatabaseTestClient(DATABASE_URL, force_rollback=False, use_existing=False)
 models = edgy.Registry(database=database)
 
 
@@ -67,6 +65,8 @@ async def create_test_database():
     async with models:
         await models.create_all()
         yield
+        if not database.drop:
+            await models.drop_all()
 
 
 async def pre_add(sender, **kwargs):
@@ -355,7 +355,7 @@ async def test_nullify_many_to_many_load(subtests):
                 assert len(await user.friends.all()) == 2
                 await user.friends.remove_many(*(await user.friends.all()))
                 assert len(await user.friends.all()) == 2
-                await Friend.query.delete()
+            await Friend.query.delete()
     finally:
         Friend.meta.signals.pre_relation_remove.disconnect(nullify_removal)
 

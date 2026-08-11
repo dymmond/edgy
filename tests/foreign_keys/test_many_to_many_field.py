@@ -7,7 +7,9 @@ from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
+database = DatabaseTestClient(
+    DATABASE_URL, force_rollback=False, use_existing=False, full_isolation=False
+)
 models = edgy.Registry(database=database)
 
 
@@ -47,7 +49,7 @@ class Studio(edgy.StrictModel):
 
 @pytest.fixture(scope="function")
 async def create_test_database():
-    async with database:
+    async with models:
         await models.create_all()
         yield
         if not database.drop:
@@ -421,7 +423,7 @@ async def test_relation_load(create_test_database, subtests):
     await Track.query.delete()
 
 
-def test_assertation_error_on_embed_through_double_underscore_attr():
+async def test_assertation_error_on_embed_through_double_underscore_attr():
     with pytest.raises(FieldDefinitionError) as raised:
 
         class MyModel(edgy.StrictModel):
