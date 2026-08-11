@@ -900,7 +900,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         Returns:
             The first model instance, or `None` if the QuerySet is empty.
         """
-        if self._cache_count is not None and self._cache_count == 0:
+        if self._cache_count == 0:
             return None
         if self._cache_first is not None:
             return self._cache_first[1]
@@ -919,13 +919,15 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             )
             self._cache_first = result_tuple
             return result_tuple[1]
+        else:
+            self._cache_count = 0
         return None
 
     async def last(self) -> EdgyEmbedTarget | None:
         """
         Returns the last record from the QuerySet...
         """
-        if self._cache_count is not None and self._cache_count == 0:
+        if self._cache_count == 0:
             return None
         if self._cache_last is not None:
             return self._cache_last[1]
@@ -946,6 +948,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             )
             self._cache_last = result_tuple
             return result_tuple[1]
+        else:
+            self._cache_count = 0
         return None
 
     async def create(self, *args: Any, **kwargs: Any) -> EdgyEmbedTarget:

@@ -48,3 +48,24 @@ async def test_queryset_delete():
 
     await Product.query.delete()
     assert await Product.query.count() == 0
+
+
+async def test_queryset_delete_cache():
+    queryset = Product.query.all()
+    await queryset.create(name="Belt", rating=5)
+    await queryset.create(name="Tie", rating=5)
+    assert queryset._cache
+    assert await queryset.delete()
+    assert not queryset._cache
+
+
+async def test_queryset_no_delete_cache():
+    await Product.query.create(name="Belt", rating=5)
+    await Product.query.create(name="Tie", rating=5)
+    queryset = Product.query.filter(name="test")
+    await queryset
+    assert queryset._cache_count == 0
+    assert queryset._cache_fetch_all
+    await queryset.delete()
+    assert queryset._cache_count == 0
+    assert queryset._cache_fetch_all

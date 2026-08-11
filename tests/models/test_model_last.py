@@ -47,3 +47,12 @@ async def test_model_last():
     assert await User.query.filter(name="Jane").last() == jane
     assert await User.query.filter(name="Test").last() == Test
     assert await User.query.filter(name="Lucy").last() is None
+
+
+async def test_model_last_none():
+    query = User.query.all()
+    assert query._cache_last is None
+    assert query._cache_count is None
+    assert await query.last() is None
+    assert query._cache_last is None
+    assert query._cache_count == 0

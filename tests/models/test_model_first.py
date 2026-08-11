@@ -37,12 +37,21 @@ async def rollback_transactions():
 
 
 async def test_model_first():
-    Test = await User.query.create(name="Test")
+    tester = await User.query.create(name="Test")
     jane = await User.query.create(name="Jane")
 
     query = User.query.all()
     assert query._cache_first is None
-    assert await query.first() == Test
+    assert await query.first() == tester
     assert query._cache_first is not None
     assert await User.query.filter(name="Jane").first() == jane
     assert await User.query.filter(name="Lucy").first() is None
+
+
+async def test_model_first_none():
+    query = User.query.all()
+    assert query._cache_first is None
+    assert query._cache_count is None
+    assert await query.first() is None
+    assert query._cache_first is None
+    assert query._cache_count == 0

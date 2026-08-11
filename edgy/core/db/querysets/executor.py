@@ -9,6 +9,7 @@ import sqlalchemy
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.datastructures import QueryModelResultCache
+from edgy.core.db.querysets.clauses import and_, or_
 from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.db import check_db_connection, hash_tablekey
@@ -150,12 +151,14 @@ class QueryExecutor:
                     batch, tables_and_models, new_cache
                 ):
                     if counter == 0:
+                        # qs is maybe a copy, so update cache on self.queryset
                         self.queryset._cache_first = result
                     last_element = result
                     counter += 1
                     current_row[0] = row
                     yield result[1]
 
+                # qs is maybe a copy, so update cache on self.queryset
                 self.queryset._cache_fetch_all = True
                 self.queryset._cache = new_cache
             else:
@@ -182,11 +185,12 @@ class QueryExecutor:
                         batch_num += 1
 
                 if batch_num <= 1:
+                    # qs is maybe a copy, so update cache on self.queryset
                     self.queryset._cache = new_cache
                     self.queryset._cache_fetch_all = True
         finally:
             _current_row_holder.reset(token)
-
+        # qs is maybe a copy, so update cache on self.queryset
         self.queryset._cache_count = counter
         self.queryset._cache_last = last_element
 
@@ -344,7 +348,8 @@ class QueryExecutor:
                 row_count = cast(int, await database.execute(expression))
 
         # clear cache after deletion.
-        self.queryset._clear_cache(keep_cached_selected=True)
+        if row_count != 0:
+            self.queryset._clear_cache(keep_cached_selected=True)
         return row_count
 
     async def _model_based_delete(self, remove_referenced_call: str | bool) -> int:
@@ -367,32 +372,38 @@ class QueryExecutor:
             else self.queryset.all()
         )
         queryset.embed_parent = None
-        self.set_queryset(queryset)
         row_count = 0
 
-        # Uuse the new executor's iterate method
-        models = [model async for model in self.iterate(fetch_all_at_once=True)]  # type: ignore
-
+        executor = QueryExecutor(queryset)
         token = CURRENT_INSTANCE.set(self.queryset)
         try:
+            # Use the new executor's iterate method
+            models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
             while models:
+                exclusion_filters = []
                 for model in models:
-                    _row_count = await model.raw_delete(
-                        skip_post_delete_hooks=False, remove_referenced_call=remove_referenced_call
-                    )
+                    try:
+                        _row_count = await model.raw_delete(
+                            skip_post_delete_hooks=False,
+                            remove_referenced_call=remove_referenced_call,
+                        )
+                    except SkipOperation:
+                        # raised from raw_delete
+                        exclusion_filters.append(and_(*model.identifying_clauses()))
+                        continue
                     if _row_count != 0:
                         row_count += 1
 
-                # clear parent cache
-                self.queryset._clear_cache(keep_cached_selected=True)
-                if self.queryset._cache_fetch_all:
+                # we fetched all
+                if self.queryset._batch_size is None:
                     break
+                if exclusion_filters:
+                    executor.set_queryset(executor.queryset.exclude(or_(*exclusion_filters)))
+                    # clear again
+                    exclusion_filters.clear()
                 # clear cache and fetch new batch
-                queryset._clear_cache(keep_cached_selected=True)
-                models = [model async for model in self.iterate(fetch_all_at_once=True)]  # type: ignore
-        except SkipOperation:
-            # raised from raw_delete
-            return row_count
+                executor.queryset._clear_cache(keep_cached_selected=True)
+                models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
         finally:
             CURRENT_INSTANCE.reset(token)
         return row_count

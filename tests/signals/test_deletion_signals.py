@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 
 import edgy
@@ -223,15 +225,32 @@ async def test_deletion_called_cascade_with_signals():
     assert logs[5].class_name == "Profile"
 
 
-async def test_deletion_prevent_loop():
+async def test_model_base_deletion_with_skip():
+    queryset = Profile.query.batch_size(2)
+
     @Profile.meta.signals.pre_delete.connect_via(Profile, weak=True)
-    async def pre_deleting(sender, model_instance, **kwargs):
-        if model_instance:
+    async def pre_deleting(sender, instance, model_instance, **kwargs):
+        assert instance is queryset
+        if model_instance and model_instance.name.startswith("raise"):
             raise SkipOperation()
 
     try:
-        await Profile.query.create(name="Edgy")
-        await Profile.query.delete()
+        await queryset.create(name="raise Edgy")
+        await queryset.create(name="noraise Edgy")
+        await queryset.create(name="raise Saffier")
+        await queryset.create(name="noraise Saffier")
+        assert bool(queryset._cache)
+        await queryset
+        # now everything is fetched
+        assert queryset._cache_fetch_all
+        await queryset.delete()
     finally:
         Profile.meta.signals.pre_delete.disconnect(pre_deleting)
-    assert await Profile.query.count() == 1
+    assert not queryset._cache.cache
+    assert queryset._cache_count is None
+    assert queryset._cache_first is None
+    assert queryset._cache_last is None
+    # prevent confused type checkers
+    assert not cast(bool, queryset._cache_fetch_all)
+    assert await queryset.count() == 2
+    assert await Profile.query.count() == 2
