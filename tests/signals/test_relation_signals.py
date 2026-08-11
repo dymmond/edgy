@@ -333,9 +333,9 @@ async def test_nullify_many_to_many():
     assert len(await user.friends.all()) == 2
 
     Friend.meta.signals.pre_relation_remove.connect(nullify_removal, through)
-    # shared
-    assert User.meta.signals.pre_relation_remove.has_receivers_for(through)
     try:
+        # shared
+        assert User.meta.signals.pre_relation_remove.has_receivers_for(through)
         await user.friends.remove_many(*(await user.friends.all()))
     finally:
         Friend.meta.signals.pre_relation_remove.disconnect(nullify_removal)
