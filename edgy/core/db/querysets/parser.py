@@ -33,17 +33,20 @@ class ResultParser:
         Parses a single row into a model instance, bypassing the cache.
         """
         is_defer_fields = bool(self.queryset._defer)
-        return await self.model_class.from_sqla_row(
-            row,
-            tables_and_models=tables_and_models,
-            select_related=self.queryset._select_related,
-            only_fields=self.queryset._only,
-            is_defer_fields=is_defer_fields,
-            prefetch_related=self.queryset._prefetch_related,
-            exclude_secrets=self.queryset._exclude_secrets,
-            using_schema=self.queryset.active_schema,
-            database=self.queryset.database,
-            reference_select=self.queryset._reference_select,
+        return cast(
+            "EdgyModel",
+            await self.model_class.from_sqla_row(
+                row,
+                tables_and_models=tables_and_models,
+                select_related=self.queryset._select_related,
+                only_fields=self.queryset._only,
+                is_defer_fields=is_defer_fields,
+                prefetch_related=self.queryset._prefetch_related,
+                exclude_secrets=self.queryset._exclude_secrets,
+                using_schema=self.queryset.active_schema,
+                database=self.queryset.database,
+                reference_select=self.queryset._reference_select,
+            ),
         )
 
     async def row_to_model(

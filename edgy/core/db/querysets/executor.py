@@ -218,8 +218,8 @@ class QueryExecutor:
 
         self.queryset._cache_count = 1
         if bypass_result_cache:
-            resultsingle = cast(
-                "EdgyModel", await self.parser.row_to_model_raw(rows[0], tables_and_models)
+            resultsingle: EdgyModel = await self.parser.row_to_model_raw(
+                rows[0], tables_and_models
             )
             return resultsingle, cast(EdgyEmbedTarget, resultsingle)
 
