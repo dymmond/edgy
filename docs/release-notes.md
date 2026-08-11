@@ -33,6 +33,7 @@
 - `run_concurrently` now properly cleans up not executed coroutines in case of an error.
 - `SuspiciousFileOperation` inherits now correctly from `EdgyException`.
 - Return row count for update.
+- Fix `get_created_time`, `get_modified_time` and `get_accessed_time` on filesystem storage. Previously it used a not existing setting and didn't followed the specs.
 
 ### Removed
 

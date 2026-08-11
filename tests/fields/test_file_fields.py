@@ -118,6 +118,10 @@ async def test_save_file_create(create_test_database):
     with model.file_field.open() as rob:
         assert rob.read() == b"!# /bin/sh"
     path = model.file_field.path
+    assert model.file_field.storage.get_accessed_time(path)
+    assert model.file_field.storage.get_modified_time(
+        path
+    ) == model.file_field.storage.get_created_time(path)
     assert os.path.exists(path)
     assert model.file_field.storage.exists(model.file_field.name)
     model.file_field.delete()
@@ -126,7 +130,7 @@ async def test_save_file_create(create_test_database):
     assert not os.path.exists(path)
 
 
-async def test_save_file_create_specal(create_test_database):
+async def test_save_file_create_special(create_test_database):
     model = await MyModäl.query.create(ä=edgy.files.ContentFile(b"!# /bin/sh", name="foo.sh"))
     # get cached
     assert model.__dict__["ä"].__dict__["size"] == 10
