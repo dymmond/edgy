@@ -1236,15 +1236,18 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 )
                 relation = getattr(raw_instance, arg.__related_name__)
                 await relation.add(model)
-        self._clear_cache(keep_cached_selected=True)
+        # we can keep the result cache because we update it
+        self._clear_cache(keep_cached_selected=True, keep_result_cache=True)
         # now resolve again
         resolved = (await self._embed_parent_in_result(raw_instance))[1]
-        if not args and not kwargs:
-            self._cache.update(
-                self.model_class,
-                values=[resolved],
-                cache_keys=[self._cache.create_cache_key(self.model_class, raw_instance)],
-            )
+        # update the result cache now
+        self._cache.update(
+            self.model_class,
+            values=[resolved],
+            cache_keys=[self._cache.create_cache_key(self.model_class, raw_instance)],
+        )
+        if not kwargs:
+            # 1. no extra filters, 2. only one result => we can fill the cache
             self._cache_first = (raw_instance, resolved)
             self._cache_last = (raw_instance, resolved)
             self._cache_fetch_all = True
