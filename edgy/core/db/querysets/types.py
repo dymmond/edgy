@@ -530,7 +530,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             resolve_embed (True): Enables embedding.
 
         Returns:
-            list[EdgyEmbedTarget]: A list of created objects.
+            list[EdgyEmbedTarget | None]: A list of created objects.
                                    Warning: Instances which are not compatible (`can_load` is False)
                                    will execute an extra save.
         """
@@ -548,7 +548,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             ...
             resolve_embed (False): Disables embedding. Default.
         Returns:
-            list[EdgyModel]: A list of created objects.
+            list[EdgyModel | None]: A list of created objects.
                              Warning: for performance reasons no embedding is applied and
                              the returned objects are maybe incomplete (check `can_load` property).
         """
@@ -572,7 +572,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             resolve_embed (bool): Triggers mode in which embedding is applied when True.
 
         Returns:
-            list[EdgyModel] | list[EdgyEmbedTarget]:
+            list[EdgyModel | None] | list[EdgyEmbedTarget | None]:
                 A list of created objects.
                 Warning: for performance reasons no embedding is applied by default and
                 the returned objects are maybe incomplete (check `can_load` property).
@@ -594,7 +594,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             resolve_embed (True): Enables embedding.
 
         Returns:
-            list[EdgyEmbedTarget]: A list of updated objects.
+            list[EdgyEmbedTarget | None]: A list of updated objects.
                                    Warning: All models must be loadable (`can_load` property is true)
                                    otherwise an `QuerySetError` is raised.
         """
@@ -613,7 +613,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             ...
             resolve_embed (False): Disables embedding. Default.
         Returns:
-            list[EdgyModel]: A list of updated objects.
+            list[EdgyModel | None]: A list of updated objects.
                              Warning: for performance reasons no embedding is applied and
                              the returned objects are maybe incomplete (check `can_load` property).
         """
@@ -662,7 +662,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             resolve_embed (True): Enables embedding.
 
         Returns:
-            list[tuple[EdgyEmbedTarget, bool]]: A list of `(instance, created)` tuples.
+            list[tuple[EdgyEmbedTarget | None, bool]]: A list of `(instance, created)` tuples.
                                                 Warning: All models must be loadable (`can_load` property is true)
                                                 otherwise an `QuerySetError` is raised.
         """
@@ -681,7 +681,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             ...
             resolve_embed (False): Disables embedding. Default.
         Returns:
-            list[tuple[EdgyModel, bool]]: A list of tuples with updated or created objects and  created flag.
+            list[tuple[EdgyModel | None, bool]]: A list of tuples with updated or created objects and  created flag.
                                           Warning: for performance reasons no embedding is applied and
                                           the returned objects are maybe incomplete (check `can_load` property).
         """
@@ -733,7 +733,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             resolve_embed (True): Enables embedding.
 
         Returns:
-            list[tuple[EdgyEmbedTarget, bool]]: A list of `(instance, created)` tuples.
+            list[tuple[EdgyEmbedTarget | None, bool]]: A list of `(instance, created)` tuples.
                                                 Warning: Instances which are not compatible (`can_load` is False)
                                                 will execute an extra save.
         """
@@ -751,7 +751,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             ...
             resolve_embed (False): Disables embedding. Default.
         Returns:
-            list[tuple[EdgyModel, bool]]: A list of `(instance, created)` tuples.
+            list[tuple[EdgyModel | None, bool]]: A list of `(instance, created)` tuples.
                                           Warning: for performance reasons no embedding is applied and
                                           the returned objects are maybe incomplete (check `can_load` property).
         """
@@ -778,7 +778,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             resolve_embed (bool): Triggers mode in which embedding is applied when True.
 
         Returns:
-            list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+            list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
                 A list of tuples with retrieved or newly created objects and created flag.
                 Warning: for performance reasons no embedding is applied by default and
                 the returned objects are maybe incomplete (check `can_load` property).
