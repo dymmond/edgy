@@ -392,7 +392,7 @@ The `on_verify` signal is triggered only when the user is verified.
 
 An other useful usecase is logging user actions:
 
-```python"
+```python
 {!> ../docs_src/signals/log_changes.py !}
 ```
 
