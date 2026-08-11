@@ -887,7 +887,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             ObjectNotFound: If no object is found.
             MultipleObjectsReturned: If more than one object is found (implicitly handled by underlying `_get_raw`).
         """
-        return (await self._get_raw(**kwargs))[1]
+        return (await self._get_raw(kwargs=kwargs))[1]
 
     select = get
 
@@ -1160,7 +1160,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             defaults = {}
 
         try:
-            raw_instance, resolved = await self._get_raw(**kwargs)
+            raw_instance, resolved = await self._get_raw(kwargs=kwargs)
         except ObjectNotFound:
             kwargs.update(defaults)
             instance: EdgyEmbedTarget = await self.create(*args, **kwargs)
@@ -1210,7 +1210,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             defaults = {}
         try:
             # bypass cache
-            raw_instance = (await self._get_raw(True, **kwargs))[0]
+            raw_instance = (await self._get_raw(kwargs=kwargs, no_update_result_cache=True))[0]
         except ObjectNotFound:
             kwargs.update(defaults)
             instance: EdgyEmbedTarget = await self.create(*args, **kwargs)

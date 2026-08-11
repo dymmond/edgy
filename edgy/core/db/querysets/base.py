@@ -681,7 +681,7 @@ class BaseQuerySet(
         )
 
     async def _get_raw(
-        self, bypass_result_cache: bool = False, /, **kwargs: Any
+        self, kwargs: dict, no_update_result_cache: bool = False
     ) -> tuple[EdgyModel, EdgyEmbedTarget]:
         """
         Base method used by get like methods.
@@ -695,7 +695,9 @@ class BaseQuerySet(
                 return cached
             filter_query = cast("BaseQuerySet", self.filter(**kwargs))
             filter_query._cache = self._cache
-            return await filter_query._get_raw(bypass_result_cache)
+            return await filter_query._get_raw(
+                kwargs=kwargs, no_update_result_cache=no_update_result_cache
+            )
         elif self._cache_count == 1:
             if self._cache_first is not None:
                 return self._cache_first
@@ -703,5 +705,6 @@ class BaseQuerySet(
                 return self._cache_last
         executor = QueryExecutor(self)
         return cast(
-            "tuple[EdgyModel, EdgyEmbedTarget]", await executor.get_one(bypass_result_cache)
+            "tuple[EdgyModel, EdgyEmbedTarget]",
+            await executor.get_one(no_update_result_cache=no_update_result_cache),
         )

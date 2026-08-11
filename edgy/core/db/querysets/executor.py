@@ -191,7 +191,7 @@ class QueryExecutor:
         self.queryset._cache_last = last_element
 
     async def get_one(
-        self, bypass_result_cache: bool = False
+        self, no_update_result_cache: bool = False
     ) -> tuple[EdgyModel, EdgyEmbedTarget]:
         """
         Fetches a single unique record from the database.
@@ -217,7 +217,7 @@ class QueryExecutor:
             raise MultipleObjectsReturned()
 
         self.queryset._cache_count = 1
-        if bypass_result_cache:
+        if no_update_result_cache:
             resultsingle: EdgyModel = await self.parser.row_to_model_raw(
                 rows[0], tables_and_models
             )
