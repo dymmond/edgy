@@ -14,7 +14,7 @@ The returned array is in the same order as the values/objects provided. And cont
 Input for all bulk operations are models of the right type or dictionaries. They can be intermixed and must be provided in an `Iterable`.
 
 !!! Warning
-    When using `SkipOperation` in an signal, `None` values are returned.
+    When using `SkipOperation` in a signal, `None` values are returned.
 
 ## Operations
 
