@@ -1050,8 +1050,11 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             )
 
             return 0
-        _injected_filters_deletion.set(injected_filters)
-        row_count = await self.raw_delete(use_models=use_models, remove_referenced_call=False)
+        token = _injected_filters_deletion.set(injected_filters)
+        try:
+            row_count = await self.raw_delete(use_models=use_models, remove_referenced_call=False)
+        finally:
+            _injected_filters_deletion.reset(token)
         await self.model_class.meta.signals.post_delete.send_async(
             self.model_class,
             instance=self,
