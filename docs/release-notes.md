@@ -11,7 +11,7 @@
 - Add relationship signals (`pre/post_relation_add` and `pre/post_relation_remove`).
 - Add bulk signals (`pre/post_bulk`).
 - Add `SkipOperation` exception for signals.
-- Add `inject_filters` parameter for `pre_delete` to dynamically inject protection rules.
+- Add `injected_filters` parameter for `pre_delete` to dynamically inject protection rules.
 
 ### Changed
 

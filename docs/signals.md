@@ -26,8 +26,8 @@ from edgy.core.signals import (
     pre_migrate,
     pre_relation_add,
     post_relation_add,
-    pre_relation_removed,
-    post_relation_removed,
+    pre_relation_remove,
+    post_relation_remove,
     pre_bulk,
     post_bulk,
 )

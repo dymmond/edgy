@@ -22,6 +22,10 @@ class BaseModelWithDeletionHandling(edgy.StrictModel):
         abstract = True
 
 
+class Unrelated(BaseModelWithDeletionHandling):
+    name = edgy.CharField(max_length=100)
+
+
 class User(BaseModelWithDeletionHandling):
     name = edgy.CharField(max_length=100)
     profile = edgy.ForeignKey(
@@ -69,6 +73,7 @@ async def create_test_database():
 
 @pytest.fixture(autouse=True, scope="function")
 async def connect_signals():
+    @Unrelated.meta.signals.pre_delete.connect_via(Unrelated, weak=True)
     @Profile.meta.signals.pre_delete.connect_via(Profile, weak=True)
     @User.meta.signals.pre_delete.connect_via(User, weak=True)
     async def pre_deleting(sender, model_instance, injected_filters=None, **kwargs):
@@ -78,6 +83,7 @@ async def connect_signals():
         elif injected_filters is not None:
             injected_filters.append({"protection": False})
 
+    @Unrelated.meta.signals.post_delete.connect_via(Unrelated, weak=True)
     @Profile.meta.signals.post_delete.connect_via(Profile, weak=True)
     @User.meta.signals.post_delete.connect_via(User, weak=True)
     async def post_deleting(sender, **kwargs):
@@ -90,8 +96,10 @@ async def connect_signals():
     try:
         yield
     finally:
+        Unrelated.meta.signals.pre_delete.disconnect(pre_deleting)
         Profile.meta.signals.pre_delete.disconnect(pre_deleting)
         User.meta.signals.pre_delete.disconnect(pre_deleting)
+        Unrelated.meta.signals.post_delete.disconnect(pre_deleting)
         Profile.meta.signals.post_delete.disconnect(post_deleting)
         User.meta.signals.post_delete.disconnect(post_deleting)
 
@@ -105,12 +113,15 @@ async def test_correct_connection(klass):
     assert post_delete.has_receivers_for(klass)
 
 
-@pytest.mark.parametrize("klass", [User, Profile])
+@pytest.mark.parametrize("klass", [User, Profile, Unrelated])
 async def test_deletion_called_once_model(klass):
     obj = await klass.query.create(name="Edgy")
+    assert not obj._db_deleted
     logs = await Log.query.all()
     assert len(logs) == 0
     await obj.delete()
+    assert not obj._db_deleted
+    assert await klass.query.count() == 1
     logs = await Log.query.all()
     assert len(logs) == 1
     assert logs[0].signal == "post_delete"
@@ -119,13 +130,14 @@ async def test_deletion_called_once_model(klass):
     assert logs[0].params["row_count"] == "0"
 
 
-@pytest.mark.parametrize("klass", [User, Profile])
+@pytest.mark.parametrize("klass", [User, Profile, Unrelated])
 @pytest.mark.parametrize("model_based", [True, False])
 async def test_deletion_called_once_query(klass, model_based):
     await klass.query.create(name="Edgy")
     logs = await Log.query.all()
     assert len(logs) == 0
     await klass.query.delete(model_based)
+    assert await klass.query.count() == 1
     logs = await Log.query.all()
     assert len(logs) == 1
     assert logs[0].signal == "post_delete"
@@ -142,6 +154,7 @@ async def test_deletion_called_once_query_model_based(klass):
     assert len(logs) == 0
     await klass.query.delete()
     logs = await Log.query.all()
+    assert await klass.query.count() == 1
     assert len(logs) == 1
     assert logs[0].signal == "post_delete"
     assert logs[0].class_name == klass.__name__
@@ -190,9 +203,11 @@ async def test_deletion_called_referenced_query():
     assert logs[0].signal == "post_delete"
     assert logs[0].params["row_count"] == "0"
     assert logs[0].params["operation_skipped"] == "False"
+    assert await User.query.count() == 1
     # now it really deletes
     with User.meta.signals.pre_delete.muted():
         await User.query.delete()
+    assert await User.query.count() == 0
     logs = await Log.query.offset(1)
     assert len(logs) == 2
 

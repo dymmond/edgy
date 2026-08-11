@@ -167,7 +167,7 @@ async def test_signals_advanced():
                     signal.connect(log, model, weak=False)
                     cleanup_array.append(lambda _signal=signal, _log=log: _signal.disconnect(_log))
 
-        assert signal.has_receivers_for(User)
+            assert signal.has_receivers_for(User)
         # Signals for the create
         user = await User.query.create(name="Edgy")
         logs = await Log.query.all()

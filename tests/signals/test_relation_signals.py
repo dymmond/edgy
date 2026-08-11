@@ -196,7 +196,6 @@ async def test_basic_m2m():
     assert logs[1].signal == "post_relation_add"
     assert logs[1].params["operation_skipped"] == "False"
     assert logs[1].params["instance"] == str(user)
-    assert logs[1].signal == "post_relation_add"
     assert logs[1].params["values"]
     assert logs[1].params["row_count"] == "1"
     assert logs[1].params["row_count_create"] == "1"
