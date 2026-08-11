@@ -49,6 +49,7 @@
 - Bulk operations return now a result instead `None`. For `bulk_get_or_create` the returned list format changes to `(instance, created)` tuples.
 - The typings changed for QuerySetType: `EdgyEmbedTarget` and `EdgyModel` (the queryset model) are switched in the `Generic` definition.
 - Stop issuing `pre_delete` and `post_delete` signals during relation operations; use `pre_relation_remove` and `post_relation_remove` signals instead.
+- `get_or_create_bulk` can return `None` values if signals are used.
 
 ## 0.35.11
 

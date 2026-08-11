@@ -913,6 +913,7 @@ class DatabaseMixin:
                     row_count=0,
                     operation_skipped=True,
                 )
+                # reraises
                 raise exc
         ignore_fields: set[str] = set()
         if remove_referenced_call and isinstance(remove_referenced_call, str):
@@ -995,6 +996,8 @@ class DatabaseMixin:
                 skip_post_delete_hooks=skip_post_delete_hooks,
                 remove_referenced_call=False,
             )
+        except SkipOperation:
+            row_count = 0
         finally:
             CURRENT_INSTANCE.reset(token)
         await self.meta.signals.post_delete.send_async(

@@ -24,6 +24,31 @@ class ResultParser:
         self.queryset = queryset
         self.model_class = queryset.model_class
 
+    async def row_to_model_raw(
+        self,
+        row: sqlalchemy.Row | Any,
+        tables_and_models: tables_and_models_type,
+    ) -> EdgyModel:
+        """
+        Parses a single row into a model instance, bypassing the cache.
+        """
+        is_defer_fields = bool(self.queryset._defer)
+        return cast(
+            "EdgyModel",
+            self.model_class.from_sqla_row(
+                row,
+                tables_and_models=tables_and_models,
+                select_related=self.queryset._select_related,
+                only_fields=self.queryset._only,
+                is_defer_fields=is_defer_fields,
+                prefetch_related=self.queryset._prefetch_related,
+                exclude_secrets=self.queryset._exclude_secrets,
+                using_schema=self.queryset.active_schema,
+                database=self.queryset.database,
+                reference_select=self.queryset._reference_select,
+            ),
+        )
+
     async def row_to_model(
         self,
         row: sqlalchemy.Row | Any,

@@ -521,18 +521,9 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
         *,
-        ignore_conflicts: Literal[True],
+        ignore_conflicts: bool = False,
         resolve_embed: Literal[True],
-    ) -> list[EdgyEmbedTarget | None]: ...
-
-    @overload
-    async def bulk_create(
-        self,
-        objs: Iterable[dict[str, Any] | EdgyModel],
-        *,
-        ignore_conflicts: Literal[False] = False,
-        resolve_embed: Literal[True],
-    ) -> list[EdgyEmbedTarget]:
+    ) -> list[EdgyEmbedTarget | None]:
         """
         Args:
             ...
@@ -549,18 +540,9 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
         *,
-        ignore_conflicts: Literal[True],
+        ignore_conflicts: bool = False,
         resolve_embed: Literal[False] = False,
-    ) -> list[EdgyModel | None]: ...
-
-    @overload
-    async def bulk_create(
-        self,
-        objs: Iterable[dict[str, Any] | EdgyModel],
-        *,
-        ignore_conflicts: Literal[False] = False,
-        resolve_embed: Literal[False] = False,
-    ) -> list[EdgyModel]:
+    ) -> list[EdgyModel | None]:
         """
         Args:
             ...
@@ -744,7 +726,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         *,
         unique_fields: Iterable[str] | None = None,
         resolve_embed: Literal[True],
-    ) -> list[tuple[EdgyEmbedTarget, bool]]:
+    ) -> list[tuple[EdgyEmbedTarget | None, bool]]:
         """
         Kwargs:
             ...
@@ -763,7 +745,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         *,
         unique_fields: Iterable[str] | None = None,
         resolve_embed: Literal[False] = False,
-    ) -> list[tuple[EdgyModel, bool]]:
+    ) -> list[tuple[EdgyModel | None, bool]]:
         """
         Kwargs:
             ...
@@ -781,7 +763,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         *,
         unique_fields: Iterable[str] | None = None,
         resolve_embed: bool = False,
-    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+    ) -> list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget | None, bool]]:
         """
         Abstract method to bulk get or create records in a table.
 

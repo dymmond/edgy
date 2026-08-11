@@ -190,7 +190,9 @@ class QueryExecutor:
         qs._cache_count = counter
         qs._cache_last = last_element
 
-    async def get_one(self) -> tuple[EdgyModel, EdgyEmbedTarget]:
+    async def get_one(
+        self, bypass_result_cache: bool = False
+    ) -> tuple[EdgyModel, EdgyEmbedTarget]:
         """
         Fetches a single unique record from the database.
         This is the refactored _get_raw (when no kwargs are present).
@@ -215,6 +217,11 @@ class QueryExecutor:
             raise MultipleObjectsReturned()
 
         self.queryset._cache_count = 1
+        if bypass_result_cache:
+            resultsingle = cast(
+                "EdgyModel", await self.parser.row_to_model_raw(rows[0], tables_and_models)
+            )
+            return resultsingle, cast(EdgyEmbedTarget, resultsingle)
 
         result: tuple[EdgyModel, EdgyEmbedTarget] = await self.parser.row_to_model(
             rows[0], tables_and_models
@@ -365,15 +372,6 @@ class QueryExecutor:
         # Uuse the new executor's iterate method
         models = [model async for model in self.iterate(fetch_all_at_once=True)]  # type: ignore
 
-        signal = queryset.model_class.meta.signals.post_delete
-
-        # introspect via temporary signal
-        @signal.connect_via(queryset.model_class)
-        def raise_SkipOperation(sender, operation_skipped: bool = False, **kwargs: Any) -> None:
-            # reraise in post
-            if operation_skipped:
-                raise SkipOperation()
-
         token = CURRENT_INSTANCE.set(self.queryset)
         try:
             while models:
@@ -386,14 +384,14 @@ class QueryExecutor:
 
                 # clear parent cache
                 self.queryset._clear_cache(keep_cached_selected=True)
-                if not self.queryset._cache_fetch_all:
-                    # clear cache and fetch new batch
-                    queryset._clear_cache(keep_cached_selected=True)
-                    models = [model async for model in self.iterate(fetch_all_at_once=True)]  # type: ignore
+                if self.queryset._cache_fetch_all:
+                    break
+                # clear cache and fetch new batch
+                queryset._clear_cache(keep_cached_selected=True)
+                models = [model async for model in self.iterate(fetch_all_at_once=True)]  # type: ignore
         except SkipOperation:
-            # raised from temporary signal
+            # raised from raw_delete
             return row_count
         finally:
             CURRENT_INSTANCE.reset(token)
-            signal.disconnect(raise_SkipOperation)
         return row_count

@@ -226,8 +226,8 @@ class BaseQuerySet(
                 tuple[Any, dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]] | None
             ) = None
         self._cache_count: int | None = None
-        self._cache_first: tuple[BaseModelType, Any] | None = None
-        self._cache_last: tuple[BaseModelType, Any] | None = None
+        self._cache_first: tuple[EdgyModel, EdgyEmbedTarget] | None = None
+        self._cache_last: tuple[EdgyModel, EdgyEmbedTarget] | None = None
         self._cache_fetch_all: bool = False
 
     def _build_order_by_iterable(
@@ -666,7 +666,9 @@ class BaseQuerySet(
         self, use_models: bool = False, remove_referenced_call: str | bool = False
     ) -> int:
         """
-        (Refactored: Now delegates to the Executor)
+        Executes delete without raising an extra signal.
+
+        Delegates to QueryExecutor.delete.
         """
         # We must create new specialists *every time* because the queryset
         # state might have changed (e.g., in _model_based_delete)
@@ -678,23 +680,28 @@ class BaseQuerySet(
             injected_filters=_injected_filters_deletion.get(),
         )
 
-    async def _get_raw(self, **kwargs: Any) -> tuple[BaseModelType, Any]:
+    async def _get_raw(
+        self, bypass_result_cache: bool = False, /, **kwargs: Any
+    ) -> tuple[EdgyModel, EdgyEmbedTarget]:
         """
-        (Refactored: Builder logic stays, execution logic delegates)
+        Base method used by get like methods.
         """
         if kwargs:
             cached = cast(
-                tuple[BaseModelType, Any] | None, self._cache.get(self.model_class, kwargs)
+                "tuple[EdgyModel, EdgyEmbedTarget] | None",
+                self._cache.get(self.model_class, kwargs),
             )
             if cached is not None:
                 return cached
             filter_query = cast("BaseQuerySet", self.filter(**kwargs))
             filter_query._cache = self._cache
-            return await filter_query._get_raw()
+            return await filter_query._get_raw(bypass_result_cache)
         elif self._cache_count == 1:
             if self._cache_first is not None:
                 return self._cache_first
             elif self._cache_last is not None:
                 return self._cache_last
         executor = QueryExecutor(self)
-        return await executor.get_one()
+        return cast(
+            "tuple[EdgyModel, EdgyEmbedTarget]", await executor.get_one(bypass_result_cache)
+        )

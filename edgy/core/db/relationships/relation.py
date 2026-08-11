@@ -323,7 +323,7 @@ class ManyRelation(ManyRelationProtocol):
         Returns:
             list[BaseModelType | None]: A list of saved intermediate model instances,
                                         or None for each record that already exists
-                                        (IntegrityError).
+                                        (IntegrityError) or when operation was skipped.
         """
         prepared = []
         through = self.through
@@ -359,7 +359,7 @@ class ManyRelation(ManyRelationProtocol):
             operation.signal_params["row_count"] = 0
             operation.signal_params["row_count_create"] = 0
             await operation.send_post_signal()
-            return []
+            return [None for _ in prepared]
         await operation.apply_db()
         # no cache update because the queryset is temporary
         # we can just rename the signals parameters for the post signal
@@ -875,7 +875,9 @@ class SingleRelation(ManyRelationProtocol):
                                         model or a dictionary.
 
         Returns:
-            list[BaseModelType | None]: A list of saved child model instances.
+            list[BaseModelType | None]: A list of saved intermediate model instances,
+                                        or None for each record that already exists
+                                        (IntegrityError) or when operation was skipped.
 
         Raises:
             RelationshipIncompatible: If a child type is not compatible.
@@ -909,7 +911,7 @@ class SingleRelation(ManyRelationProtocol):
             await operation.send_pre_signal()
         except SkipOperation:
             await operation.send_post_signal()
-            return []
+            return [None for _ in prepared]
         await operation.apply_db()
         # no cache update because the queryset is temporary
         # we can just rename the signals parameters for the post signal
