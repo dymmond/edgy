@@ -540,7 +540,7 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
         *,
-        ignore_conflicts: bool = False,
+        ignore_conflibulkcts: bool = False,
         resolve_embed: Literal[False] = False,
     ) -> list[EdgyModel | None]:
         """

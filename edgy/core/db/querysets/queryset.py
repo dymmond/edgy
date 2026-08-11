@@ -1243,7 +1243,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         # update the result cache now
         self._cache.update(
             self.model_class,
-            values=[resolved],
+            values=[(raw_instance, resolved)],
             cache_keys=[self._cache.create_cache_key(self.model_class, raw_instance)],
         )
         if not kwargs:
