@@ -476,9 +476,9 @@ class ManyRelation(ManyRelationProtocol):
             clauses = [
                 and_(*child.identifying_clauses()) for child in prepared if child is not None
             ]
-            query = queryset.filter(or_(*clauses))
+            queryset = queryset.filter(or_(*clauses))
             async with queryset.transaction():
-                row_count = await query.raw_delete(use_models=model_based_deletion)
+                row_count = await queryset.raw_delete(use_models=model_based_deletion)
                 if row_count is not None and row_count != len(clauses):
                     related_name = fk_source.name
                     raise RelationshipNotFound(

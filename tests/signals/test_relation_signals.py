@@ -342,6 +342,24 @@ async def test_nullify_many_to_many():
     assert len(await user.friends.all()) == 2
 
 
+async def test_nullify_many_to_many_load(subtests):
+    through = User.meta.fields["friends"].through
+    user = await User.query.create(name="Edgy")
+    assert len(await user.friends.all()) == 0
+
+    Friend.meta.signals.pre_relation_remove.connect(nullify_removal, through)
+    try:
+        for i in range(10):
+            with subtests.test(msg=f"iteration: {i}"):
+                await user.friends.add_many(Friend(name=f"saffier_{i}"), {"name": "saffier2"})
+                assert len(await user.friends.all()) == 2
+                await user.friends.remove_many(*(await user.friends.all()))
+                assert len(await user.friends.all()) == 2
+                await Friend.query.delete()
+    finally:
+        Friend.meta.signals.pre_relation_remove.disconnect(nullify_removal)
+
+
 async def test_nullify_one_to_many():
     profile = await Profile.query.create(name="Edgy")
     await profile.users.create(name="saffier")
