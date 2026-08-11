@@ -150,14 +150,14 @@ class QueryExecutor:
                     batch, tables_and_models, new_cache
                 ):
                     if counter == 0:
-                        qs._cache_first = result
+                        self.queryset._cache_first = result
                     last_element = result
                     counter += 1
                     current_row[0] = row
                     yield result[1]
 
-                qs._cache_fetch_all = True
-                qs._cache = new_cache
+                self.queryset._cache_fetch_all = True
+                self.queryset._cache = new_cache
             else:
                 batch_num: int = 0
                 new_cache = QueryModelResultCache(qs._cache.attrs)
@@ -174,7 +174,7 @@ class QueryExecutor:
                             batch, tables_and_models, new_cache
                         ):
                             if counter == 0:
-                                qs._cache_first = result
+                                self.queryset._cache_first = result
                             last_element = result
                             counter += 1
                             current_row[0] = row
@@ -182,13 +182,13 @@ class QueryExecutor:
                         batch_num += 1
 
                 if batch_num <= 1:
-                    qs._cache = new_cache
-                    qs._cache_fetch_all = True
+                    self.queryset._cache = new_cache
+                    self.queryset._cache_fetch_all = True
         finally:
             _current_row_holder.reset(token)
 
-        qs._cache_count = counter
-        qs._cache_last = last_element
+        self.queryset._cache_count = counter
+        self.queryset._cache_last = last_element
 
     async def get_one(
         self, bypass_result_cache: bool = False
@@ -228,6 +228,7 @@ class QueryExecutor:
         )
 
         # Update cache attributes
+        self.queryset._cache_fetch_all = True
         self.queryset._cache_first = result
         self.queryset._cache_last = result
         return result

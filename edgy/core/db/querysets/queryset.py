@@ -1117,7 +1117,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         expression = self.table.update().values(**column_values)
         expression = expression.where(await self.build_where_clause())
         check_db_connection(self.database)
-        row_count: int | None = None
+        row_count: int | None
         async with self.database as database:
             row_count = cast(int | None, await database.execute(expression))
 
@@ -1236,9 +1236,18 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 )
                 relation = getattr(raw_instance, arg.__related_name__)
                 await relation.add(model)
-        self._clear_cache()
+        self._clear_cache(keep_cached_selected=True)
         # now resolve again
         resolved = (await self._embed_parent_in_result(raw_instance))[1]
+        if not args and not kwargs:
+            self._cache.update(
+                self.model_class,
+                values=[resolved],
+                cache_keys=[self._cache.create_cache_key(self.model_class, raw_instance)],
+            )
+            self._cache_first = (raw_instance, resolved)
+            self._cache_last = (raw_instance, resolved)
+            self._cache_fetch_all = True
         return resolved, False
 
     update_or_insert = update_or_create
