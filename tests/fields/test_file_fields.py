@@ -118,10 +118,11 @@ async def test_save_file_create(create_test_database):
     with model.file_field.open() as rob:
         assert rob.read() == b"!# /bin/sh"
     path = model.file_field.path
-    assert model.file_field.storage.get_accessed_time(path)
+    name = model.file_field.name
+    assert model.file_field.storage.get_accessed_time(name)
     assert model.file_field.storage.get_modified_time(
-        path
-    ) == model.file_field.storage.get_created_time(path)
+        name
+    ) == model.file_field.storage.get_created_time(name)
     assert os.path.exists(path)
     assert model.file_field.storage.exists(model.file_field.name)
     model.file_field.delete()
