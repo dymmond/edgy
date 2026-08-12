@@ -393,7 +393,7 @@ class FileSystemStorage(Storage):
     def _datetime_from_timestamp(ts: float) -> datetime:
         """
         Converts a UNIX timestamp (float) into a `datetime` object.
-        The datetime will be timezone-aware if `settings.USE_TZ` is True.
+        The datetime will be in utc.
 
         Args:
             ts (float): The UNIX timestamp.
@@ -401,13 +401,12 @@ class FileSystemStorage(Storage):
         Returns:
             datetime: The corresponding `datetime` object.
         """
-        tz = timezone.utc if settings.USE_TZ else None
-        return datetime.fromtimestamp(ts, tz=tz)
+        return datetime.fromtimestamp(ts, tz=timezone.utc)
 
     def get_accessed_time(self, name: str) -> datetime:
         """
         Returns the last accessed time (as a `datetime` object) of the file.
-        The datetime will be timezone-aware if `settings.USE_TZ` is True.
+        The datetime will be in utc.
 
         Args:
             name (str): The name (relative path) of the file.
@@ -420,7 +419,7 @@ class FileSystemStorage(Storage):
     def get_created_time(self, name: str) -> datetime:
         """
         Returns the creation time (as a `datetime` object) of the file.
-        The datetime will be timezone-aware if `settings.USE_TZ` is True.
+        The datetime will be in utc.
 
         Args:
             name (str): The name (relative path) of the file.
@@ -428,12 +427,18 @@ class FileSystemStorage(Storage):
         Returns:
             datetime: The creation time of the file.
         """
-        return self._datetime_from_timestamp(os.path.getctime(self.path(name)))
+        stat_result = os.stat(self.path(name))
+        timestamp = (
+            stat_result.st_birthtime
+            if getattr(stat_result, "st_birthtime", None) is not None
+            else stat_result.st_ctime
+        )
+        return self._datetime_from_timestamp(timestamp)
 
     def get_modified_time(self, name: str) -> datetime:
         """
         Returns the last modified time (as a `datetime` object) of the file.
-        The datetime will be timezone-aware if `settings.USE_TZ` is True.
+        The datetime will be in utc.
 
         Args:
             name (str): The name (relative path) of the file.
