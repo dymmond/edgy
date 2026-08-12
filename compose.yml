@@ -1,7 +1,7 @@
 services:
   db:
     restart: always
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
       POSTGRES_USER: "postgres"
@@ -17,7 +17,7 @@ services:
 
   edgy_alt:
     restart: always
-    image: postgres:16
+    image: postgres:18
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
       POSTGRES_USER: "postgres"
