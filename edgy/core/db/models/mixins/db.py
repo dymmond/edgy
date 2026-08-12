@@ -976,14 +976,12 @@ class DatabaseMixin:
             )
         return row_count
 
-    async def delete(self: Model, skip_post_delete_hooks: bool = False) -> int:
+    async def delete(self: Model) -> int | None:
         """
         Deletes the current model instance from the database.
 
         This method triggers pre-delete and post-delete signals.
 
-        Args:
-            skip_post_delete_hooks: If True, post-delete hooks will not be executed.
         """
         real_class = self.get_real_class()
         try:
@@ -998,7 +996,7 @@ class DatabaseMixin:
         token = CURRENT_INSTANCE.set(self)
         try:
             row_count = await self.raw_delete(
-                skip_post_delete_hooks=skip_post_delete_hooks,
+                skip_post_delete_hooks=False,
                 remove_referenced_call=False,
             )
         except SkipOperation:
@@ -1196,6 +1194,7 @@ class DatabaseMixin:
 
     async def real_save(
         self,
+        *,
         force_insert: bool,
         values: dict[str, Any] | set[str] | None,
     ) -> Self:

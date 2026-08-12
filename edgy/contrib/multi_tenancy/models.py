@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import logging
+import sys
 import uuid
-import warnings
 from datetime import date
 from typing import Any, ClassVar, cast
 from uuid import UUID
@@ -12,10 +12,15 @@ from edgy.core.db.models.model import Model
 from edgy.core.utils.db import check_db_connection
 from edgy.exceptions import ModelSchemaError, ObjectNotFound
 
+if sys.version_info >= (3, 11):  # pragma: no cover
+    from typing import Self
+else:  # pragma: no cover
+    from typing_extensions import Self
+
 logger = logging.getLogger(__name__)
 
 
-class TenantMixin(edgy.Model):
+class TenantMixin(Model):
     """
     Abstract table that acts as an entry-point for managing tenants in an Edgy
     application.
@@ -67,10 +72,7 @@ class TenantMixin(edgy.Model):
         return f"{self.tenant_name} - {self.schema_name}"
 
     async def real_save(
-        self,
-        force_insert: bool = False,
-        values: dict[str, Any] | set[str] | None = None,
-        force_save: bool | None = None,
+        self: Model, *, force_insert: bool, values: dict[str, Any] | set[str] | None
     ) -> Model:
         """
         Creates or updates a tenant record and manages its associated database schema.
@@ -89,7 +91,6 @@ class TenantMixin(edgy.Model):
                                                                 or a set of
                                                                 field names to save.
                                                                 Defaults to `None`.
-            force_save (bool | None, optional): Deprecated. Use `force_insert` instead.
 
         Raises:
             ModelSchemaError: If an attempt is made to save a tenant to
@@ -101,15 +102,6 @@ class TenantMixin(edgy.Model):
         registry = self.meta.registry
         # Ensure the registry is set, as it's crucial for schema operations.
         assert registry, "registry is not set"
-
-        # Deprecation warning for 'force_save'.
-        if force_save is not None:
-            warnings.warn(
-                "'force_save' is deprecated in favor of 'force_insert'",
-                DeprecationWarning,
-                stacklevel=2,
-            )
-            force_insert = force_save
 
         # Extract database fields from the model instance.
         fields = self.extract_db_fields()
@@ -132,7 +124,7 @@ class TenantMixin(edgy.Model):
             )
 
         # Save the tenant record using the parent's `real_save` method.
-        tenant = await super().real_save(force_insert, values)
+        tenant: Model = await super().real_save(force_insert=force_insert, values=values)
         if (
             self.auto_create_schema
             if self.auto_create_schema is not None
@@ -157,7 +149,7 @@ class TenantMixin(edgy.Model):
                 await self.delete()
         return tenant
 
-    async def delete(self, force_drop: bool = False) -> int:
+    async def delete(self, *, force_drop: bool = False) -> int | None:
         """
         Deletes a tenant record and, if `auto_drop_schema` is True,
         also drops its associated database schema.
@@ -165,7 +157,7 @@ class TenantMixin(edgy.Model):
         This method includes a safeguard to prevent accidental deletion
         of the default public schema.
 
-        Args:
+        Kwargs:
             force_drop (bool, optional): If `True`, forces the schema to be
                                          dropped regardless of `auto_drop_schema`.
                                          Defaults to `False`.
@@ -224,10 +216,7 @@ class DomainMixin(edgy.Model):
         return self.domain
 
     async def real_save(
-        self: Any,
-        force_insert: bool = False,
-        values: dict[str, Any] | set[str] | None = None,
-        force_save: bool | None = None,
+        self, *, force_insert: bool, values: dict[str, Any] | set[str] | None
     ) -> Model:
         """
         Creates or updates a domain record, ensuring proper handling of the
@@ -246,15 +235,10 @@ class DomainMixin(edgy.Model):
                                                                 or a set of
                                                                 field names to save.
                                                                 Defaults to `None`.
-            force_save (bool | None, optional): Deprecated. Use `force_insert` instead.
 
         Returns:
             Model: The saved domain model instance.
         """
-        # Deprecation warning for 'force_save'.
-        if force_save is not None:
-            force_insert = force_save
-
         # Ensure a database connection is established before proceeding.
         check_db_connection(self.database)
 
@@ -280,9 +264,9 @@ class DomainMixin(edgy.Model):
                 await domains.update(is_primary=False)
 
             # Call the parent's `real_save` method to persist the domain record.
-            return await super().real_save(force_insert, values)
+            return await super().real_save(force_insert=force_insert, values=values)
 
-    async def delete(self) -> int:
+    async def delete(self) -> int | None:
         """
         Deletes a domain record, with a safeguard to prevent accidental
         deletion of the public domain.
@@ -372,7 +356,10 @@ class TenantUserMixin(edgy.Model):
         """
         return f"User: {self.user.pk}, Tenant: {self.tenant}"
 
-    async def real_save(self, *args: Any, **kwargs: Any) -> edgy.Model:
+    async def real_save(
+        self,
+        **kwargs: Any,
+    ) -> Self:
         """
         Creates or updates a tenant user mapping, ensuring that only one
         mapping for a given user is `is_active=True`.
@@ -381,7 +368,6 @@ class TenantUserMixin(edgy.Model):
         mappings for the same user will be automatically set to `is_active=False`.
 
         Args:
-            *args (Any): Positional arguments passed to the parent's `real_save` method.
             **kwargs (Any): Keyword arguments passed to the parent's `real_save` method.
 
         Returns:
@@ -392,7 +378,7 @@ class TenantUserMixin(edgy.Model):
         assert registry, "registry is not set"
 
         # Call the parent's `real_save` method to persist the current record.
-        await super().real_save(*args, **kwargs)
+        await super().real_save(**kwargs)
 
         # If the current mapping is set to active, deactivate all other active
         # mappings for the same user.

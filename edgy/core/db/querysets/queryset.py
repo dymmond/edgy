@@ -1017,7 +1017,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset.embed_parent = embed_parent
         return queryset
 
-    async def delete(self, use_models: bool = False) -> int:
+    async def delete(self, *, use_models: bool = False) -> int | None:
         """
         Deletes records from the database.
 

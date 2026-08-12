@@ -314,7 +314,7 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
         use_models: bool = False,
         remove_referenced_call: str | bool = False,
         injected_filters: Iterable = (),
-    ) -> int:
+    ) -> int | None:
         """
         Executes a delete operation.
 
@@ -348,7 +348,7 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
 
             check_db_connection(self.database)
             async with self.database as database:
-                row_count = cast(int, await database.execute(expression))
+                row_count = cast(int | None, await database.execute(expression))
 
         # clear cache after deletion.
         if row_count != 0:
