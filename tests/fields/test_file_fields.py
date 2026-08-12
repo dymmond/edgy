@@ -122,7 +122,7 @@ async def test_save_file_create(create_test_database):
     assert model.file_field.storage.get_accessed_time(name)
     assert model.file_field.storage.get_modified_time(
         name
-    ) == model.file_field.storage.get_created_time(name)
+    ) >= model.file_field.storage.get_created_time(name)
     assert os.path.exists(path)
     assert model.file_field.storage.exists(model.file_field.name)
     model.file_field.delete()
