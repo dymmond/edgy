@@ -35,14 +35,21 @@ class Album(edgy.StrictModel):
         registry = models
 
 
-class Track(edgy.StrictModel):
-    id = edgy.IntegerField(primary_key=True, autoincrement=True)
-    album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE, null=True)
-    title = edgy.CharField(max_length=100)
-    position = edgy.IntegerField()
+class BaseTrack(edgy.StrictModel):
+    album = edgy.ForeignKey(lambda: lazy_album, on_delete=edgy.CASCADE, null=True)
 
     class Meta:
+        abstract = True
         registry = models
+
+
+lazy_album = "Album"
+
+
+class Track(BaseTrack):
+    id = edgy.IntegerField(primary_key=True, autoincrement=True)
+    title = edgy.CharField(max_length=100)
+    position = edgy.IntegerField()
 
 
 class Organisation(edgy.StrictModel):
@@ -355,7 +362,7 @@ async def test_assertation_error_on_set_null():
         class MyOtherModel(edgy.StrictModel):
             model = edgy.ForeignKey(MyModel, on_delete=edgy.SET_NULL)
 
-    assert raised.value.args[0] == "When SET_NULL is enabled, null must be True."
+    assert raised.value.args[0] == "When SET_NULL is enabled, null must be `True`."
 
 
 async def test_error_on_missing_on_delete():
@@ -367,7 +374,7 @@ async def test_error_on_missing_on_delete():
         class MyOtherModel(edgy.StrictModel):
             model = edgy.ForeignKey(MyModel, on_delete=None)
 
-    assert raised.value.args[0] == "on_delete must not be null."
+    assert raised.value.args[0] == "`on_delete` must not be `None`."
 
 
 async def test_error_on_embed_parent_double_underscore_attr():

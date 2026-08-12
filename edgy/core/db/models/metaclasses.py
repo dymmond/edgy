@@ -1066,6 +1066,9 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
                     )
                 # make sure we have a fresh copy where we can set the owner and overwrite methods
                 value = copy.copy(value)
+                if isinstance(value, BaseForeignKey) and getattr(value, "_target", None) is None:
+                    # clear cache if target isn't set (e.g. abstract class)
+                    del value.to
                 if value.factory is not None:
                     value.factory.repack(value)
                 if value.primary_key:
