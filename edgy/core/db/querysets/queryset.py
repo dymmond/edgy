@@ -706,7 +706,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
     async def values(
         self,
         fields: Sequence[str] | str | None = None,
-        exclude: Sequence[str] | set[str] = None,
+        exclude: Sequence[str] | set[str] | None = None,
         exclude_none: bool = False,
     ) -> list[dict]:
         """
@@ -744,7 +744,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
     async def values_list(
         self,
         fields: Sequence[str] | str | None = None,
-        exclude: Sequence[str] | set[str] = None,
+        exclude: Sequence[str] | set[str] | None = None,
         exclude_none: bool = False,
         flat: bool = False,
     ) -> list[Any]:
