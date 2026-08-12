@@ -216,11 +216,17 @@ class ModelSchemaError(EdgyException):
     """
 
 
-class SuspiciousFileOperation(Exception):
+class SuspiciousFileOperation(EdgyException):
     """
     Exception raised for suspicious file operations, typically for security reasons.
 
     This is used to prevent potentially malicious file access or manipulation.
+    """
+
+
+class SkipOperation(Exception):
+    """
+    Exception raised in signals to skip operation and return empty values.
     """
 
 

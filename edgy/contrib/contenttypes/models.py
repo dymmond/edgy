@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import TYPE_CHECKING, ClassVar, cast
 
 import edgy
+from edgy.exceptions import SkipOperation
 
 from .metaclasses import ContentTypeMeta
 
@@ -51,7 +53,8 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
         referenced_obs = cast("QuerySet", getattr(self, reverse_name))
         fk = cast("BaseForeignKeyField", self.meta.fields[reverse_name].foreign_key)
         if fk.force_cascade_deletion_relation:
-            await referenced_obs.using(schema=self.schema_name).raw_delete(
-                use_models=fk.use_model_based_deletion, remove_referenced_call=reverse_name
-            )
+            with suppress(SkipOperation):
+                await referenced_obs.using(schema=self.schema_name).raw_delete(
+                    use_models=fk.use_model_based_deletion, remove_referenced_call=reverse_name
+                )
         return row_count

@@ -18,9 +18,7 @@ from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = DatabaseTestClient(
-    DATABASE_URL, drop_database=True, force_rollback=False, full_isolation=False
-)
+database = DatabaseTestClient(DATABASE_URL, force_rollback=False, use_existing=False)
 models = edgy.Registry(database=database)
 
 
@@ -67,6 +65,8 @@ async def create_test_database():
     async with models:
         await models.create_all()
         yield
+        if not database.drop:
+            await models.drop_all()
 
 
 async def pre_add(sender, **kwargs):
@@ -179,8 +179,7 @@ async def test_basic_m2m():
     assert logs[0].signal == "pre_relation_add"
     # see docs for parameters
     assert len(logs[0].params) == 9
-    assert logs[1].signal == "post_relation_add"
-    assert len(logs[1].params) == 12
+    assert len(logs[1].params) == 13
     assert logs[0].params["raw_values"]
     assert "User" in logs[0].params["source"]
     assert "Friend" in logs[0].params["target"]
@@ -194,8 +193,9 @@ async def test_basic_m2m():
     assert "values" not in logs[0].params
     assert "row_count" not in logs[0].params
     assert "row_count_create" not in logs[0].params
-    assert logs[1].params["instance"] == str(user)
     assert logs[1].signal == "post_relation_add"
+    assert logs[1].params["operation_skipped"] == "False"
+    assert logs[1].params["instance"] == str(user)
     assert logs[1].params["values"]
     assert logs[1].params["row_count"] == "1"
     assert logs[1].params["row_count_create"] == "1"
@@ -215,7 +215,7 @@ async def test_basic_m2m():
     assert "update_params" not in logs[2].params
     assert logs[3].signal == "post_relation_remove"
     # see docs for parameters
-    assert len(logs[3].params) == 8
+    assert len(logs[3].params) == 9
     assert logs[3].params["instance"] == str(user)
     assert "operation" not in logs[3].params
     assert "values" not in logs[3].params
@@ -223,6 +223,7 @@ async def test_basic_m2m():
     assert "create_params" not in logs[3].params
     assert "update_params" not in logs[3].params
     assert logs[3].params["row_count"] == "1"
+    assert logs[3].params["operation_skipped"] == "False"
     assert await Log.query.filter(signal="post_delete").count() == 0
     assert await Log.query.filter(signal="pre_delete").count() == 0
 
@@ -264,7 +265,7 @@ async def test_basic_one_to_many():
     assert "model_based_deletion" not in logs[4].params
     assert logs[5].signal == "post_relation_remove"
     # see docs for parameters
-    assert len(logs[5].params) == 7
+    assert len(logs[5].params) == 8
     assert "operation" not in logs[5].params
     assert "values" not in logs[5].params
     assert "create_params" not in logs[5].params
@@ -332,13 +333,31 @@ async def test_nullify_many_to_many():
     assert len(await user.friends.all()) == 2
 
     Friend.meta.signals.pre_relation_remove.connect(nullify_removal, through)
-    # shared
-    assert User.meta.signals.pre_relation_remove.has_receivers_for(through)
     try:
+        # shared
+        assert User.meta.signals.pre_relation_remove.has_receivers_for(through)
         await user.friends.remove_many(*(await user.friends.all()))
     finally:
         Friend.meta.signals.pre_relation_remove.disconnect(nullify_removal)
     assert len(await user.friends.all()) == 2
+
+
+async def test_nullify_many_to_many_load(subtests):
+    through = User.meta.fields["friends"].through
+    user = await User.query.create(name="Edgy")
+    assert len(await user.friends.all()) == 0
+
+    Friend.meta.signals.pre_relation_remove.connect(nullify_removal, through)
+    try:
+        for i in range(10):
+            with subtests.test(msg=f"iteration: {i}"):
+                await user.friends.add_many(Friend(name=f"saffier_{i}"), {"name": "saffier2"})
+                assert len(await user.friends.all()) == 2
+                await user.friends.remove_many(*(await user.friends.all()))
+                assert len(await user.friends.all()) == 2
+            await Friend.query.delete()
+    finally:
+        Friend.meta.signals.pre_relation_remove.disconnect(nullify_removal)
 
 
 async def test_nullify_one_to_many():

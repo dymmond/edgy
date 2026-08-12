@@ -8,6 +8,7 @@ from collections.abc import (
     Iterable,
     Sequence,
 )
+from contextvars import ContextVar
 from functools import cached_property
 from inspect import isawaitable
 from itertools import chain
@@ -34,7 +35,6 @@ from . import clauses as clauses_mod
 from .compiler import QueryCompiler
 from .executor import QueryExecutor, get_current_row
 from .mixins import QuerySetPropsMixin, TenancyMixin
-from .parser import ResultParser
 from .prefetch import Prefetch, PrefetchMixin
 from .types import (
     EdgyEmbedTarget,
@@ -50,6 +50,9 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.queryset import QuerySet
 
 _empty_set = cast(set[Any], frozenset())
+_injected_filters_deletion: ContextVar[Iterable] = ContextVar(
+    "_injected_filters_deletion", default=()
+)
 
 
 class BaseQuerySet(
@@ -223,8 +226,8 @@ class BaseQuerySet(
                 tuple[Any, dict[str, tuple[sqlalchemy.Table, type[BaseModelType]]]] | None
             ) = None
         self._cache_count: int | None = None
-        self._cache_first: tuple[BaseModelType, Any] | None = None
-        self._cache_last: tuple[BaseModelType, Any] | None = None
+        self._cache_first: tuple[EdgyModel, EdgyEmbedTarget] | None = None
+        self._cache_last: tuple[EdgyModel, EdgyEmbedTarget] | None = None
         self._cache_fetch_all: bool = False
 
     def _build_order_by_iterable(
@@ -482,9 +485,7 @@ class BaseQuerySet(
         (Refactored: Now delegates to the Executor)
         """
         # Create the specialists
-        compiler = QueryCompiler(self)
-        parser = ResultParser(self)
-        executor = QueryExecutor(self, compiler, parser)
+        executor = QueryExecutor(self)
 
         # Delegate the work
         async for model in executor.iterate(fetch_all_at_once=fetch_all_at_once):  # type: ignore
@@ -665,38 +666,43 @@ class BaseQuerySet(
         self, use_models: bool = False, remove_referenced_call: str | bool = False
     ) -> int:
         """
-        (Refactored: Now delegates to the Executor)
+        Executes delete without raising an extra signal.
+
+        Delegates to QueryExecutor.delete.
         """
         # We must create new specialists *every time* because the queryset
         # state might have changed (e.g., in _model_based_delete)
-        compiler = QueryCompiler(self)
-        parser = ResultParser(self)  # Delete doesn't use parser, but good practice
-        executor = QueryExecutor(self, compiler, parser)
+        executor = QueryExecutor(self)
 
         return await executor.delete(
-            use_models=use_models, remove_referenced_call=remove_referenced_call
+            use_models=use_models,
+            remove_referenced_call=remove_referenced_call,
+            injected_filters=_injected_filters_deletion.get(),
         )
 
-    async def _get_raw(self, **kwargs: Any) -> tuple[BaseModelType, Any]:
+    async def _get_raw(
+        self, kwargs: dict | None = None, no_update_result_cache: bool = False
+    ) -> tuple[EdgyModel, EdgyEmbedTarget]:
         """
-        (Refactored: Builder logic stays, execution logic delegates)
+        Base method used by get like methods.
         """
         if kwargs:
             cached = cast(
-                tuple[BaseModelType, Any] | None, self._cache.get(self.model_class, kwargs)
+                "tuple[EdgyModel, EdgyEmbedTarget] | None",
+                self._cache.get(self.model_class, kwargs),
             )
             if cached is not None:
                 return cached
             filter_query = cast("BaseQuerySet", self.filter(**kwargs))
             filter_query._cache = self._cache
-            return await filter_query._get_raw()
+            return await filter_query._get_raw(no_update_result_cache=no_update_result_cache)
         elif self._cache_count == 1:
             if self._cache_first is not None:
                 return self._cache_first
             elif self._cache_last is not None:
                 return self._cache_last
-
-        compiler = QueryCompiler(self)
-        parser = ResultParser(self)
-        executor = QueryExecutor(self, compiler, parser)
-        return await executor.get_one()
+        executor = QueryExecutor(self)
+        return cast(
+            "tuple[EdgyModel, EdgyEmbedTarget]",
+            await executor.get_one(no_update_result_cache=no_update_result_cache),
+        )

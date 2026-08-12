@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import warnings
-from collections.abc import AsyncGenerator, Sequence
+from collections.abc import AsyncGenerator, Iterable, Sequence
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, cast
 
@@ -9,17 +9,17 @@ import sqlalchemy
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.datastructures import QueryModelResultCache
+from edgy.core.db.querysets.clauses import and_, or_
+from edgy.core.db.querysets.parser import ResultParser
 from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.db import check_db_connection, hash_tablekey
-from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError
+from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError, SkipOperation
 
 from .types import EdgyEmbedTarget, EdgyModel
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.base import BaseQuerySet
-    from edgy.core.db.querysets.compiler import QueryCompiler
-    from edgy.core.db.querysets.parser import ResultParser
     from edgy.core.db.querysets.queryset import QuerySet
 
     from .types import tables_and_models_type
@@ -47,28 +47,33 @@ class QueryExecutor:
     def __init__(
         self,
         queryset: BaseQuerySet,
-        compiler: QueryCompiler,
-        parser: ResultParser,
     ):
         """
         Initializes the QueryExecutor.
 
         Args:
             queryset: The BaseQuerySet instance holding the query state.
-            compiler: The QueryCompiler to be used for WHERE clauses (e.g., in deletes).
-            parser: The ResultParser to be used for turning rows into models.
         """
+        self.set_queryset(queryset)
+
+    def set_queryset(self, queryset: BaseQuerySet) -> None:
+        from .compiler import QueryCompiler
+
         # we need so many internals, so we just cast to a QuerySet
         self.queryset = cast("QuerySet", queryset)
-        self.compiler = compiler
-        self.parser = parser
+        self.compiler = QueryCompiler(self.queryset)
+        self.parser: None | ResultParser = None
         self.database = queryset.database
         self.model_class = queryset.model_class
+
+    def init_parser(self, tables_and_models: tables_and_models_type) -> None:
+        from .parser import ResultParser
+
+        self.parser = ResultParser(self.queryset, tables_and_models)
 
     async def _process_and_yield_batch(
         self,
         batch: Sequence[sqlalchemy.Row],
-        tables_and_models: tables_and_models_type,
         new_cache: QueryModelResultCache,
     ) -> AsyncGenerator[tuple[tuple[EdgyModel, EdgyEmbedTarget], sqlalchemy.Row], None]:
         """
@@ -87,9 +92,10 @@ class QueryExecutor:
                 - (result_tuple): The (raw_model, embed_target) tuple.
                 - (row): The raw SQLAlchemy Row.
         """
-        prefetches = await self._prepare_prefetches_for_batch(batch, tables_and_models)
+        assert self.parser is not None, "parser not initialized"
+        prefetches = await self._prepare_prefetches_for_batch(batch, self.parser.tables_and_models)
         results: Sequence[tuple[EdgyModel, EdgyEmbedTarget]] = await self.parser.batch_to_models(
-            batch, tables_and_models, prefetches, new_cache
+            batch, prefetches, new_cache
         )
 
         for row_num, result_tuple in enumerate(results):
@@ -122,6 +128,7 @@ class QueryExecutor:
             qs = qs.distinct()
 
         expression, tables_and_models = await qs.as_select_with_tables()
+        self.init_parser(tables_and_models)
 
         if not fetch_all_at_once and bool(self.database.force_rollback):
             warnings.warn(
@@ -146,18 +153,18 @@ class QueryExecutor:
                     batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
 
                 # Use the new helper to process the single, large batch
-                async for result, row in self._process_and_yield_batch(
-                    batch, tables_and_models, new_cache
-                ):
+                async for result, row in self._process_and_yield_batch(batch, new_cache):
                     if counter == 0:
-                        qs._cache_first = result
+                        # qs is maybe a copy, so update cache on self.queryset
+                        self.queryset._cache_first = result
                     last_element = result
                     counter += 1
                     current_row[0] = row
                     yield result[1]
 
-                qs._cache_fetch_all = True
-                qs._cache = new_cache
+                # qs is maybe a copy, so update cache on self.queryset
+                self.queryset._cache_fetch_all = True
+                self.queryset._cache = new_cache
             else:
                 batch_num: int = 0
                 new_cache = QueryModelResultCache(qs._cache.attrs)
@@ -170,11 +177,9 @@ class QueryExecutor:
                         qs._cache_fetch_all = False
 
                         # Use the new helper to process each batch
-                        async for result, row in self._process_and_yield_batch(
-                            batch, tables_and_models, new_cache
-                        ):
+                        async for result, row in self._process_and_yield_batch(batch, new_cache):
                             if counter == 0:
-                                qs._cache_first = result
+                                self.queryset._cache_first = result
                             last_element = result
                             counter += 1
                             current_row[0] = row
@@ -182,15 +187,19 @@ class QueryExecutor:
                         batch_num += 1
 
                 if batch_num <= 1:
-                    qs._cache = new_cache
-                    qs._cache_fetch_all = True
+                    # qs is maybe a copy, so update cache on self.queryset
+                    self.queryset._cache = new_cache
+                    self.queryset._cache_fetch_all = True
         finally:
             _current_row_holder.reset(token)
+        # qs is maybe a copy, so update cache on self.queryset
+        self.queryset._cache_count = counter
+        self.queryset._cache_last = last_element
+        self.parser = None
 
-        qs._cache_count = counter
-        qs._cache_last = last_element
-
-    async def get_one(self) -> tuple[EdgyModel, EdgyEmbedTarget]:
+    async def get_one(
+        self, no_update_result_cache: bool = False
+    ) -> tuple[EdgyModel, EdgyEmbedTarget]:
         """
         Fetches a single unique record from the database.
         This is the refactored _get_raw (when no kwargs are present).
@@ -203,6 +212,7 @@ class QueryExecutor:
             MultipleObjectsReturned: If more than one record is found.
         """
         expression, tables_and_models = await self.queryset.as_select_with_tables()
+        self.init_parser(tables_and_models)
         check_db_connection(self.database, stacklevel=4)
 
         async with self.database as database:
@@ -215,14 +225,17 @@ class QueryExecutor:
             raise MultipleObjectsReturned()
 
         self.queryset._cache_count = 1
+        if no_update_result_cache:
+            resultsingle: EdgyModel = await self.parser.row_to_model_uncached(rows[0])
+            return resultsingle, cast(EdgyEmbedTarget, resultsingle)
 
-        result: tuple[EdgyModel, EdgyEmbedTarget] = await self.parser.row_to_model(
-            rows[0], tables_and_models
-        )
+        result: tuple[EdgyModel, EdgyEmbedTarget] = await self.parser.row_to_model(rows[0])
 
         # Update cache attributes
+        self.queryset._cache_fetch_all = True
         self.queryset._cache_first = result
         self.queryset._cache_last = result
+        self.parser = None
         return result
 
     async def _prepare_prefetches_for_batch(
@@ -295,7 +308,10 @@ class QueryExecutor:
         return prepared_prefetches
 
     async def delete(
-        self, use_models: bool = False, remove_referenced_call: str | bool = False
+        self,
+        use_models: bool = False,
+        remove_referenced_call: str | bool = False,
+        injected_filters: Iterable = (),
     ) -> int:
         """
         Executes a delete operation.
@@ -317,6 +333,8 @@ class QueryExecutor:
             or self.model_class.meta.post_delete_fields
         ):
             use_models = True
+        if injected_filters:
+            self.set_queryset(self.queryset.filter(*injected_filters))
 
         if use_models:
             row_count = await self._model_based_delete(
@@ -331,7 +349,8 @@ class QueryExecutor:
                 row_count = cast(int, await database.execute(expression))
 
         # clear cache after deletion.
-        self.queryset._clear_cache(keep_cached_selected=True)
+        if row_count != 0:
+            self.queryset._clear_cache(keep_cached_selected=True)
         return row_count
 
     async def _model_based_delete(self, remove_referenced_call: str | bool) -> int:
@@ -347,38 +366,44 @@ class QueryExecutor:
         Returns:
             The total number of models deleted.
         """
-        from edgy.core.db.querysets.compiler import QueryCompiler
-        from edgy.core.db.querysets.parser import ResultParser
 
         queryset = (
             self.queryset.limit(self.queryset._batch_size)
-            if not self.queryset._cache_fetch_all
-            else self.queryset
+            if self.queryset._batch_size is not None
+            else self.queryset.all()
         )
         queryset.embed_parent = None
         row_count = 0
 
-        compiler = QueryCompiler(queryset)
-        parser = ResultParser(queryset)
-
-        # Instantiate the QueryExecutor recursively for the new queryset
-        executor = QueryExecutor(queryset, compiler, parser)
-
-        # Uuse the new executor's iterate method
-        models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
-
+        executor = QueryExecutor(queryset)
         token = CURRENT_INSTANCE.set(self.queryset)
         try:
+            # Use the new executor's iterate method
+            models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
             while models:
+                exclusion_filters = []
                 for model in models:
-                    await model.raw_delete(
-                        skip_post_delete_hooks=False, remove_referenced_call=remove_referenced_call
-                    )
-                    row_count += 1
+                    try:
+                        _row_count = await model.raw_delete(
+                            skip_post_delete_hooks=False,
+                            remove_referenced_call=remove_referenced_call,
+                        )
+                    except SkipOperation:
+                        # raised from raw_delete
+                        exclusion_filters.append(and_(*model.identifying_clauses()))
+                        continue
+                    if _row_count != 0:
+                        row_count += 1
 
+                # we fetched all
+                if self.queryset._batch_size is None:
+                    break
+                if exclusion_filters:
+                    executor.set_queryset(executor.queryset.exclude(or_(*exclusion_filters)))
+                    # clear again
+                    exclusion_filters.clear()
                 # clear cache and fetch new batch
-                # reuse cached query
-                queryset._clear_cache(keep_cached_selected=True)
+                executor.queryset._clear_cache(keep_cached_selected=True)
                 models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
         finally:
             CURRENT_INSTANCE.reset(token)

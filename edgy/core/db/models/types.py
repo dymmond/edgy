@@ -259,6 +259,8 @@ class BaseModelType(ABC):
             The `remove_referenced_call` as a string is crucial when traversing
             related fields for deletions, as it helps in trimming stub back
             references that might otherwise lead to incorrect model deletions.
+
+            The model type raw_delete can raise SkipOperation.
         """
 
     @abstractmethod

@@ -20,11 +20,11 @@ from edgy.core.db.fields import CharField, TextField
 from edgy.core.db.models.model_reference import ModelRef
 from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.models.utils import apply_instance_extras
-from edgy.core.db.querysets.base import BaseQuerySet
+from edgy.core.db.querysets.base import BaseQuerySet, _injected_filters_deletion
 from edgy.core.db.querysets.parser import ResultParser
 from edgy.core.utils.db import CHECK_DB_CONNECTION_SILENCED, check_db_connection
 from edgy.core.utils.sync import run_sync
-from edgy.exceptions import ObjectNotFound, QuerySetError
+from edgy.exceptions import ObjectNotFound, QuerySetError, SkipOperation
 
 from .bulk import BulkOperation
 from .types import (
@@ -887,7 +887,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             ObjectNotFound: If no object is found.
             MultipleObjectsReturned: If more than one object is found (implicitly handled by underlying `_get_raw`).
         """
-        return cast(EdgyEmbedTarget, (await self._get_raw(**kwargs))[1])
+        return (await self._get_raw(kwargs=kwargs))[1]
 
     select = get
 
@@ -900,10 +900,10 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         Returns:
             The first model instance, or `None` if the QuerySet is empty.
         """
-        if self._cache_count is not None and self._cache_count == 0:
+        if self._cache_count == 0:
             return None
         if self._cache_first is not None:
-            return cast(EdgyEmbedTarget, self._cache_first[1])
+            return self._cache_first[1]
         queryset = self
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
@@ -913,22 +913,22 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         async with queryset.database as database:
             row = await database.fetch_one(expression, pos=0)
         if row:
-            parser = ResultParser(self)
-            result_tuple: tuple[Any, EdgyEmbedTarget] = await parser.row_to_model(
-                row, tables_and_models
-            )
+            parser = ResultParser(self, tables_and_models)
+            result_tuple: tuple[Any, EdgyEmbedTarget] = await parser.row_to_model(row)
             self._cache_first = result_tuple
             return result_tuple[1]
+        else:
+            self._cache_count = 0
         return None
 
     async def last(self) -> EdgyEmbedTarget | None:
         """
         Returns the last record from the QuerySet...
         """
-        if self._cache_count is not None and self._cache_count == 0:
+        if self._cache_count == 0:
             return None
         if self._cache_last is not None:
-            return cast(EdgyEmbedTarget, self._cache_last[1])
+            return self._cache_last[1]
         queryset = self
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
@@ -940,12 +940,12 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             row = await database.fetch_one(expression, pos=0)
         if row:
             # NEW FIXED LINES:
-            parser = ResultParser(self)
-            result_tuple: tuple[Any, EdgyEmbedTarget] = await parser.row_to_model(
-                row, tables_and_models
-            )
+            parser = ResultParser(self, tables_and_models)
+            result_tuple: tuple[Any, EdgyEmbedTarget] = await parser.row_to_model(row)
             self._cache_last = result_tuple
             return result_tuple[1]
+        else:
+            self._cache_count = 0
         return None
 
     async def create(self, *args: Any, **kwargs: Any) -> EdgyEmbedTarget:
@@ -1032,16 +1032,39 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         Returns:
             int: The number of rows deleted.
         """
-        await self.model_class.meta.signals.pre_delete.send_async(
-            self.model_class, instance=self, model_instance=None
-        )
-        row_count = await self.raw_delete(use_models=use_models, remove_referenced_call=False)
+        injected_filters: list[Any] = []
+        try:
+            await self.model_class.meta.signals.pre_delete.send_async(
+                self.model_class,
+                instance=self,
+                model_instance=None,
+                injected_filters=injected_filters,
+            )
+        except SkipOperation:
+            await self.model_class.meta.signals.post_delete.send_async(
+                self.model_class,
+                instance=self,
+                model_instance=None,
+                row_count=0,
+                operation_skipped=True,
+            )
+
+            return 0
+        token = _injected_filters_deletion.set(injected_filters)
+        try:
+            row_count = await self.raw_delete(use_models=use_models, remove_referenced_call=False)
+        finally:
+            _injected_filters_deletion.reset(token)
         await self.model_class.meta.signals.post_delete.send_async(
-            self.model_class, instance=self, model_instance=None, row_count=row_count
+            self.model_class,
+            instance=self,
+            model_instance=None,
+            row_count=row_count,
+            operation_skipped=False,
         )
         return row_count
 
-    async def update(self, **kwargs: Any) -> None:
+    async def update(self, **kwargs: Any) -> None | int:
         """
         Updates records in a specific table with the given keyword arguments, matching the QuerySet's filters.
 
@@ -1053,6 +1076,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
 
         Args:
             **kwargs: The field names and new values to apply to the matching records.
+        Returns:
+            int | None: Amount of rows changed if known for the database.
         """
 
         column_values = self.model_class.extract_column_values(
@@ -1065,21 +1090,36 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
 
         # Broadcast the initial update details
         # add is_update to match save
-        await self.model_class.meta.signals.pre_update.send_async(
-            self.model_class,
-            instance=self,
-            model_instance=None,
-            values=kwargs,
-            column_values=column_values,
-            is_update=True,
-            is_migration=False,
-        )
+        try:
+            await self.model_class.meta.signals.pre_update.send_async(
+                self.model_class,
+                instance=self,
+                model_instance=None,
+                values=kwargs,
+                column_values=column_values,
+                is_update=True,
+                is_migration=False,
+            )
+        except SkipOperation:
+            await self.model_class.meta.signals.post_update.send_async(
+                self.model_class,
+                instance=self,
+                model_instance=None,
+                values=kwargs,
+                column_values=column_values,
+                is_update=True,
+                is_migration=False,
+                row_count=0,
+                operation_skipped=True,
+            )
+            return 0
 
         expression = self.table.update().values(**column_values)
         expression = expression.where(await self.build_where_clause())
         check_db_connection(self.database)
+        row_count: int | None
         async with self.database as database:
-            await database.execute(expression)
+            row_count = cast(int | None, await database.execute(expression))
 
         # Broadcast the update executed
         # add is_update to match save
@@ -1091,8 +1131,11 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             column_values=column_values,
             is_update=True,
             is_migration=False,
+            row_count=row_count,
+            operation_skipped=False,
         )
         self._clear_cache()
+        return row_count
 
     async def get_or_create(
         self, defaults: dict[str, Any] | Any | None = None, *args: Any, **kwargs: Any
@@ -1117,7 +1160,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             defaults = {}
 
         try:
-            raw_instance, get_instance = await self._get_raw(**kwargs)
+            raw_instance, resolved = await self._get_raw(kwargs=kwargs)
         except ObjectNotFound:
             kwargs.update(defaults)
             instance: EdgyEmbedTarget = await self.create(*args, **kwargs)
@@ -1141,7 +1184,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 )
                 relation = getattr(raw_instance, arg.__related_name__)
                 await relation.add(model)
-        return cast(EdgyEmbedTarget, get_instance), False
+        return resolved, False
 
     select_or_insert = get_or_create
 
@@ -1166,12 +1209,14 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             args = (defaults, *args)
             defaults = {}
         try:
-            raw_instance, get_instance = await self._get_raw(**kwargs)
+            # bypass cache
+            raw_instance = (await self._get_raw(kwargs=kwargs, no_update_result_cache=True))[0]
         except ObjectNotFound:
             kwargs.update(defaults)
             instance: EdgyEmbedTarget = await self.create(*args, **kwargs)
             return instance, True
-        await get_instance.update(**defaults)
+        # when updating the resolved, we can end up with a complete different model type
+        await raw_instance.update(**defaults)
         for arg in args:
             if isinstance(arg, ModelRef):
                 relation_field = self.model_class.meta.fields[arg.__related_name__]
@@ -1191,8 +1236,22 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 )
                 relation = getattr(raw_instance, arg.__related_name__)
                 await relation.add(model)
-        self._clear_cache()
-        return cast(EdgyEmbedTarget, get_instance), False
+        # we can keep the result cache because we update it and the results are only used for parsing
+        self._clear_cache(keep_cached_selected=True, keep_result_cache=True)
+        # now resolve again
+        resolved = (await self._embed_parent_in_result(raw_instance))[1]
+        # update the result cache now
+        self._cache.update(
+            self.model_class,
+            values=[(raw_instance, resolved)],
+            cache_keys=[self._cache.create_cache_key(self.model_class, raw_instance)],
+        )
+        if not kwargs:
+            # 1. no extra filters, 2. only one result => we can fill the cache
+            self._cache_first = (raw_instance, resolved)
+            self._cache_last = (raw_instance, resolved)
+            self._cache_fetch_all = True
+        return resolved, False
 
     update_or_insert = update_or_create
 
@@ -1228,7 +1287,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
         *,
-        ignore_conflicts: Literal[True],
+        ignore_conflicts: bool = False,
         resolve_embed: Literal[True],
     ) -> list[EdgyEmbedTarget | None]: ...
 
@@ -1237,27 +1296,10 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
         *,
-        ignore_conflicts: Literal[False] = False,
-        resolve_embed: Literal[True],
-    ) -> list[EdgyEmbedTarget]: ...
-
-    @overload
-    async def bulk_create(
-        self,
-        objs: Iterable[dict[str, Any] | EdgyModel],
-        *,
-        ignore_conflicts: Literal[True],
+        ignore_conflicts: bool = False,
         resolve_embed: Literal[False] = False,
     ) -> list[EdgyModel | None]: ...
 
-    @overload
-    async def bulk_create(
-        self,
-        objs: Iterable[dict[str, Any] | EdgyModel],
-        *,
-        ignore_conflicts: Literal[False] = False,
-        resolve_embed: Literal[False] = False,
-    ) -> list[EdgyModel]: ...
     async def bulk_create(
         self,
         objs: Iterable[dict[str, Any] | EdgyModel],
@@ -1279,7 +1321,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             resolve_embed (bool): Triggers mode in which embedding is applied when True.
 
         Returns:
-            list[EdgyModel] | list[EdgyEmbedTarget]:
+            list[EdgyModel | None] | list[EdgyEmbedTarget | None]:
                 A list of created objects.
                 Warning: for performance reasons no embedding is applied by default and
                 the returned objects are maybe incomplete (check `can_load` property).
@@ -1301,7 +1343,14 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             ignore_create_conflicts=ignore_conflicts,
         )
         await operation.prepare(objs)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            await operation.send_post_signal()
+            return cast(
+                "list[EdgyModel | None] | list[EdgyEmbedTarget | None]",
+                [None for _ in operation.instances_and_created],
+            )
         await operation.apply_db()
         operation.update_cache()
         await operation.send_post_signal()
@@ -1405,7 +1454,14 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             resolve_embed=resolve_embed,
         )
         await operation.prepare(objs)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            await operation.send_post_signal()
+            return cast(
+                "list[EdgyModel | None] | list[EdgyEmbedTarget | None]",
+                [None for _ in operation.instances_and_created],
+            )
         await operation.apply_db()
         operation.update_cache()
         await operation.send_post_signal()
@@ -1508,7 +1564,14 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             resolve_embed=resolve_embed,
         )
         await operation.prepare(objs)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            await operation.send_post_signal()
+            return cast(
+                "list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget | None, bool]]",
+                [(None, False) for _ in operation.instances_and_created],
+            )
         await operation.apply_db()
         operation.update_cache()
         await operation.send_post_signal()
@@ -1521,7 +1584,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         *,
         unique_fields: Iterable[str] | None = None,
         resolve_embed: Literal[True],
-    ) -> list[tuple[EdgyEmbedTarget, bool]]: ...
+    ) -> list[tuple[EdgyEmbedTarget | None, bool]]: ...
 
     @overload
     async def bulk_get_or_create(
@@ -1530,7 +1593,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         *,
         unique_fields: Iterable[str] | None = None,
         resolve_embed: Literal[False] = False,
-    ) -> list[tuple[EdgyModel, bool]]: ...
+    ) -> list[tuple[EdgyModel | None, bool]]: ...
 
     async def bulk_get_or_create(
         self,
@@ -1538,7 +1601,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         *,
         unique_fields: Iterable[str] | None = None,
         resolve_embed: bool = False,
-    ) -> list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+    ) -> list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget | None, bool]]:
         """
         Bulk gets or creates records in a table.
 
@@ -1553,7 +1616,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             resolve_embed (bool): Triggers mode in which embedding is applied when True.
 
         Returns:
-            list[tuple[EdgyModel, bool]] | list[tuple[EdgyEmbedTarget, bool]]:
+            list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget | None, bool]]:
                 A list of tuples with retrieved or newly created objects and created flag.
                 Warning: for performance reasons no embedding is applied by default and
                 the returned objects are maybe incomplete (check `can_load` property).
@@ -1588,7 +1651,14 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             resolve_embed=resolve_embed,
         )
         await operation.prepare(objs)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            await operation.send_post_signal()
+            return cast(
+                "list[tuple[EdgyModel | None, bool]] | list[tuple[EdgyEmbedTarget | None, bool]]",
+                [(None, False) for _ in operation.instances_and_created],
+            )
         await operation.apply_db()
         operation.update_cache()
         await operation.send_post_signal()
@@ -1609,6 +1679,9 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             A `Transaction` context manager.
         """
         return self.database.transaction(force_rollback=force_rollback, **kwargs)
+
+    def __repr__(self) -> str:
+        return f"QuerySet<for <{self.model_class.__name__}> at {hex(id(self))}>"
 
     def __await__(
         self,

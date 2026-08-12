@@ -10,7 +10,12 @@ from pydantic import BaseModel
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.querysets.bulk import BulkOperation
 from edgy.core.db.querysets.clauses import and_, or_
-from edgy.exceptions import ObjectNotFound, RelationshipIncompatible, RelationshipNotFound
+from edgy.exceptions import (
+    ObjectNotFound,
+    RelationshipIncompatible,
+    RelationshipNotFound,
+    SkipOperation,
+)
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
@@ -174,7 +179,13 @@ class ManyRelation(ManyRelationProtocol):
             resolve_embed=False,
         )
         await operation.prepare(refs)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            operation.signal_params["row_count"] = 0
+            operation.signal_params["row_count_create"] = 0
+            await operation.send_post_signal()
+            return
         await operation.apply_db()
         # no cache update because the queryset is temporarysignal
         # both parameters are the same here
@@ -312,7 +323,7 @@ class ManyRelation(ManyRelationProtocol):
         Returns:
             list[BaseModelType | None]: A list of saved intermediate model instances,
                                         or None for each record that already exists
-                                        (IntegrityError).
+                                        or for each child None when operation was skipped.
         """
         prepared = []
         through = self.through
@@ -342,7 +353,13 @@ class ManyRelation(ManyRelationProtocol):
             resolve_embed=True,
         )
         await operation.prepare(prepared)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            operation.signal_params["row_count"] = 0
+            operation.signal_params["row_count_create"] = 0
+            await operation.send_post_signal()
+            return [None for _ in prepared]
         await operation.apply_db()
         # no cache update because the queryset is temporary
         # we can just rename the signals parameters for the post signal
@@ -371,7 +388,9 @@ class ManyRelation(ManyRelationProtocol):
         Raises:
             RelationshipIncompatible: If the child type is not compatible.
         """
-        return (await self.add_many(child))[0]
+        results = await self.add_many(child)
+        # bail out if no results are returned, in case the result list is modified in signals
+        return results[0] if results else None
 
     async def remove_many(self, *children: BaseModelType) -> None:
         """
@@ -423,16 +442,43 @@ class ManyRelation(ManyRelationProtocol):
                     **self._shared_relation_signals_params,
                 )
             )
-        await asyncio.gather(*ops)
+        try:
+            await asyncio.gather(*ops)
+        except SkipOperation:
+            ops = []
+            # not really necessary but be safe
+            seen_signals.clear()
+            for model_class in [
+                self._shared_relation_signals_params["source"],
+                self._shared_relation_signals_params["target"],
+                through,
+            ]:
+                signal = model_class.meta.signals.post_relation_remove
+                if (signal_id := id(signal)) in seen_signals:
+                    continue
+                seen_signals.add(signal_id)
+                ops.append(
+                    signal.send_async(
+                        through,
+                        instance=self.instance,
+                        raw_values=prepared,
+                        row_count=0,
+                        operation_skipped=True,
+                        model_based_deletion=model_based_deletion,
+                        **self._shared_relation_signals_params,
+                    )
+                )
+            await asyncio.gather(*ops)
+            return
         if prepared:
             queryset = self.get_queryset().update_embed_parent(None)
             # children can be removed by setting them to None
             clauses = [
                 and_(*child.identifying_clauses()) for child in prepared if child is not None
             ]
-            query = queryset.filter(or_(*clauses))
+            queryset = queryset.filter(or_(*clauses))
             async with queryset.transaction():
-                row_count = await query.raw_delete(use_models=model_based_deletion)
+                row_count = await queryset.raw_delete(use_models=model_based_deletion)
                 if row_count is not None and row_count != len(clauses):
                     related_name = fk_source.name
                     raise RelationshipNotFound(
@@ -462,6 +508,7 @@ class ManyRelation(ManyRelationProtocol):
                     instance=self.instance,
                     raw_values=prepared,
                     row_count=row_count,
+                    operation_skipped=False,
                     model_based_deletion=model_based_deletion,
                     **self._shared_relation_signals_params,
                 )
@@ -771,7 +818,13 @@ class SingleRelation(ManyRelationProtocol):
         )
         await operation.prepare(refs)
         operation.signal_params["instance"] = self.instance
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            operation.signal_params["row_count"] = 0
+            operation.signal_params["row_count_create"] = 0
+            await operation.send_post_signal()
+            return
         await operation.apply_db()
         # no cache update because the queryset is temporary
         # we can just rename the signals parameters for the post signal
@@ -811,7 +864,9 @@ class SingleRelation(ManyRelationProtocol):
         Raises:
             RelationshipIncompatible: If the child type is not compatible.
         """
-        return (await self.add_many(child))[0]
+        results = await self.add_many(child)
+        # bail out if no results are returned, in case the result list is modified in signals
+        return results[0] if results else None
 
     async def add_many(self, *children: BaseModelType) -> list[BaseModelType | None]:
         """
@@ -824,7 +879,8 @@ class SingleRelation(ManyRelationProtocol):
                                         model or a dictionary.
 
         Returns:
-            list[BaseModelType | None]: A list of saved child model instances.
+            list[BaseModelType | None]: A list of saved intermediate model instances,
+                                        or None for each record when the operation was skipped.
 
         Raises:
             RelationshipIncompatible: If a child type is not compatible.
@@ -854,7 +910,11 @@ class SingleRelation(ManyRelationProtocol):
             resolve_embed=True,
         )
         await operation.prepare(prepared)
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            await operation.send_post_signal()
+            return [None for _ in prepared]
         await operation.apply_db()
         # no cache update because the queryset is temporary
         # we can just rename the signals parameters for the post signal
@@ -921,7 +981,12 @@ class SingleRelation(ManyRelationProtocol):
         del operation.signal_params["create_params"]
         del operation.signal_params["update_params"]
         operation.signal_params["raw_values"] = raw_values
-        await operation.send_pre_signal()
+        try:
+            await operation.send_pre_signal()
+        except SkipOperation:
+            operation.signal_params["row_count"] = 0
+            await operation.send_post_signal()
+            return
         # allow modification via raw_values
         obj_ids = [id(obj) for obj in raw_values]
         operation.update_params = [tup for tup in operation.update_params if id(tup[0]) in obj_ids]
@@ -1026,5 +1091,5 @@ class VirtualCascadeDeletionSingleRelation(SingleRelation):
             # Determine whether to use model-based deletion from the foreign key's configuration.
             use_models=self.to.meta.fields[self.to_foreign_key].use_model_based_deletion,
             # Specify the foreign key that references the deleted instance to ensure correct removal.
-            remove_referenced_call=self.to_foreign_key,
+            remove_referenced_call=self.to_foreign_key or True,
         )

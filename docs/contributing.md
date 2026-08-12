@@ -63,7 +63,7 @@ $ hatch env create docs
 
 ### Enable pre-commit
 
-The project comes with a pre-commit hook configuration. To enable it, just run inside the clone:
+The project comes with a pre-commit (or prek) hook configuration. To enable it, just run inside the clone:
 
 ```shell
 $ hatch run  pre-commit install
@@ -91,6 +91,9 @@ $ hatch test tests/test_apiviews.py
 ```
 
 Pytest native arguments can be passed after passing `--`.
+
+!!! Warning
+    You need pytest >= 9.0 for subtests. This can be an issue with old hatch versions or old hatch environments.
 
 To run the linting, use:
 

@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import check_db_connection
-from edgy.exceptions import QuerySetError
+from edgy.exceptions import QuerySetError, SkipOperation
 
 from .types import (
     EdgyEmbedTarget,
@@ -354,7 +354,13 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                     **self.signal_params,
                 )
             )
-        await asyncio.gather(*ops)
+        try:
+            await asyncio.gather(*ops)
+        except SkipOperation as exc:
+            self.execution_step = 4  # cache
+            self.signal_params["operation_skipped"] = True
+            self.signal_params["values"] = None
+            raise exc
 
     async def apply_db(self) -> None:
         """
@@ -618,6 +624,7 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
             "values": self.result,
             "create_params": self.create_params,
             "update_params": self.update_params,
+            "operation_skipped": False,
             **self.provided_signal_params,
         }
         if self.create:

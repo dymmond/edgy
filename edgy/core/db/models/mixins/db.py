@@ -32,7 +32,12 @@ from edgy.core.db.models.utils import build_pkcolumns
 from edgy.core.db.relationships.related_field import RelatedField
 from edgy.core.utils.db import check_db_connection, hash_names
 from edgy.core.utils.models import create_edgy_model
-from edgy.exceptions import ForeignKeyBadConfigured, ModelCollisionError, ObjectNotFound
+from edgy.exceptions import (
+    ForeignKeyBadConfigured,
+    ModelCollisionError,
+    ObjectNotFound,
+    SkipOperation,
+)
 from edgy.types import Undefined
 
 if sys.version_info >= (3, 11):  # pragma: no cover
@@ -779,13 +784,25 @@ class DatabaseMixin:
             model_instance=self,
             evaluate_values=True,
         )
-        await pre_fn(
-            real_class,
-            model_instance=self,
-            instance=instance,
-            values=kwargs,
-            column_values=column_values,
-        )
+        try:
+            await pre_fn(
+                real_class,
+                model_instance=self,
+                instance=instance,
+                values=kwargs,
+                column_values=column_values,
+            )
+        except SkipOperation:
+            await post_fn(
+                real_class,
+                model_instance=self,
+                instance=instance,
+                values=kwargs,
+                column_values=column_values,
+                operation_skipped=True,
+                row_count=0,
+            )
+            return 0
         # empty updates shouldn't cause an error. E.g. only model references are updated
         clauses = self.identifying_clauses()
         row_count: int | None = None
@@ -819,6 +836,8 @@ class DatabaseMixin:
             instance=instance,
             values=kwargs,
             column_values=column_values,
+            operation_skipped=False,
+            row_count=row_count,
         )
         return row_count
 
@@ -882,9 +901,20 @@ class DatabaseMixin:
             instance is not self or remove_referenced_call
         )
         if with_signals:
-            await self.meta.signals.pre_delete.send_async(
-                real_class, instance=instance, model_instance=self
-            )
+            try:
+                await self.meta.signals.pre_delete.send_async(
+                    real_class, instance=instance, model_instance=self, injected_filters=None
+                )
+            except SkipOperation as exc:
+                await self.meta.signals.post_delete.send_async(
+                    real_class,
+                    instance=CURRENT_INSTANCE.get(),
+                    model_instance=self,
+                    row_count=0,
+                    operation_skipped=True,
+                )
+                # reraises
+                raise exc
         ignore_fields: set[str] = set()
         if remove_referenced_call and isinstance(remove_referenced_call, str):
             ignore_fields.add(remove_referenced_call)
@@ -937,6 +967,7 @@ class DatabaseMixin:
                 instance=CURRENT_INSTANCE.get(),
                 model_instance=self,
                 row_count=row_count,
+                operation_skipped=False,
             )
         return row_count
 
@@ -950,19 +981,31 @@ class DatabaseMixin:
             skip_post_delete_hooks: If True, post-delete hooks will not be executed.
         """
         real_class = self.get_real_class()
-        await self.meta.signals.pre_delete.send_async(
-            real_class, instance=self, model_instance=self
-        )
+        try:
+            await self.meta.signals.pre_delete.send_async(
+                real_class, instance=self, model_instance=self, injected_filters=None
+            )
+        except SkipOperation:
+            await self.meta.signals.post_delete.send_async(
+                real_class, instance=self, model_instance=self, row_count=0, operation_skipped=True
+            )
+            return 0
         token = CURRENT_INSTANCE.set(self)
         try:
             row_count = await self.raw_delete(
                 skip_post_delete_hooks=skip_post_delete_hooks,
                 remove_referenced_call=False,
             )
+        except SkipOperation:
+            row_count = 0
         finally:
             CURRENT_INSTANCE.reset(token)
         await self.meta.signals.post_delete.send_async(
-            real_class, instance=self, model_instance=self, row_count=row_count
+            real_class,
+            instance=self,
+            model_instance=self,
+            row_count=row_count,
+            operation_skipped=False,
         )
         return row_count
 
@@ -1070,13 +1113,24 @@ class DatabaseMixin:
             model_instance=self,
             evaluate_values=evaluate_values,
         )
-        await pre_fn(
-            real_class,
-            model_instance=self,
-            instance=instance,
-            column_values=column_values,
-            values=kwargs,
-        )
+        try:
+            await pre_fn(
+                real_class,
+                model_instance=self,
+                instance=instance,
+                column_values=column_values,
+                values=kwargs,
+            )
+        except SkipOperation:
+            await post_fn(
+                real_class,
+                model_instance=self,
+                instance=instance,
+                column_values=column_values,
+                values=kwargs,
+                operation_skipped=True,
+            )
+            return
         check_db_connection(self.database, stacklevel=4)
         table: sqlalchemy.Table = self.table
         async with (
@@ -1132,6 +1186,7 @@ class DatabaseMixin:
             instance=instance,
             column_values=column_values,
             values=kwargs,
+            operation_skipped=False,
         )
 
     async def real_save(
@@ -1177,6 +1232,7 @@ class DatabaseMixin:
                 if value is None and self.table.columns[pkcolumn].autoincrement:
                     extracted_fields.pop(pkcolumn, None)
                     force_insert = True
+                    break
                 field = self.meta.fields.get(pkcolumn)
                 # this is an IntegerField/DateTime with primary_key set
                 if field is not None:
@@ -1185,10 +1241,12 @@ class DatabaseMixin:
                     ):
                         # we create a new revision.
                         force_insert = True
+                        break
                     elif getattr(field, "auto_now_add", False):  # noqa: SIM102
                         # force_insert if auto_now_add field is empty
                         if value is None:
                             force_insert = True
+                            break
 
             # check if it exists
             if not force_insert and not await self.check_exist_in_db(only_needed=True):
@@ -1203,8 +1261,8 @@ class DatabaseMixin:
                     extracted_fields.update(values)
                 # force save must ensure a complete mapping
                 await self._insert(
-                    bool(values),
-                    extracted_fields,
+                    evaluate_values=bool(values),
+                    kwargs=extracted_fields,
                     pre_fn=partial(
                         self.meta.signals.pre_save.send_async, is_update=False, is_migration=False
                     ),
@@ -1215,9 +1273,9 @@ class DatabaseMixin:
                 )
             else:
                 await self._update(
-                    # assume partial when values are None
-                    values is not None,
-                    extracted_fields if values is None else values,
+                    # assume partial when values are not None
+                    is_partial=values is not None,
+                    kwargs=extracted_fields if values is None else values,
                     pre_fn=partial(
                         self.meta.signals.pre_save.send_async, is_update=True, is_migration=False
                     ),

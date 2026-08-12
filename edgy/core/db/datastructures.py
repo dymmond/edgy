@@ -234,7 +234,7 @@ class QueryModelResultCache:
         Returns:
             Self: A new `QueryModelResultCache` instance.
         """
-        return self.__class__(attrs, prefix=prefix, cache=self.cache)
+        return type(self)(attrs, prefix=prefix, cache=self.cache)
 
     def clear(
         self, model_class: type[BaseModelType] | None = None, prefix: str | None = None
@@ -600,3 +600,7 @@ class QueryModelResultCache:
             prefix=prefix,
         )
         return results
+
+    def __bool__(self) -> bool:
+        """Copy empty check of internal cache dictionary."""
+        return bool(self.cache)

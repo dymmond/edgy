@@ -24,12 +24,19 @@ from edgy.core.signals import (
     post_update,
     post_migrate,
     pre_migrate,
-    pre_relation,
-    post_relation,
+    pre_relation_add,
+    post_relation_add,
+    pre_relation_remove,
+    post_relation_remove,
     pre_bulk,
     post_bulk,
 )
 ```
+
+#### Pre Operations special exception
+
+If you just want to **skip** the operation without causing a bigger error, you can raise `edgy.exceptions.SkipOperation` to stop the operation and
+returning an empty value and send the corresponding post signal with `operation_skipped=True`.
 
 #### pre_save
 
@@ -69,12 +76,14 @@ post_update(sender: type["Model"], instance: Union["Model", "QuerySet"], model_i
 
 The receiver function receives following parameters:
 
-- instance - The model or QuerySet instance.
-- model_instance -The model instance if available. For save signals always available
-- values - The passed values.
-- column_values - The parsed values which are used for the db.
-- is_update - Is it an update? This is also set for `*_update` to match the save parameters.
-- is_migration - Called from `apply_default_force_nullable_fields` which is mostly for migrations. Here we have model instances.
+- `instance` - The model or QuerySet instance.
+- `model_instance` -The model instance if available. For save signals always available
+- `values` - The passed values.
+- `column_values` - The parsed values which are used for the db.
+- `is_update` - Is it an update? This is also set for `*_update` to match the save parameters.
+- `is_migration` - Called from `apply_default_force_nullable_fields` which is mostly for migrations. Here we have model instances.
+- `row_count` - (post only) The rows updated.
+- `operation_skipped` - (post only) If the operation was skipped.
 
 #### pre_delete
 
@@ -84,10 +93,26 @@ Triggered before a model is deleted (during `Model.delete()` and `Model.query.de
 pre_delete(send: type["Model"], instance: Union["Model", "QuerySet"], model_instance: Optional["Model"])
 ```
 
+A more advanced example is:
+
+```python
+{!> ../docs_src/signals/prevent_deletion.py !}
+```
+
 ##### pre_delete parameters
 
-- instance - The model or QuerySet instance.
-- model_instance -The model instance if available.
+- `instance` - The model or QuerySet instance.
+- `model_instance` - The model instance if available otherwise `None`.
+- `injected_filters` (query only) - You can insert or remove (when inserted by another signal) extra filter parameters for query deletions.
+
+**Example for the insertion of new parameters**
+
+```python
+{!> ../docs_src/signals/excempt_from_deletion.py !}
+```
+
+You can also add `or_`, `and_` or other clauses valid for the `filter` method of `QuerySet`.
+By default they are combined like with `and_`.
 
 #### post_delete
 
@@ -150,17 +175,20 @@ And for revision:
 
 #### pre_bulk
 
-The `pre_bulk` signal is issued before the database modifications and allows before executing bulk operations to manipulate
-the instances.
+The `pre_bulk` signal is issued before the database modifications and allows before executing bulk operations to manipulate the instances. Sender is the queryset. When using bulk operations on the relation queryset the sender is either the `target` model (one-to-many) or `through` model (many-to-many).
+
+```python
+{!> ../docs_src/signals/manipulate_bulk.py !}
+```
 
 #### post_bulk
 
-The `post_bulk` signal is issued after the database modifications and contains information about how many rows were created and/or updated.
+The `post_bulk` signal is issued after the database modifications and contains information about how many rows were created and/or updated. When using bulk operations on the relation queryset the sender is either the `target` model (one-to-many) or `through` model (many-to-many).
 
 #### Parameters of `*_bulk` signals
 
 - `raw_values`: Raw model instances with created flag. No resolving of `embed_parent`.
-- `values` (post only): Resolved model instances with created flag. When not using `resolve_embed`, the raw model instances.
+- `values` (post only, only when operation_skipped=False): Resolved model instances with created flag. When not using `resolve_embed`, the raw model instances.
 - `operation`: `bulk_create`, `bulk_update`, `bulk_update_or_create`, `bulk_get_or_create`.
 - `resolve_embed`: Value of `resolve_embed`.
 - `create_params`: `(raw_instance, position in raw_values, set of input kwarg names)` tuple. You can prevent an insert operation by removing an tuple. You can move an tuple to update_params if the instance should be updated instead.
@@ -181,13 +209,19 @@ Methods where this trick can be applied are: `bulk_create` (with `ignore_conflic
 
 The `pre_relation_add` signal is issued before the database modifications and allows before executing changing the relations to manipulate the instances.
 
-For Many-to-Many relations the sender is the through model.
+The sender is either the `target` model (one-to-many) or `through` model (many-to-many). Signals are also issued on overwrites of `pre_relation_add` in source.meta.signals, through.meta.signals and target.meta.signals. However if the default signal or a shared signal is used it is only issued per different signal object, so you can expect when listening to one of the signals, you get notified only once.
+
+!!! Note
+    This signal is not issued if `add_many` is called with empty arguments or `save_related` is called when staged are empty.
 
 #### post_relation_add
 
 The `post_relation_add` signal is issued after the database modifications and contains information about how many rows were changed.
 
-For Many-to-Many relations the sender is the through model.
+The sender is either the `target` model (one-to-many) or `through` model (many-to-many). Signals are also issued on overwrites of `pre_relation_add` in source.meta.signals, through.meta.signals and target.meta.signals. However if the default signal or a shared signal is used it is only issued per different signal object, so you can expect when listening to one of the signals, you get notified only once.
+
+!!! Note
+    This signal is not issued if `add_many` is called with empty arguments or `save_related` is called when staged are empty.
 
 #### Parameters of `*_relation_add` signals
 
@@ -195,7 +229,7 @@ For Many-to-Many relations the sender is the through model.
 - `row_count`: How many rows were updated/created? `None` for db systems not supporting it.
 - `row_count_create`: How many rows were created? `None` for db systems not supporting it.
 - `raw_values`: Raw model instances with created flag of either the source model (`one_to_many`) or the `through` model (`many_to_many`). Useful in combination with `create_params` and `update_params` to tweak output. There is **no** resolving via `resolve_embed`
-- `values` (post only): The resolved counterpart instances with created flag.
+- `values` (post only, only when add, add_many and `operation_skipped=False`): The resolved counterpart instances with created flag.
 - `operation`: `save_related` and `add` (also issued for `add_many` and `create`).
 - `field`: RelationField name on `source` triggering this signal.
 - `source`: Source model which contains the RelationField triggering the signals.
@@ -203,6 +237,7 @@ For Many-to-Many relations the sender is the through model.
 - `relation`: Relation type. `one_to_many`, `many_to_many`.
 - `create_params`: See bulk signal parameter.
 - `update_params`: See bulk signal parameter.
+- `operation_skipped`: Is the operation skipped? This will lead to missing parameters (`values`)
 
 **Replacing raw_values/values**
 
@@ -212,7 +247,10 @@ Here every operation allows `None` values instead of instances. So it is no prob
 
 The `pre_relation_remove` signal is issued before the database modifications for the removal of connections and allow customizations including to stop the deletion by issuing an exception.
 
-For Many-to-Many relations the sender is the through model.
+The sender is either the `target` model (one-to-many) or `through` model (many-to-many). Signals are also issued on overwrites of `pre_relation_add` in source.meta.signals, through.meta.signals and target.meta.signals. However if the default signal or a shared signal is used it is only issued per different signal object, so you can expect when listening to one of the signals, you get notified only once.
+
+!!! Note
+    This signal is not issued if `remove_many` is called with empty arguments.
 
 **Remove from removal list**
 
@@ -220,17 +258,28 @@ You have two options to block the removal of an instance
 1. raise an exception
 2. remove the instance from `raw_values`
 
+```python
+{!> ../docs_src/signals/prevent_deletion.py !}
+```
+
+```python
+{!> ../docs_src/signals/excempt_from_deletion.py !}
+```
+
 #### post_relation_remove
 
 The `post_relation_remove` signal is issued after the database modifications for the removal of connections and contains information about how many rows were changed/removed.
 
-For Many-to-Many relations the sender is the through model.
+The sender is either the `target` model (one-to-many) or `through` model (many-to-many). Signals are also issued on overwrites of `pre_relation_add` in source.meta.signals, through.meta.signals and target.meta.signals. However if the default signal or a shared signal is used it is only issued per different signal object, so you can expect when listening to one of the signals, you get notified only once.
+
+!!! Note
+    This signal is not issued if `remove_many` is called with empty arguments.
 
 #### Parameters of `*_relation_remove signals`
 
 - `instance`: Source instance.
 - `row_count` (post): How many rows were updated/deleted? `None` for db systems not supporting it.
-- `raw_values`: Raw model instances **without created flag** of either the source model (`one_to_many`) or the `through` model (`many_to_many`). There is **no** resolving via `resolve_embed`. You can
+- `raw_values`: Raw model instances **without created flag** of either the source model (`one_to_many`) or the `through` model (`many_to_many`). There is **no** resolving via `resolve_embed`. You can clear the list and readd the models you want to delete (or doing position based modifications (harder)) as long you don't await during the modifications. You should recheck if something changes if you fetch something with await.
 - `field`: RelationField name on `source` triggering this signal.
 - `source`: Source model which contains the RelationField triggering the signals.
 - `target`: Target model.
@@ -331,13 +380,23 @@ To prevent default lifecycle signals from being called, you can overwrite them p
 
 ### How to Use It
 
+**Using a custom signal**
 Use the custom signal in your logic:
 
 ```python hl_lines="17"
 {!> ../docs_src/signals/logic.py !}
 ```
-
 The `on_verify` signal is triggered only when the user is verified.
+
+**Log changes**
+
+An other useful usecase is logging user actions:
+
+```python
+{!> ../docs_src/signals/log_changes.py !}
+```
+
+Of course there are better ways for serialization.
 
 ### Disconnect the Signal
 

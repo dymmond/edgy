@@ -13,6 +13,9 @@ The returned array is in the same order as the values/objects provided. And cont
 
 Input for all bulk operations are models of the right type or dictionaries. They can be intermixed and must be provided in an `Iterable`.
 
+!!! Warning
+    When using `SkipOperation` in a signal, `None` values are returned.
+
 ## Operations
 
 ### Bulk create
@@ -31,6 +34,9 @@ returned_objs = await User.query.bulk_create([
 assert not returned_objs[0].can_load  # the pks are incomplete
 assert returned_objs[1].can_load  # the pks are complete
 ```
+
+Output:
+The array can contain `None` when either an `SkipOperation` is raised or if `ignore_conflicts=True` is used.
 
 #### `ignore_conflicts`
 
@@ -155,6 +161,9 @@ This mode has two effects:
 - It is ensured that all returned instances `can_load` when `embed_parent` is active. If necessary, it will issue serialized single inserts.
 - The embedding is resolved if `embed_parent` is set. You get the child with the embedded parent.
 
+!!! Note
+    When pointing to an attribute which is `None` and you use `resolve_embed` you get this in the output. This can be confusing.
+
 ### loadable
 
 An instances is loadable if its `can_load` property signals it is loadable. For dictionaries the on the fly generated instance is used.
@@ -164,3 +173,11 @@ You can set the `identifying_db_fields` so a provided instance becomes suddenly 
 Other effects are that `resolve_embed` succeeds for such crafted instances.
 
 It is planned to add signals so you will be able to manipulate the immediate instances via signals so you can do this trick also for dict inputs.
+
+### Signals
+
+When raising `SkipOperation` in a `pre_bulk` signal, the operation is cancelled and returned is an array with `None` values or with `(None, False)` tuples.
+
+By default the invariant: length and order of the input = length and order of the output, is kept. You can however manipulate this by signals. E.g. clearing the whole output array (values). This is **not** recommended.
+
+You can however remove elements from the output by setting them to `None`.

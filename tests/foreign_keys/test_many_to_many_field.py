@@ -7,7 +7,9 @@ from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
+database = DatabaseTestClient(
+    DATABASE_URL, force_rollback=False, use_existing=False, full_isolation=False
+)
 models = edgy.Registry(database=database)
 
 
@@ -47,7 +49,7 @@ class Studio(edgy.StrictModel):
 
 @pytest.fixture(scope="function")
 async def create_test_database():
-    async with database:
+    async with models:
         await models.create_all()
         yield
         if not database.drop:
@@ -388,7 +390,40 @@ async def test_values_list(create_test_database):
     assert arr == ["The Bird", "Heart don't stand a chance", "The Waters"]
 
 
-def test_assertation_error_on_embed_through_double_underscore_attr():
+async def test_relation_load(create_test_database, subtests):
+    for i in range(10):
+        with subtests.test(msg=f"Iteration: {i}"):
+            await Album.query.delete()
+            await Track.query.delete()
+            album = await Album.query.create(
+                name="Malibu",
+                tracks=[
+                    Track(title="The Bird", position=1),
+                    Track(title="Heart don't stand a chance", position=2),
+                    Track(title="The Waters", position=3),
+                ],
+            )
+            assert await Track.query.count() == 3
+            assert await Album.query.count() == 1
+            arr = await album.tracks.order_by("position").values_list("title", flat=True)
+            assert arr == ["The Bird", "Heart don't stand a chance", "The Waters"]
+            tracks = await album.tracks.all()
+            await album.tracks.remove_many(*tracks)
+            assert await album.tracks.count() == 0
+            assert await Track.query.count() == 3
+            await album.tracks.add_many(
+                Track(title="The Bird", position=1),
+                Track(title="Heart don't stand a chance", position=2),
+                Track(title="The Waters", position=3),
+            )
+            assert await Track.query.count() == 6
+            arr = await album.tracks.order_by("position").values_list("title", flat=True)
+            assert arr == ["The Bird", "Heart don't stand a chance", "The Waters"]
+    await Album.query.delete()
+    await Track.query.delete()
+
+
+async def test_assertation_error_on_embed_through_double_underscore_attr():
     with pytest.raises(FieldDefinitionError) as raised:
 
         class MyModel(edgy.StrictModel):

@@ -21,7 +21,7 @@ from edgy.core.db.relationships.relation import (
     VirtualCascadeDeletionSingleRelation,
 )
 from edgy.core.terminal import Print
-from edgy.exceptions import FieldDefinitionError
+from edgy.exceptions import FieldDefinitionError, SkipOperation
 from edgy.protocols.many_relationship import ManyRelationProtocol
 
 if TYPE_CHECKING:
@@ -158,6 +158,8 @@ class BaseForeignKeyField(BaseForeignKey):
                     # triggered by a reverse relation, it doesn't cause a loop.
                     remove_referenced_call=self.reverse_name or True,
                 )
+            except SkipOperation:
+                ...
             finally:
                 # Reset the current instance context.
                 CURRENT_INSTANCE.reset(token)

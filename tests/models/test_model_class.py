@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 
 import edgy
@@ -129,3 +131,28 @@ async def test_eq(create_test_database):
     assert not user.__eq__("")
     assert user != User
     assert not user.__eq__(User)
+
+
+@pytest.mark.parametrize("model_based", [True, False])
+async def test_queryset_cache(model_based, create_test_database):
+    queryset = User.query.all()
+    cache = queryset._cache
+    assert not queryset._cache
+    assert not queryset._cache_fetch_all
+    await queryset.create(name="Test 1")
+    assert cache is queryset._cache
+    assert len(queryset._cache.cache[queryset._cache.create_category(User)]) == 1
+    assert not queryset._cache_fetch_all
+    await queryset.create(name="Test 2")
+    assert len(queryset._cache.cache[queryset._cache.create_category(User)]) == 2
+    assert not queryset._cache_fetch_all
+    await queryset
+    assert cast(bool, queryset._cache_fetch_all)
+    assert len(queryset._cache.cache[queryset._cache.create_category(User)]) == 2
+    await queryset.create(name="Test 3")
+    assert not queryset._cache_fetch_all
+    assert len(queryset._cache.cache[queryset._cache.create_category(User)]) == 3
+    await queryset.create(name="Test 4")
+    assert len(queryset._cache.cache[queryset._cache.create_category(User)]) == 4
+    await queryset.delete(model_based)
+    assert not queryset._cache
