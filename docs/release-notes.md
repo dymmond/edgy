@@ -12,6 +12,7 @@
 - Add bulk signals (`pre/post_bulk`).
 - Add `SkipOperation` exception for signals.
 - Add `injected_filters` parameter for `pre_delete` to dynamically inject protection rules.
+- Allow lazy references for `ForeignKey` and `ManyToMany`. This is useful for libraries.
 
 ### Changed
 

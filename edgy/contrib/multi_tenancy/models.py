@@ -199,7 +199,7 @@ class DomainMixin(edgy.Model):
 
     domain: str = edgy.CharField(max_length=253, unique=True, db_index=True)
     tenant: Any = edgy.ForeignKey(
-        edgy.monkay.settings.tenant_model, index=True, related_name="domains"
+        lambda: edgy.monkay.settings.tenant_model, index=True, related_name="domains"
     )
     is_primary: bool = edgy.BooleanField(default=True, index=True)
 
@@ -299,12 +299,12 @@ class TenantUserMixin(edgy.Model):
     """
 
     user: Any = edgy.ForeignKey(
-        edgy.monkay.settings.auth_user_model,
+        lambda: edgy.monkay.settings.auth_user_model,
         null=False,
         related_name="tenant_user_users",
     )
     tenant: Any = edgy.ForeignKey(
-        edgy.monkay.settings.tenant_model,
+        lambda: edgy.monkay.settings.tenant_model,
         null=False,
         related_name="tenant_users_tenant",
     )

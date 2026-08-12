@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import inspect
 from abc import abstractmethod
 from collections.abc import Sequence
 from functools import cached_property
@@ -1155,6 +1156,32 @@ class BaseForeignKey(RelationshipField):
         # Suppress AttributeError if _target_registry doesn't exist.
         with contextlib.suppress(AttributeError):
             delattr(self, "_target_registry")
+
+    @property
+    def to(self) -> Any:
+        """Manages to. Resolves lazy attributes."""
+        # Check if _to_cached attribute is already set.
+        if not hasattr(self, "_to_cached"):
+            to = self._to
+            if not inspect.isclass(to) and callable(to):
+                self._to_cached = to()
+            else:
+                self._to_cached = to
+        return self._to_cached
+
+    @to.setter
+    def to(self, value: Any) -> None:
+        """Set `to` to value and clear cache."""
+        with contextlib.suppress(AttributeError):
+            delattr(self, "_to_cached")
+        self._to = value
+
+    @to.deleter
+    def to(self) -> None:
+        """Clear cache of `to`."""
+        with contextlib.suppress(AttributeError):
+            delattr(self, "_to_cached")
+        # keep _to because it is required
 
     @property
     def target(self) -> Any:

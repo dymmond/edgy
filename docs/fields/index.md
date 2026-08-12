@@ -595,6 +595,25 @@ When the second parameter is empty, the parent object is not included as attribu
 
 The reverse end of a `ForeignKey` is a [Many to one relation](../queries/many-to-one.md).
 
+##### Swappable library version
+
+You can also use a function as `to`. This is particular useful for libraries where models should be able to be swapped.
+
+
+```python
+import edgy
+
+class LibraryModel(edgy.Model):
+    user: User = edgy.ForeignKey(lambda: edgy.settings.default_user, on_delete=edgy.CASCADE)
+    class Meta:
+        abstract = True
+```
+
+!!! Warning
+    When changing the setting you might need to adapt your migrations.
+
+!!! Warning
+    When a registry is defined or not abstract the lambda is immediately resolved.
 
 ##### Parameters
 
@@ -677,6 +696,26 @@ class MyModel(edgy.Model):
 
 !!! Tip
     You can use `edgy.ManyToManyField` as alternative to `ManyToMany` instead.
+
+##### Swappable library version
+
+You can also use a function as `to` like with `ForeignKey`. This is particular useful for libraries where models should be able to be swapped.
+
+```python
+import edgy
+
+class LibraryModel(edgy.Model):
+    users: User = edgy.ManyToMany(lambda: edgy.settings.default_user)
+
+    class Meta:
+        abstract = True
+```
+
+!!! Warning
+    When changing the setting you might need to adapt your migrations.
+
+!!! Warning
+    When a registry is defined or not abstract the lambda is immediately resolved.
 
 ##### Parameters
 

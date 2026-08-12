@@ -328,7 +328,7 @@ class ForeignKeyFieldFactory(FieldFactory):
     def __new__(
         cls,
         *,
-        to: Any = None,
+        to: Any,
         on_update: str = CASCADE,
         on_delete: str = RESTRICT,
         related_name: str | Literal[False] = "",
@@ -343,7 +343,6 @@ class ForeignKeyFieldFactory(FieldFactory):
 
         Args:
             to (Any): The target model or model name to which the foreign key points.
-                      Defaults to `None`.
             on_update (str): The action to perform on update of the referenced key.
                              Defaults to `CASCADE`.
             on_delete (str): The action to perform on deletion of the referenced row.
@@ -391,15 +390,17 @@ class ForeignKeyFieldFactory(FieldFactory):
         null = kwargs["null"]
 
         if on_delete is None:
-            raise FieldDefinitionError("on_delete must not be null.")
+            raise FieldDefinitionError("`on_delete` must not be `None`.")
+        if kwargs.get("target") is not None:
+            raise FieldDefinitionError("`target` must be `None`.")
 
         # If SET_NULL is enabled for on_delete, the field must be nullable.
         if on_delete == SET_NULL and not null:
-            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
+            raise FieldDefinitionError("When SET_NULL is enabled, null must be `True`.")
 
         # If SET_NULL is enabled for on_update, the field must be nullable.
         if on_update and (on_update == SET_NULL and not null):
-            raise FieldDefinitionError("When SET_NULL is enabled, null must be True.")
+            raise FieldDefinitionError("When SET_NULL is enabled, null must be `True`.")
         related_name = kwargs.get("related_name", "")
 
         # related_name can be None or False, which is tolerated.
