@@ -1174,6 +1174,8 @@ class BaseForeignKey(RelationshipField):
         """Set `to` to value and clear cache."""
         with contextlib.suppress(AttributeError):
             delattr(self, "_to_cached")
+        with contextlib.suppress(AttributeError):
+            delattr(self, "_target")
         self._to = value
 
     @to.deleter
@@ -1181,6 +1183,8 @@ class BaseForeignKey(RelationshipField):
         """Clear cache of `to`."""
         with contextlib.suppress(AttributeError):
             delattr(self, "_to_cached")
+        with contextlib.suppress(AttributeError):
+            delattr(self, "_target")
         # keep _to because it is required
 
     @property
@@ -1213,10 +1217,7 @@ class BaseForeignKey(RelationshipField):
         Args:
             value: The target model class to set.
         """
-        # Suppress AttributeError if _target doesn't exist and delete it.
-        with contextlib.suppress(AttributeError):
-            delattr(self, "_target")
-        # Set the 'to' attribute to the new value.
+        # Set the 'to' attribute to the new value and clear with this the caches
         self.to = value
 
     @target.deleter
