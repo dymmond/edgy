@@ -427,7 +427,13 @@ class FileSystemStorage(Storage):
         Returns:
             datetime: The creation time of the file.
         """
-        return self._datetime_from_timestamp(os.path.getctime(self.path(name)))
+        stat_result = os.stat(self.path(name))
+        timestamp = (
+            stat_result.st_birthtime
+            if getattr(stat_result, "st_birthtime", None) is not None
+            else stat_result.st_ctime
+        )
+        return self._datetime_from_timestamp(timestamp)
 
     def get_modified_time(self, name: str) -> datetime:
         """
