@@ -158,7 +158,7 @@ check_types = "mypy -p edgy {args}"
 [tool.hatch.envs.hatch-static-analysis]
 # disables custom ruff rules, required to align with pre-commit
 config-path = "none"
-dependencies = ["ruff==0.14.2"]
+dependencies = ["ruff==0.16.2"]
 
 [tool.hatch.envs.hatch-test]
 # needs docker services running

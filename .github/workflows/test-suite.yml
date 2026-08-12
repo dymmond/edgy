@@ -19,7 +19,7 @@ jobs:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -33,7 +33,7 @@ jobs:
           --health-retries 5
 
       postgres_alt:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -64,7 +64,7 @@ jobs:
             workflows:
               - '.github/workflows/**'
       - id: python
-        uses: "actions/setup-python@v6"
+        uses: "actions/setup-python@v7"
         with:
           python-version: "${{ matrix.python-version }}"
           allow-prereleases: true
@@ -76,7 +76,7 @@ jobs:
       - name: "Install dependencies"
         if: ${{ steps.cache.outputs.cache-hit != 'true' }}
         run: |
-          pip install hatch virtualenv==20.39.1
+          pip install hatch
       - name: "Run linting"
         if: steps.filters.outputs.src == 'true' || steps.filters.outputs.workflows == 'true'
         run: "hatch fmt"
