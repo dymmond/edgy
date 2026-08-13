@@ -189,7 +189,15 @@ class BaseForeignKeyField(BaseForeignKey):
         # If the value is already a target model instance or its proxy.
         if isinstance(value, target | target.proxy_model):
             # Save the related model first to ensure its primary key is available.
-            await value.real_save(force_insert=False, values=None)
+            if value._db_dirty is not None:
+                # when None _db_dirty is disabled so don't try to save
+                if not value._db_loaded or not value.can_load:
+                    # save when not loaded (could affect relationship)
+                    # required; otherwise save loops can happen.
+                    await value.real_save(force_insert=False, values=None)
+                else:
+                    # save when fields were changed (could affect relationship)
+                    await value.real_save(force_insert=False, values=value._db_dirty)
             # Clean the value to extract the foreign key column values.
             _value: dict[str, Any] = self.clean(self.name, value, for_query=False)
             # it is an error if it couldn't be parsed.
@@ -237,7 +245,11 @@ class BaseForeignKeyField(BaseForeignKey):
         return cast(
             ManyRelationProtocol,
             relation(
-                to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs
+                to=self.owner,
+                reverse_name=self.reverse_name,
+                to_foreign_key=self.name,
+                embed_parent=self.embed_parent,
+                **kwargs,
             ),
         )
 

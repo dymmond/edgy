@@ -88,6 +88,7 @@ Within a model context it contains the current phase it is called for:
 * `init`: Called    in model `__init__`.
 * `init_db`: Called in model `__init__` when loaded from a row.
 * `set`: Called in model `__setattr__` (when setting an attribute).
+* `prepare_clauses`: Called in identifying clauses.
 * `load`: Called after load. Contains db values.
 * `post_insert`: Called after insert. Arguments are the ones passed to save.
 * `post_update`: Called after update. Arguments are the ones passed to save.

@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import inspect
 import warnings
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Hashable, Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
@@ -33,6 +33,7 @@ _empty = cast(set[str], frozenset())
 _excempted_attrs: set[str] = {
     "_db_loaded",
     "_db_deleted",
+    "_db_dirty",
     "_edgy_namespace",
     "_edgy_private_attrs",
 }
@@ -68,6 +69,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     _db_loaded: bool = PrivateAttr(default=False)
     # not in db anymore or deleted
     _db_deleted: bool = PrivateAttr(default=False)
+    _db_dirty: set[str] | None = PrivateAttr(default=None)
     _db_schemas: ClassVar[dict[str, type[BaseModelType]]]
 
     def __init__(
@@ -94,6 +96,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         # Always set _db_loaded and _db_deleted in __dict__ to prevent __getattr__ loop.
         self.__dict__["_db_loaded"] = False
         self.__dict__["_db_deleted"] = False
+        self.__dict__["_db_dirty"] = None
         klass = self.__class__
         # Initialize _edgy_namespace with class-level private attribute values.
         self.__dict__["_edgy_namespace"] = _edgy_namespace = {
@@ -149,17 +152,18 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         del self.__dict__["_edgy_namespace"]
         _db_loaded = self.__dict__.pop("_db_loaded")
         _db_deleted = self.__dict__.pop("_db_deleted")
+        self.__dict__.pop("_db_dirty")
         # Call Pydantic BaseModel's __init__.
         super().__init__(**kwargs)
         # Re-set _db_loaded and _db_deleted properly after Pydantic initialization.
         self._db_loaded = _db_loaded
         self._db_deleted = _db_deleted
+        self._db_dirty = set()
         self._edgy_namespace = _edgy_namespace
         # Move Pydantic extra attributes to __dict__.
         if self.__pydantic_extra__ is not None:
             self.__dict__.update(self.__pydantic_extra__)
             self.__pydantic_extra__ = None
-
         # Clean up fields not present in kwargs from __dict__.
         for field_name in self.meta.fields:
             if field_name not in kwargs:
@@ -605,6 +609,8 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                         else:
                             # Otherwise, bypass __setattr__ to update __dict__ directly.
                             object.__setattr__(self, k, v)
+                if (db_dirty := self._db_dirty) is not None:
+                    db_dirty.add(key)
             elif key in type(self).model_fields:
                 # If it's a Pydantic model field, use super().__setattr__.
                 super().__setattr__(key, value)
@@ -699,17 +705,17 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 cast("FIELD_CONTEXT_TYPE", {"field": field})
             )
         try:
-            getter: Any = None
+            getter: Callable[[BaseModelType, type[BaseModelType]], Any] | None = None
             if field is not None and hasattr(field, "__get__"):
-                getter = field.__get__
+                getter = cast("Callable[[BaseModelType, type[BaseModelType]], Any]", field.__get__)
                 # If behavior is "coro" or "passdown", return the getter result directly.
                 if behavior == "coro" or behavior == "passdown":
-                    return field.__get__(self, self.__class__)
+                    return getter(self, type(self))
                 else:
                     # Otherwise, set "passdown" behavior and try to get the field value.
                     token = MODEL_GETATTR_BEHAVIOR.set("passdown")
                     try:
-                        return field.__get__(self, self.__class__)
+                        return getter(self, type(self))
                     except AttributeError:
                         # If AttributeError, forward to the load routine.
                         pass
@@ -784,7 +790,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         other_tup = other.create_model_key(allow_missing_and_none=True)
         return self_tup == other_tup
 
-    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple:
+    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple[Hashable, ...]:
         """
         Generates a unique cache key for the model instance.
 

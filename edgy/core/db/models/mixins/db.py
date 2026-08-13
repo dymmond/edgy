@@ -18,6 +18,7 @@ from edgy.core.db.context_vars import (
     CURRENT_FIELD_CONTEXT,
     CURRENT_INSTANCE,
     CURRENT_MODEL_INSTANCE,
+    CURRENT_PHASE,
     EXPLICIT_SPECIFIED_VALUES,
     MODEL_GETATTR_BEHAVIOR,
     NO_GLOBAL_FIELD_CONSTRAINTS,
@@ -72,6 +73,7 @@ _removed_copy_keys = {
     # remove extra
     "_db_loaded",
     "_db_deleted",
+    "_db_dirty",
     "_pkcolumns",
     "_table",
     "_db_schemas",
@@ -734,20 +736,35 @@ class DatabaseMixin:
         """
         # works only if the class of the model is the main class of the queryset
         # TODO: implement prefix handling and return generic column without table attached
+        model_self = cast("Model", self)
         if prefix:
             raise NotImplementedError()
         clauses: list[Any] = []
-        for field_name in self.identifying_db_fields:
-            field = self.meta.fields.get(field_name)
-            if field is not None:
-                for column_name, value in field.clean(
-                    field_name, self.__dict__[field_name]
-                ).items():
-                    clauses.append(getattr(self.table.columns, column_name) == value)
-            else:
-                clauses.append(
-                    getattr(self.table.columns, field_name) == self.__dict__[field_name]
-                )
+        token = CURRENT_PHASE.set("prepare_clauses")
+        instance = CURRENT_INSTANCE.get()
+        token2 = CURRENT_INSTANCE.set(model_self if instance is None else instance)
+        token3 = CURRENT_MODEL_INSTANCE.set(model_self)
+        field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
+        token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
+        try:
+            for field_name in model_self.identifying_db_fields:
+                field = model_self.meta.fields.get(field_name)
+                if field is not None:
+                    field_dict.clear()
+                    field_dict["field"] = field
+                    for column_name, value in field.clean(
+                        field_name, self.__dict__[field_name]
+                    ).items():
+                        clauses.append(getattr(self.table.columns, column_name) == value)
+                else:
+                    clauses.append(
+                        getattr(self.table.columns, field_name) == self.__dict__[field_name]
+                    )
+        finally:
+            CURRENT_PHASE.reset(token)
+            CURRENT_INSTANCE.reset(token2)
+            CURRENT_MODEL_INSTANCE.reset(token3)
+            CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
         return clauses
 
     async def _update(
@@ -808,19 +825,31 @@ class DatabaseMixin:
         row_count: int | None = None
         if column_values and clauses:
             check_db_connection(self.database, stacklevel=4)
-            async with self.database as database, database.transaction():
-                # can update column_values
-                column_values.update(
-                    await self.execute_pre_save_hooks(column_values, kwargs, is_update=True)
-                )
-                expression = self.table.update().values(**column_values).where(*clauses)
-                row_count = cast(int, await database.execute(expression))
+            db_dirty = self._db_dirty
+            # prevent loops
+            self._db_dirty = None
+            try:
+                async with self.database as database, database.transaction():
+                    # can update column_values
+                    column_values.update(
+                        await self.execute_pre_save_hooks(column_values, kwargs, is_update=True)
+                    )
+                    expression = self.table.update().values(**column_values).where(*clauses)
+                    row_count = cast(int, await database.execute(expression))
 
-            # Update the model instance.
-            new_kwargs = self.transform_input(
-                column_values, phase="post_update", instance=instance, model_instance=self
-            )
-            self.__dict__.update(new_kwargs)
+                # Update the model instance.
+                new_kwargs = self.transform_input(
+                    column_values, phase="post_update", instance=instance, model_instance=self
+                )
+                self.__dict__.update(new_kwargs)
+            except BaseException:
+                self._db_dirty = db_dirty
+                raise
+            if db_dirty is not None:
+                db_dirty.difference_update(new_kwargs.keys())
+                self._db_dirty = db_dirty
+            else:
+                self._db_dirty = set()
 
         # updates aren't required to change the db, they can also just affect the meta fields
         await self.execute_post_save_hooks(kwargs.keys(), is_update=True)
@@ -952,6 +981,7 @@ class DatabaseMixin:
                 row_count = cast(int, await database.execute(expression))
         # we cannot load anymore afterwards
         self._db_deleted = True
+        self._db_dirty = None
         # now cleanup with the saved values
         if field_values:
             token_instance = CURRENT_MODEL_INSTANCE.set(self)
@@ -1028,7 +1058,7 @@ class DatabaseMixin:
             ObjectNotFound: If no row is found in the database corresponding to
                             the instance's identifying clauses.
         """
-        if only_needed and self._db_loaded_or_deleted:
+        if only_needed and (self._db_loaded_or_deleted or self._db_dirty):
             return
         row = None
         clauses = self.identifying_clauses()
@@ -1044,6 +1074,7 @@ class DatabaseMixin:
         if row is None:
             self._db_deleted = True
             self._db_loaded = True
+            self._db_dirty = None
             raise ObjectNotFound("row does not exist anymore")
         # Update the instance.
         self.__dict__.update(
@@ -1053,6 +1084,7 @@ class DatabaseMixin:
         )
         self._db_deleted = False
         self._db_loaded = True
+        self._db_dirty = set()
 
     async def check_exist_in_db(self, only_needed: bool = False) -> bool:
         """
@@ -1136,53 +1168,62 @@ class DatabaseMixin:
             return
         check_db_connection(self.database, stacklevel=4)
         table: sqlalchemy.Table = self.table
-        async with (
-            self.database as database,
-            database.connection() as connection,
-            connection.transaction(),
-        ):
-            insert_returning = database.engine.dialect.insert_returning
-            # can update column_values
-            column_values.update(
-                await self.execute_pre_save_hooks(column_values, kwargs, is_update=False)
-            )
-            # we can't just use label. If the column.key has an invalid name for the db
-            # we would cause an foo AS invalid clause
-            returning = (
-                [
-                    col
-                    for col in table.columns.values()
-                    if col.key not in column_values
-                    and (col.server_default is not None or col.autoincrement)
-                ]
-                if insert_returning
-                else []
-            )
-
-            if returning:
-                expression: Any = table.insert().values(**column_values).returning(*returning)
-                returned_mapping = dict((await connection.fetch_one(expression))._mapping)
-            else:
-                expression = table.insert().values(**column_values)
-                pk_values = await connection.execute(expression)
-                returned_mapping = (
-                    dict(pk_values._mapping) if hasattr(pk_values, "_mapping") else {}
+        # prevent loops
+        db_dirty = self._db_dirty
+        self._db_dirty = None
+        try:
+            async with (
+                self.database as database,
+                database.connection() as connection,
+                connection.transaction(),
+            ):
+                insert_returning = database.engine.dialect.insert_returning
+                # can update column_values
+                column_values.update(
+                    await self.execute_pre_save_hooks(column_values, kwargs, is_update=False)
                 )
-        for col_name, col_key in self.meta.columns_remapping.items():
-            if col_name in returned_mapping:
-                returned_mapping[col_key] = returned_mapping.pop(col_name)
-        column_values.update(returned_mapping)
+                # we can't just use label. If the column.key has an invalid name for the db
+                # we would cause an foo AS invalid clause
+                returning = (
+                    [
+                        col
+                        for col in table.columns.values()
+                        if col.key not in column_values
+                        and (col.server_default is not None or col.autoincrement)
+                    ]
+                    if insert_returning
+                    else []
+                )
 
-        new_kwargs = self.transform_input(
-            column_values, phase="post_insert", instance=instance, model_instance=self
-        )
-        self.__dict__.update(new_kwargs)
+                if returning:
+                    expression: Any = table.insert().values(**column_values).returning(*returning)
+                    returned_mapping = dict((await connection.fetch_one(expression))._mapping)
+                else:
+                    expression = table.insert().values(**column_values)
+                    pk_values = await connection.execute(expression)
+                    returned_mapping = (
+                        dict(pk_values._mapping) if hasattr(pk_values, "_mapping") else {}
+                    )
+            for col_name, col_key in self.meta.columns_remapping.items():
+                if col_name in returned_mapping:
+                    returned_mapping[col_key] = returned_mapping.pop(col_name)
+            column_values.update(returned_mapping)
 
-        if self.meta.post_save_fields:
-            await self.execute_post_save_hooks(kwargs.keys(), is_update=False)
-        # Ensure on access refresh the results is active
-        self._db_loaded = False
+            new_kwargs = self.transform_input(
+                column_values, phase="post_insert", instance=instance, model_instance=self
+            )
+            self.__dict__.update(new_kwargs)
+
+            if self.meta.post_save_fields:
+                await self.execute_post_save_hooks(kwargs.keys(), is_update=False)
+        except BaseException:
+            self._db_dirty = db_dirty
+            raise
+        finally:
+            # Ensure on access refresh the results is active
+            self._db_loaded = False
         self._db_deleted = False
+        self._db_dirty = set()
         await post_fn(
             real_class,
             model_instance=self,
@@ -1215,8 +1256,10 @@ class DatabaseMixin:
         Returns:
             The saved model instance.
         """
+        model_self = cast("Model", self)
         instance: BaseModelType | QuerySet = CURRENT_INSTANCE.get()  # type: ignore
-        extracted_fields = self.extract_db_fields()
+        dirty = model_self._db_dirty
+        extracted_fields = model_self.extract_db_fields()
         if values is None:
             explicit_values: set[str] = set()
         elif isinstance(values, set):
@@ -1228,16 +1271,16 @@ class DatabaseMixin:
 
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
-            for pkcolumn in type(self).pkcolumns:
+            for pkcolumn in type(model_self).pkcolumns:
                 # should trigger load in case of identifying_db_fields
                 value = getattr(self, pkcolumn, None)
                 if inspect.isawaitable(value):
                     value = await value
-                if value is None and self.table.columns[pkcolumn].autoincrement:
+                if value is None and model_self.table.columns[pkcolumn].autoincrement:
                     extracted_fields.pop(pkcolumn, None)
                     force_insert = True
                     break
-                field = self.meta.fields.get(pkcolumn)
+                field = model_self.meta.fields.get(pkcolumn)
                 # this is an IntegerField/DateTime with primary_key set
                 if field is not None:
                     if getattr(field, "increment_on_save", 0) != 0 or getattr(
@@ -1276,10 +1319,23 @@ class DatabaseMixin:
                     instance=instance,
                 )
             else:
+                if dirty and values is None and model_self._db_loaded:
+                    # check only for loaded model instances which have dirty tracing
+                    update_values = {k: v for k, v in extracted_fields.items() if k in dirty}
+
+                    is_partial = True
+                elif values is None:
+                    update_values = extracted_fields
+                    is_partial = False
+                else:
+                    update_values = values
+                    is_partial = not set(model_self.meta.fields.keys()).issubset(
+                        update_values.keys()
+                    )
+
                 await self._update(
-                    # assume partial when values are not None
-                    is_partial=values is not None,
-                    kwargs=extracted_fields if values is None else values,
+                    is_partial=is_partial,
+                    kwargs=update_values,
                     pre_fn=partial(
                         self.meta.signals.pre_save.send_async, is_update=True, is_migration=False
                     ),

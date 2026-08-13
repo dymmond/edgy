@@ -142,3 +142,7 @@ class ManyRelationProtocol(Protocol):
             *children (BaseModelType): One or more specific related model instances to remove.
         """
         ...
+
+    def __get__(self, instance: BaseModelType, owner: Any = None) -> ManyRelationProtocol:
+        """Initialisation of relation. It must work like a property."""
+        ...

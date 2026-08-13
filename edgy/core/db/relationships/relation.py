@@ -31,6 +31,8 @@ class ManyRelation(ManyRelationProtocol):
     allowing it to be used as a descriptor on model fields.
     """
 
+    instance: BaseModelType | None = None
+
     def __init__(
         self,
         *,
@@ -41,7 +43,6 @@ class ManyRelation(ManyRelationProtocol):
         reverse: bool = False,
         embed_through: Literal[False] | str = "",
         refs: Any = (),
-        instance: BaseModelType | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -67,16 +68,12 @@ class ManyRelation(ManyRelationProtocol):
             refs (Any): Initial references to related objects to be staged.
                         Can be a single instance or a sequence of instances.
                         Defaults to an empty tuple.
-            instance (BaseModelType | None): The current instance of the model
-                                             that owns this relationship.
-                                             Defaults to None.
             **kwargs (Any): Additional keyword arguments passed to the
                             `ManyRelationProtocol` constructor.
         """
         super().__init__(**kwargs)
         self.through = through
         self.to = to
-        self.instance = instance
         self.reverse = reverse
         self.from_foreign_key = from_foreign_key
         self.to_foreign_key = to_foreign_key
@@ -187,6 +184,10 @@ class ManyRelation(ManyRelationProtocol):
             await operation.send_post_signal()
             return
         await operation.apply_db()
+        db_dirty = getattr(self.instance, "_db_dirty", None)
+        if db_dirty is not None and not self.refs:
+            # recheck then drop
+            db_dirty.discard(self.from_foreign_key)
         # no cache update because the queryset is temporarysignal
         # both parameters are the same here
         operation.signal_params["row_count"] = operation.signal_params.get("row_count_create")
@@ -274,7 +275,7 @@ class ManyRelation(ManyRelationProtocol):
         )
         # If the 'through' model is a tenant model, set the active schema for the instance.
         if getattr(through.meta, "is_tenant", False):
-            instance.__using_schema__ = self.instance.get_active_instance_schema()  # type: ignore
+            instance.__using_schema__ = self.instance.get_active_instance_schema()
         return instance
 
     def stage(self, *children: BaseModelType) -> None:
@@ -293,6 +294,12 @@ class ManyRelation(ManyRelationProtocol):
         for child in children:
             # Expand the child into a 'through' model instance and append it to refs.
             self.refs.append(self.expand_relationship(child))
+        db_dirty = cast("set[str] | None", getattr(self.instance, "_db_dirty", None))
+        if db_dirty is not None:
+            if self.refs:
+                db_dirty.add(self.from_foreign_key)
+            else:
+                db_dirty.discard(self.from_foreign_key)
 
     async def create(self, *args: Any, **kwargs: Any) -> BaseModelType | None:
         """
@@ -576,7 +583,14 @@ class ManyRelation(ManyRelationProtocol):
             ManyRelationProtocol: The ManyRelation instance itself, with its
                                   `instance` attribute set.
         """
-        self.instance = instance
+        if self.instance is not instance and instance is not None:
+            self.instance = instance
+            db_dirty = getattr(instance, "_db_dirty", None)
+            if db_dirty is not None:
+                if not self.refs:
+                    db_dirty.discard(self.from_foreign_key)
+                else:
+                    db_dirty.add(self.from_foreign_key)
         return self
 
 
@@ -588,14 +602,16 @@ class SingleRelation(ManyRelationProtocol):
     `ManyRelationProtocol`, acting as a descriptor for model fields.
     """
 
+    instance: BaseModelType | None = None
+
     def __init__(
         self,
         *,
+        reverse_name: str | Literal[False],
         to_foreign_key: str,
         to: type[BaseModelType],
         embed_parent: tuple[str, str] | None = None,
         refs: Any = (),
-        instance: BaseModelType | None = None,
         **kwargs: Any,
     ) -> None:
         """
@@ -604,6 +620,7 @@ class SingleRelation(ManyRelationProtocol):
         Args:
             to_foreign_key (str): The name of the foreign key in the `to` model
                                   that points back to the owner of this relationship.
+            reverse_name (str): The reverse_name (name of the relationship field).
             to (type[BaseModelType]): The model class that is on the 'many' side
                                       of the relationship (or the single related model).
             embed_parent (tuple[str, str] | None): A tuple specifying how to embed
@@ -612,15 +629,12 @@ class SingleRelation(ManyRelationProtocol):
             refs (Any): Initial references to related objects to be staged.
                         Can be a single instance or a sequence of instances.
                         Defaults to an empty tuple.
-            instance (BaseModelType | None): The current instance of the model
-                                             that owns this relationship.
-                                             Defaults to None.
             **kwargs (Any): Additional keyword arguments passed to the
                             `ManyRelationProtocol` constructor.
         """
         super().__init__(**kwargs)
         self.to = to
-        self.instance = instance
+        self.reverse_name = reverse_name
         self.to_foreign_key = to_foreign_key
         self.embed_parent = embed_parent
         self.refs: list[BaseModelType] = []  # Initialize refs as a list
@@ -633,12 +647,11 @@ class SingleRelation(ManyRelationProtocol):
     @cached_property
     def _shared_relation_signals_params(self) -> dict:
         assert self.instance is not None
-        fk = self.to.meta.fields[self.to_foreign_key]
         # here reverse_name=related_name
         return {
             "source": type(self.instance),
             "target": self.to,
-            "field": fk.reverse_name,
+            "field": self.reverse_name,
             "relation": "one_to_many",
         }
 
@@ -742,7 +755,7 @@ class SingleRelation(ManyRelationProtocol):
         target_instance.identifying_db_fields = related_columns
         # If the 'to' model is a tenant model, set the active schema for the instance.
         if getattr(target.meta, "is_tenant", False):
-            target_instance.__using_schema__ = self.instance.get_active_instance_schema()  # type: ignore
+            target_instance.__using_schema__ = self.instance.get_active_instance_schema()
         return target_instance
 
     def stage(self, *children: BaseModelType) -> None:
@@ -761,6 +774,13 @@ class SingleRelation(ManyRelationProtocol):
         for child in children:
             # Expand the child into a 'to' model instance and append it to refs.
             self.refs.append(self.expand_relationship(child))
+
+        db_dirty = cast("set[str] | None", getattr(self.instance, "_db_dirty", None))
+        if db_dirty is not None:
+            if self.refs:
+                db_dirty.add(self.from_foreign_key)
+            else:
+                db_dirty.discard(self.from_foreign_key)
 
     def __getattr__(self, item: Any) -> Any:
         """
@@ -826,6 +846,10 @@ class SingleRelation(ManyRelationProtocol):
             await operation.send_post_signal()
             return
         await operation.apply_db()
+        db_dirty = getattr(self.instance, "_db_dirty", None)
+        if db_dirty is not None and not self.refs:
+            # recheck then drop
+            db_dirty.discard(self.from_foreign_key)
         # no cache update because the queryset is temporary
         # we can just rename the signals parameters for the post signal
         operation.signal_params["row_count"] = operation.signal_params.pop("row_count_update")
@@ -1068,7 +1092,14 @@ class SingleRelation(ManyRelationProtocol):
             ManyRelationProtocol: The SingleRelation instance itself, with its
                                   `instance` attribute set.
         """
-        self.instance = instance
+        if self.instance is not instance and instance is not None:
+            self.instance = instance
+            db_dirty = getattr(instance, "_db_dirty", None)
+            if db_dirty is not None:
+                if not self.refs:
+                    db_dirty.discard(self.reverse_name)
+                else:
+                    db_dirty.add(self.reverse_name)
         return self
 
 

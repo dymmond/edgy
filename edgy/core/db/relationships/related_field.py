@@ -166,19 +166,13 @@ class RelatedField(RelationshipField):
             ValueError: If `instance` is None, indicating a missing model instance.
         """
         # Ensure a model instance is provided.
-        if not instance:
-            raise ValueError("missing instance")
-
-        # If the related field hasn't been initialized on the instance's dictionary.
-        if instance.__dict__.get(self.name, None) is None:
-            # Initialize it with a new relation obtained via get_relation.
-            instance.__dict__[self.name] = self.get_relation()
-        # If the relation instance itself doesn't have a reference to its parent.
-        if instance.__dict__[self.name].instance is None:
-            # Set the parent instance reference.
-            instance.__dict__[self.name].instance = instance
-        # Return the ManyRelationProtocol instance associated with this field.
-        return instance.__dict__[self.name]  # type: ignore
+        if instance is None:
+            raise ValueError("Missing instance")
+        # If the relation hasn't been set or is None, initialize it.
+        relation: ManyRelationProtocol | None
+        if (relation := instance.__dict__.get(self.name, None)) is None:
+            relation = instance.__dict__[self.name] = self.get_relation()
+        return relation.__get__(instance, owner)
 
     @functools.cached_property
     def foreign_key(self) -> BaseForeignKeyField:

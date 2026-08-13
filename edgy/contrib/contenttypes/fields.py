@@ -96,7 +96,11 @@ class BaseContentTypeField(BaseForeignKeyField):
         return cast(
             ManyRelationProtocol,
             SingleRelation(
-                to=self.owner, to_foreign_key=self.name, embed_parent=self.embed_parent, **kwargs
+                to=self.owner,
+                reverse_name=self.reverse_name,
+                to_foreign_key=self.name,
+                embed_parent=self.embed_parent,
+                **kwargs,
             ),
         )
 

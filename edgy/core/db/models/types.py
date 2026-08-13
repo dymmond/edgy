@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Collection, Hashable, Iterable, Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -487,7 +487,7 @@ class BaseModelType(ABC):
         return type(self).__name__.lower()
 
     @abstractmethod
-    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple:
+    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple[Hashable, ...]:
         """
         Generates a unique cache key for the model instance.
 
