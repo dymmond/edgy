@@ -8,8 +8,8 @@ from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = DatabaseTestClient(DATABASE_URL)
-models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
+database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
+models = edgy.Registry(database=database)
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -62,7 +62,7 @@ class Organisation(edgy.StrictModel):
 
 class Team(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
-    org = edgy.ForeignKey(Organisation, on_delete=edgy.RESTRICT)
+    org = edgy.ForeignKey(lambda: Organisation, on_delete=edgy.RESTRICT)
     name = edgy.CharField(max_length=100)
 
     class Meta:

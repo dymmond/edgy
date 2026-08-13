@@ -705,7 +705,7 @@ You can also use a function as `to` like with `ForeignKey`. This is particular u
 import edgy
 
 class LibraryModel(edgy.Model):
-    users: User = edgy.ManyToMany(lambda: edgy.settings.default_user)
+    users: list[User] = edgy.ManyToMany(lambda: edgy.settings.default_user)
 
     class Meta:
         abstract = True

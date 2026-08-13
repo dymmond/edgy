@@ -12,7 +12,7 @@ models = edgy.Registry(database=database)
 
 class Älbum(edgy.StrictModel):
     äd = edgy.IntegerField(primary_key=True, autoincrement=True, column_name="id")
-    name = edgy.CharField(max_length=100)
+    name = edgy.CharField(max_length=100, primary_key=True)
 
     class Meta:
         registry = models
@@ -41,6 +41,11 @@ async def rollback_connections():
     with database.force_rollback():
         async with database:
             yield
+
+
+async def test_columns():
+    assert Track.meta.field_to_column_names["album"] == {"album_äd", "album_name"}
+    assert Track.table.columns.album_äd.name == "album_id"
 
 
 async def test_new_create():

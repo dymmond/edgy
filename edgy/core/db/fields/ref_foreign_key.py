@@ -80,7 +80,7 @@ class RefForeignKey(ForeignKeyFieldFactory, list):
         """
         return None
 
-    def __new__(cls, to: ModelRef, null: bool = False) -> BaseFieldType:
+    def __new__(cls, to: type[ModelRef], null: bool = False) -> BaseFieldType:
         """
         Creates a new `RefForeignKey` instance.
 
