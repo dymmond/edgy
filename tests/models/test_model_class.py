@@ -86,7 +86,8 @@ def test_partial_compare():
     assert User(id=1) == User(id=1)
     assert User(id=1) != User(id=2)
     assert User(name="edgy") == User(name="edgy")
-    assert User(name="edgy") != User(name="snake")
+    # only pks are compared
+    assert User(name="edgy") == User(name="snake")
 
 
 def test_model_pk():
