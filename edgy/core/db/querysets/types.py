@@ -809,8 +809,8 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     @abstractmethod
     async def values(
         self,
-        fields: Sequence[str] | str | None,
-        exclude: Sequence[str] | set[str] | None,
+        fields: Sequence[str] | str | None = None,
+        exclude: Sequence[str] | set[str] | None = None,
         exclude_none: bool = False,
     ) -> list[Any]:
         """
