@@ -74,6 +74,21 @@ def test_deferred_loading():
     assert user._db_loaded_or_deleted is False
 
 
+def test_deferred_loading2():
+    user = User(id=1)
+    assert user._db_loaded_or_deleted is False
+    user.create_model_key()
+    assert user._db_loaded_or_deleted is False
+
+
+def partial_compare():
+    assert User() == User()
+    assert User(id=1) == User(id=1)
+    assert User(id=1) != User(id=2)
+    assert User(name="edgy") == User(name="edgy")
+    assert User(name="edgy") != User(name="snake")
+
+
 def test_model_pk():
     user = User(pk=1)
     assert user.pk == 1

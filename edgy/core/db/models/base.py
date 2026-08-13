@@ -326,17 +326,14 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         # Initialize _seen set if not provided.
         if _seen is None:
             _seen = set()
+        _db_loaded_or_deleted = self._db_loaded_or_deleted
         try:
             model_key = self.create_model_key()
         except AttributeError:
             model_key = None
-        if model_key is not None:
+        if model_key is not None and model_key in _seen:
             # If the model key has been seen, return to prevent infinite recursion.
-            if model_key in _seen:
-                return
-            else:
-                _seen.add(model_key)
-        _db_loaded_or_deleted = self._db_loaded_or_deleted
+            return
         # Load the current instance if it can be loaded.
         if self.can_load:
             await self.load(only_needed)
@@ -347,10 +344,11 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 except AttributeError:
                     model_key = None
         if model_key is None or model_key in _seen:
-            # If the model key has been seen, return to prevent infinite recursion.
+            # If the model key has been seen or still could not figured out,
+            # return to prevent infinite recursion.
             return
         else:
-            # adding it twice is no problem (set)
+            # adding model_key now after the recheck
             _seen.add(model_key)
         # If only_needed_nest is True and the instance is already loaded or deleted, return.
         if only_needed_nest and _db_loaded_or_deleted:
