@@ -91,17 +91,18 @@ Within a model context it contains the current phase it is called for:
 * `load`: Called after load. Contains db values.
 * `post_insert`: Called after insert. Arguments are the ones passed to save.
 * `post_update`: Called after update. Arguments are the ones passed to save.
+* `compare`: Called when comparing model instances (bypasses `extract_column_values`).
 
-For  `extract_column_values` following phases exist (except called manually):
+For  `extract_column_values` following phases exist (except when called manually):
 
 * `prepare_insert`: Called in extract_column_values for insert.
 * `prepare_update`: Called in extract_column_values for update.
-* `compare`: Called when comparing model instances.
 * `delete`: Called when preparing deletion.
+
 
 ### Using the field context
 
-Field methods can access a context variable named FIELD_CONTEXT. It holds a reference to the current field instance as `field` item.
+Field methods can access a context variable named `CURRENT_FIELD_CONTEXT`. It holds a reference to the current field instance as `field` item.
 You can manipulate it like you wish but it will be resetted after the field has been transformed.
 
 ### Using the instance

@@ -73,6 +73,7 @@ async def test_add_many_to_many():
     for track in total_tracks:
         assert track.embedded.album.pk == album.pk
     assert isinstance(track1.track_albumtracks_set, ManyRelation)
+    assert len(await Album.meta.fields["tracks"].through.query.all()) == 3
 
 
 async def test_add_many_to_many_new():

@@ -75,23 +75,21 @@ class ResultParser:
         Parses a batch of rows into model instances.
         (This is the parsing half of the original _handle_batch method)
         """
-        qs = self.queryset
-
         return await new_cache.aget_or_cache_many(
             self.model_class,
             batch,
             cache_fn=lambda row: self.model_class.from_sqla_row(
                 row,
                 tables_and_models=self.tables_and_models,
-                select_related=qs._select_related,
-                only_fields=qs._only,
+                select_related=self.queryset._select_related,
+                only_fields=self.queryset._only,
                 is_defer_fields=self.is_defer_fields,
                 prefetch_related=prefetch_list,  # Use the prepared list
-                exclude_secrets=qs._exclude_secrets,
-                using_schema=qs.active_schema,
-                database=qs.database,
-                reference_select=qs._reference_select,
+                exclude_secrets=self.queryset._exclude_secrets,
+                using_schema=self.queryset.active_schema,
+                database=self.queryset.database,
+                reference_select=self.queryset._reference_select,
             ),
-            transform_fn=qs._embed_parent_in_result,
-            old_cache=qs._cache,
+            transform_fn=self.queryset._embed_parent_in_result,
+            old_cache=self.queryset._cache,
         )

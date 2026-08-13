@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 import orjson
 import sqlalchemy
-from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE
@@ -61,12 +60,11 @@ def _extract_unique_lookup_key(
         if not allow_none and value is None:
             # None is never unique except for retrieval
             return None
-        if isinstance(value, BaseModel):
-            if not getattr(value, "can_load", False):
+        if hasattr(value, "create_model_key"):
+            try:
+                value = value.create_model_key()
+            except AttributeError:
                 return None
-            value = orjson.dumps(
-                value.model_dump(mode="json", include=value.pknames), option=orjson.OPT_SORT_KEYS
-            )
         elif isinstance(value, dict | list):
             value = orjson.dumps(value, option=orjson.OPT_SORT_KEYS)
         lookup_key.append(value)

@@ -489,7 +489,8 @@ class BaseModelType(ABC):
         """
         return type(self).__name__.lower()
 
-    def create_model_key(self) -> tuple:
+    @abstractmethod
+    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple:
         """
         Generates a unique cache key for the model instance.
 
@@ -497,14 +498,9 @@ class BaseModelType(ABC):
         of its primary key column values. This key can be used for caching model
         instances to improve performance.
 
+        Kwargs:
+            allow_missing_and_none (bool): Missing keys are replaced with `None` and `None` values are allowed.
+
         Returns:
             tuple: A tuple representing the unique cache key for the model instance.
         """
-        # Start the key with the model's class name.
-        pk_key_list: list[Any] = [type(self).__name__]
-        # Iterate over primary key column names and append their string values to the key list.
-        # Note: `pkcolumns` contains column names, not column objects.
-        for attr in self.pkcolumns:
-            pk_key_list.append(str(getattr(self, attr)))
-        # Convert the list to a tuple to make it hashable for use as a dictionary key.
-        return tuple(pk_key_list)
