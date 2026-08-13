@@ -810,9 +810,8 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     async def values(
         self,
         fields: Sequence[str] | str | None,
-        exclude: Sequence[str] | set[str],
-        exclude_none: bool,
-        **kwargs: Any,
+        exclude: Sequence[str] | set[str] | None,
+        exclude_none: bool = False,
     ) -> list[Any]:
         """
         Abstract method to return a list of dictionaries, where each dictionary represents
@@ -823,7 +822,6 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
                                                  a sequence of strings, a single string, or None for all.
             exclude (Sequence[str] | set[str]): Fields to exclude from the result.
             exclude_none (bool): If True, excludes fields with None values from the result.
-            **kwargs: Additional filtering or selection criteria.
 
         Returns:
             list[Any]: A list of dictionaries representing the selected values.
@@ -833,10 +831,10 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     @abstractmethod
     async def values_list(
         self,
-        fields: Sequence[str] | str | None,
-        exclude: Sequence[str] | set[str],
-        exclude_none: bool,
-        flat: bool,
+        fields: Sequence[str] | str | None = None,
+        exclude: Sequence[str] | set[str] | None = None,
+        exclude_none: bool = False,
+        flat: bool = False,
     ) -> list[Any]:
         """
         Abstract method to return a list of tuples, where each tuple contains
