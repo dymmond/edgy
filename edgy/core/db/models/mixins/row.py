@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from edgy.core.db.fields.base import RelationshipField
+from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.models.utils import apply_instance_extras
 from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
@@ -119,7 +120,7 @@ class ModelRowMixin:
         _reference_select: reference_select_type = (
             reference_select if reference_select is not None else {}
         )
-        item: dict[str, Any] = {}  # Dictionary to store the model's attributes.
+        model_kwargs: dict[str, Any] = {}  # Dictionary to store the model's attributes.
         select_related = select_related or []
         prefetch_related = prefetch_related or []
         secret_columns: set[str] = set()
@@ -164,7 +165,7 @@ class ModelRowMixin:
 
             if remainder:
                 # Recursively call from_sqla_row for nested select_related.
-                item[field_name] = await model_class.from_sqla_row(
+                model_kwargs[field_name] = await model_class.from_sqla_row(
                     row,
                     tables_and_models=tables_and_models,
                     select_related=[remainder],
@@ -174,12 +175,12 @@ class ModelRowMixin:
                     using_schema=using_schema,
                     database=database,
                     prefix=_prefix,
-                    old_select_related_value=item.get(field_name),
+                    old_select_related_value=model_kwargs.get(field_name),
                     reference_select=reference_select_sub,
                 )
             else:
                 # Call from_sqla_row for the direct related model.
-                item[field_name] = await model_class.from_sqla_row(
+                model_kwargs[field_name] = await model_class.from_sqla_row(
                     row,
                     tables_and_models=tables_and_models,
                     exclude_secrets=exclude_secrets,
@@ -187,29 +188,30 @@ class ModelRowMixin:
                     using_schema=using_schema,
                     database=database,
                     prefix=_prefix,
-                    old_select_related_value=item.get(field_name),
+                    old_select_related_value=model_kwargs.get(field_name),
                     reference_select=reference_select_sub,
                 )
 
         # If an `old_select_related_value` (an existing model instance) is provided,
         # update its attributes with the newly populated `item` and return it.
         if old_select_related_value:
-            for k, v in item.items():
+            for k, v in model_kwargs.items():
                 setattr(old_select_related_value, k, v)
+            old_select_related_value._db_dirty = False
             return old_select_related_value
 
         table_columns = tables_and_models[prefix][0].columns
 
         # Populate the foreign key related names (lazy-loaded relationships).
         for related in cls.meta.foreign_key_fields:
-            foreign_key = cls.meta.fields[related]
+            foreign_key = cast(BaseForeignKeyField, cls.meta.fields[related])
 
             # Determine if this related field should be ignored (e.g., if it's already
             # handled by select_related or is a secret field).
             ignore_related: bool = cls.__should_ignore_related_name(related, select_related)
             if ignore_related or related in cls.meta.secret_fields:
                 continue
-            if related in item:  # Skip if already populated by select_related.
+            if related in model_kwargs:  # Skip if already populated by select_related.
                 continue
 
             if exclude_secrets and foreign_key.secret:
@@ -217,7 +219,7 @@ class ModelRowMixin:
 
             columns_to_check = foreign_key.get_column_names(related)
             model_related = foreign_key.target
-            child_item = {}
+            child_model_kwargs = {}
 
             # Collect foreign key column values from the row mapping.
             for column_name in columns_to_check:
@@ -229,7 +231,7 @@ class ModelRowMixin:
                     columnkeyhash = f"{tables_and_models[prefix][0].name}_{column.key}"
 
                 if columnkeyhash in row._mapping:
-                    child_item[foreign_key.from_fk_field_name(related, column_name)] = (
+                    child_model_kwargs[foreign_key.from_fk_field_name(related, column_name)] = (
                         row._mapping[columnkeyhash]
                     )
 
@@ -254,11 +256,13 @@ class ModelRowMixin:
                                 f"{tables_and_models[reference_source_child_parts[0]][0].name}_"
                                 f"{reference_source_child_parts[1]}"
                             )
-                    child_item[reference_target_child] = row._mapping[reference_source_child]
+                    child_model_kwargs[reference_target_child] = row._mapping[
+                        reference_source_child
+                    ]
 
             # Create a proxy model for the related field, representing a lazy-loaded
             # instance containing only the foreign key(s).
-            proxy_model = model_related.proxy_model(**child_item)
+            proxy_model = model_related.proxy_model(**child_model_kwargs)
             proxy_database = database if model_related.database is cls.database else None
 
             # Apply instance extras (schema, database, etc.) to the proxy model.
@@ -274,7 +278,7 @@ class ModelRowMixin:
             if exclude_secrets:
                 proxy_model.__no_load_trigger_attrs__.update(model_related.meta.secret_fields)
 
-            item[related] = proxy_model
+            model_kwargs[related] = proxy_model
 
         # Populate the regular column values for the main model.
         class_columns = cls.table.columns
@@ -290,14 +294,14 @@ class ModelRowMixin:
                 continue
             if column.key not in class_columns:  # Skip if the column is not part of the model.
                 continue
-            if column.key in item:  # Skip if already populated (e.g., by select_related).
+            if column.key in model_kwargs:  # Skip if already populated (e.g., by select_related).
                 continue
             columnkeyhash = column.key
             if prefix:
                 columnkeyhash = f"{tables_and_models[prefix][0].name}_{columnkeyhash}"
 
             if columnkeyhash in row._mapping:
-                item[column.key] = row._mapping[columnkeyhash]
+                model_kwargs[column.key] = row._mapping[columnkeyhash]
 
         # Apply any explicit column mappings from `reference_select`.
         for reference_target_main, reference_source_main in _reference_select.items():
@@ -315,13 +319,13 @@ class ModelRowMixin:
                         f"{reference_source_main_parts[1]}"
                     )
             # Overwrite existing item with the value from reference_select.
-            item[reference_target_main] = row._mapping[reference_source_main]
+            model_kwargs[reference_target_main] = row._mapping[reference_source_main]
 
         # Instantiate the model (either as a proxy or a full model).
         model: Model = (
-            cls.proxy_model(**item, __phase__="init_db")
+            cls.proxy_model(**model_kwargs, __phase__="init_db")
             if exclude_secrets or is_defer_fields or only_fields
-            else cls(**item, __phase__="init_db")
+            else cls(**model_kwargs, __phase__="init_db")
         )
 
         # Mark the model as fully loaded if no deferred or only_fields are active.
@@ -353,6 +357,7 @@ class ModelRowMixin:
                 prefetch_related=prefetch_related,
             )
         assert model.pk is not None, model  # Ensure the primary key is not None.
+        model._db_dirty = False
         return model
 
     @classmethod

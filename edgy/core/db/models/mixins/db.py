@@ -841,7 +841,7 @@ class DatabaseMixin:
         )
         return row_count
 
-    async def update(self: Model, **kwargs: Any) -> Self:
+    async def update(self, **kwargs: Any) -> Self:
         """
         Updates the current model instance in the database with the provided keyword arguments.
 
@@ -854,25 +854,30 @@ class DatabaseMixin:
         Returns:
             The updated model instance.
         """
+        self_model = cast("Model", self)
         token = EXPLICIT_SPECIFIED_VALUES.set(set(kwargs.keys()))
-        token2 = CURRENT_INSTANCE.set(self)
+        token2 = CURRENT_INSTANCE.set(self_model)
         try:
             # assume always partial
-            await self._update(
+            await self_model._update(
                 True,
                 kwargs,
                 pre_fn=partial(
-                    self.meta.signals.pre_update.send_async, is_update=True, is_migration=False
+                    self_model.meta.signals.pre_update.send_async,
+                    is_update=True,
+                    is_migration=False,
                 ),
                 post_fn=partial(
-                    self.meta.signals.post_update.send_async, is_update=True, is_migration=False
+                    self_model.meta.signals.post_update.send_async,
+                    is_update=True,
+                    is_migration=False,
                 ),
-                instance=self,
+                instance=self_model,
             )
         finally:
             EXPLICIT_SPECIFIED_VALUES.reset(token)
             CURRENT_INSTANCE.reset(token2)
-        return cast("Self", self)
+        return self
 
     async def raw_delete(
         self: Model, *, skip_post_delete_hooks: bool, remove_referenced_call: bool | str

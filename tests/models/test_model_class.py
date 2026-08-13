@@ -81,7 +81,7 @@ def test_deferred_loading2():
     assert user._db_loaded_or_deleted is False
 
 
-def partial_compare():
+def test_partial_compare():
     assert User() == User()
     assert User(id=1) == User(id=1)
     assert User(id=1) != User(id=2)

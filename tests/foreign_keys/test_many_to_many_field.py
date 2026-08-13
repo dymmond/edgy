@@ -404,18 +404,21 @@ async def test_relation_load(create_test_database, subtests):
                 ],
             )
             assert await Track.query.count() == 3
+            assert await Album.meta.fields["tracks"].through.query.count() == 3
             assert await Album.query.count() == 1
             arr = await album.tracks.order_by("position").values_list("title", flat=True)
             assert arr == ["The Bird", "Heart don't stand a chance", "The Waters"]
             tracks = await album.tracks.all()
             await album.tracks.remove_many(*tracks)
             assert await album.tracks.count() == 0
+            assert await Album.meta.fields["tracks"].through.query.count() == 0
             assert await Track.query.count() == 3
             await album.tracks.add_many(
                 Track(title="The Bird", position=1),
                 Track(title="Heart don't stand a chance", position=2),
                 Track(title="The Waters", position=3),
             )
+            assert await Album.meta.fields["tracks"].through.query.count() == 3
             assert await Track.query.count() == 6
             arr = await album.tracks.order_by("position").values_list("title", flat=True)
             assert arr == ["The Bird", "Heart don't stand a chance", "The Waters"]

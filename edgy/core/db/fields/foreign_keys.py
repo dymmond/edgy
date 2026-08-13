@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from functools import cached_property
 from typing import (
-    TYPE_CHECKING,
     Any,
     cast,
 )
@@ -16,6 +15,7 @@ from edgy.core.db.context_vars import CURRENT_FIELD_CONTEXT, CURRENT_INSTANCE, C
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.fields.factories import ForeignKeyFieldFactory
 from edgy.core.db.fields.types import BaseFieldType
+from edgy.core.db.models.types import BaseModelType
 from edgy.core.db.relationships.relation import (
     SingleRelation,
     VirtualCascadeDeletionSingleRelation,
@@ -23,10 +23,6 @@ from edgy.core.db.relationships.relation import (
 from edgy.core.terminal import Print
 from edgy.exceptions import FieldDefinitionError, SkipOperation
 from edgy.protocols.many_relationship import ManyRelationProtocol
-
-if TYPE_CHECKING:
-    from edgy.core.db.models.types import BaseModelType
-
 
 # Character limit for foreign key names in some database engines.
 FK_CHAR_LIMIT = 63
@@ -193,9 +189,13 @@ class BaseForeignKeyField(BaseForeignKey):
         # If the value is already a target model instance or its proxy.
         if isinstance(value, target | target.proxy_model):
             # Save the related model first to ensure its primary key is available.
-            await value.save()
+            await value.real_save(force_insert=False, values=None)
             # Clean the value to extract the foreign key column values.
-            return self.clean(self.name, value, for_query=False, hook_call=True)
+            _value: dict[str, Any] = self.clean(self.name, value, for_query=False)
+            # it is an error if it couldn't be parsed.
+            if isinstance(_value.get(self.name), BaseModelType):
+                raise ValueError(f"Couldn't save `{self.name}`.")
+            return _value
         # If the value is a dictionary, convert it to a target model instance and
         # recursively call pre_save_callback.
         elif isinstance(value, dict):
@@ -368,9 +368,7 @@ class BaseForeignKeyField(BaseForeignKey):
         instance.identifying_db_fields = related_columns
         return instance
 
-    def clean(
-        self, name: str, value: Any, for_query: bool = False, hook_call: bool = False
-    ) -> dict[str, Any]:
+    def clean(self, name: str, value: Any, for_query: bool = False) -> dict[str, Any]:
         """
         Validates and transforms the foreign key value into a dictionary of
         column-value pairs suitable for database operations.
@@ -386,8 +384,6 @@ class BaseForeignKeyField(BaseForeignKey):
                          a dictionary (for composite keys), a target model instance,
                          or a scalar (for single-column FKs).
             for_query (bool): If `True`, the cleaning is for a query operation.
-                              Defaults to `False`.
-            hook_call (bool): If `True`, indicates that this call is from a hook.
                               Defaults to `False`.
 
         Returns:
@@ -419,8 +415,8 @@ class BaseForeignKeyField(BaseForeignKey):
                 translated_name = self.from_fk_field_name(name, column_name)
                 if hasattr(value, translated_name):
                     retdict[column_name] = getattr(value, translated_name)
-                # If not all values are specified and it's a pre-save hook, return the model itself.
-                elif phase in {"prepare_insert", "prepare_update"} and not hook_call:
+                # If not all values are specified return the model itself.
+                elif phase in {"prepare_insert", "prepare_update"}:
                     return {name: value}
         elif len(column_names) == 1:
             # If it's a single-column FK, directly assign the scalar value.

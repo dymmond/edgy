@@ -759,6 +759,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             except KeyError as exc:
                 raise AttributeError from exc
         # For all other attributes, use the default __delattr__ behavior.
+        # removed entries doesn't mark db as dirty (won't be in an update)
         super().__delattr__(name)
 
     def __eq__(self, other: Any) -> bool:

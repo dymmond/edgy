@@ -164,7 +164,8 @@ class ManyRelation(ManyRelationProtocol):
                 for field in [self.from_foreign_key, self.to_foreign_key]
                 for col in self.through.meta.field_to_column_names[field]
             },
-            ignore_create_conflicts=True,
+            # important, otherwise sporadic errors
+            ignore_create_conflicts=False,
             signal_models=[
                 self._shared_relation_signals_params["source"],
                 self._shared_relation_signals_params["target"],
@@ -338,7 +339,7 @@ class ManyRelation(ManyRelationProtocol):
                 for field in [self.from_foreign_key, self.to_foreign_key]
                 for col in through.meta.field_to_column_names[field]
             },
-            ignore_create_conflicts=True,
+            ignore_create_conflicts=False,
             signal_models=[
                 self._shared_relation_signals_params["source"],
                 self._shared_relation_signals_params["target"],
