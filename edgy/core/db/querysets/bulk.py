@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 import orjson
 import sqlalchemy
-from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
 from edgy.core.db.context_vars import CURRENT_INSTANCE
@@ -61,12 +60,11 @@ def _extract_unique_lookup_key(
         if not allow_none and value is None:
             # None is never unique except for retrieval
             return None
-        if isinstance(value, BaseModel):
-            if not getattr(value, "can_load", False):
+        if hasattr(value, "create_model_key"):
+            try:
+                value = value.create_model_key()
+            except AttributeError:
                 return None
-            value = orjson.dumps(
-                value.model_dump(mode="json", include=value.pknames), option=orjson.OPT_SORT_KEYS
-            )
         elif isinstance(value, dict | list):
             value = orjson.dumps(value, option=orjson.OPT_SORT_KEYS)
         lookup_key.append(value)
@@ -497,11 +495,8 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
 
         token = CURRENT_INSTANCE.set(self.used_instance)
         try:
-            async with (
-                queryset.database as database,
-                database.transaction(),
-                database.connection() as connection,
-            ):
+            async with queryset.database as database, database.connection() as connection:
+                # FIXME: currently no transaction, as this causes errors
                 create_obj_values: list[dict | None] = []
                 if self.create_params:
                     # we can't just use label. If the column.key has an invalid name for the db
@@ -531,9 +526,10 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                     # we need to recheck if the conditions are still valid
                     if create_obj_values:
                         expression_create = queryset.table.insert().values(create_obj_values)
-                        create_return_result = cast(
-                            None | int | list, await connection.execute_many(expression_create)
-                        )
+                        async with connection.transaction():
+                            create_return_result = cast(
+                                None | int | list, await connection.execute_many(expression_create)
+                            )
                         self.row_count_create = (
                             len(create_return_result)
                             if isinstance(create_return_result, list)
@@ -564,10 +560,12 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                         for col in _update_columns
                     }
                     expression_update = expression_update.values(values_placeholder)
-                    update_result_return = cast(
-                        None | int | list,
-                        await connection.execute_many(expression_update, update_obj_values),
-                    )
+
+                    async with connection.transaction():
+                        update_result_return = cast(
+                            None | int | list,
+                            await connection.execute_many(expression_update, update_obj_values),
+                        )
                     self.row_count_update = (
                         len(update_result_return)
                         if isinstance(update_result_return, list)

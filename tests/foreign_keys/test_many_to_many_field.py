@@ -395,30 +395,45 @@ async def test_relation_load(create_test_database, subtests):
         with subtests.test(msg=f"Iteration: {i}"):
             await Album.query.delete()
             await Track.query.delete()
+            precreated_track = await Track.query.create(title="The Bird", position=1)
             album = await Album.query.create(
                 name="Malibu",
                 tracks=[
-                    Track(title="The Bird", position=1),
+                    precreated_track,
+                    precreated_track,
                     Track(title="Heart don't stand a chance", position=2),
                     Track(title="The Waters", position=3),
                 ],
             )
             assert await Track.query.count() == 3
+            assert await Album.meta.fields["tracks"].through.query.count() == 3
             assert await Album.query.count() == 1
             arr = await album.tracks.order_by("position").values_list("title", flat=True)
             assert arr == ["The Bird", "Heart don't stand a chance", "The Waters"]
             tracks = await album.tracks.all()
             await album.tracks.remove_many(*tracks)
             assert await album.tracks.count() == 0
+            assert await Album.meta.fields["tracks"].through.query.count() == 0
             assert await Track.query.count() == 3
+            # add twice
             await album.tracks.add_many(
-                Track(title="The Bird", position=1),
-                Track(title="Heart don't stand a chance", position=2),
-                Track(title="The Waters", position=3),
+                Track(title="The Hollow", position=4),
+                Track(title="The Eagle", position=5),
+                Track(title="The Waters spring", position=6),
+                *tracks,
+                tracks[1],
             )
+            assert await Album.meta.fields["tracks"].through.query.count() == 6
             assert await Track.query.count() == 6
             arr = await album.tracks.order_by("position").values_list("title", flat=True)
-            assert arr == ["The Bird", "Heart don't stand a chance", "The Waters"]
+            assert arr == [
+                "The Bird",
+                "Heart don't stand a chance",
+                "The Waters",
+                "The Hollow",
+                "The Eagle",
+                "The Waters spring",
+            ]
     await Album.query.delete()
     await Track.query.delete()
 

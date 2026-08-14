@@ -466,6 +466,7 @@ class BaseQuerySet(
         return result, new_result
 
     def get_schema(self) -> str | None:
+        """Retrieve the schema."""
         schema = self.using_schema
         if schema is Undefined:
             schema = get_schema()
@@ -488,48 +489,40 @@ class BaseQuerySet(
         executor = QueryExecutor(self)
 
         # Delegate the work
-        async for model in executor.iterate(fetch_all_at_once=fetch_all_at_once):  # type: ignore
-            yield model
+        async for tup in executor.iterate(fetch_all_at_once=fetch_all_at_once):
+            yield tup[1]
 
     async def _execute_all(self) -> list[EdgyEmbedTarget]:
         """
-        Still relies on _execute_iterate.
+        Resolves to an array and deduplicate.
         """
-        results = [result async for result in self._execute_iterate(fetch_all_at_once=True)]
+        executor = QueryExecutor(self)
+        results = [result async for result in executor.iterate(fetch_all_at_once=True)]
 
         # Only attempt dedupe for "normal" querysets.
         # Embedded querysets (e.g. album.tracks with embed_parent) must not go
         # through this path – their model_class and returned objects differ.
-        if (
-            len(results) > 1
-            and self.embed_parent is None
-            and not getattr(self, "_suppress_pk_deduplication", False)
-        ):
-            pk_names = tuple(self.model_class.pkcolumns)
-            if not pk_names:
-                # Nothing reliable to dedupe on
-                return results
-
+        if len(results) > 1 and not getattr(self, "_suppress_pk_deduplication", False):
             seen: set[tuple] = set()
             unique = []
 
-            for obj in results:
+            for tup in results:
                 try:
-                    key = tuple(getattr(obj, name) for name in pk_names)
+                    key = tup[0].create_model_key()
                 except AttributeError:
                     # The returned object does not expose the model_class PK attrs;
                     # this can happen in advanced/embedded scenarios. In that case
                     # we bail out and keep the original list to avoid breaking
                     # existing behaviour.
-                    return results
+                    return [tup[1] for tup in results]
 
                 if key not in seen:
                     seen.add(key)
-                    unique.append(obj)
+                    unique.append(tup[1])
 
-            results = unique
+            return unique
 
-        return results
+        return [tup[1] for tup in results]
 
     def _filter_or_exclude(
         self,
@@ -702,7 +695,4 @@ class BaseQuerySet(
             elif self._cache_last is not None:
                 return self._cache_last
         executor = QueryExecutor(self)
-        return cast(
-            "tuple[EdgyModel, EdgyEmbedTarget]",
-            await executor.get_one(no_update_result_cache=no_update_result_cache),
-        )
+        return await executor.get_one(no_update_result_cache=no_update_result_cache)

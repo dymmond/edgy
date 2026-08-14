@@ -3,7 +3,7 @@ from __future__ import annotations
 import warnings
 from collections.abc import AsyncGenerator, Iterable, Sequence
 from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Generic, cast
 
 import sqlalchemy
 
@@ -38,7 +38,7 @@ def get_current_row() -> sqlalchemy.Row | None:
     return row_holder[0]
 
 
-class QueryExecutor:
+class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
     """
     Runs compiled queries against the database, manages iteration,
     and coordinates prefetching, parsing, and deleting.
@@ -46,7 +46,7 @@ class QueryExecutor:
 
     def __init__(
         self,
-        queryset: BaseQuerySet,
+        queryset: BaseQuerySet[EdgyModel, EdgyEmbedTarget],
     ):
         """
         Initializes the QueryExecutor.
@@ -101,7 +101,9 @@ class QueryExecutor:
         for row_num, result_tuple in enumerate(results):
             yield result_tuple, batch[row_num]
 
-    async def iterate(self, fetch_all_at_once: bool = False) -> AsyncGenerator[EdgyModel, None]:
+    async def iterate(
+        self, fetch_all_at_once: bool = False
+    ) -> AsyncGenerator[tuple[EdgyModel, EdgyEmbedTarget], None]:
         """
         Executes the query and iterates over results, yielding model instances.
 
@@ -113,15 +115,15 @@ class QueryExecutor:
                 a single query. If False, uses a batched iterator.
 
         Yields:
-            EdgyModel: A populated model instance for each row.
+            tuple[EdgyModel, EdgyEmbedTarget]: A raw and resolved model instance for each row.
         """
         qs = self.queryset
         if qs._cache_fetch_all:
             for result in cast(
-                Sequence[tuple[EdgyModel, Any]],
+                Sequence[tuple[EdgyModel, EdgyEmbedTarget]],
                 qs._cache.get_category(self.model_class).values(),
             ):
-                yield result[1]
+                yield result
             return
 
         if qs.embed_parent:
@@ -160,7 +162,7 @@ class QueryExecutor:
                     last_element = result
                     counter += 1
                     current_row[0] = row
-                    yield result[1]
+                    yield result
 
                 # qs is maybe a copy, so update cache on self.queryset
                 self.queryset._cache_fetch_all = True
@@ -183,7 +185,7 @@ class QueryExecutor:
                             last_element = result
                             counter += 1
                             current_row[0] = row
-                            yield result[1]  # Yield the embed target
+                            yield result
                         batch_num += 1
 
                 if batch_num <= 1:
@@ -367,7 +369,7 @@ class QueryExecutor:
             The total number of models deleted.
         """
 
-        queryset = (
+        queryset: QuerySet[EdgyModel, EdgyEmbedTarget] = (
             self.queryset.limit(self.queryset._batch_size)
             if self.queryset._batch_size is not None
             else self.queryset.all()
@@ -375,11 +377,11 @@ class QueryExecutor:
         queryset.embed_parent = None
         row_count = 0
 
-        executor = QueryExecutor(queryset)
+        executor: QueryExecutor[EdgyModel, EdgyEmbedTarget] = QueryExecutor(queryset)
         token = CURRENT_INSTANCE.set(self.queryset)
         try:
             # Use the new executor's iterate method
-            models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
+            models = [tup[0] async for tup in executor.iterate(fetch_all_at_once=True)]
             while models:
                 exclusion_filters = []
                 for model in models:
@@ -404,7 +406,7 @@ class QueryExecutor:
                     exclusion_filters.clear()
                 # clear cache and fetch new batch
                 executor.queryset._clear_cache(keep_cached_selected=True)
-                models = [model async for model in executor.iterate(fetch_all_at_once=True)]  # type: ignore
+                models = [tup[0] async for tup in executor.iterate(fetch_all_at_once=True)]
         finally:
             CURRENT_INSTANCE.reset(token)
         return row_count

@@ -34,6 +34,8 @@
 - `SuspiciousFileOperation` inherits now correctly from `EdgyException`.
 - Return row count for update.
 - Fix `get_created_time`, `get_modified_time` and `get_accessed_time` on filesystem storage. Previously it used a non-existing setting and didn't follow the specs.
+- Comparing reflected models.
+- Directly issuing queries on `through` models of `ManyToMany`.
 
 ### Removed
 

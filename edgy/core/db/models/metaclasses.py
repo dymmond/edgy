@@ -8,12 +8,7 @@ from abc import ABCMeta
 from collections import UserDict, deque
 from collections.abc import Sequence
 from contextvars import ContextVar
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Literal,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 import sqlalchemy
 from pydantic._internal._model_construction import ModelMetaclass
@@ -43,6 +38,8 @@ _empty_dict: dict[str, Any] = {}
 _empty_set: frozenset[Any] = frozenset()
 
 _seen_table_names: ContextVar[set[str]] = ContextVar("_seen_table_names", default=None)
+
+T = TypeVar("T")
 
 
 class Fields(UserDict, dict[str, BaseFieldType]):
@@ -120,7 +117,7 @@ class Fields(UserDict, dict[str, BaseFieldType]):
         """
         return cast(BaseFieldType, self.data[name])
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, default: T = None) -> T | BaseFieldType:
         """
         Retrieves a field by key, with an optional default value.
 
@@ -478,14 +475,16 @@ class MetaInfo:
     )
     _include_dump: tuple[str, ...] = (
         *filter(
-            lambda x: x
-            not in {
-                "field_to_columns",
-                "field_to_column_names",
-                "columns_to_field",
-                "_fields_are_initialized",
-                "_field_stats_are_initialized",
-            },
+            lambda x: (
+                x
+                not in {
+                    "field_to_columns",
+                    "field_to_column_names",
+                    "columns_to_field",
+                    "_fields_are_initialized",
+                    "_field_stats_are_initialized",
+                }
+            ),
             __slots__,
         ),
         "pk",

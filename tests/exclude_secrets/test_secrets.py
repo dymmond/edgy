@@ -105,9 +105,9 @@ async def test_exclude_secrets_undo():
     await user.load_recursive()
 
     assert user.model_dump() == {
-        "age": 2,
         "id": 1,
+        "name": "Edgy",
+        "age": 2,
         "language": "EN",
         "main": {"id": 1, "name": "main"},
-        "name": "Edgy",
     }

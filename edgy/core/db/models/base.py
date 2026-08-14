@@ -325,18 +325,31 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         """
         # Initialize _seen set if not provided.
         if _seen is None:
-            _seen = {self.create_model_key()}
-        else:
-            model_key = self.create_model_key()
-            # If the model key has been seen, return to prevent infinite recursion.
-            if model_key in _seen:
-                return
-            else:
-                _seen.add(model_key)
+            _seen = set()
         _db_loaded_or_deleted = self._db_loaded_or_deleted
+        try:
+            model_key = self.create_model_key()
+        except AttributeError:
+            model_key = None
+        if model_key is not None and model_key in _seen:
+            # If the model key has been seen, return to prevent infinite recursion.
+            return
         # Load the current instance if it can be loaded.
         if self.can_load:
             await self.load(only_needed)
+            # recheck after loading
+            if model_key is None:
+                try:
+                    model_key = self.create_model_key()
+                except AttributeError:
+                    model_key = None
+        if model_key is None or model_key in _seen:
+            # If the model key has been seen or still could not figured out,
+            # return to prevent infinite recursion.
+            return
+        else:
+            # adding model_key now after the recheck
+            _seen.add(model_key)
         # If only_needed_nest is True and the instance is already loaded or deleted, return.
         if only_needed_nest and _db_loaded_or_deleted:
             return
@@ -477,7 +490,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         :param instance: The current instance being processed.
         :param model_instance: The model instance context.
         :param evaluate_values: If True, callable values in `extracted_values` will be
-                                 evaluated.
+                                evaluated.
         :return: A dictionary of validated column values.
         """
         validated: dict[str, Any] = {}
@@ -495,7 +508,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 for k, v in extracted_values.items():
                     if callable(v):
                         field_dict.clear()
-                        field_dict["field"] = cast("BaseFieldType", cls.meta.fields.get(k))
+                        field_dict["field"] = cls.meta.fields.get(k)
                         v = v()
                     new_extracted_values[k] = v
                 extracted_values = new_extracted_values
@@ -746,6 +759,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             except KeyError as exc:
                 raise AttributeError from exc
         # For all other attributes, use the default __delattr__ behavior.
+        # removed entries doesn't mark db as dirty (won't be in an update)
         super().__delattr__(name)
 
     def __eq__(self, other: Any) -> bool:
@@ -766,27 +780,68 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             return False
         if self.meta.tablename != other.meta.tablename:
             return False
+        self_tup = self.create_model_key(allow_missing_and_none=True)
+        other_tup = other.create_model_key(allow_missing_and_none=True)
+        return self_tup == other_tup
 
-        # Extract identifying column values for comparison, handling partial extraction.
-        self_dict = self.extract_column_values(
-            self.extract_db_fields(self.pkcolumns),
-            is_partial=True,
-            phase="compare",
-            instance=self,
-            model_instance=self,
-        )
-        other_dict = other.extract_column_values(
-            other.extract_db_fields(self.pkcolumns),
-            is_partial=True,
-            phase="compare",
-            instance=other,
-            model_instance=other,
-        )
-        # Get all unique keys from both dictionaries.
-        key_set = {*self_dict.keys(), *other_dict.keys()}
-        # Compare values for each key. If any mismatch, return False.
-        for field_name in key_set:
-            if self_dict.get(field_name) != other_dict.get(field_name):
-                return False
-        # If all identifying field values match, the instances are considered equal.
-        return True
+    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple:
+        """
+        Generates a unique cache key for the model instance.
+
+        The key is composed of the model's class name and the string representation
+        of its primary key column values. This key can be used for caching model
+        instances to improve performance.
+
+        Kwargs:
+            allow_missing_and_none (bool): Missing keys are replaced with `None` and `None` values are allowed.
+
+        Returns:
+            tuple: A tuple representing the unique cache key for the model instance.
+        """
+        # Start the key with the model's class name.
+        pk_key_list: list[Any] = [type(self).__name__]
+        # Iterate over primary key column names and append their string values to the key list.
+        # Note: `pkcolumns` contains column names, not column objects.
+        token = CURRENT_PHASE.set("compare")
+        token2 = CURRENT_INSTANCE.set(self)
+        token3 = CURRENT_MODEL_INSTANCE.set(self)
+        field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
+        token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
+        try:
+            for attr in self.pkcolumns:
+                field = self.meta.fields.get(attr)
+                try:
+                    if field is not None:
+                        # this handles e.g. fks and composite keys properly
+                        field_dict.clear()
+                        field_dict["field"] = field
+                        for col_name, value in field.clean(
+                            attr, object.__getattribute__(self, attr)
+                        ).items():
+                            # None is invalid
+                            if value is None:
+                                if allow_missing_and_none:
+                                    pk_key_list.append(None)
+                                    continue
+                                else:
+                                    raise AttributeError(f"{col_name} is `None`")
+                            pk_key_list.append(str(value))
+                    else:
+                        value = getattr(self, attr)
+                        # None is invalid
+                        if value is None:
+                            raise AttributeError(f"{attr} is `None`")
+                        pk_key_list.append(str(value))
+                except AttributeError:
+                    if allow_missing_and_none:
+                        pk_key_list.append(None)
+                    else:
+                        raise
+        finally:
+            CURRENT_PHASE.reset(token)
+            CURRENT_INSTANCE.reset(token2)
+            CURRENT_MODEL_INSTANCE.reset(token3)
+            CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
+        # Convert the list to a tuple to make it hashable for use as a dictionary key.
+        # Raise AttributeError otherwise.
+        return tuple(pk_key_list)
