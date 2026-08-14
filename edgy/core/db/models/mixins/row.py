@@ -197,7 +197,6 @@ class ModelRowMixin:
         if old_select_related_value:
             for k, v in model_kwargs.items():
                 setattr(old_select_related_value, k, v)
-            old_select_related_value._db_dirty = False
             return old_select_related_value
 
         table_columns = tables_and_models[prefix][0].columns
@@ -357,7 +356,6 @@ class ModelRowMixin:
                 prefetch_related=prefetch_related,
             )
         assert model.pk is not None, model  # Ensure the primary key is not None.
-        model._db_dirty = False
         return model
 
     @classmethod

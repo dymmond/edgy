@@ -495,11 +495,8 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
 
         token = CURRENT_INSTANCE.set(self.used_instance)
         try:
-            async with (
-                queryset.database as database,
-                database.transaction(),
-                database.connection() as connection,
-            ):
+            async with queryset.database as database, database.connection() as connection:
+                # FIXME: currently no transaction, as this causes errors
                 create_obj_values: list[dict | None] = []
                 if self.create_params:
                     # we can't just use label. If the column.key has an invalid name for the db

@@ -164,8 +164,7 @@ class ManyRelation(ManyRelationProtocol):
                 for field in [self.from_foreign_key, self.to_foreign_key]
                 for col in self.through.meta.field_to_column_names[field]
             },
-            # important, otherwise sporadic errors
-            ignore_create_conflicts=False,
+            ignore_create_conflicts=True,
             signal_models=[
                 self._shared_relation_signals_params["source"],
                 self._shared_relation_signals_params["target"],
@@ -174,7 +173,7 @@ class ManyRelation(ManyRelationProtocol):
             signal_postfix="relation_add",
             signal_params={"operation": "save_related", **self._shared_relation_signals_params},
             create=True,
-            retrieve=True,
+            retrieve=False,
             update=False,
             used_instance=self.instance,
             resolve_embed=False,
@@ -339,7 +338,7 @@ class ManyRelation(ManyRelationProtocol):
                 for field in [self.from_foreign_key, self.to_foreign_key]
                 for col in through.meta.field_to_column_names[field]
             },
-            ignore_create_conflicts=False,
+            ignore_create_conflicts=True,
             signal_models=[
                 self._shared_relation_signals_params["source"],
                 self._shared_relation_signals_params["target"],
@@ -348,7 +347,7 @@ class ManyRelation(ManyRelationProtocol):
             signal_postfix="relation_add",
             signal_params={"operation": "add", **self._shared_relation_signals_params},
             create=True,
-            retrieve=True,
+            retrieve=False,
             update=False,
             used_instance=self.instance,
             resolve_embed=True,
