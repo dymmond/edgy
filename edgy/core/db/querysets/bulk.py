@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 from collections.abc import (
     Awaitable,
+    Callable,
     Collection,
     Iterable,
 )
+from contextlib import AsyncExitStack
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generic, cast
 
@@ -391,12 +393,11 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
             can_result_cache = True
 
         check_db_connection(queryset.database, 4)
-        con_lock = asyncio.Lock()
         row_count_create_single = 0
 
         async def _iterate_create(
             item: tuple[EdgyModel, int, set[str]],
-            connection: Connection,
+            connection: Connection | Callable[[], Connection],
             returning: list[sqlalchemy.ColumnElement],
         ) -> dict[str, Any] | None:
             nonlocal row_count_create_single
@@ -417,9 +418,12 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                 self.resolve_embed and queryset.embed_parent and not item[0].can_load
             ):
                 try:
-                    # con_lock ensures only one userlandthread is accessing the database concurrently
-                    # so the transaction is correctly mapped
-                    async with con_lock, connection.transaction():
+                    cm = AsyncExitStack()
+                    if callable(connection):
+                        connection = connection()
+                    await cm.enter_async_context(connection)
+                    await cm.enter_async_context(connection.transaction())
+                    async with cm:
                         if returning:
                             expression: Any = (
                                 queryset.table.insert().values(**col_values).returning(*returning)
@@ -495,8 +499,11 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
 
         token = CURRENT_INSTANCE.set(self.used_instance)
         try:
-            async with queryset.database as database, database.connection() as connection:
-                # FIXME: currently no transaction, as this causes errors
+            async with (
+                queryset.database as database,
+                database.transaction(),
+                database.connection() as connection,
+            ):
                 create_obj_values: list[dict | None] = []
                 if self.create_params:
                     # we can't just use label. If the column.key has an invalid name for the db
@@ -515,7 +522,15 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                         for val in (
                             await run_concurrently(
                                 [
-                                    _iterate_create(tup, connection, returning)
+                                    # one connection, one transaction. When concurrent_limit == 1,
+                                    # we reuse the existing connection
+                                    _iterate_create(
+                                        tup,
+                                        connection
+                                        if concurrent_limit == 1
+                                        else database.connection,
+                                        returning,
+                                    )
                                     for tup in self.create_params
                                 ],
                                 limit=concurrent_limit,
