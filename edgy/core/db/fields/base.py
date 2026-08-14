@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import copy
+import inspect
 from abc import abstractmethod
 from collections.abc import Sequence
 from functools import cached_property
@@ -1157,6 +1158,36 @@ class BaseForeignKey(RelationshipField):
             delattr(self, "_target_registry")
 
     @property
+    def to(self) -> Any:
+        """Manages to. Resolves lazy attributes."""
+        # Check if _to_cached attribute is already set.
+        if not hasattr(self, "_to_cached"):
+            to = self._to
+            if not inspect.isclass(to) and callable(to):
+                self._to_cached = to()
+            else:
+                self._to_cached = to
+        return self._to_cached
+
+    @to.setter
+    def to(self, value: Any) -> None:
+        """Set `to` to value and clear cache."""
+        with contextlib.suppress(AttributeError):
+            delattr(self, "_to_cached")
+        with contextlib.suppress(AttributeError):
+            delattr(self, "_target")
+        self._to = value
+
+    @to.deleter
+    def to(self) -> None:
+        """Clear cache of `to`."""
+        with contextlib.suppress(AttributeError):
+            delattr(self, "_to_cached")
+        with contextlib.suppress(AttributeError):
+            delattr(self, "_target")
+        # keep _to because it is required
+
+    @property
     def target(self) -> Any:
         """
         Retrieves the target model class for the foreign key relationship.
@@ -1186,10 +1217,7 @@ class BaseForeignKey(RelationshipField):
         Args:
             value: The target model class to set.
         """
-        # Suppress AttributeError if _target doesn't exist and delete it.
-        with contextlib.suppress(AttributeError):
-            delattr(self, "_target")
-        # Set the 'to' attribute to the new value.
+        # Set the 'to' attribute to the new value and clear with this the caches
         self.to = value
 
     @target.deleter

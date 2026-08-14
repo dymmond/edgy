@@ -750,7 +750,7 @@ class ForeignKey(ForeignKeyFieldFactory, cast(Any, object)):
 
     def __new__(
         cls,
-        to: type[BaseModelType] | str,
+        to: type[BaseModelType] | str | Callable[[], type[BaseModelType] | str],
         **kwargs: Any,
     ) -> BaseFieldType:
         """
@@ -760,8 +760,9 @@ class ForeignKey(ForeignKeyFieldFactory, cast(Any, object)):
         `kwargs` to the parent `ForeignKeyFieldFactory` for field construction.
 
         Args:
-            to (type[BaseModelType] | str): The target model class or its string name
-                                          to which this foreign key points.
+            to (type[BaseModelType] | str | Callable[[], type[BaseModelType] | str]):
+                The target model class or its string name or a lazy version of it
+                to which this foreign key points.
             **kwargs (Any): Additional keyword arguments for the foreign key field.
 
         Returns:

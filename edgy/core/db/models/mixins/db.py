@@ -206,7 +206,7 @@ def _set_related_name_for_foreign_keys(
         return
 
     for name in meta.foreign_key_fields:
-        foreign_key = meta.fields[name]
+        foreign_key = cast("BaseForeignKey", meta.fields[name])
         related_name = getattr(foreign_key, "related_name", None)
         if related_name is False:
             # skip related_field

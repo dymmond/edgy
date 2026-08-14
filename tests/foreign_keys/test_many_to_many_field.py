@@ -29,10 +29,20 @@ class Track(edgy.StrictModel):
         registry = models
 
 
-class Album(edgy.StrictModel):
+class BaseAlbum(edgy.StrictModel):
+    tracks = edgy.ManyToMany(lambda: lazy_track, embed_through="embedded")
+
+    class Meta:
+        abstract = True
+        registry = models
+
+
+lazy_track = "Track"
+
+
+class Album(BaseAlbum):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     name = edgy.CharField(max_length=100)
-    tracks = edgy.ManyToMany(Track, embed_through="embedded")
 
     class Meta:
         registry = models
@@ -40,7 +50,7 @@ class Album(edgy.StrictModel):
 
 class Studio(edgy.StrictModel):
     name = edgy.CharField(max_length=255)
-    users = edgy.ManyToMany(User)
+    users = edgy.ManyToMany(lambda: User)
     albums = edgy.ManyToMany(Album)
 
     class Meta:

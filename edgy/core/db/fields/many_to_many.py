@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Literal, cast
 
@@ -539,7 +539,7 @@ class ManyToManyField(ForeignKeyFieldFactory, list):
 
     def __new__(
         cls,
-        to: BaseModelType | type[Model] | str,
+        to: type[BaseModelType] | str | Callable[[], type[BaseModelType] | str],
         *,
         to_fields: Sequence[str] = (),
         to_foreign_key: str = "",
@@ -554,7 +554,9 @@ class ManyToManyField(ForeignKeyFieldFactory, list):
         Creates a new `ManyToManyField` instance.
 
         Args:
-            to (Union[BaseModelType, type[Model], str]): The target model class or its string name.
+            to (type[BaseModelType] | str | Callable[[], type[BaseModelType] | str]):
+                The target model class or its string name or a lazy version of it
+                to which this foreign key points.
             to_fields (Sequence[str]): Fields on the `target` model that the `through`
                                       model's foreign key to `target` will reference.
             to_foreign_key (str): The name of the foreign key field in the `through`

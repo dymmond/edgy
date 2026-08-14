@@ -294,7 +294,7 @@ async def test_assertation_error_on_set_null():
         class MyOtherModel(edgy.StrictModel):
             model = edgy.ForeignKey(MyModel, on_delete=edgy.SET_NULL)
 
-    assert raised.value.args[0] == "When SET_NULL is enabled, null must be True."
+    assert raised.value.args[0] == "When SET_NULL is enabled, null must be `True`."
 
 
 async def test_assertation_error_on_missing_on_delete():
@@ -306,4 +306,4 @@ async def test_assertation_error_on_missing_on_delete():
         class MyOtherModel(edgy.StrictModel):
             model = edgy.ForeignKey(MyModel, on_delete=None)
 
-    assert raised.value.args[0] == "on_delete must not be null."
+    assert raised.value.args[0] == "`on_delete` must not be `None`."
