@@ -8,8 +8,8 @@ from tests.settings import DATABASE_URL
 
 pytestmark = pytest.mark.anyio
 
-database = DatabaseTestClient(DATABASE_URL, full_isolation=False)
-models = edgy.Registry(database=database)
+database = DatabaseTestClient(DATABASE_URL)
+models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
 @pytest.fixture(autouse=True, scope="module")
