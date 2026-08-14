@@ -526,9 +526,10 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                     # we need to recheck if the conditions are still valid
                     if create_obj_values:
                         expression_create = queryset.table.insert().values(create_obj_values)
-                        create_return_result = cast(
-                            None | int | list, await connection.execute_many(expression_create)
-                        )
+                        async with connection.transaction():
+                            create_return_result = cast(
+                                None | int | list, await connection.execute_many(expression_create)
+                            )
                         self.row_count_create = (
                             len(create_return_result)
                             if isinstance(create_return_result, list)
@@ -559,10 +560,12 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                         for col in _update_columns
                     }
                     expression_update = expression_update.values(values_placeholder)
-                    update_result_return = cast(
-                        None | int | list,
-                        await connection.execute_many(expression_update, update_obj_values),
-                    )
+
+                    async with connection.transaction():
+                        update_result_return = cast(
+                            None | int | list,
+                            await connection.execute_many(expression_update, update_obj_values),
+                        )
                     self.row_count_update = (
                         len(update_result_return)
                         if isinstance(update_result_return, list)
