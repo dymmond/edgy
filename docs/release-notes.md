@@ -25,6 +25,8 @@
 - Bulk operations are now keywords only (except the first `objs` parameter).
 - Dedupe `bulk_create`, `bulk_get_or_create`, and `bulk_update_or_create` inputs.
 - Refactor `QueryExecutor` so it can update itself.
+- `real_save`, `raw_delete` and `delete` are now keyword only to prevent bad overwrites.
+- Remove the `skip_post_delete_hooks` parameter from `delete` as it is for internal use and shouldn't be exposed.
 
 ### Fixed
 
@@ -53,6 +55,9 @@
 - The typings changed for QuerySetType: `EdgyEmbedTarget` and `EdgyModel` (the queryset model) are switched in the `Generic` definition.
 - Stop issuing `pre_delete` and `post_delete` signals during relation operations; use `pre_relation_remove` and `post_relation_remove` signals instead.
 - `bulk_get_or_create` can return `None` values if signals are used.
+- `real_save`, `raw_delete` and `delete` are now keyword only.
+- Remove the `skip_post_delete_hooks` parameter from `delete` as it is for internal use and shouldn't be exposed. Check in
+  `raw_delete` if `CURRENT_INSTANCE.get() is self` instead.
 
 ## 0.35.11
 

@@ -137,7 +137,7 @@ async def test_deletion_called_once_query(klass, model_based):
     await klass.query.create(name="Edgy")
     logs = await Log.query.all()
     assert len(logs) == 0
-    await klass.query.delete(model_based)
+    await klass.query.delete(use_models=model_based)
     assert await klass.query.count() == 1
     logs = await Log.query.all()
     assert len(logs) == 1

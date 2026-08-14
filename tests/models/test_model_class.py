@@ -170,5 +170,5 @@ async def test_queryset_cache(model_based, create_test_database):
     assert len(queryset._cache.cache[queryset._cache.create_category(User)]) == 3
     await queryset.create(name="Test 4")
     assert len(queryset._cache.cache[queryset._cache.create_category(User)]) == 4
-    await queryset.delete(model_based)
+    await queryset.delete(use_models=model_based)
     assert not queryset._cache

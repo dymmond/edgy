@@ -656,14 +656,16 @@ class BaseQuerySet(
         return queryset
 
     async def raw_delete(
-        self, use_models: bool = False, remove_referenced_call: str | bool = False
-    ) -> int:
+        self, *, use_models: bool = False, remove_referenced_call: str | bool = False
+    ) -> int | None:
         """
-        Executes delete without raising an extra signal.
+        Internal delete method.
+
+        Exposes remove_referenced_call and doesn't raise an extra signal.
 
         Delegates to QueryExecutor.delete.
         """
-        # We must create new specialists *every time* because the queryset
+        # We must create new executors *every time* because the queryset
         # state might have changed (e.g., in _model_based_delete)
         executor = QueryExecutor(self)
 

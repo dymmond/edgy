@@ -788,7 +788,17 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
     bulk_select_or_insert = bulk_get_or_create
 
     @abstractmethod
-    async def delete(self) -> int:
+    async def raw_delete(
+        self, *, use_models: bool = False, remove_referenced_call: str | bool = False
+    ) -> int | None:
+        """
+        Abstract internal delete method.
+
+        Exposes remove_referenced_call and doesn't raise an extra signal.
+        """
+
+    @abstractmethod
+    async def delete(self, *, use_models: bool = False) -> int | None:
         """
         Abstract method to delete all objects matching the QuerySet criteria from the database.
         """

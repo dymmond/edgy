@@ -191,8 +191,9 @@ class BaseModelType(ABC):
     @abstractmethod
     async def real_save(
         self,
-        force_insert: bool = False,
-        values: dict[str, Any] | set[str] | list[str] | None = None,
+        *,
+        force_insert: bool,
+        values: dict[str, Any] | set[str] | list[str] | None,
     ) -> BaseModelType:
         """
         Abstract asynchronous method for saving the model instance to the database.
@@ -200,7 +201,7 @@ class BaseModelType(ABC):
         This is the raw save operation used internally by querysets and direct calls.
         It allows for fine-grained control over the save process.
 
-        Args:
+        Kwargs:
             force_insert (bool): If `True`, forces an SQL INSERT operation, even if
                                  the instance might already exist (e.g., if primary key is set).
                                  Defaults to `False`.
@@ -225,7 +226,7 @@ class BaseModelType(ABC):
         This is the user-facing save operation, intended for direct calls on model instances.
         It provides a simpler interface compared to `real_save`.
 
-        Args:
+        Kwargs:
             force_insert (bool): If `True`, forces an SQL INSERT operation. Defaults to `False`.
             values (dict[str, Any] | set[str] | list[str] | None): Optional. Values or field names
                                                                  to save. Defaults to `None`.
@@ -264,16 +265,13 @@ class BaseModelType(ABC):
         """
 
     @abstractmethod
-    async def delete(self, skip_post_delete_hooks: bool = False) -> int | None:
+    async def delete(self) -> int | None:
         """
         Abstract asynchronous method to delete the model instance from the database.
 
         This is the user-facing delete operation, intended for direct calls on
         model instances and not typically used by internal methods which prefer `raw_delete`.
 
-        Args:
-            skip_post_delete_hooks (bool): If `True`, skips the execution of post-delete
-                                           hooks on related fields. Defaults to `False`.
         """
 
     @abstractmethod
@@ -392,7 +390,7 @@ class BaseModelType(ABC):
         phase: str = "",
         instance: BaseModelType | QuerySetType | None = None,
         model_instance: BaseModelType | None = None,
-        evaluate_kwarg_values: bool = False,
+        evaluate_values: bool = False,
     ) -> dict[str, Any]:
         """
         Abstract class method to extract and process column values from a dictionary,
@@ -416,9 +414,8 @@ class BaseModelType(ABC):
                                                          Defaults to `None`.
             model_instance (BaseModelType | None): The specific model instance being operated on.
                                                   Defaults to `None`.
-            evaluate_kwarg_values (bool): If `True`, evaluates values that are
-                                         callable (e.g., default factories).
-                                         Defaults to `False`.
+            evaluate_values (bool): If `True`, evaluates values that are callable (e.g., default factories).
+                                    Defaults to `False`.
 
         Returns:
             dict[str, Any]: A dictionary containing the extracted and processed column values.

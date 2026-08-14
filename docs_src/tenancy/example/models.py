@@ -56,10 +56,11 @@ class Tenant(edgy.Model):
 
     async def real_save(
         self,
-        force_insert: bool = False,
-        values: Union[dict[str, Any], set[str], None] = None,
+        *,
+        force_insert: bool,
+        values: Union[dict[str, Any], set[str], None],
     ) -> Model:
-        tenant = await super().real_save(force_insert, values)
+        tenant = await super().real_save(force_insert=force_insert, values=values)
         try:
             await registry.schema.create_schema(
                 schema=tenant.schema_name,
