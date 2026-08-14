@@ -30,7 +30,7 @@ class Track(edgy.StrictModel):
 
 
 class BaseAlbum(edgy.StrictModel):
-    tracks = edgy.ForeignKey(lambda: lazy_track, embed_through="embedded")
+    tracks = edgy.ManyToMany(lambda: lazy_track, embed_through="embedded")
 
     class Meta:
         abstract = True
