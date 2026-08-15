@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 from collections.abc import (
     Awaitable,
-    Callable,
     Collection,
     Iterable,
 )
@@ -397,7 +396,7 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
 
         async def _iterate_create(
             item: tuple[EdgyModel, int, set[str]],
-            connection: Connection | Callable[[], Connection],
+            connection: Connection,
             returning: list[sqlalchemy.ColumnElement],
         ) -> dict[str, Any] | None:
             nonlocal row_count_create_single
@@ -419,8 +418,6 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
             ):
                 try:
                     cm = AsyncExitStack()
-                    if callable(connection):
-                        connection = connection()
                     await cm.enter_async_context(connection)
                     await cm.enter_async_context(connection.transaction())
                     async with cm:
@@ -522,18 +519,17 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                         for val in (
                             await run_concurrently(
                                 [
-                                    # one connection, one transaction. When concurrent_limit == 1,
-                                    # we reuse the existing connection
+                                    # one connection, many transactions
                                     _iterate_create(
                                         tup,
-                                        connection
-                                        if concurrent_limit == 1
-                                        else database.connection,
+                                        connection,
                                         returning,
                                     )
                                     for tup in self.create_params
                                 ],
-                                limit=concurrent_limit,
+                                # FIXME: we can't parallize because it isn't safe because of a
+                                # regression in databasez, to execute transactions parallel on one connection
+                                limit=1,
                             )
                         )
                         if val is not None
