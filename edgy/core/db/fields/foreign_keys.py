@@ -188,8 +188,12 @@ class BaseForeignKeyField(BaseForeignKey):
 
         # If the value is already a target model instance or its proxy.
         if isinstance(value, target | target.proxy_model):
+            maybe_loop = False
+            db_dirty = value._db_dirty
             # Save the related model first to ensure its primary key is available.
-            if value._db_dirty is not None:
+            if db_dirty is None:
+                maybe_loop = True
+            else:
                 # when None _db_dirty is disabled so don't try to save
                 if not value._db_loaded or not value.can_load:
                     # save when not loaded (could affect relationship)
@@ -197,11 +201,17 @@ class BaseForeignKeyField(BaseForeignKey):
                     await value.real_save(force_insert=False, values=None)
                 else:
                     # save when fields were changed (could affect relationship)
-                    await value.real_save(force_insert=False, values=value._db_dirty)
+                    await value.real_save(force_insert=False, values=db_dirty)
             # Clean the value to extract the foreign key column values.
             _value: dict[str, Any] = self.clean(self.name, value, for_query=False)
             # it is an error if it couldn't be parsed.
-            if isinstance(_value.get(self.name), BaseModelType):
+            if isinstance(_value.get(self.name), BaseModelType) or (
+                original_value is not None and not _value
+            ):
+                if maybe_loop:
+                    raise ValueError(
+                        f"Couldn't save `{self.name}`. Please save child first. Is a loop?"
+                    )
                 raise ValueError(f"Couldn't save `{self.name}`.")
             return _value
         # If the value is a dictionary, convert it to a target model instance and

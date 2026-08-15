@@ -179,6 +179,16 @@ async def test_loop2():
     await user.load_recursive()
 
 
+async def test_loop_fail_gracefully():
+    user = User2(name="foo")
+    user.friend = user
+    with pytest.raises(ValueError) as excwrapper:
+        await user.save()
+    assert (
+        excwrapper.value.args[0] == "Couldn't save `friend`. Please save child first. Is a loop?"
+    )
+
+
 async def test_loop3():
     user = await User2.query.create(name="foo")
     user.friends.stage(user, user, user, User2(name="bar"))
