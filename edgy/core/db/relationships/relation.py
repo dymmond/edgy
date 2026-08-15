@@ -185,9 +185,12 @@ class ManyRelation(ManyRelationProtocol):
             return
         await operation.apply_db()
         db_dirty = getattr(self.instance, "_db_dirty", None)
-        if db_dirty is not None and not self.refs:
-            # recheck then drop
-            db_dirty.discard(self.from_foreign_key)
+        if db_dirty is not None:
+            # new ones are added
+            if self.refs:
+                db_dirty.add(self.from_foreign_key)
+            else:
+                db_dirty.discard(self.from_foreign_key)
         # no cache update because the queryset is temporarysignal
         # both parameters are the same here
         operation.signal_params["row_count"] = operation.signal_params.get("row_count_create")
@@ -607,7 +610,7 @@ class SingleRelation(ManyRelationProtocol):
     def __init__(
         self,
         *,
-        reverse_name: str | Literal[False],
+        reverse_name: str,
         to_foreign_key: str,
         to: type[BaseModelType],
         embed_parent: tuple[str, str] | None = None,
@@ -778,9 +781,9 @@ class SingleRelation(ManyRelationProtocol):
         db_dirty = cast("set[str] | None", getattr(self.instance, "_db_dirty", None))
         if db_dirty is not None:
             if self.refs:
-                db_dirty.add(self.from_foreign_key)
+                db_dirty.add(self.reverse_name)
             else:
-                db_dirty.discard(self.from_foreign_key)
+                db_dirty.discard(self.reverse_name)
 
     def __getattr__(self, item: Any) -> Any:
         """
@@ -847,9 +850,12 @@ class SingleRelation(ManyRelationProtocol):
             return
         await operation.apply_db()
         db_dirty = getattr(self.instance, "_db_dirty", None)
-        if db_dirty is not None and not self.refs:
-            # recheck then drop
-            db_dirty.discard(self.from_foreign_key)
+        if db_dirty is not None:
+            # new ones are added
+            if self.refs:
+                db_dirty.add(self.reverse_name)
+            else:
+                db_dirty.discard(self.reverse_name)
         # no cache update because the queryset is temporary
         # we can just rename the signals parameters for the post signal
         operation.signal_params["row_count"] = operation.signal_params.pop("row_count_update")
