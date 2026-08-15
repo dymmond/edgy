@@ -587,40 +587,37 @@ class EdgyBaseModel(BaseModel, BaseModelType):
 
         fields = self.meta.fields
         field = fields.get(key, None)
-        # Set context variables for the current instance, model instance, and phase.
-        token = CURRENT_INSTANCE.set(self)
-        token2 = CURRENT_MODEL_INSTANCE.set(self)
-        token3 = CURRENT_PHASE.set("set")
-        if field is not None:
-            token_field_ctx = CURRENT_FIELD_CONTEXT.set(
-                cast("FIELD_CONTEXT_TYPE", {"field": field})
-            )
-        try:
-            if field is not None:
-                # If the field has a custom __set__ method, use it.
-                if hasattr(field, "__set__"):
-                    field.__set__(self, value)
-                else:
-                    # Apply to_model transformation and set values.
-                    for k, v in field.to_model(key, value).items():
-                        if k in type(self).model_fields:
-                            # If it's a Pydantic model field, use super().__setattr__.
-                            super().__setattr__(k, v)
-                        else:
-                            # Otherwise, bypass __setattr__ to update __dict__ directly.
-                            object.__setattr__(self, k, v)
-                if (db_dirty := self._db_dirty) is not None:
-                    db_dirty.add(key)
-            elif key in type(self).model_fields:
+        if field is None:
+            if key in type(self).model_fields:
                 # If it's a Pydantic model field, use super().__setattr__.
                 super().__setattr__(key, value)
             else:
                 # For other attributes, bypass __setattr__ to update __dict__ directly.
                 object.__setattr__(self, key, value)
+            return
+        # Set context variables for the current instance, model instance, and phase.
+        token = CURRENT_INSTANCE.set(self)
+        token2 = CURRENT_MODEL_INSTANCE.set(self)
+        token3 = CURRENT_PHASE.set("set")
+        token_field_ctx = CURRENT_FIELD_CONTEXT.set(cast("FIELD_CONTEXT_TYPE", {"field": field}))
+        try:
+            # If the field has a custom __set__ method, use it.
+            if hasattr(field, "__set__"):
+                field.__set__(self, value)
+            else:
+                # Apply to_model transformation and set values.
+                for k, v in field.to_model(key, value).items():
+                    if k in type(self).model_fields:
+                        # If it's a Pydantic model field, use super().__setattr__.
+                        super().__setattr__(k, v)
+                    else:
+                        # Otherwise, bypass __setattr__ to update __dict__ directly.
+                        object.__setattr__(self, k, v)
+            if (db_dirty := self._db_dirty) is not None:
+                db_dirty.add(key)
         finally:
             # Reset context variables.
-            if field is not None:
-                CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
+            CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
             CURRENT_INSTANCE.reset(token)
             CURRENT_MODEL_INSTANCE.reset(token2)
             CURRENT_PHASE.reset(token3)
@@ -808,9 +805,6 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         pk_key_list: list[Any] = [type(self).__name__]
         # Iterate over primary key column names and append their string values to the key list.
         # Note: `pkcolumns` contains column names, not column objects.
-        token = CURRENT_PHASE.set("compare")
-        token2 = CURRENT_INSTANCE.set(self)
-        token3 = CURRENT_MODEL_INSTANCE.set(self)
         field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
         token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
         try:
@@ -844,9 +838,6 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     else:
                         raise
         finally:
-            CURRENT_PHASE.reset(token)
-            CURRENT_INSTANCE.reset(token2)
-            CURRENT_MODEL_INSTANCE.reset(token3)
             CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
         # Convert the list to a tuple to make it hashable for use as a dictionary key.
         # Raise AttributeError otherwise.
