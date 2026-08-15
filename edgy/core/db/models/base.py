@@ -670,6 +670,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             "_edgy_private_attrs"
         ):
             try:
+                # we need __getattr__ here, not __getattribute__
                 return super().__getattr__("_edgy_namespace")[name]
             except KeyError as exc:
                 raise AttributeError from exc
