@@ -25,6 +25,7 @@ from .types import BaseModelType
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
     from edgy.core.db.fields.types import FIELD_CONTEXT_TYPE, BaseFieldType
+    from edgy.core.db.models.managers import Manager
     from edgy.core.db.models.model import Model
     from edgy.core.db.querysets.types import QuerySetType
 
@@ -576,12 +577,14 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         :param key: The name of the attribute to set.
         :param value: The value to set.
         """
+        # bypass our overwrites
+        super_getter: Callable[[str], Any] = super().__getattr__
         # Handle Edgy's private attributes by storing them in _edgy_namespace.
-        if key in self._edgy_private_attrs:
-            self._edgy_namespace[key] = value
+        if key in super_getter("_edgy_private_attrs"):
+            super_getter("_edgy_namespace")[key] = value
             return
         # Handle Pydantic's private attributes directly.
-        if key in self.__private_attributes__:
+        if key in super_getter("__private_attributes__"):
             super().__setattr__(key, value)
             return
 
@@ -637,7 +640,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             # If a getter is provided, use it, handling awaitable results.
             token = MODEL_GETATTR_BEHAVIOR.set("coro")
             try:
-                result = getter(self, self.__class__)
+                result = getter(self, type(self))
                 if inspect.isawaitable(result):
                     result = await result
                 return result
@@ -659,11 +662,12 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         :return: The value of the attribute.
         :raises AttributeError: If the attribute is not found in private namespace.
         """
+        super_getter: Callable[[str], Any] = super().__getattribute__
         # If the attribute is an Edgy private attribute and not the private attributes set itself,
         # try to retrieve it from _edgy_namespace.
-        if name != "_edgy_private_attrs" and name in self._edgy_private_attrs:
+        if name != "_edgy_private_attrs" and name in super_getter("_edgy_private_attrs"):
             try:
-                return self._edgy_namespace[name]
+                return super_getter("_edgy_namespace")[name]
             except KeyError as exc:
                 raise AttributeError from exc
         # For all other attributes, use the default __getattribute__ behavior.
@@ -682,19 +686,23 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         :param name: The name of the attribute to retrieve.
         :return: The value of the attribute.
         """
+
+        # bypass our overwrites
+        super_getter: Callable[[str], Any] = super().__getattr__
         # Attributes exempted from triggering special __getattr__ logic.
-        if name in _excempted_attrs or name in self._edgy_private_attrs:
-            return super().__getattr__(name)
+        if name in _excempted_attrs or name in super_getter("_edgy_private_attrs"):
+            return super_getter(name)
 
         behavior = MODEL_GETATTR_BEHAVIOR.get()
-        manager = self.meta.managers.get(name)
+        manager: None | Manager = super_getter("meta").managers.get(name)
         if manager is not None:
+            namespace: dict[str, Any]
             # Initialize and cache manager instances on first access.
-            if name not in self._edgy_namespace:
+            if name not in (namespace := super_getter("_edgy_namespace")):
                 manager = copy.copy(manager)
                 manager.instance = self
-                self._edgy_namespace[name] = manager
-            return self._edgy_namespace[name]
+                namespace[name] = manager
+            return namespace[name]
 
         field = self.meta.fields.get(name)
         if field is not None:
@@ -739,7 +747,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 # Otherwise, run the coroutine synchronously.
                 return run_sync(coro)
             # If none of the above, use the default __getattr__ behavior (will raise AttributeError).
-            return super().__getattr__(name)
+            return super_getter(name)
         finally:
             # Reset CURRENT_FIELD_CONTEXT if a field was involved.
             if field:
