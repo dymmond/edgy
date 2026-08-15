@@ -1279,6 +1279,7 @@ class DatabaseMixin:
         model_self = cast("Model", self)
         instance: BaseModelType | QuerySet = CURRENT_INSTANCE.get()  # type: ignore
         db_dirty = pydantic_getter(model_self, "_db_dirty")
+        meta = model_self.meta
         extracted_fields = model_self.extract_db_fields()
         if values is None:
             explicit_values: set[str] = set()
@@ -1300,7 +1301,7 @@ class DatabaseMixin:
                     extracted_fields.pop(pkcolumn, None)
                     force_insert = True
                     break
-                field = model_self.meta.fields.get(pkcolumn)
+                field = meta.fields.get(pkcolumn)
                 # this is an IntegerField/DateTime with primary_key set
                 if field is not None:
                     if getattr(field, "increment_on_save", 0) != 0 or getattr(
@@ -1341,7 +1342,16 @@ class DatabaseMixin:
             else:
                 if db_dirty and values is None and pydantic_getter(model_self, "_db_loaded"):
                     # check only for loaded model instances which have dirty tracing
-                    update_values = {k: v for k, v in extracted_fields.items() if k in db_dirty}
+                    update_values = {
+                        k: v
+                        for k, v in extracted_fields.items()
+                        if k in db_dirty
+                        or (
+                            k in meta.foreign_key_fields
+                            and v is not None
+                            and pydantic_getter(v, "_db_dirty")
+                        )
+                    }
 
                     is_partial = True
                 elif values is None:
