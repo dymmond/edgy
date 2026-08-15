@@ -698,7 +698,7 @@ class DatabaseMixin:
             value: The value to assign to the attribute.
         """
         if key == "__using_schema__":
-            # bypass own __getattr__ overwrite
+            # bypass own __getattr__ overwrite for pydantic attributes
             BaseModel.__getattr__(self, "_edgy_namespace").pop("_table", None)
         super().__setattr__(key, value)
 
@@ -796,9 +796,9 @@ class DatabaseMixin:
         Returns:
             The number of rows updated, or None if no update was performed.
         """
-        # bypass own __getattr__ overwrite
+        # bypass own __getattr__ overwrite for pydantic attributes
         pydantic_getter = BaseModel.__getattr__
-        # bypass own __setattr__ overwrite
+        # bypass own __setattr__ overwrite for pydantic attributes
         pydantic_setter = BaseModel.__setattr__
         real_class = self.get_real_class()
         column_values = self.extract_column_values(
@@ -935,9 +935,9 @@ class DatabaseMixin:
         Returns:
             The number of rows deleted.
         """
-        # bypass own __getattr__ overwrite
+        # bypass own __getattr__ overwrite for pydantic attributes
         pydantic_getter = BaseModel.__getattr__
-        # bypass own __setattr__ overwrite
+        # bypass own __setattr__ overwrite for pydantic attributes
         pydantic_setter = BaseModel.__setattr__
         if pydantic_getter(self, "_db_deleted"):
             return 0
@@ -1071,9 +1071,9 @@ class DatabaseMixin:
             ObjectNotFound: If no row is found in the database corresponding to
                             the instance's identifying clauses.
         """
-        # bypass own __getattr__ overwrite
+        # bypass own __getattr__ overwrite for pydantic attributes
         pydantic_getter = BaseModel.__getattr__
-        # bypass own __setattr__ overwrite
+        # bypass own __setattr__ overwrite for pydantic attributes
         pydantic_setter = BaseModel.__setattr__
         if only_needed and (self._db_loaded_or_deleted or pydantic_getter(self, "_db_dirty")):
             return
@@ -1114,9 +1114,9 @@ class DatabaseMixin:
         Returns:
             True if the instance exists in the database, False otherwise.
         """
-        # bypass own __getattr__ overwrite
+        # bypass own __getattr__ overwrite for pydantic attributes
         pydantic_getter = BaseModel.__getattr__
-        # bypass own __setattr__ overwrite
+        # bypass own __setattr__ overwrite for pydantic attributes
         pydantic_setter = BaseModel.__setattr__
         if only_needed:
             if pydantic_getter(self, "_db_deleted"):
@@ -1159,9 +1159,9 @@ class DatabaseMixin:
             post_fn: An asynchronous callable to be executed after the insert.
             instance: The model instance or queryset initiating the insert.
         """
-        # bypass own __getattr__ overwrite
+        # bypass own __getattr__ overwrite for pydantic attributes
         pydantic_getter = BaseModel.__getattr__
-        # bypass own __setattr__ overwrite
+        # bypass own __setattr__ overwrite for pydantic attributes
         pydantic_setter = BaseModel.__setattr__
         model_self = cast("Model", self)
         real_class = model_self.get_real_class()
@@ -1282,7 +1282,7 @@ class DatabaseMixin:
         Returns:
             The saved model instance.
         """
-        # bypass own __getattr__ overwrite
+        # bypass own __getattr__ overwrite for pydantic attributes
         pydantic_getter = BaseModel.__getattr__
         model_self = cast("Model", self)
         instance: BaseModelType | QuerySet = CURRENT_INSTANCE.get()  # type: ignore

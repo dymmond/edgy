@@ -109,7 +109,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         }
         # Override __show_pk__ if provided in kwargs.
         if __show_pk__ is not None:
-            self.__dict__["__show_pk__"] = __show_pk__
+            _edgy_namespace["__show_pk__"] = __show_pk__
 
         # Handle ModelRef instances for relation fields.
         for arg in args:
@@ -154,10 +154,9 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         _db_loaded = self.__dict__.pop("_db_loaded")
         _db_deleted = self.__dict__.pop("_db_deleted")
         self.__dict__.pop("_db_dirty")
-        self.__dict__.pop("__show_pk__")
         # Call Pydantic BaseModel's __init__.
         super().__init__(**kwargs)
-        # bypass own __setattr__ overwrite
+        # bypass own __setattr__ overwrite for pydantic attributes
         pydantic_setter = BaseModel.__setattr__
         # Re-set _db_loaded and _db_deleted properly after Pydantic initialization.
         pydantic_setter(self, "_db_loaded", _db_loaded)
@@ -665,12 +664,13 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         :return: The value of the attribute.
         :raises AttributeError: If the attribute is not found in private namespace.
         """
-        super_getter: Callable[[str], Any] = super().__getattribute__
         # If the attribute is an Edgy private attribute and not the private attributes set itself,
         # try to retrieve it from _edgy_namespace.
-        if name != "_edgy_private_attrs" and name in super_getter("_edgy_private_attrs"):
+        if name != "_edgy_private_attrs" and name in super().__getattribute__(
+            "_edgy_private_attrs"
+        ):
             try:
-                return super_getter("_edgy_namespace")[name]
+                return super().__getattr__("_edgy_namespace")[name]
             except KeyError as exc:
                 raise AttributeError from exc
         # For all other attributes, use the default __getattribute__ behavior.
@@ -690,10 +690,12 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         :return: The value of the attribute.
         """
 
-        # bypass own __getattr__ overwrite
+        # bypass own __getattr__ overwrite for pydantic attributes
         pydantic_getter = BaseModel.__getattr__
+        if name in pydantic_getter(self, "_edgy_private_attrs"):
+            return self.__getattribute__(name)
         # Attributes exempted from triggering special __getattr__ logic.
-        if name in _excempted_attrs or name in pydantic_getter(self, "_edgy_private_attrs"):
+        if name in _excempted_attrs:
             return super().__getattr__(name)
 
         behavior = MODEL_GETATTR_BEHAVIOR.get()

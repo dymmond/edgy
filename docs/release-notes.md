@@ -29,6 +29,7 @@
 - Refactor `QueryExecutor` so it can update itself.
 - `real_save`, `raw_delete` and `delete` are now keyword only to prevent bad overwrites.
 - Remove the `skip_post_delete_hooks` parameter from `delete` as it is for internal use and shouldn't be exposed.
+- (Internal detail only) bypass the overwritten `__getattr__`, `__getattribute__` and `__setattr__` for speed improvements.
 
 ### Fixed
 
