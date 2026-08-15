@@ -109,7 +109,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         }
         # Override __show_pk__ if provided in kwargs.
         if __show_pk__ is not None:
-            self.__show_pk__ = __show_pk__
+            self.__dict__["__show_pk__"] = __show_pk__
 
         # Handle ModelRef instances for relation fields.
         for arg in args:
@@ -154,6 +154,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         _db_loaded = self.__dict__.pop("_db_loaded")
         _db_deleted = self.__dict__.pop("_db_deleted")
         self.__dict__.pop("_db_dirty")
+        self.__dict__.pop("__show_pk__")
         # Call Pydantic BaseModel's __init__.
         super().__init__(**kwargs)
         # bypass own __setattr__ overwrite
