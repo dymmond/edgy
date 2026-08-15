@@ -18,7 +18,6 @@ from edgy.core.db.context_vars import (
     CURRENT_FIELD_CONTEXT,
     CURRENT_INSTANCE,
     CURRENT_MODEL_INSTANCE,
-    CURRENT_PHASE,
     EXPLICIT_SPECIFIED_VALUES,
     MODEL_GETATTR_BEHAVIOR,
     NO_GLOBAL_FIELD_CONSTRAINTS,
@@ -745,10 +744,6 @@ class DatabaseMixin:
         if prefix:
             raise NotImplementedError()
         clauses: list[Any] = []
-        token = CURRENT_PHASE.set("prepare_clauses")
-        instance = CURRENT_INSTANCE.get()
-        token2 = CURRENT_INSTANCE.set(model_self if instance is None else instance)
-        token3 = CURRENT_MODEL_INSTANCE.set(model_self)
         field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
         token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
         try:
@@ -766,9 +761,6 @@ class DatabaseMixin:
                         getattr(self.table.columns, field_name) == self.__dict__[field_name]
                     )
         finally:
-            CURRENT_PHASE.reset(token)
-            CURRENT_INSTANCE.reset(token2)
-            CURRENT_MODEL_INSTANCE.reset(token3)
             CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
         return clauses
 

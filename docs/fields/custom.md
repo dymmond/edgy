@@ -88,7 +88,6 @@ Within a model context it contains the current phase it is called for:
 * `init`: Called    in model `__init__`.
 * `init_db`: Called in model `__init__` when loaded from a row.
 * `set`: Called in model `__setattr__` (when setting an attribute).
-* `prepare_clauses`: Called in identifying clauses.
 * `load`: Called after load. Contains db values.
 * `post_insert`: Called after insert. Arguments are the ones passed to save.
 * `post_update`: Called after update. Arguments are the ones passed to save.
@@ -99,7 +98,7 @@ For  `extract_column_values` following phases exist (except when called manually
 * `prepare_update`: Called in extract_column_values for update.
 * `delete`: Called when preparing deletion.
 
-Comparing, accessing the values and generating clauses have no `CURRENT_PHASE` set nor `CURRENT_INSTANCE` nor `CURRENT_MODEL_INSTANCE`.
+Comparing, accessing the values and generating clauses have no `CURRENT_PHASE` set (`CURRENT_PHASE.get() == ""`) nor `CURRENT_INSTANCE` nor `CURRENT_MODEL_INSTANCE`.
 
 ### Using the field context
 
