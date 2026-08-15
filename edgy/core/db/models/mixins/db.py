@@ -463,7 +463,7 @@ class DatabaseMixin:
         Returns:
             The active schema as a string, or None if no schema is found.
         """
-        if (namespace := self._edgy_namespace["__using_schema__"]) is not Undefined:
+        if (namespace := self._edgy_namespace)["__using_schema__"] is not Undefined:
             return cast(str | None, namespace["__using_schema__"])
         return type(self).get_active_class_schema(
             check_schema=check_schema, check_tenant=check_tenant
