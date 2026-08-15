@@ -156,10 +156,12 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         self.__dict__.pop("_db_dirty")
         # Call Pydantic BaseModel's __init__.
         super().__init__(**kwargs)
+        # bypass own __setattr__ overwrite
+        pydantic_setter = BaseModel.__setattr__
         # Re-set _db_loaded and _db_deleted properly after Pydantic initialization.
-        self._db_loaded = _db_loaded
-        self._db_deleted = _db_deleted
-        self._db_dirty = set()
+        pydantic_setter(self, "_db_loaded", _db_loaded)
+        pydantic_setter(self, "_db_deleted", _db_deleted)
+        pydantic_setter(self, "_db_dirty", set())
         self._edgy_namespace = _edgy_namespace
         # Move Pydantic extra attributes to __dict__.
         if self.__pydantic_extra__ is not None:
@@ -616,7 +618,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     else:
                         # Otherwise, bypass __setattr__ to update __dict__ directly.
                         object.__setattr__(self, k, v)
-            if (db_dirty := self._db_dirty) is not None:
+            if (db_dirty := super_getter("_db_dirty")) is not None:
                 db_dirty.add(key)
         finally:
             # Reset context variables.
@@ -687,18 +689,18 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         :return: The value of the attribute.
         """
 
-        # bypass our overwrites
-        super_getter: Callable[[str], Any] = super().__getattr__
+        # bypass own __getattr__ overwrite
+        pydantic_getter = BaseModel.__getattr__
         # Attributes exempted from triggering special __getattr__ logic.
-        if name in _excempted_attrs or name in super_getter("_edgy_private_attrs"):
-            return super_getter(name)
+        if name in _excempted_attrs or name in pydantic_getter(self, "_edgy_private_attrs"):
+            return super().__getattr__(name)
 
         behavior = MODEL_GETATTR_BEHAVIOR.get()
-        manager: None | Manager = super_getter("meta").managers.get(name)
+        manager: None | Manager = pydantic_getter(self, "meta").managers.get(name)
         if manager is not None:
             namespace: dict[str, Any]
             # Initialize and cache manager instances on first access.
-            if name not in (namespace := super_getter("_edgy_namespace")):
+            if name not in (namespace := pydantic_getter(self, "_edgy_namespace")):
                 manager = copy.copy(manager)
                 manager.instance = self
                 namespace[name] = manager
@@ -747,7 +749,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 # Otherwise, run the coroutine synchronously.
                 return run_sync(coro)
             # If none of the above, use the default __getattr__ behavior (will raise AttributeError).
-            return super_getter(name)
+            return super().__getattr__(name)
         finally:
             # Reset CURRENT_FIELD_CONTEXT if a field was involved.
             if field:
