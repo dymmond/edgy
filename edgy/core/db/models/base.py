@@ -654,6 +654,14 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         except KeyError:
             raise AttributeError(f"Attribute: {name} not found") from None
 
+    def _get_from_edgy_namespace(self, name: str) -> Any:
+        """Shared helper from `__getattribute__`  and `__getattr__` to access _edgy_namespace quickly."""
+        try:
+            # we need __getattr__ here, not __getattribute__
+            return super().__getattr__("_edgy_namespace")[name]
+        except KeyError as exc:
+            raise AttributeError from exc
+
     def __getattribute__(self, name: str) -> Any:
         """
         Custom getter for model attributes.
@@ -669,11 +677,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         if name != "_edgy_private_attrs" and name in super().__getattribute__(
             "_edgy_private_attrs"
         ):
-            try:
-                # we need __getattr__ here, not __getattribute__
-                return super().__getattr__("_edgy_namespace")[name]
-            except KeyError as exc:
-                raise AttributeError from exc
+            return self._get_from_edgy_namespace(name)
         # For all other attributes, use the default __getattribute__ behavior.
         return super().__getattribute__(name)
 
@@ -693,8 +697,10 @@ class EdgyBaseModel(BaseModel, BaseModelType):
 
         # bypass own __getattr__ overwrite for pydantic attributes
         pydantic_getter = BaseModel.__getattr__
+        # this direct call improves speed enormously
         if name in pydantic_getter(self, "_edgy_private_attrs"):
-            return self.__getattribute__(name)
+            # skip rendundant check, just access the edgy namespace
+            return self._get_from_edgy_namespace(name)
         # Attributes exempted from triggering special __getattr__ logic.
         if name in _excempted_attrs:
             return super().__getattr__(name)
