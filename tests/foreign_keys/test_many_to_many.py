@@ -68,6 +68,7 @@ async def create_test_database():
 async def test_loop():
     user = await User2.query.create(name="foo")
     await user.friends.add(user)
+    assert await user.friends.values_list("name", flat=True) == ["foo"]
     assert await User2.query.order_by("id").values_list("name", flat=True) == ["foo"]
 
 
