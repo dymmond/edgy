@@ -104,6 +104,14 @@ class AnotherPerson(edgy.StrictModel):
         registry = models
 
 
+class User2(edgy.StrictModel):
+    name: str = edgy.CharField(max_length=100)
+    friend: "User2" = edgy.ForeignKey("User2", null=True, related_name="friends")
+
+    class Meta:
+        registry = models
+
+
 async def test_no_relation():
     for field in Profile.meta.fields:
         assert not field.startswith("person")
@@ -154,6 +162,39 @@ async def test_create_dynamic():
     assert await Album.query.get(name="Malibu")
     await track.update(album=Album(name="Foo"))
     assert await Album.query.get(name="Foo")
+
+
+async def test_loop():
+    user = await User2.query.create(name="foo")
+    user.friend = user
+    await user.save()
+    await user.load_recursive()
+
+
+async def test_loop2():
+    user = User2(name="foo")
+    await user.save()
+    user.friend = user
+    await user.save()
+    await user.load_recursive()
+
+
+async def test_loop_fail_gracefully():
+    user = User2(name="foo")
+    user.friend = user
+    with pytest.raises(ValueError) as excwrapper:
+        await user.save()
+    assert (
+        excwrapper.value.args[0] == "Couldn't save `friend`. Please save child first. Is a loop?"
+    )
+
+
+async def test_loop3():
+    user = await User2.query.create(name="foo")
+    user.friends.stage(user, user, user, User2(name="bar"))
+    await user.save()
+    await user.load_recursive()
+    assert await User2.query.order_by("id").values_list("name", flat=True) == ["foo", "bar"]
 
 
 async def test_select_related():

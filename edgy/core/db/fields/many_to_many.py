@@ -506,15 +506,13 @@ class BaseManyToManyForeignKeyField(BaseForeignKey):
         `ManyRelationProtocol` object associated with that instance, initializing it
         if it hasn't been already.
         """
-        if instance:
-            # If the relation hasn't been set or is None, initialize it.
-            if instance.__dict__.get(self.name, None) is None:
-                instance.__dict__[self.name] = self.get_relation()
-            # Ensure the relation object has a reference to its instance.
-            if instance.__dict__[self.name].instance is None:
-                instance.__dict__[self.name].instance = instance
-            return instance.__dict__[self.name]  # type: ignore
-        raise ValueError("Missing instance")
+        if instance is None:
+            raise ValueError("Missing instance")
+        # If the relation hasn't been set or is None, initialize it.
+        relation: ManyRelationProtocol | None
+        if (relation := instance.__dict__.get(self.name, None)) is None:
+            relation = instance.__dict__[self.name] = self.get_relation()
+        return relation.__get__(instance, owner)
 
     async def post_save_callback(self, value: ManyRelationProtocol, is_update: bool) -> None:
         """

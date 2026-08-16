@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 import inspect
 import warnings
-from collections.abc import Collection, Sequence
+from collections.abc import Callable, Collection, Hashable, Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
@@ -25,6 +25,7 @@ from .types import BaseModelType
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
     from edgy.core.db.fields.types import FIELD_CONTEXT_TYPE, BaseFieldType
+    from edgy.core.db.models.managers import Manager
     from edgy.core.db.models.model import Model
     from edgy.core.db.querysets.types import QuerySetType
 
@@ -33,6 +34,7 @@ _empty = cast(set[str], frozenset())
 _excempted_attrs: set[str] = {
     "_db_loaded",
     "_db_deleted",
+    "_db_dirty",
     "_edgy_namespace",
     "_edgy_private_attrs",
 }
@@ -68,6 +70,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
     _db_loaded: bool = PrivateAttr(default=False)
     # not in db anymore or deleted
     _db_deleted: bool = PrivateAttr(default=False)
+    _db_dirty: set[str] | None = PrivateAttr(default=None)
     _db_schemas: ClassVar[dict[str, type[BaseModelType]]]
 
     def __init__(
@@ -94,6 +97,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         # Always set _db_loaded and _db_deleted in __dict__ to prevent __getattr__ loop.
         self.__dict__["_db_loaded"] = False
         self.__dict__["_db_deleted"] = False
+        self.__dict__["_db_dirty"] = None
         klass = self.__class__
         # Initialize _edgy_namespace with class-level private attribute values.
         self.__dict__["_edgy_namespace"] = _edgy_namespace = {
@@ -105,7 +109,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         }
         # Override __show_pk__ if provided in kwargs.
         if __show_pk__ is not None:
-            self.__show_pk__ = __show_pk__
+            _edgy_namespace["__show_pk__"] = __show_pk__
 
         # Handle ModelRef instances for relation fields.
         for arg in args:
@@ -149,17 +153,20 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         del self.__dict__["_edgy_namespace"]
         _db_loaded = self.__dict__.pop("_db_loaded")
         _db_deleted = self.__dict__.pop("_db_deleted")
+        self.__dict__.pop("_db_dirty")
         # Call Pydantic BaseModel's __init__.
         super().__init__(**kwargs)
+        # bypass own __setattr__ overwrite for pydantic attributes
+        pydantic_setter = BaseModel.__setattr__
         # Re-set _db_loaded and _db_deleted properly after Pydantic initialization.
-        self._db_loaded = _db_loaded
-        self._db_deleted = _db_deleted
+        pydantic_setter(self, "_db_loaded", _db_loaded)
+        pydantic_setter(self, "_db_deleted", _db_deleted)
+        pydantic_setter(self, "_db_dirty", set())
         self._edgy_namespace = _edgy_namespace
         # Move Pydantic extra attributes to __dict__.
         if self.__pydantic_extra__ is not None:
             self.__dict__.update(self.__pydantic_extra__)
             self.__pydantic_extra__ = None
-
         # Clean up fields not present in kwargs from __dict__.
         for field_name in self.meta.fields:
             if field_name not in kwargs:
@@ -572,49 +579,50 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         :param key: The name of the attribute to set.
         :param value: The value to set.
         """
+        # bypass our overwrites
+        super_getter: Callable[[str], Any] = super().__getattr__
         # Handle Edgy's private attributes by storing them in _edgy_namespace.
-        if key in self._edgy_private_attrs:
-            self._edgy_namespace[key] = value
+        if key in super_getter("_edgy_private_attrs"):
+            super_getter("_edgy_namespace")[key] = value
             return
         # Handle Pydantic's private attributes directly.
-        if key in self.__private_attributes__:
+        if key in super_getter("__private_attributes__"):
             super().__setattr__(key, value)
             return
 
         fields = self.meta.fields
         field = fields.get(key, None)
-        # Set context variables for the current instance, model instance, and phase.
-        token = CURRENT_INSTANCE.set(self)
-        token2 = CURRENT_MODEL_INSTANCE.set(self)
-        token3 = CURRENT_PHASE.set("set")
-        if field is not None:
-            token_field_ctx = CURRENT_FIELD_CONTEXT.set(
-                cast("FIELD_CONTEXT_TYPE", {"field": field})
-            )
-        try:
-            if field is not None:
-                # If the field has a custom __set__ method, use it.
-                if hasattr(field, "__set__"):
-                    field.__set__(self, value)
-                else:
-                    # Apply to_model transformation and set values.
-                    for k, v in field.to_model(key, value).items():
-                        if k in type(self).model_fields:
-                            # If it's a Pydantic model field, use super().__setattr__.
-                            super().__setattr__(k, v)
-                        else:
-                            # Otherwise, bypass __setattr__ to update __dict__ directly.
-                            object.__setattr__(self, k, v)
-            elif key in type(self).model_fields:
+        if field is None:
+            if key in type(self).model_fields:
                 # If it's a Pydantic model field, use super().__setattr__.
                 super().__setattr__(key, value)
             else:
                 # For other attributes, bypass __setattr__ to update __dict__ directly.
                 object.__setattr__(self, key, value)
+            return
+        # Set context variables for the current instance, model instance, and phase.
+        token = CURRENT_INSTANCE.set(self)
+        token2 = CURRENT_MODEL_INSTANCE.set(self)
+        token3 = CURRENT_PHASE.set("set")
+        token_field_ctx = CURRENT_FIELD_CONTEXT.set(cast("FIELD_CONTEXT_TYPE", {"field": field}))
+        try:
+            # If the field has a custom __set__ method, use it.
+            if hasattr(field, "__set__"):
+                field.__set__(self, value)
+            else:
+                # Apply to_model transformation and set values.
+                for k, v in field.to_model(key, value).items():
+                    if k in type(self).model_fields:
+                        # If it's a Pydantic model field, use super().__setattr__.
+                        super().__setattr__(k, v)
+                    else:
+                        # Otherwise, bypass __setattr__ to update __dict__ directly.
+                        object.__setattr__(self, k, v)
+            if (db_dirty := super_getter("_db_dirty")) is not None:
+                db_dirty.add(key)
         finally:
             # Reset context variables.
-            if field is not None:
-                CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
+            CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
             CURRENT_INSTANCE.reset(token)
             CURRENT_MODEL_INSTANCE.reset(token2)
             CURRENT_PHASE.reset(token3)
@@ -634,7 +642,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             # If a getter is provided, use it, handling awaitable results.
             token = MODEL_GETATTR_BEHAVIOR.set("coro")
             try:
-                result = getter(self, self.__class__)
+                result = getter(self, type(self))
                 if inspect.isawaitable(result):
                     result = await result
                 return result
@@ -658,9 +666,12 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         """
         # If the attribute is an Edgy private attribute and not the private attributes set itself,
         # try to retrieve it from _edgy_namespace.
-        if name != "_edgy_private_attrs" and name in self._edgy_private_attrs:
+        if name != "_edgy_private_attrs" and name in super().__getattribute__(
+            "_edgy_private_attrs"
+        ):
             try:
-                return self._edgy_namespace[name]
+                # we need __getattr__ here, not __getattribute__
+                return super().__getattr__("_edgy_namespace")[name]
             except KeyError as exc:
                 raise AttributeError from exc
         # For all other attributes, use the default __getattribute__ behavior.
@@ -679,19 +690,30 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         :param name: The name of the attribute to retrieve.
         :return: The value of the attribute.
         """
+
+        # bypass own __getattr__ overwrite for pydantic attributes
+        pydantic_getter = BaseModel.__getattr__
+        # this direct call improves speed enormously
+        if name in pydantic_getter(self, "_edgy_private_attrs"):
+            try:
+                # we need __getattr__ here, not __getattribute__
+                return super().__getattr__("_edgy_namespace")[name]
+            except KeyError as exc:
+                raise AttributeError from exc
         # Attributes exempted from triggering special __getattr__ logic.
-        if name in _excempted_attrs or name in self._edgy_private_attrs:
+        if name in _excempted_attrs:
             return super().__getattr__(name)
 
         behavior = MODEL_GETATTR_BEHAVIOR.get()
-        manager = self.meta.managers.get(name)
+        manager: None | Manager = pydantic_getter(self, "meta").managers.get(name)
         if manager is not None:
+            namespace: dict[str, Any]
             # Initialize and cache manager instances on first access.
-            if name not in self._edgy_namespace:
+            if name not in (namespace := pydantic_getter(self, "_edgy_namespace")):
                 manager = copy.copy(manager)
                 manager.instance = self
-                self._edgy_namespace[name] = manager
-            return self._edgy_namespace[name]
+                namespace[name] = manager
+            return namespace[name]
 
         field = self.meta.fields.get(name)
         if field is not None:
@@ -699,17 +721,17 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                 cast("FIELD_CONTEXT_TYPE", {"field": field})
             )
         try:
-            getter: Any = None
+            getter: Callable[[BaseModelType, type[BaseModelType]], Any] | None = None
             if field is not None and hasattr(field, "__get__"):
-                getter = field.__get__
+                getter = cast("Callable[[BaseModelType, type[BaseModelType]], Any]", field.__get__)
                 # If behavior is "coro" or "passdown", return the getter result directly.
                 if behavior == "coro" or behavior == "passdown":
-                    return field.__get__(self, self.__class__)
+                    return getter(self, type(self))
                 else:
                     # Otherwise, set "passdown" behavior and try to get the field value.
                     token = MODEL_GETATTR_BEHAVIOR.set("passdown")
                     try:
-                        return field.__get__(self, self.__class__)
+                        return getter(self, type(self))
                     except AttributeError:
                         # If AttributeError, forward to the load routine.
                         pass
@@ -784,7 +806,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         other_tup = other.create_model_key(allow_missing_and_none=True)
         return self_tup == other_tup
 
-    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple:
+    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple[Hashable, ...]:
         """
         Generates a unique cache key for the model instance.
 
@@ -802,9 +824,6 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         pk_key_list: list[Any] = [type(self).__name__]
         # Iterate over primary key column names and append their string values to the key list.
         # Note: `pkcolumns` contains column names, not column objects.
-        token = CURRENT_PHASE.set("compare")
-        token2 = CURRENT_INSTANCE.set(self)
-        token3 = CURRENT_MODEL_INSTANCE.set(self)
         field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
         token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
         try:
@@ -838,9 +857,6 @@ class EdgyBaseModel(BaseModel, BaseModelType):
                     else:
                         raise
         finally:
-            CURRENT_PHASE.reset(token)
-            CURRENT_INSTANCE.reset(token2)
-            CURRENT_MODEL_INSTANCE.reset(token3)
             CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
         # Convert the list to a tuple to make it hashable for use as a dictionary key.
         # Raise AttributeError otherwise.
