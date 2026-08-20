@@ -527,9 +527,7 @@ class BulkOperation(Generic[EdgyModel, EdgyEmbedTarget]):
                                     )
                                     for tup in self.create_params
                                 ],
-                                # FIXME: we can't parallize because it isn't safe because of a
-                                # regression in databasez, to execute transactions parallel on one connection
-                                limit=1,
+                                limit=concurrent_limit,
                             )
                         )
                         if val is not None
