@@ -91,7 +91,6 @@ Within a model context it contains the current phase it is called for:
 * `load`: Called after load. Contains db values.
 * `post_insert`: Called after insert. Arguments are the ones passed to save.
 * `post_update`: Called after update. Arguments are the ones passed to save.
-* `compare`: Called when comparing model instances (bypasses `extract_column_values`).
 
 For  `extract_column_values` following phases exist (except when called manually):
 
@@ -99,6 +98,7 @@ For  `extract_column_values` following phases exist (except when called manually
 * `prepare_update`: Called in extract_column_values for update.
 * `delete`: Called when preparing deletion.
 
+Comparing, accessing the values and generating clauses have no `CURRENT_PHASE` set (`CURRENT_PHASE.get() == ""`) nor `CURRENT_INSTANCE` nor `CURRENT_MODEL_INSTANCE`.
 
 ### Using the field context
 
@@ -108,7 +108,7 @@ You can manipulate it like you wish but it will be resetted after the field has 
 ### Using the instance
 
 There are 2 ContextVar named `CURRENT_INSTANCE` and `CURRENT_MODEL_INSTANCE`. `CURRENT_INSTANCE` is the executing instance of a QuerySet or Model while
-`CURRENT_MODEL_INSTANCE` is always a model instance or `None`. When calling manually also `CURRENT_INSTANCE` can be `None`.
+`CURRENT_MODEL_INSTANCE` is always a model instance or `None` (get like access like comparing, generating clauses). When calling manually also `CURRENT_INSTANCE` can be `None`.
 They are available during setting an attribute, `transform_input` and `extract_column_values` calls when set as well as in the `pre_save_callback` or `post_save_callback` hooks.
 This implies you can use them in all sub methods like get_default...
 
@@ -134,7 +134,7 @@ For getting an immutable object attached to a Model instance, there are two ways
 
 The last way is a bit more complicated than managers. You need to consider 3 ways the field is affected:
 
-1. `__init__` and `load`: Some values are passed to the field. Use `to_model` for providing an initial object with the CURRENT_INSTANCE context var.
+1. `__init__` and `load`: Some values are passed to the field. Use `to_model` for providing an initial object with the `CURRENT_MODEL_INSTANCE` context var.
     Note: this doesn't gurantee the initialization. We still need the  `__get__`-
 2. `__getattr__` here the object can get an instance it can attach to. Use `__get__` for this.
 3. Set access. Either use `__set__` or `to_model` so it uses the old value.

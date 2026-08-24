@@ -499,9 +499,6 @@ class BaseQuerySet(
         executor = QueryExecutor(self)
         results = [result async for result in executor.iterate(fetch_all_at_once=True)]
 
-        # Only attempt dedupe for "normal" querysets.
-        # Embedded querysets (e.g. album.tracks with embed_parent) must not go
-        # through this path – their model_class and returned objects differ.
         if len(results) > 1 and not getattr(self, "_suppress_pk_deduplication", False):
             seen: set[tuple] = set()
             unique = []

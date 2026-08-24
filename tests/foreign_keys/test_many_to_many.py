@@ -48,6 +48,14 @@ class Studio(edgy.StrictModel):
         registry = models
 
 
+class User2(edgy.StrictModel):
+    name: str = edgy.CharField(max_length=100)
+    friends: "User2" = edgy.ManyToMany("User2", null=True, related_name="friends_of")
+
+    class Meta:
+        registry = models
+
+
 @pytest.fixture(autouse=True, scope="function")
 async def create_test_database():
     async with database:
@@ -55,6 +63,31 @@ async def create_test_database():
         yield
         if not database.drop:
             await models.drop_all()
+
+
+async def test_loop():
+    user = await User2.query.create(name="foo")
+    await user.friends.add(user)
+    assert await user.friends.values_list("name", flat=True) == ["foo"]
+    assert await User2.query.order_by("id").values_list("name", flat=True) == ["foo"]
+
+
+async def test_loop2():
+    user = User2(name="foo")
+    await user.save()
+    user.friends.stage(user)
+    user.friends.stage(User2(name="bar"))
+    assert await User2.query.order_by("id").values_list("name", flat=True) == ["foo"]
+    await user.save()
+    assert await User2.query.order_by("id").values_list("name", flat=True) == ["foo", "bar"]
+
+
+async def test_loop3():
+    user = await User2.query.create(name="foo")
+    user.friends_of.stage(user, user, user, User2(name="bar"))
+    await user.save()
+    await user.load_recursive()
+    assert await User2.query.order_by("id").values_list("name", flat=True) == ["foo", "bar"]
 
 
 async def test_add_many_to_many():

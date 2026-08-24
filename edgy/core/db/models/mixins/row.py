@@ -196,7 +196,7 @@ class ModelRowMixin:
         # update its attributes with the newly populated `item` and return it.
         if old_select_related_value:
             for k, v in model_kwargs.items():
-                setattr(old_select_related_value, k, v)
+                object.__setattr__(old_select_related_value, k, v)
             return old_select_related_value
 
         table_columns = tables_and_models[prefix][0].columns
@@ -326,10 +326,10 @@ class ModelRowMixin:
             if exclude_secrets or is_defer_fields or only_fields
             else cls(**model_kwargs, __phase__="init_db")
         )
+        model._db_deleted = False
 
         # Mark the model as fully loaded if no deferred or only_fields are active.
         if not is_defer_fields and not only_fields:
-            model._db_deleted = False
             model._db_loaded = True
 
         # If excluding secrets, ensure these attributes do not trigger a load.
@@ -425,7 +425,7 @@ class ModelRowMixin:
                 unidirectional fields).
             NotImplementedError: If prefetching from other databases is attempted.
         """
-        model_key = ()
+        model_key: tuple = ()
         if related._is_finished:
             # If the prefetch operation is marked as finished (meaning all rows for this
             # prefetch have been collected), then bake the results. This allows for
@@ -436,7 +436,7 @@ class ModelRowMixin:
         # If the model's key exists in the baked results, retrieve and set the prefetched
         # data directly.
         if model_key in related._baked_results:
-            setattr(model, related.to_attr, related._baked_results[model_key])
+            object.__setattr__(model, related.to_attr, related._baked_results[model_key])
         else:
             # If not in baked results, or not finished, proceed with fetching.
             # Crawl the relationship path to get details about the related model and
@@ -476,7 +476,7 @@ class ModelRowMixin:
                 for pkcol in cls.pkcolumns
             }
             # Execute the prefetched query and set the result on the model instance.
-            setattr(model, related.to_attr, await queryset.filter(clause))
+            object.__setattr__(model, related.to_attr, await queryset.filter(clause))
 
     @classmethod
     async def __handle_prefetch_related(

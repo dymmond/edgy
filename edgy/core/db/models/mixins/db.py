@@ -72,6 +72,7 @@ _removed_copy_keys = {
     # remove extra
     "_db_loaded",
     "_db_deleted",
+    "_db_dirty",
     "_pkcolumns",
     "_table",
     "_db_schemas",
@@ -461,8 +462,8 @@ class DatabaseMixin:
         Returns:
             The active schema as a string, or None if no schema is found.
         """
-        if self._edgy_namespace["__using_schema__"] is not Undefined:
-            return cast(str | None, self._edgy_namespace["__using_schema__"])
+        if (namespace := self._edgy_namespace)["__using_schema__"] is not Undefined:
+            return cast(str | None, namespace["__using_schema__"])
         return type(self).get_active_class_schema(
             check_schema=check_schema, check_tenant=check_tenant
         )
@@ -621,13 +622,14 @@ class DatabaseMixin:
         Returns:
             The SQLAlchemy `Table` object.
         """
-        if self._edgy_namespace.get("_table") is None:
+        namespace = self._edgy_namespace
+        if namespace.get("_table") is None:
             schema = self.get_active_instance_schema()
             return cast(
                 "sqlalchemy.Table",
                 type(self).table_schema(schema),
             )
-        return cast("sqlalchemy.Table", self._edgy_namespace["_table"])
+        return cast("sqlalchemy.Table", namespace["_table"])
 
     @table.setter
     def table(self, value: sqlalchemy.Table | None) -> None:
@@ -640,8 +642,9 @@ class DatabaseMixin:
             value: The SQLAlchemy `Table` object to set.
         """
         assert isinstance(value, sqlalchemy.Table), f"Cannot assign: {value!r} to table."
-        self._edgy_namespace.pop("_pkcolumns", None)
-        self._edgy_namespace["_table"] = value
+        namespace = self._edgy_namespace
+        namespace.pop("_pkcolumns", None)
+        namespace["_table"] = value
 
     @table.deleter
     def table(self) -> None:
@@ -650,8 +653,9 @@ class DatabaseMixin:
 
         Also clears cached primary key columns.
         """
-        self._edgy_namespace.pop("_pkcolumns", None)
-        self._edgy_namespace.pop("_table", None)
+        namespace = self._edgy_namespace
+        namespace.pop("_pkcolumns", None)
+        namespace.pop("_table", None)
 
     @property
     def pkcolumns(self) -> Sequence[str]:
@@ -663,12 +667,13 @@ class DatabaseMixin:
         Returns:
             A sequence of strings representing the primary key column names.
         """
-        if self._edgy_namespace.get("_pkcolumns") is None:
-            if self._edgy_namespace.get("_table") is None:
-                self._edgy_namespace["_pkcolumns"] = type(self).pkcolumns
+        namespace = self._edgy_namespace
+        if namespace.get("_pkcolumns") is None:
+            if namespace.get("_table") is None:
+                namespace["_pkcolumns"] = type(self).pkcolumns
             else:
-                self._edgy_namespace["_pkcolumns"] = build_pkcolumns(self)
-        return cast(Sequence[str], self._edgy_namespace["_pkcolumns"])
+                namespace["_pkcolumns"] = build_pkcolumns(self)
+        return cast(Sequence[str], namespace["_pkcolumns"])
 
     @property
     def pknames(self) -> Sequence[str]:
@@ -692,7 +697,8 @@ class DatabaseMixin:
             value: The value to assign to the attribute.
         """
         if key == "__using_schema__":
-            self._edgy_namespace.pop("_table", None)
+            # bypass own __getattr__ overwrite for pydantic attributes
+            BaseModel.__getattr__(self, "_edgy_namespace").pop("_table", None)
         super().__setattr__(key, value)
 
     def get_columns_for_name(self: Model, name: str) -> Sequence[sqlalchemy.Column]:
@@ -734,20 +740,28 @@ class DatabaseMixin:
         """
         # works only if the class of the model is the main class of the queryset
         # TODO: implement prefix handling and return generic column without table attached
+        model_self = cast("Model", self)
         if prefix:
             raise NotImplementedError()
         clauses: list[Any] = []
-        for field_name in self.identifying_db_fields:
-            field = self.meta.fields.get(field_name)
-            if field is not None:
-                for column_name, value in field.clean(
-                    field_name, self.__dict__[field_name]
-                ).items():
-                    clauses.append(getattr(self.table.columns, column_name) == value)
-            else:
-                clauses.append(
-                    getattr(self.table.columns, field_name) == self.__dict__[field_name]
-                )
+        field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
+        token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
+        try:
+            for field_name in model_self.identifying_db_fields:
+                field = model_self.meta.fields.get(field_name)
+                if field is not None:
+                    field_dict.clear()
+                    field_dict["field"] = field
+                    for column_name, value in field.clean(
+                        field_name, self.__dict__[field_name]
+                    ).items():
+                        clauses.append(getattr(self.table.columns, column_name) == value)
+                else:
+                    clauses.append(
+                        getattr(self.table.columns, field_name) == self.__dict__[field_name]
+                    )
+        finally:
+            CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
         return clauses
 
     async def _update(
@@ -774,6 +788,10 @@ class DatabaseMixin:
         Returns:
             The number of rows updated, or None if no update was performed.
         """
+        # bypass own __getattr__ overwrite for pydantic attributes
+        pydantic_getter = BaseModel.__getattr__
+        # bypass own __setattr__ overwrite for pydantic attributes
+        pydantic_setter = BaseModel.__setattr__
         real_class = self.get_real_class()
         column_values = self.extract_column_values(
             extracted_values=kwargs,
@@ -808,28 +826,40 @@ class DatabaseMixin:
         row_count: int | None = None
         if column_values and clauses:
             check_db_connection(self.database, stacklevel=4)
-            async with self.database as database, database.transaction():
-                # can update column_values
-                column_values.update(
-                    await self.execute_pre_save_hooks(column_values, kwargs, is_update=True)
-                )
-                expression = self.table.update().values(**column_values).where(*clauses)
-                row_count = cast(int, await database.execute(expression))
+            db_dirty = pydantic_getter(self, "_db_dirty")
+            # prevent loops
+            pydantic_setter(self, "_db_dirty", None)
+            try:
+                async with self.database as database, database.transaction():
+                    # can update column_values
+                    column_values.update(
+                        await self.execute_pre_save_hooks(column_values, kwargs, is_update=True)
+                    )
+                    expression = self.table.update().values(**column_values).where(*clauses)
+                    row_count = cast(int, await database.execute(expression))
 
-            # Update the model instance.
-            new_kwargs = self.transform_input(
-                column_values, phase="post_update", instance=instance, model_instance=self
-            )
-            self.__dict__.update(new_kwargs)
+                # Update the model instance.
+                new_kwargs = self.transform_input(
+                    column_values, phase="post_update", instance=instance, model_instance=self
+                )
+                self.__dict__.update(new_kwargs)
+            except BaseException:
+                pydantic_setter(self, "_db_dirty", db_dirty)
+                raise
+            if db_dirty is not None:
+                db_dirty.difference_update(new_kwargs.keys())
+                pydantic_setter(self, "_db_dirty", db_dirty)
+            else:
+                pydantic_setter(self, "_db_dirty", set())
 
         # updates aren't required to change the db, they can also just affect the meta fields
         await self.execute_post_save_hooks(kwargs.keys(), is_update=True)
 
         if column_values or kwargs:
             # Ensure on access refresh the results is active
-            self._db_deleted = False if row_count is None else row_count == 0
+            pydantic_setter(self, "_db_deleted", False if row_count is None else row_count == 0)
             # TODO: maybe can be unchanged in case of not self._db_deleted
-            self._db_loaded = False
+            pydantic_setter(self, "_db_loaded", False)
         await post_fn(
             real_class,
             model_instance=self,
@@ -897,7 +927,11 @@ class DatabaseMixin:
         Returns:
             The number of rows deleted.
         """
-        if self._db_deleted:
+        # bypass own __getattr__ overwrite for pydantic attributes
+        pydantic_getter = BaseModel.__getattr__
+        # bypass own __setattr__ overwrite for pydantic attributes
+        pydantic_setter = BaseModel.__setattr__
+        if pydantic_getter(self, "_db_deleted"):
             return 0
         instance = CURRENT_INSTANCE.get()
         real_class = self.get_real_class()
@@ -951,7 +985,8 @@ class DatabaseMixin:
             async with self.database as database:
                 row_count = cast(int, await database.execute(expression))
         # we cannot load anymore afterwards
-        self._db_deleted = True
+        pydantic_setter(self, "_db_deleted", True)
+        pydantic_setter(self, "_db_dirty", None)
         # now cleanup with the saved values
         if field_values:
             token_instance = CURRENT_MODEL_INSTANCE.set(self)
@@ -1028,7 +1063,11 @@ class DatabaseMixin:
             ObjectNotFound: If no row is found in the database corresponding to
                             the instance's identifying clauses.
         """
-        if only_needed and self._db_loaded_or_deleted:
+        # bypass own __getattr__ overwrite for pydantic attributes
+        pydantic_getter = BaseModel.__getattr__
+        # bypass own __setattr__ overwrite for pydantic attributes
+        pydantic_setter = BaseModel.__setattr__
+        if only_needed and (self._db_loaded_or_deleted or pydantic_getter(self, "_db_dirty")):
             return
         row = None
         clauses = self.identifying_clauses()
@@ -1042,8 +1081,9 @@ class DatabaseMixin:
                 row = await database.fetch_one(expression)
         # check if is in system
         if row is None:
-            self._db_deleted = True
-            self._db_loaded = True
+            pydantic_setter(self, "_db_deleted", True)
+            pydantic_setter(self, "_db_loaded", True)
+            pydantic_setter(self, "_db_dirty", None)
             raise ObjectNotFound("row does not exist anymore")
         # Update the instance.
         self.__dict__.update(
@@ -1051,8 +1091,9 @@ class DatabaseMixin:
                 dict(row._mapping), phase="load", instance=self, model_instance=self
             )
         )
-        self._db_deleted = False
-        self._db_loaded = True
+        pydantic_setter(self, "_db_deleted", False)
+        pydantic_setter(self, "_db_loaded", True)
+        pydantic_setter(self, "_db_dirty", set())
 
     async def check_exist_in_db(self, only_needed: bool = False) -> bool:
         """
@@ -1065,10 +1106,14 @@ class DatabaseMixin:
         Returns:
             True if the instance exists in the database, False otherwise.
         """
+        # bypass own __getattr__ overwrite for pydantic attributes
+        pydantic_getter = BaseModel.__getattr__
+        # bypass own __setattr__ overwrite for pydantic attributes
+        pydantic_setter = BaseModel.__setattr__
         if only_needed:
-            if self._db_deleted:
+            if pydantic_getter(self, "_db_deleted"):
                 return False
-            if self._db_loaded:
+            if pydantic_getter(self, "_db_loaded"):
                 return True
         clauses = self.identifying_clauses()
         if not clauses:
@@ -1081,11 +1126,11 @@ class DatabaseMixin:
         check_db_connection(self.database)
         async with self.database as database:
             result = cast(bool, await database.fetch_val(expression))
-            self._db_deleted = not result
+            pydantic_setter(self, "_db_deleted", not result)
             return result
 
     async def _insert(
-        self: Model,
+        self,
         evaluate_values: bool,
         kwargs: dict[str, Any],
         pre_fn: Callable[..., Awaitable[Any]],
@@ -1106,20 +1151,25 @@ class DatabaseMixin:
             post_fn: An asynchronous callable to be executed after the insert.
             instance: The model instance or queryset initiating the insert.
         """
-        real_class = self.get_real_class()
-        column_values: dict[str, Any] = self.extract_column_values(
+        # bypass own __getattr__ overwrite for pydantic attributes
+        pydantic_getter = BaseModel.__getattr__
+        # bypass own __setattr__ overwrite for pydantic attributes
+        pydantic_setter = BaseModel.__setattr__
+        model_self = cast("Model", self)
+        real_class = model_self.get_real_class()
+        column_values: dict[str, Any] = model_self.extract_column_values(
             extracted_values=kwargs,
             is_partial=False,
             is_update=False,
             phase="prepare_insert",
             instance=instance,
-            model_instance=self,
+            model_instance=model_self,
             evaluate_values=evaluate_values,
         )
         try:
             await pre_fn(
                 real_class,
-                model_instance=self,
+                model_instance=model_self,
                 instance=instance,
                 column_values=column_values,
                 values=kwargs,
@@ -1127,65 +1177,74 @@ class DatabaseMixin:
         except SkipOperation:
             await post_fn(
                 real_class,
-                model_instance=self,
+                model_instance=model_self,
                 instance=instance,
                 column_values=column_values,
                 values=kwargs,
                 operation_skipped=True,
             )
             return
-        check_db_connection(self.database, stacklevel=4)
-        table: sqlalchemy.Table = self.table
-        async with (
-            self.database as database,
-            database.connection() as connection,
-            connection.transaction(),
-        ):
-            insert_returning = database.engine.dialect.insert_returning
-            # can update column_values
-            column_values.update(
-                await self.execute_pre_save_hooks(column_values, kwargs, is_update=False)
-            )
-            # we can't just use label. If the column.key has an invalid name for the db
-            # we would cause an foo AS invalid clause
-            returning = (
-                [
-                    col
-                    for col in table.columns.values()
-                    if col.key not in column_values
-                    and (col.server_default is not None or col.autoincrement)
-                ]
-                if insert_returning
-                else []
-            )
-
-            if returning:
-                expression: Any = table.insert().values(**column_values).returning(*returning)
-                returned_mapping = dict((await connection.fetch_one(expression))._mapping)
-            else:
-                expression = table.insert().values(**column_values)
-                pk_values = await connection.execute(expression)
-                returned_mapping = (
-                    dict(pk_values._mapping) if hasattr(pk_values, "_mapping") else {}
+        check_db_connection(model_self.database, stacklevel=4)
+        table: sqlalchemy.Table = model_self.table
+        # prevent loops
+        db_dirty = pydantic_getter(model_self, "_db_dirty")
+        pydantic_setter(model_self, "_db_dirty", None)
+        try:
+            async with (
+                model_self.database as database,
+                database.connection() as connection,
+                connection.transaction(),
+            ):
+                insert_returning = database.engine.dialect.insert_returning
+                # can update column_values
+                column_values.update(
+                    await model_self.execute_pre_save_hooks(column_values, kwargs, is_update=False)
                 )
-        for col_name, col_key in self.meta.columns_remapping.items():
-            if col_name in returned_mapping:
-                returned_mapping[col_key] = returned_mapping.pop(col_name)
-        column_values.update(returned_mapping)
+                # we can't just use label. If the column.key has an invalid name for the db
+                # we would cause an foo AS invalid clause
+                returning = (
+                    [
+                        col
+                        for col in table.columns.values()
+                        if col.key not in column_values
+                        and (col.server_default is not None or col.autoincrement)
+                    ]
+                    if insert_returning
+                    else []
+                )
 
-        new_kwargs = self.transform_input(
-            column_values, phase="post_insert", instance=instance, model_instance=self
-        )
-        self.__dict__.update(new_kwargs)
+                if returning:
+                    expression: Any = table.insert().values(**column_values).returning(*returning)
+                    returned_mapping = dict((await connection.fetch_one(expression))._mapping)
+                else:
+                    expression = table.insert().values(**column_values)
+                    pk_values = await connection.execute(expression)
+                    returned_mapping = (
+                        dict(pk_values._mapping) if hasattr(pk_values, "_mapping") else {}
+                    )
+            for col_name, col_key in model_self.meta.columns_remapping.items():
+                if col_name in returned_mapping:
+                    returned_mapping[col_key] = returned_mapping.pop(col_name)
+            column_values.update(returned_mapping)
 
-        if self.meta.post_save_fields:
-            await self.execute_post_save_hooks(kwargs.keys(), is_update=False)
-        # Ensure on access refresh the results is active
-        self._db_loaded = False
-        self._db_deleted = False
+            new_kwargs = model_self.transform_input(
+                column_values, phase="post_insert", instance=instance, model_instance=model_self
+            )
+            self.__dict__.update(new_kwargs)
+
+            if model_self.meta.post_save_fields:
+                await model_self.execute_post_save_hooks(kwargs.keys(), is_update=False)
+        except BaseException:
+            pydantic_setter(model_self, "_db_dirty", db_dirty)
+            raise
+        finally:
+            # Ensure on access refresh the results is active
+            pydantic_setter(model_self, "_db_loaded", False)
+        pydantic_setter(model_self, "_db_deleted", False)
+        pydantic_setter(model_self, "_db_dirty", set())
         await post_fn(
             real_class,
-            model_instance=self,
+            model_instance=model_self,
             instance=instance,
             column_values=column_values,
             values=kwargs,
@@ -1215,8 +1274,13 @@ class DatabaseMixin:
         Returns:
             The saved model instance.
         """
+        # bypass own __getattr__ overwrite for pydantic attributes
+        pydantic_getter = BaseModel.__getattr__
+        model_self = cast("Model", self)
         instance: BaseModelType | QuerySet = CURRENT_INSTANCE.get()  # type: ignore
-        extracted_fields = self.extract_db_fields()
+        db_dirty = pydantic_getter(model_self, "_db_dirty")
+        meta = model_self.meta
+        extracted_fields = model_self.extract_db_fields()
         if values is None:
             explicit_values: set[str] = set()
         elif isinstance(values, set):
@@ -1228,16 +1292,16 @@ class DatabaseMixin:
 
         token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
-            for pkcolumn in type(self).pkcolumns:
+            for pkcolumn in type(model_self).pkcolumns:
                 # should trigger load in case of identifying_db_fields
                 value = getattr(self, pkcolumn, None)
                 if inspect.isawaitable(value):
                     value = await value
-                if value is None and self.table.columns[pkcolumn].autoincrement:
+                if value is None and model_self.table.columns[pkcolumn].autoincrement:
                     extracted_fields.pop(pkcolumn, None)
                     force_insert = True
                     break
-                field = self.meta.fields.get(pkcolumn)
+                field = meta.fields.get(pkcolumn)
                 # this is an IntegerField/DateTime with primary_key set
                 if field is not None:
                     if getattr(field, "increment_on_save", 0) != 0 or getattr(
@@ -1276,10 +1340,32 @@ class DatabaseMixin:
                     instance=instance,
                 )
             else:
+                if db_dirty and values is None and pydantic_getter(model_self, "_db_loaded"):
+                    # check only for loaded model instances which have dirty tracing
+                    update_values = {
+                        k: v
+                        for k, v in extracted_fields.items()
+                        if k in db_dirty
+                        or (
+                            k in meta.foreign_key_fields
+                            and v is not None
+                            and pydantic_getter(v, "_db_dirty")
+                        )
+                    }
+
+                    is_partial = True
+                elif values is None:
+                    update_values = extracted_fields
+                    is_partial = False
+                else:
+                    update_values = values
+                    is_partial = not set(model_self.meta.fields.keys()).issubset(
+                        update_values.keys()
+                    )
+
                 await self._update(
-                    # assume partial when values are not None
-                    is_partial=values is not None,
-                    kwargs=extracted_fields if values is None else values,
+                    is_partial=is_partial,
+                    kwargs=update_values,
                     pre_fn=partial(
                         self.meta.signals.pre_save.send_async, is_update=True, is_migration=False
                     ),
@@ -1293,7 +1379,7 @@ class DatabaseMixin:
         return self
 
     async def save(
-        self: Model,
+        self,
         force_insert: bool = False,
         values: dict[str, Any] | set[str] | None = None,
         force_save: bool | None = None,
@@ -1316,6 +1402,7 @@ class DatabaseMixin:
         Returns:
             The saved model instance.
         """
+        model_self = cast("Model", self)
         if force_save is not None:
             warnings.warn(
                 "'force_save' is deprecated in favor of 'force_insert'",
@@ -1323,9 +1410,9 @@ class DatabaseMixin:
                 stacklevel=2,
             )
             force_insert = force_save
-        token = CURRENT_INSTANCE.set(self)
+        token = CURRENT_INSTANCE.set(model_self)
         try:
-            return await self.real_save(force_insert=force_insert, values=values)
+            return await model_self.real_save(force_insert=force_insert, values=values)
         finally:
             CURRENT_INSTANCE.reset(token)
 

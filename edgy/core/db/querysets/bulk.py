@@ -4,6 +4,7 @@ import asyncio
 from collections.abc import (
     Awaitable,
     Collection,
+    Hashable,
     Iterable,
 )
 from contextlib import AsyncExitStack
@@ -68,6 +69,8 @@ def _extract_unique_lookup_key(
                 return None
         elif isinstance(value, dict | list):
             value = orjson.dumps(value, option=orjson.OPT_SORT_KEYS)
+        if not isinstance(value, Hashable):
+            return None
         lookup_key.append(value)
     return tuple(lookup_key)
 
