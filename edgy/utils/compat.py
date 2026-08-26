@@ -31,15 +31,24 @@ def is_class_and_subclass(value: Any, _type: T | tuple[T, ...]) -> TypeGuard[T]:
         ```python
         from typing import List
 
-        class MyBase: pass
-        class MyClass(MyBase): pass
-        class AnotherClass: pass
+
+        class MyBase:
+            pass
+
+
+        class MyClass(MyBase):
+            pass
+
+
+        class AnotherClass:
+            pass
+
 
         assert is_class_and_subclass(MyClass, MyBase) == True
         assert is_class_and_subclass(MyClass, (MyBase, AnotherClass)) == True
         assert is_class_and_subclass(AnotherClass, MyBase) == False
-        assert is_class_and_subclass(MyClass(), MyBase) == False # Not a class
-        assert is_class_and_subclass(List[str], list) == True # Handles generic types
+        assert is_class_and_subclass(MyClass(), MyBase) == False  # Not a class
+        assert is_class_and_subclass(List[str], list) == True  # Handles generic types
         assert is_class_and_subclass(str, object) == True
         ```
     """

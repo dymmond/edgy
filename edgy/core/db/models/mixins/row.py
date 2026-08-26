@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Hashable, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
@@ -29,6 +29,8 @@ class ModelRowMixin:
     This class provides methods to convert raw database rows into Edgy ORM model objects,
     handling relationships such as `select_related` and `prefetch_related`.
     """
+
+    pkcolumns: ClassVar[Sequence[str]]
 
     @classmethod
     def can_load_from_row(cls: type[Model], row: Row, table: Table) -> bool:
@@ -381,7 +383,9 @@ class ModelRowMixin:
         return False
 
     @classmethod
-    def create_model_key_from_sqla_row(cls, row: Row, row_prefix: str = "") -> tuple:
+    def create_model_key_from_sqla_row(
+        cls, row: Row, row_prefix: str = ""
+    ) -> tuple[Hashable, ...]:
         """
         Builds a unique cache key for a model instance based on its class name and
         primary key values extracted from a SQLAlchemy row.

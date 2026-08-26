@@ -72,13 +72,13 @@ class MetaDataDict(defaultdict[str, sqlalchemy.MetaData]):
             raise KeyError(f'Extra database "{key}" does not exist.')
         return super().__getitem__(key)
 
-    def get(self, key: str, default: Any = None) -> sqlalchemy.MetaData:
+    def get(self, key: str | None, default: Any = None) -> sqlalchemy.MetaData:
         """
         Retrieves the MetaData object for the given key, returning a default
         value if the key is not found.
 
         Args:
-            key (str): The name of the database.
+            key (str | None): The name of the database.
             default (Any): The default value to return if the key is not found.
                            Defaults to None.
 

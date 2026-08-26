@@ -34,6 +34,7 @@ class DescriptiveMeta:
     database = Database("sqlite:///db.sqlite")
     models = Registry(database=database)
 
+
     class User(Model):
         id: int = edgy.IntegerField(primary_key=True)
         name: str = edgy.CharField(max_length=100)
@@ -358,7 +359,7 @@ class BaseModelType(ABC):
 
     @abstractmethod
     async def execute_pre_save_hooks(
-        self, values: dict[str, Any], original: dict[str, Any], is_update: bool
+        self, column_values: dict[str, Any], original: dict[str, Any], is_update: bool
     ) -> dict[str, Any]:
         """
         Abstract asynchronous method to execute pre-save hooks for the model.
@@ -369,7 +370,7 @@ class BaseModelType(ABC):
         validation, or other preparatory actions.
 
         Args:
-            values (dict[str, Any]): A dictionary of the current values to be saved.
+            column_values (dict[str, Any]): A dictionary of the current column values to be saved.
             original (dict[str, Any]): A dictionary of the original values before modification,
                                        useful in update scenarios.
             is_update (bool): `True` if the save operation is an update; `False` if it's an insert.
