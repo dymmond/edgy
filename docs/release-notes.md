@@ -1,5 +1,11 @@
 # Release Notes
 
+## 0.36.1
+
+### Fixed
+
+- Fix copying model without a registry and adding it to one when its `meta.registry` equals `None`.
+
 ## 0.36.0
 
 ### Added

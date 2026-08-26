@@ -137,7 +137,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         Returns:
             dict[str, Any]: A dictionary of field names to their type annotations.
         """
-        return {name: field.annotation for name, field in self.fields.items()}
+        return {name: field.annotation for name, field in self.edgy_fields.items()}
 
     def to_factory_field(self) -> FactoryField:
         """
