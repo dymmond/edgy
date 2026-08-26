@@ -130,7 +130,8 @@ class CombinedQuerySet(QuerySet):
 
         # Select-related caches: copy values to avoid recomputation unless necessary
         queryset._select_related.update(self._select_related)
-        queryset._select_related_weak.update(self._select_related_weak)
+        queryset._select_related_g_and_o.update(self._select_related_g_and_o)
+        queryset._select_related_embedding.update(self._select_related_embedding)
         queryset._cached_select_related_expression = self._cached_select_related_expression
 
         # Locking is not supported for combined sets; ensure none is carried

@@ -158,6 +158,7 @@ def crawl_relationship(
     # Handle the last segment if traverse_last is True and the last field was a RelationshipField.
     if traverse_last and isinstance(field, RelationshipField):
         model_class, reverse_part, path = field.traverse_field(path)
+        # either field name alone if prefix path is empty or concatenated
         forward_prefix_path = (
             f"{forward_prefix_path}__{field_name}" if forward_prefix_path else field_name
         )

@@ -534,8 +534,15 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         """
         queryset: QuerySet = self._clone()
         queryset._order_by = order_by
-        if queryset._update_select_related_weak(order_by, clear=True):
-            queryset._update_select_related_weak(queryset._group_by, clear=False)
+        if queryset._update_select_related_weak(
+            order_by, cache_name="_select_related_g_and_o", clear=True, traverse_last=False
+        ):
+            queryset._update_select_related_weak(
+                queryset._group_by,
+                cache_name="_select_related_g_and_o",
+                clear=False,
+                traverse_last=False,
+            )
         return queryset
 
     def reverse(self) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
@@ -610,8 +617,15 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         """
         queryset: QuerySet = self._clone()
         queryset._group_by = group_by
-        if queryset._update_select_related_weak(group_by, clear=True):
-            queryset._update_select_related_weak(queryset._order_by, clear=False)
+        if queryset._update_select_related_weak(
+            group_by, cache_name="_select_related_g_and_o", clear=True, traverse_last=False
+        ):
+            queryset._update_select_related_weak(
+                queryset._order_by,
+                cache_name="_select_related_g_and_o",
+                clear=False,
+                traverse_last=False,
+            )
         return queryset
 
     def distinct(
@@ -825,7 +839,9 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset: QuerySet = self
 
         needs_distinct = (
-            bool(queryset.or_clauses) or bool(queryset._select_related) or bool(queryset._group_by)
+            bool(queryset.or_clauses)
+            or bool(queryset._select_related.union(queryset._select_related_embedding))
+            or bool(queryset._group_by)
         )
 
         base_select = await queryset.as_select()
@@ -994,28 +1010,6 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             CHECK_DB_CONNECTION_SILENCED.reset(token)
 
     insert = create
-
-    @overload
-    def update_embed_parent(self, embed_parent: None) -> QuerySet[EdgyModel, EdgyModel]: ...
-    @overload
-    def update_embed_parent(
-        self, embed_parent: tuple[str, str]
-    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]: ...
-    def update_embed_parent(
-        self, embed_parent: tuple[str, str] | None
-    ) -> QuerySet[EdgyModel, EdgyEmbedTarget] | QuerySet[EdgyModel, EdgyModel]:
-        """
-        Update or remove (provide None) embed_parent applied on instances.
-        Note: this doesn't affect embed_parent for filters.
-
-        Args:
-            embed_parent: define the new embed_parent.
-        Returns:
-            QuerySetType: A new QuerySet instance with the new embedding.
-        """
-        queryset = self._clone()
-        queryset.embed_parent = embed_parent
-        return queryset
 
     async def delete(self, *, use_models: bool = False) -> int | None:
         """

@@ -134,11 +134,10 @@ class ManyRelation(ManyRelationProtocol):
         # If embed_through is not "",  use modern logic.
         if self.embed_through != "":
             queryset.embed_parent_filters = queryset.embed_parent
-        # FIXME: find issue why this is required
-        # add missing select despite it should be set by embed_parent it is required somewhere else
+        # because we set embed_parent directly, this is required
         if not self.through.meta.fields[self.to_foreign_key].is_cross_db():
-            # not initialized yet
-            queryset._select_related.add(self.to_foreign_key)
+            # not initialized yet, so add it manually
+            queryset._select_related_embedding.add(self.to_foreign_key)
         return queryset.using(schema=self.instance.get_active_instance_schema())
 
     async def save_related(self) -> None:

@@ -41,7 +41,9 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
             await self.model_class.from_sqla_row(
                 row=row,
                 tables_and_models=self.tables_and_models,
-                select_related=self.queryset._select_related,
+                select_related=self.queryset._select_related.union(
+                    self.queryset._select_related_embedding
+                ),
                 only_fields=self.queryset._only,
                 is_defer_fields=self.is_defer_fields,
                 exclude_secrets=self.queryset._exclude_secrets,
@@ -111,7 +113,9 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
             cache_fn=lambda row: self.model_class.from_sqla_row(
                 row=row,
                 tables_and_models=self.tables_and_models,
-                select_related=self.queryset._select_related,
+                select_related=self.queryset._select_related.union(
+                    self.queryset._select_related_embedding
+                ),
                 only_fields=self.queryset._only,
                 is_defer_fields=self.is_defer_fields,
                 exclude_secrets=self.queryset._exclude_secrets,

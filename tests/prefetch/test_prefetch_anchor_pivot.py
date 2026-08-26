@@ -157,7 +157,7 @@ async def test_prefetch_select_related_pivot():
     await post.reactions.create(body="is true")
     await post.reactions.create(body="I like javascript")
 
-    posts = await Post.query.select_related("user").prefetch_related(
+    posts = await Post.query.prefetch_related(
         Prefetch(to_attr="comments_filtered", related_name="comments"),
         Prefetch(to_attr="reactions_filtered", related_name="reactions"),
     )

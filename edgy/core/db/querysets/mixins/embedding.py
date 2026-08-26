@@ -84,7 +84,9 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                     tables_and_models=tables_and_models,
                     prefetches=prefetches_list,
                 )
-            for path in self_queryset._select_related:
+            for path in self_queryset._select_related.union(
+                self_queryset._select_related_embedding
+            ):
                 prefix = ""
                 new_result: BaseModelType | None = instance
                 for part in path.split("__"):
@@ -274,20 +276,13 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             )
             # the assigned queryset has an empty cache
             new_prefetch.queryset = prefetch_queryset
+            new_prefetch.forward_path = prefetch.forward_path
             new_prefetch._forward_path_to_anchor = prefetch_crawl_result.forward_path
             new_prefetch._reverse_path_to_anchor = prefetch_crawl_result.reverse_path
-            if new_prefetch.from_anchor:
-                new_prefetch._forward_path = (
-                    f"{new_prefetch.from_anchor}__{target_crawl_result.forward_path}".removesuffix(
-                        "__"
-                    )
-                )
-            else:
-                new_prefetch._forward_path = target_crawl_result.forward_path
             new_prefetch._baking_finished = asyncio.Event()
             new_prefetch._target_model = cast("type[Model]", target_crawl_result.model_class)
             new_prefetch._baked_results = {}
-            prepared_prefetches.setdefault(new_prefetch._forward_path, []).append(new_prefetch)
+            prepared_prefetches.setdefault(new_prefetch.forward_path, []).append(new_prefetch)
         return prepared_prefetches
 
     def prefetch_related(self, *prefetch: Prefetch) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
@@ -327,4 +322,66 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
 
         # Append the new prefetch objects to the queryset's internal list.
         queryset._prefetch_related = [*self_queryset._prefetch_related, *prefetch]
+        select_pathes: set[str] = set()
+        # this one extra doesn't matter much from performance perspective, is maybe even cheaper
+        if queryset.embed_parent and queryset.embed_parent[0]:
+            # parsed later
+            select_pathes.add(queryset.embed_parent[0])
+        # now add the forward pathes
+        select_pathes.update(
+            prefetch.forward_path
+            for prefetch in queryset._prefetch_related
+            if prefetch.forward_path
+        )
+        # they are sanitized and analyzed later in _update_select_related_weak
+        queryset._update_select_related_weak(
+            select_pathes, cache_name="_select_related_embedding", clear=True, traverse_last=True
+        )
+        return queryset
+
+    @overload
+    def update_embed_parent(self, embed_parent: None) -> QuerySet[EdgyModel, EdgyModel]: ...
+    @overload
+    def update_embed_parent(
+        self, embed_parent: tuple[str, str]
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]: ...
+    def update_embed_parent(
+        self, embed_parent: tuple[str, str] | None
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget] | QuerySet[EdgyModel, EdgyModel]:
+        """
+        Update or remove (provide None) embed_parent applied on instances.
+        Note: this doesn't affect embed_parent for filters.
+
+        Args:
+            embed_parent: define the new embed_parent.
+        Returns:
+            QuerySetType: A new QuerySet instance with the new embedding.
+        """
+        queryset = self._clone()
+        queryset.embed_parent = embed_parent
+        select_pathes: set[str] = set()
+        if queryset.embed_parent and queryset.embed_parent[0]:
+            # just add them, they are parsed later
+            select_pathes.add(queryset.embed_parent[0])
+
+        if (
+            queryset._update_select_related_weak(
+                select_pathes,
+                cache_name="_select_related_embedding",
+                clear=True,
+                traverse_last=True,
+            )
+            and queryset._prefetch_related
+        ):
+            # regenerate prefetch pathes
+
+            queryset._update_select_related_weak(
+                (
+                    prefetch.forward_path
+                    for prefetch in queryset._prefetch_related
+                    if prefetch.forward_path
+                ),
+                cache_name="_select_related_embedding",
+                clear=False,
+            )
         return queryset

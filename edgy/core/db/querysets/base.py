@@ -116,7 +116,9 @@ class BaseQuerySet(
         self._offset = offset
         select_related = set(select_related)
         self._select_related: set[str] = set()
-        self._select_related_weak: set[str] = set()
+        # groups and order by
+        self._select_related_g_and_o = set()
+        self._select_related_embedding = set()
         if select_related:
             self._update_select_related(select_related)
         self._prefetch_related = list(prefetch_related)
@@ -196,7 +198,8 @@ class BaseQuerySet(
         queryset.or_clauses.extend(self.or_clauses)
         queryset.embed_parent_filters = self.embed_parent_filters
         queryset._select_related.update(self._select_related)
-        queryset._select_related_weak.update(self._select_related_weak)
+        queryset._select_related_g_and_o.update(self._select_related_g_and_o)
+        queryset._select_related_embedding.update(self._select_related_embedding)
         queryset._cached_select_related_expression = self._cached_select_related_expression
         queryset._for_update = self._for_update.copy() if self._for_update is not None else None
         return cast("QuerySet", queryset)
@@ -376,26 +379,38 @@ class BaseQuerySet(
         ]
         return order_col.desc() if reverse else order_col
 
-    def _update_select_related_weak(self, fields: Iterable[str], *, clear: bool) -> bool:
-        related: set[str] = set()
+    def _update_select_related_weak(
+        self, fields: Iterable[str], *, cache_name: str, clear: bool, traverse_last: bool
+    ) -> bool:
+        # retrieve the cache from queryset, use cache_name to identify
+        cache_weak: set[str] = getattr(self, cache_name)
+        new_related: set[str] = set()
         for field_name in fields:
+            # strip leading - from order_by
             field_name = field_name.lstrip("-")
             related_element = clauses_mod.clean_path_to_crawl_result(
                 self.model_class,
                 path=field_name,
                 embed_parent=self.embed_parent_filters,
                 model_database=self.database,
+                traverse_last=traverse_last,
             ).forward_path
+            # eliminate empty pathes
             if related_element:
-                related.add(related_element)
-        if related and not self._select_related.union(self._select_related_weak).issuperset(
-            related
-        ):
-            self._cached_select_related_expression = None
+                new_related.add(related_element)
+        # check if the caches are the same sets
+        if new_related != cache_weak:
+            # invalidate _cached_select_related_expression, when not subset
+            if not self._select_related.issuperset(new_related):
+                self._cached_select_related_expression = None
+            # now clear the cache to update, if clear was specified
             if clear:
-                self._select_related_weak.clear()
-            self._select_related_weak.update(related)
+                cache_weak.clear()
+            # and fill it with the new content
+            cache_weak.update(new_related)
+            # return True if the cache was updated
             return True
+        # return False if the cache was not updated
         return False
 
     def _update_select_related(self, pathes: Iterable[str]) -> None:
