@@ -6,7 +6,7 @@ import inspect
 import warnings
 from abc import ABCMeta
 from collections import UserDict, deque
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
@@ -31,18 +31,19 @@ if TYPE_CHECKING:
     from databasez.core.transaction import Transaction
 
     from edgy.core.connection import Database
+    from edgy.core.db.fields.base import BaseField
     from edgy.core.db.models import Model
     from edgy.core.db.models.types import BaseModelType
 
 _empty_dict: dict[str, Any] = {}
 _empty_set: frozenset[Any] = frozenset()
 
-_seen_table_names: ContextVar[set[str]] = ContextVar("_seen_table_names", default=None)
+_seen_table_names: ContextVar[set[str] | None] = ContextVar("_seen_table_names", default=None)
 
 T = TypeVar("T")
 
 
-class Fields(UserDict, dict[str, BaseFieldType]):
+class Fields(UserDict[str, BaseFieldType]):
     """Smart wrapper which tries to prevent invalidation as far as possible"""
 
     meta: MetaInfo
@@ -105,7 +106,7 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             for field_attr in _field_sets_to_clear:
                 getattr(self.meta, field_attr).discard(name)
 
-    def __getitem__(self, name: str) -> BaseFieldType:
+    def __getitem__(self, key: str) -> BaseFieldType:
         """
         Retrieves a field by name.
 
@@ -115,7 +116,7 @@ class Fields(UserDict, dict[str, BaseFieldType]):
         Returns:
             The field object.
         """
-        return cast(BaseFieldType, self.data[name])
+        return self.data[key]
 
     def get(self, key: str, default: T = None) -> T | BaseFieldType:
         """
@@ -145,7 +146,7 @@ class Fields(UserDict, dict[str, BaseFieldType]):
         """
         return key in self.data
 
-    def __setitem__(self, name: str, value: BaseFieldType) -> None:
+    def __setitem__(self, key: str, value: BaseFieldType) -> None:
         """
         Sets a field with the given name and value. Invalidates meta-information.
 
@@ -153,29 +154,29 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             name: The name of the field.
             value: The field object.
         """
-        if name in self.data:
-            self.discard_field_from_meta(name)
-        self.data[name] = value
-        self.add_field_to_meta(name, value)
+        if key in self.data:
+            self.discard_field_from_meta(key)
+        self.data[key] = value
+        self.add_field_to_meta(key, value)
         if self.meta.model is not None:
-            self.meta.model.model_fields[name] = value
+            cast("type[Model]", self.meta.model).model_fields[key] = cast("BaseField", value)
         self.meta.invalidate(invalidate_stats=False)
 
-    def __delitem__(self, name: str) -> None:
+    def __delitem__(self, key: str) -> None:
         """
         Deletes a field by name. Invalidates meta-information.
 
         Args:
             name: The name of the field to delete.
         """
-        if self.data.pop(name, None) is not None:
-            self.discard_field_from_meta(name)
+        if self.data.pop(key, None) is not None:
+            self.discard_field_from_meta(key)
             if self.meta.model is not None:
-                self.meta.model.model_fields.pop(name, None)
+                cast("type[Model]", self.meta.model).model_fields.pop(key, None)
             self.meta.invalidate(invalidate_stats=False)
 
 
-class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
+class FieldToColumns(UserDict, Mapping[str, Sequence[sqlalchemy.Column]]):
     """
     Manages the mapping from field names to their corresponding SQLAlchemy columns.
     """
@@ -192,7 +193,7 @@ class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
         self.meta = meta
         super().__init__()
 
-    def __getitem__(self, name: str) -> Sequence[sqlalchemy.Column]:
+    def __getitem__(self, key: str) -> Sequence[sqlalchemy.Column]:
         """
         Retrieves the SQLAlchemy columns for a given field name.
 
@@ -202,13 +203,13 @@ class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
         Returns:
             A sequence of SQLAlchemy Column objects.
         """
-        if name in self.data:
-            return cast(Sequence[sqlalchemy.Column], self.data[name])
-        field = self.meta.fields[name]
-        result = self.data[name] = field.get_columns(name)
+        if key in self.data:
+            return cast(Sequence[sqlalchemy.Column], self.data[key])
+        field = self.meta.fields[key]
+        result = self.data[key] = field.get_columns(key)
         return result
 
-    def __setitem__(self, name: str, value: Any) -> None:
+    def __setitem__(self, key: str, value: Any) -> None:
         """
         This method is not supported for FieldToColumns.
 
@@ -257,7 +258,7 @@ class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
             return False
 
 
-class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
+class FieldToColumnNames(FieldToColumns, Mapping[str, frozenset[str]]):
     """
     Manages the mapping from field names to their corresponding SQLAlchemy column key names.
     """
@@ -279,7 +280,7 @@ class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
         return result
 
 
-class ColumnsToField(UserDict, dict[str, str]):
+class ColumnsToField(UserDict, Mapping[str, str]):
     """
     Manages the mapping from SQLAlchemy column names to their corresponding field names.
     """
@@ -321,20 +322,20 @@ class ColumnsToField(UserDict, dict[str, str]):
                     _columns_to_field[column_name] = field_name
             self.data.update(_columns_to_field)
 
-    def __getitem__(self, name: str) -> str:
+    def __getitem__(self, key: str) -> str:
         """
         Retrieves the field name for a given column name. Ensures initialization.
 
         Args:
-            name: The name of the column.
+            key: The key of the column.
 
         Returns:
             The name of the field.
         """
         self.init()
-        return cast(str, super().__getitem__(name))
+        return cast(str, super().__getitem__(key))
 
-    def __setitem__(self, name: str, value: Any) -> None:
+    def __setitem__(self, key: str, item: Any) -> None:
         """
         This method is not supported for ColumnsToField.
 
@@ -343,7 +344,7 @@ class ColumnsToField(UserDict, dict[str, str]):
         """
         raise Exception("Cannot set item here")
 
-    def __contains__(self, name: str) -> bool:
+    def __contains__(self, key: str) -> bool:
         """
         Checks if a column name exists in the mapping. Ensures initialization.
 
@@ -354,7 +355,7 @@ class ColumnsToField(UserDict, dict[str, str]):
             True if the column name exists, False otherwise.
         """
         self.init()
-        return super().__contains__(name)
+        return super().__contains__(key)
 
     def __iter__(self) -> Any:
         """
@@ -364,7 +365,7 @@ class ColumnsToField(UserDict, dict[str, str]):
         return super().__iter__()
 
 
-class ColumnsRemapping(UserDict, dict[str, str]):
+class ColumnsRemapping(UserDict, Mapping[str, str]):
     """
     Renames column.name to column.key
     """
@@ -621,7 +622,7 @@ class MetaInfo:
             DeprecationWarning,
             stacklevel=2,
         )
-        return self.fields
+        return cast("dict[str, BaseFieldType]", self.fields)
 
     @property
     def is_multi(self) -> bool:
@@ -1491,4 +1492,4 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             stacklevel=2,
         )
         meta: MetaInfo = cls.meta
-        return meta.fields
+        return cast("dict[str, BaseFieldType]", meta.fields)

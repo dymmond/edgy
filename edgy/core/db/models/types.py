@@ -34,6 +34,7 @@ class DescriptiveMeta:
     database = Database("sqlite:///db.sqlite")
     models = Registry(database=database)
 
+
     class User(Model):
         id: int = edgy.IntegerField(primary_key=True)
         name: str = edgy.CharField(max_length=100)

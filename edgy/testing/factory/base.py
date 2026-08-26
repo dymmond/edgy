@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Collection, Mapping
 from typing import TYPE_CHECKING, Any, ClassVar, Literal, cast
 
 from edgy.core.utils.sync import run_sync
@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 
     from edgy import Model
     from edgy.core.connection import Database
+    from edgy.core.db.fields.base import BaseField
+    from edgy.core.db.fields.types import BaseFieldType
 
     from .metaclasses import MetaInfo
     from .types import FieldFactoryCallback, ModelFactoryContext
@@ -116,7 +118,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                 self.__kwargs__[key] = value
 
     @property
-    def edgy_fields(self) -> dict[str, Any]:
+    def edgy_fields(self) -> Mapping[str, BaseFieldType]:
         """
         Returns the Edgy fields of the associated model.
 
@@ -137,7 +139,10 @@ class ModelFactory(metaclass=ModelFactoryMeta):
         Returns:
             dict[str, Any]: A dictionary of field names to their type annotations.
         """
-        return {name: field.annotation for name, field in self.edgy_fields.items()}
+        return {
+            name: cast("BaseField", field).annotation
+            for name, field in self.meta.model.meta.fields.items()
+        }
 
     def to_factory_field(self) -> FactoryField:
         """
@@ -397,6 +402,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
 
                 name = FactoryField(callback="female_name")
 
+
             user = UserFactory(name="Test User").build()
             # user.name will be "Test User", other fields will be faked.
             ```
@@ -490,6 +496,7 @@ class ModelFactory(metaclass=ModelFactoryMeta):
                 class Meta:
                     model = User
                     # Assuming User model has a 'name' field
+
 
             user = await UserFactory(name="John Doe").build_and_save()
             # A 'User' instance with name "John Doe" is created and saved to DB.
