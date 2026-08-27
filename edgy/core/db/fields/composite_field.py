@@ -573,12 +573,14 @@ class CompositeField(FieldFactory):
         """
         inner_fields = kwargs.get("inner_fields")
         if inner_fields is not None:
+            # transform validated inner_fields in ConcreteCompositeField
             # If inner_fields is a model with a 'meta' attribute, extract its fields.
             if hasattr(inner_fields, "meta"):
+                # for checking the model later in the validation
                 kwargs.setdefault("model", inner_fields)
                 inner_fields = inner_fields.meta.fields
-            # If inner_fields is a dictionary, convert it to an items view.
-            if isinstance(inner_fields, dict):
+            # If inner_fields is a Mapping, convert it to an items view.
+            if isinstance(inner_fields, Mapping):
                 inner_fields = inner_fields.items()
             # If it's not a sequence, raise an error.
             elif not isinstance(inner_fields, Sequence):
