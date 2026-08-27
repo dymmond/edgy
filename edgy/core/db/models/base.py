@@ -395,7 +395,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             DeprecationWarning,
             stacklevel=2,
         )
-        return cast("dict[str, BaseFieldType]", self.meta.fields)
+        return dict(self.meta.fields)
 
     async def execute_pre_save_hooks(
         self, column_values: dict[str, Any], original: dict[str, Any], is_update: bool

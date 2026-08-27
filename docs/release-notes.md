@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Make Fields, FieldToColumns, FieldToColumnNames and ColumnsRemapping appropiate mappings.
+- Make Fields, FieldToColumns, FieldToColumnNames and ColumnsRemapping appropriate mappings.
   You can't do the dirty trick anymore testing for a dict.
 
 ### Fixed

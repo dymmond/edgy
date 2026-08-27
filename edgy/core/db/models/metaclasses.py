@@ -5,8 +5,8 @@ import copy
 import inspect
 import warnings
 from abc import ABCMeta
-from collections import UserDict, deque
-from collections.abc import Iterator, Mapping, Sequence
+from collections import deque
+from collections.abc import Iterator, Mapping, MutableMapping, Sequence
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
@@ -43,7 +43,7 @@ _seen_table_names: ContextVar[set[str] | None] = ContextVar("_seen_table_names",
 T = TypeVar("T")
 
 
-class Fields(UserDict[str, BaseFieldType]):
+class Fields(MutableMapping[str, BaseFieldType]):
     """Smart wrapper which tries to prevent invalidation as far as possible"""
 
     meta: MetaInfo
@@ -57,7 +57,7 @@ class Fields(UserDict[str, BaseFieldType]):
             data: An optional dictionary of initial field data.
         """
         self.meta = meta
-        super().__init__(data)
+        self._data = data or {}
 
     def add_field_to_meta(self, name: str, field: BaseFieldType) -> None:
         """
@@ -106,6 +106,17 @@ class Fields(UserDict[str, BaseFieldType]):
             for field_attr in _field_sets_to_clear:
                 getattr(self.meta, field_attr).discard(name)
 
+    def __getitem__(self, key: str) -> BaseFieldType:
+        """
+        Retrieve the field from data.
+
+        Args:
+            key: The name of the field.
+        Returns:
+            The field with the name or raise a KeyError.
+        """
+        return self._data[key]
+
     def __setitem__(self, key: str, item: BaseFieldType) -> None:
         """
         Sets a field with the given name and value. Invalidates meta-information.
@@ -114,9 +125,9 @@ class Fields(UserDict[str, BaseFieldType]):
             name: The name of the field.
             value: The field object.
         """
-        if key in self.data:
+        if key in self._data:
             self.discard_field_from_meta(key)
-        self.data[key] = item
+        self._data[key] = item
         self.add_field_to_meta(key, item)
         if self.meta.model is not None:
             cast("type[Model]", self.meta.model).model_fields[key] = cast("BaseField", item)
@@ -129,11 +140,23 @@ class Fields(UserDict[str, BaseFieldType]):
         Args:
             name: The name of the field to delete.
         """
-        if self.data.pop(key, None) is not None:
+        if self._data.pop(key, None) is not None:
             self.discard_field_from_meta(key)
             if self.meta.model is not None:
                 cast("type[Model]", self.meta.model).model_fields.pop(key, None)
             self.meta.invalidate(invalidate_stats=False)
+
+    def __iter__(self) -> Iterator[str]:
+        """
+        Redirects to internal data.
+        """
+        return self._data.__iter__()
+
+    def __len__(self) -> int:
+        """
+        Redirects to internal data.
+        """
+        return len(self._data)
 
 
 class FieldToColumns(Mapping[str, Sequence[sqlalchemy.Column]]):
@@ -151,7 +174,7 @@ class FieldToColumns(Mapping[str, Sequence[sqlalchemy.Column]]):
             meta: The MetaInfo object associated with these columns.
         """
         self.meta = meta
-        self.data: dict[str, Sequence[sqlalchemy.Column]] = {}
+        self._data: dict[str, Sequence[sqlalchemy.Column]] = {}
 
     def __getitem__(self, key: str) -> Sequence[sqlalchemy.Column]:
         """
@@ -163,10 +186,10 @@ class FieldToColumns(Mapping[str, Sequence[sqlalchemy.Column]]):
         Returns:
             A sequence of SQLAlchemy Column objects.
         """
-        if key in self.data:
-            return self.data[key]
+        if key in self._data:
+            return self._data[key]
         field = self.meta.fields[key]
-        result = self.data[key] = field.get_columns(key)
+        result = self._data[key] = field.get_columns(key)
         return result
 
     def __iter__(self) -> Iterator[str]:
@@ -175,7 +198,7 @@ class FieldToColumns(Mapping[str, Sequence[sqlalchemy.Column]]):
         """
         # this initializes this fields data by requesting all the columns
         self.meta.columns_to_field.init()
-        return self.data.__iter__()
+        return self._data.__iter__()
 
     def __len__(self) -> int:
         """
@@ -183,7 +206,7 @@ class FieldToColumns(Mapping[str, Sequence[sqlalchemy.Column]]):
         """
         # this initializes this fields data by requesting all the columns
         self.meta.columns_to_field.init()
-        return len(self.data)
+        return len(self._data)
 
 
 class FieldToColumnNames(Mapping[str, frozenset[str]]):
@@ -201,7 +224,7 @@ class FieldToColumnNames(Mapping[str, frozenset[str]]):
             meta: The MetaInfo object associated with these columns.
         """
         self.meta = meta
-        self.data: dict[str, frozenset[str]] = {}
+        self._data: dict[str, frozenset[str]] = {}
 
     def __getitem__(self, key: str) -> frozenset[str]:
         """
@@ -213,10 +236,10 @@ class FieldToColumnNames(Mapping[str, frozenset[str]]):
         Returns:
             A sequence of SQLAlchemy Column objects.
         """
-        if key in self.data:
-            return self.data[key]
+        if key in self._data:
+            return self._data[key]
         columns = self.meta.field_to_columns[key]
-        result = self.data[key] = frozenset([col.key for col in columns])
+        result = self._data[key] = frozenset([col.key for col in columns])
         return result
 
     def __iter__(self) -> Iterator[str]:
@@ -238,7 +261,6 @@ class ColumnsToField(Mapping[str, str]):
     """
 
     meta: MetaInfo
-    _init: bool
 
     def __init__(self, meta: MetaInfo):
         """
@@ -248,9 +270,7 @@ class ColumnsToField(Mapping[str, str]):
             meta: The MetaInfo object associated with these mappings.
         """
         self.meta = meta
-        # fail in case of a missing initialization
-        self.data: dict[str, str] = cast(dict[str, str], None)
-        self._init = False
+        self._data: dict[str, str] | None = None
 
     def init(self) -> None:
         """
@@ -260,7 +280,7 @@ class ColumnsToField(Mapping[str, str]):
         Raises:
             ValueError: If a column name collision is detected.
         """
-        if not self._init:
+        if self._data is None:
             _columns_to_field: dict[str, str] = {}
             for field_name in self.meta.fields:
                 # init structure
@@ -272,8 +292,7 @@ class ColumnsToField(Mapping[str, str]):
                             f"and {_columns_to_field[column_name]}"
                         )
                     _columns_to_field[column_name] = field_name
-            self.data = _columns_to_field
-            self._init = True
+            self._data = _columns_to_field
 
     def __getitem__(self, key: str) -> str:
         """
@@ -286,21 +305,24 @@ class ColumnsToField(Mapping[str, str]):
             The name of the field.
         """
         self.init()
-        return self.data.__getitem__(key)
+        assert self._data is not None
+        return self._data.__getitem__(key)
 
     def __iter__(self) -> Any:
         """
         Ensures initialization and returns an iterator over the keys.
         """
         self.init()
-        return self.data.__iter__()
+        assert self._data is not None
+        return self._data.__iter__()
 
     def __len__(self) -> Any:
         """
         Ensures initialization and returns length.
         """
         self.init()
-        return len(self.data)
+        assert self._data is not None
+        return len(self._data)
 
 
 class ColumnsRemapping(Mapping[str, str]):
@@ -309,7 +331,6 @@ class ColumnsRemapping(Mapping[str, str]):
     """
 
     meta: MetaInfo
-    _init: bool
 
     def __init__(self, meta: MetaInfo):
         """
@@ -319,9 +340,7 @@ class ColumnsRemapping(Mapping[str, str]):
             meta: The MetaInfo object associated with these mappings.
         """
         self.meta = meta
-        # fail for sure when not initialized
-        self.data: dict[str, str] = cast("dict[str, str]", None)
-        self._init = False
+        self._data: dict[str, str] | None = None
 
     def init(self) -> None:
         """
@@ -331,8 +350,7 @@ class ColumnsRemapping(Mapping[str, str]):
         Raises:
             ValueError: If a column name collision is detected.
         """
-        if not self._init:
-            self._init = True
+        if self._data is None:
             _columns_remapping: dict[str, str] = {}
             for field_name in self.meta.fields:
                 # init structure
@@ -340,7 +358,7 @@ class ColumnsRemapping(Mapping[str, str]):
                 for column in columns:
                     if column.key != column.name:
                         _columns_remapping[column.name] = column.key
-            self.data = _columns_remapping
+            self._data = _columns_remapping
 
     def __getitem__(self, key: str) -> str:
         """
@@ -353,21 +371,24 @@ class ColumnsRemapping(Mapping[str, str]):
             The key of the column.
         """
         self.init()
-        return self.data.__getitem__(key)
+        assert self._data is not None
+        return self._data.__getitem__(key)
 
     def __iter__(self) -> Any:
         """
         Ensures initialization and returns an iterator over the names.
         """
         self.init()
-        return self.data.__iter__()
+        assert self._data is not None
+        return self._data.__iter__()
 
     def __len__(self) -> Any:
         """
         Ensures initialization and returns length.
         """
         self.init()
-        return len(self.data)
+        assert self._data is not None
+        return len(self._data)
 
 
 _trigger_attributes_fields_MetaInfo: set[str] = {
@@ -525,8 +546,10 @@ class MetaInfo:
 
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
+        # this is internally transformed into a `Fields` instance
         self.fields = {**getattr(meta, "fields", _empty_dict)}  # type: ignore
-        self.managers = {**getattr(meta, "managers", _empty_dict)}
+        # no transformation, so new dict
+        self.managers = {**getattr(meta, "managers", {})}
         self.multi_related = {*getattr(meta, "multi_related", _empty_set)}
         self.load_dict(kwargs)
 
@@ -583,7 +606,7 @@ class MetaInfo:
             DeprecationWarning,
             stacklevel=2,
         )
-        return cast("dict[str, BaseFieldType]", self.fields)
+        return dict(self.fields)
 
     @property
     def is_multi(self) -> bool:
