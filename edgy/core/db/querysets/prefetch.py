@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Hashable
 from typing import TYPE_CHECKING, Any
 
 from edgy.exceptions import QuerySetError
@@ -54,7 +55,7 @@ class Prefetch:
         self._bake_prefix: str = ""
         # A defaultdict to store the baked results, mapping model keys to lists of
         # related instances.
-        self._baked_results: dict[tuple[str, ...], list[Any]] = defaultdict(list)
+        self._baked_results: dict[tuple[Hashable, ...], list[Any]] = defaultdict(list)
         # Internal flag to indicate if the baking process has been completed.
         self._baked = False
 
