@@ -1476,4 +1476,4 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
             stacklevel=2,
         )
         meta: MetaInfo = cls.meta
-        return cast("dict[str, BaseFieldType]", meta.fields)
+        return dict(meta.fields)
