@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
@@ -394,6 +395,11 @@ class ModelRowMixin:
         Returns:
             tuple: A tuple representing the unique key for the model instance.
         """
+        warnings.warn(
+            "This method is deprecated, use a models `create_model_key` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         pk_key_list: list[Any] = [cls.__name__]
         for attr in cls.pkcolumns:
             # Append the primary key value from the row to the key list.

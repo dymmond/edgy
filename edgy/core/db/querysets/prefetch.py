@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
+from edgy.core.db.querysets.executor import QueryExecutor
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
@@ -80,15 +81,13 @@ class Prefetch:
             return
         self._baked = True
         # Execute the queryset and asynchronously iterate over the results.
-        # The `True` argument for `_execute_iterate` ensures all results are
+        # The `True` argument for `iterate` ensures all results are
         # fetched at once for processing.
-        async for result in self.queryset._execute_iterate(True):
+        async for raw_model, result in QueryExecutor(self.queryset).iterate(True):
             # Create a unique model key from the current SQLAlchemy row using the
             # specified bake prefix. This key links the prefetched item back to
             # its parent model instance.
-            model_key = model_class.create_model_key_from_sqla_row(
-                self.queryset._current_row, row_prefix=self._bake_prefix
-            )
+            model_key = raw_model.create_model_key()
             # Append the prefetched result to the list associated with its model key.
             self._baked_results[model_key].append(result)
 
