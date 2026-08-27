@@ -179,5 +179,5 @@ class PrefetchMixin:
             raise QuerySetError("The prefetch_related must have Prefetch type objects only.")
 
         # Append the new prefetch objects to the queryset's internal list.
-        queryset._prefetch_related = [*self._prefetch_related, *prefetch]
+        queryset._prefetch_related = [*queryset._prefetch_related, *prefetch]
         return queryset
