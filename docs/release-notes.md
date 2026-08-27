@@ -2,9 +2,15 @@
 
 ## 0.36.1
 
+### Changed
+
+- Make Fields, FieldToColumns, FieldToColumnNames and ColumnsRemapping appropiate mappings.
+  You can't do the dirty trick anymore testing for a dict.
+
 ### Fixed
 
 - Fix copying model without a registry and adding it to one when its `meta.registry` equals `None`.
+- Fix CompositeField handling Mapping.
 
 ## 0.36.0
 
