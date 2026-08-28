@@ -429,12 +429,13 @@ class ModelRowMixin:
                 unidirectional fields).
             NotImplementedError: If prefetching from other databases is attempted.
         """
+        # delay until now
+        await related.init_bake()
         model_key: tuple = ()
-        if related._is_finished:
-            # If the prefetch operation is marked as finished (meaning all rows for this
-            # prefetch have been collected), then bake the results. This allows for
-            # efficient retrieval of prefetched data.
-            await related.init_bake(type(model))
+        if related._baked:
+            # If the prefetch operation is marked as baked (meaning all rows for this
+            # prefetch have been collected and bake was successful), then retrieve the model_key
+            # FIXME: better use from_sqla_row
             model_key = model.create_model_key()
 
         # If the model's key exists in the baked results, retrieve and set the prefetched
@@ -442,6 +443,8 @@ class ModelRowMixin:
         if model_key in related._baked_results:
             object.__setattr__(model, related.to_attr, related._baked_results[model_key])
         else:
+            # Check early for potential conflicts with existing attributes on the model.
+            check_prefetch_collision(model, related)
             # If not in baked results, or not finished, proceed with fetching.
             # Crawl the relationship path to get details about the related model and
             # reverse path.
@@ -459,19 +462,14 @@ class ModelRowMixin:
                 )
 
             queryset = related.queryset
-            if related._is_finished:
-                assert queryset is not None, "Queryset is not set but _is_finished flag"
-            else:
-                # Check for potential conflicts with existing attributes on the model.
-                check_prefetch_collision(model, related)
-                if queryset is None:
-                    # If no specific queryset is provided for prefetch, default to all.
-                    queryset = crawl_result.model_class.query.all()
+            if queryset is None:
+                # If no specific queryset is provided for prefetch, default to all.
+                queryset = crawl_result.model_class.query.all()
 
-                # Ensure the reverse path is selected to link back to the main model.
-                queryset = queryset.all()
-                queryset._select_related.add(crawl_result.reverse_path)
-                queryset._cached_select_related_expression = None
+            # Create clone without any cache
+            queryset = queryset.all()
+            # Ensure the reverse path is selected to link back to the main model. Skip verification.
+            queryset._select_related.add(crawl_result.reverse_path)
 
             # Construct the filter clause for the prefetched query using the main model's
             # primary key(s).
