@@ -39,31 +39,37 @@ def test_control_lazyness():
     assert not BaseUser.meta._field_stats_are_initialized
     assert not User.meta._fields_are_initialized
     assert User.meta._field_stats_are_initialized
-    assert "name" not in User.meta.columns_to_field.data
+    assert User.meta.columns_to_field._data is None
     # lazy init
     assert User.meta._fields_are_initialized
     assert not Product.meta._fields_are_initialized
-    assert "rating" not in Product.meta.columns_to_field.data
+    assert Product.meta.columns_to_field._data is None
     # lazy init
     assert Product.meta._fields_are_initialized
 
     # init pk stuff
-    assert "id" not in Product.meta.columns_to_field.data
+    assert User.meta.columns_to_field._data is None
     assert not User.meta.fields["pk"].fieldless_pkcolumns
-    assert "id" in User.meta.columns_to_field.data
+    # thanks to fieldless_pkcolumns we are inited now
+    assert "id" in User.meta.columns_to_field._data
 
     # invalidate
     models.invalidate_models()
     assert User.meta is models.get_model("User").meta
+    # now it is uninitialized again
     assert not User.meta._fields_are_initialized
-    assert "name" not in User.meta.columns_to_field.data
+    assert User.meta.columns_to_field._data is None
     assert not Product.meta._fields_are_initialized
-    assert "rating" not in Product.meta.columns_to_field.data
+    assert Product.meta.columns_to_field._data is None
 
     models.init_models(init_column_mappers=False, init_class_attrs=False)
-    assert "name" not in User.meta.columns_to_field.data
-    assert "rating" not in Product.meta.columns_to_field.data
-    assert "pknames" not in Product.__dict__
+    # still not initialized
+    assert User.meta.columns_to_field._data is None
+    assert Product.meta.columns_to_field._data is None
+    assert "_pkcolumns" not in Product.__dict__
+    assert "_pknames" not in Product.__dict__
     models.init_models()
-    assert "name" in User.meta.columns_to_field.data
-    assert "rating" in Product.meta.columns_to_field.data
+    assert "_pkcolumns" in Product.__dict__
+    assert "_pknames" in Product.__dict__
+    assert "name" in User.meta.columns_to_field._data
+    assert "rating" in Product.meta.columns_to_field._data
