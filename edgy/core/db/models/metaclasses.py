@@ -595,20 +595,6 @@ class MetaInfo:
         return self._needs_special_serialization
 
     @property
-    def fields_mapping(self) -> dict[str, BaseFieldType]:
-        """
-        Returns a mapping of field names to field objects.
-
-        Deprecated: Use `fields` instead.
-        """
-        warnings.warn(
-            "'fields_mapping' has been deprecated, use 'fields' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return dict(self.fields)
-
-    @property
     def is_multi(self) -> bool:
         """
         Checks if the model has multiple relationships.
@@ -1462,18 +1448,3 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         Returns the SQLAlchemy ColumnCollection for the model's table.
         """
         return cast("sqlalchemy.sql.ColumnCollection", cls.table.columns)
-
-    @property
-    def fields(cls) -> dict[str, BaseFieldType]:
-        """
-        Returns a dictionary of field names to BaseFieldType objects for the model.
-
-        Deprecated: Use `meta.fields` instead.
-        """
-        warnings.warn(
-            "'fields' has been deprecated, use 'meta.fields' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        meta: MetaInfo = cls.meta
-        return dict(meta.fields)

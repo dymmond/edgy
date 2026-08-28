@@ -1,12 +1,18 @@
 # Release Notes
 
-## 0.36.1
+## 0.37.0
 
 ### Changed
 
 - Make Fields, FieldToColumns, FieldToColumnNames and ColumnsRemapping appropriate mappings.
   You can't do the dirty trick anymore testing for a dict.
 - Fix contracts; it was always an error to access the data attribute directly (just inherited from UserDict).
+
+### Removed
+
+- Remove long deprecated `fields` and `fields_mapping`.
+
+## 0.36.1
 
 ### Fixed
 

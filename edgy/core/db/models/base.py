@@ -383,20 +383,6 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         )
         return self.meta.signals
 
-    @property
-    def fields(self) -> dict[str, BaseFieldType]:
-        """
-        Deprecated: Use `meta.fields` instead.
-
-        Returns a dictionary of the model's fields.
-        """
-        warnings.warn(
-            "'fields' has been deprecated, use 'meta.fields' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return dict(self.meta.fields)
-
     async def execute_pre_save_hooks(
         self, column_values: dict[str, Any], original: dict[str, Any], is_update: bool
     ) -> dict[str, Any]:
