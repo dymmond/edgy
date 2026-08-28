@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 import inspect
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -54,7 +54,7 @@ class ConcreteCompositeField(BaseCompositeField):
         self,
         *,
         inner_fields: (
-            Sequence[str | tuple[str, BaseFieldType]] | type[BaseModelType] | dict[str, Any]
+            Sequence[str | tuple[str, BaseFieldType]] | type[BaseModelType] | Mapping[str, Any]
         ) = (),
         **kwargs: Any,
     ) -> None:
@@ -80,11 +80,12 @@ class ConcreteCompositeField(BaseCompositeField):
 
         # If inner_fields is a model with a 'meta' attribute, extract its fields.
         if hasattr(inner_fields, "meta"):
-            kwargs.setdefault("model", inner_fields)
-            kwargs.setdefault("inherit", inner_fields.meta.inherit)
-            inner_fields = inner_fields.meta.fields
+            inner_fields_as_model = cast("type[BaseModelType]", inner_fields)
+            kwargs.setdefault("model", inner_fields_as_model)
+            kwargs.setdefault("inherit", inner_fields_as_model.meta.inherit)
+            inner_fields = inner_fields_as_model.meta.fields
         # If inner_fields is a dictionary, convert it to an items view.
-        if isinstance(inner_fields, dict):
+        if isinstance(inner_fields, Mapping):
             inner_fields = inner_fields.items()  # type: ignore
 
         # Extract 'owner' and 'model' from kwargs.
@@ -102,7 +103,7 @@ class ConcreteCompositeField(BaseCompositeField):
         super().__init__(null=True, **kwargs)
 
         # Process each inner field definition.
-        for field in inner_fields:
+        for field in cast("Sequence[str | tuple[str, BaseFieldType]]", inner_fields):
             if isinstance(field, str):
                 # If it's a string, simply add the name to inner_field_names.
                 self.inner_field_names.append(field)
@@ -572,12 +573,14 @@ class CompositeField(FieldFactory):
         """
         inner_fields = kwargs.get("inner_fields")
         if inner_fields is not None:
+            # transform validated inner_fields in ConcreteCompositeField
             # If inner_fields is a model with a 'meta' attribute, extract its fields.
             if hasattr(inner_fields, "meta"):
+                # for checking the model later in the validation
                 kwargs.setdefault("model", inner_fields)
                 inner_fields = inner_fields.meta.fields
-            # If inner_fields is a dictionary, convert it to an items view.
-            if isinstance(inner_fields, dict):
+            # If inner_fields is a Mapping, convert it to an items view.
+            if isinstance(inner_fields, Mapping):
                 inner_fields = inner_fields.items()
             # If it's not a sequence, raise an error.
             elif not isinstance(inner_fields, Sequence):

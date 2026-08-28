@@ -1,3 +1,5 @@
+from typing import cast
+
 import pytest
 
 import edgy
@@ -9,8 +11,56 @@ database = DatabaseTestClient(DATABASE_URL, drop_database=True)
 pytestmark = pytest.mark.anyio
 
 
+@pytest.mark.parametrize(
+    "manual, use_database", [(True, True), (True, "keep"), (True, database), (False, False)]
+)
+@pytest.mark.parametrize("base_registry", [None, False])
+async def test_copy_model_abstract_inherited(base_registry, manual, use_database):
+    models = edgy.Registry(database=database)
+
+    class Target(edgy.StrictModel):
+        class Meta:
+            registry = base_registry
+
+    class BaseProduct(edgy.StrictModel):
+        target = edgy.fields.ForeignKey(Target)
+        attr1 = edgy.fields.CharField(default="*", max_length=100)
+
+        class Meta:
+            registry = base_registry
+            abstract = True
+
+    class Product(BaseProduct):
+        attr2 = edgy.fields.CharField(default="*", max_length=100)
+
+        class Meta:
+            pass
+
+    assert BaseProduct.meta.fields["attr1"].default == "*"
+    assert Product.meta.fields["attr1"].default == "*"
+    assert Product.meta.fields["attr2"].default == "*"
+    Target.copy_edgy_model(models)
+    BaseProduct.add_to_registry(models)
+    with pytest.raises(LookupError):
+        models.get_model("BaseProduct")
+    Product.add_to_registry(models)
+    Target.copy_edgy_model(models, on_conflict="replace")
+    if manual:
+        NewProduct = Product.copy_edgy_model()
+        NewProduct.add_to_registry(models, on_conflict="replace", database=use_database)
+
+    else:
+        Product.copy_edgy_model(registry=models, on_conflict="replace")
+    assert Product is not models.get_model("Product")
+    NewProduct = cast("edgy.Model", models.get_model("Product"))
+    assert NewProduct.meta.fields["attr1"].default == "*"
+    assert NewProduct.meta.fields["attr2"].default == "*"
+    assert NewProduct.model_fields["attr1"].default == "*"
+    assert NewProduct.model_fields["attr2"].default == "*"
+
+
 @pytest.mark.parametrize("unlink_same_registry", [True, False])
-async def test_copy_model_abstract(unlink_same_registry):
+async def test_copy_model_abstract_through(unlink_same_registry):
     models = edgy.Registry(database=database)
     models2 = edgy.Registry(database=database, schema="another")
 
