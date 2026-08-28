@@ -435,8 +435,9 @@ class ModelRowMixin:
         if related._baked:
             # If the prefetch operation is marked as baked (meaning all rows for this
             # prefetch have been collected and bake was successful), then retrieve the model_key
-            # FIXME: better use from_sqla_row
-            model_key = model.create_model_key()
+            assert isinstance(model, cls)
+            # use row directly, because the primary key could have been changed in model
+            model_key = cls.create_model_key_from_sqla_row(row, row_prefix)
 
         # If the model's key exists in the baked results, retrieve and set the prefetched
         # data directly.

@@ -89,9 +89,10 @@ class Prefetch:
         """
         from .executor import QueryExecutor
 
-        # If already baked, not finished, or no queryset, do not proceed.
-        if self._baked or self._baking_model is None or self.queryset is None:
+        # If already baked or without baking model do not proceed.
+        if self._baked or self._baking_model is None:
             return
+        assert self.queryset is not None
         self._baked = True
         # Execute the queryset and asynchronously iterate over the results.
         # The `True` argument for `_execute_iterate` ensures all results are
