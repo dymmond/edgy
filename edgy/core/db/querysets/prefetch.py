@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Hashable
-from typing import TYPE_CHECKING, Any
+from inspect import isclass
+from typing import TYPE_CHECKING, Any, cast
 
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
-    from edgy import Model, QuerySet
+    from edgy import QuerySet
     from edgy.core.db.models.types import BaseModelType
 
 
@@ -49,8 +50,7 @@ class Prefetch:
         self.related_name = related_name
         self.to_attr = to_attr
         self.queryset: QuerySet | None = queryset
-        # Internal flag to indicate if the prefetching process has finished.
-        self._is_finished = False
+        self._baking_model: type[BaseModelType] | None = None
         # Internal prefix used during the baking process for creating model keys.
         self._bake_prefix: str = ""
         # A defaultdict to store the baked results, mapping model keys to lists of
@@ -59,7 +59,23 @@ class Prefetch:
         # Internal flag to indicate if the baking process has been completed.
         self._baked = False
 
-    async def init_bake(self, model_class: type[Model]) -> None:
+    def create_checked_clone(self, model_class: type[BaseModelType]) -> Prefetch:
+        """
+        Check for collisions and prepare clone with assigned baking model.
+
+        Args:
+            model_class: Model class used for baking to.
+        """
+        check_prefetch_collision(model_class, self)
+        new_prefetch = Prefetch(
+            related_name=self.related_name,
+            to_attr=self.to_attr,
+            queryset=None,
+        )
+        self._baking_model = model_class
+        return new_prefetch
+
+    async def init_bake(self) -> None:
         """
         Initializes the baking process for prefetching related objects.
 
@@ -69,32 +85,32 @@ class Prefetch:
         from the queryset, creates a unique `model_key` for each related
         instance based on the `model_class` and `_bake_prefix`, and then
         appends the result to the corresponding list in `_baked_results`.
-        This effectively groups related objects by their parent model's key.
-
-        Args:
-            model_class (type[Model]): The main model class to which the prefetched
-                                        results will eventually be attached. This
-                                        is used to create the model keys for grouping.
+        This effectively groups related objects by their parent model's key
         """
+        from .executor import QueryExecutor
+
         # If already baked, not finished, or no queryset, do not proceed.
-        if self._baked or not self._is_finished or self.queryset is None:
+        if self._baked or self._baking_model is None or self.queryset is None:
             return
         self._baked = True
         # Execute the queryset and asynchronously iterate over the results.
         # The `True` argument for `_execute_iterate` ensures all results are
         # fetched at once for processing.
-        async for result in self.queryset._execute_iterate(True):
+        executor = QueryExecutor(self.queryset)
+        async for result in executor.iterate(True):
             # Create a unique model key from the current SQLAlchemy row using the
             # specified bake prefix. This key links the prefetched item back to
             # its parent model instance.
-            model_key = model_class.create_model_key_from_sqla_row(
-                self.queryset._current_row, row_prefix=self._bake_prefix
+            model_key = self._baking_model.create_model_key_from_sqla_row(
+                executor._current_row, row_prefix=self._bake_prefix
             )
             # Append the prefetched result to the list associated with its model key.
             self._baked_results[model_key].append(result)
 
 
-def check_prefetch_collision(model: BaseModelType, related: Prefetch) -> Prefetch:
+def check_prefetch_collision(
+    model: type[BaseModelType] | BaseModelType, related: Prefetch
+) -> Prefetch:
     """
     Checks for potential attribute name collisions when prefetching.
 
@@ -104,7 +120,7 @@ def check_prefetch_collision(model: BaseModelType, related: Prefetch) -> Prefetc
     unexpected behavior or overwriting of crucial model components.
 
     Args:
-        model (BaseModelType): The model class instance to which the prefetched
+        model (type[BaseModelType] | BaseModelType): The model class to which the prefetched
                                results will be attached. This is the "parent"
                                model in the prefetch relationship.
         related (Prefetch): The `Prefetch` object containing the `to_attr`
@@ -126,9 +142,11 @@ def check_prefetch_collision(model: BaseModelType, related: Prefetch) -> Prefetc
         or related.to_attr in model.meta.fields
         or related.to_attr in model.meta.managers
     ):
+        if not isclass(model):
+            model = cast("type[BaseModelType]", type(model))
         raise QuerySetError(
             f"Conflicting attribute to_attr='{related.related_name}' with "
-            f"'{related.to_attr}' in {model.__class__.__name__}"
+            f"'{related.to_attr}' in {model.__name__}"
         )
     return related
 
