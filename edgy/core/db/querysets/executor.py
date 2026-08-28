@@ -11,7 +11,6 @@ from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.querysets.clauses import and_, or_
 from edgy.core.db.querysets.parser import ResultParser
-from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.db import check_db_connection, hash_tablekey
 from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError, SkipOperation
@@ -20,6 +19,7 @@ from .types import EdgyEmbedTarget, EdgyModel
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.base import BaseQuerySet
+    from edgy.core.db.querysets.prefetch import Prefetch
     from edgy.core.db.querysets.queryset import QuerySet
 
     from .types import tables_and_models_type
@@ -260,6 +260,8 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
             NotImplementedError: If a prefetch crosses database boundaries.
             QuerySetError: If a prefetch path is invalid (e.g., unidirectional).
         """
+        from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
+
         prepared_prefetches: list[Prefetch] = []
         qs = self.queryset
 

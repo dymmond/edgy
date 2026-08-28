@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
-from edgy.core.db.querysets.executor import QueryExecutor
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
@@ -76,6 +75,8 @@ class Prefetch:
                                         results will eventually be attached. This
                                         is used to create the model keys for grouping.
         """
+        from edgy.core.db.querysets.executor import QueryExecutor
+
         # If already baked, not finished, or no queryset, do not proceed.
         if self._baked or not self._is_finished or self.queryset is None:
             return
