@@ -605,7 +605,9 @@ class DatabaseMixin:
                 on_conflict=on_conflict,
                 database=(
                     "keep"
-                    if cls.meta.registry is False or cls.database is not cls.meta.registry.database
+                    if cls.meta.registry is False
+                    or cls.meta.registry is None
+                    or cls.database is not cls.meta.registry.database
                     else True
                 ),
             )
