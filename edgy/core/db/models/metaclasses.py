@@ -374,7 +374,7 @@ class ColumnsRemapping(Mapping[str, str]):
         assert self._data is not None
         return self._data.__getitem__(key)
 
-    def __iter__(self) -> Any:
+    def __iter__(self) -> Iterator[str]:
         """
         Ensures initialization and returns an iterator over the names.
         """
@@ -382,7 +382,7 @@ class ColumnsRemapping(Mapping[str, str]):
         assert self._data is not None
         return self._data.__iter__()
 
-    def __len__(self) -> Any:
+    def __len__(self) -> int:
         """
         Ensures initialization and returns length.
         """
