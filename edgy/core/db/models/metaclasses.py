@@ -57,7 +57,7 @@ class Fields(MutableMapping[str, BaseFieldType]):
             data: An optional dictionary of initial field data.
         """
         self.meta = meta
-        self._data = data or {}
+        self._data = {} if data is None else dict(data)
 
     def add_field_to_meta(self, name: str, field: BaseFieldType) -> None:
         """

@@ -72,7 +72,7 @@ class Prefetch:
             to_attr=self.to_attr,
             queryset=None,
         )
-        self._baking_model = model_class
+        new_prefetch._baking_model = model_class
         return new_prefetch
 
     async def init_bake(self) -> None:
