@@ -469,6 +469,7 @@ class ModelRowMixin:
 
             # Create clone without any cache
             queryset = queryset.all()
+            queryset._cached_select_related_expression = None
             # Ensure the reverse path is selected to link back to the main model. Skip verification.
             queryset._select_related.add(crawl_result.reverse_path)
 
