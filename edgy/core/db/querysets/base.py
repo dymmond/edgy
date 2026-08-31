@@ -170,7 +170,9 @@ class BaseQuerySet(
 
     def _clone(self) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
-        This is core to the builder pattern
+        This is core to the builder pattern.
+
+        Note: the _cached_select_related_expression is transferred.
         """
         queryset = self.__class__(
             self.model_class,
