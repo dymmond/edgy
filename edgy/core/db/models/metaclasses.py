@@ -211,7 +211,7 @@ class FieldToColumns(Mapping[str, Sequence[sqlalchemy.Column]]):
 
 class FieldToColumnNames(Mapping[str, frozenset[str]]):
     """
-    Manages the mapping from field names to their corresponding SQLAlchemy column key names.
+    Manages the mapping from field names to their corresponding SQLAlchemy column keys.
     """
 
     meta: MetaInfo
@@ -228,13 +228,13 @@ class FieldToColumnNames(Mapping[str, frozenset[str]]):
 
     def __getitem__(self, key: str) -> frozenset[str]:
         """
-        Retrieves the SQLAlchemy columns for a given field name.
+        Retrieves the SQLAlchemy column keys for a given field name.
 
         Args:
             name: The name of the field.
 
         Returns:
-            A sequence of SQLAlchemy Column objects.
+            A frozenset of SQLAlchemy Column keys.
         """
         if key in self._data:
             return self._data[key]
@@ -308,7 +308,7 @@ class ColumnsToField(Mapping[str, str]):
         assert self._data is not None
         return self._data.__getitem__(key)
 
-    def __iter__(self) -> Any:
+    def __iter__(self) -> Iterator[str]:
         """
         Ensures initialization and returns an iterator over the keys.
         """
@@ -316,7 +316,7 @@ class ColumnsToField(Mapping[str, str]):
         assert self._data is not None
         return self._data.__iter__()
 
-    def __len__(self) -> Any:
+    def __len__(self) -> int:
         """
         Ensures initialization and returns length.
         """
