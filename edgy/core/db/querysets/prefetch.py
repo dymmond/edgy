@@ -98,7 +98,7 @@ class Prefetch:
         # The `True` argument for `_execute_iterate` ensures all results are
         # fetched at once for processing.
         executor = QueryExecutor(self.queryset)
-        async for result in executor.iterate(True):
+        async for _, result in executor.iterate(True):
             # Create a unique model key from the current SQLAlchemy row using the
             # specified bake prefix. This key links the prefetched item back to
             # its parent model instance.
