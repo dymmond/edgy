@@ -81,7 +81,7 @@ testing = [
     "pytest-timeout",
     "pytest-mock",
     "ipdb",
-    "httpx",
+    "httpx2",
     "uvicorn",
     "mypy[faster-cache]>=1.16,<2.0",
     "ordered-set",
