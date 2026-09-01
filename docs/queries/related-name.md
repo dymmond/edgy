@@ -155,7 +155,7 @@ This setup is sufficient to illustrate deep nested queries.
 
 ```python
 team = await acme.teams_set.filter(
-        members__email=monica.email, members__users__name=user.name
+    members__email=monica.email, members__users__name=user.name
 ).get()
 
 # <Team: Team(id=4)>

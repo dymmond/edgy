@@ -1,4 +1,4 @@
-import httpx
+import httpx2
 
 data = {
     "name": "Edgy",
@@ -10,4 +10,4 @@ data = {
 # Make the API call to create the user with some posts
 # This will also create the posts and associate them with the user
 # All the posts will be in uppercase as per `field_validator` in the ModelRef.
-response = httpx.post("/create", json=data)
+response = httpx2.post("/create", json=data)

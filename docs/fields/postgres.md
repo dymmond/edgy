@@ -17,6 +17,7 @@ from typing import List
 import sqlalchemy
 import edgy
 
+
 class MyModel(edgy.Model):
     data: List[str] = edgy.fields.PGArrayField(sqlalchemy.String(), default=list)
     ...

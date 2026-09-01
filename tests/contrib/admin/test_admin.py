@@ -3,7 +3,7 @@ from base64 import urlsafe_b64decode
 from collections.abc import AsyncGenerator
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from lilya.apps import Lilya
 from lilya.middleware import DefineMiddleware
 from lilya.middleware.sessions import SessionMiddleware

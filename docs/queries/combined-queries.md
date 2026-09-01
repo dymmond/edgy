@@ -33,6 +33,7 @@ You can continue chaining methods such as:
 ```python
 import edgy
 
+
 class Customer(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
     country = edgy.CharField(max_length=2)
@@ -144,11 +145,7 @@ qs = (
 Outer modifiers apply to the entire combined result:
 
 ```python
-top_customers = (
-    swiss.union(german)
-    .order_by("-id")
-    .limit(10)
-)
+top_customers = swiss.union(german).order_by("-id").limit(10)
 ```
 
 ### Deferred Fields and `only()`

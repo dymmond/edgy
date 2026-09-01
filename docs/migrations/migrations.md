@@ -570,8 +570,7 @@ For different default databases, add the database to extra and prevent execution
 **Example:**
 
 ```python
-def downgrade():
-    ...
+def downgrade(): ...
 ```
 
 Becomes:

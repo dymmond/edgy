@@ -46,8 +46,8 @@ You can have multiple foreign keys referencing the same model.
 profile = await Profile.query.get(id=1)
 
 # We have a profile instance, but it only has the primary key populated
-print(profile.user)       # User(id=1) [sparse]
-print(profile.user.pk)    # 1
+print(profile.user)  # User(id=1) [sparse]
+print(profile.user.pk)  # 1
 print(profile.user.email)  # Raises AttributeError
 ```
 
@@ -60,8 +60,8 @@ profile = await Profile.query.get(id=1)
 await profile.load_recursive()
 
 # We have a profile instance and all foreign key relations populated
-print(profile.user)       # User(id=1)
-print(profile.user.pk)    # 1
+print(profile.user)  # User(id=1)
+print(profile.user.pk)  # 1
 print(profile.user.email)  # foo@bar.com
 ```
 
@@ -70,7 +70,7 @@ print(profile.user.email)  # foo@bar.com
 ```python
 profile = await Profile.query.get(user__id=1)
 
-await profile.user.load() # loads the foreign key
+await profile.user.load()  # loads the foreign key
 ```
 
 ### Load an Instance with the Foreign Key Relationship Populated Using `select_related`
@@ -78,8 +78,8 @@ await profile.user.load() # loads the foreign key
 ```python
 profile = await Profile.query.select_related("user").get(id=1)
 
-print(profile.user)       # User(id=1)
-print(profile.user.pk)    # 1
+print(profile.user)  # User(id=1)
+print(profile.user.pk)  # 1
 print(profile.user.email)  # foo@bar.com
 ```
 
@@ -104,8 +104,8 @@ await Profile.query.create(user=user)
 ```python
 profile = await Profile.query.get(user__email="foo@bar.com")
 
-print(profile.user.email) # "foo@bar.com"
-print(profile.user.first_name) # "Foo"
+print(profile.user.email)  # "foo@bar.com"
+print(profile.user.first_name)  # "Foo"
 ```
 
 ## ForeignKey Constraints

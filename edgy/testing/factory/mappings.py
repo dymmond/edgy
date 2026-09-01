@@ -283,13 +283,15 @@ DEFAULT_MAPPING: dict[str, FactoryCallback | None] = {
             # TODO: find better definition
             "gt": (
                 "min",
-                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name)
-                - 0.0000000001,
+                lambda edgy_field, attr_name, context: (
+                    getattr(edgy_field, attr_name) - 0.0000000001
+                ),
             ),
             "lt": (
                 "max",
-                lambda edgy_field, attr_name, context: getattr(edgy_field, attr_name)
-                + 0.0000000001,
+                lambda edgy_field, attr_name, context: (
+                    getattr(edgy_field, attr_name) + 0.0000000001
+                ),
             ),
         },
     ),

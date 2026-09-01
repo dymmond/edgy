@@ -3,7 +3,7 @@ from typing import Any
 
 import pytest
 from anyio import from_thread, sleep, to_thread
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from pydantic import BaseModel
 from ravyn import Gateway, Ravyn, post
 
