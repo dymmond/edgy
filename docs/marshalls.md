@@ -83,7 +83,7 @@ The `fields` list also supports the use of `__all__`, which includes all fields 
 
 ```python
 class CustomMarshall(Marshall):
-    marshall_config: ConfigMarshall = ConfigMarshall(model=User, fields=['__all__'])
+    marshall_config: ConfigMarshall = ConfigMarshall(model=User, fields=["__all__"])
 ```
 
 ## Fields
@@ -105,7 +105,9 @@ All fields have a **mandatory** attribute `field_type`, which specifies the Pyth
 
 ```python
 class CustomMarshall(Marshall):
-    marshall_config: ConfigMarshall = ConfigMarshall(model="myapp.models.MyModel", fields=['__all__'])
+    marshall_config: ConfigMarshall = ConfigMarshall(
+        model="myapp.models.MyModel", fields=["__all__"]
+    )
     details: fields.MarshallMethodField = fields.MarshallMethodField(field_type=Dict[str, Any])
     age: fields.MarshallField = fields.MarshallField(int, source="age")
 ```
@@ -153,8 +155,13 @@ In some cases, you might need to provide extra context to a marshall. You can do
 
 ```python
 class UserMarshall(Marshall):
-    marshall_config: ConfigMarshall = ConfigMarshall(model=User, fields=["name", "email"],)
-    additional_context: fields.MarshallMethodField = fields.MarshallMethodField(field_type=dict[str, Any])
+    marshall_config: ConfigMarshall = ConfigMarshall(
+        model=User,
+        fields=["name", "email"],
+    )
+    additional_context: fields.MarshallMethodField = fields.MarshallMethodField(
+        field_type=dict[str, Any]
+    )
 
     def get_additional_context(self, instance: edgy.Model) -> dict[str, Any]:
         return self.context
@@ -194,14 +201,17 @@ class User(edgy.Model):
     class Meta:
         registry = models
 
+
 class EmailUpdateMarshall(Marshall):
     marshall_config = ConfigMarshall(model=User, fields=["email"])
+
 
 @post("/update_email/{id}")
 async def update_email(id: int, data: EmailUpdateMarshall) -> EmailUpdateMarshall:
     data.instance = await User.query.get(id=id)
     await data.save()
     return data
+
 
 ## the following would crash when saving or accessing instance, because "name" is required
 
@@ -232,7 +242,7 @@ data = {
     "name": "Edgy",
     "email": "edgy@example.com",
     "language": "EN",
-    "description": "Nice marshall"
+    "description": "Nice marshall",
 }
 marshall = UserMarshall(**data)
 await marshall.save()

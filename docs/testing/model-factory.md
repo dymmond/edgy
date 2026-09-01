@@ -103,8 +103,7 @@ Specify a different database or schema using class or instance variables (`__usi
 
 ```python
 # class variables
-class UserFactory(ModelFactory, database=database, __using_schema__="other"):
-    ...
+class UserFactory(ModelFactory, database=database, __using_schema__="other"): ...
 ```
 
 Or on the build method:
@@ -252,7 +251,7 @@ class ProductFactory(ModelFactory):
     name = "Product 1"
     rating = 5
     in_stock = True
-    user = SubFactory("tests.factories.UserFactory") # String import
+    user = SubFactory("tests.factories.UserFactory")  # String import
 ```
 
 Did you see? With this SubFactory object, we can simply apply factories as a `string` with the location of the factory
@@ -274,7 +273,7 @@ class ProductFactory(ModelFactory):
     name = "Product 1"
     rating = 5
     in_stock = True
-    user = SubFactory(UserFactory) # Object import
+    user = SubFactory(UserFactory)  # Object import
     user.parameters["randomly_nullify"] = True
 
 

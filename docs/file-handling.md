@@ -79,6 +79,7 @@ Example:
 ``` python
 from uuid import uuid4
 
+
 def generate_name_fn(instance, name, direct):
     return f"documents/{uuid4()}/{name}"
 ```
@@ -88,6 +89,7 @@ for implementing an overwrite logic, so no new filename is generated, when passi
 
 ``` python
 from uuid import uuid4
+
 
 def generate_name_fn(instance, name, direct):
     if direct:
@@ -128,6 +130,7 @@ The definition is:
 
 ``` python
 from pydantic import Base64Bytes, BaseModel, ConfigDict
+
 
 class FileStruct(BaseModel):
     model_config = ConfigDict(extra="forbid")

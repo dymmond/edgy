@@ -230,9 +230,7 @@ required `select_related` information.
 
 ```python
 expr = (
-    Q(name__icontains="adam") |
-    Q(email__icontains="adam") |
-    Q(language__icontains="adam")
+    Q(name__icontains="adam") | Q(email__icontains="adam") | Q(language__icontains="adam")
 ) & ~Q(status="banned")
 
 results = await User.query.filter(expr)

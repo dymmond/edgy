@@ -1,7 +1,7 @@
 from collections.abc import AsyncGenerator
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from ravyn import Ravyn, post
 
 import edgy

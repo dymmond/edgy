@@ -48,13 +48,13 @@ If you prefer not to use a shared field for key-value operations, you can separa
 ### Searching for a Key
 
 ```python
-registry.content_type.query.filter(tags__tag__startswith='key=')
+registry.content_type.query.filter(tags__tag__startswith="key=")
 ```
 
 ### Searching for a Key with a Value Prefix
 
 ```python
-registry.content_type.query.filter(tags__tag__startswith='key=value_start')
+registry.content_type.query.filter(tags__tag__startswith="key=value_start")
 ```
 
 ## References

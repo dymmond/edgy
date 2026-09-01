@@ -69,7 +69,7 @@ As mentioned, you can combine operations with `exclude_secrets`.
 
 ```python
 users = await User.query.filter(id=1).exclude_secrets()
-users = await User.query.filter(id=1).exclude_secrets().get() # returns only 1 object
+users = await User.query.filter(id=1).exclude_secrets().get()  # returns only 1 object
 users = await User.query.exclude_secrets().only("email")
 ```
 

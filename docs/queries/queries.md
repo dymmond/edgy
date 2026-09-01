@@ -97,9 +97,9 @@ Let us see an example:
 ```python
 # Using the 'main' schema
 
-User.query.using(schema='main').all()
-User.query.using(schema='main').filter(email__icontains="user@example.com")
-User.query.using(schema='main').get(pk=1)
+User.query.using(schema="main").all()
+User.query.using(schema="main").filter(email__icontains="user@example.com")
+User.query.using(schema="main").get(pk=1)
 ```
 
 **Using the with_schema**
@@ -107,7 +107,6 @@ User.query.using(schema='main').get(pk=1)
 ```python
 # Using the 'main' schema
 with with_schema("main"):
-
     # Query the 'User' from the 'main' schema
     User.query.all()
     User.query.filter(email__icontains="user@example.com")
@@ -356,13 +355,9 @@ This is often preferable when you want some condition to always apply (e.g. `act
 You can also pass the additional filters as plain kwargs if you don't need dicts:
 
 ```python
-user_query = (
-    User.query
-    .and_(active=True)
-    .or_(
-        email__icontains="outlook",
-        email__icontains="gmail",
-    )
+user_query = User.query.and_(active=True).or_(
+    email__icontains="outlook",
+    email__icontains="gmail",
 )
 # Still: active = TRUE AND (email ILIKE '%outlook%' OR email ILIKE '%gmail%')
 users = await user_query
@@ -422,13 +417,9 @@ and only "OR" inside a smaller group of conditions.
 
 ```python
 # Active users whose email is either Outlook or Gmail
-users = await (
-    User.query
-    .filter(active=True)
-    .local_or(
-        email__icontains="outlook",
-        email__icontains="gmail",
-    )
+users = await User.query.filter(active=True).local_or(
+    email__icontains="outlook",
+    email__icontains="gmail",
 )
 # SQL‑like: WHERE active = TRUE AND (email ILIKE '%outlook%' OR email ILIKE '%gmail%')
 ```
@@ -439,10 +430,8 @@ You can also pass multiple keyword-based filters as dictionaries, similar to `or
 semantics stay local:
 
 ```python
-query = (
-    User.query
-    .filter(country="CH")
-    .local_or({"email__icontains": "outlook"}, {"email__icontains": "gmail"})
+query = User.query.filter(country="CH").local_or(
+    {"email__icontains": "outlook"}, {"email__icontains": "gmail"}
 )
 users = await query
 # SQL‑like: WHERE country = 'CH' AND (email ILIKE '%outlook%' OR email ILIKE '%gmail%')
@@ -999,12 +988,7 @@ select_for_update(
 
 ```python
 async with database.transaction():
-    order = await (
-        Order.query
-        .filter(id=order_id)
-        .select_for_update()
-        .get()
-    )
+    order = await Order.query.filter(id=order_id).select_for_update().get()
     order.status = "processing"
     await order.save()
 ```
@@ -1016,12 +1000,7 @@ Immediate failure if the row is locked by another transaction.
 ```python
 maybe = None
 async with database.transaction():
-    maybe = await (
-        Order.query
-        .filter(id=order_id)
-        .select_for_update(nowait=True)
-        .get_or_none()
-    )
+    maybe = await Order.query.filter(id=order_id).select_for_update(nowait=True).get_or_none()
 
 if not maybe:
     # Someone else holds the lock; choose another strategy (retry, queue, etc.)
@@ -1039,9 +1018,8 @@ BATCH = 10
 
 async with database.transaction():
     jobs = await (
-        Job.query
-        .filter(status="pending")
-        .order_by("created_at")                # Recommended for fairness/stability
+        Job.query.filter(status="pending")
+        .order_by("created_at")  # Recommended for fairness/stability
         .select_for_update(skip_locked=True)
         .limit(BATCH)
     )
@@ -1077,8 +1055,7 @@ When a query touches multiple tables (via select_related), you can restrict whic
 ```python
 async with database.transaction():
     items = await (
-        LineItem.query
-        .select_related("order")      # bring order into the SELECT/JOIN
+        LineItem.query.select_related("order")  # bring order into the SELECT/JOIN
         .select_for_update(of=[LineItem])
         .all()
     )
@@ -1098,8 +1075,8 @@ q2 = Order.query.select_for_update().filter(id=order_id)
 ##### Clones preserve the lock mode:
 
 ```python
-q3 = q1.all()            # clone keeps FOR UPDATE
-q4 = q1.all(True)        # clear cache, same object; lock mode is preserved
+q3 = q1.all()  # clone keeps FOR UPDATE
+q4 = q1.all(True)  # clear cache, same object; lock mode is preserved
 ```
 
 only()/defer() affect selected columns but not the lock behavior.
@@ -1156,11 +1133,7 @@ async with database.transaction():
 # skip locked batch
 async with database.transaction():
     users = await (
-        User.query
-        .filter(active=True)
-        .order_by("id")
-        .select_for_update(skip_locked=True)
-        .limit(50)
+        User.query.filter(active=True).order_by("id").select_for_update(skip_locked=True).limit(50)
     )
 ```
 
@@ -1190,9 +1163,9 @@ a new one in case of not existing.
 Returns a tuple of `instance` and boolean `created`.
 
 ```python
-user, created = await User.query.get_or_create(email="foo@bar.com", defaults={
-    "is_active": False, "first_name": "Foo"
-})
+user, created = await User.query.get_or_create(
+    email="foo@bar.com", defaults={"is_active": False, "first_name": "Foo"}
+)
 ```
 
 This will query the `User` model with the `email` as the lookup key. If it doesn't exist, then it
@@ -1212,9 +1185,9 @@ a new one in case of not existing.
 Returns a tuple of `instance` and boolean `created`.
 
 ```python
-user, created = await User.query.update_or_create(email="foo@bar.com", defaults={
-    "is_active": False, "first_name": "Foo"
-})
+user, created = await User.query.update_or_create(
+    email="foo@bar.com", defaults={"is_active": False, "first_name": "Foo"}
+)
 ```
 
 This will query the `User` model with the `email` as the lookup key. If it doesn't exist, then it

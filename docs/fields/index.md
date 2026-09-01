@@ -91,7 +91,6 @@ class MyModel(edgy.Model):
     big_number: int = edgy.BigIntegerField(default=0)
     another_big_number: int = edgy.BigIntegerField(gte=10)
     ...
-
 ```
 
 This field is used as a default field for the `id` of a model.
@@ -176,7 +175,6 @@ class MyModel(edgy.Model):
     description: str = edgy.CharField(max_length=255)
     title: str = edgy.CharField(max_length=50, min_length=200)
     ...
-
 ```
 
 ##### Parameters:
@@ -191,6 +189,7 @@ An ChoiceField which uses the native SQLAlchemy Enum type. It has some problems 
 ```python
 from enum import Enum
 import edgy
+
 
 class Status(Enum):
     ACTIVE = "active"
@@ -218,6 +217,7 @@ An emulated ChoiceField. It has better database support but maybe adjustments in
 ```python
 from enum import Enum
 import edgy
+
 
 class Status(Enum):
     ACTIVE = "active"
@@ -259,11 +259,13 @@ class MyModel(edgy.Model):
     composite: edgy.CompositeField = edgy.CompositeField(inner_fields=["email", "sent"])
     ...
 
+
 class MyModel(edgy.Model):
     email: str = edgy.EmailField(max_length=60, null=True, read_only=True)
     sent: datetime.datetime = edgy.DateTimeField(null=True, read_only=True)
     composite = edgy.CompositeField(inner_fields=["email", "sent"])
     ...
+
 
 obj = MyModel()
 obj.composite = {"email": "foobar@example.com", "sent": datetime.datetime.now()}
@@ -319,13 +321,17 @@ It is used in the contrib permissions feature.
 ```python
 import edgy
 
+
 class BasePermission(edgy.Model):
     name: str = edgy.fields.CharField(max_length=100, null=False)
     description: Optional[str] = edgy.fields.ComputedField(
         getter="get_description",  # uses the getter classmethod/staticmethod of the class/subclass
         setter="set_description",  # uses the setter classmethod/staticmethod of the class/subclass
-        fallback_getter=lambda field, instance, owner: instance.name,  # fallback to return the name
+        fallback_getter=lambda field, instance, owner: (
+            instance.name
+        ),  # fallback to return the name
     )
+
     @classmethod
     def get_description(cls, field, instance, owner=None) -> str:
         return instance.name
@@ -349,13 +355,15 @@ Secret ComputedFields need some adjustments
 ```python
 import edgy
 
+
 class BasePermission(edgy.Model):
     name: str = edgy.fields.CharField(max_length=100, null=False)
     description: Optional[str] = edgy.fields.ComputedField(
         getter="get_description",  # uses the getter classmethod/staticmethod of the class/subclass
         secret=True,
-        exclude=False
+        exclude=False,
     )
+
     @classmethod
     def get_description(cls, field, instance, owner=None) -> str:
         # fields get added here when secrets are excluded. We can leverage this in
@@ -375,7 +383,6 @@ import edgy
 class MyModel(edgy.Model):
     created_at: datetime.date = edgy.DateField(default=datetime.date.today)
     ...
-
 ```
 
 !!! Note
@@ -411,7 +418,6 @@ import edgy
 class MyModel(edgy.Model):
     created_at: datetime.datetime = edgy.DateTimeField(default=datetime.datetime.now)
     ...
-
 ```
 
 DateTimeField supports int, float, string (isoformat), date object and of course datetime as input. They are automatically converted to datetime.
@@ -441,6 +447,7 @@ For example the time worked on a project.
 import datetime
 import edgy
 
+
 class Project(edgy.Model):
     worked: datetime.timedelta = edgy.DurationField(default=datetime.timedelta())
     estimated_time: datetime.timedelta = edgy.DurationField()
@@ -452,6 +459,7 @@ class Project(edgy.Model):
 ```python
 import decimal
 import edgy
+
 
 class MyModel(edgy.Model):
     price: decimal.Decimal = edgy.DecimalField(max_digits=5, decimal_places=2, null=True)
@@ -522,8 +530,10 @@ class AbstractModel(edgy.Model):
     class Meta:
         abstract = True
 
+
 class ConcreteModel(AbstractModel):
     email: Type[None] = edgy.ExcludeField()
+
 
 # works
 obj = ConcreteModel(email="foo@example.com", price=1.5)
@@ -577,7 +587,6 @@ class MyModel(edgy.Model):
     user: User = edgy.ForeignKey("User", on_delete=edgy.CASCADE)
     profile: Profile = edgy.ForeignKey(Profile, on_delete=edgy.CASCADE, related_name="my_models")
     ...
-
 ```
 
 Hint you can change the base for the reverse end with embed_parent:
@@ -603,8 +612,10 @@ You can also use a function as `to`. This is particular useful for libraries whe
 ```python
 import edgy
 
+
 class LibraryModel(edgy.Model):
     user: User = edgy.ForeignKey(lambda: edgy.settings.default_user, on_delete=edgy.CASCADE)
+
     class Meta:
         abstract = True
 ```
@@ -691,7 +702,6 @@ class Organisation(edgy.Model):
 class MyModel(edgy.Model):
     users: List[User] = edgy.ManyToMany(User)
     organisations: List[Organisation] = edgy.ManyToMany("Organisation")
-
 ```
 
 !!! Tip
@@ -703,6 +713,7 @@ You can also use a function as `to` like with `ForeignKey`. This is particular u
 
 ```python
 import edgy
+
 
 class LibraryModel(edgy.Model):
     users: list[User] = edgy.ManyToMany(lambda: edgy.settings.default_user)
@@ -790,7 +801,6 @@ import edgy
 class MyModel(edgy.Model):
     ip_address: str = edgy.IPAddressField()
     ...
-
 ```
 
 Derives from the same as [CharField](#charfield) and validates the value of an IP. It currently
@@ -840,7 +850,6 @@ import edgy
 class MyModel(edgy.Model):
     data: bytes = edgy.BinaryField()
     ...
-
 ```
 
 !!! Note
@@ -878,7 +887,6 @@ import edgy
 class MyModel(edgy.Model):
     data: str = edgy.TextField(null=True)
     ...
-
 ```
 
 Similar to [CharField](#charfield) but has no `max_length` restrictions.
@@ -928,7 +936,6 @@ def get_time():
 class MyModel(edgy.Model):
     time: datetime.time = edgy.TimeField(default=get_time)
     ...
-
 ```
 
 ##### Parameters
@@ -957,6 +964,7 @@ Derives from the same as [CharField](#charfield) and validates the value of an U
 ```python
 from uuid import UUID
 import edgy
+
 
 class MyModel(edgy.Model):
     uuid: UUID = fields.UUIDField()
@@ -988,12 +996,12 @@ class MyModel(edgy.Model):
     rev: int = edgy.SmallIntegerField(default=0, increment_on_save=1)
     ...
 
+
 async def main():
     obj = await MyModel.query.create()
     # obj.rev == 0
     await obj.save()
     # obj.rev == 1
-
 ```
 
 What happens here? On every save the counter is in database increased. When accessing the attribute it is automatically loaded.
@@ -1009,10 +1017,12 @@ Hint: it has a very special handling.
 ```python
 import edgy
 
+
 class MyModel(edgy.Model):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     rev: int = edgy.SmallIntegerField(default=0, increment_on_save=1, primary_key=True)
     ...
+
 
 async def main():
     obj = await MyModel.query.create()
@@ -1032,12 +1042,16 @@ Sometimes you want to be able to modify old revisions. There is a second revisio
 ```python
 import edgy
 
+
 class MyModel(edgy.Model):
     id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
     document = edgy.fields.FileField(null=True)
-    rev: int = edgy.SmallIntegerField(default=0, increment_on_save=1, primary_key=True, read_only=False)
+    rev: int = edgy.SmallIntegerField(
+        default=0, increment_on_save=1, primary_key=True, read_only=False
+    )
     name = edgy.CharField(max_length=50)
     ...
+
 
 async def main():
     obj = await MyModel.query.create(name="foo")
@@ -1062,6 +1076,7 @@ import edgy
 class MyModel(edgy.Model):
     counter: int = edgy.IntegerField(increment_on_save=-1)
     ...
+
 
 async def main():
     # we have no default here

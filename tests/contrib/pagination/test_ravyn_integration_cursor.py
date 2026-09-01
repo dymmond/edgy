@@ -2,7 +2,7 @@ from collections.abc import AsyncGenerator
 from typing import Optional
 
 import pytest
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from pydantic import BaseModel
 from ravyn import Gateway, Ravyn, get, post
 

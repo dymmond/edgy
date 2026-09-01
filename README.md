@@ -301,7 +301,6 @@ app = Ravyn(
     on_startup=[database.connect],
     on_shutdown=[database.disconnect],
 )
-
 ```
 
 The response of the API `/create` should have a format similar to this (assuming the post with the following payload as well):

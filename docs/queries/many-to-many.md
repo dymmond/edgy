@@ -27,6 +27,7 @@ a parameter for the `to`.
 class Profile(edgy.Model):
     users: List[User] = edgy.ManyToMany(User)
 
+
 # Using a string
 class Profile(edgy.Model):
     users: List[User] = edgy.ManyToMany("User")

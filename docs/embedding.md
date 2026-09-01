@@ -12,6 +12,7 @@ Fields with `inherit=False` are excluded from the embedding process. This preven
 from typing import ClassVar
 import edgy
 
+
 class InheritableModel(edgy.Model):
     first_name: str = edgy.CharField(max_length=255)
     last_name: str = edgy.CharField(max_length=255)
@@ -19,16 +20,20 @@ class InheritableModel(edgy.Model):
     class Meta:
         abstract = True
 
+
 class NonInheritableModel(edgy.Model):
     age: int = edgy.IntegerField()
+
     class Meta:
         abstract = True
         inherit = False
+
 
 class MyModel(edgy.Model):
     model1: ClassVar[InheritableModel] = InheritableModel
     # ClassVar is optional
     model2 = NonInheritableModel
+
 
 class AnotherModel(MyModel):
     pass
@@ -59,6 +64,7 @@ For more explicit control over the embedding process, you can use the `Composite
 from typing import ClassVar
 import edgy
 
+
 class InheritableModel(edgy.Model):
     first_name: str = edgy.CharField(max_length=255)
     last_name: str = edgy.CharField(max_length=255)
@@ -66,16 +72,20 @@ class InheritableModel(edgy.Model):
     class Meta:
         abstract = True
 
+
 class NonInheritableModel(edgy.Model):
     age: int = edgy.IntegerField()
+
     class Meta:
         abstract = True
         inherit = False
+
 
 class MyModel(edgy.Model):
     model1: InheritableModel = edgy.CompositeField(inner_fields=InheritableModel)
     # note: the inherit information can be overwritten
     model2 = edgy.CompositeField(inner_fields=NonInheritableModel, inherit=True)
+
 
 class AnotherModel(MyModel):
     pass
