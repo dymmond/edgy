@@ -47,10 +47,7 @@ registry = edgy.Registry(database=database)
 
 # Create the schema
 await create_schema(
-    registry=registry,
-    schema_name="edgy",
-    if_not_exists=True,
-    should_create_tables=True
+    registry=registry, schema_name="edgy", if_not_exists=True, should_create_tables=True
 )
 ```
 
@@ -87,7 +84,7 @@ User.query.all()
 **Querying the `main` schema:**
 
 ```python
-User.query.using(schema='main').all()
+User.query.using(schema="main").all()
 ```
 
 ### Using with Database

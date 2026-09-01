@@ -27,10 +27,18 @@ When you need to create many instances in one go, or `in bulk`.
     are complete with `can_load`.
 
 ```python
-returned_objs = await User.query.bulk_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"id": 100, "email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-])
+returned_objs = await User.query.bulk_create(
+    [
+        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
+        {
+            "id": 100,
+            "email": "bar@foo.com",
+            "first_name": "Bar",
+            "last_name": "Foo",
+            "is_active": True,
+        },
+    ]
+)
 assert not returned_objs[0].can_load  # the pks are incomplete
 assert returned_objs[1].can_load  # the pks are complete
 ```
@@ -44,16 +52,16 @@ When the database is compatible and we don't need the returned values, we can us
 Assuming email is the primary key, we can do something like this:
 
 ```python
-await User.query.bulk_create([
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-    ...
-], ignore_conflicts=True)
+await User.query.bulk_create(
+    [{"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True}, ...],
+    ignore_conflicts=True,
+)
 
 # is ignored
-await User.query.bulk_create([
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": False},
-    ...
-], ignore_conflicts=True)
+await User.query.bulk_create(
+    [{"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": False}, ...],
+    ignore_conflicts=True,
+)
 ```
 
 What does it do? Simply skipping rows which would cause a conflict. It is maybe not as performant because single inserts are issued.
@@ -65,17 +73,19 @@ When you need to update many instances in one go, or **in bulk**. With `update_f
 By default all fields are updatable.
 
 ```python
-await User.query.bulk_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-])
+await User.query.bulk_create(
+    [
+        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
+        {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
+    ]
+)
 
 users = await User.query.all()
 
 for user in users:
     user.is_active = False
 
-retrieved_objects = await User.query.bulk_update(users, update_fields=['is_active'])
+retrieved_objects = await User.query.bulk_update(users, update_fields=["is_active"])
 ```
 
 !!! Note
@@ -89,18 +99,24 @@ we do not insert duplicates by filtering the unique keys of the model data being
 When not provided `unique_fields` default to the primary keys.
 
 ```python
-results = await User.query.bulk_get_or_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-], unique_fields=["email"])
+results = await User.query.bulk_get_or_create(
+    [
+        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
+        {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
+    ],
+    unique_fields=["email"],
+)
 
 # Try to reinsert the same values
-await User.query.bulk_get_or_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-], unique_fields=["email"])
+await User.query.bulk_get_or_create(
+    [
+        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
+        {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
+    ],
+    unique_fields=["email"],
+)
 
-users = await User.query.all() # 2 as total
+users = await User.query.all()  # 2 as total
 ```
 
 !!! Note
@@ -113,26 +129,33 @@ users = await User.query.all() # 2 as total
 The returned array is in tuples with state flag if the object was created.
 
 ```python
-results = await User.query.bulk_get_or_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
-], unique_fields=["email"])
+results = await User.query.bulk_get_or_create(
+    [
+        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": True},
+        {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": True},
+    ],
+    unique_fields=["email"],
+)
 
 assert results[0][1]  # created
 assert results[0][1]  # created
 
 # Try to reinsert the same values
-results = await User.query.bulk_update_or_create([
-    {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": False},
-    {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": False},
-], unique_fields=["email"], update_fields=["last_name"])
+results = await User.query.bulk_update_or_create(
+    [
+        {"email": "foo@bar.com", "first_name": "Foo", "last_name": "Bar", "is_active": False},
+        {"email": "bar@foo.com", "first_name": "Bar", "last_name": "Foo", "is_active": False},
+    ],
+    unique_fields=["email"],
+    update_fields=["last_name"],
+)
 
 assert results[0][0].is_active
 assert results[1][0].is_active
 assert not results[0][1]  # updated
 assert not results[1][1]  # updated
 
-users = await User.query.all() # 2 as total
+users = await User.query.all()  # 2 as total
 ```
 
 By default `unique_fields` are the primary keys and columns and `update_fields` are all the fields defined in the model class.

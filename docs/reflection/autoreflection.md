@@ -7,13 +7,14 @@ Edgy provides `AutoReflectModel` to automate this process, using pattern matchin
 ```python
 from edgy.contrib.autoreflection import AutoReflectModel
 
+
 class Reflected(AutoReflectModel):
     class Meta:
         include_pattern = ".*"  # Regex or string, matches table names (default: ".*")
         exclude_pattern = None  # Regex or string, excludes table names (default: None)
         template = "{modelname}{tablename}"  # String or function for model name generation
         databases = (None,)  # Databases to reflect (None: main database, string: extra database)
-        schemes = (None,) # Schemes to check for tables.
+        schemes = (None,)  # Schemes to check for tables.
 ```
 
 When a reflected model is generated, its `Meta` class is converted to a regular `MetaInfo`.

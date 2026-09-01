@@ -47,9 +47,9 @@ def test_parametrize_factory():
 
         language = FactoryField(callback="language_code")
         name = FactoryField(
-            callback=lambda field_instance,
-            faker,
-            parameters: f"{parameters['first_name']} {parameters['last_name']}",
+            callback=lambda field_instance, faker, parameters: (
+                f"{parameters['first_name']} {parameters['last_name']}"
+            ),
             parameters={
                 "first_name": lambda field_instance, faker, parameters: faker.name(),
                 "last_name": lambda field_instance, faker, parameters: faker.name(),
@@ -69,9 +69,9 @@ def test_parametrize_factory_context():
 
         language = FactoryField(callback="language_code")
         name = FactoryField(
-            callback=lambda field_instance,
-            context,
-            parameters: f"{parameters['first_name']} {parameters['last_name']}",
+            callback=lambda field_instance, context, parameters: (
+                f"{parameters['first_name']} {parameters['last_name']}"
+            ),
             parameters={
                 "first_name": lambda field_instance, context, parameters: context["faker"].name(),
                 "last_name": lambda field_instance, context, parameters: context["faker"].name(),

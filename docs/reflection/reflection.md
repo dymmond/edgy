@@ -105,12 +105,14 @@ import edgy
 
 registry = edgy.Registry(...)
 
+
 class AdvancedReflected(edgy.ReflectModel):
     __using_schema__ = "foo"
     a = edgy.CharField(max_length=40)
 
     class Meta:
         registry = registry
+
 
 AdvancedReflected.database = otherdb
 AdvancedReflected.__using_schema__ = "foo"

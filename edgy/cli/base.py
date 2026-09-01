@@ -131,9 +131,11 @@ class Migrate:
             module = import_module(location)
             members = inspect.getmembers(
                 module,
-                lambda attr: is_class_and_subclass(attr, Model)
-                and not attr.meta.abstract
-                and not is_class_and_subclass(attr, ReflectModel),
+                lambda attr: (
+                    is_class_and_subclass(attr, Model)
+                    and not attr.meta.abstract
+                    and not is_class_and_subclass(attr, ReflectModel)
+                ),
             )
             for name, model in members:
                 models[name] = model

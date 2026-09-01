@@ -1108,7 +1108,7 @@ Becomes now
 
 ``` python
 with with_tenant("foo"):
-  ...
+    ...
 ```
 
 
@@ -1122,7 +1122,7 @@ Becomes now
 
 ``` python
 with with_schema("foo"):
-  ...
+    ...
 ```
 
 ## 0.17.4
