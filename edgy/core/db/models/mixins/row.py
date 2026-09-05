@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.models.utils import apply_instance_extras
-from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.exceptions import QuerySetError
@@ -18,6 +17,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.connection import Database
     from edgy.core.db.models.model import Model
     from edgy.core.db.models.types import BaseModelType
+    from edgy.core.db.querysets.prefetch import Prefetch
     from edgy.core.db.querysets.types import reference_select_type
 
 
@@ -429,23 +429,17 @@ class ModelRowMixin:
                 unidirectional fields).
             NotImplementedError: If prefetching from other databases is attempted.
         """
-        # delay until now
-        await related.init_bake()
-        model_key: tuple = ()
-        if related._baked:
-            # If the prefetch operation is marked as baked (meaning all rows for this
-            # prefetch have been collected and bake was successful), then retrieve the model_key
-            assert isinstance(model, cls)
-            # use row directly, because the primary key could have been changed in model
-            model_key = cls.create_model_key_from_sqla_row(row, row_prefix)
 
-        # If the model's key exists in the baked results, retrieve and set the prefetched
-        # data directly.
-        if model_key in related._baked_results:
-            object.__setattr__(model, related.to_attr, related._baked_results[model_key])
+        # If the model is the baking model, initialize and check the cache
+        if cls is related._baking_model:
+            # delay until now
+            await related.init_bake()
+            assert related._baked
+            model_key = cls.create_model_key_from_sqla_row(row, row_prefix)
+            object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))
         else:
             # Check early for potential conflicts with existing attributes on the model.
-            check_prefetch_collision(model, related)
+            related.check_for_collision(model)
             # If not in baked results, or not finished, proceed with fetching.
             # Crawl the relationship path to get details about the related model and
             # reverse path.
@@ -516,7 +510,7 @@ class ModelRowMixin:
 
         for related in prefetch_related:
             # Check for conflicting names early to prevent unexpected overwrites.
-            check_prefetch_collision(model=model, related=related)
+            related.check_for_collision(model=model)
             row_prefix = f"{tables_and_models[prefix][0].name}_" if prefix else ""
             queries.append(
                 cls.__set_prefetch(row=row, row_prefix=row_prefix, model=model, related=related)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from collections import defaultdict
 from collections.abc import Hashable
 from inspect import isclass
@@ -59,21 +60,39 @@ class Prefetch:
         # Internal flag to indicate if the baking process has been completed.
         self._baked = False
 
-    def create_checked_clone(self, model_class: type[BaseModelType]) -> Prefetch:
+    def check_for_collision(self, model: type[BaseModelType] | BaseModelType) -> None:
         """
-        Check for collisions and prepare clone with assigned baking model.
+        Checks for potential attribute name collisions when prefetching.
+
+        This function ensures that the `to_attr` specified in a `Prefetch` object
+        does not conflict with any existing attributes, fields (database columns),
+        or managers defined on the target `model`. A collision could lead to
+        unexpected behavior or overwriting of crucial model components.
 
         Args:
-            model_class: Model class used for baking to.
+            model (type[BaseModelType] | BaseModelType):
+                The model class to which the prefetched
+                results will be attached. This is the "parent"
+                model in the prefetch relationship.
+
+        Raises:
+            QuerySetError: If the `to_attr` from the `Prefetch` object conflicts
+                        with an existing attribute, field, or manager on the
+                        `model`. The error message specifies the conflicting
+                        attribute and the model class.
         """
-        check_prefetch_collision(model_class, self)
-        new_prefetch = Prefetch(
-            related_name=self.related_name,
-            to_attr=self.to_attr,
-            queryset=None,
-        )
-        new_prefetch._baking_model = model_class
-        return new_prefetch
+        # Check for collision with existing attributes, model fields, or model managers.
+        if (
+            hasattr(model, self.to_attr)
+            or self.to_attr in model.meta.fields
+            or self.to_attr in model.meta.managers
+        ):
+            if not isclass(model):
+                model = cast("type[BaseModelType]", type(model))
+            raise QuerySetError(
+                f"Conflicting attribute to_attr='{self.related_name}' with "
+                f"'{self.to_attr}' in {model.__name__}"
+            )
 
     async def init_bake(self) -> None:
         """
@@ -90,9 +109,10 @@ class Prefetch:
         from .executor import QueryExecutor
 
         # If already baked or without baking model do not proceed.
-        if self._baked or self._baking_model is None:
+        if self._baked:
             return
         assert self.queryset is not None
+        assert self._baking_model is self.queryset.model_class
         self._baked = True
         # Execute the queryset and asynchronously iterate over the results.
         # The `True` argument for `_execute_iterate` ensures all results are
@@ -137,18 +157,12 @@ def check_prefetch_collision(
                        `model`. The error message specifies the conflicting
                        attribute and the model class.
     """
-    # Check for collision with existing attributes, model fields, or model managers.
-    if (
-        hasattr(model, related.to_attr)
-        or related.to_attr in model.meta.fields
-        or related.to_attr in model.meta.managers
-    ):
-        if not isclass(model):
-            model = cast("type[BaseModelType]", type(model))
-        raise QuerySetError(
-            f"Conflicting attribute to_attr='{related.related_name}' with "
-            f"'{related.to_attr}' in {model.__name__}"
-        )
+    warnings.warn(
+        "This method is deprecated. Use `prefetch.check_for_collision` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    related.check_for_collision(model)
     return related
 
 
