@@ -429,13 +429,15 @@ class ModelRowMixin:
                 unidirectional fields).
             NotImplementedError: If prefetching from other databases is attempted.
         """
-
+        # Generate the model key
+        model_key = cls.create_model_key_from_sqla_row(row, row_prefix)
         # If the model is the baking model, initialize and check the cache
         if cls is related._baking_model:
-            # delay until now
+            # delay until now, we should only bake if the baking model is fitting
             await related.init_bake()
-            assert related._baked
-            model_key = cls.create_model_key_from_sqla_row(row, row_prefix)
+            object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))
+        elif model_key in related._baked_results:
+            # use cache if available
             object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))
         else:
             # Check early for potential conflicts with existing attributes on the model.
@@ -473,8 +475,12 @@ class ModelRowMixin:
                 f"{crawl_result.reverse_path}__{pkcol}": row._mapping[f"{row_prefix}{pkcol}"]
                 for pkcol in cls.pkcolumns
             }
-            # Execute the prefetched query and set the result on the model instance.
-            object.__setattr__(model, related.to_attr, await queryset.filter(clause))
+            # Execute the prefetched query
+            result = await queryset.filter(clause)
+            # Update the cache
+            related._baked_results[model_key] = result
+            # Set the result on the model instance.
+            object.__setattr__(model, related.to_attr, result)
 
     @classmethod
     async def __handle_prefetch_related(
