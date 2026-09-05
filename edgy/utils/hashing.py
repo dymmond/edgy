@@ -30,7 +30,9 @@ def hash_to_identifier(key: str | bytes) -> str:
     Examples:
         ```python
         hash_to_identifier("my_database_name")  # e.g., "_L5XQ2Z7OQYF..."
-        hash_to_identifier(b"[http://example.com/api/v1/users](http://example.com/api/v1/users)")
+        hash_to_identifier(
+            b"[http://example.com/api/v1/users](http://example.com/api/v1/users)"
+        )
         # e.g., "_K1N3Y2P0R2..."
         ```
 

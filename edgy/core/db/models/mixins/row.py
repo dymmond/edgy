@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, cast
+from collections.abc import Hashable, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.models.utils import apply_instance_extras
-from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.exceptions import QuerySetError
@@ -18,6 +17,7 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.connection import Database
     from edgy.core.db.models.model import Model
     from edgy.core.db.models.types import BaseModelType
+    from edgy.core.db.querysets.prefetch import Prefetch
     from edgy.core.db.querysets.types import reference_select_type
 
 
@@ -29,6 +29,8 @@ class ModelRowMixin:
     This class provides methods to convert raw database rows into Edgy ORM model objects,
     handling relationships such as `select_related` and `prefetch_related`.
     """
+
+    pkcolumns: ClassVar[Sequence[str]]
 
     @classmethod
     def can_load_from_row(cls: type[Model], row: Row, table: Table) -> bool:
@@ -56,6 +58,7 @@ class ModelRowMixin:
     @classmethod
     async def from_sqla_row(
         cls: type[Model],
+        *,
         row: Row,
         tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
         select_related: Sequence[Any] | None = None,
@@ -68,7 +71,7 @@ class ModelRowMixin:
         prefix: str = "",
         old_select_related_value: Model | None = None,
         reference_select: reference_select_type | None = None,
-    ) -> Model | None:
+    ) -> Model:
         """
         Converts a SQLAlchemy `Row` object into an Edgy `Model` instance.
 
@@ -78,7 +81,7 @@ class ModelRowMixin:
         fields, managing prefixes for joined tables, and applying deferred or secret
         field exclusions.
 
-        Args:
+        Kwargs:
             row (Row): The SQLAlchemy row result to convert.
             tables_and_models (dict[str, tuple[Table, type[BaseModelType]]]): A dictionary
                 mapping prefixes to tuples of SQLAlchemy Table objects and Edgy Model types,
@@ -166,7 +169,7 @@ class ModelRowMixin:
             if remainder:
                 # Recursively call from_sqla_row for nested select_related.
                 model_kwargs[field_name] = await model_class.from_sqla_row(
-                    row,
+                    row=row,
                     tables_and_models=tables_and_models,
                     select_related=[remainder],
                     prefetch_related=prefetch_related,
@@ -181,7 +184,7 @@ class ModelRowMixin:
             else:
                 # Call from_sqla_row for the direct related model.
                 model_kwargs[field_name] = await model_class.from_sqla_row(
-                    row,
+                    row=row,
                     tables_and_models=tables_and_models,
                     exclude_secrets=exclude_secrets,
                     is_defer_fields=is_defer_fields,
@@ -381,7 +384,9 @@ class ModelRowMixin:
         return False
 
     @classmethod
-    def create_model_key_from_sqla_row(cls, row: Row, row_prefix: str = "") -> tuple:
+    def create_model_key_from_sqla_row(
+        cls, *, row: Row, row_prefix: str = ""
+    ) -> tuple[Hashable, ...]:
         """
         Builds a unique cache key for a model instance based on its class name and
         primary key values extracted from a SQLAlchemy row.
@@ -425,19 +430,19 @@ class ModelRowMixin:
                 unidirectional fields).
             NotImplementedError: If prefetching from other databases is attempted.
         """
-        model_key: tuple = ()
-        if related._is_finished:
-            # If the prefetch operation is marked as finished (meaning all rows for this
-            # prefetch have been collected), then bake the results. This allows for
-            # efficient retrieval of prefetched data.
-            await related.init_bake(type(model))
-            model_key = model.create_model_key()
-
-        # If the model's key exists in the baked results, retrieve and set the prefetched
-        # data directly.
-        if model_key in related._baked_results:
-            object.__setattr__(model, related.to_attr, related._baked_results[model_key])
+        # Generate the model key
+        model_key = cls.create_model_key_from_sqla_row(row=row, row_prefix=row_prefix)
+        # If the model is the baking model, initialize and check the cache
+        if cast("type[Model]", cls) is related._baking_model:
+            # delay until now, we should only bake if the baking model is fitting
+            await related.init_bake()
+            object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))
+        elif model_key in related._baked_results:
+            # use cache if available
+            object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))
         else:
+            # Check early for potential conflicts with existing attributes on the model.
+            related.check_for_collision(model)
             # If not in baked results, or not finished, proceed with fetching.
             # Crawl the relationship path to get details about the related model and
             # reverse path.
@@ -455,19 +460,15 @@ class ModelRowMixin:
                 )
 
             queryset = related.queryset
-            if related._is_finished:
-                assert queryset is not None, "Queryset is not set but _is_finished flag"
-            else:
-                # Check for potential conflicts with existing attributes on the model.
-                check_prefetch_collision(model, related)
-                if queryset is None:
-                    # If no specific queryset is provided for prefetch, default to all.
-                    queryset = crawl_result.model_class.query.all()
+            if queryset is None:
+                # If no specific queryset is provided for prefetch, default to all.
+                queryset = crawl_result.model_class.query.all()
 
-                # Ensure the reverse path is selected to link back to the main model.
-                queryset = queryset.all()
-                queryset._select_related.add(crawl_result.reverse_path)
-                queryset._cached_select_related_expression = None
+            # Create clone without any cache
+            queryset = queryset.all()
+            queryset._cached_select_related_expression = None
+            # Ensure the reverse path is selected to link back to the main model. Skip verification.
+            queryset._select_related.add(crawl_result.reverse_path)
 
             # Construct the filter clause for the prefetched query using the main model's
             # primary key(s).
@@ -475,8 +476,12 @@ class ModelRowMixin:
                 f"{crawl_result.reverse_path}__{pkcol}": row._mapping[f"{row_prefix}{pkcol}"]
                 for pkcol in cls.pkcolumns
             }
-            # Execute the prefetched query and set the result on the model instance.
-            object.__setattr__(model, related.to_attr, await queryset.filter(clause))
+            # Execute the prefetched query
+            result = await queryset.filter(clause)
+            # Update the cache
+            related._baked_results[model_key] = result
+            # Set the result on the model instance.
+            object.__setattr__(model, related.to_attr, result)
 
     @classmethod
     async def __handle_prefetch_related(
@@ -512,7 +517,7 @@ class ModelRowMixin:
 
         for related in prefetch_related:
             # Check for conflicting names early to prevent unexpected overwrites.
-            check_prefetch_collision(model=model, related=related)
+            related.check_for_collision(model=model)
             row_prefix = f"{tables_and_models[prefix][0].name}_" if prefix else ""
             queries.append(
                 cls.__set_prefetch(row=row, row_prefix=row_prefix, model=model, related=related)

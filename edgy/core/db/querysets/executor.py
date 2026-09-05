@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import warnings
 from collections.abc import AsyncGenerator, Iterable, Sequence
-from contextvars import ContextVar
-from typing import TYPE_CHECKING, Any, Generic, cast
+from typing import TYPE_CHECKING, Generic, cast
 
 import sqlalchemy
 
@@ -11,10 +10,8 @@ from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.querysets.clauses import and_, or_
 from edgy.core.db.querysets.parser import ResultParser
-from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
-from edgy.core.db.relationships.utils import crawl_relationship
-from edgy.core.utils.db import check_db_connection, hash_tablekey
-from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError, SkipOperation
+from edgy.core.utils.db import check_db_connection
+from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, SkipOperation
 
 from .types import EdgyEmbedTarget, EdgyModel
 
@@ -25,24 +22,13 @@ if TYPE_CHECKING:  # pragma: no cover
     from .types import tables_and_models_type
 
 
-_current_row_holder: ContextVar[list[sqlalchemy.Row | None] | None] = ContextVar(
-    "_current_row_holder", default=None
-)
-
-
-def get_current_row() -> sqlalchemy.Row | None:
-    """Get async safe the current row when in _execute_iterate"""
-    row_holder = _current_row_holder.get()
-    if not row_holder:
-        return None
-    return row_holder[0]
-
-
 class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
     """
     Runs compiled queries against the database, manages iteration,
     and coordinates prefetching, parsing, and deleting.
     """
+
+    _current_row: sqlalchemy.Row | None
 
     def __init__(
         self,
@@ -75,7 +61,7 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
         self,
         batch: Sequence[sqlalchemy.Row],
         new_cache: QueryModelResultCache,
-    ) -> AsyncGenerator[tuple[tuple[EdgyModel, EdgyEmbedTarget], sqlalchemy.Row], None]:
+    ) -> AsyncGenerator[tuple[EdgyModel, EdgyEmbedTarget], None]:
         """
         Processes a single batch of rows.
 
@@ -84,7 +70,6 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
 
         Args:
             batch: A list of raw SQLAlchemy Row objects.
-            tables_and_models: The table/model mapping from the compiler.
             new_cache: The result cache to populate.
 
         Yields:
@@ -93,13 +78,13 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
                 - (row): The raw SQLAlchemy Row.
         """
         assert self.parser is not None, "parser not initialized"
-        prefetches = await self._prepare_prefetches_for_batch(batch, self.parser.tables_and_models)
         results: Sequence[tuple[EdgyModel, EdgyEmbedTarget]] = await self.parser.batch_to_models(
-            batch, prefetches, new_cache
+            batch, new_cache
         )
 
         for row_num, result_tuple in enumerate(results):
-            yield result_tuple, batch[row_num]
+            self._current_row = batch[row_num]
+            yield result_tuple
 
     async def iterate(
         self, fetch_all_at_once: bool = False
@@ -143,57 +128,49 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
                 fetch_all_at_once = True
 
         counter = 0
-        last_element: tuple[EdgyModel, Any] | None = None
+        last_element: tuple[EdgyModel, EdgyEmbedTarget] | None = None
         check_db_connection(self.database, stacklevel=4)
-        current_row: list[sqlalchemy.Row | None] = [None]
-        token = _current_row_holder.set(current_row)
+        if fetch_all_at_once:
+            new_cache = QueryModelResultCache(qs._cache.attrs)
+            async with self.database as database:
+                batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
 
-        try:
-            if fetch_all_at_once:
-                new_cache = QueryModelResultCache(qs._cache.attrs)
-                async with self.database as database:
-                    batch = cast(Sequence[sqlalchemy.Row], await database.fetch_all(expression))
-
-                # Use the new helper to process the single, large batch
-                async for result, row in self._process_and_yield_batch(batch, new_cache):
-                    if counter == 0:
-                        # qs is maybe a copy, so update cache on self.queryset
-                        self.queryset._cache_first = result
-                    last_element = result
-                    counter += 1
-                    current_row[0] = row
-                    yield result
-
-                # qs is maybe a copy, so update cache on self.queryset
-                self.queryset._cache_fetch_all = True
-                self.queryset._cache = new_cache
-            else:
-                batch_num: int = 0
-                new_cache = QueryModelResultCache(qs._cache.attrs)
-                async with self.database as database:
-                    async for batch in cast(
-                        AsyncGenerator[Sequence[sqlalchemy.Row], None],
-                        database.batched_iterate(expression, batch_size=qs._batch_size),
-                    ):
-                        new_cache.clear()
-                        qs._cache_fetch_all = False
-
-                        # Use the new helper to process each batch
-                        async for result, row in self._process_and_yield_batch(batch, new_cache):
-                            if counter == 0:
-                                self.queryset._cache_first = result
-                            last_element = result
-                            counter += 1
-                            current_row[0] = row
-                            yield result
-                        batch_num += 1
-
-                if batch_num <= 1:
+            # Use the new helper to process the single, large batch
+            async for result in self._process_and_yield_batch(batch, new_cache):
+                if counter == 0:
                     # qs is maybe a copy, so update cache on self.queryset
-                    self.queryset._cache = new_cache
-                    self.queryset._cache_fetch_all = True
-        finally:
-            _current_row_holder.reset(token)
+                    self.queryset._cache_first = result
+                last_element = result
+                counter += 1
+                yield result
+
+            # qs is maybe a copy, so update cache on self.queryset
+            self.queryset._cache_fetch_all = True
+            self.queryset._cache = new_cache
+        else:
+            batch_num: int = 0
+            new_cache = QueryModelResultCache(qs._cache.attrs)
+            async with self.database as database:
+                async for batch in cast(
+                    AsyncGenerator[Sequence[sqlalchemy.Row], None],
+                    database.batched_iterate(expression, batch_size=qs._batch_size),
+                ):
+                    new_cache.clear()
+                    qs._cache_fetch_all = False
+
+                    # Use the new helper to process each batch
+                    async for result in self._process_and_yield_batch(batch, new_cache):
+                        if counter == 0:
+                            self.queryset._cache_first = result
+                        last_element = result
+                        counter += 1
+                        yield result
+                    batch_num += 1
+
+            if batch_num <= 1:
+                # qs is maybe a copy, so update cache on self.queryset
+                self.queryset._cache = new_cache
+                self.queryset._cache_fetch_all = True
         # qs is maybe a copy, so update cache on self.queryset
         self.queryset._cache_count = counter
         self.queryset._cache_last = last_element
@@ -218,13 +195,14 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
         check_db_connection(self.database, stacklevel=4)
 
         async with self.database as database:
-            rows = await database.fetch_all(expression.limit(2))
+            rows = cast("Sequence[sqlalchemy.Row]", await database.fetch_all(expression.limit(2)))
 
         if not rows:
             self.queryset._cache_count = 0
             raise ObjectNotFound()
         if len(rows) > 1:
             raise MultipleObjectsReturned()
+        self._current_row = rows[0]
 
         self.queryset._cache_count = 1
         if no_update_result_cache:
@@ -239,75 +217,6 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
         self.queryset._cache_last = result
         self.parser = None
         return result
-
-    async def _prepare_prefetches_for_batch(
-        self,
-        batch: Sequence[sqlalchemy.Row],
-        tables_and_models: tables_and_models_type,
-    ) -> list[Prefetch]:
-        """
-        Builds the Prefetch objects for a given batch of results.
-        This is the *prefetch building* half of the original _handle_batch.
-
-        Args:
-            batch: The current batch of SQLAlchemy Row objects.
-            tables_and_models: The table/model mapping from the compiler.
-
-        Returns:
-            A list of populated Prefetch objects, ready to be executed.
-
-        Raises:
-            NotImplementedError: If a prefetch crosses database boundaries.
-            QuerySetError: If a prefetch path is invalid (e.g., unidirectional).
-        """
-        prepared_prefetches: list[Prefetch] = []
-        qs = self.queryset
-
-        for prefetch in qs._prefetch_related:
-            check_prefetch_collision(self.model_class, prefetch)  # type: ignore
-
-            crawl_result = crawl_relationship(
-                self.model_class, prefetch.related_name, traverse_last=True
-            )
-            if crawl_result.cross_db_remainder:
-                raise NotImplementedError(
-                    "Cannot prefetch from other db yet. Maybe in future this feature will be added."
-                )
-            if crawl_result.reverse_path is False:
-                raise QuerySetError(
-                    detail=("Creating a reverse path is not possible, unidirectional fields used.")
-                )
-
-            prefetch_queryset: QuerySet | None = prefetch.queryset
-
-            clauses = [
-                {
-                    f"{crawl_result.reverse_path}__{pkcol}": row._mapping[pkcol]
-                    for pkcol in self.model_class.pkcolumns
-                }
-                for row in batch
-            ]
-            if prefetch_queryset is None:
-                prefetch_queryset = crawl_result.model_class.query.local_or(*clauses)
-            else:
-                prefetch_queryset = prefetch_queryset.local_or(*clauses)
-
-            if prefetch_queryset.model_class is self.model_class:
-                prefetch_queryset = prefetch_queryset.select_related(prefetch.related_name)
-                prefetch_queryset.embed_parent = (prefetch.related_name, "")
-            else:
-                prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
-
-            new_prefetch = Prefetch(
-                related_name=prefetch.related_name,
-                to_attr=prefetch.to_attr,
-                queryset=prefetch_queryset,
-            )
-            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=tables_and_models[''][0].key, prefix=crawl_result.reverse_path)}_"
-            new_prefetch._is_finished = True
-            prepared_prefetches.append(new_prefetch)
-
-        return prepared_prefetches
 
     async def delete(
         self,

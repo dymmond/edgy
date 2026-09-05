@@ -197,7 +197,9 @@ def filepath_to_uri(path: str | None) -> str:
     Examples:
         ```python
         filepath_to_uri("/path/to/my file.txt")  # -> "/path/to/my%20file.txt"
-        filepath_to_uri("C:\\Users\\file'name.doc") # -> "C:/Users/file'name.doc" (only \\ to /)
+        filepath_to_uri(
+            "C:\\Users\\file'name.doc"
+        )  # -> "C:/Users/file'name.doc" (only \\ to /)
         ```
     """
     if not path:

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any
+from collections.abc import Hashable
+from inspect import isclass
+from typing import TYPE_CHECKING, Any, cast
 
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
-    from edgy import Model, QuerySet
+    from edgy import QuerySet
     from edgy.core.db.models.types import BaseModelType
 
 
@@ -48,17 +51,50 @@ class Prefetch:
         self.related_name = related_name
         self.to_attr = to_attr
         self.queryset: QuerySet | None = queryset
-        # Internal flag to indicate if the prefetching process has finished.
-        self._is_finished = False
+        self._baking_model: type[BaseModelType] | None = None
         # Internal prefix used during the baking process for creating model keys.
         self._bake_prefix: str = ""
         # A defaultdict to store the baked results, mapping model keys to lists of
         # related instances.
-        self._baked_results: dict[tuple[str, ...], list[Any]] = defaultdict(list)
+        self._baked_results: dict[tuple[Hashable, ...], list[Any]] = defaultdict(list)
         # Internal flag to indicate if the baking process has been completed.
         self._baked = False
 
-    async def init_bake(self, model_class: type[Model]) -> None:
+    def check_for_collision(self, model: type[BaseModelType] | BaseModelType) -> None:
+        """
+        Checks for potential attribute name collisions when prefetching.
+
+        This function ensures that the `to_attr` specified in a `Prefetch` object
+        does not conflict with any existing attributes, fields (database columns),
+        or managers defined on the target `model`. A collision could lead to
+        unexpected behavior or overwriting of crucial model components.
+
+        Args:
+            model (type[BaseModelType] | BaseModelType):
+                The model class to which the prefetched
+                results will be attached. This is the "parent"
+                model in the prefetch relationship.
+
+        Raises:
+            QuerySetError: If the `to_attr` from the `Prefetch` object conflicts
+                        with an existing attribute, field, or manager on the
+                        `model`. The error message specifies the conflicting
+                        attribute and the model class.
+        """
+        # Check for collision with existing attributes, model fields, or model managers.
+        if (
+            hasattr(model, self.to_attr)
+            or self.to_attr in model.meta.fields
+            or self.to_attr in model.meta.managers
+        ):
+            if not isclass(model):
+                model = cast("type[BaseModelType]", type(model))
+            raise QuerySetError(
+                f"Conflicting attribute to_attr='{self.related_name}' with "
+                f"'{self.to_attr}' in {model.__name__}"
+            )
+
+    async def init_bake(self) -> None:
         """
         Initializes the baking process for prefetching related objects.
 
@@ -68,32 +104,34 @@ class Prefetch:
         from the queryset, creates a unique `model_key` for each related
         instance based on the `model_class` and `_bake_prefix`, and then
         appends the result to the corresponding list in `_baked_results`.
-        This effectively groups related objects by their parent model's key.
-
-        Args:
-            model_class (type[Model]): The main model class to which the prefetched
-                                        results will eventually be attached. This
-                                        is used to create the model keys for grouping.
+        This effectively groups related objects by their parent model's key
         """
-        # If already baked, not finished, or no queryset, do not proceed.
-        if self._baked or not self._is_finished or self.queryset is None:
+        from .executor import QueryExecutor
+
+        # If already baked or without baking model do not proceed.
+        if self._baked:
             return
+        assert self.queryset is not None
+        assert self._baking_model is self.queryset.model_class
         self._baked = True
         # Execute the queryset and asynchronously iterate over the results.
         # The `True` argument for `_execute_iterate` ensures all results are
         # fetched at once for processing.
-        async for result in self.queryset._execute_iterate(True):
+        executor = QueryExecutor(self.queryset)
+        async for _, result in executor.iterate(True):
             # Create a unique model key from the current SQLAlchemy row using the
             # specified bake prefix. This key links the prefetched item back to
             # its parent model instance.
-            model_key = model_class.create_model_key_from_sqla_row(
-                self.queryset._current_row, row_prefix=self._bake_prefix
+            model_key = self._baking_model.create_model_key_from_sqla_row(
+                row=executor._current_row, row_prefix=self._bake_prefix
             )
             # Append the prefetched result to the list associated with its model key.
             self._baked_results[model_key].append(result)
 
 
-def check_prefetch_collision(model: BaseModelType, related: Prefetch) -> Prefetch:
+def check_prefetch_collision(
+    model: type[BaseModelType] | BaseModelType, related: Prefetch
+) -> Prefetch:
     """
     Checks for potential attribute name collisions when prefetching.
 
@@ -103,7 +141,7 @@ def check_prefetch_collision(model: BaseModelType, related: Prefetch) -> Prefetc
     unexpected behavior or overwriting of crucial model components.
 
     Args:
-        model (BaseModelType): The model class instance to which the prefetched
+        model (type[BaseModelType] | BaseModelType): The model class to which the prefetched
                                results will be attached. This is the "parent"
                                model in the prefetch relationship.
         related (Prefetch): The `Prefetch` object containing the `to_attr`
@@ -119,16 +157,12 @@ def check_prefetch_collision(model: BaseModelType, related: Prefetch) -> Prefetc
                        `model`. The error message specifies the conflicting
                        attribute and the model class.
     """
-    # Check for collision with existing attributes, model fields, or model managers.
-    if (
-        hasattr(model, related.to_attr)
-        or related.to_attr in model.meta.fields
-        or related.to_attr in model.meta.managers
-    ):
-        raise QuerySetError(
-            f"Conflicting attribute to_attr='{related.related_name}' with "
-            f"'{related.to_attr}' in {model.__class__.__name__}"
-        )
+    warnings.warn(
+        "This method is deprecated. Use `prefetch.check_for_collision` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    related.check_for_collision(model)
     return related
 
 
@@ -178,5 +212,5 @@ class PrefetchMixin:
             raise QuerySetError("The prefetch_related must have Prefetch type objects only.")
 
         # Append the new prefetch objects to the queryset's internal list.
-        queryset._prefetch_related = [*self._prefetch_related, *prefetch]
+        queryset._prefetch_related = [*queryset._prefetch_related, *prefetch]
         return queryset

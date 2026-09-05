@@ -33,7 +33,7 @@ from edgy.types import Undefined
 
 from . import clauses as clauses_mod
 from .compiler import QueryCompiler
-from .executor import QueryExecutor, get_current_row
+from .executor import QueryExecutor
 from .mixins import QuerySetPropsMixin, TenancyMixin
 from .prefetch import Prefetch, PrefetchMixin
 from .types import (
@@ -170,7 +170,9 @@ class BaseQuerySet(
 
     def _clone(self) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
-        This is core to the builder pattern
+        This is core to the builder pattern.
+
+        Note: the _cached_select_related_expression is transferred.
         """
         queryset = self.__class__(
             self.model_class,
@@ -473,11 +475,6 @@ class BaseQuerySet(
         if schema is None:
             schema = self.model_class.get_db_schema()
         return schema
-
-    @property
-    def _current_row(self) -> sqlalchemy.Row | None:
-        """(Refactored: Delegates to the helper in executor.py)"""
-        return get_current_row()
 
     async def _execute_iterate(
         self, fetch_all_at_once: bool = False
