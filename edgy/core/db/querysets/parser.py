@@ -15,6 +15,7 @@ from .types import EdgyEmbedTarget, EdgyModel, tables_and_models_type
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.base import BaseQuerySet
+    from edgy.core.db.querysets.queryset import QuerySet
 
 
 class ResultParser:
@@ -48,8 +49,6 @@ class ResultParser:
             NotImplementedError: If a prefetch crosses database boundaries.
             QuerySetError: If a prefetch path is invalid (e.g., unidirectional).
         """
-        from .prefetch import check_prefetch_collision
-
         prepared_prefetches: list[Prefetch] = []
         seen_prefetches: set[tuple[None | int, str, str]] = set()
 
@@ -76,15 +75,15 @@ class ResultParser:
                     detail=("Creating a reverse path is not possible, unidirectional fields used.")
                 )
 
-            check_prefetch_collision(self.model_class, prefetch)
+            prefetch.check_for_collision(self.model_class)
             new_prefetch = Prefetch(related_name=prefetch.related_name, to_attr=prefetch.to_attr)
 
-            prefetch_queryset: BaseQuerySet | None = prefetch.queryset
+            prefetch_queryset: QuerySet | None = prefetch.queryset
 
             clauses = [
                 {
                     f"{crawl_result.reverse_path}__{pkcol}": row._mapping[pkcol]
-                    for pkcol in self.model_class.pkcolumns
+                    for pkcol in crawl_result.model_class.pkcolumns
                 }
                 for row in rows
             ]
@@ -100,6 +99,7 @@ class ResultParser:
                 prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
             # the assigned queryset has an empty cache
             new_prefetch.queryset = prefetch_queryset
+            new_prefetch._baking_model = prefetch_queryset.model_class
             new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=self.tables_and_models[''][0].key, prefix=crawl_result.reverse_path)}_"
             prepared_prefetches.append(new_prefetch)
         return prepared_prefetches
@@ -111,6 +111,7 @@ class ResultParser:
         """
         Parses a single row into a model instance, without using the cache.
         """
+        prepared_prefetches = self.prepare_prefetches_for_rows([row])
         return cast(
             "EdgyModel",
             await self.model_class.from_sqla_row(
@@ -119,7 +120,7 @@ class ResultParser:
                 select_related=self.queryset._select_related,
                 only_fields=self.queryset._only,
                 is_defer_fields=self.is_defer_fields,
-                prefetch_related=self.queryset._prefetch_related,
+                prefetch_related=prepared_prefetches,
                 exclude_secrets=self.queryset._exclude_secrets,
                 using_schema=self.queryset.active_schema,
                 database=self.queryset.database,
