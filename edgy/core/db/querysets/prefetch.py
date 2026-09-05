@@ -123,7 +123,7 @@ class Prefetch:
             # specified bake prefix. This key links the prefetched item back to
             # its parent model instance.
             model_key = self._baking_model.create_model_key_from_sqla_row(
-                executor._current_row, row_prefix=self._bake_prefix
+                row=executor._current_row, row_prefix=self._bake_prefix
             )
             # Append the prefetched result to the list associated with its model key.
             self._baked_results[model_key].append(result)

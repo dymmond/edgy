@@ -115,7 +115,7 @@ class ResultParser:
         return cast(
             "EdgyModel",
             await self.model_class.from_sqla_row(
-                row,
+                row=row,
                 tables_and_models=self.tables_and_models,
                 select_related=self.queryset._select_related,
                 only_fields=self.queryset._only,
@@ -158,7 +158,7 @@ class ResultParser:
             self.model_class,
             batch,
             cache_fn=lambda row: self.model_class.from_sqla_row(
-                row,
+                row=row,
                 tables_and_models=self.tables_and_models,
                 select_related=self.queryset._select_related,
                 only_fields=self.queryset._only,
