@@ -58,6 +58,7 @@ class ModelRowMixin:
     @classmethod
     async def from_sqla_row(
         cls: type[Model],
+        *,
         row: Row,
         tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
         select_related: Sequence[Any] | None = None,
@@ -70,7 +71,7 @@ class ModelRowMixin:
         prefix: str = "",
         old_select_related_value: Model | None = None,
         reference_select: reference_select_type | None = None,
-    ) -> Model | None:
+    ) -> Model:
         """
         Converts a SQLAlchemy `Row` object into an Edgy `Model` instance.
 
@@ -80,7 +81,7 @@ class ModelRowMixin:
         fields, managing prefixes for joined tables, and applying deferred or secret
         field exclusions.
 
-        Args:
+        Kwargs:
             row (Row): The SQLAlchemy row result to convert.
             tables_and_models (dict[str, tuple[Table, type[BaseModelType]]]): A dictionary
                 mapping prefixes to tuples of SQLAlchemy Table objects and Edgy Model types,
@@ -168,7 +169,7 @@ class ModelRowMixin:
             if remainder:
                 # Recursively call from_sqla_row for nested select_related.
                 model_kwargs[field_name] = await model_class.from_sqla_row(
-                    row,
+                    row=row,
                     tables_and_models=tables_and_models,
                     select_related=[remainder],
                     prefetch_related=prefetch_related,
@@ -183,7 +184,7 @@ class ModelRowMixin:
             else:
                 # Call from_sqla_row for the direct related model.
                 model_kwargs[field_name] = await model_class.from_sqla_row(
-                    row,
+                    row=row,
                     tables_and_models=tables_and_models,
                     exclude_secrets=exclude_secrets,
                     is_defer_fields=is_defer_fields,
@@ -384,7 +385,7 @@ class ModelRowMixin:
 
     @classmethod
     def create_model_key_from_sqla_row(
-        cls, row: Row, row_prefix: str = ""
+        cls, *, row: Row, row_prefix: str = ""
     ) -> tuple[Hashable, ...]:
         """
         Builds a unique cache key for a model instance based on its class name and
@@ -430,9 +431,9 @@ class ModelRowMixin:
             NotImplementedError: If prefetching from other databases is attempted.
         """
         # Generate the model key
-        model_key = cls.create_model_key_from_sqla_row(row, row_prefix)
+        model_key = cls.create_model_key_from_sqla_row(row=row, row_prefix=row_prefix)
         # If the model is the baking model, initialize and check the cache
-        if cls is related._baking_model:
+        if cast("type[Model]", cls) is related._baking_model:
             # delay until now, we should only bake if the baking model is fitting
             await related.init_bake()
             object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))
