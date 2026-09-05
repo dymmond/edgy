@@ -10,15 +10,13 @@ from edgy.core.db.context_vars import CURRENT_INSTANCE
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.querysets.clauses import and_, or_
 from edgy.core.db.querysets.parser import ResultParser
-from edgy.core.db.relationships.utils import crawl_relationship
-from edgy.core.utils.db import check_db_connection, hash_tablekey
-from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, QuerySetError, SkipOperation
+from edgy.core.utils.db import check_db_connection
+from edgy.exceptions import MultipleObjectsReturned, ObjectNotFound, SkipOperation
 
 from .types import EdgyEmbedTarget, EdgyModel
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.querysets.base import BaseQuerySet
-    from edgy.core.db.querysets.prefetch import Prefetch
     from edgy.core.db.querysets.queryset import QuerySet
 
     from .types import tables_and_models_type
@@ -72,7 +70,6 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
 
         Args:
             batch: A list of raw SQLAlchemy Row objects.
-            tables_and_models: The table/model mapping from the compiler.
             new_cache: The result cache to populate.
 
         Yields:
@@ -81,9 +78,8 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
                 - (row): The raw SQLAlchemy Row.
         """
         assert self.parser is not None, "parser not initialized"
-        prefetches = await self._prepare_prefetches_for_batch(batch, self.parser.tables_and_models)
         results: Sequence[tuple[EdgyModel, EdgyEmbedTarget]] = await self.parser.batch_to_models(
-            batch, prefetches, new_cache
+            batch, new_cache
         )
 
         for row_num, result_tuple in enumerate(results):
@@ -221,70 +217,6 @@ class QueryExecutor(Generic[EdgyModel, EdgyEmbedTarget]):
         self.queryset._cache_last = result
         self.parser = None
         return result
-
-    async def _prepare_prefetches_for_batch(
-        self,
-        batch: Sequence[sqlalchemy.Row],
-        tables_and_models: tables_and_models_type,
-    ) -> list[Prefetch]:
-        """
-        Builds the Prefetch objects for a given batch of results.
-        This is the *prefetch building* half of the original _handle_batch.
-
-        Args:
-            batch: The current batch of SQLAlchemy Row objects.
-            tables_and_models: The table/model mapping from the compiler.
-
-        Returns:
-            A list of populated Prefetch objects, ready to be executed.
-
-        Raises:
-            NotImplementedError: If a prefetch crosses database boundaries.
-            QuerySetError: If a prefetch path is invalid (e.g., unidirectional).
-        """
-        prepared_prefetches: list[Prefetch] = []
-        qs = self.queryset
-
-        for prefetch in qs._prefetch_related:
-            crawl_result = crawl_relationship(
-                self.model_class, prefetch.related_name, traverse_last=True
-            )
-            if crawl_result.cross_db_remainder:
-                raise NotImplementedError(
-                    "Cannot prefetch from other db yet. Maybe in future this feature will be added."
-                )
-            if crawl_result.reverse_path is False:
-                raise QuerySetError(
-                    detail=("Creating a reverse path is not possible, unidirectional fields used.")
-                )
-
-            new_prefetch = prefetch.create_checked_clone(self.model_class)
-
-            prefetch_queryset: QuerySet | None = prefetch.queryset
-
-            clauses = [
-                {
-                    f"{crawl_result.reverse_path}__{pkcol}": row._mapping[pkcol]
-                    for pkcol in self.model_class.pkcolumns
-                }
-                for row in batch
-            ]
-            if prefetch_queryset is None:
-                prefetch_queryset = crawl_result.model_class.query.local_or(*clauses)
-            else:
-                prefetch_queryset = prefetch_queryset.local_or(*clauses)
-
-            if prefetch_queryset.model_class is self.model_class:
-                prefetch_queryset = prefetch_queryset.select_related(prefetch.related_name)
-                prefetch_queryset.embed_parent = (prefetch.related_name, "")
-            else:
-                prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
-            # the assigned queryset has an empty cache
-            new_prefetch.queryset = prefetch_queryset
-            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=tables_and_models[''][0].key, prefix=crawl_result.reverse_path)}_"
-            prepared_prefetches.append(new_prefetch)
-
-        return prepared_prefetches
 
     async def delete(
         self,
