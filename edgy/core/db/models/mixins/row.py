@@ -441,8 +441,6 @@ class ModelRowMixin:
             # use cache if available
             object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))
         else:
-            # Check early for potential conflicts with existing attributes on the model.
-            related.check_for_collision(model)
             # If not in baked results, or not finished, proceed with fetching.
             # Crawl the relationship path to get details about the related model and
             # reverse path.
