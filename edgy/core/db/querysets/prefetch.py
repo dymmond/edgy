@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import warnings
 from collections import defaultdict
 from collections.abc import Hashable
@@ -56,6 +57,11 @@ class Prefetch:
         self.queryset: QuerySet | None = queryset
         # Internal flag to indicate if the baking process has been completed.
         self._baked = False
+
+    @cached_property
+    def _baking_finished(self) -> asyncio.Event:
+        """Wait until baking is finished."""
+        return asyncio.Event()
 
     @cached_property
     def _bake_prefix(self) -> str:
@@ -119,9 +125,9 @@ class Prefetch:
                 f"'{self.to_attr}' in {model.__name__}"
             )
 
-    async def init_bake(self) -> None:
+    async def _init_bake(self) -> None:
         """
-        Initializes the baking process for prefetching related objects.
+        (Internal method) Initializes the baking process for prefetching related objects.
 
         This asynchronous method is responsible for executing the internal
         `queryset` (if it exists and the process is ready) and populating
@@ -133,11 +139,14 @@ class Prefetch:
         """
         from .executor import QueryExecutor
 
-        # If already baked or without baking model do not proceed.
-        if self._baked:
-            return
+        bake_prefix = self._bake_prefix
+        target_model = self._target_model
         qs = self.queryset
-        assert qs is not None
+        assert qs is not None, "`queryset` not initialized"
+        # If already baking check event.
+        if self._baked:
+            await self._baking_finished.wait()
+            return
         self._baked = True
         # Execute the queryset and asynchronously iterate over the results.
         # The `True` argument for `_execute_iterate` ensures all results are
@@ -148,12 +157,13 @@ class Prefetch:
             # Create a unique model key from the current SQLAlchemy row using the
             # specified bake prefix. This key links the prefetched item back to
             # its parent model instance.
-            model_key = self._target_model.create_model_key_from_sqla_row(
-                row=executor._current_row, row_prefix=self._bake_prefix
+            model_key = target_model.create_model_key_from_sqla_row(
+                row=executor._current_row, row_prefix=bake_prefix
             )
             # Append the prefetched result to the list associated with its model key.
             result_dict[model_key].append(result)
         self._baked_results.update(result_dict)
+        self._baking_finished.set()
 
 
 def check_prefetch_collision(

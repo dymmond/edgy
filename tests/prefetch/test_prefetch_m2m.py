@@ -23,7 +23,7 @@ class IntrospectingModel(edgy.StrictModel):
         prefetches = kwargs.get("prefetch_related")
         initial_dicts = None
         if prefetches:
-            await asyncio.gather(*(prefetch.init_bake() for prefetch in prefetches))
+            await asyncio.gather(*(prefetch._init_bake() for prefetch in prefetches))
             initial_dicts = [dict(prefetch._baked_results) for prefetch in prefetches]
         returnobj = await super().from_sqla_row(**kwargs)
         object.__setattr__(returnobj, "introspected_prefetches", prefetches)

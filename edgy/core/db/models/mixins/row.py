@@ -435,7 +435,7 @@ class ModelRowMixin:
         # If the model is the target model, initialize and check the cache
         if cast("type[Model]", cls) is related._target_model:
             # delay until now, we should only bake if the baking model is fitting
-            await related.init_bake()
+            await related._init_bake()
             object.__setattr__(
                 model, related.to_attr, list(related._baked_results.get(model_key, ()))
             )
@@ -518,7 +518,7 @@ class ModelRowMixin:
         for related in prefetch_related:
             # Check for conflicting names early to prevent unexpected overwrites.
             related.check_for_collision(model=model)
-            row_prefix = f"{tables_and_models[prefix][0].name}_" if prefix else ""
+            row_prefix = f"{tables_and_models[prefix][0].key}_" if prefix else ""
             queries.append(
                 cls.__set_prefetch(row=row, row_prefix=row_prefix, model=model, related=related)
             )
