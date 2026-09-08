@@ -60,8 +60,12 @@ class Prefetch:
 
     @cached_property
     def _baking_finished(self) -> asyncio.Event:
-        """Wait until baking is finished."""
-        return asyncio.Event()
+        """
+        Wait until baking is finished.
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_baking_finished` not set.")
 
     @cached_property
     def _bake_prefix(self) -> str:

@@ -8,6 +8,7 @@
   You can't do the dirty trick anymore testing for a dict.
 - Fix contracts; it was always an error to access the data attribute directly (just inherited from UserDict).
 - `create_model_key_from_sqla_row` and `from_sqla_row` are keyword only now, so we can better overwrite it. E.g. for test purposes.
+- Make Prefetch `init_bake` and more internal. QuerySetErrors are now raised if the attributes are illegally accessed.
 
 ### Removed
 

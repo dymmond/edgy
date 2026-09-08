@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, cast
 
@@ -99,6 +100,7 @@ class ResultParser:
                 prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
             # the assigned queryset has an empty cache
             new_prefetch.queryset = prefetch_queryset
+            new_prefetch._baking_finished = asyncio.Event()
             new_prefetch._target_model = self.model_class
             new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=self.tables_and_models[''][0].key, prefix=crawl_result.reverse_path)}_"
             new_prefetch._baked_results = {}
