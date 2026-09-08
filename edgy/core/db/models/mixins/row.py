@@ -434,7 +434,7 @@ class ModelRowMixin:
         model_key = cls.create_model_key_from_sqla_row(row=row, row_prefix=row_prefix)
         # If the model is the target model, initialize and check the cache
         assert cast("type[Model]", cls) is related._target_model
-        # Delay until now, we should only bake if the target model is fitting.
+        # Delay until now, we should only bake if the target model is fitting but this is safe.
         await related._init_bake()
         # Ensure it is in the baked results.
         related._baked_results.setdefault(model_key, [])
