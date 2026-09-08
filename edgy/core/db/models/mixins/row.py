@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, ClassVar, cast
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.models.utils import apply_instance_extras
-from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.exceptions import QuerySetError
 
@@ -172,7 +171,8 @@ class ModelRowMixin:
                     row=row,
                     tables_and_models=tables_and_models,
                     select_related=[remainder],
-                    prefetch_related=prefetch_related,
+                    # we currently only set prefetches to the main query
+                    # prefetch_related=prefetch_related,
                     exclude_secrets=exclude_secrets,
                     is_defer_fields=is_defer_fields,
                     using_schema=using_schema,
@@ -433,55 +433,12 @@ class ModelRowMixin:
         # Generate the model key
         model_key = cls.create_model_key_from_sqla_row(row=row, row_prefix=row_prefix)
         # If the model is the target model, initialize and check the cache
-        if cast("type[Model]", cls) is related._target_model:
-            # delay until now, we should only bake if the baking model is fitting
-            await related._init_bake()
-            object.__setattr__(
-                model, related.to_attr, list(related._baked_results.get(model_key, ()))
-            )
-        elif model_key in related._baked_results:
-            # use cache if available
-            object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))
-        else:
-            # If not in baked results, or not finished, proceed with fetching.
-            # Crawl the relationship path to get details about the related model and
-            # reverse path.
-            crawl_result = crawl_relationship(
-                model.__class__, related.related_name, traverse_last=True
-            )
-            if crawl_result.reverse_path is False:
-                raise QuerySetError(
-                    detail="Creating a reverse path is not possible, unidirectional fields used."
-                )
-            if crawl_result.cross_db_remainder:
-                raise NotImplementedError(
-                    "Cannot prefetch from other db yet. Maybe in future this feature will be "
-                    "added."
-                )
-
-            queryset = related.queryset
-            if queryset is None:
-                # If no specific queryset is provided for prefetch, default to all.
-                queryset = crawl_result.model_class.query.all()
-
-            # Create clone without any cache
-            queryset = queryset.all()
-            queryset._cached_select_related_expression = None
-            # Ensure the reverse path is selected to link back to the main model. Skip verification.
-            queryset._select_related.add(crawl_result.reverse_path)
-
-            # Construct the filter clause for the prefetched query using the main model's
-            # primary key(s).
-            clause = {
-                f"{crawl_result.reverse_path}__{pkcol}": row._mapping[f"{row_prefix}{pkcol}"]
-                for pkcol in cls.pkcolumns
-            }
-            # Execute the prefetched query
-            result = await queryset.filter(clause)
-            # Update the cache
-            related._baked_results[model_key] = result
-            # Set the result on the model instance.
-            object.__setattr__(model, related.to_attr, result)
+        assert cast("type[Model]", cls) is related._target_model
+        # Delay until now, we should only bake if the target model is fitting.
+        await related._init_bake()
+        # Ensure it is in the baked results.
+        related._baked_results.setdefault(model_key, [])
+        object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))
 
     @classmethod
     async def __handle_prefetch_related(
