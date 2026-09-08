@@ -35,7 +35,6 @@ from . import clauses as clauses_mod
 from .compiler import QueryCompiler
 from .executor import QueryExecutor
 from .mixins import QuerySetPropsMixin, TenancyMixin
-from .prefetch import Prefetch, PrefetchMixin
 from .types import (
     EdgyEmbedTarget,
     EdgyModel,
@@ -47,7 +46,9 @@ from .types import (
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.connection import Database
     from edgy.core.db.fields.types import BaseFieldType
-    from edgy.core.db.querysets.queryset import QuerySet
+
+    from .prefetch import Prefetch
+    from .queryset import QuerySet
 
 _empty_set = cast(set[Any], frozenset())
 _injected_filters_deletion: ContextVar[Iterable] = ContextVar(
@@ -58,7 +59,6 @@ _injected_filters_deletion: ContextVar[Iterable] = ContextVar(
 class BaseQuerySet(
     TenancyMixin[EdgyModel, EdgyEmbedTarget],
     QuerySetPropsMixin,
-    PrefetchMixin,
     QuerySetType[EdgyModel, EdgyEmbedTarget],
     Generic[EdgyModel, EdgyEmbedTarget],
 ):

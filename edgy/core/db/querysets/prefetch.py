@@ -3,14 +3,17 @@ from __future__ import annotations
 import warnings
 from collections import defaultdict
 from collections.abc import Hashable
+from functools import cached_property
 from inspect import isclass
 from typing import TYPE_CHECKING, Any, cast
 
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
-    from edgy import QuerySet
+    from edgy.core.db.models.model import Model
     from edgy.core.db.models.types import BaseModelType
+
+    from .queryset import QuerySet
 
 
 class Prefetch:
@@ -51,14 +54,36 @@ class Prefetch:
         self.related_name = related_name
         self.to_attr = to_attr
         self.queryset: QuerySet | None = queryset
-        self._baking_model: type[BaseModelType] | None = None
-        # Internal prefix used during the baking process for creating model keys.
-        self._bake_prefix: str = ""
-        # A defaultdict to store the baked results, mapping model keys to lists of
-        # related instances.
-        self._baked_results: dict[tuple[Hashable, ...], list[Any]] = defaultdict(list)
         # Internal flag to indicate if the baking process has been completed.
         self._baked = False
+
+    @cached_property
+    def _bake_prefix(self) -> str:
+        """
+        Maps back to target model.
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_bake_prefix` not set.")
+
+    @cached_property
+    def _target_model(self) -> type[Model]:
+        """
+        Holds origin model (source model, where prefetches are attached).
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_target_model` not set.")
+
+    @cached_property
+    def _baked_results(self) -> dict[tuple[Hashable, ...], list[Any]]:
+        """
+        Persisted dict to store the baked results, mapping model keys to lists of
+        related instances.
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_baked_results` not set.")
 
     def check_for_collision(self, model: type[BaseModelType] | BaseModelType) -> None:
         """
@@ -111,22 +136,24 @@ class Prefetch:
         # If already baked or without baking model do not proceed.
         if self._baked:
             return
-        assert self.queryset is not None
-        assert self._baking_model is self.queryset.model_class
+        qs = self.queryset
+        assert qs is not None
         self._baked = True
         # Execute the queryset and asynchronously iterate over the results.
         # The `True` argument for `_execute_iterate` ensures all results are
         # fetched at once for processing.
-        executor = QueryExecutor(self.queryset)
+        executor = QueryExecutor(qs)
+        result_dict = defaultdict(list)
         async for _, result in executor.iterate(True):
             # Create a unique model key from the current SQLAlchemy row using the
             # specified bake prefix. This key links the prefetched item back to
             # its parent model instance.
-            model_key = self._baking_model.create_model_key_from_sqla_row(
+            model_key = self._target_model.create_model_key_from_sqla_row(
                 row=executor._current_row, row_prefix=self._bake_prefix
             )
             # Append the prefetched result to the list associated with its model key.
-            self._baked_results[model_key].append(result)
+            result_dict[model_key].append(result)
+        self._baked_results.update(result_dict)
 
 
 def check_prefetch_collision(
@@ -164,53 +191,3 @@ def check_prefetch_collision(
     )
     related.check_for_collision(model)
     return related
-
-
-class PrefetchMixin:
-    """
-    Mixin class providing methods for performing `prefetch_related` operations
-    on a QuerySet.
-
-    This mixin distinguishes between `select_related` (which performs SQL joins)
-    and `prefetch_related` (which performs separate lookups and Python-side
-    object mapping). It allows users to specify relationships that should be
-    eagerly loaded into separate attributes of the main model instances.
-    """
-
-    def prefetch_related(self, *prefetch: Prefetch) -> QuerySet:
-        """
-        Performs a reverse lookup for foreign keys and other relationships,
-        populating results onto the main model instances.
-
-        This method is distinct from `select_related` in that `select_related`
-        performs a SQL JOIN to fetch related data in the same query, whereas
-        `prefetch_related` executes separate queries for each relationship
-        and then joins the results in Python. This is particularly useful for
-        many-to-many relationships or reverse foreign key lookups, or when
-        preloading related objects for a large set of parent objects.
-
-        Args:
-            *prefetch (Prefetch): One or more `Prefetch` objects, each defining
-                                   a relationship to prefetch, including the
-                                   `related_name` and the `to_attr` where results
-                                   will be stored. An optional custom `QuerySet`
-                                   can also be provided within the `Prefetch` object.
-
-        Returns:
-            QuerySet: A new `QuerySet` instance with the specified prefetch
-                      relationships configured. This new QuerySet can then be
-                      further filtered, ordered, or executed.
-
-        Raises:
-            QuerySetError: If any argument passed to `prefetch` is not an
-                           instance of the `Prefetch` class.
-        """
-        queryset: QuerySet = self._clone()
-
-        # Validate that all provided arguments are instances of Prefetch.
-        if any(not isinstance(value, Prefetch) for value in prefetch):
-            raise QuerySetError("The prefetch_related must have Prefetch type objects only.")
-
-        # Append the new prefetch objects to the queryset's internal list.
-        queryset._prefetch_related = [*queryset._prefetch_related, *prefetch]
-        return queryset

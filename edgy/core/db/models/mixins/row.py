@@ -432,11 +432,13 @@ class ModelRowMixin:
         """
         # Generate the model key
         model_key = cls.create_model_key_from_sqla_row(row=row, row_prefix=row_prefix)
-        # If the model is the baking model, initialize and check the cache
-        if cast("type[Model]", cls) is related._baking_model:
+        # If the model is the target model, initialize and check the cache
+        if cast("type[Model]", cls) is related._target_model:
             # delay until now, we should only bake if the baking model is fitting
             await related.init_bake()
-            object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))
+            object.__setattr__(
+                model, related.to_attr, list(related._baked_results.get(model_key, ()))
+            )
         elif model_key in related._baked_results:
             # use cache if available
             object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))

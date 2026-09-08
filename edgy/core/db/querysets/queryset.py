@@ -27,6 +27,7 @@ from edgy.core.utils.sync import run_sync
 from edgy.exceptions import ObjectNotFound, QuerySetError, SkipOperation
 
 from .bulk import BulkOperation
+from .prefetch import Prefetch
 from .types import (
     EdgyEmbedTarget,
     EdgyModel,
@@ -1015,6 +1016,44 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         """
         queryset = self._clone()
         queryset.embed_parent = embed_parent
+        return queryset
+
+    def prefetch_related(self, *prefetch: Prefetch) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
+        """
+        Performs a reverse lookup for foreign keys and other relationships,
+        populating results onto the main model instances.
+
+        This method is distinct from `select_related` in that `select_related`
+        performs a SQL JOIN to fetch related data in the same query, whereas
+        `prefetch_related` executes separate queries for each relationship
+        and then joins the results in Python. This is particularly useful for
+        many-to-many relationships or reverse foreign key lookups, or when
+        preloading related objects for a large set of parent objects.
+
+        Args:
+            *prefetch (Prefetch): One or more `Prefetch` objects, each defining
+                                   a relationship to prefetch, including the
+                                   `related_name` and the `to_attr` where results
+                                   will be stored. An optional custom `QuerySet`
+                                   can also be provided within the `Prefetch` object.
+
+        Returns:
+            QuerySet: A new `QuerySet` instance with the specified prefetch
+                      relationships configured. This new QuerySet can then be
+                      further filtered, ordered, or executed.
+
+        Raises:
+            QuerySetError: If any argument passed to `prefetch` is not an
+                           instance of the `Prefetch` class.
+        """
+        queryset: QuerySet = self._clone()
+
+        # Validate that all provided arguments are instances of Prefetch.
+        if any(not isinstance(value, Prefetch) for value in prefetch):
+            raise QuerySetError("The prefetch_related must have Prefetch type objects only.")
+
+        # Append the new prefetch objects to the queryset's internal list.
+        queryset._prefetch_related = [*queryset._prefetch_related, *prefetch]
         return queryset
 
     async def delete(self, *, use_models: bool = False) -> int | None:
