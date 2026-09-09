@@ -61,7 +61,7 @@ class ModelRowMixin:
         row: Row,
         tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
         select_related: Sequence[Any] | None = None,
-        prefetch_related: Sequence[Prefetch] | None = None,
+        prefetch_related: dict[str, Sequence[Prefetch]] | None = None,
         only_fields: Sequence[str] | None = None,
         is_defer_fields: bool = False,
         exclude_secrets: bool = False,
@@ -124,7 +124,6 @@ class ModelRowMixin:
         )
         model_kwargs: dict[str, Any] = {}  # Dictionary to store the model's attributes.
         select_related = select_related or []
-        prefetch_related = prefetch_related or []
         secret_columns: set[str] = set()
 
         # If exclude_secrets is True, gather all column names corresponding to secret fields.
@@ -171,8 +170,7 @@ class ModelRowMixin:
                     row=row,
                     tables_and_models=tables_and_models,
                     select_related=[remainder],
-                    # we currently only set prefetches to the main query
-                    # prefetch_related=prefetch_related,
+                    prefetch_related=prefetch_related,
                     exclude_secrets=exclude_secrets,
                     is_defer_fields=is_defer_fields,
                     using_schema=using_schema,
@@ -186,6 +184,7 @@ class ModelRowMixin:
                 model_kwargs[field_name] = await model_class.from_sqla_row(
                     row=row,
                     tables_and_models=tables_and_models,
+                    prefetch_related=prefetch_related,
                     exclude_secrets=exclude_secrets,
                     is_defer_fields=is_defer_fields,
                     using_schema=using_schema,
@@ -350,13 +349,13 @@ class ModelRowMixin:
         )
 
         # Handle prefetch_related fields if specified.
-        if prefetch_related:
+        if prefetch_related and (prefetch_related_list := prefetch_related.get(prefix or "")):
             await cls.__handle_prefetch_related(
                 row=row,
                 prefix=prefix,
                 model=model,
                 tables_and_models=tables_and_models,
-                prefetch_related=prefetch_related,
+                prefetch_related_list=prefetch_related_list,
             )
         assert model.pk is not None, model  # Ensure the primary key is not None.
         return model
@@ -447,7 +446,7 @@ class ModelRowMixin:
         model: Model,
         prefix: str,
         tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
-        prefetch_related: Sequence[Prefetch],
+        prefetch_related_list: Sequence[Prefetch],
     ) -> None:
         """
         Manages the execution of all `prefetch_related` queries for a given model instance.
@@ -472,7 +471,8 @@ class ModelRowMixin:
         """
         queries = []
 
-        for related in prefetch_related:
+        for related in prefetch_related_list:
+            assert (prefix or "") == related._forward_path
             # Check for conflicting names early to prevent unexpected overwrites.
             related.check_for_collision(model=model)
             row_prefix = f"{tables_and_models[prefix][0].key}_" if prefix else ""

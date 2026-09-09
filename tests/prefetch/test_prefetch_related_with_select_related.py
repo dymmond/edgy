@@ -58,7 +58,7 @@ async def test_prefetch_related():
     await Track.query.create(album=fantasies, title="Satellite Mind", position=3)
 
     track = await Track.query.prefetch_related(
-        Prefetch("tracks_set", to_attr="albums", queryset=Album.query.filter())
+        Prefetch(related_name="tracks_set", to_attr="albums", queryset=Album.query.filter())
     ).get(title="The Bird")
 
     assert track.album.pk == 1
@@ -79,7 +79,9 @@ async def test_prefetch_related_with_select_related():
 
     track = (
         await Track.query.select_related("album")
-        .prefetch_related(Prefetch("tracks_set", to_attr="albums", queryset=Album.query.filter()))
+        .prefetch_related(
+            Prefetch(related_name="tracks_set", to_attr="albums", queryset=Album.query.filter())
+        )
         .get(title="The Bird")
     )
 
@@ -96,7 +98,9 @@ async def test_prefetch_related_with_select_related_return_multiple():
 
     tracks = (
         await Track.query.select_related("album")
-        .prefetch_related(Prefetch("tracks_set", to_attr="albums", queryset=Album.query.filter()))
+        .prefetch_related(
+            Prefetch(related_name="tracks_set", to_attr="albums", queryset=Album.query.filter())
+        )
         .filter(title="The Bird")
     )
 
@@ -111,7 +115,9 @@ async def test_prefetch_related_with_select_related_return_none():
 
     tracks = (
         await Track.query.select_related("album")
-        .prefetch_related(Prefetch("tracks_set", to_attr="albums", queryset=Album.query.filter()))
+        .prefetch_related(
+            Prefetch(related_name="tracks_set", to_attr="albums", queryset=Album.query.filter())
+        )
         .filter(album__id=2)
     )
 

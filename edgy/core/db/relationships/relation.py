@@ -877,6 +877,8 @@ class SingleRelation(ManyRelationProtocol):
         Returns:
             BaseModelType | None: The newly created and added child instance.
         """
+        # we need to add the instance here to satisfy pydantic constraints
+        kwargs[self.to_foreign_key] = self.instance
         return await self.add(self.to(*args, **kwargs))
 
     async def add(self, child: BaseModelType) -> BaseModelType | None:

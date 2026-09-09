@@ -448,6 +448,7 @@ class BaseQuerySet(
         """
         This is a result transformation, called by the Parser.
         """
+        # FIXME: we might should reassign prefetches after resolving
         if isawaitable(result):
             result = await result
         if result is None:

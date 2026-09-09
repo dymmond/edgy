@@ -2,6 +2,10 @@
 
 ## 0.37.0
 
+### Added
+
+- Add different anchor points for prefetches.
+
 ### Changed
 
 - Make Fields, FieldToColumns, FieldToColumnNames and ColumnsRemapping appropriate mappings.
@@ -9,6 +13,7 @@
 - Fix contracts; it was always an error to access the data attribute directly (just inherited from UserDict).
 - `create_model_key_from_sqla_row` and `from_sqla_row` are keyword only now, so we can better overwrite it. E.g. for test purposes.
 - Make Prefetch `init_bake` and more internal. QuerySetErrors are now raised if the attributes are illegally accessed.
+- Make Prefetch keyword-only like in documentation.
 
 ### Removed
 

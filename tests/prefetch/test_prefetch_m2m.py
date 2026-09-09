@@ -23,8 +23,18 @@ class IntrospectingModel(edgy.StrictModel):
         prefetches = kwargs.get("prefetch_related")
         initial_dicts = None
         if prefetches:
-            await asyncio.gather(*(prefetch._init_bake() for prefetch in prefetches))
-            initial_dicts = [dict(prefetch._baked_results) for prefetch in prefetches]
+            await asyncio.gather(
+                *(
+                    prefetch._init_bake()
+                    for prefetch_list in prefetches.values()
+                    for prefetch in prefetch_list
+                )
+            )
+            initial_dicts = [
+                dict(prefetch._baked_results)
+                for prefetch_list in prefetches.values()
+                for prefetch in prefetch_list
+            ]
         returnobj = await super().from_sqla_row(**kwargs)
         object.__setattr__(returnobj, "introspected_prefetches", prefetches)
         object.__setattr__(returnobj, "introspected_prefetches_initial_baked", initial_dicts)
@@ -94,7 +104,7 @@ async def test_prefetch_m2m_directly():
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
     )
-    assert all(prefetch._baked_results for prefetch in space_query.introspected_prefetches)
+    assert all(prefetch._baked_results for prefetch in space_query.introspected_prefetches[""])
     assert space.create_model_key() in space_query.introspected_prefetches_initial_baked[0]
 
 
@@ -127,7 +137,7 @@ async def test_prefetch_m2m_directly_mixed():
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
     )
-    assert all(prefetch._baked_results for prefetch in space_query.introspected_prefetches)
+    assert all(prefetch._baked_results for prefetch in space_query.introspected_prefetches[""])
     assert space.create_model_key() in space_query.introspected_prefetches_initial_baked[0]
 
 
@@ -158,7 +168,7 @@ async def test_prefetch_m2m_directly_mixed_none():
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
     )
-    assert all(prefetch._baked for prefetch in space_query.introspected_prefetches)
+    assert all(prefetch._baked for prefetch in space_query.introspected_prefetches[""])
     # the dictionary is empty, so we can't find it
     assert space.create_model_key() not in space_query.introspected_prefetches_initial_baked[0]
 
@@ -192,7 +202,7 @@ async def test_prefetch_m2m_reverse_prefetch():
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
     )
-    assert all(prefetch._baked_results for prefetch in user_query.introspected_prefetches)
+    assert all(prefetch._baked_results for prefetch in user_query.introspected_prefetches[""])
     assert user_query.create_model_key() in user_query.introspected_prefetches_initial_baked[0]
 
 

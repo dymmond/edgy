@@ -23,8 +23,18 @@ class IntrospectingModel(edgy.StrictModel):
         prefetches = kwargs.get("prefetch_related")
         initial_dicts = None
         if prefetches:
-            await asyncio.gather(*(prefetch._init_bake() for prefetch in prefetches))
-            initial_dicts = [dict(prefetch._baked_results) for prefetch in prefetches]
+            await asyncio.gather(
+                *(
+                    prefetch._init_bake()
+                    for prefetch_list in prefetches.values()
+                    for prefetch in prefetch_list
+                )
+            )
+            initial_dicts = [
+                dict(prefetch._baked_results)
+                for prefetch_list in prefetches.values()
+                for prefetch in prefetch_list
+            ]
         returnobj = await super().from_sqla_row(**kwargs)
         object.__setattr__(returnobj, "introspected_prefetches", prefetches)
         object.__setattr__(returnobj, "introspected_prefetches_initial_baked", initial_dicts)
@@ -93,7 +103,7 @@ async def test_multiple_prefetch_single_user_model_shared_cache():
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
     )
-    assert all(prefetch._baked_results for prefetch in users[0].introspected_prefetches)
+    assert all(prefetch._baked_results for prefetch in users[0].introspected_prefetches[""])
     assert all(
         users[0].create_model_key() in prefetch_dict
         for prefetch_dict in users[0].introspected_prefetches_initial_baked
@@ -132,17 +142,19 @@ async def test_multiple_prefetch_model_shared_cache():
         for prefetch in prefetches
     )
     assert all(
-        prefetch._baked_results for _user in users for prefetch in _user.introspected_prefetches
+        prefetch._baked_results
+        for _user in users
+        for prefetch in _user.introspected_prefetches[""]
     )
 
     assert users[0].introspected_prefetches is users[1].introspected_prefetches
     assert (
-        users[0].introspected_prefetches[0]._baked_results
-        is users[1].introspected_prefetches[0]._baked_results
+        users[0].introspected_prefetches[""][0]._baked_results
+        is users[1].introspected_prefetches[""][0]._baked_results
     )
     assert (
-        users[0].introspected_prefetches[1]._baked_results
-        is users[1].introspected_prefetches[1]._baked_results
+        users[0].introspected_prefetches[""][1]._baked_results
+        is users[1].introspected_prefetches[""][1]._baked_results
     )
     assert all(
         users[1].create_model_key() in prefetch_dict
@@ -180,7 +192,7 @@ async def test_multiple_prefetch_model_calls(batch_size):
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
     )
-    assert all(prefetch._baked_results for prefetch in users[0].introspected_prefetches)
+    assert all(prefetch._baked_results for prefetch in users[0].introspected_prefetches[""])
 
     user1 = [value for value in users if value.pk == user.pk][0]
     assert len(user1.to_posts) == 5

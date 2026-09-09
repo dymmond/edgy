@@ -2,7 +2,6 @@ import pytest
 
 import edgy
 from edgy.core.db.querysets import Prefetch
-from edgy.exceptions import QuerySetError
 from edgy.testclient import DatabaseTestClient
 from tests.settings import DATABASE_URL
 
@@ -21,15 +20,15 @@ class User(edgy.StrictModel):
 
 class Post(edgy.StrictModel):
     user = edgy.ForeignKey(User, related_name="posts")
-    comment = edgy.CharField(max_length=255)
+    body = edgy.CharField(max_length=255)
 
     class Meta:
         registry = models
 
 
-class Article(edgy.StrictModel):
-    user = edgy.ForeignKey(User, related_name="articles")
-    content = edgy.CharField(max_length=255)
+class Comment(edgy.StrictModel):
+    post = edgy.ForeignKey(Post, related_name="comments")
+    body = edgy.CharField(max_length=255)
 
     class Meta:
         registry = models
@@ -52,23 +51,20 @@ async def rollback_transactions():
         yield
 
 
-class Test: ...
+async def test_prefetch_select_related():
+    user = await User.query.create(name="Edgy")
+    post = await user.posts.create(body="edgy is the best ORM ever")
+    await post.comments.create(body="is true")
+    await post.comments.create(body="I like javascript")
 
+    post = await user.posts.create(body="ravyn can handle asgi on a top level")
+    await post.comments.create(body="is true")
+    await post.comments.create(body="is really true")
 
-async def test_multiple_prefetch_model_calls():
-    await User.query.create(name="Edgy")
-
-    with pytest.raises(QuerySetError):
-        await User.query.prefetch_related(
-            Prefetch(related_name="posts", to_attr="posts"),
-            Prefetch(related_name="articles", to_attr="articles"),
-        ).all()
-
-
-async def test_raise_prefetch_related_error():
-    await User.query.create(name="Edgy")
-
-    with pytest.raises(QuerySetError):
-        await User.query.prefetch_related(
-            Test(),
-        ).all()
+    posts = await Comment.query.prefetch_related(
+        Prefetch(to_attr="post__comments_filtered", related_name="post__comments"),
+        Prefetch(to_attr="post__users_filtered", related_name="post__user"),
+    ).update_embed_parent(("post", "origin_comment"))
+    assert len(posts) == 4
+    assert len(posts[0].comments_filtered)
+    assert len(posts[2].comments_filtered)

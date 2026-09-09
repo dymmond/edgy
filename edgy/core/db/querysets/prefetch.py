@@ -29,14 +29,16 @@ class Prefetch:
 
     def __init__(
         self,
+        *,
         related_name: str,
         to_attr: str,
         queryset: QuerySet | None = None,
+        anchor_path: str | None = None,
     ) -> None:
         """
         Initializes a Prefetch object.
 
-        Args:
+        Kwargs:
             related_name (str): The name of the related field (e.g., a reverse
                                  foreign key relation or a many-to-many relation)
                                  to prefetch. This corresponds to the name of the
@@ -51,12 +53,23 @@ class Prefetch:
                                          queryset for the related model. This allows
                                          for custom filtering or ordering of the
                                          prefetched data.
+            anchor_path (str): The path to the start
         """
         self.related_name = related_name
         self.to_attr = to_attr
         self.queryset: QuerySet | None = queryset
+        self.anchor_path = anchor_path or ""
         # Internal flag to indicate if the baking process has been completed.
         self._baked = False
+
+    @cached_property
+    def _forward_path(self) -> str:
+        """
+        Forward path for matching.
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_forward_path` not set.")
 
     @cached_property
     def _baking_finished(self) -> asyncio.Event:

@@ -15,6 +15,7 @@ from edgy.exceptions import QuerySetError
 from .types import EdgyEmbedTarget, EdgyModel, tables_and_models_type
 
 if TYPE_CHECKING:  # pragma: no cover
+    from edgy import Model
     from edgy.core.db.querysets.base import BaseQuerySet
     from edgy.core.db.querysets.queryset import QuerySet
 
@@ -34,7 +35,7 @@ class ResultParser:
     def prepare_prefetches_for_rows(
         self,
         rows: Sequence[sqlalchemy.Row],
-    ) -> list[Prefetch]:
+    ) -> dict[str, list[Prefetch]]:
         """
         Builds the Prefetch objects for a given batch of results.
         This is the *prefetch building* half of the original _handle_batch.
@@ -50,46 +51,57 @@ class ResultParser:
             NotImplementedError: If a prefetch crosses database boundaries.
             QuerySetError: If a prefetch path is invalid (e.g., unidirectional).
         """
-        prepared_prefetches: list[Prefetch] = []
-        seen_prefetches: set[tuple[None | int, str, str]] = set()
+        prepared_prefetches: dict[str, list[Prefetch]] = {}
+        seen_prefetches: set[tuple[None | int, str, str, str]] = set()
 
         for prefetch in self.queryset._prefetch_related:
             compare_tuple = (
                 id(prefetch.queryset) if prefetch.queryset is not None else None,
                 prefetch.related_name,
+                prefetch.anchor_path,
                 prefetch.to_attr,
             )
             if compare_tuple in seen_prefetches:
                 continue
             else:
                 seen_prefetches.add(compare_tuple)
-
-            crawl_result = crawl_relationship(
-                self.model_class, prefetch.related_name, traverse_last=True
+            target_crawl_result = crawl_relationship(
+                self.model_class, prefetch.to_attr, allow_crossing_db=True
             )
-            if crawl_result.cross_db_remainder:
+            source_crawl_result = crawl_relationship(
+                self.model_class, prefetch.anchor_path, allow_crossing_db=True, traverse_last=True
+            )
+
+            prefetch_crawl_result = crawl_relationship(
+                source_crawl_result.model_class, prefetch.related_name, traverse_last=True
+            )
+            if prefetch_crawl_result.cross_db_remainder:
                 raise NotImplementedError(
                     "Cannot prefetch from other db yet. Maybe in future this feature will be added."
                 )
-            if crawl_result.reverse_path is False:
+            if prefetch_crawl_result.reverse_path is False:
                 raise QuerySetError(
                     detail=("Creating a reverse path is not possible, unidirectional fields used.")
                 )
 
-            prefetch.check_for_collision(self.model_class)
-            new_prefetch = Prefetch(related_name=prefetch.related_name, to_attr=prefetch.to_attr)
+            prefetch.check_for_collision(source_crawl_result.model_class)
+            new_prefetch = Prefetch(
+                related_name=prefetch.related_name,
+                to_attr=prefetch.to_attr,
+                anchor_path=prefetch.anchor_path,
+            )
 
             prefetch_queryset: QuerySet | None = prefetch.queryset
 
             clauses = [
                 {
-                    f"{crawl_result.reverse_path}__{pkcol}": row._mapping[pkcol]
-                    for pkcol in crawl_result.model_class.pkcolumns
+                    f"{prefetch_crawl_result.reverse_path}__{pkcol}": row._mapping[pkcol]
+                    for pkcol in source_crawl_result.model_class.pkcolumns
                 }
                 for row in rows
             ]
             if prefetch_queryset is None:
-                prefetch_queryset = crawl_result.model_class.query.local_or(*clauses)
+                prefetch_queryset = prefetch_crawl_result.model_class.query.local_or(*clauses)
             else:
                 prefetch_queryset = prefetch_queryset.local_or(*clauses)
 
@@ -97,14 +109,17 @@ class ResultParser:
                 prefetch_queryset = prefetch_queryset.select_related(prefetch.related_name)
                 prefetch_queryset.embed_parent = (prefetch.related_name, "")
             else:
-                prefetch_queryset = prefetch_queryset.select_related(crawl_result.reverse_path)
+                prefetch_queryset = prefetch_queryset.select_related(
+                    prefetch_crawl_result.reverse_path
+                )
             # the assigned queryset has an empty cache
             new_prefetch.queryset = prefetch_queryset
+            new_prefetch._forward_path = target_crawl_result.forward_path
             new_prefetch._baking_finished = asyncio.Event()
-            new_prefetch._target_model = self.model_class
-            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=self.tables_and_models[''][0].key, prefix=crawl_result.reverse_path)}_"
+            new_prefetch._target_model = cast("type[Model]", target_crawl_result.model_class)
+            new_prefetch._bake_prefix = f"{hash_tablekey(tablekey=self.tables_and_models[''][0].key, prefix=prefetch_crawl_result.reverse_path)}_"
             new_prefetch._baked_results = {}
-            prepared_prefetches.append(new_prefetch)
+            prepared_prefetches.setdefault(new_prefetch._forward_path, []).append(new_prefetch)
         return prepared_prefetches
 
     async def row_to_model_uncached(
