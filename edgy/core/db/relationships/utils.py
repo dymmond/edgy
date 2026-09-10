@@ -140,10 +140,15 @@ def crawl_relationship(
                 operator = splitted[1]
                 break
             else:
+                if field is None:
+                    raise ValueError(
+                        f"Tried to cross field: `{field_name}` which does not exist"
+                        f"remainder: `{splitted[1]}`"
+                    )
                 # Raise an error if trying to cross a non-relationship field with further segments.
                 raise ValueError(
-                    f"Tried to cross field: {field_name} of type {field!r}, "
-                    f"remainder: {splitted[1]}"
+                    f"Tried to cross field: `{field_name}` of type `{field!r}`, "
+                    f"remainder: `{splitted[1]}`"
                 )
         else:
             # If only one part remains, it's the final field name, and the operator is "exact".

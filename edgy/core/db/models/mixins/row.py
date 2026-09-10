@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Hashable, Sequence
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.models.utils import apply_instance_extras
-from edgy.core.utils.concurrency import run_concurrently
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -16,7 +15,6 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.connection import Database
     from edgy.core.db.models.model import Model
     from edgy.core.db.models.types import BaseModelType
-    from edgy.core.db.querysets.prefetch import Prefetch
     from edgy.core.db.querysets.types import reference_select_type
 
 
@@ -61,7 +59,6 @@ class ModelRowMixin:
         row: Row,
         tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
         select_related: Sequence[Any] | None = None,
-        prefetch_related: dict[str, Sequence[Prefetch]] | None = None,
         only_fields: Sequence[str] | None = None,
         is_defer_fields: bool = False,
         exclude_secrets: bool = False,
@@ -87,8 +84,6 @@ class ModelRowMixin:
                 representing the tables and models involved in the query.
             select_related (Sequence[Any] | None): An optional sequence of relationship
                 names to eager-load. These relationships will be joined in the main query.
-            prefetch_related (Sequence[Prefetch] | None): An optional sequence of `Prefetch`
-                objects for pre-fetching related data in separate queries.
             only_fields (Sequence[str] | None): An optional sequence of field names to
                 include in the model instance. If specified, only these fields will be
                 populated.
@@ -170,7 +165,6 @@ class ModelRowMixin:
                     row=row,
                     tables_and_models=tables_and_models,
                     select_related=[remainder],
-                    prefetch_related=prefetch_related,
                     exclude_secrets=exclude_secrets,
                     is_defer_fields=is_defer_fields,
                     using_schema=using_schema,
@@ -184,7 +178,6 @@ class ModelRowMixin:
                 model_kwargs[field_name] = await model_class.from_sqla_row(
                     row=row,
                     tables_and_models=tables_and_models,
-                    prefetch_related=prefetch_related,
                     exclude_secrets=exclude_secrets,
                     is_defer_fields=is_defer_fields,
                     using_schema=using_schema,
@@ -348,15 +341,6 @@ class ModelRowMixin:
             table=tables_and_models[prefix][0],
         )
 
-        # Handle prefetch_related fields if specified.
-        if prefetch_related and (prefetch_related_list := prefetch_related.get(prefix or "")):
-            await cls.__handle_prefetch_related(
-                row=row,
-                prefix=prefix,
-                model=model,
-                tables_and_models=tables_and_models,
-                prefetch_related_list=prefetch_related_list,
-            )
         assert model.pk is not None, model  # Ensure the primary key is not None.
         return model
 
@@ -381,105 +365,3 @@ class ModelRowMixin:
             if related_name in fields:
                 return True
         return False
-
-    @classmethod
-    def create_model_key_from_sqla_row(
-        cls, *, row: Row, row_prefix: str = ""
-    ) -> tuple[Hashable, ...]:
-        """
-        Builds a unique cache key for a model instance based on its class name and
-        primary key values extracted from a SQLAlchemy row.
-
-        Args:
-            row (Row): The SQLAlchemy row object from which to extract primary key values.
-            row_prefix (str): An optional prefix for column names in the row mapping,
-                used when dealing with joined tables.
-
-        Returns:
-            tuple: A tuple representing the unique key for the model instance.
-        """
-        pk_key_list: list[Any] = [cls.__name__]
-        for attr in cls.pkcolumns:
-            # Append the primary key value from the row to the key list.
-            pk_key_list.append(str(row._mapping[f"{row_prefix}{attr}"]))
-        return tuple(pk_key_list)
-
-    @classmethod
-    async def __set_prefetch(
-        cls,
-        row: Row,
-        model: Model,
-        row_prefix: str,
-        related: Prefetch,
-    ) -> None:
-        """
-        Sets a prefetched relationship on a model instance. This method handles the logic
-        of retrieving and associating the prefetched data.
-
-        Args:
-            row (Row): The SQLAlchemy row from which the main model was constructed.
-            model (Model): The Edgy Model instance to which the prefetched data will be
-                attached.
-            row_prefix (str): The prefix used for columns in the SQLAlchemy row,
-                representing the main model's table.
-            related (Prefetch): The Prefetch object specifying the relationship to prefetch.
-
-        Raises:
-            QuerySetError: If creating a reverse path is not possible (e.g., for
-                unidirectional fields).
-            NotImplementedError: If prefetching from other databases is attempted.
-        """
-        # Generate the model key
-        model_key = cls.create_model_key_from_sqla_row(row=row, row_prefix=row_prefix)
-        # If the model is the target model, initialize and check the cache
-        assert cast("type[Model]", cls) is related._target_model
-        # Delay until now, we should only bake if the target model is fitting but this is safe.
-        await related._init_bake()
-        # Ensure it is in the baked results.
-        related._baked_results.setdefault(model_key, [])
-        object.__setattr__(model, related.to_attr, list(related._baked_results[model_key]))
-
-    @classmethod
-    async def __handle_prefetch_related(
-        cls,
-        row: Row,
-        model: Model,
-        prefix: str,
-        tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
-        prefetch_related_list: Sequence[Prefetch],
-    ) -> None:
-        """
-        Manages the execution of all `prefetch_related` queries for a given model instance.
-        This method iterates through the specified prefetch relationships, checks for
-        collisions, and initiates the asynchronous loading of related data.
-
-        Args:
-            row (Row): The SQLAlchemy row from which the main model was constructed.
-            model (Model): The Edgy Model instance for which prefetch relationships are
-                to be handled.
-            prefix (str): The prefix used for columns in the SQLAlchemy row,
-                representing the main model's table.
-            tables_and_models (dict[str, tuple[Table, type[BaseModelType]]]): A dictionary
-                mapping prefixes to tuples of SQLAlchemy Table objects and Edgy Model types,
-                representing the tables and models involved in the query.
-            prefetch_related (Sequence[Prefetch]): A sequence of `Prefetch` objects to
-                process.
-
-        Raises:
-            QuerySetError: If a conflicting attribute is found that would be
-                overwritten by a prefetch operation.
-        """
-        queries = []
-
-        for related in prefetch_related_list:
-            assert (prefix or "") == related._forward_path
-            # Check for conflicting names early to prevent unexpected overwrites.
-            related.check_for_collision(model=model)
-            row_prefix = f"{tables_and_models[prefix][0].key}_" if prefix else ""
-            queries.append(
-                cls.__set_prefetch(row=row, row_prefix=row_prefix, model=model, related=related)
-            )
-
-        # Execute all prefetch queries concurrently if there are any.
-        if queries:
-            await run_concurrently(queries)

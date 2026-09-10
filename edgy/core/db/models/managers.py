@@ -139,10 +139,11 @@ class Manager(BaseManager):
         if name == "model_class":
             # legacy fallback
             return self.owner
+        queryset = self.get_queryset()
         try:
             # Attempt to get the attribute from the queryset first. This allows
             # methods like .filter(), .get() to be called directly on the manager.
-            return getattr(self.get_queryset(), name)
+            return getattr(queryset, name)
         except AttributeError:
             # If the attribute is not found on the queryset, try to get it from the owner model.
             return getattr(self.owner, name)

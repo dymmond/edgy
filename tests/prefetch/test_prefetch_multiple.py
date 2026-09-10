@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 import edgy
@@ -13,42 +11,14 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
-class IntrospectingModel(edgy.StrictModel):
-    class Meta:
-        registry = models
-        abstract = True
-
-    @classmethod
-    async def from_sqla_row(cls, **kwargs) -> edgy.Model:
-        prefetches = kwargs.get("prefetch_related")
-        initial_dicts = None
-        if prefetches:
-            await asyncio.gather(
-                *(
-                    prefetch._init_bake()
-                    for prefetch_list in prefetches.values()
-                    for prefetch in prefetch_list
-                )
-            )
-            initial_dicts = [
-                dict(prefetch._baked_results)
-                for prefetch_list in prefetches.values()
-                for prefetch in prefetch_list
-            ]
-        returnobj = await super().from_sqla_row(**kwargs)
-        object.__setattr__(returnobj, "introspected_prefetches", prefetches)
-        object.__setattr__(returnobj, "introspected_prefetches_initial_baked", initial_dicts)
-        return returnobj
-
-
-class User(IntrospectingModel):
+class User(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
 
     class Meta:
         registry = models
 
 
-class Post(IntrospectingModel):
+class Post(edgy.StrictModel):
     user = edgy.ForeignKey(User, related_name="posts")
     comment = edgy.CharField(max_length=255)
 
@@ -56,7 +26,7 @@ class Post(IntrospectingModel):
         registry = models
 
 
-class Article(IntrospectingModel):
+class Article(edgy.StrictModel):
     user = edgy.ForeignKey(User, related_name="articles")
     content = edgy.CharField(max_length=255)
 
@@ -99,16 +69,6 @@ async def test_multiple_prefetch_single_user_model_shared_cache():
 
     assert len(users) == 1
 
-    assert all(
-        not prefetch._baked and "_baked_results" not in prefetch.__dict__
-        for prefetch in prefetches
-    )
-    assert all(prefetch._baked_results for prefetch in users[0].introspected_prefetches[""])
-    assert all(
-        users[0].create_model_key() in prefetch_dict
-        for prefetch_dict in users[0].introspected_prefetches_initial_baked
-    )
-
     assert len(users[0].to_posts) == 5
     assert len(users[0].to_articles) == 50
 
@@ -140,25 +100,6 @@ async def test_multiple_prefetch_model_shared_cache():
     assert all(
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
-    )
-    assert all(
-        prefetch._baked_results
-        for _user in users
-        for prefetch in _user.introspected_prefetches[""]
-    )
-
-    assert users[0].introspected_prefetches is users[1].introspected_prefetches
-    assert (
-        users[0].introspected_prefetches[""][0]._baked_results
-        is users[1].introspected_prefetches[""][0]._baked_results
-    )
-    assert (
-        users[0].introspected_prefetches[""][1]._baked_results
-        is users[1].introspected_prefetches[""][1]._baked_results
-    )
-    assert all(
-        users[1].create_model_key() in prefetch_dict
-        for prefetch_dict in users[1].introspected_prefetches_initial_baked
     )
 
 
@@ -192,7 +133,6 @@ async def test_multiple_prefetch_model_calls(batch_size):
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
     )
-    assert all(prefetch._baked_results for prefetch in users[0].introspected_prefetches[""])
 
     user1 = [value for value in users if value.pk == user.pk][0]
     assert len(user1.to_posts) == 5

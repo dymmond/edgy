@@ -447,7 +447,7 @@ class QueryModelResultCache:
         model_class: type[BaseModelType],
         row_or_models: Sequence[Any],
         cache_fn: Callable[[Any], BaseModelType | None] | None = None,
-        transform_fn: Callable[[BaseModelType | None], Any] | None = None,
+        transform_fn: Callable[[int, BaseModelType | None], Any] | None = None,
         prefix: str | None = None,
         old_cache: QueryModelResultCache | None = None,
     ) -> Sequence[Any]:
@@ -470,7 +470,7 @@ class QueryModelResultCache:
                                                                      a `BaseModelType`
                                                                      instance to cache.
                                                                      Defaults to None.
-            transform_fn (Callable[[BaseModelType | None], Any] | None): An optional
+            transform_fn (Callable[[int, BaseModelType | None], Any] | None): An optional
                                                                         synchronous
                                                                         function to
                                                                         transform the
@@ -491,7 +491,7 @@ class QueryModelResultCache:
         cache_update: list[BaseModelType] = []
         results: list[Any | None] = []
 
-        for row_or_model in row_or_models:
+        for pos, row_or_model in enumerate(row_or_models):
             try:
                 # Attempt to create a cache key for the current row or model.
                 cache_key = self.create_cache_key(model_class, row_or_model, prefix=prefix)
@@ -501,7 +501,7 @@ class QueryModelResultCache:
                 if cache_fn is not None:
                     result = cache_fn(row_or_model)
                 if transform_fn is not None:
-                    result = transform_fn(result)
+                    result = transform_fn(pos, result)
                 results.append(result)
                 continue
 
@@ -515,7 +515,7 @@ class QueryModelResultCache:
                     cache_update_keys.append(cache_key)
                     if transform_fn is not None:
                         # Apply transformation if a transform_fn is provided.
-                        result = transform_fn(result)
+                        result = transform_fn(pos, result)
                     cache_update.append(result)
             results.append(result)
         # Update the cache with any newly created entries.
@@ -527,7 +527,7 @@ class QueryModelResultCache:
         model_class: type[BaseModelType],
         row_or_models: Sequence[Any],
         cache_fn: Callable[[Any], Awaitable[BaseModelType | None]] | None = None,
-        transform_fn: Callable[[BaseModelType | None], Awaitable[Any]] | None = None,
+        transform_fn: Callable[[int, BaseModelType | None], Awaitable[Any]] | None = None,
         prefix: str | None = None,
         old_cache: Self | None = None,
     ) -> Sequence[Any]:
@@ -545,7 +545,7 @@ class QueryModelResultCache:
             cache_fn (Callable[[Any], Awaitable[BaseModelType | None]] | None):
                 An optional asynchronous function that takes a row/model and returns
                 a `BaseModelType` instance to cache. Defaults to None.
-            transform_fn (Callable[[BaseModelType | None], Awaitable[Any]] | None):
+            transform_fn (Callable[[int, BaseModelType | None], Awaitable[Any]] | None):
                 An optional asynchronous function to transform the cached model
                 instance before returning it. Defaults to None.
             prefix (str | None): The prefix for the cache category. If None, the
@@ -560,7 +560,7 @@ class QueryModelResultCache:
         cache_update: dict[Any, Any] = {}
         ops: list = []
 
-        async def _helper(row_or_model: Any) -> Any:
+        async def _helper(pos: int, row_or_model: Any) -> Any:
             try:
                 # Attempt to create a cache key for the current row or model.
                 cache_key = self.create_cache_key(model_class, row_or_model, prefix=prefix)
@@ -571,7 +571,7 @@ class QueryModelResultCache:
                 if cache_fn is not None:
                     result = await cache_fn(row_or_model)
                 if transform_fn is not None:
-                    result = await transform_fn(result)
+                    result = await transform_fn(pos, result)
                 return result
 
             # Attempt to retrieve the result from the cache.
@@ -582,12 +582,12 @@ class QueryModelResultCache:
                 if result is not None:
                     if transform_fn is not None:
                         # Apply asynchronous transformation if a transform_fn is provided.
-                        result = await transform_fn(result)
+                        result = await transform_fn(pos, result)
                     cache_update[cache_key] = result
             return result
 
-        for row_or_model in row_or_models:
-            ops.append(_helper(row_or_model))
+        for pos, row_or_model in enumerate(row_or_models):
+            ops.append(_helper(pos, row_or_model))
 
         results: list[BaseModelType | None] = await run_concurrently(
             ops, limit=getattr(settings, "orm_row_prefetch_limit", None)

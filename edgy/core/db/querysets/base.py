@@ -10,7 +10,6 @@ from collections.abc import (
 )
 from contextvars import ContextVar
 from functools import cached_property
-from inspect import isawaitable
 from itertools import chain
 from typing import (
     TYPE_CHECKING,
@@ -18,12 +17,11 @@ from typing import (
     Generic,
     Literal,
     cast,
-    overload,
 )
 
 import sqlalchemy
 
-from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR, get_schema
+from edgy.core.db.context_vars import get_schema
 from edgy.core.db.datastructures import QueryModelResultCache
 from edgy.core.db.fields.base import BaseForeignKey
 from edgy.core.db.models.types import BaseModelType
@@ -34,7 +32,7 @@ from edgy.types import Undefined
 from . import clauses as clauses_mod
 from .compiler import QueryCompiler
 from .executor import QueryExecutor
-from .mixins import QuerySetPropsMixin, TenancyMixin
+from .mixins import EmbeddingMixin, QuerySetPropsMixin, TenancyMixin
 from .types import (
     EdgyEmbedTarget,
     EdgyModel,
@@ -58,6 +56,7 @@ _injected_filters_deletion: ContextVar[Iterable] = ContextVar(
 
 class BaseQuerySet(
     TenancyMixin[EdgyModel, EdgyEmbedTarget],
+    EmbeddingMixin[EdgyModel, EdgyEmbedTarget],
     QuerySetPropsMixin,
     QuerySetType[EdgyModel, EdgyEmbedTarget],
     Generic[EdgyModel, EdgyEmbedTarget],
@@ -435,38 +434,6 @@ class BaseQuerySet(
             model_database=self.database,
         )
         return tables_and_models[crawl_result.forward_path][0].columns[crawl_result.field_name]
-
-    @overload
-    async def _embed_parent_in_result(self, result: None) -> tuple[None, None]: ...
-    @overload
-    async def _embed_parent_in_result(
-        self, result: EdgyModel | Awaitable[EdgyModel]
-    ) -> tuple[EdgyModel, EdgyEmbedTarget]: ...
-    async def _embed_parent_in_result(
-        self, result: EdgyModel | Awaitable[EdgyModel] | None
-    ) -> tuple[EdgyModel, EdgyEmbedTarget] | tuple[None, None]:
-        """
-        This is a result transformation, called by the Parser.
-        """
-        # FIXME: we might should reassign prefetches after resolving
-        if isawaitable(result):
-            result = await result
-        if result is None:
-            return None, None
-        if not self.embed_parent:
-            return result, cast(EdgyEmbedTarget, result)
-        token = MODEL_GETATTR_BEHAVIOR.set("coro")
-        try:
-            new_result: Any = result
-            for part in self.embed_parent[0].split("__"):
-                new_result = getattr(new_result, part)
-                if isawaitable(new_result):
-                    new_result = await new_result
-        finally:
-            MODEL_GETATTR_BEHAVIOR.reset(token)
-        if self.embed_parent[1]:
-            setattr(new_result, self.embed_parent[1], result)
-        return result, new_result
 
     def get_schema(self) -> str | None:
         """Retrieve the schema."""

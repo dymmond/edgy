@@ -1,5 +1,3 @@
-import asyncio
-
 import pytest
 
 import edgy
@@ -13,39 +11,14 @@ database = DatabaseTestClient(DATABASE_URL)
 models = edgy.Registry(database=edgy.Database(database, force_rollback=True))
 
 
-class IntrospectingModel(edgy.StrictModel):
-    class Meta:
-        registry = models
-        abstract = True
-
-    @classmethod
-    async def from_sqla_row(cls, **kwargs) -> edgy.Model:
-        prefetches = kwargs.get("prefetch_related")
-        initial_dicts = None
-        if prefetches:
-            await asyncio.gather(
-                *(
-                    prefetch._init_bake()
-                    for prefetch_list in prefetches.values()
-                    for prefetch in prefetch_list
-                )
-            )
-            initial_dicts = [
-                dict(prefetch._baked_results)
-                for prefetch_list in prefetches.values()
-                for prefetch in prefetch_list
-            ]
-        returnobj = await super().from_sqla_row(**kwargs)
-        object.__setattr__(returnobj, "introspected_prefetches", prefetches)
-        object.__setattr__(returnobj, "introspected_prefetches_initial_baked", initial_dicts)
-        return returnobj
-
-
-class User(IntrospectingModel):
+class User(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
 
+    class Meta:
+        registry = models
 
-class Role(IntrospectingModel):
+
+class Role(edgy.StrictModel):
     name = edgy.CharField(max_length=100)
     users = edgy.ManyToMany("User", related_name="roles")
 
@@ -53,7 +26,7 @@ class Role(IntrospectingModel):
         registry = models
 
 
-class SpaceGroup(IntrospectingModel):
+class SpaceGroup(edgy.StrictModel):
     role = edgy.ForeignKey(Role, related_name="groups")
     name = edgy.CharField(max_length=100)
 
@@ -61,7 +34,7 @@ class SpaceGroup(IntrospectingModel):
         registry = models
 
 
-class Space(IntrospectingModel):
+class Space(edgy.StrictModel):
     groups = edgy.ManyToManyField(SpaceGroup, related_name="spaces")
     name = edgy.CharField(max_length=100)
 
@@ -104,8 +77,6 @@ async def test_prefetch_m2m_directly():
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
     )
-    assert all(prefetch._baked_results for prefetch in space_query.introspected_prefetches[""])
-    assert space.create_model_key() in space_query.introspected_prefetches_initial_baked[0]
 
 
 async def test_prefetch_m2m_directly_mixed():
@@ -137,8 +108,6 @@ async def test_prefetch_m2m_directly_mixed():
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
     )
-    assert all(prefetch._baked_results for prefetch in space_query.introspected_prefetches[""])
-    assert space.create_model_key() in space_query.introspected_prefetches_initial_baked[0]
 
 
 async def test_prefetch_m2m_directly_mixed_none():
@@ -168,9 +137,6 @@ async def test_prefetch_m2m_directly_mixed_none():
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
     )
-    assert all(prefetch._baked for prefetch in space_query.introspected_prefetches[""])
-    # the dictionary is empty, so we can't find it
-    assert space.create_model_key() not in space_query.introspected_prefetches_initial_baked[0]
 
 
 async def test_prefetch_m2m_reverse_prefetch():
@@ -202,8 +168,6 @@ async def test_prefetch_m2m_reverse_prefetch():
         not prefetch._baked and "_baked_results" not in prefetch.__dict__
         for prefetch in prefetches
     )
-    assert all(prefetch._baked_results for prefetch in user_query.introspected_prefetches[""])
-    assert user_query.create_model_key() in user_query.introspected_prefetches_initial_baked[0]
 
 
 async def test_prefetch_m2m_reverse_prefetch_none():

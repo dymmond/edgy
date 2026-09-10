@@ -81,13 +81,13 @@ class Prefetch:
         raise QuerySetError("`_baking_finished` not set.")
 
     @cached_property
-    def _bake_prefix(self) -> str:
+    def _reverse_path_to_anchor(self) -> str:
         """
         Maps back to target model.
 
         Placeholder which raises when not initialized.
         """
-        raise QuerySetError("`_bake_prefix` not set.")
+        raise QuerySetError("`_reverse_path_to_anchor` not set.")
 
     @cached_property
     def _target_model(self) -> type[Model]:
@@ -156,7 +156,6 @@ class Prefetch:
         """
         from .executor import QueryExecutor
 
-        bake_prefix = self._bake_prefix
         target_model = self._target_model
         qs = self.queryset
         assert qs is not None, "`queryset` not initialized"
@@ -170,12 +169,19 @@ class Prefetch:
         # fetched at once for processing.
         executor = QueryExecutor(qs)
         result_dict = defaultdict(list)
+        first = True
         async for _, result in executor.iterate(True):
+            # now this is initialized
+            if first:
+                bake_prefix = (
+                    f"{executor.parser.tables_and_models[self._reverse_path_to_anchor][0].name}_"
+                )
+                first = False
             # Create a unique model key from the current SQLAlchemy row using the
             # specified bake prefix. This key links the prefetched item back to
             # its parent model instance.
-            model_key = target_model.create_model_key_from_sqla_row(
-                row=executor._current_row, row_prefix=bake_prefix
+            model_key = target_model.create_model_key_from_raw_mapping(
+                mapping=executor._current_row._mapping, prefix=bake_prefix
             )
             # Append the prefetched result to the list associated with its model key.
             result_dict[model_key].append(result)
