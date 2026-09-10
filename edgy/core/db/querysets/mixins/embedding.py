@@ -86,10 +86,12 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                     prefetches=prefetches_list,
                 )
             for path in self_queryset._select_related:
-                new_result: BaseModelType = instance
+                new_result: BaseModelType | None = instance
                 for part in path.split("__"):
                     prefix = f"{prefix}__{part}" if prefix else part
-                    new_result = cast("BaseModelType", getattr(new_result, part))
+                    new_result = cast("BaseModelType | None", getattr(new_result, part, None))
+                    if new_result is None:
+                        break
                     if prefix in seen:
                         continue
                     seen.add(prefix)

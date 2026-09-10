@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 import sqlalchemy
 
 from edgy.core.db.datastructures import QueryModelResultCache
-from edgy.core.utils.concurrency import run_concurrently
 
 from .types import EdgyEmbedTarget, EdgyModel, tables_and_models_type
 
@@ -56,18 +55,15 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
         self,
         row: sqlalchemy.Row,
     ) -> EdgyModel:
-        prepared_prefetches = self.queryset._prepare_prefetches_for_rows([row]).get("")
+        prepared_prefetches = self.queryset._prepare_prefetches_for_rows([row])
         result = await self._row_to_model_uncached(row)
         if prepared_prefetches:
-            await run_concurrently(
-                [prefetch._init_bake() for prefetch in prepared_prefetches],
-                limit=1 if getattr(self.queryset.database, "force_rollback", False) else None,
-            )
-            self.queryset._apply_prefetches_list(
+            await self.queryset._apply_prefetches_self_and_select_related(
                 instance=result,
                 tables_and_models=self.tables_and_models,
                 mapping=row._mapping,
-                prefetches=prepared_prefetches,
+                prefetches_dict=prepared_prefetches,
+                seen=set(),
             )
         return result
 
