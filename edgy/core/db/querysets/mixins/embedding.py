@@ -184,8 +184,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         return result, new_result
 
     def _prepare_prefetches_for_rows(
-        self,
-        rows: Sequence[sqlalchemy.Row],
+        self, rows: Sequence[sqlalchemy.Row], tables_and_models: tables_and_models_type
     ) -> dict[str, list[Prefetch]]:
         """
         Builds the Prefetch objects for a given batch of results.
@@ -251,11 +250,15 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             )
 
             prefetch_queryset: QuerySet | None = prefetch.queryset
-
+            row_prefix = (
+                f"{tables_and_models[anchor_crawl_result.forward_path][0].name}_"
+                if anchor_crawl_result.forward_path
+                else ""
+            )
             clauses = [
                 {
                     f"{prefetch_crawl_result.reverse_path}__{pkcol}": row._mapping[
-                        anchor_crawl_result.model_class.tables.columns[pkcol]
+                        f"{row_prefix}{pkcol}"
                     ]
                     for pkcol in anchor_crawl_result.model_class.pkcolumns
                 }
