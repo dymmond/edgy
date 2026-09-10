@@ -29,7 +29,7 @@ class Prefetch:
 
     def __init__(
         self,
-        *,
+        *args,
         related_name: str,
         to_attr: str,
         queryset: QuerySet | None = None,
@@ -55,8 +55,13 @@ class Prefetch:
                                          prefetched data.
             anchor_path (str): The path to the start
         """
-        self.related_name = related_name
-        self.to_attr = to_attr
+        if args:
+            warnings.warn("`Prefetch` is now keyword-only.", DeprecationWarning, stacklevel=2)
+            self.related_name = args[0]
+            self.to_attr = args[1]
+        else:
+            self.related_name = related_name
+            self.to_attr = to_attr
         self.queryset: QuerySet | None = queryset
         self.anchor_path = anchor_path or ""
         # Internal flag to indicate if the baking process has been completed.

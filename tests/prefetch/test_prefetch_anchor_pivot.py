@@ -134,7 +134,6 @@ async def test_prefetch_mixed_pivot2():
         .update_embed_parent(("post", "origin_comment"))
     )
     assert len(posts) == 4
-    # FIXME: the three cases does produce 0 results
     assert len(posts[0].users_filtered) == 1
     assert len(posts[0].comments_filtered) == 2
     assert len(posts[2].comments_filtered) == 2

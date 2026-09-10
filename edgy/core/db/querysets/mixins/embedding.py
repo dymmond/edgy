@@ -70,11 +70,10 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
     ) -> None:
         """Apply prefetches on select related branches."""
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
-        prefix = ""
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
         try:
-            if prefix not in seen and (prefetches_list := prefetches_dict.get("")):
-                seen.add(prefix)
+            if "" not in seen and (prefetches_list := prefetches_dict.get("")):
+                seen.add("")
                 await run_concurrently(
                     [prefetch._init_bake() for prefetch in prefetches_list],
                     limit=1 if getattr(self_queryset.database, "force_rollback", False) else None,
@@ -86,6 +85,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                     prefetches=prefetches_list,
                 )
             for path in self_queryset._select_related:
+                prefix = ""
                 new_result: BaseModelType | None = instance
                 for part in path.split("__"):
                     prefix = f"{prefix}__{part}" if prefix else part
@@ -254,7 +254,9 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
 
             clauses = [
                 {
-                    f"{prefetch_crawl_result.reverse_path}__{pkcol}": row._mapping[pkcol]
+                    f"{prefetch_crawl_result.reverse_path}__{pkcol}": row._mapping[
+                        anchor_crawl_result.model_class.tables.columns[pkcol]
+                    ]
                     for pkcol in anchor_crawl_result.model_class.pkcolumns
                 }
                 for row in rows

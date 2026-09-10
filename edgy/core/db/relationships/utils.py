@@ -142,7 +142,7 @@ def crawl_relationship(
             else:
                 if field is None:
                     raise ValueError(
-                        f"Tried to cross field: `{field_name}` which does not exist"
+                        f"Tried to cross field: `{field_name}` which does not exist "
                         f"remainder: `{splitted[1]}`"
                     )
                 # Raise an error if trying to cross a non-relationship field with further segments.
@@ -158,7 +158,9 @@ def crawl_relationship(
     # Handle the last segment if traverse_last is True and the last field was a RelationshipField.
     if traverse_last and isinstance(field, RelationshipField):
         model_class, reverse_part, path = field.traverse_field(path)
-        forward_prefix_path = f"{forward_prefix_path}__{field_name}"
+        forward_prefix_path = (
+            f"{forward_prefix_path}__{field_name}" if forward_prefix_path else field_name
+        )
         reverse = not isinstance(field, BaseForeignKey)
     else:
         # If not traversing the last field, set reverse to False and reverse_part to field_name.
