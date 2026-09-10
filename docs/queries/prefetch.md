@@ -40,8 +40,9 @@ from edgy.core.db.querysets import Prefetch
 To make the [Prefetch](#prefetch) work properly some parameters are needed to make sure it runs smoothly:
 
 * **related_name** - The [related_name](./related-name.md) type of query to perform.
-* **to_attr** - The name of the new attribute in the model being queried where the results will be stored.
+* **to_attr** - The name of the new attribute in the model being queried where the results will be stored. You can save to ForeignKey relations selected with `select_related` by traversing with `__`.
 * **queryset** (Optional) - Additional queryset for the type of query being made.
+* **anchor_path** (Optional) - Change anchor for `related_name` and `to_attr`. This must be a path to a model, also traversing with `__`. Defaults to `""` (the current model).
 
 ### Special attention
 
@@ -77,7 +78,7 @@ The `company` now has an attribute `tracks` where it contains all the associated
 
 ### Auto generated related names
 
-What if you don't add a `related_name`? That is covered in [related_names](./related-name.md#automatic-generation), which means, if you don't provide a related name, **automatically Edgy generates it and that is the one you must use**.
+What if you don't add a `related_name` to a `ForeignKey` or `ManyToMany`-Field? That is covered in [related_names](./related-name.md#automatic-generation), which means, if you don't provide a related name, **automatically Edgy generates it and that is the one you must use**.
 
 ### What can be used
 
@@ -143,13 +144,21 @@ What if you want to use the `queryset` parameter of the [Prefetch](#prefetch). L
 {!> ../docs_src/prefetch/second/data.py !}
 ```
 
-**You know want to query using the queryset**:
+**You may want to query using the queryset**:
 
-* All the tracks that belong to a specific `Company`. The tracks are associated with `albums` and `studios` **but** the `Track` will be also internally filtered.
+All the tracks that belong to a specific `Company`. The tracks are associated with `albums` and `studios` **but** the `Track` will be also internally filtered.
 
 ```python hl_lines="14"
 {!> ../docs_src/prefetch/second/prefetch_filtered.py !}
 ```
 
 This easy, right? The total tracks should be **1** as the **bird** is part of the title of the `track` that belongs to the `studio` that belongs to the `company`.
+```
+
+**You might want to pivot**:
+
+Given the former example we can also pivot and add it to company.studio.album.
+
+```python hl_lines="14"
+{!> ../docs_src/prefetch/second/prefetch_filtered_alternative.py !}
 ```

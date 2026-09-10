@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Hashable, Mapping, Sequence
+from collections.abc import Awaitable, Mapping, Sequence
 from inspect import isawaitable
 from typing import TYPE_CHECKING, Any, Generic, cast, overload
 
@@ -37,28 +37,23 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         prefix: str = "",
         # if not provided we use row_prefix = "", required for embedding
         tables_and_models: tables_and_models_type | None = None,
-        prefixes_map: dict[str, tuple[Hashable, ...]] | None = None,
     ) -> None:
-        prefixes_map = prefixes_map if prefixes_map is not None else {}
+        """Apply prefetches to a specific model instance."""
         for related in prefetches:
             # Check for conflicting names early to prevent unexpected overwrites.
             related.check_for_collision(model=instance)
             reduced_prefix = prefix.removesuffix(related._forward_path_to_anchor).removesuffix(
                 "__"
             )
-            if prefixes_map.get(reduced_prefix) is None:
-                # tables can be alias
-                row_prefix = (
-                    f"{get_table_key_or_name(tables_and_models[reduced_prefix][0])}_"
-                    if reduced_prefix and tables_and_models
-                    else ""
-                )
-                model_key = related._target_model.create_model_key_from_raw_mapping(
-                    mapping=mapping, prefix=row_prefix
-                )
-                prefixes_map[prefix] = model_key
-            else:
-                model_key = prefixes_map[prefix]
+            # tables can be alias
+            row_prefix = (
+                f"{get_table_key_or_name(tables_and_models[reduced_prefix][0])}_"
+                if reduced_prefix and tables_and_models
+                else ""
+            )
+            model_key = related._target_model.create_model_key_from_raw_mapping(
+                mapping=mapping, prefix=row_prefix
+            )
             # Ensure it is in the baked results.
             related._baked_results.setdefault(model_key, [])
             new_attr_name = related.to_attr.rsplit("__", 1)[-1]
@@ -71,9 +66,9 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         prefetches_dict: dict[str, list[Prefetch]],
         mapping: Mapping,
         tables_and_models: tables_and_models_type | None,
-        prefixes_map: dict[str, tuple[Hashable, ...]],
         seen: set[str],
     ) -> None:
+        """Apply prefetches on select related branches."""
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
         prefix = ""
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
@@ -139,14 +134,13 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         tables_and_models: tables_and_models_type | None = None,
     ) -> tuple[EdgyModel, EdgyEmbedTarget] | tuple[None, None]:
         """
-        This is a result transformation, called by the Parser.
+        This is a result transformation and apply prefetches.
         """
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
         if isawaitable(result):
             result = await result
         if result is None:
             return None, None
-        prefixes_map: dict[str, tuple[Hashable, ...]] = {}
         seen_prefixes: set[str] = set()
         if mapping is not None and prefetches_dict:
             await self._apply_prefetches_self_and_select_related(
@@ -154,7 +148,6 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 prefetches_dict=prefetches_dict,
                 mapping=mapping,
                 tables_and_models=tables_and_models,
-                prefixes_map=prefixes_map,
                 seen=seen_prefixes,
             )
         if not self_queryset.embed_parent:
