@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+import warnings
+from collections.abc import Hashable, Sequence
 from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from edgy.core.db.fields.base import RelationshipField
@@ -365,3 +366,26 @@ class ModelRowMixin:
             if related_name in fields:
                 return True
         return False
+
+    @classmethod
+    def create_model_key_from_sqla_row(
+        cls, row: Row, row_prefix: str = ""
+    ) -> tuple[Hashable, ...]:
+        """
+        Builds a unique cache key for a model instance based on its class name and
+        primary key values extracted from a SQLAlchemy row.
+
+        Args:
+            row (Row): The SQLAlchemy row object from which to extract primary key values.
+            row_prefix (str): An optional prefix for column names in the row mapping,
+                used when dealing with joined tables.
+
+        Returns:
+            tuple: A tuple representing the unique key for the model instance.
+        """
+        warnings.warn(
+            "`create_model_key_from_sqla_row` is deprecated use `create_model_key_from_raw_mapping` instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return cls.create_model_key_from_raw_mapping(mapping=row._mapping, prefix=row_prefix)  # type: ignore

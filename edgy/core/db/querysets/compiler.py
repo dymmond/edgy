@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy
 
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
-from edgy.core.utils.db import hash_tablekey
+from edgy.core.utils.db import get_table_key_or_name, hash_tablekey
 from edgy.exceptions import QuerySetError
 
 from . import clauses as clauses_mod
@@ -15,20 +15,6 @@ from .types import tables_and_models_type
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.querysets.base import BaseQuerySet
-
-
-def get_table_key_or_name(table: sqlalchemy.Table | sqlalchemy.Alias) -> str:
-    """
-    Retrieves the key or name of a SQLAlchemy table or alias.
-
-    Args:
-        table: The SQLAlchemy table or alias object.
-    """
-    try:
-        return table.key  # type: ignore
-    except AttributeError:
-        # alias
-        return table.name
 
 
 class QueryCompiler:

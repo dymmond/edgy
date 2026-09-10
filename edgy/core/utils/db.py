@@ -11,6 +11,8 @@ from edgy.exceptions import DatabaseNotConnectedWarning
 from edgy.utils.hashing import hash_to_identifier
 
 if TYPE_CHECKING:
+    import sqlalchemy
+
     from edgy.core.connection.database import Database
 
 # Context variable to control silencing of database connection warnings.
@@ -122,6 +124,20 @@ def hash_names(
     if outer_prefix:
         hashed = f"{outer_prefix}{hashed}"
     return hashed
+
+
+def get_table_key_or_name(table: sqlalchemy.Table | sqlalchemy.Alias, /) -> str:
+    """
+    Retrieves the key or name of a SQLAlchemy table or alias.
+
+    Args:
+        table: The SQLAlchemy table or alias object.
+    """
+    try:
+        return table.key  # type: ignore
+    except AttributeError:
+        # alias
+        return table.name
 
 
 def force_fields_nullable_as_list_string(apostroph: str = '"') -> str:

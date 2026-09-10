@@ -61,10 +61,14 @@ async def test_prefetch_select_related():
     await post.comments.create(body="is true")
     await post.comments.create(body="is really true")
 
-    posts = await Comment.query.prefetch_related(
-        Prefetch(to_attr="post__comments_filtered", related_name="post__comments"),
-        Prefetch(to_attr="post__users_filtered", related_name="post__user"),
-    ).update_embed_parent(("post", "origin_comment"))
+    posts = (
+        await Comment.query.select_related("post")
+        .prefetch_related(
+            Prefetch(to_attr="comments_filtered", related_name="comments", anchor_path="post"),
+            Prefetch(to_attr="post__users_filtered", related_name="post__user"),
+        )
+        .update_embed_parent(("post", "origin_comment"))
+    )
     assert len(posts) == 4
     assert len(posts[0].comments_filtered)
     assert len(posts[2].comments_filtered)

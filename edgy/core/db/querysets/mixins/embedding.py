@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Awaitable, Mapping, Sequence
+from collections.abc import Awaitable, Hashable, Mapping, Sequence
 from inspect import isawaitable
 from typing import TYPE_CHECKING, Any, Generic, cast, overload
 
@@ -12,6 +12,7 @@ from edgy.core.db.querysets.prefetch import Prefetch
 from edgy.core.db.querysets.types import EdgyEmbedTarget, EdgyModel, tables_and_models_type
 from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.concurrency import run_concurrently
+from edgy.core.utils.db import get_table_key_or_name
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -27,35 +28,41 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
     on a QuerySet like `prefetch_related` and `_embed_parent_in_result`.
     """
 
-    async def _apply_prefetches_list(
+    def _apply_prefetches_list(
         self,
         *,
         instance: BaseModelType,
         prefetches: Sequence[Prefetch],
         mapping: Mapping,
         prefix: str = "",
+        # if not provided we use row_prefix = "", required for embedding
         tables_and_models: tables_and_models_type | None = None,
+        prefixes_map: dict[str, tuple[Hashable, ...]] | None = None,
     ) -> None:
-        self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
-        assert not prefix or tables_and_models
-        # tables can be alias
-        row_prefix = (
-            f"{tables_and_models[prefix][0].name}_" if prefix and tables_and_models else ""
-        )
-        model_key = self_queryset.model_class.create_model_key_from_raw_mapping(
-            mapping=mapping, prefix=row_prefix
-        )
-        await run_concurrently(
-            [prefetch._init_bake() for prefetch in prefetches],
-            limit=1 if getattr(self_queryset.database, "force_rollback", False) else None,
-        )
+        prefixes_map = prefixes_map if prefixes_map is not None else {}
         for related in prefetches:
-            assert (prefix or "") == related._forward_path
             # Check for conflicting names early to prevent unexpected overwrites.
             related.check_for_collision(model=instance)
+            reduced_prefix = prefix.removesuffix(related._forward_path_to_anchor).removesuffix(
+                "__"
+            )
+            if prefixes_map.get(reduced_prefix) is None:
+                # tables can be alias
+                row_prefix = (
+                    f"{get_table_key_or_name(tables_and_models[reduced_prefix][0])}_"
+                    if reduced_prefix and tables_and_models
+                    else ""
+                )
+                model_key = related._target_model.create_model_key_from_raw_mapping(
+                    mapping=mapping, prefix=row_prefix
+                )
+                prefixes_map[prefix] = model_key
+            else:
+                model_key = prefixes_map[prefix]
             # Ensure it is in the baked results.
             related._baked_results.setdefault(model_key, [])
-            object.__setattr__(instance, related.to_attr, list(related._baked_results[model_key]))
+            new_attr_name = related.to_attr.rsplit("__", 1)[-1]
+            object.__setattr__(instance, new_attr_name, list(related._baked_results[model_key]))
 
     async def _apply_prefetches_self_and_select_related(
         self,
@@ -64,16 +71,21 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         prefetches_dict: dict[str, list[Prefetch]],
         mapping: Mapping,
         tables_and_models: tables_and_models_type | None,
+        prefixes_map: dict[str, tuple[Hashable, ...]],
         seen: set[str],
     ) -> None:
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
         prefix = ""
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
         try:
-            if prefetches_list := prefetches_dict.get(""):
-                await self._apply_prefetches_list(
+            if prefix not in seen and (prefetches_list := prefetches_dict.get("")):
+                seen.add(prefix)
+                await run_concurrently(
+                    [prefetch._init_bake() for prefetch in prefetches_list],
+                    limit=1 if getattr(self_queryset.database, "force_rollback", False) else None,
+                )
+                self._apply_prefetches_list(
                     instance=instance,
-                    prefix=prefix,
                     mapping=mapping,
                     tables_and_models=tables_and_models,
                     prefetches=prefetches_list,
@@ -87,7 +99,13 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                         continue
                     seen.add(prefix)
                     if prefetches_list := prefetches_dict.get(prefix):
-                        await self._apply_prefetches_list(
+                        await run_concurrently(
+                            [prefetch._init_bake() for prefetch in prefetches_list],
+                            limit=1
+                            if getattr(self_queryset.database, "force_rollback", False)
+                            else None,
+                        )
+                        self._apply_prefetches_list(
                             instance=new_result,
                             prefix=prefix,
                             mapping=mapping,
@@ -128,6 +146,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             result = await result
         if result is None:
             return None, None
+        prefixes_map: dict[str, tuple[Hashable, ...]] = {}
         seen_prefixes: set[str] = set()
         if mapping is not None and prefetches_dict:
             await self._apply_prefetches_self_and_select_related(
@@ -135,6 +154,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 prefetches_dict=prefetches_dict,
                 mapping=mapping,
                 tables_and_models=tables_and_models,
+                prefixes_map=prefixes_map,
                 seen=seen_prefixes,
             )
         if not self_queryset.embed_parent:
@@ -148,31 +168,22 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 new_result = getattr(new_result, part)
                 if isawaitable(new_result):
                     new_result = await new_result
-                if (
-                    tables_and_models is not None
-                    and mapping is not None
-                    and prefix not in seen_prefixes
-                    and prefetches_dict
-                    and (prefetches_list := prefetches_dict.get(prefix))
-                ):
-                    await self._apply_prefetches_list(
-                        instance=new_result,
-                        prefix=prefix,
-                        mapping=mapping,
-                        tables_and_models=tables_and_models,
-                        prefetches=prefetches_list,
-                    )
-                seen_prefixes.add(prefix)
+                # if (
+                #     tables_and_models is not None
+                #     and mapping is not None
+                #     and prefix not in seen_prefixes
+                #     and prefetches_dict
+                #     and (prefetches_list := prefetches_dict.get(prefix))
+                # ):
+                #     await self._apply_prefetches_list(
+                #         instance=new_result,
+                #         mapping=mapping,
+                #         prefetches=prefetches_list,
+                #         # not in select related, don't provide prefix
+                #     )
+                # seen_prefixes.add(prefix)
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
-        if mapping is not None and prefetches_dict:
-            await self._apply_prefetches_self_and_select_related(
-                instance=new_result,
-                prefetches_dict=prefetches_dict,
-                mapping=mapping,
-                tables_and_models=tables_and_models,
-                seen=seen_prefixes,
-            )
         if self_queryset.embed_parent[1]:
             setattr(new_result, self_queryset.embed_parent[1], result)
         return result, new_result
@@ -217,9 +228,13 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             anchor_crawl_result = crawl_relationship(
                 self_queryset.model_class,
                 prefetch.anchor_path,
-                allow_crossing_db=True,
+                # allow_crossing_db=True,
                 traverse_last=True,
             )
+            if anchor_crawl_result.cross_db_remainder:
+                raise NotImplementedError(
+                    "Cannot prefetch from other db yet. Maybe in future this feature will be added."
+                )
 
             prefetch_crawl_result = crawl_relationship(
                 anchor_crawl_result.model_class, prefetch.related_name, traverse_last=True
@@ -259,10 +274,13 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             )
             # the assigned queryset has an empty cache
             new_prefetch.queryset = prefetch_queryset
+            new_prefetch._forward_path_to_anchor = prefetch_crawl_result.forward_path
             new_prefetch._reverse_path_to_anchor = prefetch_crawl_result.reverse_path
             if new_prefetch.anchor_path:
                 new_prefetch._forward_path = (
-                    f"{new_prefetch.anchor_path}__{target_crawl_result.forward_path}"
+                    f"{new_prefetch.anchor_path}__{target_crawl_result.forward_path}".removesuffix(
+                        "__"
+                    )
                 )
             else:
                 new_prefetch._forward_path = target_crawl_result.forward_path

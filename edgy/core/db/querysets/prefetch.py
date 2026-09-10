@@ -81,9 +81,18 @@ class Prefetch:
         raise QuerySetError("`_baking_finished` not set.")
 
     @cached_property
+    def _forward_path_to_anchor(self) -> str:
+        """
+        Maps back to anchor model.
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_forward_path_to_anchor` not set.")
+
+    @cached_property
     def _reverse_path_to_anchor(self) -> str:
         """
-        Maps back to target model.
+        Maps back to anchor model.
 
         Placeholder which raises when not initialized.
         """
@@ -129,17 +138,18 @@ class Prefetch:
                         `model`. The error message specifies the conflicting
                         attribute and the model class.
         """
+        attr_name = self.to_attr.rsplit("__", 1)[-1]
         # Check for collision with existing attributes, model fields, or model managers.
         if (
-            hasattr(model, self.to_attr)
-            or self.to_attr in model.meta.fields
-            or self.to_attr in model.meta.managers
+            hasattr(model, attr_name)
+            or attr_name in model.meta.fields
+            or attr_name in model.meta.managers
         ):
             if not isclass(model):
                 model = cast("type[BaseModelType]", type(model))
             raise QuerySetError(
-                f"Conflicting attribute to_attr='{self.related_name}' with "
-                f"'{self.to_attr}' in {model.__name__}"
+                f"Conflicting attribute to_attr='{attr_name}' for related_name=`{self.related_name}` "
+                f"'in {model.__name__}"
             )
 
     async def _init_bake(self) -> None:
