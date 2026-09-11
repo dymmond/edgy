@@ -12,6 +12,6 @@ company = await Company.query.select_related("studio__album").prefetch_related(
         related_name="tracks",
         to_attr="tracks_filtered",
         queryset=Track.query.filter(title__icontains="bird"),
-        anchor_path="studio__album",
+        from_anchor="studio__album",
     )
 )

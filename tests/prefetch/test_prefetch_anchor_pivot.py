@@ -67,9 +67,9 @@ async def test_prefetch_pivot_all():
     posts = (
         await Comment.query.select_related("post")
         .prefetch_related(
-            Prefetch(to_attr="comments_filtered", related_name="comments", anchor_path="post"),
-            Prefetch(to_attr="reactions_filtered", related_name="reactions", anchor_path="post"),
-            Prefetch(to_attr="users_filtered", related_name="user", anchor_path="post"),
+            Prefetch(to_attr="comments_filtered", related_name="comments", from_anchor="post"),
+            Prefetch(to_attr="reactions_filtered", related_name="reactions", from_anchor="post"),
+            Prefetch(to_attr="users_filtered", related_name="user", from_anchor="post"),
         )
         .update_embed_parent(("post", "origin_comment"))
     )
@@ -98,8 +98,8 @@ async def test_prefetch_mixed_pivot1():
         await Comment.query.select_related("post")
         .prefetch_related(
             Prefetch(to_attr="post__comments_filtered", related_name="post__comments"),
-            Prefetch(to_attr="reactions_filtered", related_name="reactions", anchor_path="post"),
-            Prefetch(to_attr="users_filtered", related_name="user", anchor_path="post"),
+            Prefetch(to_attr="reactions_filtered", related_name="reactions", from_anchor="post"),
+            Prefetch(to_attr="users_filtered", related_name="user", from_anchor="post"),
         )
         .update_embed_parent(("post", "origin_comment"))
     )
@@ -127,7 +127,7 @@ async def test_prefetch_mixed_pivot2():
     posts = (
         await Comment.query.select_related("post")
         .prefetch_related(
-            Prefetch(to_attr="comments_filtered", related_name="comments", anchor_path="post"),
+            Prefetch(to_attr="comments_filtered", related_name="comments", from_anchor="post"),
             Prefetch(to_attr="post__reactions_filtered", related_name="post__reactions"),
             Prefetch(to_attr="post__users_filtered", related_name="post__user"),
         )

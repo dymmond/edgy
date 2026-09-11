@@ -33,7 +33,7 @@ class Prefetch:
         related_name: str,
         to_attr: str,
         queryset: QuerySet | None = None,
-        anchor_path: str | None = None,
+        from_anchor: str | None = None,
     ) -> None:
         """
         Initializes a Prefetch object.
@@ -53,7 +53,8 @@ class Prefetch:
                                          queryset for the related model. This allows
                                          for custom filtering or ordering of the
                                          prefetched data.
-            anchor_path (str): The path to the start
+            from_anchor (str | None): The path to the start of related_name and to_attr. Can be a submodel.
+                                      Leave empty to use the default, the current model.
         """
         if args:
             warnings.warn("`Prefetch` is now keyword-only.", DeprecationWarning, stacklevel=2)
@@ -63,7 +64,7 @@ class Prefetch:
             self.related_name = related_name
             self.to_attr = to_attr
         self.queryset: QuerySet | None = queryset
-        self.anchor_path = anchor_path or ""
+        self.from_anchor = from_anchor or ""
         # Internal flag to indicate if the baking process has been completed.
         self._baked = False
 

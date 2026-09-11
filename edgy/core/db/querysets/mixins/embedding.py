@@ -209,7 +209,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             compare_tuple = (
                 id(prefetch.queryset) if prefetch.queryset is not None else None,
                 prefetch.related_name,
-                prefetch.anchor_path,
+                prefetch.from_anchor,
                 prefetch.to_attr,
             )
             if compare_tuple in seen_prefetches:
@@ -221,7 +221,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             )
             anchor_crawl_result = crawl_relationship(
                 self_queryset.model_class,
-                prefetch.anchor_path,
+                prefetch.from_anchor,
                 # allow_crossing_db=True,
                 traverse_last=True,
             )
@@ -246,7 +246,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             new_prefetch = Prefetch(
                 related_name=prefetch.related_name,
                 to_attr=prefetch.to_attr,
-                anchor_path=prefetch.anchor_path,
+                from_anchor=prefetch.from_anchor,
             )
 
             prefetch_queryset: QuerySet | None = prefetch.queryset
@@ -276,9 +276,9 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             new_prefetch.queryset = prefetch_queryset
             new_prefetch._forward_path_to_anchor = prefetch_crawl_result.forward_path
             new_prefetch._reverse_path_to_anchor = prefetch_crawl_result.reverse_path
-            if new_prefetch.anchor_path:
+            if new_prefetch.from_anchor:
                 new_prefetch._forward_path = (
-                    f"{new_prefetch.anchor_path}__{target_crawl_result.forward_path}".removesuffix(
+                    f"{new_prefetch.from_anchor}__{target_crawl_result.forward_path}".removesuffix(
                         "__"
                     )
                 )
