@@ -159,5 +159,5 @@ This easy, right? The total tracks should be **1** as the **bird** is part of th
 Given the former example we can also pivot and add it to `company.studio.album` as `tracks_filtered` attribute.
 
 ```python hl_lines="14"
-{!> ../docs_src/prefetch/second/prefetch_filtered_alternative.py !}
+{!> ../docs_src/prefetch/second/prefetch_filtered_anchor.py !}
 ```
