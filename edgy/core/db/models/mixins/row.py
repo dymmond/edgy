@@ -104,9 +104,7 @@ class ModelRowMixin:
                 especially for aliased columns or complex selects.
 
         Returns:
-            Model | None: A fully populated Edgy Model instance, or None if the model
-            cannot be loaded from the row due to missing primary key values in joined
-            relationships.
+            Model: A fully populated Edgy Model instance.
 
         Raises:
             QuerySetError: If a field specified in `select_related` does not exist on

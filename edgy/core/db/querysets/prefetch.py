@@ -29,7 +29,7 @@ class Prefetch:
 
     def __init__(
         self,
-        *args,
+        *args: Any,
         related_name: str,
         to_attr: str,
         queryset: QuerySet | None = None,
