@@ -134,6 +134,15 @@ class ManyRelation(ManyRelationProtocol):
         # If embed_through is not "",  use modern logic.
         if self.embed_through != "":
             queryset.embed_parent_filters = queryset.embed_parent
+        # add missing selects, regardless if embed_through is set or update_parent_embed is used
+        if self.reverse:
+            if not fk.is_cross_db():
+                # not initialized yet
+                queryset._select_related.add(self.from_foreign_key)
+        else:
+            if not self.through.meta.fields[self.to_foreign_key].is_cross_db():
+                # not initialized yet
+                queryset._select_related.add(self.to_foreign_key)
         return queryset.using(schema=self.instance.get_active_instance_schema())
 
     async def save_related(self) -> None:
