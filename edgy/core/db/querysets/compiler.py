@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy
 
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
+from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.db import get_table_key_or_name, hash_tablekey
 from edgy.exceptions import QuerySetError
 
@@ -316,7 +317,15 @@ class QueryCompiler:
         _select_tables_and_models: tables_and_models_type = {"": (select_from, self.model_class)}
         transitions: dict[tuple[str, str, str], tuple[Any, tuple[str, str, str] | None, str]] = {}
 
-        for select_path in self.queryset._select_related.union(self.queryset._select_related_weak):
+        select_pathes = self.queryset._select_related.union(self.queryset._select_related_weak)
+        if self.queryset.embed_parent:
+            # implicit select the forward path of embed_parent
+            result = crawl_relationship(
+                self.queryset.model_class, self.queryset.embed_parent[0], traverse_last=True
+            )
+            select_pathes.add(result.forward_path)
+
+        for select_path in select_pathes:
             model_class = self.model_class
             former_table = maintable
             former_transition = None

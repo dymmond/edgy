@@ -20,6 +20,7 @@
 - `create_model_key_from_sqla_row` is deprecated now.
 - `crawl_relationship` has now a better error when a field does not exist.
 - Move `get_table_key_or_name` to `edgy.core.utils.db`.
+- Add embedded path implicit to select_related pathes.
 
 ### Fixed
 
