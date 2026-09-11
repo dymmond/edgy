@@ -134,14 +134,11 @@ class ManyRelation(ManyRelationProtocol):
         # If embed_through is not "",  use modern logic.
         if self.embed_through != "":
             queryset.embed_parent_filters = queryset.embed_parent
-        if self.reverse:
-            if not fk.is_cross_db():
-                # not initialized yet
-                queryset._select_related.add(self.from_foreign_key)
-        else:
-            if not self.through.meta.fields[self.to_foreign_key].is_cross_db():
-                # not initialized yet
-                queryset._select_related.add(self.to_foreign_key)
+        # FIXME: find issue why this is required
+        # add missing select despite it should be set by embed_parent it is required somewhere else
+        if not self.through.meta.fields[self.to_foreign_key].is_cross_db():
+            # not initialized yet
+            queryset._select_related.add(self.to_foreign_key)
         return queryset.using(schema=self.instance.get_active_instance_schema())
 
     async def save_related(self) -> None:
@@ -698,13 +695,6 @@ class SingleRelation(ManyRelationProtocol):
                 RelationshipField,
             ):
                 queryset.embed_parent_filters = queryset.embed_parent
-                # also add to select_related, when not cross db
-                if not embed_parent_field.is_cross_db(
-                    owner_database=getattr(self.instance, "database", None)
-                ):
-                    # TODO: though this works, this isn't performant for deeply nested embed_parent definition
-                    # not initialized yet, so just add it
-                    queryset._select_related.add(embed_parent_field_name)
         return queryset
 
     def all(self, clear_cache: bool = False) -> QuerySet:
@@ -877,6 +867,8 @@ class SingleRelation(ManyRelationProtocol):
         Returns:
             BaseModelType | None: The newly created and added child instance.
         """
+        # we need to add the instance here to satisfy pydantic constraints
+        kwargs[self.to_foreign_key] = self.instance
         return await self.add(self.to(*args, **kwargs))
 
     async def add(self, child: BaseModelType) -> BaseModelType | None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import Collection, Hashable, Iterable, Sequence
+from collections.abc import Collection, Hashable, Iterable, Mapping, Sequence
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, ClassVar
 
@@ -33,6 +33,7 @@ class DescriptiveMeta:
 
     database = Database("sqlite:///db.sqlite")
     models = Registry(database=database)
+
 
     class User(Model):
         id: int = edgy.IntegerField(primary_key=True)
@@ -358,7 +359,7 @@ class BaseModelType(ABC):
 
     @abstractmethod
     async def execute_pre_save_hooks(
-        self, values: dict[str, Any], original: dict[str, Any], is_update: bool
+        self, column_values: dict[str, Any], original: dict[str, Any], is_update: bool
     ) -> dict[str, Any]:
         """
         Abstract asynchronous method to execute pre-save hooks for the model.
@@ -369,7 +370,7 @@ class BaseModelType(ABC):
         validation, or other preparatory actions.
 
         Args:
-            values (dict[str, Any]): A dictionary of the current values to be saved.
+            column_values (dict[str, Any]): A dictionary of the current column values to be saved.
             original (dict[str, Any]): A dictionary of the original values before modification,
                                        useful in update scenarios.
             is_update (bool): `True` if the save operation is an update; `False` if it's an insert.
@@ -501,3 +502,25 @@ class BaseModelType(ABC):
         Returns:
             tuple: A tuple representing the unique cache key for the model instance.
         """
+
+    @classmethod
+    def create_model_key_from_raw_mapping(
+        cls, *, mapping: Mapping, prefix: str = ""
+    ) -> tuple[Hashable, ...]:
+        """
+        Builds a unique cache key for a model instance based on its class name and
+        primary key values extracted from a SQLAlchemy row.
+
+        Args:
+            mapping (Row mapping): The SQLAlchemy row mapping from which to extract primary key values.
+            prefix (str): An optional prefix for column names in the row mapping,
+                used when dealing with joined tables.
+
+        Returns:
+            tuple: A tuple representing the unique key for the model instance.
+        """
+        pk_key_list: list[Any] = [cls.__name__]
+        for attr in cls.pkcolumns:
+            # Append the primary key value from the row to the key list.
+            pk_key_list.append(str(mapping[f"{prefix}{attr}"]))
+        return tuple(pk_key_list)

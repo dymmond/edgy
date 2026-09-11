@@ -43,6 +43,7 @@ def crawl_relationship(
     model_database: Database | None = None,
     callback_fn: Any = None,
     traverse_last: bool = False,
+    allow_crossing_db: bool = False,
 ) -> RelationshipCrawlResult:
     """
     Crawls a relationship path, typically used for query lookups that span
@@ -97,7 +98,7 @@ def crawl_relationship(
             model_class_new, reverse_part, path = field.traverse_field(path)
 
             # Check for cross-database relationships.
-            if field.is_cross_db(model_database):
+            if not allow_crossing_db and field.is_cross_db(model_database):
                 # If it's a cross-DB relationship, stop traversal and record the remainder.
                 cross_db_remainder = path
                 break
@@ -139,10 +140,15 @@ def crawl_relationship(
                 operator = splitted[1]
                 break
             else:
+                if field is None:
+                    raise ValueError(
+                        f"Tried to cross field: `{field_name}` which does not exist "
+                        f"remainder: `{splitted[1]}`"
+                    )
                 # Raise an error if trying to cross a non-relationship field with further segments.
                 raise ValueError(
-                    f"Tried to cross field: {field_name} of type {field!r}, "
-                    f"remainder: {splitted[1]}"
+                    f"Tried to cross field: `{field_name}` of type `{field!r}`, "
+                    f"remainder: `{splitted[1]}`"
                 )
         else:
             # If only one part remains, it's the final field name, and the operator is "exact".
@@ -152,6 +158,9 @@ def crawl_relationship(
     # Handle the last segment if traverse_last is True and the last field was a RelationshipField.
     if traverse_last and isinstance(field, RelationshipField):
         model_class, reverse_part, path = field.traverse_field(path)
+        forward_prefix_path = (
+            f"{forward_prefix_path}__{field_name}" if forward_prefix_path else field_name
+        )
         reverse = not isinstance(field, BaseForeignKey)
     else:
         # If not traversing the last field, set reverse to False and reverse_part to field_name.

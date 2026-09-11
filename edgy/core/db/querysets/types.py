@@ -21,6 +21,8 @@ if TYPE_CHECKING:
     from edgy.core.connection import Database
     from edgy.core.db.models.types import BaseModelType
 
+    from .prefetch import Prefetch
+
 if sys.version_info >= (3, 13):  # pragma: no cover
     from typing import TypeVar
 else:  # pragma: no cover
@@ -990,6 +992,25 @@ class QuerySetType(ABC, Generic[EdgyModel, EdgyEmbedTarget]):
             QuerySetType: A new QuerySet instance with the specified references selected.
         """
         ...
+
+    @abstractmethod
+    def prefetch_related(self, *prefetch: Prefetch) -> QuerySetType[EdgyModel, EdgyEmbedTarget]:
+        """
+        Abstract method to perform a reverse lookup for foreign keys and other relationships,
+        populating results onto the main model instances.
+
+        Args:
+            *prefetch (Prefetch): One or more `Prefetch` objects, each defining
+                                   a relationship to prefetch, including the
+                                   `related_name` and the `to_attr` where results
+                                   will be stored. An optional custom `QuerySet`
+                                   can also be provided within the `Prefetch` object.
+
+        Returns:
+            QuerySetType: A new `QuerySetType` instance with the specified prefetch
+                      relationships configured. This new QuerySetType can then be
+                      further filtered, ordered, or executed.
+        """
 
     @abstractmethod
     def __await__(self) -> Generator[Any, None, list[EdgyEmbedTarget]]:

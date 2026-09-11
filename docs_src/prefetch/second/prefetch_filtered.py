@@ -13,4 +13,4 @@ company = await Company.query.prefetch_related(
         to_attr="tracks",
         queryset=Track.query.filter(title__icontains="bird"),
     )
-)
+).get()

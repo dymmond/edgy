@@ -51,7 +51,29 @@ async def rollback_transactions():
         yield
 
 
-async def test_multiple_prefetch_model_calls():
+async def test_multiple_prefetch_single_user_model_shared_cache():
+    user = await User.query.create(name="Edgy")
+
+    for i in range(5):
+        await Post.query.create(comment=f"Comment number {i}", user=user)
+
+    for i in range(50):
+        await Article.query.create(content=f"Comment number {i}", user=user)
+    del user
+
+    prefetches = [
+        Prefetch(related_name="posts", to_attr="to_posts"),
+        Prefetch(related_name="articles", to_attr="to_articles"),
+    ]
+    users = await User.query.prefetch_related(*prefetches).all()
+
+    assert len(users) == 1
+
+    assert len(users[0].to_posts) == 5
+    assert len(users[0].to_articles) == 50
+
+
+async def test_multiple_prefetch_model_shared_cache():
     user = await User.query.create(name="Edgy")
 
     for i in range(5):
@@ -68,12 +90,49 @@ async def test_multiple_prefetch_model_calls():
     for i in range(20):
         await Article.query.create(content=f"Comment number {i}", user=ravyn)
 
-    users = await User.query.prefetch_related(
+    prefetches = [
         Prefetch(related_name="posts", to_attr="to_posts"),
         Prefetch(related_name="articles", to_attr="to_articles"),
-    ).all()
+    ]
+    users = await User.query.prefetch_related(*prefetches).all()
 
     assert len(users) == 2
+    assert all(
+        not prefetch._baked and "_baked_results" not in prefetch.__dict__
+        for prefetch in prefetches
+    )
+
+
+@pytest.mark.parametrize("batch_size", [1, 100])
+async def test_multiple_prefetch_model_calls(batch_size):
+    user = await User.query.create(name="Edgy")
+
+    for i in range(5):
+        await Post.query.create(comment=f"Comment number {i}", user=user)
+
+    for i in range(50):
+        await Article.query.create(content=f"Comment number {i}", user=user)
+
+    ravyn = await User.query.create(name="Ravyn")
+
+    for i in range(15):
+        await Post.query.create(comment=f"Comment number {i}", user=ravyn)
+
+    for i in range(20):
+        await Article.query.create(content=f"Comment number {i}", user=ravyn)
+
+    prefetches = [
+        Prefetch(related_name="posts", to_attr="to_posts"),
+        Prefetch(related_name="articles", to_attr="to_articles"),
+    ]
+    users = await User.query.prefetch_related(*prefetches).batch_size(batch_size).all()
+
+    assert len(users) == 2
+
+    assert all(
+        not prefetch._baked and "_baked_results" not in prefetch.__dict__
+        for prefetch in prefetches
+    )
 
     user1 = [value for value in users if value.pk == user.pk][0]
     assert len(user1.to_posts) == 5

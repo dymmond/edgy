@@ -52,6 +52,9 @@ async def rollback_transactions():
         yield
 
 
+class Test: ...
+
+
 async def test_multiple_prefetch_model_calls():
     await User.query.create(name="Edgy")
 
@@ -59,4 +62,13 @@ async def test_multiple_prefetch_model_calls():
         await User.query.prefetch_related(
             Prefetch(related_name="posts", to_attr="posts"),
             Prefetch(related_name="articles", to_attr="articles"),
+        ).all()
+
+
+async def test_raise_prefetch_related_error():
+    await User.query.create(name="Edgy")
+
+    with pytest.raises(QuerySetError):
+        await User.query.prefetch_related(
+            Test(),
         ).all()

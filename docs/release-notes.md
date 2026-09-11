@@ -1,5 +1,36 @@
 # Release Notes
 
+## 0.37.0
+
+### Added
+
+- Add different anchor points for prefetches.
+- Allow sub-attributes (select_related) for prefetches as anchor.
+- `crawl_relationship` has now a mode to traverse databases.
+
+### Changed
+
+- Make Fields, FieldToColumns, FieldToColumnNames and ColumnsRemapping appropriate mappings.
+  You can't do the dirty trick anymore testing for a dict.
+- Fix contracts; it was always an error to access the data attribute directly (just inherited from UserDict).
+- `from_sqla_row` is keyword only now, so we can better update and introspect it.
+- Make Prefetch `init_bake` and more internal. QuerySetErrors are now raised if the attributes are illegally accessed.
+- Make Prefetch keyword-only like in documentation.
+- Assign prefetches from queryset not in `from_sqla_row`. This allows better handling of embeddings.
+- `create_model_key_from_sqla_row` is deprecated now.
+- `crawl_relationship` has now a better error when a field does not exist.
+- Move `get_table_key_or_name` to `edgy.core.utils.db`.
+- Add embedded path implicit to select_related paths.
+
+### Fixed
+
+- Using `create` in non-nullable ForeignKey relations.
+- Don't mask AttributeErrors in managers when creating the queryset failed.
+
+### Removed
+
+- Remove long deprecated `fields` and `fields_mapping`.
+
 ## 0.36.1
 
 ### Fixed

@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, cast
+import warnings
+from collections.abc import Hashable, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, cast
 
 from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
 from edgy.core.db.models.utils import apply_instance_extras
-from edgy.core.db.querysets.prefetch import Prefetch, check_prefetch_collision
-from edgy.core.db.relationships.utils import crawl_relationship
-from edgy.core.utils.concurrency import run_concurrently
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -29,6 +27,8 @@ class ModelRowMixin:
     This class provides methods to convert raw database rows into Edgy ORM model objects,
     handling relationships such as `select_related` and `prefetch_related`.
     """
+
+    pkcolumns: ClassVar[Sequence[str]]
 
     @classmethod
     def can_load_from_row(cls: type[Model], row: Row, table: Table) -> bool:
@@ -56,10 +56,10 @@ class ModelRowMixin:
     @classmethod
     async def from_sqla_row(
         cls: type[Model],
+        *,
         row: Row,
         tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
         select_related: Sequence[Any] | None = None,
-        prefetch_related: Sequence[Prefetch] | None = None,
         only_fields: Sequence[str] | None = None,
         is_defer_fields: bool = False,
         exclude_secrets: bool = False,
@@ -68,7 +68,7 @@ class ModelRowMixin:
         prefix: str = "",
         old_select_related_value: Model | None = None,
         reference_select: reference_select_type | None = None,
-    ) -> Model | None:
+    ) -> Model:
         """
         Converts a SQLAlchemy `Row` object into an Edgy `Model` instance.
 
@@ -78,15 +78,13 @@ class ModelRowMixin:
         fields, managing prefixes for joined tables, and applying deferred or secret
         field exclusions.
 
-        Args:
+        Kwargs:
             row (Row): The SQLAlchemy row result to convert.
             tables_and_models (dict[str, tuple[Table, type[BaseModelType]]]): A dictionary
                 mapping prefixes to tuples of SQLAlchemy Table objects and Edgy Model types,
                 representing the tables and models involved in the query.
             select_related (Sequence[Any] | None): An optional sequence of relationship
                 names to eager-load. These relationships will be joined in the main query.
-            prefetch_related (Sequence[Prefetch] | None): An optional sequence of `Prefetch`
-                objects for pre-fetching related data in separate queries.
             only_fields (Sequence[str] | None): An optional sequence of field names to
                 include in the model instance. If specified, only these fields will be
                 populated.
@@ -106,9 +104,7 @@ class ModelRowMixin:
                 especially for aliased columns or complex selects.
 
         Returns:
-            Model | None: A fully populated Edgy Model instance, or None if the model
-            cannot be loaded from the row due to missing primary key values in joined
-            relationships.
+            Model: A fully populated Edgy Model instance.
 
         Raises:
             QuerySetError: If a field specified in `select_related` does not exist on
@@ -122,7 +118,6 @@ class ModelRowMixin:
         )
         model_kwargs: dict[str, Any] = {}  # Dictionary to store the model's attributes.
         select_related = select_related or []
-        prefetch_related = prefetch_related or []
         secret_columns: set[str] = set()
 
         # If exclude_secrets is True, gather all column names corresponding to secret fields.
@@ -166,10 +161,9 @@ class ModelRowMixin:
             if remainder:
                 # Recursively call from_sqla_row for nested select_related.
                 model_kwargs[field_name] = await model_class.from_sqla_row(
-                    row,
+                    row=row,
                     tables_and_models=tables_and_models,
                     select_related=[remainder],
-                    prefetch_related=prefetch_related,
                     exclude_secrets=exclude_secrets,
                     is_defer_fields=is_defer_fields,
                     using_schema=using_schema,
@@ -181,7 +175,7 @@ class ModelRowMixin:
             else:
                 # Call from_sqla_row for the direct related model.
                 model_kwargs[field_name] = await model_class.from_sqla_row(
-                    row,
+                    row=row,
                     tables_and_models=tables_and_models,
                     exclude_secrets=exclude_secrets,
                     is_defer_fields=is_defer_fields,
@@ -346,15 +340,6 @@ class ModelRowMixin:
             table=tables_and_models[prefix][0],
         )
 
-        # Handle prefetch_related fields if specified.
-        if prefetch_related:
-            await cls.__handle_prefetch_related(
-                row=row,
-                prefix=prefix,
-                model=model,
-                tables_and_models=tables_and_models,
-                prefetch_related=prefetch_related,
-            )
         assert model.pk is not None, model  # Ensure the primary key is not None.
         return model
 
@@ -381,7 +366,9 @@ class ModelRowMixin:
         return False
 
     @classmethod
-    def create_model_key_from_sqla_row(cls, row: Row, row_prefix: str = "") -> tuple:
+    def create_model_key_from_sqla_row(
+        cls, row: Row, row_prefix: str = ""
+    ) -> tuple[Hashable, ...]:
         """
         Builds a unique cache key for a model instance based on its class name and
         primary key values extracted from a SQLAlchemy row.
@@ -394,130 +381,9 @@ class ModelRowMixin:
         Returns:
             tuple: A tuple representing the unique key for the model instance.
         """
-        pk_key_list: list[Any] = [cls.__name__]
-        for attr in cls.pkcolumns:
-            # Append the primary key value from the row to the key list.
-            pk_key_list.append(str(row._mapping[f"{row_prefix}{attr}"]))
-        return tuple(pk_key_list)
-
-    @classmethod
-    async def __set_prefetch(
-        cls,
-        row: Row,
-        model: Model,
-        row_prefix: str,
-        related: Prefetch,
-    ) -> None:
-        """
-        Sets a prefetched relationship on a model instance. This method handles the logic
-        of retrieving and associating the prefetched data.
-
-        Args:
-            row (Row): The SQLAlchemy row from which the main model was constructed.
-            model (Model): The Edgy Model instance to which the prefetched data will be
-                attached.
-            row_prefix (str): The prefix used for columns in the SQLAlchemy row,
-                representing the main model's table.
-            related (Prefetch): The Prefetch object specifying the relationship to prefetch.
-
-        Raises:
-            QuerySetError: If creating a reverse path is not possible (e.g., for
-                unidirectional fields).
-            NotImplementedError: If prefetching from other databases is attempted.
-        """
-        model_key: tuple = ()
-        if related._is_finished:
-            # If the prefetch operation is marked as finished (meaning all rows for this
-            # prefetch have been collected), then bake the results. This allows for
-            # efficient retrieval of prefetched data.
-            await related.init_bake(type(model))
-            model_key = model.create_model_key()
-
-        # If the model's key exists in the baked results, retrieve and set the prefetched
-        # data directly.
-        if model_key in related._baked_results:
-            object.__setattr__(model, related.to_attr, related._baked_results[model_key])
-        else:
-            # If not in baked results, or not finished, proceed with fetching.
-            # Crawl the relationship path to get details about the related model and
-            # reverse path.
-            crawl_result = crawl_relationship(
-                model.__class__, related.related_name, traverse_last=True
-            )
-            if crawl_result.reverse_path is False:
-                raise QuerySetError(
-                    detail="Creating a reverse path is not possible, unidirectional fields used."
-                )
-            if crawl_result.cross_db_remainder:
-                raise NotImplementedError(
-                    "Cannot prefetch from other db yet. Maybe in future this feature will be "
-                    "added."
-                )
-
-            queryset = related.queryset
-            if related._is_finished:
-                assert queryset is not None, "Queryset is not set but _is_finished flag"
-            else:
-                # Check for potential conflicts with existing attributes on the model.
-                check_prefetch_collision(model, related)
-                if queryset is None:
-                    # If no specific queryset is provided for prefetch, default to all.
-                    queryset = crawl_result.model_class.query.all()
-
-                # Ensure the reverse path is selected to link back to the main model.
-                queryset = queryset.all()
-                queryset._select_related.add(crawl_result.reverse_path)
-                queryset._cached_select_related_expression = None
-
-            # Construct the filter clause for the prefetched query using the main model's
-            # primary key(s).
-            clause = {
-                f"{crawl_result.reverse_path}__{pkcol}": row._mapping[f"{row_prefix}{pkcol}"]
-                for pkcol in cls.pkcolumns
-            }
-            # Execute the prefetched query and set the result on the model instance.
-            object.__setattr__(model, related.to_attr, await queryset.filter(clause))
-
-    @classmethod
-    async def __handle_prefetch_related(
-        cls,
-        row: Row,
-        model: Model,
-        prefix: str,
-        tables_and_models: dict[str, tuple[Table, type[BaseModelType]]],
-        prefetch_related: Sequence[Prefetch],
-    ) -> None:
-        """
-        Manages the execution of all `prefetch_related` queries for a given model instance.
-        This method iterates through the specified prefetch relationships, checks for
-        collisions, and initiates the asynchronous loading of related data.
-
-        Args:
-            row (Row): The SQLAlchemy row from which the main model was constructed.
-            model (Model): The Edgy Model instance for which prefetch relationships are
-                to be handled.
-            prefix (str): The prefix used for columns in the SQLAlchemy row,
-                representing the main model's table.
-            tables_and_models (dict[str, tuple[Table, type[BaseModelType]]]): A dictionary
-                mapping prefixes to tuples of SQLAlchemy Table objects and Edgy Model types,
-                representing the tables and models involved in the query.
-            prefetch_related (Sequence[Prefetch]): A sequence of `Prefetch` objects to
-                process.
-
-        Raises:
-            QuerySetError: If a conflicting attribute is found that would be
-                overwritten by a prefetch operation.
-        """
-        queries = []
-
-        for related in prefetch_related:
-            # Check for conflicting names early to prevent unexpected overwrites.
-            check_prefetch_collision(model=model, related=related)
-            row_prefix = f"{tables_and_models[prefix][0].name}_" if prefix else ""
-            queries.append(
-                cls.__set_prefetch(row=row, row_prefix=row_prefix, model=model, related=related)
-            )
-
-        # Execute all prefetch queries concurrently if there are any.
-        if queries:
-            await run_concurrently(queries)
+        warnings.warn(
+            "`create_model_key_from_sqla_row` is deprecated use `create_model_key_from_raw_mapping` instead",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return cls.create_model_key_from_raw_mapping(mapping=row._mapping, prefix=row_prefix)  # type: ignore

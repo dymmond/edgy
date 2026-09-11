@@ -5,8 +5,8 @@ import copy
 import inspect
 import warnings
 from abc import ABCMeta
-from collections import UserDict, deque
-from collections.abc import Sequence
+from collections import deque
+from collections.abc import Iterator, Mapping, MutableMapping, Sequence
 from contextvars import ContextVar
 from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
@@ -31,18 +31,19 @@ if TYPE_CHECKING:
     from databasez.core.transaction import Transaction
 
     from edgy.core.connection import Database
+    from edgy.core.db.fields.base import BaseField
     from edgy.core.db.models import Model
     from edgy.core.db.models.types import BaseModelType
 
 _empty_dict: dict[str, Any] = {}
 _empty_set: frozenset[Any] = frozenset()
 
-_seen_table_names: ContextVar[set[str]] = ContextVar("_seen_table_names", default=None)
+_seen_table_names: ContextVar[set[str] | None] = ContextVar("_seen_table_names", default=None)
 
 T = TypeVar("T")
 
 
-class Fields(UserDict, dict[str, BaseFieldType]):
+class Fields(MutableMapping[str, BaseFieldType]):
     """Smart wrapper which tries to prevent invalidation as far as possible"""
 
     meta: MetaInfo
@@ -56,7 +57,7 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             data: An optional dictionary of initial field data.
         """
         self.meta = meta
-        super().__init__(data)
+        self._data = {} if data is None else dict(data)
 
     def add_field_to_meta(self, name: str, field: BaseFieldType) -> None:
         """
@@ -105,47 +106,18 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             for field_attr in _field_sets_to_clear:
                 getattr(self.meta, field_attr).discard(name)
 
-    def __getitem__(self, name: str) -> BaseFieldType:
+    def __getitem__(self, key: str) -> BaseFieldType:
         """
-        Retrieves a field by name.
+        Retrieve the field from data.
 
         Args:
-            name: The name of the field.
-
+            key: The name of the field.
         Returns:
-            The field object.
+            The field with the name or raise a KeyError.
         """
-        return cast(BaseFieldType, self.data[name])
+        return self._data[key]
 
-    def get(self, key: str, default: T = None) -> T | BaseFieldType:
-        """
-        Retrieves a field by key, with an optional default value.
-
-        Args:
-            key: The key of the field.
-            default: The default value to return if the key is not found.
-
-        Returns:
-            The field object or the default value.
-        """
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
-    def __contains__(self, key: str) -> bool:
-        """
-        Checks if a key exists in the fields.
-
-        Args:
-            key: The key to check.
-
-        Returns:
-            True if the key exists, False otherwise.
-        """
-        return key in self.data
-
-    def __setitem__(self, name: str, value: BaseFieldType) -> None:
+    def __setitem__(self, key: str, item: BaseFieldType) -> None:
         """
         Sets a field with the given name and value. Invalidates meta-information.
 
@@ -153,29 +125,41 @@ class Fields(UserDict, dict[str, BaseFieldType]):
             name: The name of the field.
             value: The field object.
         """
-        if name in self.data:
-            self.discard_field_from_meta(name)
-        self.data[name] = value
-        self.add_field_to_meta(name, value)
+        if key in self._data:
+            self.discard_field_from_meta(key)
+        self._data[key] = item
+        self.add_field_to_meta(key, item)
         if self.meta.model is not None:
-            self.meta.model.model_fields[name] = value
+            cast("type[Model]", self.meta.model).model_fields[key] = cast("BaseField", item)
         self.meta.invalidate(invalidate_stats=False)
 
-    def __delitem__(self, name: str) -> None:
+    def __delitem__(self, key: str) -> None:
         """
         Deletes a field by name. Invalidates meta-information.
 
         Args:
             name: The name of the field to delete.
         """
-        if self.data.pop(name, None) is not None:
-            self.discard_field_from_meta(name)
+        if self._data.pop(key, None) is not None:
+            self.discard_field_from_meta(key)
             if self.meta.model is not None:
-                self.meta.model.model_fields.pop(name, None)
+                cast("type[Model]", self.meta.model).model_fields.pop(key, None)
             self.meta.invalidate(invalidate_stats=False)
 
+    def __iter__(self) -> Iterator[str]:
+        """
+        Redirects to internal data.
+        """
+        return self._data.__iter__()
 
-class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
+    def __len__(self) -> int:
+        """
+        Redirects to internal data.
+        """
+        return len(self._data)
+
+
+class FieldToColumns(Mapping[str, Sequence[sqlalchemy.Column]]):
     """
     Manages the mapping from field names to their corresponding SQLAlchemy columns.
     """
@@ -190,9 +174,9 @@ class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
             meta: The MetaInfo object associated with these columns.
         """
         self.meta = meta
-        super().__init__()
+        self._data: dict[str, Sequence[sqlalchemy.Column]] = {}
 
-    def __getitem__(self, name: str) -> Sequence[sqlalchemy.Column]:
+    def __getitem__(self, key: str) -> Sequence[sqlalchemy.Column]:
         """
         Retrieves the SQLAlchemy columns for a given field name.
 
@@ -202,90 +186,81 @@ class FieldToColumns(UserDict, dict[str, Sequence[sqlalchemy.Column]]):
         Returns:
             A sequence of SQLAlchemy Column objects.
         """
-        if name in self.data:
-            return cast(Sequence[sqlalchemy.Column], self.data[name])
-        field = self.meta.fields[name]
-        result = self.data[name] = field.get_columns(name)
+        if key in self._data:
+            return self._data[key]
+        field = self.meta.fields[key]
+        result = self._data[key] = field.get_columns(key)
         return result
 
-    def __setitem__(self, name: str, value: Any) -> None:
-        """
-        This method is not supported for FieldToColumns.
-
-        Raises:
-            Exception: Always raises an exception as setting items directly is not allowed.
-        """
-        raise Exception("Cannot set item here")
-
-    def __iter__(self) -> Any:
+    def __iter__(self) -> Iterator[str]:
         """
         Initializes the columns_to_field mapping and returns an iterator over the keys.
         """
+        # this initializes this fields data by requesting all the columns
         self.meta.columns_to_field.init()
-        return super().__iter__()
+        return self._data.__iter__()
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def __len__(self) -> int:
         """
-        Retrieves the SQLAlchemy columns for a given key, with an optional default value.
-
-        Args:
-            key: The key of the field.
-            default: The default value to return if the key is not found.
-
-        Returns:
-            A sequence of SQLAlchemy Column objects or the default value.
+        Initializes the columns_to_field mapping and return the result length of the dict.
         """
-        try:
-            return self[key]
-        except KeyError:
-            return default
-
-    def __contains__(self, key: str) -> bool:
-        """
-        Checks if a key exists in the mapping.
-
-        Args:
-            key: The key to check.
-
-        Returns:
-            True if the key exists, False otherwise.
-        """
-        try:
-            self[key]
-            return True
-        except KeyError:
-            return False
+        # this initializes this fields data by requesting all the columns
+        self.meta.columns_to_field.init()
+        return len(self._data)
 
 
-class FieldToColumnNames(FieldToColumns, dict[str, frozenset[str]]):
+class FieldToColumnNames(Mapping[str, frozenset[str]]):
     """
-    Manages the mapping from field names to their corresponding SQLAlchemy column key names.
+    Manages the mapping from field names to their corresponding SQLAlchemy column keys.
     """
 
-    def __getitem__(self, name: str) -> frozenset[str]:
+    meta: MetaInfo
+
+    def __init__(self, meta: MetaInfo):
         """
-        Retrieves the SQLAlchemy column names for a given field name.
+        Initializes the FieldToColumnNames object.
+
+        Args:
+            meta: The MetaInfo object associated with these columns.
+        """
+        self.meta = meta
+        self._data: dict[str, frozenset[str]] = {}
+
+    def __getitem__(self, key: str) -> frozenset[str]:
+        """
+        Retrieves the SQLAlchemy column keys for a given field name.
 
         Args:
             name: The name of the field.
 
         Returns:
-            A frozenset of column names.
+            A frozenset of SQLAlchemy Column keys.
         """
-        if name in self.data:
-            return cast(frozenset[str], self.data[name])
-        column_keys = frozenset(column.key for column in self.meta.field_to_columns[name])
-        result = self.data[name] = column_keys
+        if key in self._data:
+            return self._data[key]
+        columns = self.meta.field_to_columns[key]
+        result = self._data[key] = frozenset([col.key for col in columns])
         return result
 
+    def __iter__(self) -> Iterator[str]:
+        """
+        Same result as field_to_columns so use it instead.
+        """
+        return self.meta.field_to_columns.__iter__()
 
-class ColumnsToField(UserDict, dict[str, str]):
+    def __len__(self) -> int:
+        """
+        Same result as field_to_columns so use it instead.
+        """
+        return self.meta.field_to_columns.__len__()
+
+
+class ColumnsToField(Mapping[str, str]):
     """
     Manages the mapping from SQLAlchemy column names to their corresponding field names.
     """
 
     meta: MetaInfo
-    _init: bool
 
     def __init__(self, meta: MetaInfo):
         """
@@ -295,8 +270,7 @@ class ColumnsToField(UserDict, dict[str, str]):
             meta: The MetaInfo object associated with these mappings.
         """
         self.meta = meta
-        self._init = False
-        super().__init__()
+        self._data: dict[str, str] | None = None
 
     def init(self) -> None:
         """
@@ -306,8 +280,7 @@ class ColumnsToField(UserDict, dict[str, str]):
         Raises:
             ValueError: If a column name collision is detected.
         """
-        if not self._init:
-            self._init = True
+        if self._data is None:
             _columns_to_field: dict[str, str] = {}
             for field_name in self.meta.fields:
                 # init structure
@@ -319,58 +292,45 @@ class ColumnsToField(UserDict, dict[str, str]):
                             f"and {_columns_to_field[column_name]}"
                         )
                     _columns_to_field[column_name] = field_name
-            self.data.update(_columns_to_field)
+            self._data = _columns_to_field
 
-    def __getitem__(self, name: str) -> str:
+    def __getitem__(self, key: str) -> str:
         """
         Retrieves the field name for a given column name. Ensures initialization.
 
         Args:
-            name: The name of the column.
+            key: The key of the column.
 
         Returns:
             The name of the field.
         """
         self.init()
-        return cast(str, super().__getitem__(name))
+        assert self._data is not None
+        return self._data.__getitem__(key)
 
-    def __setitem__(self, name: str, value: Any) -> None:
-        """
-        This method is not supported for ColumnsToField.
-
-        Raises:
-            Exception: Always raises an exception as setting items directly is not allowed.
-        """
-        raise Exception("Cannot set item here")
-
-    def __contains__(self, name: str) -> bool:
-        """
-        Checks if a column name exists in the mapping. Ensures initialization.
-
-        Args:
-            name: The column name to check.
-
-        Returns:
-            True if the column name exists, False otherwise.
-        """
-        self.init()
-        return super().__contains__(name)
-
-    def __iter__(self) -> Any:
+    def __iter__(self) -> Iterator[str]:
         """
         Ensures initialization and returns an iterator over the keys.
         """
         self.init()
-        return super().__iter__()
+        assert self._data is not None
+        return self._data.__iter__()
+
+    def __len__(self) -> int:
+        """
+        Ensures initialization and returns length.
+        """
+        self.init()
+        assert self._data is not None
+        return len(self._data)
 
 
-class ColumnsRemapping(UserDict, dict[str, str]):
+class ColumnsRemapping(Mapping[str, str]):
     """
     Renames column.name to column.key
     """
 
     meta: MetaInfo
-    _init: bool
 
     def __init__(self, meta: MetaInfo):
         """
@@ -380,8 +340,7 @@ class ColumnsRemapping(UserDict, dict[str, str]):
             meta: The MetaInfo object associated with these mappings.
         """
         self.meta = meta
-        self._init = False
-        super().__init__()
+        self._data: dict[str, str] | None = None
 
     def init(self) -> None:
         """
@@ -391,8 +350,7 @@ class ColumnsRemapping(UserDict, dict[str, str]):
         Raises:
             ValueError: If a column name collision is detected.
         """
-        if not self._init:
-            self._init = True
+        if self._data is None:
             _columns_remapping: dict[str, str] = {}
             for field_name in self.meta.fields:
                 # init structure
@@ -400,12 +358,37 @@ class ColumnsRemapping(UserDict, dict[str, str]):
                 for column in columns:
                     if column.key != column.name:
                         _columns_remapping[column.name] = column.key
-            self.data.update(_columns_remapping)
+            self._data = _columns_remapping
 
-    def __getattribute__(self, name: str) -> Any:
-        if name not in {"init", "_init", "data"}:
-            self.init()
-        return object.__getattribute__(self, name)
+    def __getitem__(self, key: str) -> str:
+        """
+        Retrieves the field name for a given column name. Ensures initialization.
+
+        Args:
+            key: The name of the column.
+
+        Returns:
+            The key of the column.
+        """
+        self.init()
+        assert self._data is not None
+        return self._data.__getitem__(key)
+
+    def __iter__(self) -> Iterator[str]:
+        """
+        Ensures initialization and returns an iterator over the names.
+        """
+        self.init()
+        assert self._data is not None
+        return self._data.__iter__()
+
+    def __len__(self) -> int:
+        """
+        Ensures initialization and returns length.
+        """
+        self.init()
+        assert self._data is not None
+        return len(self._data)
 
 
 _trigger_attributes_fields_MetaInfo: set[str] = {
@@ -563,8 +546,10 @@ class MetaInfo:
 
         self.signals = signals_module.Broadcaster(getattr(meta, "signals", None) or {})
         self.signals.set_lifecycle_signals_from(signals_module, overwrite=False)
+        # this is internally transformed into a `Fields` instance
         self.fields = {**getattr(meta, "fields", _empty_dict)}  # type: ignore
-        self.managers = {**getattr(meta, "managers", _empty_dict)}
+        # no transformation, so new dict
+        self.managers = {**getattr(meta, "managers", {})}
         self.multi_related = {*getattr(meta, "multi_related", _empty_set)}
         self.load_dict(kwargs)
 
@@ -608,20 +593,6 @@ class MetaInfo:
             self._needs_special_serialization = _needs_special_serialization
 
         return self._needs_special_serialization
-
-    @property
-    def fields_mapping(self) -> dict[str, BaseFieldType]:
-        """
-        Returns a mapping of field names to field objects.
-
-        Deprecated: Use `fields` instead.
-        """
-        warnings.warn(
-            "'fields_mapping' has been deprecated, use 'fields' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self.fields
 
     @property
     def is_multi(self) -> bool:
@@ -1477,18 +1448,3 @@ class BaseModelMeta(ModelMetaclass, ABCMeta):
         Returns the SQLAlchemy ColumnCollection for the model's table.
         """
         return cast("sqlalchemy.sql.ColumnCollection", cls.table.columns)
-
-    @property
-    def fields(cls) -> dict[str, BaseFieldType]:
-        """
-        Returns a dictionary of field names to BaseFieldType objects for the model.
-
-        Deprecated: Use `meta.fields` instead.
-        """
-        warnings.warn(
-            "'fields' has been deprecated, use 'meta.fields' instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        meta: MetaInfo = cls.meta
-        return meta.fields

@@ -30,12 +30,14 @@ class SQLAlchemyModelMixin:
     import sqlalchemy
     import edgy
 
+
     class Workspace(edgy.SQLAlchemyModelMixin, edgy.StrictModel):
         id: int = edgy.IntegerField(primary_key=True, autoincrement=True)
         name: str = edgy.CharField(max_length=255)
 
         class Meta:
             registry = ...
+
 
     stmt = sqlalchemy.select(Workspace.id).where(Workspace.id == 1)
     ```

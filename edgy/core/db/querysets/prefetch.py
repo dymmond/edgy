@@ -1,13 +1,20 @@
 from __future__ import annotations
 
+import asyncio
+import warnings
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any
+from collections.abc import Hashable
+from functools import cached_property
+from inspect import isclass
+from typing import TYPE_CHECKING, Any, cast
 
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
-    from edgy import Model, QuerySet
+    from edgy.core.db.models.model import Model
     from edgy.core.db.models.types import BaseModelType
+
+    from .queryset import QuerySet
 
 
 class Prefetch:
@@ -22,14 +29,16 @@ class Prefetch:
 
     def __init__(
         self,
+        *args: Any,
         related_name: str,
         to_attr: str,
         queryset: QuerySet | None = None,
+        from_anchor: str | None = None,
     ) -> None:
         """
         Initializes a Prefetch object.
 
-        Args:
+        Kwargs:
             related_name (str): The name of the related field (e.g., a reverse
                                  foreign key relation or a many-to-many relation)
                                  to prefetch. This corresponds to the name of the
@@ -44,23 +53,114 @@ class Prefetch:
                                          queryset for the related model. This allows
                                          for custom filtering or ordering of the
                                          prefetched data.
+            from_anchor (str | None): The path to the start of related_name and to_attr. Can be a submodel.
+                                      Leave empty to use the default, the current model.
         """
-        self.related_name = related_name
-        self.to_attr = to_attr
+        if args:
+            warnings.warn("`Prefetch` is now keyword-only.", DeprecationWarning, stacklevel=2)
+            self.related_name = args[0]
+            self.to_attr = args[1]
+        else:
+            self.related_name = related_name
+            self.to_attr = to_attr
         self.queryset: QuerySet | None = queryset
-        # Internal flag to indicate if the prefetching process has finished.
-        self._is_finished = False
-        # Internal prefix used during the baking process for creating model keys.
-        self._bake_prefix: str = ""
-        # A defaultdict to store the baked results, mapping model keys to lists of
-        # related instances.
-        self._baked_results: dict[tuple[str, ...], list[Any]] = defaultdict(list)
+        self.from_anchor = from_anchor or ""
         # Internal flag to indicate if the baking process has been completed.
         self._baked = False
 
-    async def init_bake(self, model_class: type[Model]) -> None:
+    @cached_property
+    def _forward_path(self) -> str:
         """
-        Initializes the baking process for prefetching related objects.
+        Forward path for matching.
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_forward_path` not set.")
+
+    @cached_property
+    def _baking_finished(self) -> asyncio.Event:
+        """
+        Wait until baking is finished.
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_baking_finished` not set.")
+
+    @cached_property
+    def _forward_path_to_anchor(self) -> str:
+        """
+        Maps back to anchor model.
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_forward_path_to_anchor` not set.")
+
+    @cached_property
+    def _reverse_path_to_anchor(self) -> str:
+        """
+        Maps back to anchor model.
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_reverse_path_to_anchor` not set.")
+
+    @cached_property
+    def _target_model(self) -> type[Model]:
+        """
+        Holds origin model (source model, where prefetches are attached).
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_target_model` not set.")
+
+    @cached_property
+    def _baked_results(self) -> dict[tuple[Hashable, ...], list[Any]]:
+        """
+        Persisted dict to store the baked results, mapping model keys to lists of
+        related instances.
+
+        Placeholder which raises when not initialized.
+        """
+        raise QuerySetError("`_baked_results` not set.")
+
+    def check_for_collision(self, model: type[BaseModelType] | BaseModelType) -> None:
+        """
+        Checks for potential attribute name collisions when prefetching.
+
+        This function ensures that the `to_attr` specified in a `Prefetch` object
+        does not conflict with any existing attributes, fields (database columns),
+        or managers defined on the target `model`. A collision could lead to
+        unexpected behavior or overwriting of crucial model components.
+
+        Args:
+            model (type[BaseModelType] | BaseModelType):
+                The model class to which the prefetched
+                results will be attached. This is the "parent"
+                model in the prefetch relationship.
+
+        Raises:
+            QuerySetError: If the `to_attr` from the `Prefetch` object conflicts
+                        with an existing attribute, field, or manager on the
+                        `model`. The error message specifies the conflicting
+                        attribute and the model class.
+        """
+        attr_name = self.to_attr.rsplit("__", 1)[-1]
+        # Check for collision with existing attributes, model fields, or model managers.
+        if (
+            hasattr(model, attr_name)
+            or attr_name in model.meta.fields
+            or attr_name in model.meta.managers
+        ):
+            if not isclass(model):
+                model = cast("type[BaseModelType]", type(model))
+            raise QuerySetError(
+                f"Conflicting attribute to_attr='{attr_name}' for related_name=`{self.related_name}` "
+                f"'in {model.__name__}"
+            )
+
+    async def _init_bake(self) -> None:
+        """
+        (Internal method) Initializes the baking process for prefetching related objects.
 
         This asynchronous method is responsible for executing the internal
         `queryset` (if it exists and the process is ready) and populating
@@ -68,32 +168,46 @@ class Prefetch:
         from the queryset, creates a unique `model_key` for each related
         instance based on the `model_class` and `_bake_prefix`, and then
         appends the result to the corresponding list in `_baked_results`.
-        This effectively groups related objects by their parent model's key.
-
-        Args:
-            model_class (type[Model]): The main model class to which the prefetched
-                                        results will eventually be attached. This
-                                        is used to create the model keys for grouping.
+        This effectively groups related objects by their parent model's key
         """
-        # If already baked, not finished, or no queryset, do not proceed.
-        if self._baked or not self._is_finished or self.queryset is None:
+        from .executor import QueryExecutor
+
+        target_model = self._target_model
+        qs = self.queryset
+        assert qs is not None, "`queryset` not initialized"
+        # If already baking check event.
+        if self._baked:
+            await self._baking_finished.wait()
             return
         self._baked = True
         # Execute the queryset and asynchronously iterate over the results.
         # The `True` argument for `_execute_iterate` ensures all results are
         # fetched at once for processing.
-        async for result in self.queryset._execute_iterate(True):
+        executor = QueryExecutor(qs)
+        result_dict = defaultdict(list)
+        first = True
+        async for _, result in executor.iterate(True):
+            # now this is initialized
+            if first:
+                bake_prefix = (
+                    f"{executor.parser.tables_and_models[self._reverse_path_to_anchor][0].name}_"
+                )
+                first = False
             # Create a unique model key from the current SQLAlchemy row using the
             # specified bake prefix. This key links the prefetched item back to
             # its parent model instance.
-            model_key = model_class.create_model_key_from_sqla_row(
-                self.queryset._current_row, row_prefix=self._bake_prefix
+            model_key = target_model.create_model_key_from_raw_mapping(
+                mapping=executor._current_row._mapping, prefix=bake_prefix
             )
             # Append the prefetched result to the list associated with its model key.
-            self._baked_results[model_key].append(result)
+            result_dict[model_key].append(result)
+        self._baked_results.update(result_dict)
+        self._baking_finished.set()
 
 
-def check_prefetch_collision(model: BaseModelType, related: Prefetch) -> Prefetch:
+def check_prefetch_collision(
+    model: type[BaseModelType] | BaseModelType, related: Prefetch
+) -> Prefetch:
     """
     Checks for potential attribute name collisions when prefetching.
 
@@ -103,7 +217,7 @@ def check_prefetch_collision(model: BaseModelType, related: Prefetch) -> Prefetc
     unexpected behavior or overwriting of crucial model components.
 
     Args:
-        model (BaseModelType): The model class instance to which the prefetched
+        model (type[BaseModelType] | BaseModelType): The model class to which the prefetched
                                results will be attached. This is the "parent"
                                model in the prefetch relationship.
         related (Prefetch): The `Prefetch` object containing the `to_attr`
@@ -119,64 +233,10 @@ def check_prefetch_collision(model: BaseModelType, related: Prefetch) -> Prefetc
                        `model`. The error message specifies the conflicting
                        attribute and the model class.
     """
-    # Check for collision with existing attributes, model fields, or model managers.
-    if (
-        hasattr(model, related.to_attr)
-        or related.to_attr in model.meta.fields
-        or related.to_attr in model.meta.managers
-    ):
-        raise QuerySetError(
-            f"Conflicting attribute to_attr='{related.related_name}' with "
-            f"'{related.to_attr}' in {model.__class__.__name__}"
-        )
+    warnings.warn(
+        "This method is deprecated. Use `prefetch.check_for_collision` instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    related.check_for_collision(model)
     return related
-
-
-class PrefetchMixin:
-    """
-    Mixin class providing methods for performing `prefetch_related` operations
-    on a QuerySet.
-
-    This mixin distinguishes between `select_related` (which performs SQL joins)
-    and `prefetch_related` (which performs separate lookups and Python-side
-    object mapping). It allows users to specify relationships that should be
-    eagerly loaded into separate attributes of the main model instances.
-    """
-
-    def prefetch_related(self, *prefetch: Prefetch) -> QuerySet:
-        """
-        Performs a reverse lookup for foreign keys and other relationships,
-        populating results onto the main model instances.
-
-        This method is distinct from `select_related` in that `select_related`
-        performs a SQL JOIN to fetch related data in the same query, whereas
-        `prefetch_related` executes separate queries for each relationship
-        and then joins the results in Python. This is particularly useful for
-        many-to-many relationships or reverse foreign key lookups, or when
-        preloading related objects for a large set of parent objects.
-
-        Args:
-            *prefetch (Prefetch): One or more `Prefetch` objects, each defining
-                                   a relationship to prefetch, including the
-                                   `related_name` and the `to_attr` where results
-                                   will be stored. An optional custom `QuerySet`
-                                   can also be provided within the `Prefetch` object.
-
-        Returns:
-            QuerySet: A new `QuerySet` instance with the specified prefetch
-                      relationships configured. This new QuerySet can then be
-                      further filtered, ordered, or executed.
-
-        Raises:
-            QuerySetError: If any argument passed to `prefetch` is not an
-                           instance of the `Prefetch` class.
-        """
-        queryset: QuerySet = self._clone()
-
-        # Validate that all provided arguments are instances of Prefetch.
-        if any(not isinstance(value, Prefetch) for value in prefetch):
-            raise QuerySetError("The prefetch_related must have Prefetch type objects only.")
-
-        # Append the new prefetch objects to the queryset's internal list.
-        queryset._prefetch_related = [*self._prefetch_related, *prefetch]
-        return queryset
