@@ -7,7 +7,7 @@ models = edgy.Registry(database=database)
 # All the tracks that belong to a specific `Company`.
 # The tracks are associated with `albums` and `studios`
 # where the `Track` will be also internally filtered
-company = await Company.query.prefetch_related(
+companies = await Company.query.prefetch_related(
     Prefetch(
         related_name="studio__album__tracks",
         to_attr="tracks",

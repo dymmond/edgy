@@ -152,12 +152,11 @@ All the tracks that belong to a specific `Company`. The tracks are associated wi
 {!> ../docs_src/prefetch/second/prefetch_filtered.py !}
 ```
 
-This easy, right? The total tracks should be **1** as the **bird** is part of the title of the `track` that belongs to the `studio` that belongs to the `company`.
-```
+This easy, right? The total tracks should be **1** as the **bird** is part of the title of the `track` that belongs to the `studio` that belongs to the company for company in the `companies` list.
 
 **You might want to pivot**:
 
-Given the former example we can also pivot and add it to company.studio.album as `tracks_filtered`.
+Given the former example we can also pivot and add it to `company.studio.album` as `tracks_filtered` for company in the `companies` list.
 
 ```python hl_lines="14"
 {!> ../docs_src/prefetch/second/prefetch_filtered_alternative.py !}
