@@ -117,8 +117,9 @@ class BaseQuerySet(
         select_related = set(select_related)
         self._select_related: set[str] = set()
         # groups and order by
-        self._select_related_g_and_o = set()
-        self._select_related_embedding = set()
+        self._select_related_g_and_o: set[str] = set()
+        # embedded, like embed_parent or prefetches
+        self._select_related_embedding: set[str] = set()
         if select_related:
             self._update_select_related(select_related)
         self._prefetch_related = list(prefetch_related)

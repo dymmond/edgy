@@ -215,6 +215,7 @@ def clean_path_to_crawl_result(
     path: str,
     embed_parent: tuple[str, str] | None = None,
     model_database: Database | None = None,
+    traverse_last: bool = False,
 ) -> RelationshipCrawlResult:
     if embed_parent:
         # If a prefix is defined and the key starts with it, remove the prefix.
@@ -225,7 +226,9 @@ def clean_path_to_crawl_result(
             path = f"{embed_parent[0]}__{path}"
     # Crawl the relationship to find the relevant sub_model_class, field_name,
     # operator, related_string, and cross-database remainder.
-    crawl_result = crawl_relationship(model_class, path, model_database=model_database)
+    crawl_result = crawl_relationship(
+        model_class, path, model_database=model_database, traverse_last=traverse_last
+    )
     if crawl_result.operator != "exact":
         raise ValueError("Cannot select operators here.")
     return crawl_result
