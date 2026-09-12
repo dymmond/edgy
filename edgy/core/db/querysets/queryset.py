@@ -535,13 +535,12 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset: QuerySet = self._clone()
         queryset._order_by = order_by
         if queryset._update_select_related_weak(
-            order_by, cache_name="_select_related_g_and_o", clear=True, traverse_last=False
+            (x.lstrip("-") for x in order_by), cache_name="_select_related_g_and_o", clear=True
         ):
             queryset._update_select_related_weak(
                 queryset._group_by,
                 cache_name="_select_related_g_and_o",
                 clear=False,
-                traverse_last=False,
             )
         return queryset
 
@@ -618,13 +617,12 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset: QuerySet = self._clone()
         queryset._group_by = group_by
         if queryset._update_select_related_weak(
-            group_by, cache_name="_select_related_g_and_o", clear=True, traverse_last=False
+            group_by, cache_name="_select_related_g_and_o", clear=True
         ):
             queryset._update_select_related_weak(
-                queryset._order_by,
+                (x.lstrip("-") for x in queryset._order_by),
                 cache_name="_select_related_g_and_o",
                 clear=False,
-                traverse_last=False,
             )
         return queryset
 

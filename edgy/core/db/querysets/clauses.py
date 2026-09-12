@@ -213,10 +213,21 @@ def clean_query_kwargs(
 def clean_path_to_crawl_result(
     model_class: type[BaseModelType],
     path: str,
+    *,
     embed_parent: tuple[str, str] | None = None,
     model_database: Database | None = None,
-    traverse_last: bool = False,
 ) -> RelationshipCrawlResult:
+    """
+    For use with filter-like definitions but without operator support (e.g. distinct, order_by, ...).
+
+    Args:
+        model_class (type[BaseModelType]): Input model.
+        path (str): Field path.
+
+    Kwargs:
+        embed_parent (tuple[str, str] | None): Provide a embed_parent value from e.g. QuerySet.
+        model_database (Database | None): Set the model_database.
+    """
     if embed_parent:
         # If a prefix is defined and the key starts with it, remove the prefix.
         if embed_parent[1] and path.startswith(embed_parent[1]):
@@ -227,10 +238,8 @@ def clean_path_to_crawl_result(
     # Crawl the relationship to find the relevant sub_model_class, field_name,
     # operator, related_string, and cross-database remainder.
     crawl_result = crawl_relationship(
-        model_class, path, model_database=model_database, traverse_last=traverse_last
+        model_class, path, model_database=model_database, no_operator=True
     )
-    if crawl_result.operator != "exact":
-        raise ValueError("Cannot select operators here.")
     return crawl_result
 
 

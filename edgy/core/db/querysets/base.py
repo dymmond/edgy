@@ -381,21 +381,47 @@ class BaseQuerySet(
         return order_col.desc() if reverse else order_col
 
     def _update_select_related_weak(
-        self, fields: Iterable[str], *, cache_name: str, clear: bool, traverse_last: bool
+        self, fields: Iterable[str], *, cache_name: str, clear: bool
     ) -> bool:
+        """
+        Update the select_related cache with cache_name. This is a special cache,
+        which is directly used.
+
+        Warning: Depending of the cache_name, a different normalization strategy is used.
+
+        Args:
+            fields: list of field pathes.
+        Kwargs:
+            cache_name: Select the select_related cache. This also affects the normalization strategy.
+            clear: Clear the cache.
+        """
         # retrieve the cache from queryset, use cache_name to identify
         cache_weak: set[str] = getattr(self, cache_name)
+        match cache_name:
+            case "_select_related_embedding":
+                related_element_fn: Callable[[str], str] = lambda field_name: (
+                    crawl_relationship(
+                        self.model_class,
+                        field_name,
+                        model_database=self.database,
+                        traverse_last=True,
+                        no_operator=True,
+                    ).forward_path
+                )
+            case "_select_related_g_and_o":
+                related_element_fn = lambda field_name: (
+                    clauses_mod.clean_path_to_crawl_result(
+                        self.model_class,
+                        path=field_name,
+                        embed_parent=self.embed_parent_filters,
+                        model_database=self.database,
+                    ).forward_path
+                )
+            case _:
+                raise QuerySetError(f"Invalid cache (`{cache_name}`) used.")
         new_related: set[str] = set()
         for field_name in fields:
-            # strip leading - from order_by
-            field_name = field_name.lstrip("-")
-            related_element = clauses_mod.clean_path_to_crawl_result(
-                self.model_class,
-                path=field_name,
-                embed_parent=self.embed_parent_filters,
-                model_database=self.database,
-                traverse_last=traverse_last,
-            ).forward_path
+            related_element = related_element_fn(field_name)
             # eliminate empty pathes
             if related_element:
                 new_related.add(related_element)

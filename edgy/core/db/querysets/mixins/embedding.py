@@ -219,13 +219,17 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             else:
                 seen_prefetches.add(compare_tuple)
             target_crawl_result = crawl_relationship(
-                self_queryset.model_class, prefetch.to_attr, allow_crossing_db=True
+                self_queryset.model_class,
+                prefetch.to_attr,
+                # allow_crossing_db=True,
+                no_operator=True,
             )
             anchor_crawl_result = crawl_relationship(
                 self_queryset.model_class,
                 prefetch.from_anchor,
                 # allow_crossing_db=True,
                 traverse_last=True,
+                no_operator=True,
             )
             if anchor_crawl_result.cross_db_remainder:
                 raise NotImplementedError(
@@ -233,7 +237,10 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 )
 
             prefetch_crawl_result = crawl_relationship(
-                anchor_crawl_result.model_class, prefetch.related_name, traverse_last=True
+                anchor_crawl_result.model_class,
+                prefetch.related_name,
+                traverse_last=True,
+                no_operator=True,
             )
             if prefetch_crawl_result.cross_db_remainder:
                 raise NotImplementedError(
@@ -335,7 +342,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         )
         # they are sanitized and analyzed later in _update_select_related_weak
         queryset._update_select_related_weak(
-            select_pathes, cache_name="_select_related_embedding", clear=True, traverse_last=True
+            select_pathes, cache_name="_select_related_embedding", clear=True
         )
         return queryset
 
@@ -357,7 +364,8 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         Returns:
             QuerySetType: A new QuerySet instance with the new embedding.
         """
-        queryset = self._clone()
+        self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
+        queryset = self_queryset._clone()
         queryset.embed_parent = embed_parent
         select_pathes: set[str] = set()
         if queryset.embed_parent and queryset.embed_parent[0]:
@@ -369,7 +377,6 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 select_pathes,
                 cache_name="_select_related_embedding",
                 clear=True,
-                traverse_last=True,
             )
             and queryset._prefetch_related
         ):

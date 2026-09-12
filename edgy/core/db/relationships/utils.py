@@ -44,6 +44,7 @@ def crawl_relationship(
     callback_fn: Any = None,
     traverse_last: bool = False,
     allow_crossing_db: bool = False,
+    no_operator: bool = False,
 ) -> RelationshipCrawlResult:
     """
     Crawls a relationship path, typically used for query lookups that span
@@ -66,6 +67,7 @@ def crawl_relationship(
                               also be traversed as a relationship. This is useful
                               for scenarios where the final segment is itself
                               a relationship. Defaults to False.
+        no_operator (bool): If True, raise if an operator was found.
 
     Returns:
         RelationshipCrawlResult: A NamedTuple containing the details of the
@@ -74,8 +76,9 @@ def crawl_relationship(
                                  and any cross-database remainder.
 
     Raises:
-        ValueError: If an attempt is made to cross a non-relationship field with
+        ValueError: If an attempt is made to cross a non-relationship or non-existent field with
                     remaining path segments.
+                    If no_operator was provided and an operator was found.
     """
     field = None
     forward_prefix_path = ""
@@ -137,18 +140,20 @@ def crawl_relationship(
         elif len(splitted) == 2:
             # If the second part does not contain "__", it's likely an operator.
             if "__" not in splitted[1]:
+                if no_operator:
+                    raise ValueError(f"Unexpected operator was found: {splitted[1]}.")
                 operator = splitted[1]
                 break
             else:
                 if field is None:
                     raise ValueError(
                         f"Tried to cross field: `{field_name}` which does not exist "
-                        f"remainder: `{splitted[1]}`"
+                        f"remainder: `{splitted[1]}`."
                     )
                 # Raise an error if trying to cross a non-relationship field with further segments.
                 raise ValueError(
                     f"Tried to cross field: `{field_name}` of type `{field!r}`, "
-                    f"remainder: `{splitted[1]}`"
+                    f"remainder: `{splitted[1]}`."
                 )
         else:
             # If only one part remains, it's the final field name, and the operator is "exact".
