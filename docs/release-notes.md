@@ -14,8 +14,8 @@
   You can't do the dirty trick anymore testing for a dict.
 - Fix contracts; it was always an error to access the data attribute directly (just inherited from UserDict).
 - `from_sqla_row` is keyword only now, so we can better update and introspect it.
-- Make Prefetch `init_bake` and more internal. QuerySetErrors are now raised if the attributes are illegally accessed.
-- Make Prefetch keyword-only like in documentation.
+- Make `Prefetch`'s `init_bake` and other internals private. QuerySetErrors are now raised if the attributes are illegally accessed.
+- Make `Prefetch` keyword-only like in documentation.
 - Assign prefetches from queryset not in `from_sqla_row`. This allows better handling of embeddings.
 - `create_model_key_from_sqla_row` is deprecated now.
 - `crawl_relationship` has now a better error when a field does not exist.
