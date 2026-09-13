@@ -137,6 +137,8 @@ class ManyRelation(ManyRelationProtocol):
         # because we set embed_parent directly, this is required
         if not self.through.meta.fields[self.to_foreign_key].is_cross_db():
             # not initialized yet, so add it manually
+            # add also to _select_related_embedding, because it is the part of select related evaluated
+            # for prefetches sub attachments
             queryset._select_related_embedding.add(self.to_foreign_key)
         return queryset.using(schema=self.instance.get_active_instance_schema())
 

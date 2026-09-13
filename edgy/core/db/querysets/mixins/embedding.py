@@ -68,7 +68,22 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         tables_and_models: tables_and_models_type | None,
         seen: set[str],
     ) -> None:
-        """Apply prefetches on select related branches."""
+        """Apply prefetches on select related branches.
+
+        This method applies prefetching logic to the current queryset by considering
+        select related relationships and embedding targets. It handles fetching related
+        data concurrently and embedding parents in the result set.
+
+        Args:
+            instance: The current EdgyModel instance.
+            prefetches_dict: A dictionary mapping relationship or embedding paths to lists of Prefetch objects.
+            mapping: The mapping object used for database operations.
+            tables_and_models: Optional tables and models information.
+            seen: A set tracking already processed prefixes to prevent redundant fetches.
+
+        Returns:
+            None
+        """
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
         try:
@@ -84,19 +99,22 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                     tables_and_models=tables_and_models,
                     prefetches=prefetches_list,
                 )
-            for path in self_queryset._select_related.union(
-                self_queryset._select_related_embedding
+            # we need only to check the automatically generated embedding.
+            for path in sorted(
+                self_queryset._select_related_embedding, key=lambda x: x.count("__"), reverse=True
             ):
                 prefix = ""
-                new_result: BaseModelType | None = instance
+                current_instance: BaseModelType | None = instance
                 for part in path.split("__"):
                     prefix = f"{prefix}__{part}" if prefix else part
-                    new_result = cast("BaseModelType | None", getattr(new_result, part, None))
-                    if new_result is None:
-                        break
                     if prefix in seen:
                         continue
+                    current_instance = cast(
+                        "BaseModelType | None", getattr(current_instance, part, None)
+                    )
                     seen.add(prefix)
+                    if current_instance is None:
+                        break
                     if prefetches_list := prefetches_dict.get(prefix):
                         await run_concurrently(
                             [prefetch._init_bake() for prefetch in prefetches_list],
@@ -105,7 +123,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                             else None,
                         )
                         self._apply_prefetches_list(
-                            instance=new_result,
+                            instance=current_instance,
                             prefix=prefix,
                             mapping=mapping,
                             tables_and_models=tables_and_models,

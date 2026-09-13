@@ -191,12 +191,14 @@ def clean_query_kwargs(
                 key = f"{embed_parent[0]}__{key}"
         # Crawl the relationship to find the relevant sub_model_class, field_name,
         # operator, related_string, and cross-database remainder.
-        sub_model_class, field_name, _, _, _, cross_db_remainder = crawl_relationship(
-            model_class, key, model_database=model_database
-        )
+        crawl_result = crawl_relationship(model_class, key, model_database=model_database)
         # Determine the field; if there's a cross-database remainder, the field is None,
         # otherwise, get the field from the sub_model_class's meta.fields.
-        field = None if cross_db_remainder else sub_model_class.meta.fields.get(field_name)
+        field = (
+            None
+            if crawl_result.cross_db_remainder
+            else crawl_result.model_class.meta.fields.get(crawl_result.field_name)
+        )
         # Clean the field value if a field is found and the value is not callable.
         if field is not None and not callable(val):
             # Update new_kwargs with the cleaned key-value pair(s).
@@ -216,9 +218,12 @@ def clean_path_to_crawl_result(
     *,
     embed_parent: tuple[str, str] | None = None,
     model_database: Database | None = None,
+    path_to_field: bool = True,
 ) -> RelationshipCrawlResult:
     """
-    For use with filter-like definitions but without operator support (e.g. distinct, order_by, ...).
+    For use with advanced crawling definitions but without operator support (e.g. distinct, order_by, ...).
+
+    Use is_model_path for use with select related clauses.
 
     Args:
         model_class (type[BaseModelType]): Input model.
@@ -227,6 +232,7 @@ def clean_path_to_crawl_result(
     Kwargs:
         embed_parent (tuple[str, str] | None): Provide a embed_parent value from e.g. QuerySet.
         model_database (Database | None): Set the model_database.
+        path_to_field (bool): If it points to a field.
     """
     if embed_parent:
         # If a prefix is defined and the key starts with it, remove the prefix.
@@ -238,8 +244,18 @@ def clean_path_to_crawl_result(
     # Crawl the relationship to find the relevant sub_model_class, field_name,
     # operator, related_string, and cross-database remainder.
     crawl_result = crawl_relationship(
-        model_class, path, model_database=model_database, no_operator=True
+        model_class,
+        path,
+        model_database=model_database,
+        no_operator=True,
+        traverse_last=not path_to_field,
     )
+    if path_to_field and not crawl_result.field_name:
+        raise ValueError("No field name found.")
+    elif not path_to_field and crawl_result.field_name:
+        raise ValueError(
+            f"Should not find a field name: `{crawl_result.field_name}`, path to a model."
+        )
     return crawl_result
 
 
@@ -334,7 +350,7 @@ def _calculate_select_related(queryset: QuerySetType, *, kwargs: dict[str, Any])
     # Iterate through the cleaned kwargs to identify relationship paths.
     for key in cleaned_kwargs:
         # Crawl the relationship for each key to get detailed information, including related_str.
-        _, _, _, related_str, _, _ = crawl_relationship(queryset.model_class, key)
+        related_str = crawl_relationship(queryset.model_class, key).forward_path
         # If a related_str is found, it means this key involves a relationship, so add it.
         if related_str:
             select_related.add(related_str)
@@ -519,25 +535,26 @@ class _EnhancedClausesHelper:
             for key, value in cleaned_kwargs.items():
                 # Crawl the relationship to get the model_class, field_name, operator,
                 # related_string, and cross-database remainder.
-                model_class, field_name, op, related_str, _, cross_db_remainder = (
-                    crawl_relationship(queryset.model_class, key)
-                )
+                # model_class, _, field_name, op, related_str, _, cross_db_remainder
+                crawl_result = crawl_relationship(queryset.model_class, key)
                 # Get the field from the model's meta fields, or use generic_field as fallback.
-                field = model_class.meta.fields.get(field_name, generic_field)
+                field = crawl_result.model_class.meta.fields.get(
+                    crawl_result.field_name, generic_field
+                )
                 # Handle cross-database relationships.
-                if cross_db_remainder:
+                if crawl_result.cross_db_remainder:
                     # Assert that a specific field (not generic_field) must be found for FK.
                     assert field is not generic_field
                     # Cast to BaseForeignKey for type-specific access.
                     fk_field = cast(BaseForeignKey, field)
                     # Construct a subquery to fetch related primary keys.
                     sub_query = (
-                        fk_field.target.query.filter(**{cross_db_remainder: value})
+                        fk_field.target.query.filter(**{crawl_result.cross_db_remainder: value})
                         .only(*fk_field.related_columns.keys())
                         .values_list(fields=fk_field.related_columns.keys())
                     )
                     # Get the table from tables_and_models using the related string.
-                    table = tables_and_models[related_str][0]
+                    table = tables_and_models[crawl_result.forward_path][0]
                     # Create an SQLAlchemy tuple for the foreign key columns.
                     fk_tuple = sqlalchemy.tuple_(
                         *(getattr(table.columns, colname) for colname in field.get_column_names())
@@ -553,10 +570,14 @@ class _EnhancedClausesHelper:
                     # Parse the argument, handling callables and awaitables.
                     value = await parse_clause_arg(value, queryset, tables_and_models)
                     # Get the table from tables_and_models using the related string.
-                    table = tables_and_models[related_str][0]
+                    table = tables_and_models[crawl_result.forward_path][0]
 
                     # Add the field's operator clause to the list of clauses.
-                    clauses.append(field.operator_to_clause(field.name, op, table, value))
+                    clauses.append(
+                        field.operator_to_clause(
+                            field.name, crawl_result.operator or "exact", table, value
+                        )
+                    )
             # Combine all generated clauses using the initialized operator.
             return self.op(*clauses)
 
