@@ -10,10 +10,11 @@ import sqlalchemy
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.querysets.prefetch import Prefetch
 from edgy.core.db.querysets.types import EdgyEmbedTarget, EdgyModel, tables_and_models_type
-from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import get_table_key_or_name
 from edgy.exceptions import QuerySetError
+
+from ..clauses import clean_path_to_crawl_result
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy import Model
@@ -236,29 +237,35 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 continue
             else:
                 seen_prefetches.add(compare_tuple)
-            target_crawl_result = crawl_relationship(
+            target_crawl_result = clean_path_to_crawl_result(
                 self_queryset.model_class,
                 prefetch.to_attr,
+                embed_parent=self.embed_parent_filters,
                 # allow_crossing_db=True,
-                no_operator=True,
+                # no_operator=True,
             )
-            anchor_crawl_result = crawl_relationship(
+            anchor_crawl_result = clean_path_to_crawl_result(
                 self_queryset.model_class,
                 prefetch.from_anchor,
+                embed_parent=self.embed_parent_filters,
+                model_database=self.database,
+                path_to_field=False,
                 # allow_crossing_db=True,
-                traverse_last=True,
-                no_operator=True,
+                # traverse_last=True,
+                # no_operator=True,
             )
             if anchor_crawl_result.cross_db_remainder:
                 raise NotImplementedError(
                     "Cannot prefetch from other db yet. Maybe in future this feature will be added."
                 )
 
-            prefetch_crawl_result = crawl_relationship(
+            prefetch_crawl_result = clean_path_to_crawl_result(
                 anchor_crawl_result.model_class,
                 prefetch.related_name,
-                traverse_last=True,
-                no_operator=True,
+                path_to_field=False,
+                embed_parent=self.embed_parent_filters,
+                # traverse_last=True,
+                # no_operator=True,
             )
             if prefetch_crawl_result.cross_db_remainder:
                 raise NotImplementedError(

@@ -64,7 +64,7 @@ async def rollback_transactions():
         yield
 
 
-async def test_prefetch_related(subtests):
+async def test_prefetch_related_basic():
     album = await Album.query.create(name="Malibu")
     track1 = await Track.query.create(album=album, title="The Bird", position=1)
     track2 = await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
@@ -81,7 +81,7 @@ async def test_prefetch_related(subtests):
 
     assert len(studio.tracks) == 3
 
-    stud = stud_new = await Studio.query.create(album=album2, name="New")
+    stud = await Studio.query.create(album=album2, name="New")
     await stud.contributing_to.add_many(track1, track2)
 
     studio = await Studio.query.prefetch_related(
@@ -89,6 +89,18 @@ async def test_prefetch_related(subtests):
     ).get(pk=stud.pk)
 
     assert len(studio.tracks) == 1
+
+
+async def test_prefetch_related_advanced(subtests):
+    album = await Album.query.create(name="Malibu")
+    await Track.query.create(album=album, title="The Bird", position=1)
+    await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
+    await Track.query.create(album=album, title="The Waters", position=3)
+
+    album2 = await Album.query.create(name="West")
+    await Track.query.create(album=album2, title="The Bird", position=1)
+
+    stud_new = await Studio.query.create(album=album, name="Valentim")
 
     with subtests.test("first empty then with results"):
         tracks = await album.tracks.order_by("-position").prefetch_related(
