@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, NamedTuple
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Literal
+from warnings import warn
 
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 
@@ -9,14 +11,16 @@ if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.models.types import BaseModelType
 
 
-class RelationshipCrawlResult(NamedTuple):
+@dataclass
+class RelationshipCrawlResult:
     """
     A named tuple to encapsulate the results of a relationship crawl operation.
 
     Attributes:
         model_class (type["BaseModelType"]): The final model class reached
                                              after traversing the relationship path.
-        field_name (str): The name of the field that was last resolved in the path.
+        last_field_name (str): The name of the field that was last resolved in the path.
+        field_name (str): The name of the current field that was in the path.
         operator (str | None): The query operator extracted from the path (e.g., "exact", "icontains").
                                None if no operator is specified.
         forward_path (str): The accumulated path traversed in the "forward" direction
@@ -29,11 +33,45 @@ class RelationshipCrawlResult(NamedTuple):
     """
 
     model_class: type[BaseModelType]
+    # not exposed in iter
+    last_field_name: str
     field_name: str
-    operator: str | None
+    operator: str
     forward_path: str
     reverse_path: str | Literal[False]
     cross_db_remainder: str
+
+    def __iter__(self) -> Any:
+        warn(
+            "Unpacking a RelationshipCrawlResult is deprecated. Access the attributes direct.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return iter(
+            (
+                self.model_class,
+                self.field_name,
+                self.operator,
+                self.forward_path,
+                self.reverse_path,
+                self.cross_db_remainder,
+            )
+        )
+
+    def __getitem__(self, key: int) -> Any:
+        warn(
+            "Accessing a RelationshipCrawlResult like a tuple is deprecated. Access the attributes direct.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return (
+            self.model_class,
+            self.field_name,
+            self.operator,
+            self.forward_path,
+            self.reverse_path,
+            self.cross_db_remainder,
+        )[key]
 
 
 def crawl_relationship(
@@ -44,6 +82,7 @@ def crawl_relationship(
     callback_fn: Any = None,
     traverse_last: bool = False,
     allow_crossing_db: bool = False,
+    no_operator: bool = False,
 ) -> RelationshipCrawlResult:
     """
     Crawls a relationship path, typically used for query lookups that span
@@ -66,6 +105,7 @@ def crawl_relationship(
                               also be traversed as a relationship. This is useful
                               for scenarios where the final segment is itself
                               a relationship. Defaults to False.
+        no_operator (bool): If True, raise if an operator was found.
 
     Returns:
         RelationshipCrawlResult: A NamedTuple containing the details of the
@@ -74,13 +114,15 @@ def crawl_relationship(
                                  and any cross-database remainder.
 
     Raises:
-        ValueError: If an attempt is made to cross a non-relationship field with
+        ValueError: If an attempt is made to cross a non-relationship or non-existent field with
                     remaining path segments.
+                    If no_operator was provided and an operator was found.
     """
     field = None
     forward_prefix_path = ""
     reverse_path: str | Literal[False] = ""
-    operator: str | None = "exact"
+    operator: str = "exact"
+    last_field_name: str = ""
     field_name: str = path
     cross_db_remainder: str = ""
 
@@ -88,6 +130,7 @@ def crawl_relationship(
     while path:
         # Split the path into the current field name and the remaining path.
         splitted = path.split("__", 1)
+        last_field_name = field_name
         field_name = splitted[0]
         # Get the field from the current model_class's meta fields.
         field = model_class.meta.fields.get(field_name)
@@ -120,10 +163,12 @@ def crawl_relationship(
             if callback_fn:
                 callback_fn(
                     model_class=model_class,
+                    last_field_name=last_field_name,
                     field=field,
                     reverse_path=reverse_path,
                     forward_path=forward_prefix_path,
                     reverse=reverse,
+                    # here None
                     operator=None,  # Operator is not relevant at this stage of traversal.
                     cross_db_remainder=cross_db_remainder,
                 )
@@ -137,18 +182,20 @@ def crawl_relationship(
         elif len(splitted) == 2:
             # If the second part does not contain "__", it's likely an operator.
             if "__" not in splitted[1]:
+                if no_operator:
+                    raise ValueError(f"Unexpected operator was found: {splitted[1]}.")
                 operator = splitted[1]
                 break
             else:
                 if field is None:
                     raise ValueError(
                         f"Tried to cross field: `{field_name}` which does not exist "
-                        f"remainder: `{splitted[1]}`"
+                        f"remainder: `{splitted[1]}`."
                     )
                 # Raise an error if trying to cross a non-relationship field with further segments.
                 raise ValueError(
                     f"Tried to cross field: `{field_name}` of type `{field!r}`, "
-                    f"remainder: `{splitted[1]}`"
+                    f"remainder: `{splitted[1]}`."
                 )
         else:
             # If only one part remains, it's the final field name, and the operator is "exact".
@@ -158,9 +205,11 @@ def crawl_relationship(
     # Handle the last segment if traverse_last is True and the last field was a RelationshipField.
     if traverse_last and isinstance(field, RelationshipField):
         model_class, reverse_part, path = field.traverse_field(path)
+        # either field name alone if prefix path is empty or concatenated
         forward_prefix_path = (
             f"{forward_prefix_path}__{field_name}" if forward_prefix_path else field_name
         )
+        field_name = ""
         reverse = not isinstance(field, BaseForeignKey)
     else:
         # If not traversing the last field, set reverse to False and reverse_part to field_name.
@@ -178,9 +227,11 @@ def crawl_relationship(
         callback_fn(
             model_class=model_class,
             field=field,
+            last_field_name=last_field_name,
             reverse_path=reverse_path,
             forward_path=forward_prefix_path,
             reverse=reverse,
+            # here always string
             operator=operator,
             cross_db_remainder=cross_db_remainder,
         )
@@ -188,6 +239,7 @@ def crawl_relationship(
     # Return the comprehensive result of the relationship crawl.
     return RelationshipCrawlResult(
         model_class=model_class,
+        last_field_name=last_field_name,
         field_name=field_name,
         operator=operator,
         forward_path=forward_prefix_path,

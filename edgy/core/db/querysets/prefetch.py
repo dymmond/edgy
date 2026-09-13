@@ -69,13 +69,14 @@ class Prefetch:
         self._baked = False
 
     @cached_property
-    def _forward_path(self) -> str:
+    def forward_path(self) -> str:
         """
-        Forward path for matching.
-
-        Placeholder which raises when not initialized.
+        Forward path to the target model. This value is **unvalidated**.
         """
-        raise QuerySetError("`_forward_path` not set.")
+        parts = self.to_attr.rsplit("__", 1)
+        if len(parts) == 1:
+            return self.from_anchor
+        return f"{self.from_anchor}__{parts[0]}" if self.from_anchor else parts[0]
 
     @cached_property
     def _baking_finished(self) -> asyncio.Event:

@@ -14,18 +14,21 @@
   You can't do the dirty trick anymore testing for a dict.
 - Fix contracts; it was always an error to access the data attribute directly (just inherited from UserDict).
 - `from_sqla_row` is keyword only now, so we can better update and introspect it.
-- Make Prefetch `init_bake` and more internal. QuerySetErrors are now raised if the attributes are illegally accessed.
-- Make Prefetch keyword-only like in documentation.
+- Make `Prefetch`'s `init_bake` and other internals private. QuerySetErrors are now raised if the attributes are illegally accessed.
+- Make `Prefetch` keyword-only like in documentation.
 - Assign prefetches from queryset not in `from_sqla_row`. This allows better handling of embeddings.
 - `create_model_key_from_sqla_row` is deprecated now.
 - `crawl_relationship` has now a better error when a field does not exist.
 - Move `get_table_key_or_name` to `edgy.core.utils.db`.
 - Add embedded path implicit to select_related paths.
+- Unpacking and accessing `CrawlResult` (the result of `crawl_relationship`) is now deprecated. Use the results attributes instead.
 
 ### Fixed
 
 - Using `create` in non-nullable ForeignKey relations.
 - Don't mask AttributeErrors in managers when creating the queryset failed.
+- `to_attr` and `from_anchor` of Prefetch doesn't require explicit `select_related` calls anymore. They are deduced.
+- Performance issues with `update_embed_parent` when not using `select_related`. Also implicit deduced.
 
 ### Removed
 

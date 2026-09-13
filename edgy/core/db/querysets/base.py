@@ -116,7 +116,10 @@ class BaseQuerySet(
         self._offset = offset
         select_related = set(select_related)
         self._select_related: set[str] = set()
-        self._select_related_weak: set[str] = set()
+        # groups and order by
+        self._select_related_g_and_o: set[str] = set()
+        # embedded, like embed_parent or prefetches
+        self._select_related_embedding: set[str] = set()
         if select_related:
             self._update_select_related(select_related)
         self._prefetch_related = list(prefetch_related)
@@ -196,7 +199,8 @@ class BaseQuerySet(
         queryset.or_clauses.extend(self.or_clauses)
         queryset.embed_parent_filters = self.embed_parent_filters
         queryset._select_related.update(self._select_related)
-        queryset._select_related_weak.update(self._select_related_weak)
+        queryset._select_related_g_and_o.update(self._select_related_g_and_o)
+        queryset._select_related_embedding.update(self._select_related_embedding)
         queryset._cached_select_related_expression = self._cached_select_related_expression
         queryset._for_update = self._for_update.copy() if self._for_update is not None else None
         return cast("QuerySet", queryset)
@@ -303,17 +307,17 @@ class BaseQuerySet(
         )
 
         for key, value in cleaned_kwargs.items():
-            model_class, field_name, op, related_str, _, cross_db_remainder = crawl_relationship(
-                self.model_class, key
+            crawl_result = crawl_relationship(self.model_class, key)
+            if crawl_result.forward_path:
+                select_related.add(crawl_result.forward_path)
+            field = crawl_result.model_class.meta.fields.get(
+                crawl_result.field_name, clauses_mod.generic_field
             )
-            if related_str:
-                select_related.add(related_str)
-            field = model_class.meta.fields.get(field_name, clauses_mod.generic_field)
-            if cross_db_remainder:
+            if crawl_result.cross_db_remainder:
                 assert field is not clauses_mod.generic_field
                 fk_field = cast(BaseForeignKey, field)
                 sub_query = (
-                    fk_field.target.query.filter(**{cross_db_remainder: value})
+                    fk_field.target.query.filter(**{crawl_result.cross_db_remainder: value})
                     .only(*fk_field.related_columns.keys())
                     .values_list(fields=fk_field.related_columns.keys())
                 )
@@ -324,7 +328,7 @@ class BaseQuerySet(
                     *,
                     _field: BaseFieldType = field,
                     _sub_query: QuerySet = sub_query,
-                    _prefix: str = related_str,
+                    _prefix: str = crawl_result.forward_path,
                 ) -> Any:
                     table = tables_and_models[_prefix][0]
                     fk_tuple = sqlalchemy.tuple_(
@@ -344,9 +348,9 @@ class BaseQuerySet(
                     *,
                     _field: BaseFieldType = field,
                     _value: Any = value,
-                    _op: str | None = op,
-                    _prefix: str = related_str,
-                    _field_name: str = field_name,
+                    _op: str | None = crawl_result.operator,
+                    _prefix: str = crawl_result.forward_path,
+                    _field_name: str = crawl_result.field_name,
                 ) -> Any:
                     _value = await clauses_mod.parse_clause_arg(
                         _value, queryset, tables_and_models
@@ -376,26 +380,67 @@ class BaseQuerySet(
         ]
         return order_col.desc() if reverse else order_col
 
-    def _update_select_related_weak(self, fields: Iterable[str], *, clear: bool) -> bool:
-        related: set[str] = set()
+    def _update_select_related_weak(
+        self, fields: Iterable[str], *, cache_name: str, clear: bool
+    ) -> bool:
+        """
+        Update the select_related cache with cache_name. This is a special cache,
+        which is directly used.
+
+        Warning: Depending of the cache_name, a different normalization strategy is used.
+
+        Args:
+            fields: list of field pathes.
+        Kwargs:
+            cache_name: Select the select_related cache. This also affects the normalization strategy.
+            clear: Clear the cache.
+        """
+        # retrieve the cache from queryset, use cache_name to identify
+        cache_weak: set[str] = getattr(self, cache_name)
+        # use cache_name to load presets, this allows rapid changes in case of different
+        # required cache behaviour and validates the cache name
+        match cache_name:
+            case "_select_related_embedding":
+                related_element_fn: Callable[[str], str] = lambda field_name: (
+                    clauses_mod.clean_path_to_crawl_result(
+                        self.model_class,
+                        field_name,
+                        model_database=self.database,
+                        embed_parent=self.embed_parent_filters,
+                        # we need this as we have no field name here
+                        path_to_field=False,
+                    ).forward_path
+                )
+            case "_select_related_g_and_o":
+                related_element_fn = lambda field_name: (
+                    clauses_mod.clean_path_to_crawl_result(
+                        self.model_class,
+                        path=field_name,
+                        embed_parent=self.embed_parent_filters,
+                        model_database=self.database,
+                    ).forward_path
+                )
+            case _:
+                raise QuerySetError(f"Invalid cache (`{cache_name}`) used.")
+        new_related: set[str] = set()
         for field_name in fields:
-            field_name = field_name.lstrip("-")
-            related_element = clauses_mod.clean_path_to_crawl_result(
-                self.model_class,
-                path=field_name,
-                embed_parent=self.embed_parent_filters,
-                model_database=self.database,
-            ).forward_path
+            related_element = related_element_fn(field_name)
+            # eliminate empty pathes
             if related_element:
-                related.add(related_element)
-        if related and not self._select_related.union(self._select_related_weak).issuperset(
-            related
-        ):
-            self._cached_select_related_expression = None
+                new_related.add(related_element)
+        # check if the caches are the same sets
+        if new_related != cache_weak:
+            # invalidate _cached_select_related_expression, when not subset
+            if not self._select_related.issuperset(new_related):
+                self._cached_select_related_expression = None
+            # now clear the cache to update, if clear was specified
             if clear:
-                self._select_related_weak.clear()
-            self._select_related_weak.update(related)
+                cache_weak.clear()
+            # and fill it with the new content
+            cache_weak.update(new_related)
+            # return True if the cache was updated
             return True
+        # return False if the cache was not updated
         return False
 
     def _update_select_related(self, pathes: Iterable[str]) -> None:

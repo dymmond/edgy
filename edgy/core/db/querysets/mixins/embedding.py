@@ -10,10 +10,11 @@ import sqlalchemy
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
 from edgy.core.db.querysets.prefetch import Prefetch
 from edgy.core.db.querysets.types import EdgyEmbedTarget, EdgyModel, tables_and_models_type
-from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import get_table_key_or_name
 from edgy.exceptions import QuerySetError
+
+from ..clauses import clean_path_to_crawl_result
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy import Model
@@ -68,7 +69,22 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         tables_and_models: tables_and_models_type | None,
         seen: set[str],
     ) -> None:
-        """Apply prefetches on select related branches."""
+        """Apply prefetches on select related branches.
+
+        This method applies prefetching logic to the current queryset by considering
+        select related relationships and embedding targets. It handles fetching related
+        data concurrently and embedding parents in the result set.
+
+        Args:
+            instance: The current EdgyModel instance.
+            prefetches_dict: A dictionary mapping relationship or embedding paths to lists of Prefetch objects.
+            mapping: The mapping object used for database operations.
+            tables_and_models: Optional tables and models information.
+            seen: A set tracking already processed prefixes to prevent redundant fetches.
+
+        Returns:
+            None
+        """
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
         try:
@@ -84,17 +100,22 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                     tables_and_models=tables_and_models,
                     prefetches=prefetches_list,
                 )
-            for path in self_queryset._select_related:
+            # we need only to check the automatically generated embedding.
+            for path in sorted(
+                self_queryset._select_related_embedding, key=lambda x: x.count("__"), reverse=True
+            ):
                 prefix = ""
-                new_result: BaseModelType | None = instance
+                current_instance: BaseModelType | None = instance
                 for part in path.split("__"):
                     prefix = f"{prefix}__{part}" if prefix else part
-                    new_result = cast("BaseModelType | None", getattr(new_result, part, None))
-                    if new_result is None:
-                        break
                     if prefix in seen:
                         continue
+                    current_instance = cast(
+                        "BaseModelType | None", getattr(current_instance, part, None)
+                    )
                     seen.add(prefix)
+                    if current_instance is None:
+                        break
                     if prefetches_list := prefetches_dict.get(prefix):
                         await run_concurrently(
                             [prefetch._init_bake() for prefetch in prefetches_list],
@@ -103,7 +124,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                             else None,
                         )
                         self._apply_prefetches_list(
-                            instance=new_result,
+                            instance=current_instance,
                             prefix=prefix,
                             mapping=mapping,
                             tables_and_models=tables_and_models,
@@ -216,22 +237,35 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 continue
             else:
                 seen_prefetches.add(compare_tuple)
-            target_crawl_result = crawl_relationship(
-                self_queryset.model_class, prefetch.to_attr, allow_crossing_db=True
+            target_crawl_result = clean_path_to_crawl_result(
+                self_queryset.model_class,
+                prefetch.to_attr,
+                embed_parent=self.embed_parent_filters,
+                # allow_crossing_db=True,
+                # no_operator=True,
             )
-            anchor_crawl_result = crawl_relationship(
+            anchor_crawl_result = clean_path_to_crawl_result(
                 self_queryset.model_class,
                 prefetch.from_anchor,
+                embed_parent=self.embed_parent_filters,
+                model_database=self.database,
+                path_to_field=False,
                 # allow_crossing_db=True,
-                traverse_last=True,
+                # traverse_last=True,
+                # no_operator=True,
             )
             if anchor_crawl_result.cross_db_remainder:
                 raise NotImplementedError(
                     "Cannot prefetch from other db yet. Maybe in future this feature will be added."
                 )
 
-            prefetch_crawl_result = crawl_relationship(
-                anchor_crawl_result.model_class, prefetch.related_name, traverse_last=True
+            prefetch_crawl_result = clean_path_to_crawl_result(
+                anchor_crawl_result.model_class,
+                prefetch.related_name,
+                path_to_field=False,
+                embed_parent=self.embed_parent_filters,
+                # traverse_last=True,
+                # no_operator=True,
             )
             if prefetch_crawl_result.cross_db_remainder:
                 raise NotImplementedError(
@@ -274,20 +308,13 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             )
             # the assigned queryset has an empty cache
             new_prefetch.queryset = prefetch_queryset
+            new_prefetch.forward_path = prefetch.forward_path
             new_prefetch._forward_path_to_anchor = prefetch_crawl_result.forward_path
             new_prefetch._reverse_path_to_anchor = prefetch_crawl_result.reverse_path
-            if new_prefetch.from_anchor:
-                new_prefetch._forward_path = (
-                    f"{new_prefetch.from_anchor}__{target_crawl_result.forward_path}".removesuffix(
-                        "__"
-                    )
-                )
-            else:
-                new_prefetch._forward_path = target_crawl_result.forward_path
             new_prefetch._baking_finished = asyncio.Event()
             new_prefetch._target_model = cast("type[Model]", target_crawl_result.model_class)
             new_prefetch._baked_results = {}
-            prepared_prefetches.setdefault(new_prefetch._forward_path, []).append(new_prefetch)
+            prepared_prefetches.setdefault(new_prefetch.forward_path, []).append(new_prefetch)
         return prepared_prefetches
 
     def prefetch_related(self, *prefetch: Prefetch) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
@@ -327,4 +354,66 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
 
         # Append the new prefetch objects to the queryset's internal list.
         queryset._prefetch_related = [*self_queryset._prefetch_related, *prefetch]
+        select_pathes: set[str] = set()
+        # this one extra doesn't matter much from performance perspective, is maybe even cheaper
+        if queryset.embed_parent and queryset.embed_parent[0]:
+            # parsed later
+            select_pathes.add(queryset.embed_parent[0])
+        # now add the forward pathes
+        select_pathes.update(
+            prefetch.forward_path
+            for prefetch in queryset._prefetch_related
+            if prefetch.forward_path
+        )
+        # they are sanitized and analyzed later in _update_select_related_weak
+        queryset._update_select_related_weak(
+            select_pathes, cache_name="_select_related_embedding", clear=True
+        )
+        return queryset
+
+    @overload
+    def update_embed_parent(self, embed_parent: None) -> QuerySet[EdgyModel, EdgyModel]: ...
+    @overload
+    def update_embed_parent(
+        self, embed_parent: tuple[str, str]
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]: ...
+    def update_embed_parent(
+        self, embed_parent: tuple[str, str] | None
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget] | QuerySet[EdgyModel, EdgyModel]:
+        """
+        Update or remove (provide None) embed_parent applied on instances.
+        Note: this doesn't affect embed_parent for filters.
+
+        Args:
+            embed_parent: define the new embed_parent.
+        Returns:
+            QuerySetType: A new QuerySet instance with the new embedding.
+        """
+        self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
+        queryset = self_queryset._clone()
+        queryset.embed_parent = embed_parent
+        select_pathes: set[str] = set()
+        if queryset.embed_parent and queryset.embed_parent[0]:
+            # just add them, they are parsed later
+            select_pathes.add(queryset.embed_parent[0])
+
+        if (
+            queryset._update_select_related_weak(
+                select_pathes,
+                cache_name="_select_related_embedding",
+                clear=True,
+            )
+            and queryset._prefetch_related
+        ):
+            # regenerate prefetch pathes
+
+            queryset._update_select_related_weak(
+                (
+                    prefetch.forward_path
+                    for prefetch in queryset._prefetch_related
+                    if prefetch.forward_path
+                ),
+                cache_name="_select_related_embedding",
+                clear=False,
+            )
         return queryset

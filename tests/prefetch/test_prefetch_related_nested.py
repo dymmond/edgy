@@ -22,6 +22,9 @@ class Album(edgy.StrictModel):
 class Track(edgy.StrictModel):
     id = edgy.IntegerField(primary_key=True, autoincrement=True)
     album = edgy.ForeignKey("Album", on_delete=edgy.CASCADE, related_name="tracks")
+    related_studios = edgy.ManyToMany(
+        "Studio", on_delete=edgy.CASCADE, related_name="contributing_to"
+    )
     title = edgy.CharField(max_length=100)
     position = edgy.IntegerField()
 
@@ -61,10 +64,10 @@ async def rollback_transactions():
         yield
 
 
-async def test_prefetch_related():
+async def test_prefetch_related_basic():
     album = await Album.query.create(name="Malibu")
-    await Track.query.create(album=album, title="The Bird", position=1)
-    await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
+    track1 = await Track.query.create(album=album, title="The Bird", position=1)
+    track2 = await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
     await Track.query.create(album=album, title="The Waters", position=3)
 
     album2 = await Album.query.create(name="West")
@@ -79,12 +82,57 @@ async def test_prefetch_related():
     assert len(studio.tracks) == 3
 
     stud = await Studio.query.create(album=album2, name="New")
+    await stud.contributing_to.add_many(track1, track2)
 
     studio = await Studio.query.prefetch_related(
         Prefetch(related_name="album__tracks", to_attr="tracks"),
     ).get(pk=stud.pk)
 
     assert len(studio.tracks) == 1
+
+
+async def test_prefetch_related_advanced(subtests):
+    album = await Album.query.create(name="Malibu")
+    await Track.query.create(album=album, title="The Bird", position=1)
+    await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
+    await Track.query.create(album=album, title="The Waters", position=3)
+
+    album2 = await Album.query.create(name="West")
+    await Track.query.create(album=album2, title="The Bird", position=1)
+
+    stud_new = await Studio.query.create(album=album, name="Valentim")
+
+    with subtests.test("first empty then with results"):
+        tracks = await album.tracks.order_by("-position").prefetch_related(
+            Prefetch(related_name="related_studios", to_attr="album__rstudios"),
+        )
+        assert len(tracks) == 3
+        assert tracks[0].album is not tracks[1].album
+        assert tracks[1].album is not tracks[2].album
+        assert tracks[0].album.rstudios == []
+        assert tracks[1].album.rstudios == [stud_new]
+        assert tracks[2].album.rstudios == [stud_new]
+
+    with subtests.test("first with results then empty"):
+        tracks = await album.tracks.order_by("position").prefetch_related(
+            Prefetch(related_name="related_studios", to_attr="album__rstudios"),
+        )
+        assert len(tracks) == 3
+        assert tracks[0].album is not tracks[1].album
+        assert tracks[1].album is not tracks[2].album
+        assert tracks[0].album.rstudios == [stud_new]
+        assert tracks[1].album.rstudios == [stud_new]
+        assert tracks[2].album.rstudios == []
+
+    with subtests.test("only empty"):
+        track = (
+            await album.tracks.filter(position=3)
+            .prefetch_related(
+                Prefetch(related_name="related_studios", to_attr="album__rstudios"),
+            )
+            .get()
+        )
+        assert track.album.rstudios == []
 
 
 async def test_prefetch_related_nested():
