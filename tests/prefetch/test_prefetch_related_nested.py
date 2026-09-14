@@ -93,14 +93,17 @@ async def test_prefetch_related_basic():
 
 async def test_prefetch_related_advanced(subtests):
     album = await Album.query.create(name="Malibu")
-    await Track.query.create(album=album, title="The Bird", position=1)
-    await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
+    track1 = await Track.query.create(album=album, title="The Bird", position=1)
+    track2 = await Track.query.create(album=album, title="Heart don't stand a chance", position=2)
     await Track.query.create(album=album, title="The Waters", position=3)
 
     album2 = await Album.query.create(name="West")
     await Track.query.create(album=album2, title="The Bird", position=1)
 
-    stud_new = await Studio.query.create(album=album, name="Valentim")
+    await Studio.query.create(album=album, name="Valentim")
+
+    stud_new = await Studio.query.create(album=album2, name="New")
+    await stud_new.contributing_to.add_many(track1, track2)
 
     with subtests.test("first empty then with results"):
         tracks = await album.tracks.order_by("-position").prefetch_related(
@@ -109,8 +112,11 @@ async def test_prefetch_related_advanced(subtests):
         assert len(tracks) == 3
         assert tracks[0].album is not tracks[1].album
         assert tracks[1].album is not tracks[2].album
+        assert await tracks[0].related_studios.all() == []
         assert tracks[0].album.rstudios == []
+        assert await tracks[1].related_studios.all() == [stud_new]
         assert tracks[1].album.rstudios == [stud_new]
+        assert await tracks[2].related_studios.all() == [stud_new]
         assert tracks[2].album.rstudios == [stud_new]
 
     with subtests.test("first with results then empty"):
@@ -120,8 +126,11 @@ async def test_prefetch_related_advanced(subtests):
         assert len(tracks) == 3
         assert tracks[0].album is not tracks[1].album
         assert tracks[1].album is not tracks[2].album
+        assert await tracks[0].related_studios.all() == [stud_new]
         assert tracks[0].album.rstudios == [stud_new]
+        assert await tracks[1].related_studios.all() == [stud_new]
         assert tracks[1].album.rstudios == [stud_new]
+        assert await tracks[2].related_studios.all() == []
         assert tracks[2].album.rstudios == []
 
     with subtests.test("only empty"):
@@ -133,6 +142,7 @@ async def test_prefetch_related_advanced(subtests):
             .get()
         )
         assert track.album.rstudios == []
+        assert await track.related_studios.all() == []
 
 
 async def test_prefetch_related_nested():
