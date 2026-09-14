@@ -8,7 +8,9 @@ from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.connection.database import Database
+    from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
+    from edgy.protocols.relationship_crawl import RelationshipCrawlFn
 
 
 @dataclass
@@ -79,7 +81,7 @@ def crawl_relationship(
     path: str,
     *,
     model_database: Database | None = None,
-    callback_fn: Any = None,
+    callback_fn: None | RelationshipCrawlFn = None,
     traverse_last: bool = False,
     allow_crossing_db: bool = False,
     no_operator: bool = False,
@@ -98,9 +100,10 @@ def crawl_relationship(
         model_database ("Database" | None): The database instance associated with the
                                             current `model_class`. Used for cross-database checks.
                                             Defaults to None.
-        callback_fn (Any): An optional callback function to be called at each step
+        callback_fn (None | Callable[..., None]): An optional callback function to be called at each step
                            of the traversal. It receives various parameters about
                            the current state of the crawl. Defaults to None.
+                           This can be used to early stop traversals. E.g. to stop loops.
         traverse_last (bool): If True, the last identified field in the path will
                               also be traversed as a relationship. This is useful
                               for scenarios where the final segment is itself
@@ -133,7 +136,7 @@ def crawl_relationship(
         last_field_name = field_name
         field_name = splitted[0]
         # Get the field from the current model_class's meta fields.
-        field = model_class.meta.fields.get(field_name)
+        field: BaseFieldType | None = model_class.meta.fields.get(field_name)
 
         # Check if the field is a RelationshipField and there are more segments.
         if isinstance(field, RelationshipField) and len(splitted) == 2:
@@ -163,8 +166,9 @@ def crawl_relationship(
             if callback_fn:
                 callback_fn(
                     model_class=model_class,
-                    last_field_name=last_field_name,
                     field=field,
+                    field_name=field_name,
+                    last_field_name=last_field_name,
                     reverse_path=reverse_path,
                     forward_path=forward_prefix_path,
                     reverse=reverse,
@@ -181,6 +185,7 @@ def crawl_relationship(
         # If there are two parts but the first part is not a relationship field.
         elif len(splitted) == 2:
             # If the second part does not contain "__", it's likely an operator.
+            # Operators are not allowed to contain __
             if "__" not in splitted[1]:
                 if no_operator:
                     raise ValueError(f"Unexpected operator was found: {splitted[1]}.")
@@ -198,7 +203,7 @@ def crawl_relationship(
                     f"remainder: `{splitted[1]}`."
                 )
         else:
-            # If only one part remains, it's the final field name, and the operator is "exact".
+            # If only one part remains, it's the final field name, and the operator defaults to "exact".
             operator = "exact"
             break
 
@@ -210,12 +215,13 @@ def crawl_relationship(
             f"{forward_prefix_path}__{field_name}" if forward_prefix_path else field_name
         )
         field_name = ""
+        # Travelling reverse a foreign key
         reverse = not isinstance(field, BaseForeignKey)
     else:
-        # If not traversing the last field, set reverse to False and reverse_part to field_name.
-        reverse = False
+        # If not traversing the last field, set reverse_part to field_name.
         reverse_part = field_name
-
+        # Not travelling reverse a foreign key
+        reverse = False
     # Final update to reverse_path.
     if reverse_part and reverse_path is not False:
         reverse_path = f"{reverse_part}__{reverse_path}" if reverse_path else reverse_part
@@ -223,10 +229,12 @@ def crawl_relationship(
         reverse_path = False
 
     # Call the callback function one last time with the final state if a field was found.
-    if callback_fn and field is not None:
+    if callback_fn:
         callback_fn(
             model_class=model_class,
+            # can be None
             field=field,
+            field_name=field_name,
             last_field_name=last_field_name,
             reverse_path=reverse_path,
             forward_path=forward_prefix_path,
