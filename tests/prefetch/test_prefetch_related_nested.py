@@ -41,7 +41,7 @@ class Studio(edgy.StrictModel):
 
 
 class Company(edgy.StrictModel):
-    studio = edgy.ForeignKey(Studio, related_name="companies")
+    studio = edgy.ForeignKey(Studio, related_name="companies", null=True)
 
     class Meta:
         registry = models
@@ -151,16 +151,20 @@ async def test_prefetch_related_nested():
 
     album2 = await Album.query.create(name="West")
     await Track.query.create(album=album2, title="The Bird", position=1)
+    await Track.query.create(album=album2, title="The Birdy", position=2)
 
     stud = await Studio.query.create(album=album, name="Valentim")
 
+    # to disalign the ids
+    await Company.query.create()
     await Company.query.create(studio=stud)
 
     company = await Company.query.prefetch_related(
         Prefetch(related_name="studio__album__tracks", to_attr="tracks")
-    )
+    ).order_by("id")
 
-    assert len(company[0].tracks) == 1
+    assert len(company[0].tracks) == 0
+    assert len(company[1].tracks) == 1
 
     company = await Company.query.prefetch_related(
         Prefetch(related_name="studio__album__tracks", to_attr="tracks")

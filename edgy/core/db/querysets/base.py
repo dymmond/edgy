@@ -348,7 +348,7 @@ class BaseQuerySet(
                     *,
                     _field: BaseFieldType = field,
                     _value: Any = value,
-                    _op: str | None = crawl_result.operator,
+                    _op: str = crawl_result.operator or "exact",
                     _prefix: str = crawl_result.forward_path,
                     _field_name: str = crawl_result.field_name,
                 ) -> Any:
@@ -401,16 +401,7 @@ class BaseQuerySet(
         # required cache behaviour and validates the cache name
         match cache_name:
             case "_select_related_embedding":
-                related_element_fn: Callable[[str], str] = lambda field_name: (
-                    clauses_mod.clean_path_to_crawl_result(
-                        self.model_class,
-                        field_name,
-                        model_database=self.database,
-                        embed_parent=self.embed_parent_filters,
-                        # we need this as we have no field name here
-                        path_to_field=False,
-                    ).forward_path
-                )
+                related_element_fn: Callable[[str], str] = lambda field_name: field_name
             case "_select_related_g_and_o":
                 related_element_fn = lambda field_name: (
                     clauses_mod.clean_path_to_crawl_result(
@@ -446,7 +437,6 @@ class BaseQuerySet(
     def _update_select_related(self, pathes: Iterable[str]) -> None:
         related: set[str] = set()
         for path in pathes:
-            path = path.lstrip("-")
             crawl_result = clauses_mod.clean_path_to_crawl_result(
                 self.model_class,
                 path=path,

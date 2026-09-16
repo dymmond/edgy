@@ -234,22 +234,17 @@ def clean_path_to_crawl_result(
         model_database (Database | None): Set the model_database.
         path_to_field (bool): If it points to a field.
     """
-    if embed_parent:
-        # If a prefix is defined and the key starts with it, remove the prefix.
-        if embed_parent[1] and path.startswith(embed_parent[1]):
-            path = path.removeprefix(embed_parent[1]).removeprefix("__")
-        else:
-            # Otherwise, prepend the parent alias to the key.
-            path = f"{embed_parent[0]}__{path}"
     # Crawl the relationship to find the relevant sub_model_class, field_name,
     # operator, related_string, and cross-database remainder.
     crawl_result = crawl_relationship(
         model_class,
         path,
+        embed_parent=embed_parent,
         model_database=model_database,
-        no_operator=True,
         traverse_last=not path_to_field,
     )
+    if crawl_result.operator:
+        raise ValueError(f"Unexpected operator: `{crawl_result.operator}`.")
     if path_to_field and not crawl_result.field_name:
         raise ValueError("No field name found.")
     elif not path_to_field and crawl_result.field_name:

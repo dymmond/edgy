@@ -1,19 +1,23 @@
 from __future__ import annotations
 
+from collections.abc import Container
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any, Literal, cast
 from warnings import warn
 
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.connection.database import Database
+    from edgy.core.db.fields.foreign_keys import BaseForeignKeyField
+    from edgy.core.db.fields.many_to_many import BaseManyToManyForeignKeyField
     from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
+    from edgy.core.db.relationships.related_field import RelatedField
     from edgy.protocols.relationship_crawl import RelationshipCrawlFn
 
 
-@dataclass
+@dataclass(slots=True, frozen=True, kw_only=True)
 class RelationshipCrawlResult:
     """
     A named tuple to encapsulate the results of a relationship crawl operation.
@@ -21,7 +25,6 @@ class RelationshipCrawlResult:
     Attributes:
         model_class (type["BaseModelType"]): The final model class reached
                                              after traversing the relationship path.
-        last_field_name (str): The name of the field that was last resolved in the path.
         field_name (str): The name of the current field that was in the path.
         operator (str | None): The query operator extracted from the path (e.g., "exact", "icontains").
                                None if no operator is specified.
@@ -35,8 +38,6 @@ class RelationshipCrawlResult:
     """
 
     model_class: type[BaseModelType]
-    # not exposed in iter
-    last_field_name: str
     field_name: str
     operator: str
     forward_path: str
@@ -80,11 +81,11 @@ def crawl_relationship(
     model_class: type[BaseModelType],
     path: str,
     *,
+    embed_parent: None | tuple[str, str] = None,
     model_database: Database | None = None,
     callback_fn: None | RelationshipCrawlFn = None,
     traverse_last: bool = False,
     allow_crossing_db: bool = False,
-    no_operator: bool = False,
 ) -> RelationshipCrawlResult:
     """
     Crawls a relationship path, typically used for query lookups that span
@@ -97,6 +98,8 @@ def crawl_relationship(
         model_class (type["BaseModelType"]): The starting model class for the crawl.
         path (str): The relationship path to traverse, typically in a "field__field__operator"
                     format.
+    Kwargs:
+        embed_parent (tuple[str, str] | None): Provide a embed_parent value from e.g. QuerySet.
         model_database ("Database" | None): The database instance associated with the
                                             current `model_class`. Used for cross-database checks.
                                             Defaults to None.
@@ -108,7 +111,6 @@ def crawl_relationship(
                               also be traversed as a relationship. This is useful
                               for scenarios where the final segment is itself
                               a relationship. Defaults to False.
-        no_operator (bool): If True, raise if an operator was found.
 
     Returns:
         RelationshipCrawlResult: A NamedTuple containing the details of the
@@ -121,11 +123,19 @@ def crawl_relationship(
                     remaining path segments.
                     If no_operator was provided and an operator was found.
     """
-    field = None
+    if embed_parent:
+        # If a prefix is defined and the key starts with it, remove the prefix.
+        if embed_parent[1] and path.startswith(embed_parent[1]):
+            path = path.removeprefix(embed_parent[1]).removeprefix("__")
+        elif not path:
+            path = embed_parent[0]
+        else:
+            # Otherwise, prepend the parent alias to the key.
+            path = f"{embed_parent[0]}__{path}"
+    field: BaseFieldType | None = None
     forward_prefix_path = ""
     reverse_path: str | Literal[False] = ""
-    operator: str = "exact"
-    last_field_name: str = ""
+    operator: str = ""
     field_name: str = path
     cross_db_remainder: str = ""
 
@@ -133,10 +143,9 @@ def crawl_relationship(
     while path:
         # Split the path into the current field name and the remaining path.
         splitted = path.split("__", 1)
-        last_field_name = field_name
         field_name = splitted[0]
         # Get the field from the current model_class's meta fields.
-        field: BaseFieldType | None = model_class.meta.fields.get(field_name)
+        field = model_class.meta.fields.get(field_name)
 
         # Check if the field is a RelationshipField and there are more segments.
         if isinstance(field, RelationshipField) and len(splitted) == 2:
@@ -144,14 +153,15 @@ def crawl_relationship(
             model_class_new, reverse_part, path = field.traverse_field(path)
 
             # Check for cross-database relationships.
-            if not allow_crossing_db and field.is_cross_db(model_database):
-                # If it's a cross-DB relationship, stop traversal and record the remainder.
+            if field.is_cross_db(model_database):
+                # If it's a cross-DB relationship record the remainder.
                 cross_db_remainder = path
-                break
-            else:
-                # If not cross-DB, update the model_class and reset model_database.
-                model_class = model_class_new
-                model_database = None  # Reset database context for the new model.
+                # Stop the travel if not allowed
+                if not allow_crossing_db:
+                    break
+            # If passed, update the model_class and reset model_database.
+            model_class = model_class_new
+            model_database = None  # Reset database context for the new model.
 
             # Determine if the relationship is a reverse relationship (not a BaseForeignKey).
             reverse = not isinstance(field, BaseForeignKey)
@@ -168,7 +178,6 @@ def crawl_relationship(
                     model_class=model_class,
                     field=field,
                     field_name=field_name,
-                    last_field_name=last_field_name,
                     reverse_path=reverse_path,
                     forward_path=forward_prefix_path,
                     reverse=reverse,
@@ -187,8 +196,8 @@ def crawl_relationship(
             # If the second part does not contain "__", it's likely an operator.
             # Operators are not allowed to contain __
             if "__" not in splitted[1]:
-                if no_operator:
-                    raise ValueError(f"Unexpected operator was found: {splitted[1]}.")
+                if splitted[1] == "":
+                    raise ValueError("Path unsanitized, ends with `__`.")
                 operator = splitted[1]
                 break
             else:
@@ -203,8 +212,8 @@ def crawl_relationship(
                     f"remainder: `{splitted[1]}`."
                 )
         else:
-            # If only one part remains, it's the final field name, and the operator defaults to "exact".
-            operator = "exact"
+            # If only one part remains, it's the final field name, and the operator is empty
+            operator = ""
             break
 
     # Handle the last segment if traverse_last is True and the last field was a RelationshipField.
@@ -235,11 +244,10 @@ def crawl_relationship(
             # can be None
             field=field,
             field_name=field_name,
-            last_field_name=last_field_name,
             reverse_path=reverse_path,
             forward_path=forward_prefix_path,
             reverse=reverse,
-            # here always string
+            # here always string. In case of no operator empty ""
             operator=operator,
             cross_db_remainder=cross_db_remainder,
         )
@@ -247,10 +255,26 @@ def crawl_relationship(
     # Return the comprehensive result of the relationship crawl.
     return RelationshipCrawlResult(
         model_class=model_class,
-        last_field_name=last_field_name,
         field_name=field_name,
         operator=operator,
         forward_path=forward_prefix_path,
         reverse_path=reverse_path,
         cross_db_remainder=cross_db_remainder,
     )
+
+
+def get_related_column_keys(field: BaseFieldType) -> Container[str]:
+    """Return for a relation field the related columns. M2M relations are expanded."""
+    owner_meta = field.owner.meta
+    # try to pollute less the utils room, so check the information via meta
+    if field.name in owner_meta.foreign_key_fields:
+        return cast("BaseForeignKeyField", field).related_columns.keys()
+    elif field.name in owner_meta.many_to_many_fields:
+        m2m_field = cast("BaseManyToManyForeignKeyField", field)
+        return cast("type[BaseModelType]", m2m_field.through).meta.field_to_column_names[
+            m2m_field.from_foreign_key
+        ]
+    else:
+        assert type(field).__name__ == "RelatedField", f"Unhandled relation field: {field!r}"
+        field = cast("RelatedField", field).foreign_key
+        return field.owner.meta.field_to_column_names[field.name]

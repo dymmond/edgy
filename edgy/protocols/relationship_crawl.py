@@ -12,7 +12,6 @@ class RelationshipCrawlFn(Protocol):
         model_class: type[BaseModelType],
         field: BaseFieldType | None,
         field_name: str,
-        last_field_name: str,
         reverse_path: str | Literal[False],
         forward_path: str,
         reverse: bool,

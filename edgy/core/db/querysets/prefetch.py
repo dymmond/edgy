@@ -73,6 +73,7 @@ class Prefetch:
         """
         Forward path to the target model. This value is **unvalidated**.
         """
+        # use the non-field part
         parts = self.to_attr.rsplit("__", 1)
         if len(parts) == 1:
             return self.from_anchor
@@ -106,13 +107,13 @@ class Prefetch:
         raise QuerySetError("`_reverse_path_to_anchor` not set.")
 
     @cached_property
-    def _target_model(self) -> type[Model]:
+    def _anchor_model(self) -> type[Model]:
         """
         Holds origin model (source model, where prefetches are attached).
 
         Placeholder which raises when not initialized.
         """
-        raise QuerySetError("`_target_model` not set.")
+        raise QuerySetError("`_anchor_model` not set.")
 
     @cached_property
     def _baked_results(self) -> dict[tuple[Hashable, ...], list[Any]]:
@@ -156,7 +157,7 @@ class Prefetch:
                 model = cast("type[BaseModelType]", type(model))
             raise QuerySetError(
                 f"Conflicting attribute to_attr='{attr_name}' for related_name=`{self.related_name}` "
-                f"'in {model.__name__}"
+                f"on {model.__name__}"
             )
 
     async def _init_bake(self) -> None:
@@ -173,7 +174,7 @@ class Prefetch:
         """
         from .executor import QueryExecutor
 
-        target_model = self._target_model
+        anchor_model = self._anchor_model
         qs = self.queryset
         assert qs is not None, "`queryset` not initialized"
         # If already baking check event.
@@ -197,7 +198,7 @@ class Prefetch:
             # Create a unique model key from the current SQLAlchemy row using the
             # specified bake prefix. This key links the prefetched item back to
             # its parent model instance.
-            model_key = target_model.create_model_key_from_raw_mapping(
+            model_key = anchor_model.create_model_key_from_raw_mapping(
                 mapping=executor._current_row._mapping, prefix=bake_prefix
             )
             # Append the prefetched result to the list associated with its model key.

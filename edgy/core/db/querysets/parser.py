@@ -66,7 +66,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
                 instance=result,
                 tables_and_models=self.tables_and_models,
                 mapping=row._mapping,
-                prefetches_dict=prepared_prefetches,
+                prepared_prefetches=prepared_prefetches,
                 seen=set(),
             )
         return result
@@ -90,7 +90,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
                 cast("EdgyModel", instance),
                 mapping=row._mapping,
                 tables_and_models=self.tables_and_models,
-                prefetches_dict=prepared_prefetches,
+                prepared_prefetches=prepared_prefetches,
             ),
         )
         return cast(tuple[EdgyModel, EdgyEmbedTarget], result[0])
@@ -127,7 +127,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
                 cast("EdgyModel", instance),
                 mapping=batch[pos]._mapping,
                 tables_and_models=self.tables_and_models,
-                prefetches_dict=prepared_prefetches,
+                prepared_prefetches=prepared_prefetches,
             ),
             old_cache=self.queryset._cache,
         )

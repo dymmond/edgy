@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 import sqlalchemy
 
 from edgy.core.db.fields.base import BaseForeignKey, RelationshipField
+from edgy.core.db.relationships.utils import get_related_column_keys
 from edgy.core.utils.db import get_table_key_or_name, hash_tablekey
 from edgy.exceptions import QuerySetError
 
@@ -88,7 +89,9 @@ class QueryCompiler:
 
     def _should_include_column(
         self,
+        tables_and_models: tables_and_models_type,
         field_name: str,
+        column_key: str,
         model_class: type[BaseModelType],
         prefix: str = "",
     ) -> bool:
@@ -96,8 +99,10 @@ class QueryCompiler:
         Helper method to check if a column should be included based on
         .only(), .defer(), and .exclude_secrets() rules.
 
-        Args:
-            field_name: The name of the model field.
+        Args:,
+            tables_and_models: The table/model mapping from `join_graph_data`.
+            field_name: The name of the model field or column key (when not available).
+            column_key: The key of the column.
             model_class: The model class that owns the field.
             prefix: The join prefix (e.g., "related_model").
 
@@ -105,20 +110,31 @@ class QueryCompiler:
             True if the column should be included, False otherwise.
         """
         qs = self.queryset
+        full_field_name = f"{prefix}__{field_name}" if prefix else field_name
+        # special handle embeddings, we require the pkcolumns, so include them
+        if prefix and prefix in qs._select_related_embedding:
+            splitted = prefix.rsplit("__", 1)
+            if len(splitted) == 2:
+                parent_model_path, parent_field_name = splitted
+            else:
+                parent_model_path, parent_field_name = "", splitted[0]
+            parent_model = tables_and_models[parent_model_path][1]
+            if column_key in get_related_column_keys(parent_model.meta.fields[parent_field_name]):
+                return True
 
         # Check .only() rules
-        if qs._only:
-            if not prefix and field_name not in qs._only:
-                return False
-            if prefix and prefix not in qs._only and f"{prefix}__{field_name}" not in qs._only:
-                return False
+        if qs._only and full_field_name not in qs._only:
+            return False
+
+        # After only, so we know it is either in only or in select_related
+        # Check that _only is populated
+        if prefix and qs._only and prefix not in qs._select_related:
+            # not selected, leftovers from order by,
+            return False
 
         # Check .defer() rules
-        if qs._defer:
-            if not prefix and field_name in qs._defer:
-                return False
-            if prefix and (prefix in qs._defer or f"{prefix}__{field_name}" in qs._defer):
-                return False
+        if qs._defer and full_field_name in qs._defer:
+            return False
 
         # Check .exclude_secrets() rules
         if (  # noqa
@@ -152,7 +168,9 @@ class QueryCompiler:
                 field_name = model_class.meta.columns_to_field.get(column_key, column_key)
 
                 # Delegate the complex logic to the helper
-                if not self._should_include_column(field_name, model_class, prefix):
+                if not self._should_include_column(
+                    tables_and_models, field_name, column_key, model_class, prefix
+                ):
                     continue
 
                 # Add the column, aliasing if it's from a joined table

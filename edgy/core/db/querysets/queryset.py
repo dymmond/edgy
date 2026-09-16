@@ -922,6 +922,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         if not queryset._order_by:
             queryset = queryset.order_by(*self.model_class.pkcolumns)
         expression, tables_and_models = await queryset.as_select_with_tables()
+        # this works, because in case of no order_by, the inserted default order doesn't produce
+        # extra selections
         self._cached_select_related_expression = queryset._cached_select_related_expression
         check_db_connection(queryset.database)
         async with queryset.database as database:
@@ -948,6 +950,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             queryset = queryset.order_by(*self.model_class.pkcolumns)
         queryset = queryset.reverse()
         expression, tables_and_models = await queryset.as_select_with_tables()
+        # this works, because in case of no order_by, the inserted default order doesn't produce
+        # extra selections
         self._cached_select_related_expression = queryset._cached_select_related_expression
         check_db_connection(queryset.database)
         async with queryset.database as database:

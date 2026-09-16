@@ -59,7 +59,7 @@ async def rollback_transactions():
         yield
 
 
-async def test_prefetch_m2m_directly():
+async def test_prefetch_m2m_forward():
     role = await Role.query.create(name="Admin")
     group1 = await SpaceGroup.query.create(name="Group 1", role=role)
     group2 = await SpaceGroup.query.create(name="Group 2", role=role)
@@ -110,7 +110,37 @@ async def test_prefetch_m2m_directly_mixed():
     )
 
 
-async def test_prefetch_m2m_directly_mixed_none():
+async def test_prefetch_m2m_indirect():
+    role1 = await Role.query.create(name="Admin")
+    role2 = await Role.query.create(name="User")
+    group1 = await SpaceGroup.query.create(name="Admingroup", role=role1)
+    group2 = await SpaceGroup.query.create(name="Group 2", role=role2)
+
+    space = await Space.query.create(name="Space 1")
+    total = await space.groups.add_many(group1, group2)
+
+    user = await User.query.create(name="Edgy")
+    user2 = await User.query.create(name="Ravyn")
+
+    await role1.users.add_many(user)
+    await role2.users.add_many(user, user2)
+
+    assert len(total) == 2
+    prefetches = [
+        Prefetch(
+            related_name="role__users",
+            to_attr="to_users",
+            queryset=User.query.all().distinct("id"),
+        )
+    ]
+
+    groups = await space.groups.prefetch_related(*prefetches).order_by("id")
+
+    assert len(groups[0].to_users) == 1
+    assert len(groups[1].to_users) == 1
+
+
+async def test_prefetch_m2m_directly_mixed_noresults():
     role = await Role.query.create(name="Admin")
     group1 = await SpaceGroup.query.create(name="Group 1", role=role)
     group2 = await SpaceGroup.query.create(name="Group 2", role=role)

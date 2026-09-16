@@ -7,6 +7,7 @@
 - Add different anchor points for prefetches.
 - Allow sub-attributes (select_related) for prefetches as anchor.
 - `crawl_relationship` has now a mode to traverse databases.
+- `crawl_relationship` returns now not `exact` as operator, when no operator was found but an empty string.
 
 ### Changed
 
@@ -17,11 +18,12 @@
 - Make `Prefetch`'s `init_bake` and other internals private. QuerySetErrors are now raised if the attributes are illegally accessed.
 - Make `Prefetch` keyword-only like in documentation.
 - Assign prefetches from queryset not in `from_sqla_row`. This allows better handling of embeddings.
-- `create_model_key_from_sqla_row` is deprecated now.
-- `crawl_relationship` has now a better error when a field does not exist.
+- `create_model_key_from_sqla_row` is deprecated now. Use the more generalized `create_model_key_from_raw_mapping` for the row mapping (`row._mapping`) instead.
 - Move `get_table_key_or_name` to `edgy.core.utils.db`.
 - Add embedded path implicit to select_related paths.
+- `crawl_relationship` has now a better error when a field does not exist.
 - Unpacking and accessing `CrawlResult` (the result of `crawl_relationship`) is now deprecated. Use the results attributes instead.
+- Don't select unneccessary columns.
 
 ### Fixed
 
@@ -33,6 +35,10 @@
 ### Removed
 
 - Remove long deprecated `fields` and `fields_mapping`.
+
+### Breaking
+
+- `crawl_relationship` returns now not `exact` as operator, when no operator was found but an empty string.
 
 ## 0.36.1
 
