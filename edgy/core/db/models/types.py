@@ -495,6 +495,7 @@ class BaseModelType(ABC):
         The key is composed of the model's class name and the string representation
         of its primary key column values. This key can be used for caching model
         instances to improve performance.
+        Compatible to `create_model_key_from_raw_mapping` when `allow_missing_and_none=False`.
 
         Kwargs:
             allow_missing_and_none (bool): Missing keys are replaced with `None` and `None` values are allowed.
@@ -510,6 +511,7 @@ class BaseModelType(ABC):
         """
         Builds a unique cache key for a model instance based on its class name and
         primary key values extracted from a SQLAlchemy row.
+        Compatible to `create_model_key`.
 
         Args:
             mapping (Row mapping): The SQLAlchemy row mapping from which to extract primary key values.

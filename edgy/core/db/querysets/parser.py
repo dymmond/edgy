@@ -58,7 +58,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
         row: sqlalchemy.Row,
     ) -> EdgyModel:
         prepared_prefetches = self.queryset._prepare_prefetches_for_rows(
-            [row], self.tables_and_models
+            rows=[row], tables_and_models=self.tables_and_models
         )
         result = await self._row_to_model_uncached(row)
         if prepared_prefetches:
@@ -80,7 +80,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
         (Refactored from _get_or_cache_row)
         """
         prepared_prefetches = self.queryset._prepare_prefetches_for_rows(
-            [row], self.tables_and_models
+            rows=[row], tables_and_models=self.tables_and_models
         )
         result = await self.queryset._cache.aget_or_cache_many(
             self.model_class,
@@ -105,7 +105,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
         (This is the parsing half of the original _handle_batch method)
         """
         prepared_prefetches = self.queryset._prepare_prefetches_for_rows(
-            batch, self.tables_and_models
+            rows=batch, tables_and_models=self.tables_and_models
         )
         return await new_cache.aget_or_cache_many(
             self.model_class,

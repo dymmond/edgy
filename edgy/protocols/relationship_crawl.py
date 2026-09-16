@@ -17,5 +17,6 @@ class RelationshipCrawlFn(Protocol):
         reverse: bool,
         operator: None | str,
         cross_db_remainder: str,
+        last_cross_db_remainder: str,
     ) -> None:
         """Callback hint."""

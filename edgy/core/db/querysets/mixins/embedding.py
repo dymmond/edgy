@@ -18,7 +18,6 @@ from edgy.exceptions import QuerySetError
 from .. import clauses as clauses_mod
 
 if TYPE_CHECKING:  # pragma: no cover
-    from edgy import Model
     from edgy.core.db.fields.base import BaseForeignKey
     from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.querysets.prefetch import Prefetch
@@ -39,11 +38,11 @@ def _apply_prefetches_helper(
         related.check_for_collision(model=instance)
         # tables can be alias
         row_prefix = (
-            f"{get_table_key_or_name(tables_and_models[related._forward_path_to_anchor][0])}_"
-            if related._forward_path_to_anchor and tables_and_models
+            f"{get_table_key_or_name(tables_and_models[related._anchor.forward_path][0])}_"
+            if related._anchor.forward_path and tables_and_models
             else ""
         )
-        model_key = related._anchor_model.create_model_key_from_raw_mapping(
+        model_key = related._anchor.model_class.create_model_key_from_raw_mapping(
             mapping=mapping, prefix=row_prefix
         )
         # Ensure it is in the baked results.
@@ -87,8 +86,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         resolve_anchor_dict: dict[str, list[Prefetch]] = {}
         for prefetch in prepared_prefetches:
             target_dict.setdefault(prefetch.forward_path, []).append(prefetch)
-            # FIXME: only add prefetches which are not complete yet
-            if prefetch.from_anchor:
+            if prefetch.from_anchor and prefetch._anchor.cross_db_remainder:
                 resolve_anchor_dict.setdefault(prefetch.from_anchor, []).append(prefetch)
 
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
@@ -115,10 +113,13 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                             "BaseForeignKey | None", old_instance.meta.fields.get(part)
                         )
                     ) and fk_field.is_cross_db():
-                        raise NotImplementedError("db Traversal isn't implemented yet.")
-                        # await current_instance.load()
-                        # if part in resolve_anchor_dict:
-                        #    # TODO: use the anchor dictionary to resolve
+                        await current_instance.load()
+                        if prefetches_list := resolve_anchor_dict.get(prefix):
+                            mapping = current_instance.extract_column_values(
+                                current_instance.extract_db_fields(), instance=current_instance
+                            )
+                            for prefetch in prefetches_list:
+                                prefetch._set_clauses_by_mappings(mappings=[mapping])
                     if prefetches_list := target_dict.get(prefix):
                         await run_concurrently(
                             [prefetch._init_bake() for prefetch in prefetches_list],
@@ -207,7 +208,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         return result, new_result
 
     def _prepare_prefetches_for_rows(
-        self, rows: Sequence[sqlalchemy.Row], tables_and_models: tables_and_models_type
+        self, *, rows: Sequence[sqlalchemy.Row], tables_and_models: tables_and_models_type
     ) -> Sequence[Prefetch]:
         """
         Builds the Prefetch objects for a given batch of results.
@@ -238,6 +239,12 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 continue
             else:
                 seen_prefetches.add(compare_tuple)
+            new_prefetch = Prefetch(
+                related_name=prefetch.related_name,
+                to_attr=prefetch.to_attr,
+                from_anchor=prefetch.from_anchor,
+            )
+
             anchor_crawl_result = crawl_relationship(
                 self_queryset.model_class,
                 prefetch.from_anchor,
@@ -245,34 +252,26 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 model_database=self_queryset.database,
                 # allow_crossing_db=True,
                 traverse_last=True,
+                allow_crossing_db=True,
+                callback_fn=new_prefetch._anchor_crawl_fn,
             )
-            if anchor_crawl_result.field_name or anchor_crawl_result.operator:
-                raise QuerySetError(
-                    detail=f"`from_anchor` points to non-relation field: `{anchor_crawl_result.field_name}`."
-                )
 
-            if anchor_crawl_result.cross_db_remainder:
-                raise NotImplementedError(
-                    "Cannot prefetch from other db yet. Maybe in future this feature will be added."
-                )
+            new_prefetch._anchor = anchor_crawl_result
 
             prefetch_crawl_result = crawl_relationship(
                 anchor_crawl_result.model_class,
                 prefetch.related_name,
                 traverse_last=True,
             )
-            if prefetch_crawl_result.field_name or anchor_crawl_result.operator:
+
+            if prefetch_crawl_result.field_name or prefetch_crawl_result.operator:
                 raise QuerySetError(
-                    detail=f"`related_name` path points to non-relation field: `{prefetch_crawl_result.field_name}`."
-                )
-            if prefetch_crawl_result.cross_db_remainder:
-                raise NotImplementedError(
-                    "Cannot prefetch from other db yet. Maybe in future this feature will be added."
+                    detail=f"The `related_name` path points to non-relation field: `{prefetch_crawl_result.field_name}`."
                 )
             if prefetch_crawl_result.reverse_path is False:
                 raise QuerySetError(
                     detail=(
-                        "Creating a reverse path to `from_anchor` is not possible, unidirectional fields were used."
+                        "Creating a reverse path from `related_name` is not possible, unidirectional fields were used."
                     )
                 )
 
@@ -290,42 +289,19 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 )
 
             prefetch.check_for_collision(anchor_crawl_result.model_class)
-            new_prefetch = Prefetch(
-                related_name=prefetch.related_name,
-                to_attr=prefetch.to_attr,
-                from_anchor=prefetch.from_anchor,
-            )
-
             prefetch_queryset: QuerySet | None = prefetch.queryset
-            row_prefix = (
-                f"{tables_and_models[anchor_crawl_result.forward_path][0].name}_"
-                if anchor_crawl_result.forward_path
-                else ""
-            )
-            clauses = [
-                {
-                    f"{prefetch_crawl_result.reverse_path}__{pkcol}": row._mapping[
-                        f"{row_prefix}{pkcol}"
-                    ]
-                    for pkcol in anchor_crawl_result.model_class.pkcolumns
-                }
-                for row in rows
-            ]
             if prefetch_queryset is None:
-                prefetch_queryset = prefetch_crawl_result.model_class.query.local_or(*clauses)
+                prefetch_queryset = prefetch_crawl_result.model_class.query.all()
             else:
-                prefetch_queryset = prefetch_queryset.local_or(*clauses)
+                prefetch_queryset = prefetch_queryset.all()
             # just add the resolved path to _select_related_embedding, so get less cruft
             prefetch_queryset._select_related_embedding.add(prefetch_crawl_result.reverse_path)
             # the assigned queryset has an empty cache
             new_prefetch.queryset = prefetch_queryset
             # don't calculate twice
             new_prefetch.forward_path = prefetch.forward_path
-            new_prefetch._forward_path_to_anchor = anchor_crawl_result.forward_path
-            new_prefetch._reverse_path_to_anchor = prefetch_crawl_result.reverse_path
-            new_prefetch._baking_finished = asyncio.Event()
-            new_prefetch._anchor_model = cast("type[Model]", anchor_crawl_result.model_class)
-            new_prefetch._baked_results = {}
+
+            # now check early
             prefetch_key = (new_prefetch.forward_path, new_prefetch.to_attr.rsplit("__", 1)[-1])
             if prefetch_key in prepared_prefetches:
                 raise QuerySetError(
@@ -333,6 +309,13 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                     f"'on {prefetch_crawl_result.model_class.__name__}"
                 )
 
+            new_prefetch._reverse_path_to_anchor = prefetch_crawl_result.reverse_path
+            new_prefetch._baking_finished = asyncio.Event()
+            new_prefetch._baked_results = {}
+            if not new_prefetch._anchor.cross_db_remainder:
+                new_prefetch._set_clauses_by_mappings(
+                    mappings=(row._mapping for row in rows), tables_and_models=tables_and_models
+                )
             prepared_prefetches[prefetch_key] = new_prefetch
         return list(prepared_prefetches.values())
 

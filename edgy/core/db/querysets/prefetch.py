@@ -3,16 +3,19 @@ from __future__ import annotations
 import asyncio
 import warnings
 from collections import defaultdict
-from collections.abc import Hashable
+from collections.abc import Container, Hashable, Iterable, Mapping
 from functools import cached_property
 from inspect import isclass
 from typing import TYPE_CHECKING, Any, cast
 
+from edgy.core.db.querysets.types import tables_and_models_type
+from edgy.core.db.relationships.utils import get_related_column_keys
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
-    from edgy.core.db.models.model import Model
+    from edgy.core.db.fields import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
+    from edgy.core.db.relationships.utils import RelationshipCrawlResult
 
     from .queryset import QuerySet
 
@@ -89,13 +92,13 @@ class Prefetch:
         raise QuerySetError("`_baking_finished` not set.")
 
     @cached_property
-    def _forward_path_to_anchor(self) -> str:
+    def _anchor(self) -> RelationshipCrawlResult:
         """
-        Maps back to anchor model.
+        Maps back to anchor crawl result.
 
         Placeholder which raises when not initialized.
         """
-        raise QuerySetError("`_forward_path_to_anchor` not set.")
+        raise QuerySetError("`_anchor` not set.")
 
     @cached_property
     def _reverse_path_to_anchor(self) -> str:
@@ -107,13 +110,13 @@ class Prefetch:
         raise QuerySetError("`_reverse_path_to_anchor` not set.")
 
     @cached_property
-    def _anchor_model(self) -> type[Model]:
+    def _anchor_columns(self) -> Container[str]:
         """
-        Holds origin model (source model, where prefetches are attached).
+        Holds the anchor columns
 
         Placeholder which raises when not initialized.
         """
-        raise QuerySetError("`_anchor_model` not set.")
+        raise QuerySetError("`_anchor_columns` not set.")
 
     @cached_property
     def _baked_results(self) -> dict[tuple[Hashable, ...], list[Any]]:
@@ -160,6 +163,45 @@ class Prefetch:
                 f"on {model.__name__}"
             )
 
+    def _anchor_crawl_fn(
+        self,
+        field: BaseFieldType | None,
+        operator: str | None,
+        field_name: str,
+        model_class: Any,
+        **kwargs: Any,
+    ) -> None:
+        # last
+        if operator is not None:
+            if field_name or operator:
+                raise QuerySetError(
+                    detail=f"`from_anchor` path points to a non-relation field: `{field_name}`."
+                )
+            self._anchor_columns = (
+                get_related_column_keys(field) if field is not None else model_class.pkcolumns
+            )
+
+    def _set_clauses_by_mappings(
+        self,
+        *,
+        mappings: Iterable[Mapping],
+        tables_and_models: tables_and_models_type | None = None,
+    ):
+        assert self.queryset is not None
+        row_prefix = (
+            f"{tables_and_models[self._anchor.forward_path][0].name}_"
+            if self._anchor.forward_path and tables_and_models is not None
+            else ""
+        )
+        clauses = [
+            {
+                f"{self._reverse_path_to_anchor}__{pkcol}": mapping[f"{row_prefix}{pkcol}"]
+                for pkcol in self._anchor_columns
+            }
+            for mapping in mappings
+        ]
+        self.queryset = self.queryset.local_or(*clauses)
+
     async def _init_bake(self) -> None:
         """
         (Internal method) Initializes the baking process for prefetching related objects.
@@ -174,7 +216,7 @@ class Prefetch:
         """
         from .executor import QueryExecutor
 
-        anchor_model = self._anchor_model
+        anchor_model = self._anchor.model_class
         qs = self.queryset
         assert qs is not None, "`queryset` not initialized"
         # If already baking check event.

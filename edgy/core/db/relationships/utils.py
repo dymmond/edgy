@@ -33,7 +33,8 @@ class RelationshipCrawlResult:
         reverse_path (str | Literal[False]): The accumulated path for reversing the
                                              relationship. This can be False if the
                                              path cannot be reversed or is not applicable.
-        cross_db_remainder (str): Any remaining part of the path if a cross-database
+        last_cross_db_remainder (str): Last remaing part of the oath if a cross-database
+        cross_db_remainder (str): Full remaining part of the path if a cross-database
                                   relationship was encountered and traversal stopped.
     """
 
@@ -42,6 +43,7 @@ class RelationshipCrawlResult:
     operator: str
     forward_path: str
     reverse_path: str | Literal[False]
+    last_cross_db_remainder: str
     cross_db_remainder: str
 
     def __iter__(self) -> Any:
@@ -138,6 +140,7 @@ def crawl_relationship(
     operator: str = ""
     field_name: str = path
     cross_db_remainder: str = ""
+    last_cross_db_remainder: str = ""
 
     # Loop while there are still segments in the path to process.
     while path:
@@ -155,7 +158,9 @@ def crawl_relationship(
             # Check for cross-database relationships.
             if field.is_cross_db(model_database):
                 # If it's a cross-DB relationship record the remainder.
-                cross_db_remainder = path
+                if not cross_db_remainder:
+                    cross_db_remainder = path
+                last_cross_db_remainder = path
                 # Stop the travel if not allowed
                 if not allow_crossing_db:
                     break
@@ -184,6 +189,7 @@ def crawl_relationship(
                     # here None
                     operator=None,  # Operator is not relevant at this stage of traversal.
                     cross_db_remainder=cross_db_remainder,
+                    last_cross_db_remainder=last_cross_db_remainder,
                 )
 
             # Update the forward_prefix_path.
@@ -250,6 +256,7 @@ def crawl_relationship(
             # here always string. In case of no operator empty ""
             operator=operator,
             cross_db_remainder=cross_db_remainder,
+            last_cross_db_remainder=last_cross_db_remainder,
         )
 
     # Return the comprehensive result of the relationship crawl.
@@ -260,6 +267,7 @@ def crawl_relationship(
         forward_path=forward_prefix_path,
         reverse_path=reverse_path,
         cross_db_remainder=cross_db_remainder,
+        last_cross_db_remainder=last_cross_db_remainder,
     )
 
 
