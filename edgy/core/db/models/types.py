@@ -194,7 +194,7 @@ class BaseModelType(ABC):
         self,
         *,
         force_insert: bool,
-        values: dict[str, Any] | set[str] | list[str] | None,
+        values: dict[str, Any] | set[str] | None,
     ) -> BaseModelType:
         """
         Abstract asynchronous method for saving the model instance to the database.
