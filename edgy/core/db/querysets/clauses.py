@@ -220,11 +220,9 @@ def _clean_path_validator(
     if operator is not None:
         # not empty string
         if operator:
-            raise ValueError(f"Unexpected operator: `{operator}`.")
+            raise ValueError(f"Unexpected operator: `{operator}`, field name {field_name}.")
         if not field_name:
             raise ValueError("No field name found.")
-        if not field:
-            raise ValueError(f"No field for name `{field_name}` found.")
 
 
 def clean_path_to_crawl_result(

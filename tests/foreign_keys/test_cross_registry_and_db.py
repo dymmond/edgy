@@ -67,6 +67,7 @@ async def test_empty_fk():
 
 
 async def test_create():
+    await ObjectC.query.create(b={"a": {"c": ObjectC(), "self_ref": ObjectA()}})
     obj = await ObjectC.query.create(b={"a": {"c": None, "self_ref": None}})
     # assert obj.b.a.self_ref is None
     obj.b.a.self_ref = obj.b.a
@@ -81,6 +82,7 @@ async def test_create():
 
 
 async def test_query():
+    await ObjectC.query.create(b={"a": {"c": ObjectC(), "self_ref": ObjectA()}})
     obj = await ObjectC.query.create(b={"a": {"c": None, "self_ref": None}})
     # assert obj.b.a.self_ref is None
     obj.b.a.c = obj

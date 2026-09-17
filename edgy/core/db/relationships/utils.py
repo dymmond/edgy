@@ -149,6 +149,7 @@ def crawl_relationship(
         field_name = splitted[0]
         # Get the field from the current model_class's meta fields.
         field = model_class.meta.fields.get(field_name)
+        in_columns_or_fields = field is not None or field_name in model_class.table.columns
 
         # Check if the field is a RelationshipField and there are more segments.
         if isinstance(field, RelationshipField) and len(splitted) == 2:
@@ -201,7 +202,8 @@ def crawl_relationship(
         elif len(splitted) == 2:
             # If the second part does not contain "__", it's likely an operator.
             # Operators are not allowed to contain __
-            if "__" not in splitted[1]:
+            # if a forward path was provided, the field_name must either exist in columns or in fields
+            if "__" not in splitted[1] and (not forward_prefix_path or in_columns_or_fields):
                 if splitted[1] == "":
                     raise ValueError("Path unsanitized, ends with `__`.")
                 operator = splitted[1]
