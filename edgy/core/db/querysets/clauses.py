@@ -17,6 +17,7 @@ from edgy.core.utils.concurrency import run_concurrently
 
 if TYPE_CHECKING:
     from edgy.core.connection.database import Database
+    from edgy.core.db.fields.types import BaseFieldType
 
     from .types import QuerySetType, tables_and_models_type
 
@@ -212,18 +213,29 @@ def clean_query_kwargs(
     return new_kwargs
 
 
+def _clean_path_validator(
+    operator: str | None, field_name: str, field: BaseFieldType | None, **kwargs: Any
+) -> None:
+    # is last call
+    if operator is not None:
+        # not empty string
+        if operator:
+            raise ValueError(f"Unexpected operator: `{operator}`.")
+        if not field_name:
+            raise ValueError("No field name found.")
+        if not field:
+            raise ValueError(f"No field for name `{field_name}` found.")
+
+
 def clean_path_to_crawl_result(
     model_class: type[BaseModelType],
     path: str,
     *,
     embed_parent: tuple[str, str] | None = None,
     model_database: Database | None = None,
-    path_to_field: bool = True,
 ) -> RelationshipCrawlResult:
     """
-    For use with advanced crawling definitions but without operator support (e.g. distinct, order_by, ...).
-
-    Use is_model_path for use with select related clauses.
+    For use for cleaning field pathes without operator support (e.g. distinct, order_by, ...).
 
     Args:
         model_class (type[BaseModelType]): Input model.
@@ -232,7 +244,6 @@ def clean_path_to_crawl_result(
     Kwargs:
         embed_parent (tuple[str, str] | None): Provide a embed_parent value from e.g. QuerySet.
         model_database (Database | None): Set the model_database.
-        path_to_field (bool): If it points to a field.
     """
     # Crawl the relationship to find the relevant sub_model_class, field_name,
     # operator, related_string, and cross-database remainder.
@@ -241,16 +252,8 @@ def clean_path_to_crawl_result(
         path,
         embed_parent=embed_parent,
         model_database=model_database,
-        traverse_last=not path_to_field,
+        callback_fn=_clean_path_validator,
     )
-    if crawl_result.operator:
-        raise ValueError(f"Unexpected operator: `{crawl_result.operator}`.")
-    if path_to_field and not crawl_result.field_name:
-        raise ValueError("No field name found.")
-    elif not path_to_field and crawl_result.field_name:
-        raise ValueError(
-            f"Should not find a field name: `{crawl_result.field_name}`, path to a model."
-        )
     return crawl_result
 
 

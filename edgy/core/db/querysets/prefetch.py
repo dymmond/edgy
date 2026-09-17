@@ -9,7 +9,7 @@ from inspect import isclass
 from typing import TYPE_CHECKING, Any, cast
 
 from edgy.core.db.querysets.types import tables_and_models_type
-from edgy.core.db.relationships.utils import get_related_column_keys
+from edgy.core.db.relationships.utils import crawl_relationship, get_related_column_keys
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
@@ -62,25 +62,20 @@ class Prefetch:
         if args:
             warnings.warn("`Prefetch` is now keyword-only.", DeprecationWarning, stacklevel=2)
             self.related_name = args[0]
-            self.to_attr = args[1]
+            to_attr = args[1]
         else:
             self.related_name = related_name
-            self.to_attr = to_attr
         self.queryset: QuerySet | None = queryset
         self.from_anchor = from_anchor or ""
+        if to_attr.startswith("+"):
+            to_attr = f"{from_anchor}__{to_attr[1:]}" if from_anchor else to_attr
+        self.to_attr: str = to_attr
+        if not self.to_attr:
+            raise ValueError("`to_attr` cannot be empty.")
+        if self.to_attr.startswith("+"):
+            raise ValueError("`to_attr` cannot start with multiple `+`.")
         # Internal flag to indicate if the baking process has been completed.
         self._baked = False
-
-    @cached_property
-    def forward_path(self) -> str:
-        """
-        Forward path to the target model. This value is **unvalidated**.
-        """
-        # use the non-field part
-        parts = self.to_attr.rsplit("__", 1)
-        if len(parts) == 1:
-            return self.from_anchor
-        return f"{self.from_anchor}__{parts[0]}" if self.from_anchor else parts[0]
 
     @cached_property
     def _baking_finished(self) -> asyncio.Event:
@@ -168,10 +163,11 @@ class Prefetch:
         field: BaseFieldType | None,
         operator: str | None,
         field_name: str,
-        model_class: Any,
+        model_class: type[BaseModelType],
         **kwargs: Any,
     ) -> None:
-        # last
+        """For use with the anchor crawl."""
+        # last execution
         if operator is not None:
             if field_name or operator:
                 raise QuerySetError(
@@ -181,12 +177,41 @@ class Prefetch:
                 get_related_column_keys(field) if field is not None else model_class.pkcolumns
             )
 
+    def _generate_select_related_pathes(self, queryset: QuerySet) -> Iterable[str]:
+        """Generate pathes for select related."""
+        pathes: set[str] = set()
+        anchor_forward_path = self.from_anchor.rsplit("__", 1)[0]
+        if anchor_forward_path:
+            crawl_result = crawl_relationship(
+                queryset.model_class,
+                anchor_forward_path,
+                model_database=queryset.database,
+                embed_parent=queryset.embed_parent_filters,
+                traverse_last=True,
+            )
+            if crawl_result.field_name:
+                raise ValueError(
+                    f"Should not find a field name: `{crawl_result.field_name}`, should be a path to a model."
+                )
+            if crawl_result.forward_path:
+                pathes.add(crawl_result.forward_path)
+        if "__" in self.to_attr:
+            crawl_result = crawl_relationship(
+                queryset.model_class,
+                self.to_attr,
+                model_database=queryset.database,
+                embed_parent=queryset.embed_parent_filters,
+            )
+            if crawl_result.forward_path:
+                pathes.add(crawl_result.forward_path)
+        return pathes
+
     def _set_clauses_by_mappings(
         self,
         *,
         mappings: Iterable[Mapping],
         tables_and_models: tables_and_models_type | None = None,
-    ):
+    ) -> None:
         assert self.queryset is not None
         row_prefix = (
             f"{tables_and_models[self._anchor.forward_path][0].name}_"

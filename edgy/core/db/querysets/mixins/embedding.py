@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Mapping, Sequence
 from inspect import isawaitable
+from itertools import chain
 from typing import TYPE_CHECKING, Any, Generic, cast, overload
 
 import sqlalchemy
@@ -14,8 +15,6 @@ from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.core.utils.concurrency import run_concurrently
 from edgy.core.utils.db import get_table_key_or_name
 from edgy.exceptions import QuerySetError
-
-from .. import clauses as clauses_mod
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.fields.base import BaseForeignKey
@@ -85,14 +84,17 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         target_dict: dict[str, list[Prefetch]] = {}
         resolve_anchor_dict: dict[str, list[Prefetch]] = {}
         for prefetch in prepared_prefetches:
-            target_dict.setdefault(prefetch.forward_path, []).append(prefetch)
+            target_dict.setdefault(
+                prefetch.to_attr.rsplit("__", 1)[0] if "__" in prefetch.to_attr else "", []
+            ).append(prefetch)
             if prefetch.from_anchor and prefetch._anchor.cross_db_remainder:
                 resolve_anchor_dict.setdefault(prefetch.from_anchor, []).append(prefetch)
 
         token = MODEL_GETATTR_BEHAVIOR.set("passdown")
         try:
-            # we need only to check the prefetches dict
-            for path in sorted(target_dict, key=lambda x: len(x), reverse=True):
+            # we need to check the prefetches dicts for the select pathes
+            # first the anchor dictionary, then the targets
+            for path in chain(resolve_anchor_dict.keys(), target_dict.keys()):
                 prefix = ""
                 current_instance: BaseModelType | None = instance
                 for part in path.split("__"):
@@ -113,7 +115,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                             "BaseForeignKey | None", old_instance.meta.fields.get(part)
                         )
                     ) and fk_field.is_cross_db():
-                        await current_instance.load()
+                        await current_instance.load(only_needed=True)
                         if prefetches_list := resolve_anchor_dict.get(prefix):
                             mapping = current_instance.extract_column_values(
                                 current_instance.extract_db_fields(), instance=current_instance
@@ -226,13 +228,13 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             QuerySetError: If a prefetch path is invalid (e.g., unidirectional).
         """
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
-        prepared_prefetches: dict[tuple[str, str], Prefetch] = {}
+        prepared_prefetches: dict[str, Prefetch] = {}
         seen_prefetches: set[tuple[str, str, str]] = set()
 
         for prefetch in self_queryset._prefetch_related:
             compare_tuple = (
                 prefetch.related_name,
-                prefetch.forward_path,
+                prefetch.from_anchor,
                 prefetch.to_attr,
             )
             if compare_tuple in seen_prefetches:
@@ -263,6 +265,13 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 prefetch.related_name,
                 traverse_last=True,
             )
+            if prefetch_crawl_result.cross_db_remainder:
+                raise QuerySetError(
+                    detail=(
+                        f"The `related_name` crosses from: `{prefetch_crawl_result.forward_path}` the database. "
+                        "Please use an appropiate `anchor_from`."
+                    )
+                )
 
             if prefetch_crawl_result.field_name or prefetch_crawl_result.operator:
                 raise QuerySetError(
@@ -276,7 +285,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 )
 
             target_crawl_result = crawl_relationship(
-                anchor_crawl_result.model_class,
+                self_queryset.model_class,
                 prefetch.to_attr,
                 traverse_last=True,
             )
@@ -288,7 +297,6 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                     )
                 )
 
-            prefetch.check_for_collision(anchor_crawl_result.model_class)
             prefetch_queryset: QuerySet | None = prefetch.queryset
             if prefetch_queryset is None:
                 prefetch_queryset = prefetch_crawl_result.model_class.query.all()
@@ -298,17 +306,15 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             prefetch_queryset._select_related_embedding.add(prefetch_crawl_result.reverse_path)
             # the assigned queryset has an empty cache
             new_prefetch.queryset = prefetch_queryset
-            # don't calculate twice
-            new_prefetch.forward_path = prefetch.forward_path
-
-            # now check early
-            prefetch_key = (new_prefetch.forward_path, new_prefetch.to_attr.rsplit("__", 1)[-1])
-            if prefetch_key in prepared_prefetches:
+            # now check key if the prefetch configuration is already registered
+            # if yes, raise.
+            if new_prefetch.to_attr in prepared_prefetches:
                 raise QuerySetError(
-                    f"Conflicting prefetches to_attr='{prefetch_key[1]}' for path=`{prefetch_key[1]}` "
+                    f"Conflicting prefetches to_attr='{new_prefetch.to_attr}'"
                     f"'on {prefetch_crawl_result.model_class.__name__}"
                 )
-
+            # check collision on target model
+            new_prefetch.check_for_collision(prefetch_crawl_result.model_class)
             new_prefetch._reverse_path_to_anchor = prefetch_crawl_result.reverse_path
             new_prefetch._baking_finished = asyncio.Event()
             new_prefetch._baked_results = {}
@@ -316,7 +322,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 new_prefetch._set_clauses_by_mappings(
                     mappings=(row._mapping for row in rows), tables_and_models=tables_and_models
                 )
-            prepared_prefetches[prefetch_key] = new_prefetch
+            prepared_prefetches[new_prefetch.to_attr] = new_prefetch
         return list(prepared_prefetches.values())
 
     def prefetch_related(self, *prefetch: Prefetch) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
@@ -363,16 +369,10 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             select_pathes.add(queryset.embed_parent[0])
         # now add the forward pathes, we need to resolve them because embed_parent is resolved
         select_pathes.update(
-            clauses_mod.clean_path_to_crawl_result(
-                self_queryset.model_class,
-                prefetch.forward_path,
-                model_database=self_queryset.database,
-                embed_parent=self_queryset.embed_parent_filters,
-                # we need this as we have no field name here
-                path_to_field=False,
-            ).forward_path
-            for prefetch in queryset._prefetch_related
-            if prefetch.forward_path
+            *(
+                prefetch._generate_select_related_pathes(queryset)
+                for prefetch in queryset._prefetch_related
+            )
         )
         # they are sanitized and analyzed later in _update_select_related_weak
         queryset._update_select_related_weak(
@@ -417,17 +417,11 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             # regenerate prefetch pathes
 
             queryset._update_select_related_weak(
-                (
-                    clauses_mod.clean_path_to_crawl_result(
-                        self_queryset.model_class,
-                        prefetch.forward_path,
-                        model_database=self_queryset.database,
-                        embed_parent=self_queryset.embed_parent_filters,
-                        # we need this as we have no field name here
-                        path_to_field=False,
-                    ).forward_path
-                    for prefetch in queryset._prefetch_related
-                    if prefetch.forward_path
+                chain(
+                    *(
+                        prefetch._generate_select_related_pathes(queryset)
+                        for prefetch in queryset._prefetch_related
+                    )
                 ),
                 cache_name="_select_related_embedding",
                 clear=False,

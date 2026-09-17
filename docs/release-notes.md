@@ -6,6 +6,7 @@
 
 - Add different anchor points for prefetches.
 - Allow sub-attributes (select_related) for prefetches as anchor.
+- Allow chaining `to_attr` to anchor by prefixing with `+`.
 - `crawl_relationship` has now a mode to traverse databases.
 - `crawl_relationship` returns now not `exact` as operator, when no operator was found but an empty string.
 

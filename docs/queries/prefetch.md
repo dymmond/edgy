@@ -40,7 +40,7 @@ from edgy.core.db.querysets import Prefetch
 To make the [Prefetch](#prefetch) work properly some parameters are needed to make sure it runs smoothly:
 
 * **related_name** - The [related_name](./related-name.md) type of query to perform.
-* **to_attr** - The name of the new attribute in the model being queried where the results will be stored. You can save to ForeignKey relations selected with `select_related` by traversing with `__`.
+* **to_attr** - The name of the new attribute in the model being queried where the results will be stored. You can save to ForeignKey relations selected with `select_related` by traversing with `__`. Use `+` to use the anchor as reference point.
 * **queryset** (Optional) - Additional queryset for the type of query being made.
 * **from_anchor** (Optional) - Change anchor for `related_name` and `to_attr`. This must be a path to a model, also traversing with `__`. Defaults to `""` (the current model).
 

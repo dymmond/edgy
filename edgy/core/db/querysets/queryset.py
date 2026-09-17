@@ -535,7 +535,9 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset: QuerySet = self._clone()
         queryset._order_by = order_by
         if queryset._update_select_related_weak(
-            (x.lstrip("-") for x in order_by), cache_name="_select_related_g_and_o", clear=True
+            (x.removeprefix("-") for x in order_by),
+            cache_name="_select_related_g_and_o",
+            clear=True,
         ):
             queryset._update_select_related_weak(
                 queryset._group_by,
