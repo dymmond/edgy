@@ -55,6 +55,30 @@ async def rollback_transactions():
 class Test: ...
 
 
+@pytest.mark.parametrize("related_name", ["", "+", "+posts", "name"])
+async def test_invalid_related_name(related_name):
+    await User.query.create(name="Edgy")
+    with pytest.raises(QuerySetError):
+        await User.query.prefetch_related(
+            Prefetch(related_name=related_name, to_attr="posts"),
+        ).all()
+
+
+@pytest.mark.parametrize("to_attr", ["", "+", "++posts"])
+async def test_invalid_to_attr(to_attr):
+    with pytest.raises(ValueError):
+        Prefetch(related_name="posts", to_attr=to_attr)
+
+
+@pytest.mark.parametrize("to_attr", ["name", "posts__comment", "name__post"])
+async def test_invalid_to_attr2(to_attr):
+    await User.query.create(name="Edgy")
+    with pytest.raises(QuerySetError):
+        await User.query.prefetch_related(
+            Prefetch(related_name="posts", to_attr=to_attr),
+        ).all()
+
+
 async def test_multiple_prefetch_model_calls():
     await User.query.create(name="Edgy")
 

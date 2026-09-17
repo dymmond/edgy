@@ -4,11 +4,12 @@ import asyncio
 from collections.abc import Awaitable, Mapping, Sequence
 from inspect import isawaitable
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Generic, cast, overload
+from typing import TYPE_CHECKING, Any, Generic, Literal, cast, overload
 
 import sqlalchemy
 
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.querysets.prefetch import Prefetch
 from edgy.core.db.querysets.types import EdgyEmbedTarget, EdgyModel, tables_and_models_type
 from edgy.core.db.relationships.utils import crawl_relationship
@@ -18,6 +19,7 @@ from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
     from edgy.core.db.fields.base import BaseForeignKey
+    from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.querysets.prefetch import Prefetch
     from edgy.core.db.querysets.queryset import QuerySet
@@ -48,6 +50,25 @@ def _apply_prefetches_helper(
         related._baked_results.setdefault(model_key, [])
         new_attr_name = related.to_attr.rsplit("__", 1)[-1]
         object.__setattr__(instance, new_attr_name, list(related._baked_results[model_key]))
+
+
+def _target_crawl_fn(
+    field: BaseFieldType | None,
+    field_name: str,
+    reverse_path: str | Literal[False],
+    **kwargs: Any,
+) -> None:
+    if reverse_path is False:
+        raise QuerySetError(
+            detail=(
+                "Creating a reverse path from `to_attr` to `from_anchor` is not possible, "
+                "unidirectional fields were used."
+            )
+        )
+    if field is not None and not isinstance(field, RelationshipField):
+        raise QuerySetError(
+            detail=f"`from_anchor` path points to a non-relation field: `{field_name}`."
+        )
 
 
 class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
@@ -206,7 +227,8 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
         if self_queryset.embed_parent[1]:
-            setattr(new_result, self_queryset.embed_parent[1], result)
+            # this works also on strict models
+            object.__setattr__(new_result, self_queryset.embed_parent[1], result)
         return result, new_result
 
     def _prepare_prefetches_for_rows(
@@ -284,19 +306,12 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                     )
                 )
 
-            target_crawl_result = crawl_relationship(
+            crawl_relationship(
                 self_queryset.model_class,
                 prefetch.to_attr,
                 traverse_last=True,
+                callback_fn=_target_crawl_fn,
             )
-            if target_crawl_result.reverse_path is False:
-                raise QuerySetError(
-                    detail=(
-                        "Creating a reverse path from `to_attr` to `from_anchor` is not possible, "
-                        "unidirectional fields were used."
-                    )
-                )
-
             prefetch_queryset: QuerySet | None = prefetch.queryset
             if prefetch_queryset is None:
                 prefetch_queryset = prefetch_crawl_result.model_class.query.all()

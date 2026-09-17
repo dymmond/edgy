@@ -42,7 +42,7 @@ To make the [Prefetch](#prefetch) work properly some parameters are needed to ma
 * **related_name** - The [related_name](./related-name.md) type of query to perform.
 * **to_attr** - The name of the new attribute in the model being queried where the results will be stored. You can save to ForeignKey relations selected with `select_related` by traversing with `__`. Use `+` to use the anchor as reference point.
 * **queryset** (Optional) - Additional queryset for the type of query being made.
-* **from_anchor** (Optional) - Change anchor for `related_name` and `to_attr`. This must be a path to a model, also traversing with `__`. Defaults to `""` (the current model).
+* **from_anchor** (Optional) - Change anchor for `related_name` and `to_attr` (for the later only when prefixed with `+`). This must be a path to a model, also traversing with `__`. Defaults to `""` (the current model).
 
 ### Special attention
 
@@ -154,10 +154,12 @@ All the tracks that belong to a specific `Company`. The tracks are associated wi
 
 This easy, right? The total tracks should be **1** as the **bird** is part of the title of the `track` that belongs to the `studio` that belongs to the `company`.
 
-**You might want to pivot**:
+**You might want to pivot (re-anchoring)**:
 
-Given the former example we can also pivot and add it to `company.studio.album` as `tracks_filtered` attribute.
+Given the former example we can also pivot and move the anchor to `company.studio.album` with `tracks_filtered` attribute on the `Company` instance. Targetting with `to_attr` and reanchoring with `from_anchor` are independent. You can however make `to_attr` relative to `from_anchor` by prefixing the `to_attr` value with `+`.
 
-```python hl_lines="14"
+```python
 {!> ../docs_src/prefetch/second/prefetch_filtered_anchor.py !}
 ```
+
+The beauty of re-anchoring is that now different databases can be traversed. Just the anchor table and the `related_name` referenced table can not cross databases.
