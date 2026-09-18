@@ -28,6 +28,7 @@
 
 ### Fixed
 
+- `ForeignKey`s on unique columns became incorrectly unique.
 - Using `create` in non-nullable ForeignKey relations.
 - Don't mask AttributeErrors in managers when creating the queryset failed.
 - `to_attr` and `from_anchor` of Prefetch doesn't require explicit `select_related` calls anymore. They are deduced.
