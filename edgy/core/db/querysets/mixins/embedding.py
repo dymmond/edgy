@@ -48,7 +48,6 @@ async def _apply_prefetches_helper(
             )
             await related._init_bake(anchor_mapping)
         else:
-            # tables can be alias
             row_prefix = (
                 f"{get_table_key_or_name(tables_and_models[related._anchor.forward_path][0])}_"
                 if related._anchor.forward_path and tables_and_models
@@ -125,10 +124,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                     if prefix in seen:
                         continue
                     seen.add(prefix)
-                    # we need the pks
-                    if prefix in anchor_dict:
-                        await current_instance.load(only_needed=True)
-                    # empty part for empty pathes
+                    # part is empty when path="" (empty, only main model)
                     if part:
                         current_instance = cast(
                             "BaseModelType | None | Awaitable[BaseModelType | None]",
@@ -139,12 +135,15 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                     if current_instance is None:
                         break
                     if prefix in anchor_dict:
+                        # we need the pks of the current instance and can't just select them (different db)
+                        await current_instance.load(only_needed=True)
                         mapping = current_instance.extract_column_values(
                             current_instance.extract_db_fields(only=instance.pkcolumns),
                             instance=current_instance,
                             phase="",
                         )
                         anchor_dict[prefetch.from_anchor] = mapping
+            # reset
             seen.clear()
             for path in target_dict:
                 prefix = ""
@@ -154,7 +153,7 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                     if prefix in seen:
                         continue
                     seen.add(prefix)
-                    # empty part for empty pathes
+                    # part is empty when path="" (empty, only main model)
                     if part:
                         current_instance = cast(
                             "BaseModelType | None | Awaitable[BaseModelType | None]",
