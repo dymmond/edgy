@@ -72,6 +72,10 @@ async def test_prefetch_crossdb_pivot(target_prefix: str):
     await Company.query.create(name="Fake company")
     await Company.query.create(studio=stud, name="Music Company")
 
+    company = await Company.query.get(name="Music Company")
+    assert company.studio is not None
+    assert company.studio.album is not None
+
     companies = await Company.query.prefetch_related(
         edgy.Prefetch(
             to_attr=f"{target_prefix}sorted_tracks",
@@ -82,6 +86,7 @@ async def test_prefetch_crossdb_pivot(target_prefix: str):
     )
     assert companies[0].studio is None
     assert companies[1].studio is not None
+    assert companies[1].studio.album is not None
     if target_prefix:
         assert companies[1].studio.album.sorted_tracks == [track1, track2, track3]
     else:
@@ -101,7 +106,7 @@ async def test_prefetch_crossdb_mid():
     await Company.query.create(name="Fake company")
     comp = await Company.query.create(studio=stud, name="Music Company")
     stud.primary_company = comp
-    stud.save()
+    await stud.save()
 
     studios = await Studio.query.prefetch_related(
         edgy.Prefetch(

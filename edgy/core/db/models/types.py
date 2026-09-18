@@ -488,9 +488,7 @@ class BaseModelType(ABC):
         return type(self).__name__.lower()
 
     @abstractmethod
-    def create_model_key(
-        self, *, used_fields: Sequence[str] | None = None, allow_missing_and_none: bool = False
-    ) -> tuple[Hashable, ...]:
+    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple[Hashable, ...]:
         """
         Generates a unique cache key for the model instance.
 
@@ -500,8 +498,6 @@ class BaseModelType(ABC):
         Compatible to `create_model_key_from_raw_mapping` when `allow_missing_and_none=False`.
 
         Kwargs:
-            used_fields (Sequence[str]):
-                Fields or columns used for the model key. Order is important. `None` uses pkcolumns. Defaults to `None`.
             allow_missing_and_none (bool): Missing keys are replaced with `None` and `None` values are allowed.
 
         Returns:
@@ -525,8 +521,8 @@ class BaseModelType(ABC):
         Returns:
             tuple: A tuple representing the unique key for the model instance.
         """
-        pk_key_list: list[Any] = [cls.__name__]
+        key_list: list[Any] = [cls.__name__]
         for attr in cls.pkcolumns:
             # Append the primary key value from the row to the key list.
-            pk_key_list.append(str(mapping[f"{prefix}{attr}"]))
-        return tuple(pk_key_list)
+            key_list.append(str(mapping[f"{prefix}{attr}"]))
+        return tuple(key_list)

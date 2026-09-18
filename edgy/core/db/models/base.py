@@ -555,9 +555,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             CURRENT_PHASE.reset(token)
         return validated
 
-    def create_model_key(
-        self, *, used_fields: Sequence[str] | None = None, allow_missing_and_none: bool = False
-    ) -> tuple[Hashable, ...]:
+    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple[Hashable, ...]:
         """
         Generates a unique cache key for the model instance.
 
@@ -567,15 +565,11 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         This key is compatible to `create_model_key_from_raw_mapping` when `allow_missing_and_none=False`.
 
         Kwargs:
-            used_fields (Sequence[str]):
-                Fields or columns used for the model key. Order is important. `None` uses pkcolumns. Defaults to `None`.
             allow_missing_and_none (bool): Missing keys are replaced with `None` and `None` values are allowed.
 
         Returns:
             tuple: A tuple representing the unique cache key for the model instance.
         """
-        if used_fields is None:
-            used_fields = self.pkcolumns
         # Start the key with the model's class name.
         pk_key_list: list[Any] = [type(self).__name__]
         # Iterate over primary key column names and append their string values to the key list.
@@ -583,7 +577,7 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
         token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
         try:
-            for attr in used_fields:
+            for attr in self.pkcolumns:
                 field = self.meta.fields.get(attr)
                 try:
                     if field is not None:

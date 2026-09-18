@@ -113,12 +113,17 @@ class QueryCompiler:
         full_field_name = f"{prefix}__{field_name}" if prefix else field_name
         # special handle embeddings, we require the pkcolumns, so include them
         if prefix and prefix in qs._select_related_embedding:
+            # we need to allowlist the primary columns (prefetch anchoring) so just select all pks
+            # most probably get_related_column_keys will not lead to new insights
+            if column_key in model_class.pkcolumns:
+                return True
             splitted = prefix.rsplit("__", 1)
             if len(splitted) == 2:
                 parent_model_path, parent_field_name = splitted
             else:
                 parent_model_path, parent_field_name = "", splitted[0]
             parent_model = tables_and_models[parent_model_path][1]
+            # allowlist columns used for the fk
             if column_key in get_related_column_keys(parent_model.meta.fields[parent_field_name]):
                 return True
 
@@ -126,8 +131,8 @@ class QueryCompiler:
         if qs._only and full_field_name not in qs._only:
             return False
 
-        # After only, so we know it is either in only or in select_related
-        # Check that _only is populated
+        # After only, so we know full_field_name is either emitted from only or from select_related
+        # Check that when _only is populated the prefix is also in select_related
         if prefix and qs._only and prefix not in qs._select_related:
             # not selected, leftovers from order by,
             return False

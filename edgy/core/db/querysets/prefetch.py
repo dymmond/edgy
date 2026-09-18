@@ -3,17 +3,16 @@ from __future__ import annotations
 import asyncio
 import warnings
 from collections import defaultdict
-from collections.abc import Hashable, Iterable, Mapping, Sequence
+from collections.abc import Hashable, Iterable, Mapping
 from functools import cached_property
 from inspect import isclass
 from typing import TYPE_CHECKING, Any, cast
 
 from edgy.core.db.querysets.types import tables_and_models_type
-from edgy.core.db.relationships.utils import crawl_relationship, get_related_column_keys
+from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
-    from edgy.core.db.fields import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.relationships.utils import RelationshipCrawlResult
 
@@ -74,8 +73,10 @@ class Prefetch:
             raise ValueError("`to_attr` cannot be empty.")
         if self.to_attr.startswith("+"):
             raise ValueError("`to_attr` cannot start with multiple `+`.")
-        # Internal flag to indicate if the baking process has been completed.
+        # Internal flag to indicate if the baking process of _bake_without_mapping path has been completed.
         self._baked = False
+        # Internal flag if clauses are set
+        self._bake_without_mapping = False
 
     @cached_property
     def _baking_finished(self) -> asyncio.Event:
@@ -103,15 +104,6 @@ class Prefetch:
         Placeholder which raises when not initialized.
         """
         raise QuerySetError("`_reverse_path_to_anchor` not set.")
-
-    @cached_property
-    def _anchor_columns(self) -> Sequence[str]:
-        """
-        Holds the anchor columns
-
-        Placeholder which raises when not initialized.
-        """
-        raise QuerySetError("`_anchor_columns` not set.")
 
     @cached_property
     def _baked_results(self) -> dict[tuple[Hashable, ...], list[Any]]:
@@ -156,27 +148,6 @@ class Prefetch:
             raise QuerySetError(
                 f"Conflicting attribute to_attr='{attr_name}' for related_name=`{self.related_name}` "
                 f"on {model.__name__}"
-            )
-
-    def _anchor_crawl_fn(
-        self,
-        field: BaseFieldType | None,
-        operator: str | None,
-        field_name: str,
-        model_class: type[BaseModelType],
-        **kwargs: Any,
-    ) -> None:
-        """For use with the anchor crawl."""
-        # last execution
-        if operator is not None:
-            if field_name or operator:
-                raise QuerySetError(
-                    detail=f"`from_anchor` path points to a non-relation field: `{field_name}`."
-                )
-            self._anchor_columns = (
-                sorted(get_related_column_keys(field))
-                if field is not None
-                else model_class.pkcolumns
             )
 
     def _generate_select_related_pathes(self, queryset: QuerySet) -> Iterable[str]:
@@ -229,13 +200,15 @@ class Prefetch:
         clauses = [
             {
                 f"{self._reverse_path_to_anchor}__{pkcol}": mapping[f"{row_prefix}{pkcol}"]
-                for pkcol in self._anchor_columns
+                for pkcol in self._anchor.model_class.pkcolumns
             }
             for mapping in mappings
         ]
         self.queryset = self.queryset.local_or(*clauses)
+        # can bake without extra_mapping
+        self._bake_without_mapping = True
 
-    async def _init_bake(self) -> None:
+    async def _init_bake(self, mapping: Mapping | None = None) -> None:
         """
         (Internal method) Initializes the baking process for prefetching related objects.
 
@@ -252,11 +225,22 @@ class Prefetch:
         anchor_model = self._anchor.model_class
         qs = self.queryset
         assert qs is not None, "`queryset` not initialized"
-        # If already baking check event.
-        if self._baked:
-            await self._baking_finished.wait()
-            return
-        self._baked = True
+        assert self._bake_without_mapping == (mapping is None), "Wrong baking path used"
+        if mapping is None:
+            # only true if clauses are set
+            if not self._bake_without_mapping:
+                return
+            # If already baking check event.
+            if self._baked:
+                await self._baking_finished.wait()
+                return
+            self._baked = True
+        else:
+            clauses = {
+                f"{self._reverse_path_to_anchor}__{pkcol}": mapping[pkcol]
+                for pkcol in anchor_model.pkcolumns
+            }
+            qs = qs.filter(**clauses)
         # Execute the queryset and asynchronously iterate over the results.
         # The `True` argument for `_execute_iterate` ensures all results are
         # fetched at once for processing.
@@ -279,7 +263,8 @@ class Prefetch:
             # Append the prefetched result to the list associated with its model key.
             result_dict[model_key].append(result)
         self._baked_results.update(result_dict)
-        self._baking_finished.set()
+        if mapping is None:
+            self._baking_finished.set()
 
 
 def check_prefetch_collision(
