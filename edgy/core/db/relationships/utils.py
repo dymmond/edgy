@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Container
+from collections.abc import Collection
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal, cast
 from warnings import warn
@@ -113,6 +113,7 @@ def crawl_relationship(
                               also be traversed as a relationship. This is useful
                               for scenarios where the final segment is itself
                               a relationship. Defaults to False.
+        allow_crossing_db (bool): If True, the databases can be crossed.
 
     Returns:
         RelationshipCrawlResult: A NamedTuple containing the details of the
@@ -224,8 +225,20 @@ def crawl_relationship(
             operator = ""
             break
 
-    # Handle the last segment if traverse_last is True and the last field was a RelationshipField.
-    if traverse_last and isinstance(field, RelationshipField):
+    # Check for cross-database relationships of the last field.
+    if isinstance(field, RelationshipField) and field.is_cross_db(model_database):
+        # If it's a cross-DB relationship record the remainder.
+        if not cross_db_remainder:
+            cross_db_remainder = path
+        last_cross_db_remainder = path
+
+    # Handle the last segment if traverse_last is True and the last field was a RelationshipField and
+    # we can cross the db.
+    if (
+        traverse_last
+        and isinstance(field, RelationshipField)
+        and (not cross_db_remainder or allow_crossing_db)
+    ):
         model_class, reverse_part, path = field.traverse_field(path)
         # either field name alone if prefix path is empty or concatenated
         forward_prefix_path = (
@@ -273,7 +286,7 @@ def crawl_relationship(
     )
 
 
-def get_related_column_keys(field: BaseFieldType) -> Container[str]:
+def get_related_column_keys(field: BaseFieldType) -> Collection[str]:
     """Return for a relation field the related columns. M2M relations are expanded."""
     owner_meta = field.owner.meta
     # try to pollute less the utils room, so check the information via meta

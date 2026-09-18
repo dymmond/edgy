@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import warnings
 from collections import defaultdict
-from collections.abc import Container, Hashable, Iterable, Mapping
+from collections.abc import Hashable, Iterable, Mapping, Sequence
 from functools import cached_property
 from inspect import isclass
 from typing import TYPE_CHECKING, Any, cast
@@ -105,7 +105,7 @@ class Prefetch:
         raise QuerySetError("`_reverse_path_to_anchor` not set.")
 
     @cached_property
-    def _anchor_columns(self) -> Container[str]:
+    def _anchor_columns(self) -> Sequence[str]:
         """
         Holds the anchor columns
 
@@ -174,13 +174,16 @@ class Prefetch:
                     detail=f"`from_anchor` path points to a non-relation field: `{field_name}`."
                 )
             self._anchor_columns = (
-                get_related_column_keys(field) if field is not None else model_class.pkcolumns
+                sorted(get_related_column_keys(field))
+                if field is not None
+                else model_class.pkcolumns
             )
 
     def _generate_select_related_pathes(self, queryset: QuerySet) -> Iterable[str]:
         """Generate pathes for select related."""
         pathes: set[str] = set()
         anchor_forward_path = self.from_anchor.rsplit("__", 1)[0]
+
         if anchor_forward_path:
             crawl_result = crawl_relationship(
                 queryset.model_class,
@@ -188,10 +191,13 @@ class Prefetch:
                 model_database=queryset.database,
                 embed_parent=queryset.embed_parent_filters,
                 traverse_last=True,
+                allow_crossing_db=False,
             )
-            if crawl_result.field_name:
+            # for cross db requests this is okay
+            if crawl_result.field_name and not crawl_result.cross_db_remainder:
                 raise ValueError(
-                    f"Should not find a field name: `{crawl_result.field_name}`, should be a path to a model."
+                    f"Should not find a field name: `{crawl_result.field_name}` on `{crawl_result.model_class}`, "
+                    "should be a path to a model."
                 )
             if crawl_result.forward_path:
                 pathes.add(crawl_result.forward_path)
@@ -201,8 +207,10 @@ class Prefetch:
                 self.to_attr,
                 model_database=queryset.database,
                 embed_parent=queryset.embed_parent_filters,
+                allow_crossing_db=True,
             )
-            if crawl_result.forward_path:
+            # for cross db requests this is okay
+            if crawl_result.field_name and not crawl_result.cross_db_remainder:
                 pathes.add(crawl_result.forward_path)
         return pathes
 
