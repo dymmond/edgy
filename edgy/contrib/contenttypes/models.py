@@ -30,10 +30,11 @@ class ContentType(edgy.Model, metaclass=ContentTypeMeta):
 
     async def get_instance(self) -> edgy.Model:
         reverse_name = f"reverse_{self.name.lower()}"
-        queryset = cast("QuerySet[edgy.Model]", getattr(self, reverse_name)).using(
-            schema=self.schema_name
+        return (
+            await cast("QuerySet[edgy.Model]", getattr(self, reverse_name))
+            .using(schema=self.schema_name)
+            .get()
         )
-        return await queryset.get()
 
     async def raw_delete(
         self, *, skip_post_delete_hooks: bool, remove_referenced_call: bool | str

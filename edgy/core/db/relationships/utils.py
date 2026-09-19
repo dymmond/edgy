@@ -225,8 +225,13 @@ def crawl_relationship(
             operator = ""
             break
 
-    # Check for cross-database relationships of the last field.
-    if isinstance(field, RelationshipField) and field.is_cross_db(model_database):
+    # Check for cross-database relationships of the last field if traverse_last true.
+    # Otherwise we are not supposed to look up the information as we end with the field which is in the same db
+    if (
+        traverse_last
+        and isinstance(field, RelationshipField)
+        and field.is_cross_db(model_database)
+    ):
         # If it's a cross-DB relationship record the remainder.
         if not cross_db_remainder:
             cross_db_remainder = path
