@@ -25,6 +25,7 @@
 - `crawl_relationship` has now a better error when a field does not exist.
 - Unpacking and accessing `CrawlResult` (the result of `crawl_relationship`) is now deprecated. Use the results attributes instead.
 - `select_related` has now a sparse mode, which will become the default in future. It doesn't select all columns on the intermediate paths but only the ones required for traversal.
+- Unpacking `RelationshipCrawlResult` like a tuple is deprecated now. Access attributes directly.
 
 ### Fixed
 
