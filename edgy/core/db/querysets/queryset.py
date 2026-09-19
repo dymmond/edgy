@@ -243,7 +243,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
         | dict[str, Any]
-        | QuerySet,
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -292,7 +292,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
         | dict[str, Any]
-        | QuerySet,
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -318,7 +318,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
         | dict[str, Any]
-        | QuerySet,
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -372,7 +372,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
         | dict[str, Any]
-        | QuerySet,
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -398,7 +398,7 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
             | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
         ]
         | dict[str, Any]
-        | QuerySet,
+        | QuerySetType,
         **kwargs: Any,
     ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -436,8 +436,8 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
 
     def extra_select(
         self,
-        *extra: sqlalchemy.ColumnClause,
-    ) -> QuerySetType:
+        *extra: sqlalchemy.ClauseElement,
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Adds extra columns or expressions to the SELECT statement.
 

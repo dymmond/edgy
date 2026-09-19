@@ -44,6 +44,9 @@ To make the [Prefetch](#prefetch) work properly some parameters are needed to ma
 * **queryset** (Optional) - Additional queryset for the type of query being made.
 * **from_anchor** (Optional) - Change anchor for `related_name` and `to_attr` (for the later only when prefixed with `+`). This must be a path to a model, also traversing with `__`. Defaults to `""` (the current model).
 
+!!! Warning
+    Prefetches are not affected by `update_embed_parent` updates. They resolve paths like `QuerySet.filter`.
+
 ### Special attention
 
 This means, imagine you have the following:

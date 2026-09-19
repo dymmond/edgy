@@ -532,7 +532,7 @@ class BaseQuerySet(
                 | Awaitable[sqlalchemy.sql.expression.BinaryExpression],
             ]
             | dict[str, Any]
-            | QuerySet
+            | QuerySetType
         ],
         exclude: bool = False,
         or_: bool = False,

@@ -78,7 +78,7 @@ async def test_prefetch_crossdb_pivot(target_prefix: str):
     assert company.studio is not None
     assert company.studio.album is not None
 
-    companies = await Company.query.prefetch_related(
+    companies = await Company.query.order_by("id").prefetch_related(
         edgy.Prefetch(
             to_attr=f"{target_prefix}sorted_tracks",
             queryset=Track.query.order_by("-position"),
@@ -110,7 +110,7 @@ async def test_prefetch_crossdb_mid():
     stud.primary_company = comp
     await stud.save()
 
-    studios = await Studio.query.prefetch_related(
+    studios = await Studio.query.order_by("id").prefetch_related(
         edgy.Prefetch(
             to_attr="primary_company__sorted_tracks",
             queryset=Track.query.order_by("-position"),
