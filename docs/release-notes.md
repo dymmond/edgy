@@ -26,6 +26,7 @@
 - Unpacking and accessing `CrawlResult` (the result of `crawl_relationship`) is now deprecated. Use the results attributes instead.
 - `select_related` has now a sparse mode, which will become the default in future. It doesn't select all columns on the intermediate paths but only the ones required for traversal.
 - Unpacking `RelationshipCrawlResult` like a tuple is deprecated now. Access attributes directly.
+- When querying selected instances are proxy models and may not contain every value (except when selected). This disallows checks like `isinstance(user, User)`. Replace it with `user.get_real_class() is User`.
 
 ### Fixed
 
@@ -46,6 +47,7 @@
   In the new sparse mode only the relevant columns for traversing are selected. It will become the default in future.
   A DeprecationWarning will be issued if you are affected.
   Upgrade `select_related("company__user")` to `select_related("company","company__user")` or use the keyword `sparse=False`.
+- When querying selected instances are proxy models and may not contain every value (except when selected). This disallows checks like `isinstance(user, User)`. Replace it with `user.get_real_class() is User`.
 
 ## 0.36.1
 
