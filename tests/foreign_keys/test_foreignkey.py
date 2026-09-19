@@ -279,7 +279,9 @@ async def test_multiple_fk():
     await Member.query.create(team=team, email="e@example.org")
 
     members = (
-        await Member.query.select_related("team__org").filter(team__org__ident="ACME Ltd").all()
+        await Member.query.select_related("team__org", "team", sparse=True)
+        .filter(team__org__ident="ACME Ltd")
+        .all()
     )
     assert len(members) == 4
     for member in members:

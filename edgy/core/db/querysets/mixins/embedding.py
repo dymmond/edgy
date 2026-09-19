@@ -3,11 +3,13 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Mapping, Sequence
 from inspect import isawaitable
+from itertools import chain
 from typing import TYPE_CHECKING, Any, Generic, cast, overload
 
 import sqlalchemy
 
 from edgy.core.db.context_vars import MODEL_GETATTR_BEHAVIOR
+from edgy.core.db.fields.base import RelationshipField
 from edgy.core.db.querysets.prefetch import Prefetch
 from edgy.core.db.querysets.types import EdgyEmbedTarget, EdgyModel, tables_and_models_type
 from edgy.core.db.relationships.utils import crawl_relationship
@@ -16,10 +18,59 @@ from edgy.core.utils.db import get_table_key_or_name
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:  # pragma: no cover
-    from edgy import Model
+    from edgy.core.db.fields.types import BaseFieldType
     from edgy.core.db.models.types import BaseModelType
     from edgy.core.db.querysets.prefetch import Prefetch
     from edgy.core.db.querysets.queryset import QuerySet
+
+
+async def _apply_prefetches_helper(
+    *,
+    instance: BaseModelType,
+    prefetches: Sequence[Prefetch],
+    mapping: Mapping,
+    # if not provided we use row_prefix = "", required for embedding
+    tables_and_models: tables_and_models_type | None,
+    anchor_dict: dict[str, Mapping | None],
+) -> None:
+    """Apply prefetches to a specific model instance."""
+    for related in prefetches:
+        # Check for conflicting names early to prevent unexpected overwrites.
+        related.check_for_collision(model=instance)
+        if related.from_anchor in anchor_dict:
+            anchor_mapping = anchor_dict.get(related.from_anchor)
+            # anchor does not exist
+            if anchor_mapping is None:
+                return
+            # a bit slower because now we have to bake
+            model_key = related._anchor.model_class.create_model_key_from_raw_mapping(
+                mapping=anchor_mapping
+            )
+            await related._init_bake(anchor_mapping)
+        else:
+            row_prefix = (
+                f"{get_table_key_or_name(tables_and_models[related._anchor.forward_path][0])}_"
+                if related._anchor.forward_path and tables_and_models
+                else ""
+            )
+            model_key = related._anchor.model_class.create_model_key_from_raw_mapping(
+                mapping=mapping, prefix=row_prefix
+            )
+        # Ensure it is in the baked results.
+        related._baked_results.setdefault(model_key, [])
+        new_attr_name = related.to_attr.rsplit("__", 1)[-1]
+        object.__setattr__(instance, new_attr_name, list(related._baked_results[model_key]))
+
+
+def _target_crawl_fn(
+    field: BaseFieldType | None,
+    field_name: str,
+    **kwargs: Any,
+) -> None:
+    if field is not None and not isinstance(field, RelationshipField):
+        raise QuerySetError(
+            detail=f"`from_anchor` path points to a non-relation field: `{field_name}`."
+        )
 
 
 class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
@@ -28,86 +79,107 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
     on a QuerySet like `prefetch_related` and `_embed_parent_in_result`.
     """
 
-    def _apply_prefetches_list(
-        self,
-        *,
-        instance: BaseModelType,
-        prefetches: Sequence[Prefetch],
-        mapping: Mapping,
-        prefix: str = "",
-        # if not provided we use row_prefix = "", required for embedding
-        tables_and_models: tables_and_models_type | None = None,
-    ) -> None:
-        """Apply prefetches to a specific model instance."""
-        for related in prefetches:
-            # Check for conflicting names early to prevent unexpected overwrites.
-            related.check_for_collision(model=instance)
-            reduced_prefix = prefix.removesuffix(related._forward_path_to_anchor).removesuffix(
-                "__"
-            )
-            # tables can be alias
-            row_prefix = (
-                f"{get_table_key_or_name(tables_and_models[reduced_prefix][0])}_"
-                if reduced_prefix and tables_and_models
-                else ""
-            )
-            model_key = related._target_model.create_model_key_from_raw_mapping(
-                mapping=mapping, prefix=row_prefix
-            )
-            # Ensure it is in the baked results.
-            related._baked_results.setdefault(model_key, [])
-            new_attr_name = related.to_attr.rsplit("__", 1)[-1]
-            object.__setattr__(instance, new_attr_name, list(related._baked_results[model_key]))
-
-    async def _apply_prefetches_self_and_select_related(
+    async def _apply_prefetches_self_and_related(
         self,
         *,
         instance: EdgyModel,
-        prefetches_dict: dict[str, list[Prefetch]],
+        prepared_prefetches: Sequence[Prefetch],
         mapping: Mapping,
         tables_and_models: tables_and_models_type | None,
-        seen: set[str],
     ) -> None:
-        """Apply prefetches on select related branches."""
+        """Apply prefetches on select related branches.
+
+        This method applies prefetching logic to the current queryset by considering
+        select related relationships and embedding targets. It handles fetching related
+        data concurrently and embedding parents in the result set.
+
+        Args:
+            instance: The current EdgyModel instance.
+            prepared_prefetches: A Sequence of prepared Prefetch objects.
+            mapping: The mapping object used for database operations.
+            tables_and_models: Optional tables and models information.
+
+        Returns:
+            None
+        """
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
-        token = MODEL_GETATTR_BEHAVIOR.set("passdown")
+        seen: set[str] = set()
+        target_dict: dict[str, list[Prefetch]] = {}
+        anchor_dict: dict[str, Mapping | None] = {}
+        for prefetch in prepared_prefetches:
+            target_dict.setdefault(
+                prefetch.to_attr.rsplit("__", 1)[0] if "__" in prefetch.to_attr else "", []
+            ).append(prefetch)
+            if prefetch.from_anchor and prefetch._anchor.cross_db_remainder:
+                anchor_dict[prefetch.from_anchor] = None
+
+        token = MODEL_GETATTR_BEHAVIOR.set("coro")
         try:
-            if "" not in seen and (prefetches_list := prefetches_dict.get("")):
-                seen.add("")
-                await run_concurrently(
-                    [prefetch._init_bake() for prefetch in prefetches_list],
-                    limit=1 if getattr(self_queryset.database, "force_rollback", False) else None,
-                )
-                self._apply_prefetches_list(
-                    instance=instance,
-                    mapping=mapping,
-                    tables_and_models=tables_and_models,
-                    prefetches=prefetches_list,
-                )
-            for path in self_queryset._select_related:
+            # we need to check the prefetches dicts for the select pathes
+            for path in anchor_dict:
                 prefix = ""
-                new_result: BaseModelType | None = instance
+                current_instance: BaseModelType | None | Awaitable[BaseModelType | None] = instance
                 for part in path.split("__"):
                     prefix = f"{prefix}__{part}" if prefix else part
-                    new_result = cast("BaseModelType | None", getattr(new_result, part, None))
-                    if new_result is None:
-                        break
                     if prefix in seen:
                         continue
                     seen.add(prefix)
-                    if prefetches_list := prefetches_dict.get(prefix):
+                    # part is empty when path="" (empty, only main model)
+                    if part:
+                        current_instance = cast(
+                            "BaseModelType | None | Awaitable[BaseModelType | None]",
+                            getattr(current_instance, part, None),
+                        )
+                    if isawaitable(current_instance):
+                        current_instance = await current_instance
+                    if current_instance is None:
+                        break
+                    if prefix in anchor_dict:
+                        # we need the pks of the current instance and can't just select them (different db)
+                        await current_instance.load(only_needed=True)
+                        mapping = current_instance.extract_column_values(
+                            current_instance.extract_db_fields(only=instance.pkcolumns),
+                            instance=current_instance,
+                            phase="",
+                        )
+                        anchor_dict[prefetch.from_anchor] = mapping
+            # reset
+            seen.clear()
+            for path in target_dict:
+                prefix = ""
+                current_instance = instance
+                for part in path.split("__"):
+                    prefix = f"{prefix}__{part}" if prefix else part
+                    if prefix in seen:
+                        continue
+                    seen.add(prefix)
+                    # part is empty when path="" (empty, only main model)
+                    if part:
+                        current_instance = cast(
+                            "BaseModelType | None | Awaitable[BaseModelType | None]",
+                            getattr(current_instance, part, None),
+                        )
+                    if isawaitable(current_instance):
+                        current_instance = await current_instance
+                    if current_instance is None:
+                        break
+                    if prefetches_list := target_dict.get(prefix):
                         await run_concurrently(
-                            [prefetch._init_bake() for prefetch in prefetches_list],
+                            [
+                                prefetch._init_bake()
+                                for prefetch in prefetches_list
+                                if prefetch._bake_without_mapping
+                            ],
                             limit=1
                             if getattr(self_queryset.database, "force_rollback", False)
                             else None,
                         )
-                        self._apply_prefetches_list(
-                            instance=new_result,
-                            prefix=prefix,
+                        await _apply_prefetches_helper(
+                            instance=current_instance,
                             mapping=mapping,
                             tables_and_models=tables_and_models,
                             prefetches=prefetches_list,
+                            anchor_dict=anchor_dict,
                         )
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
@@ -116,23 +188,26 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
     async def _embed_parent_in_result(
         self,
         result: None,
+        *,
+        prepared_prefetches: Sequence[Prefetch] | None = None,
         mapping: Mapping | None = None,
-        prefetches_dict: dict[str, list[Prefetch]] | None = None,
         tables_and_models: tables_and_models_type | None = None,
     ) -> tuple[None, None]: ...
     @overload
     async def _embed_parent_in_result(
         self,
         result: EdgyModel | Awaitable[EdgyModel],
+        *,
+        prepared_prefetches: Sequence[Prefetch] | None = None,
         mapping: Mapping | None = None,
-        prefetches_dict: dict[str, list[Prefetch]] | None = None,
         tables_and_models: tables_and_models_type | None = None,
     ) -> tuple[EdgyModel, EdgyEmbedTarget]: ...
     async def _embed_parent_in_result(
         self,
         result: EdgyModel | Awaitable[EdgyModel] | None,
+        *,
+        prepared_prefetches: Sequence[Prefetch] | None = None,
         mapping: Mapping | None = None,
-        prefetches_dict: dict[str, list[Prefetch]] | None = None,
         tables_and_models: tables_and_models_type | None = None,
     ) -> tuple[EdgyModel, EdgyEmbedTarget] | tuple[None, None]:
         """
@@ -143,14 +218,25 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             result = await result
         if result is None:
             return None, None
-        seen_prefixes: set[str] = set()
-        if mapping is not None and prefetches_dict:
-            await self._apply_prefetches_self_and_select_related(
-                instance=result,
-                prefetches_dict=prefetches_dict,
+        if mapping is not None and prepared_prefetches:
+            if tables_and_models is None:
+                tables_and_models = (await self_queryset.as_select_with_tables())[1]
+            # apply embedding
+            prefetched_instance = result
+            if self_queryset.embed_parent_filters and self_queryset.embed_parent_filters[0]:
+                token = MODEL_GETATTR_BEHAVIOR.set("coro")
+                try:
+                    for part in self_queryset.embed_parent_filters[0].split("__"):
+                        prefetched_instance = getattr(prefetched_instance, part)
+                        if isawaitable(prefetched_instance):
+                            prefetched_instance = await prefetched_instance
+                finally:
+                    MODEL_GETATTR_BEHAVIOR.reset(token)
+            await self._apply_prefetches_self_and_related(
+                instance=prefetched_instance,
+                prepared_prefetches=prepared_prefetches,
                 mapping=mapping,
                 tables_and_models=tables_and_models,
-                seen=seen_prefixes,
             )
         if not self_queryset.embed_parent:
             return result, cast("EdgyEmbedTarget", result)
@@ -163,29 +249,16 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 new_result = getattr(new_result, part)
                 if isawaitable(new_result):
                     new_result = await new_result
-                # if (
-                #     tables_and_models is not None
-                #     and mapping is not None
-                #     and prefix not in seen_prefixes
-                #     and prefetches_dict
-                #     and (prefetches_list := prefetches_dict.get(prefix))
-                # ):
-                #     await self._apply_prefetches_list(
-                #         instance=new_result,
-                #         mapping=mapping,
-                #         prefetches=prefetches_list,
-                #         # not in select related, don't provide prefix
-                #     )
-                # seen_prefixes.add(prefix)
         finally:
             MODEL_GETATTR_BEHAVIOR.reset(token)
         if self_queryset.embed_parent[1]:
-            setattr(new_result, self_queryset.embed_parent[1], result)
+            # this works also on strict models
+            object.__setattr__(new_result, self_queryset.embed_parent[1], result)
         return result, new_result
 
     def _prepare_prefetches_for_rows(
-        self, rows: Sequence[sqlalchemy.Row], tables_and_models: tables_and_models_type
-    ) -> dict[str, list[Prefetch]]:
+        self, *, rows: Sequence[sqlalchemy.Row], tables_and_models: tables_and_models_type
+    ) -> Sequence[Prefetch]:
         """
         Builds the Prefetch objects for a given batch of results.
         This is the *prefetch building* half of the original _handle_batch.
@@ -202,12 +275,11 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
             QuerySetError: If a prefetch path is invalid (e.g., unidirectional).
         """
         self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
-        prepared_prefetches: dict[str, list[Prefetch]] = {}
-        seen_prefetches: set[tuple[None | int, str, str, str]] = set()
+        prepared_prefetches: dict[str, Prefetch] = {}
+        seen_prefetches: set[tuple[str, str, str]] = set()
 
         for prefetch in self_queryset._prefetch_related:
             compare_tuple = (
-                id(prefetch.queryset) if prefetch.queryset is not None else None,
                 prefetch.related_name,
                 prefetch.from_anchor,
                 prefetch.to_attr,
@@ -216,79 +288,85 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
                 continue
             else:
                 seen_prefetches.add(compare_tuple)
-            target_crawl_result = crawl_relationship(
-                self_queryset.model_class, prefetch.to_attr, allow_crossing_db=True
-            )
-            anchor_crawl_result = crawl_relationship(
-                self_queryset.model_class,
-                prefetch.from_anchor,
-                # allow_crossing_db=True,
-                traverse_last=True,
-            )
-            if anchor_crawl_result.cross_db_remainder:
-                raise NotImplementedError(
-                    "Cannot prefetch from other db yet. Maybe in future this feature will be added."
-                )
-
-            prefetch_crawl_result = crawl_relationship(
-                anchor_crawl_result.model_class, prefetch.related_name, traverse_last=True
-            )
-            if prefetch_crawl_result.cross_db_remainder:
-                raise NotImplementedError(
-                    "Cannot prefetch from other db yet. Maybe in future this feature will be added."
-                )
-            if prefetch_crawl_result.reverse_path is False:
-                raise QuerySetError(
-                    detail=("Creating a reverse path is not possible, unidirectional fields used.")
-                )
-
-            prefetch.check_for_collision(anchor_crawl_result.model_class)
             new_prefetch = Prefetch(
                 related_name=prefetch.related_name,
                 to_attr=prefetch.to_attr,
                 from_anchor=prefetch.from_anchor,
             )
 
-            prefetch_queryset: QuerySet | None = prefetch.queryset
-            row_prefix = (
-                f"{tables_and_models[anchor_crawl_result.forward_path][0].name}_"
-                if anchor_crawl_result.forward_path
-                else ""
+            anchor_crawl_result = crawl_relationship(
+                self_queryset.model_class,
+                prefetch.from_anchor,
+                embed_parent=self_queryset.embed_parent_filters,
+                model_database=self_queryset.database,
+                # allow_crossing_db=True,
+                traverse_last=True,
+                allow_crossing_db=True,
             )
-            clauses = [
-                {
-                    f"{prefetch_crawl_result.reverse_path}__{pkcol}": row._mapping[
-                        f"{row_prefix}{pkcol}"
-                    ]
-                    for pkcol in anchor_crawl_result.model_class.pkcolumns
-                }
-                for row in rows
-            ]
-            if prefetch_queryset is None:
-                prefetch_queryset = prefetch_crawl_result.model_class.query.local_or(*clauses)
-            else:
-                prefetch_queryset = prefetch_queryset.local_or(*clauses)
+            if anchor_crawl_result.field_name or anchor_crawl_result.operator:
+                raise QuerySetError(
+                    detail=f"`from_anchor` path points to a non-relation field: `{anchor_crawl_result.field_name}`."
+                )
+            new_prefetch._anchor = anchor_crawl_result
 
-            prefetch_queryset = prefetch_queryset.select_related(
-                prefetch_crawl_result.reverse_path
+            prefetch_crawl_result = crawl_relationship(
+                anchor_crawl_result.model_class,
+                prefetch.related_name,
+                traverse_last=True,
             )
-            # the assigned queryset has an empty cache
-            new_prefetch.queryset = prefetch_queryset
-            new_prefetch._forward_path_to_anchor = prefetch_crawl_result.forward_path
-            new_prefetch._reverse_path_to_anchor = prefetch_crawl_result.reverse_path
-            if new_prefetch.from_anchor:
-                new_prefetch._forward_path = (
-                    f"{new_prefetch.from_anchor}__{target_crawl_result.forward_path}".removesuffix(
-                        "__"
+            if prefetch_crawl_result.cross_db_remainder:
+                raise QuerySetError(
+                    detail=(
+                        f"The `related_name` crosses from: `{prefetch_crawl_result.forward_path}` the database. "
+                        "Please use an appropiate `anchor_from`."
                     )
                 )
+
+            if prefetch_crawl_result.field_name or prefetch_crawl_result.operator:
+                raise QuerySetError(
+                    detail=f"The `related_name` path points to non-relation field: `{prefetch_crawl_result.field_name}`."
+                )
+            if prefetch_crawl_result.reverse_path is False:
+                raise QuerySetError(
+                    detail=(
+                        "Creating a reverse path from `related_name` is not possible, unidirectional fields were used."
+                    )
+                )
+
+            crawl_relationship(
+                self_queryset.model_class,
+                prefetch.to_attr,
+                traverse_last=True,
+                allow_crossing_db=True,
+                callback_fn=_target_crawl_fn,
+            )
+            prefetch_queryset: QuerySet | None = prefetch.queryset
+            if prefetch_queryset is None:
+                prefetch_queryset = prefetch_crawl_result.model_class.query.all()
             else:
-                new_prefetch._forward_path = target_crawl_result.forward_path
+                prefetch_queryset = prefetch_queryset.all()
+            # just add the resolved path to _select_related_embedding, so get less cruft
+            prefetch_queryset._select_related_embedding.add(prefetch_crawl_result.reverse_path)
+            # the assigned queryset has an empty cache
+            new_prefetch.queryset = prefetch_queryset
+            # now check key if the prefetch configuration is already registered
+            # if yes, raise.
+            if new_prefetch.to_attr in prepared_prefetches:
+                raise QuerySetError(
+                    f"Conflicting prefetches to_attr='{new_prefetch.to_attr}'"
+                    f"'on {prefetch_crawl_result.model_class.__name__}"
+                )
+            # check collision on target model
+            new_prefetch.check_for_collision(prefetch_crawl_result.model_class)
+            new_prefetch._reverse_path_to_anchor = prefetch_crawl_result.reverse_path
             new_prefetch._baking_finished = asyncio.Event()
-            new_prefetch._target_model = cast("type[Model]", target_crawl_result.model_class)
             new_prefetch._baked_results = {}
-            prepared_prefetches.setdefault(new_prefetch._forward_path, []).append(new_prefetch)
-        return prepared_prefetches
+            if not new_prefetch._anchor.cross_db_remainder:
+                new_prefetch._set_clauses_by_mappings(
+                    mappings=(row._mapping for row in rows), tables_and_models=tables_and_models
+                )
+            prepared_prefetches[new_prefetch.to_attr] = new_prefetch
+        return list(prepared_prefetches.values())
 
     def prefetch_related(self, *prefetch: Prefetch) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
@@ -327,4 +405,80 @@ class EmbeddingMixin(Generic[EdgyModel, EdgyEmbedTarget]):
 
         # Append the new prefetch objects to the queryset's internal list.
         queryset._prefetch_related = [*self_queryset._prefetch_related, *prefetch]
+        select_pathes: set[str] = set()
+        # this one extra doesn't matter much from performance perspective, is maybe even cheaper
+        if queryset.embed_parent and queryset.embed_parent[0]:
+            # can be cross db, so only add the first expanded part
+            crawl_result = crawl_relationship(
+                queryset.model_class,
+                queryset.embed_parent[0],
+                model_database=queryset.database,
+                traverse_last=True,
+            )
+            select_pathes.add(crawl_result.forward_path)
+        # now add the forward pathes, we need to resolve them because embed_parent is resolved
+        select_pathes.update(
+            *(
+                prefetch._generate_select_related_pathes(queryset)
+                for prefetch in queryset._prefetch_related
+            )
+        )
+        # they are sanitized and analyzed later in _update_select_related_weak
+        queryset._update_select_related_weak(
+            select_pathes, cache_name="_select_related_embedding", clear=True
+        )
+        return queryset
+
+    @overload
+    def update_embed_parent(self, embed_parent: None) -> QuerySet[EdgyModel, EdgyModel]: ...
+    @overload
+    def update_embed_parent(
+        self, embed_parent: tuple[str, str]
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]: ...
+    def update_embed_parent(
+        self, embed_parent: tuple[str, str] | None
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget] | QuerySet[EdgyModel, EdgyModel]:
+        """
+        Update or remove (provide None) embed_parent applied on instances.
+        Note: this doesn't affect embed_parent for filters.
+
+        Args:
+            embed_parent: define the new embed_parent.
+        Returns:
+            QuerySetType: A new QuerySet instance with the new embedding.
+        """
+        self_queryset = cast("QuerySet[EdgyModel, EdgyEmbedTarget]", self)
+        queryset = self_queryset._clone()
+        queryset.embed_parent = embed_parent
+        select_pathes: set[str] = set()
+        if queryset.embed_parent and queryset.embed_parent[0]:
+            # can be cross db, so only add the first expanded part
+            crawl_result = crawl_relationship(
+                queryset.model_class,
+                queryset.embed_parent[0],
+                model_database=queryset.database,
+                traverse_last=True,
+            )
+            select_pathes.add(crawl_result.forward_path)
+
+        if (
+            queryset._update_select_related_weak(
+                select_pathes,
+                cache_name="_select_related_embedding",
+                clear=True,
+            )
+            and queryset._prefetch_related
+        ):
+            # regenerate prefetch pathes
+
+            queryset._update_select_related_weak(
+                chain(
+                    *(
+                        prefetch._generate_select_related_pathes(queryset)
+                        for prefetch in queryset._prefetch_related
+                    )
+                ),
+                cache_name="_select_related_embedding",
+                clear=False,
+            )
         return queryset

@@ -555,6 +555,64 @@ class EdgyBaseModel(BaseModel, BaseModelType):
             CURRENT_PHASE.reset(token)
         return validated
 
+    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple[Hashable, ...]:
+        """
+        Generates a unique cache key for the model instance.
+
+        The key is composed of the model's class name and the string representation
+        of its primary key column values. This key can be used for caching model
+        instances to improve performance.
+        This key is compatible to `create_model_key_from_raw_mapping` when `allow_missing_and_none=False`.
+
+        Kwargs:
+            allow_missing_and_none (bool): Missing keys are replaced with `None` and `None` values are allowed.
+
+        Returns:
+            tuple: A tuple representing the unique cache key for the model instance.
+        """
+        # Start the key with the model's class name.
+        pk_key_list: list[Any] = [type(self).__name__]
+        # Iterate over primary key column names and append their string values to the key list.
+        # Note: `pkcolumns` contains column names, not column objects.
+        field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
+        token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
+        try:
+            for attr in self.pkcolumns:
+                field = self.meta.fields.get(attr)
+                try:
+                    if field is not None:
+                        # this handles e.g. fks and composite keys properly
+                        field_dict.clear()
+                        field_dict["field"] = field
+                        # undo field manipulation
+                        for col_name, value in field.clean(
+                            attr, object.__getattribute__(self, attr)
+                        ).items():
+                            # None is invalid
+                            if value is None:
+                                if allow_missing_and_none:
+                                    pk_key_list.append(None)
+                                    continue
+                                else:
+                                    raise AttributeError(f"{col_name} is `None`")
+                            pk_key_list.append(str(value))
+                    else:
+                        value = getattr(self, attr)
+                        # None is invalid
+                        if value is None:
+                            raise AttributeError(f"{attr} is `None`")
+                        pk_key_list.append(str(value))
+                except AttributeError:
+                    if allow_missing_and_none:
+                        pk_key_list.append(None)
+                    else:
+                        raise
+        finally:
+            CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
+        # Convert the list to a tuple to make it hashable for use as a dictionary key.
+        # Raise AttributeError otherwise.
+        return tuple(pk_key_list)
+
     def __setattr__(self, key: str, value: Any) -> None:
         """
         Custom setter for model attributes.
@@ -791,59 +849,3 @@ class EdgyBaseModel(BaseModel, BaseModelType):
         self_tup = self.create_model_key(allow_missing_and_none=True)
         other_tup = other.create_model_key(allow_missing_and_none=True)
         return self_tup == other_tup
-
-    def create_model_key(self, *, allow_missing_and_none: bool = False) -> tuple[Hashable, ...]:
-        """
-        Generates a unique cache key for the model instance.
-
-        The key is composed of the model's class name and the string representation
-        of its primary key column values. This key can be used for caching model
-        instances to improve performance.
-
-        Kwargs:
-            allow_missing_and_none (bool): Missing keys are replaced with `None` and `None` values are allowed.
-
-        Returns:
-            tuple: A tuple representing the unique cache key for the model instance.
-        """
-        # Start the key with the model's class name.
-        pk_key_list: list[Any] = [type(self).__name__]
-        # Iterate over primary key column names and append their string values to the key list.
-        # Note: `pkcolumns` contains column names, not column objects.
-        field_dict: FIELD_CONTEXT_TYPE = cast("FIELD_CONTEXT_TYPE", {})
-        token_field_ctx = CURRENT_FIELD_CONTEXT.set(field_dict)
-        try:
-            for attr in self.pkcolumns:
-                field = self.meta.fields.get(attr)
-                try:
-                    if field is not None:
-                        # this handles e.g. fks and composite keys properly
-                        field_dict.clear()
-                        field_dict["field"] = field
-                        for col_name, value in field.clean(
-                            attr, object.__getattribute__(self, attr)
-                        ).items():
-                            # None is invalid
-                            if value is None:
-                                if allow_missing_and_none:
-                                    pk_key_list.append(None)
-                                    continue
-                                else:
-                                    raise AttributeError(f"{col_name} is `None`")
-                            pk_key_list.append(str(value))
-                    else:
-                        value = getattr(self, attr)
-                        # None is invalid
-                        if value is None:
-                            raise AttributeError(f"{attr} is `None`")
-                        pk_key_list.append(str(value))
-                except AttributeError:
-                    if allow_missing_and_none:
-                        pk_key_list.append(None)
-                    else:
-                        raise
-        finally:
-            CURRENT_FIELD_CONTEXT.reset(token_field_ctx)
-        # Convert the list to a tuple to make it hashable for use as a dictionary key.
-        # Raise AttributeError otherwise.
-        return tuple(pk_key_list)

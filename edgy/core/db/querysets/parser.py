@@ -41,7 +41,9 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
             await self.model_class.from_sqla_row(
                 row=row,
                 tables_and_models=self.tables_and_models,
-                select_related=self.queryset._select_related,
+                select_related=self.queryset._select_related.union(
+                    self.queryset._select_related_embedding
+                ),
                 only_fields=self.queryset._only,
                 is_defer_fields=self.is_defer_fields,
                 exclude_secrets=self.queryset._exclude_secrets,
@@ -56,7 +58,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
         row: sqlalchemy.Row,
     ) -> EdgyModel:
         prepared_prefetches = self.queryset._prepare_prefetches_for_rows(
-            [row], self.tables_and_models
+            rows=[row], tables_and_models=self.tables_and_models
         )
         result = await self._row_to_model_uncached(row)
         if prepared_prefetches:
@@ -64,7 +66,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
                 instance=result,
                 tables_and_models=self.tables_and_models,
                 mapping=row._mapping,
-                prefetches_dict=prepared_prefetches,
+                prepared_prefetches=prepared_prefetches,
                 seen=set(),
             )
         return result
@@ -78,7 +80,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
         (Refactored from _get_or_cache_row)
         """
         prepared_prefetches = self.queryset._prepare_prefetches_for_rows(
-            [row], self.tables_and_models
+            rows=[row], tables_and_models=self.tables_and_models
         )
         result = await self.queryset._cache.aget_or_cache_many(
             self.model_class,
@@ -88,7 +90,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
                 cast("EdgyModel", instance),
                 mapping=row._mapping,
                 tables_and_models=self.tables_and_models,
-                prefetches_dict=prepared_prefetches,
+                prepared_prefetches=prepared_prefetches,
             ),
         )
         return cast(tuple[EdgyModel, EdgyEmbedTarget], result[0])
@@ -103,7 +105,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
         (This is the parsing half of the original _handle_batch method)
         """
         prepared_prefetches = self.queryset._prepare_prefetches_for_rows(
-            batch, self.tables_and_models
+            rows=batch, tables_and_models=self.tables_and_models
         )
         return await new_cache.aget_or_cache_many(
             self.model_class,
@@ -111,7 +113,9 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
             cache_fn=lambda row: self.model_class.from_sqla_row(
                 row=row,
                 tables_and_models=self.tables_and_models,
-                select_related=self.queryset._select_related,
+                select_related=self.queryset._select_related.union(
+                    self.queryset._select_related_embedding
+                ),
                 only_fields=self.queryset._only,
                 is_defer_fields=self.is_defer_fields,
                 exclude_secrets=self.queryset._exclude_secrets,
@@ -123,7 +127,7 @@ class ResultParser(Generic[EdgyModel, EdgyEmbedTarget]):
                 cast("EdgyModel", instance),
                 mapping=batch[pos]._mapping,
                 tables_and_models=self.tables_and_models,
-                prefetches_dict=prepared_prefetches,
+                prepared_prefetches=prepared_prefetches,
             ),
             old_cache=self.queryset._cache,
         )

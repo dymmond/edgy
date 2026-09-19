@@ -199,7 +199,7 @@ async def test_many_to_many_many_fields():
     total_albums = await studio.albums.all()
 
     assert len(total_users) == 3
-    assert isinstance(total_users[0], User)
+    assert total_users[0].get_real_class() is User
     assert total_users[0].pk == user1.pk
     assert total_users[1].pk == user2.pk
     assert total_users[2].pk == user3.pk
@@ -217,9 +217,9 @@ async def test_many_to_many_many_fields():
     total_tracks_album3 = await album3.tracks.all()
     assert len(total_tracks_album3) == 1
     assert total_tracks_album3[0].pk == track3.pk
-    # deep select_related
+    # deep select_related but doesn't matter because nowhere reachable
     albums = await Album.query.filter(id=album1.id).select_related(
-        "album_studioalbums_set__studio"
+        "album_studioalbums_set__studio", sparse=True
     )
     assert albums[0]._db_loaded_or_deleted
 

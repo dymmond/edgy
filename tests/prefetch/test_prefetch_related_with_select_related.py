@@ -58,7 +58,7 @@ async def test_prefetch_related():
     await Track.query.create(album=fantasies, title="Satellite Mind", position=3)
 
     track = await Track.query.prefetch_related(
-        Prefetch(related_name="tracks_set", to_attr="albums", queryset=Album.query.filter())
+        Prefetch(related_name="album", to_attr="albums", queryset=Album.query.filter())
     ).get(title="The Bird")
 
     assert track.album.pk == 1
@@ -80,7 +80,7 @@ async def test_prefetch_related_with_select_related():
     track = (
         await Track.query.select_related("album")
         .prefetch_related(
-            Prefetch(related_name="tracks_set", to_attr="albums", queryset=Album.query.filter())
+            Prefetch(related_name="album", to_attr="albums", queryset=Album.query.filter())
         )
         .get(title="The Bird")
     )
@@ -88,6 +88,18 @@ async def test_prefetch_related_with_select_related():
     assert track.album.name == "Malibu"
     assert len(track.albums) == 1
     assert track.albums[0].name == "Malibu"
+
+    track = (
+        await Track.query.select_related("album")
+        .prefetch_related(
+            Prefetch(related_name="album", to_attr="album__albums", queryset=Album.query.filter())
+        )
+        .get(title="The Bird")
+    )
+
+    assert track.album.name == "Malibu"
+    assert len(track.album.albums) == 1
+    assert track.album.albums[0].name == "Malibu"
 
 
 async def test_prefetch_related_with_select_related_return_multiple():
@@ -99,7 +111,7 @@ async def test_prefetch_related_with_select_related_return_multiple():
     tracks = (
         await Track.query.select_related("album")
         .prefetch_related(
-            Prefetch(related_name="tracks_set", to_attr="albums", queryset=Album.query.filter())
+            Prefetch(related_name="album", to_attr="albums", queryset=Album.query.filter())
         )
         .filter(title="The Bird")
     )
@@ -116,7 +128,7 @@ async def test_prefetch_related_with_select_related_return_none():
     tracks = (
         await Track.query.select_related("album")
         .prefetch_related(
-            Prefetch(related_name="tracks_set", to_attr="albums", queryset=Album.query.filter())
+            Prefetch(related_name="album", to_attr="albums", queryset=Album.query.filter())
         )
         .filter(album__id=2)
     )

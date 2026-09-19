@@ -672,11 +672,10 @@ class BaseForeignKeyField(BaseForeignKey):
                 key=fkcolumn_name,
                 type_=related_column.type,  # Inherit type from the related column.
                 name=self.get_fk_column_name(name, related_column.name),  # DB column name.
-                primary_key=self.primary_key,  # Inherit primary key status.
+                primary_key=self.primary_key,  # Add to pk
                 autoincrement=False,  # FKs cannot autoincrement.
                 # Nullability is OR of related column's nullability and field's nullability.
                 nullable=related_column.nullable or nullable,
-                unique=related_column.unique,  # Inherit uniqueness.
             )
             columns.append(fkcolumn)
         return columns

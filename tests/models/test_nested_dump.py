@@ -59,7 +59,7 @@ async def test_nested_defer():
     )
     await Organisation.query.create(user=user)
 
-    org_query = Organisation.query.select_related("user__profile").defer("name")
+    org_query = Organisation.query.select_related("user__profile", sparse=False).defer("name")
     org = await org_query.last()
 
     assert org.model_dump() == {
@@ -79,7 +79,9 @@ async def test_nested_exclude_secret():
     )
     await Organisation.query.create(user=user)
 
-    org_query = Organisation.query.select_related("user__profile").exclude_secrets(True)
+    org_query = Organisation.query.select_related("user__profile", sparse=False).exclude_secrets(
+        True
+    )
     org = await org_query.last()
 
     assert org.model_dump() == {

@@ -3,16 +3,18 @@ from __future__ import annotations
 import asyncio
 import warnings
 from collections import defaultdict
-from collections.abc import Hashable
+from collections.abc import Hashable, Iterable, Mapping
 from functools import cached_property
 from inspect import isclass
 from typing import TYPE_CHECKING, Any, cast
 
+from edgy.core.db.querysets.types import tables_and_models_type
+from edgy.core.db.relationships.utils import crawl_relationship
 from edgy.exceptions import QuerySetError
 
 if TYPE_CHECKING:
-    from edgy.core.db.models.model import Model
     from edgy.core.db.models.types import BaseModelType
+    from edgy.core.db.relationships.utils import RelationshipCrawlResult
 
     from .queryset import QuerySet
 
@@ -59,23 +61,22 @@ class Prefetch:
         if args:
             warnings.warn("`Prefetch` is now keyword-only.", DeprecationWarning, stacklevel=2)
             self.related_name = args[0]
-            self.to_attr = args[1]
+            to_attr = args[1]
         else:
             self.related_name = related_name
-            self.to_attr = to_attr
         self.queryset: QuerySet | None = queryset
         self.from_anchor = from_anchor or ""
-        # Internal flag to indicate if the baking process has been completed.
+        if to_attr.startswith("+"):
+            to_attr = f"{from_anchor}__{to_attr[1:]}" if from_anchor else to_attr
+        self.to_attr: str = to_attr
+        if not self.to_attr:
+            raise ValueError("`to_attr` cannot be empty.")
+        if self.to_attr.startswith("+"):
+            raise ValueError("`to_attr` cannot start with multiple `+`.")
+        # Internal flag to indicate if the baking process of _bake_without_mapping path has been completed.
         self._baked = False
-
-    @cached_property
-    def _forward_path(self) -> str:
-        """
-        Forward path for matching.
-
-        Placeholder which raises when not initialized.
-        """
-        raise QuerySetError("`_forward_path` not set.")
+        # Internal flag if clauses are set
+        self._bake_without_mapping = False
 
     @cached_property
     def _baking_finished(self) -> asyncio.Event:
@@ -87,13 +88,13 @@ class Prefetch:
         raise QuerySetError("`_baking_finished` not set.")
 
     @cached_property
-    def _forward_path_to_anchor(self) -> str:
+    def _anchor(self) -> RelationshipCrawlResult:
         """
-        Maps back to anchor model.
+        Maps back to anchor crawl result.
 
         Placeholder which raises when not initialized.
         """
-        raise QuerySetError("`_forward_path_to_anchor` not set.")
+        raise QuerySetError("`_anchor` not set.")
 
     @cached_property
     def _reverse_path_to_anchor(self) -> str:
@@ -103,15 +104,6 @@ class Prefetch:
         Placeholder which raises when not initialized.
         """
         raise QuerySetError("`_reverse_path_to_anchor` not set.")
-
-    @cached_property
-    def _target_model(self) -> type[Model]:
-        """
-        Holds origin model (source model, where prefetches are attached).
-
-        Placeholder which raises when not initialized.
-        """
-        raise QuerySetError("`_target_model` not set.")
 
     @cached_property
     def _baked_results(self) -> dict[tuple[Hashable, ...], list[Any]]:
@@ -155,10 +147,68 @@ class Prefetch:
                 model = cast("type[BaseModelType]", type(model))
             raise QuerySetError(
                 f"Conflicting attribute to_attr='{attr_name}' for related_name=`{self.related_name}` "
-                f"'in {model.__name__}"
+                f"on {model.__name__}"
             )
 
-    async def _init_bake(self) -> None:
+    def _generate_select_related_pathes(self, queryset: QuerySet) -> Iterable[str]:
+        """Generate pathes for select related."""
+        pathes: set[str] = set()
+        anchor_forward_path = self.from_anchor.rsplit("__", 1)[0]
+
+        if anchor_forward_path:
+            crawl_result = crawl_relationship(
+                queryset.model_class,
+                anchor_forward_path,
+                model_database=queryset.database,
+                embed_parent=queryset.embed_parent_filters,
+                traverse_last=True,
+                allow_crossing_db=False,
+            )
+            # for cross db requests this is okay
+            if crawl_result.field_name and not crawl_result.cross_db_remainder:
+                raise ValueError(
+                    f"Should not find a field name: `{crawl_result.field_name}` on `{crawl_result.model_class}`, "
+                    "should be a path to a model."
+                )
+            if crawl_result.forward_path:
+                pathes.add(crawl_result.forward_path)
+        if "__" in self.to_attr:
+            crawl_result = crawl_relationship(
+                queryset.model_class,
+                self.to_attr,
+                model_database=queryset.database,
+                embed_parent=queryset.embed_parent_filters,
+                allow_crossing_db=True,
+            )
+            # for cross db requests this is okay
+            if crawl_result.field_name and not crawl_result.cross_db_remainder:
+                pathes.add(crawl_result.forward_path)
+        return pathes
+
+    def _set_clauses_by_mappings(
+        self,
+        *,
+        mappings: Iterable[Mapping],
+        tables_and_models: tables_and_models_type | None = None,
+    ) -> None:
+        assert self.queryset is not None
+        row_prefix = (
+            f"{tables_and_models[self._anchor.forward_path][0].name}_"
+            if self._anchor.forward_path and tables_and_models is not None
+            else ""
+        )
+        clauses = [
+            {
+                f"{self._reverse_path_to_anchor}__{pkcol}": mapping[f"{row_prefix}{pkcol}"]
+                for pkcol in self._anchor.model_class.pkcolumns
+            }
+            for mapping in mappings
+        ]
+        self.queryset = self.queryset.local_or(*clauses)
+        # can bake without extra_mapping
+        self._bake_without_mapping = True
+
+    async def _init_bake(self, mapping: Mapping | None = None) -> None:
         """
         (Internal method) Initializes the baking process for prefetching related objects.
 
@@ -172,14 +222,25 @@ class Prefetch:
         """
         from .executor import QueryExecutor
 
-        target_model = self._target_model
+        anchor_model = self._anchor.model_class
         qs = self.queryset
         assert qs is not None, "`queryset` not initialized"
-        # If already baking check event.
-        if self._baked:
-            await self._baking_finished.wait()
-            return
-        self._baked = True
+        assert self._bake_without_mapping == (mapping is None), "Wrong baking path used"
+        if mapping is None:
+            # only true if clauses are set
+            if not self._bake_without_mapping:
+                return
+            # If already baking check event.
+            if self._baked:
+                await self._baking_finished.wait()
+                return
+            self._baked = True
+        else:
+            clauses = {
+                f"{self._reverse_path_to_anchor}__{pkcol}": mapping[pkcol]
+                for pkcol in anchor_model.pkcolumns
+            }
+            qs = qs.filter(**clauses)
         # Execute the queryset and asynchronously iterate over the results.
         # The `True` argument for `_execute_iterate` ensures all results are
         # fetched at once for processing.
@@ -196,13 +257,14 @@ class Prefetch:
             # Create a unique model key from the current SQLAlchemy row using the
             # specified bake prefix. This key links the prefetched item back to
             # its parent model instance.
-            model_key = target_model.create_model_key_from_raw_mapping(
+            model_key = anchor_model.create_model_key_from_raw_mapping(
                 mapping=executor._current_row._mapping, prefix=bake_prefix
             )
             # Append the prefetched result to the list associated with its model key.
             result_dict[model_key].append(result)
         self._baked_results.update(result_dict)
-        self._baking_finished.set()
+        if mapping is None:
+            self._baking_finished.set()
 
 
 def check_prefetch_collision(
