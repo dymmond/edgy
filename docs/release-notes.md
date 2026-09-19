@@ -8,10 +8,10 @@
 - Allow sub-attributes (select_related) for prefetches as anchor.
 - Allow chaining `to_attr` to anchor by prefixing with `+`.
 - `crawl_relationship` has now a mode to traverse databases.
-- `crawl_relationship` returns now not `exact` as operator, when no `operator` was found but an empty string.
 
 ### Changed
 
+- `crawl_relationship` returns now not `exact` as operator, when no `operator` was found but an empty string.
 - Make Fields, FieldToColumns, FieldToColumnNames and ColumnsRemapping appropriate mappings.
   You can't do the dirty trick anymore testing for a dict.
 - Fix contracts; it was always an error to access the data attribute directly (just inherited from UserDict).
