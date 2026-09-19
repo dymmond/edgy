@@ -113,6 +113,13 @@ class QueryCompiler:
         """
         qs = self.queryset
         full_field_name = f"{prefix}__{field_name}" if prefix else field_name
+        # allow all elements of the select path
+        if full_field_name in select_embedded_parts:
+            return True
+        # order and group fields must be in the select set
+        if full_field_name in self.queryset._select_related_g_and_o:
+            return True
+        # a bit heavy, so check it last
         if prefix:
             splitted = prefix.rsplit("__", 1)
             if len(splitted) == 2:
@@ -133,12 +140,7 @@ class QueryCompiler:
                 parent_model.meta.fields[parent_field_name]
             ):
                 return True
-        # allow all elements of the select path
-        if full_field_name in select_embedded_parts:
-            return True
-        # order and group fields must be in the select set
-        if full_field_name in self.queryset._select_related_g_and_o:
-            return True
+        ################ now rules to reject ################
 
         # Check .only() rules
         if qs._only and full_field_name not in qs._only:
@@ -162,7 +164,7 @@ class QueryCompiler:
         ):
             return False
 
-        # If no rules excluded it, include it
+        ############### default action: select ###############
         return True
 
     def _build_columns(self, tables_and_models: tables_and_models_type) -> list[Any]:
