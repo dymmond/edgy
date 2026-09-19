@@ -47,6 +47,9 @@ To make the [Prefetch](#prefetch) work properly some parameters are needed to ma
 !!! Warning
     Prefetches are not affected by `update_embed_parent` updates. They resolve paths like `QuerySet.filter`.
 
+!!! Warning
+    Intermediate instances and target instances of `to_attr`, when used with a nested path, have not necessarily all columns selected (they are partial). You might need to issue a select_related to this path (except last field part) too with `sparse=False`.
+
 ### Special attention
 
 This means, imagine you have the following:

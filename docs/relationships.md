@@ -83,6 +83,31 @@ print(profile.user.pk)  # 1
 print(profile.user.email)  # foo@bar.com
 ```
 
+This works also over multiple intermediate instances but be careful:
+
+The intermediate instances traversed will not neccessarily fully loaded in future. This behavior can be changed
+with `sparse=True` (sparse paths) or `sparse=False` (old, current behavior).
+If you want to select the intermediate instances too, then you can provide them too.
+E.g. `select_related("user__company")` becomes `select_related("user__company", "user")`.
+
+Full example:
+
+```python
+profile = await Profile.query.select_related("user__company", sparse=False).get(id=1)
+# is the same as
+profile = await Profile.query.select_related("user", "user__company", sparse=False).get(id=1)
+
+print(profile.user)  # User(id=1)
+print(profile.user.pk)  # 1
+print(profile.user.email)  # foo@bar.com
+
+# but with sparse
+profile = await Profile.query.select_related("user__company", sparse=True).get(id=1)
+assert "email" not in profile.user.__dict__  # but will load eventually with a performance hit
+
+
+```
+
 ### Access Foreign Key Values Directly from the Model
 
 !!! Note

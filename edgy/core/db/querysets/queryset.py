@@ -697,14 +697,24 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
         queryset._defer = set(fields)
         return queryset
 
-    def select_related(self, *related: str) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
+    def select_related(
+        self, *related: str, sparse: bool | None = None
+    ) -> QuerySet[EdgyModel, EdgyEmbedTarget]:
         """
         Returns a QuerySet that will “follow” foreign-key relationships, selecting additional
         related-object data when it executes its query.
 
         This is a performance booster which results in a single more complex query but means
 
-        later use of foreign-key relationships won't require database queries.
+        The later use of foreign-key relationships won't require database queries.
+
+        Args:
+            *related (str): Relationship names to eager load. Supports '__' for nested relationships.
+        Kwargs:
+            sparse (bool): Shall only retrieve the for traversal neccessary columns of intermediate path parts
+                           (new behavior)?
+                           If `False` we retrieve the full columns of intermediate path parts like before.
+                           Defaults currently to `False` but will switch to `True` in future.
         """
         queryset: QuerySet = self._clone()
         if len(related) >= 1 and not isinstance(cast(Any, related[0]), str):
@@ -714,7 +724,31 @@ class QuerySet(BaseQuerySet[EdgyModel, EdgyEmbedTarget], Generic[EdgyModel, Edgy
                 stacklevel=2,
             )
             related = cast(tuple[str, ...], related[0])
-        queryset._update_select_related(related)
+        if not sparse:
+            has_split = False
+            new_related: set[str] = set()
+            # we only sort if we need to output a warning
+            paths = sorted(related, key=lambda x: x.count("__")) if sparse is None else related
+            for path in paths:
+                prefix = ""
+                for part in path.split("__"):
+                    prefix = f"{prefix}__{part}" if prefix else part
+                    if prefix not in new_related:
+                        if "__" in prefix:
+                            has_split = True
+                        new_related.add(prefix)
+            # when affected warn
+            if has_split and sparse is None:
+                warnings.warn(
+                    "`select_related` will become sparse in future. This means intermediate select path parts are not fully selected anymore "
+                    "by default. To control this behavior, provide the keyword `sparse` to select_related."
+                    "You can also add the intermediate path parts manually to the select_related for the former behavior.",
+                    DeprecationWarning,
+                    stacklevel=2,
+                )
+            queryset._update_select_related(new_related)
+        else:
+            queryset._update_select_related(related)
         return queryset
 
     async def values(
