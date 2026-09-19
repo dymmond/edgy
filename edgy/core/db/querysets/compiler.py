@@ -95,6 +95,7 @@ class QueryCompiler:
         model_class: type[BaseModelType],
         prefix: str,
         select_embedded_parts: set[str],
+        extra_selectable_prefixes: set[str],
     ) -> bool:
         """
         Helper method to check if a column should be included based on
@@ -146,8 +147,9 @@ class QueryCompiler:
         if qs._only and full_field_name not in qs._only:
             return False
 
-        # Check that the prefix is also in select_related
-        if prefix and prefix not in qs._select_related:
+        # Check that the prefix is also in select_related and not in embedded endpoints
+        # this is weaker than select_embedded_parts
+        if prefix and prefix not in qs._select_related and prefix not in extra_selectable_prefixes:
             # not selected, leftovers from order by, group by.
             # embedding should consumed its parts
             return False
@@ -183,6 +185,12 @@ class QueryCompiler:
         """
         columns_and_extra: list[Any] = [*self.queryset._extra_select]
         select_embedded_parts: set[str] = set()
+        # may are not part of the set because not selected
+        # this is weaker than select_embedded_parts
+        extra_selectable_prefixes: set[str] = set()
+        if self.queryset.embed_parent:
+            extra_selectable_prefixes.add(self.queryset.embed_parent[0])
+        # FIXME: add also content type columns
         for path in self.queryset._select_related_embedding:
             prefix = ""
             for part in path.split("__"):
@@ -202,6 +210,7 @@ class QueryCompiler:
                     model_class,
                     prefix,
                     select_embedded_parts,
+                    extra_selectable_prefixes,
                 ):
                     continue
 
