@@ -288,16 +288,22 @@ def crawl_relationship(
 
 def get_related_column_keys(field: BaseFieldType) -> Collection[str]:
     """Return for a relation field the related columns. M2M relations are expanded."""
+    # You can think it as a form of traversal, just to return the column key names
     owner_meta = field.owner.meta
-    # try to pollute less the utils room, so check the information via meta
+    # try to pollute less the utils namespace, so check the information via meta
     if field.name in owner_meta.foreign_key_fields:
+        # easiest case: is a BaseForeignKeyField in forward direction and we can use related_columns
         return cast("BaseForeignKeyField", field).related_columns.keys()
     elif field.name in owner_meta.many_to_many_fields:
         m2m_field = cast("BaseManyToManyForeignKeyField", field)
+        # if ManytoMany in forward direction: get the internal through foreign key and return
+        # the column keys of the foreign key pointing reverse to the start.
         return cast("type[BaseModelType]", m2m_field.through).meta.field_to_column_names[
             m2m_field.from_foreign_key
         ]
     else:
+        # RelatedField, reverse direction. Find the foreign key the related field is the reverse
+        # and return the column keys of the foreign key
         assert type(field).__name__ == "RelatedField", f"Unhandled relation field: {field!r}"
         field = cast("RelatedField", field).foreign_key
         return field.owner.meta.field_to_column_names[field.name]
