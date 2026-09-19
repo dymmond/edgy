@@ -136,6 +136,9 @@ class QueryCompiler:
         # allow all elements of the select path
         if full_field_name in select_embedded_parts:
             return True
+        # order and group fields must be in the select set
+        if full_field_name in self.queryset._select_related_g_and_o:
+            return True
 
         # Check .only() rules
         if qs._only and full_field_name not in qs._only:
